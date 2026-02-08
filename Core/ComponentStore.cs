@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using BattleSystemECS.Components;
 using BattleSystemECS.Core;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Core
 {
@@ -39,6 +41,15 @@ namespace BattleSystemECS.Core
         public int[] EnemyGoldReward = new int[MAX_MONSTERS];
         public int[] EnemyWaveNumber = new int[MAX_MONSTERS];
         public bool[] EnemyActive = new bool[MAX_MONSTERS];
+
+        // ==================== 技能组件的 SOA 存储 ====================
+        public string[] SkillName = new string[MAX_PLAYERS];
+        public float[] SkillDamageMultiplier = new float[MAX_PLAYERS];
+        public int[] SkillAreaWidth = new int[MAX_PLAYERS];
+        public int[] SkillAreaHeight = new int[MAX_PLAYERS];
+        public int[] SkillAttackRange = new int[MAX_PLAYERS];
+        public float[] SkillCooldown = new float[MAX_PLAYERS];
+        public float[] SkillCurrentCooldown = new float[MAX_PLAYERS];
 
         // ==================== 实体管理 ====================
         public int PlayerEntityId { get; private set; } = 1;
@@ -109,7 +120,7 @@ namespace BattleSystemECS.Core
             PlayerAttackDamage[entityId] = attackDamage;
             PlayerCurrentLevel[entityId] = currentLevel;
             PlayerGold[entityId] = 0f;
-            PlayerUpgradeThreshold[entityId] = 100f;
+            PlayerUpgradeThreshold[entityId] = 1000f;  // 提高到 1000 以更快升级测试技能
             PlayerBuffs[entityId] = new List<string>();
 
             PlayerEntityId = entityId;
@@ -249,6 +260,92 @@ namespace BattleSystemECS.Core
         {
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0;
             return EnemyGoldReward[enemyId];
+        }
+
+        // ==================== 技能组件 SOA 访问方法 ====================
+
+        public string GetSkillName(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return "";
+            return SkillName[playerId];
+        }
+
+        public void SetSkillName(int playerId, string name)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            SkillName[playerId] = name;
+        }
+
+        public float GetSkillDamageMultiplier(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 1f;
+            return SkillDamageMultiplier[playerId];
+        }
+
+        public void SetSkillDamageMultiplier(int playerId, float multiplier)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            SkillDamageMultiplier[playerId] = multiplier;
+        }
+
+        public int GetSkillAreaWidth(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 1;
+            return SkillAreaWidth[playerId];
+        }
+
+        public void SetSkillAreaWidth(int playerId, int width)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            SkillAreaWidth[playerId] = width;
+        }
+
+        public int GetSkillAreaHeight(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 1;
+            return SkillAreaHeight[playerId];
+        }
+
+        public void SetSkillAreaHeight(int playerId, int height)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            SkillAreaHeight[playerId] = height;
+        }
+
+        public int GetSkillAttackRange(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 1;
+            return SkillAttackRange[playerId];
+        }
+
+        public void SetSkillAttackRange(int playerId, int range)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            SkillAttackRange[playerId] = range;
+        }
+
+        public float GetSkillCooldown(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            return SkillCooldown[playerId];
+        }
+
+        public void SetSkillCooldown(int playerId, float cooldown)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            SkillCooldown[playerId] = cooldown;
+        }
+
+        public float GetSkillCurrentCooldown(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            return SkillCurrentCooldown[playerId];
+        }
+
+        public void SetSkillCurrentCooldown(int playerId, float currentCooldown)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            SkillCurrentCooldown[playerId] = currentCooldown;
         }
 
         // ==================== 实体查询 ====================

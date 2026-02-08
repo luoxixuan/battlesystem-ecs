@@ -24,6 +24,7 @@ namespace BattleSystemECS.Core
         private GoldRewardSystem goldRewardSystem;
         private WaveSpawningSystem waveSpawningSystem;
         private UpgradeSystem upgradeSystem;
+        private SkillSystem skillSystem;  // 技能系统
 
         // 渲染器
         private IRenderer logger;
@@ -76,6 +77,7 @@ namespace BattleSystemECS.Core
             goldRewardSystem = new GoldRewardSystem(store, logger, playerId);
             waveSpawningSystem = new WaveSpawningSystem(store, logger, gameConfig);
             upgradeSystem = new UpgradeSystem(store, logger, playerId);
+            skillSystem = new SkillSystem(store, logger, playerId);  // 初始化技能系统
         }
 
         /// <summary>
@@ -186,6 +188,17 @@ namespace BattleSystemECS.Core
 
                     // 应用升级（SOA）
                     upgradeSystem.Update();
+
+                    // 更新技能系统冷却
+                    skillSystem.Update(1f);  // 每回合 1 秒
+
+                    // 手动释放技能（注释掉，防止重复执行）
+                    // 只在敌人数量 > 50 时自动释放技能，避免每个回合都释放
+                    var activeEnemyIds = store.GetActiveEnemyIds();
+                    if (activeEnemyIds.Count > 50)
+                    {
+                        // skillSystem.AutoCastSkill();  // 暂时注释掉，避免重复执行
+                    }
 
                     // 渲染地图（SOA）
                     mapSystem.Update();
