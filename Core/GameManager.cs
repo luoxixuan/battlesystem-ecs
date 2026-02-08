@@ -77,7 +77,10 @@ namespace BattleSystemECS.Core
             goldRewardSystem = new GoldRewardSystem(store, logger, playerId);
             waveSpawningSystem = new WaveSpawningSystem(store, logger, gameConfig);
             upgradeSystem = new UpgradeSystem(store, logger, playerId);
-            skillSystem = new SkillSystem(store, logger, playerId);  // 初始化技能系统
+            skillSystem = new SkillSystem(store, logger, playerId, gameConfig);  // 初始化技能系统（从配置加载）
+
+            // 初始化玩家技能（从配置加载）
+            skillSystem.InitializePlayerSkills();  // 初始化技能系统
         }
 
         /// <summary>

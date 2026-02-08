@@ -6,8 +6,8 @@ using BattleSystemECS.Config;
 namespace BattleSystemECS.Systems
 {
     /// <summary>
-    /// 技能释放系统 - SOA (Struct of Arrays) 优化
-    /// 实现三种技能：
+    /// 技能释放系统 - SOA (Struct of Arrays) 优化，配置驱动
+    /// 从 JSON 配置加载技能数据，实现三种技能：
     /// 1. 十字范围伤害技能（Cross Slash）
     /// 2. 3x3 范围伤害技能（Mega Explosion）
     /// 3. 攻击距离 9 的单体技能（Sniper Shot）
@@ -18,17 +18,75 @@ namespace BattleSystemECS.Systems
         private IRenderer renderer;
         private int playerId;
         private float deltaTime = 1f;
+        private GameConfig gameConfig;
+        
+        // 技能数据（从配置加载）
+        private Config.SkillConfig skillCrossSlash;
+        private Config.SkillConfig skillMegaExplosion;
+        private Config.SkillConfig skillSniperShot;
 
-        // 技能列表
-        private string skillCrossSlash = "Cross Slash";      // 十字范围伤害，倍率 400%，攻击距离 3
-        private string skillMegaExplosion = "Mega Explosion"; // 3x3 范围伤害，倍率 400%，攻击距离 5
-        private string skillSniperShot = "Sniper Shot";       // 单体伤害，倍率 400%，攻击距离 9
-
-        public SkillSystem(Core.ComponentStore store, IRenderer renderer, int playerId)
+        public SkillSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
             this.store = store;
             this.renderer = renderer;
             this.playerId = playerId;
+            this.gameConfig = gameConfig;
+
+            // 从配置加载技能数据
+            LoadSkillsFromConfig();
+        }
+
+        /// <summary>
+        /// 从配置加载技能数据
+        /// </summary>
+        private void LoadSkillsFromConfig()
+        {
+            skillCrossSlash = gameConfig.GetSkillConfig("Cross Slash");
+            skillMegaExplosion = gameConfig.GetSkillConfig("Mega Explosion");
+            skillSniperShot = gameConfig.GetSkillConfig("Sniper Shot");
+
+            // 如果配置中没有找到技能，使用默认值
+            if (skillCrossSlash == null)
+            {
+                skillCrossSlash = new Config.SkillConfig
+                {
+                    Name = "Cross Slash",
+                    Description = "十字范围伤害 - 400% 伤害倍率，3x3 十字形范围",
+                    DamageMultiplier = 4f,
+                    AreaWidth = 3,
+                    AreaHeight = 3,
+                    AttackRange = 3,
+                    Cooldown = 5f
+                };
+            }
+
+            if (skillMegaExplosion == null)
+            {
+                skillMegaExplosion = new Config.SkillConfig
+                {
+                    Name = "Mega Explosion",
+                    Description = "3x3 范围伤害 - 400% 伤害倍率，9 格范围",
+                    DamageMultiplier = 4f,
+                    AreaWidth = 3,
+                    AreaHeight = 3,
+                    AttackRange = 5,
+                    Cooldown = 10f
+                };
+            }
+
+            if (skillSniperShot == null)
+            {
+                skillSniperShot = new Config.SkillConfig
+                {
+                    Name = "Sniper Shot",
+                    Description = "超远距离单体攻击 - 400% 伤害倍率，9 格攻击距离",
+                    DamageMultiplier = 4f,
+                    AreaWidth = 1,
+                    AreaHeight = 1,
+                    AttackRange = 9,
+                    Cooldown = 8f
+                };
+            }
         }
 
         /// <summary>
@@ -37,49 +95,52 @@ namespace BattleSystemECS.Systems
         public void InitializePlayerSkills()
         {
             // 设置十字范围伤害技能
-            store.SetSkillName(playerId, skillCrossSlash);
-            store.SetSkillDamageMultiplier(playerId, 4f);  // 400%
-            store.SetSkillAreaWidth(playerId, 3);      // 十字形：中心 + 左右
-            store.SetSkillAreaHeight(playerId, 3);     // 十字形：中心 + 上下
-            store.SetSkillAttackRange(playerId, 3);    // 攻击距离 3
-            store.SetSkillCooldown(playerId, 5f);     // 冷却时间 5 秒
+            store.SetSkillName(playerId, skillCrossSlash.Name);
+            store.SetSkillDamageMultiplier(playerId, skillCrossSlash.DamageMultiplier);
+            store.SetSkillAreaWidth(playerId, skillCrossSlash.AreaWidth);
+            store.SetSkillAreaHeight(playerId, skillCrossSlash.AreaHeight);
+            store.SetSkillAttackRange(playerId, skillCrossSlash.AttackRange);
+            store.SetSkillCooldown(playerId, skillCrossSlash.Cooldown);
             store.SetSkillCurrentCooldown(playerId, 0f); // 当前冷却 0 秒
 
-            renderer.Log("[SKILL] Cross Slash skill equipped!");
-            renderer.Log("[SKILL]   - Damage Multiplier: 400%");
-            renderer.Log("[SKILL]   - Area: 3x3 (Cross shape)");
-            renderer.Log("[SKILL]   - Attack Range: 3 grids");
-            renderer.Log("[SKILL]   - Cooldown: 5 seconds");
+            renderer.Log("[SKILL] Cross Slash skill equipped from config!");
+            renderer.Log("[SKILL]   - Damage Multiplier: " + skillCrossSlash.DamageMultiplier);
+            renderer.Log("[SKILL]   - Area: " + skillCrossSlash.AreaWidth + "x" + skillCrossSlash.AreaHeight + " (Cross shape)");
+            renderer.Log("[SKILL]   - Attack Range: " + skillCrossSlash.AttackRange + " grids");
+            renderer.Log("[SKILL]   - Cooldown: " + skillCrossSlash.Cooldown + " seconds");
+            renderer.Log("[SKILL]   - Auto-cast: " + skillCrossSlash.AutoCast);
 
             // 设置 3x3 范围伤害技能
-            store.SetSkillName(playerId, skillMegaExplosion);
-            store.SetSkillDamageMultiplier(playerId, 4f);  // 400%
-            store.SetSkillAreaWidth(playerId, 3);      // 3x3 范围
-            store.SetSkillAreaHeight(playerId, 3);
-            store.SetSkillAttackRange(playerId, 5);    // 攻击距离 5
-            store.SetSkillCooldown(playerId, 10f);    // 冷却时间 10 秒
+            store.SetSkillName(playerId, skillMegaExplosion.Name);
+            store.SetSkillDamageMultiplier(playerId, skillMegaExplosion.DamageMultiplier);
+            store.SetSkillAreaWidth(playerId, skillMegaExplosion.AreaWidth);
+            store.SetSkillAreaHeight(playerId, skillMegaExplosion.AreaHeight);
+            store.SetSkillAttackRange(playerId, skillMegaExplosion.AttackRange);
+            store.SetSkillCooldown(playerId, skillMegaExplosion.Cooldown);
             store.SetSkillCurrentCooldown(playerId, 0f); // 当前冷却 0 秒
 
-            renderer.Log("[SKILL] Mega Explosion skill equipped!");
-            renderer.Log("[SKILL]   - Damage Multiplier: 400%");
-            renderer.Log("[SKILL]   - Area: 3x3 (Box shape)");
-            renderer.Log("[SKILL]   - Attack Range: 5 grids");
-            renderer.Log("[SKILL]   - Cooldown: 10 seconds");
+            renderer.Log("[SKILL] Mega Explosion skill equipped from config!");
+            renderer.Log("[SKILL]   - Damage Multiplier: " + skillMegaExplosion.DamageMultiplier);
+            renderer.Log("[SKILL]   - Area: " + skillMegaExplosion.AreaWidth + "x" + skillMegaExplosion.AreaHeight + " (Box shape)");
+            renderer.Log("[SKILL]   - Attack Range: " + skillMegaExplosion.AttackRange + " grids");
+            renderer.Log("[SKILL]   - Cooldown: " + skillMegaExplosion.Cooldown + " seconds");
+            renderer.Log("[SKILL]   - Auto-cast: " + skillMegaExplosion.AutoCast);
 
             // 设置单体高伤害技能
-            store.SetSkillName(playerId, skillSniperShot);
-            store.SetSkillDamageMultiplier(playerId, 4f);  // 400%
-            store.SetSkillAreaWidth(playerId, 1);      // 单体
-            store.SetSkillAreaHeight(playerId, 1);
-            store.SetSkillAttackRange(playerId, 9);    // 攻击距离 9
-            store.SetSkillCooldown(playerId, 8f);     // 冷却时间 8 秒
+            store.SetSkillName(playerId, skillSniperShot.Name);
+            store.SetSkillDamageMultiplier(playerId, skillSniperShot.DamageMultiplier);
+            store.SetSkillAreaWidth(playerId, skillSniperShot.AreaWidth);
+            store.SetSkillAreaHeight(playerId, skillSniperShot.AreaHeight);
+            store.SetSkillAttackRange(playerId, skillSniperShot.AttackRange);
+            store.SetSkillCooldown(playerId, skillSniperShot.Cooldown);
             store.SetSkillCurrentCooldown(playerId, 0f); // 当前冷却 0 秒
 
-            renderer.Log("[SKILL] Sniper Shot skill equipped!");
-            renderer.Log("[SKILL]   - Damage Multiplier: 400%");
-            renderer.Log("[SKILL]   - Area: 1x1 (Single target)");
-            renderer.Log("[SKILL]   - Attack Range: 9 grids");
-            renderer.Log("[SKILL]   - Cooldown: 8 seconds");
+            renderer.Log("[SKILL] Sniper Shot skill equipped from config!");
+            renderer.Log("[SKILL]   - Damage Multiplier: " + skillSniperShot.DamageMultiplier);
+            renderer.Log("[SKILL]   - Area: " + skillSniperShot.AreaWidth + "x" + skillSniperShot.AreaHeight + " (Single target)");
+            renderer.Log("[SKILL]   - Attack Range: " + skillSniperShot.AttackRange + " grids");
+            renderer.Log("[SKILL]   - Cooldown: " + skillSniperShot.Cooldown + " seconds");
+            renderer.Log("[SKILL]   - Auto-cast: " + skillSniperShot.AutoCast);
         }
 
         /// <summary>
@@ -89,7 +150,7 @@ namespace BattleSystemECS.Systems
         {
             this.deltaTime = deltaTime;
 
-            // 更新技能冷却
+            // 更新技能冷却（所有三个技能共享一个冷却槽）
             float currentCooldown = store.GetSkillCurrentCooldown(playerId);
             if (currentCooldown > 0f)
             {
@@ -117,15 +178,15 @@ namespace BattleSystemECS.Systems
             float playerY = store.PositionY[playerId];
 
             // 根据技能名称释放不同技能
-            if (skillName == skillCrossSlash)
+            if (skillName == "Cross Slash" || skillName == skillCrossSlash.Name)
             {
                 CastCrossSlash(baseDamage, playerX, playerY);
             }
-            else if (skillName == skillMegaExplosion)
+            else if (skillName == "Mega Explosion" || skillName == skillMegaExplosion.Name)
             {
                 CastMegaExplosion(baseDamage, playerX, playerY);
             }
-            else if (skillName == skillSniperShot)
+            else if (skillName == "Sniper Shot" || skillName == skillSniperShot.Name)
             {
                 CastSniperShot(baseDamage, playerX, playerY);
             }
@@ -140,9 +201,9 @@ namespace BattleSystemECS.Systems
         /// </summary>
         private void CastCrossSlash(float baseDamage, float playerX, float playerY)
         {
-            float damageMultiplier = 4f;  // 400%
+            float damageMultiplier = skillCrossSlash.DamageMultiplier; // 400%
             float finalDamage = baseDamage * damageMultiplier;
-            int range = 3;
+            int range = skillCrossSlash.AttackRange;
 
             // 十字形：中心 + 左右 + 上下
             int[] xOffset = { 0, -1, 1, 0, 0 };
@@ -199,10 +260,9 @@ namespace BattleSystemECS.Systems
             }
 
             // 设置冷却
-            float cooldown = store.GetSkillCooldown(playerId);
-            store.SetSkillCurrentCooldown(playerId, cooldown);
+            store.SetSkillCurrentCooldown(playerId, skillCrossSlash.Cooldown);
 
-            renderer.Log($"[SKILL] Cross Slash cast! Hit {enemiesHit} enemies, cooldown: {cooldown}s");
+            renderer.Log($"[SKILL] Cross Slash cast! Hit {enemiesHit} enemies, cooldown: {skillCrossSlash.Cooldown}s");
         }
 
         /// <summary>
@@ -210,9 +270,9 @@ namespace BattleSystemECS.Systems
         /// </summary>
         private void CastMegaExplosion(float baseDamage, float playerX, float playerY)
         {
-            float damageMultiplier = 4f;  // 400%
+            float damageMultiplier = skillMegaExplosion.DamageMultiplier; // 400%
             float finalDamage = baseDamage * damageMultiplier;
-            int range = 5;
+            int range = skillMegaExplosion.AttackRange;
 
             // 3x3 方形：以玩家为中心，3x3 范围
             int enemiesHit = 0;
@@ -261,10 +321,9 @@ namespace BattleSystemECS.Systems
             }
 
             // 设置冷却
-            float cooldown = store.GetSkillCooldown(playerId);
-            store.SetSkillCurrentCooldown(playerId, cooldown);
+            store.SetSkillCurrentCooldown(playerId, skillMegaExplosion.Cooldown);
 
-            renderer.Log($"[SKILL] Mega Explosion cast! Hit {enemiesHit} enemies, cooldown: {cooldown}s");
+            renderer.Log($"[SKILL] Mega Explosion cast! Hit {enemiesHit} enemies, cooldown: {skillMegaExplosion.Cooldown}s");
         }
 
         /// <summary>
@@ -272,9 +331,9 @@ namespace BattleSystemECS.Systems
         /// </summary>
         private void CastSniperShot(float baseDamage, float playerX, float playerY)
         {
-            float damageMultiplier = 4f;  // 400%
+            float damageMultiplier = skillSniperShot.DamageMultiplier; // 400%
             float finalDamage = baseDamage * damageMultiplier;
-            int range = 9;
+            int range = skillSniperShot.AttackRange;
 
             // 单体技能：只攻击距离最近的单个敌人
             float closestDistance = float.MaxValue;
@@ -328,16 +387,15 @@ namespace BattleSystemECS.Systems
             }
 
             // 设置冷却
-            float cooldown = store.GetSkillCooldown(playerId);
-            store.SetSkillCurrentCooldown(playerId, cooldown);
+            store.SetSkillCurrentCooldown(playerId, skillSniperShot.Cooldown);
 
             if (closestEnemyId != -1)
             {
-                renderer.Log($"[SKILL] Sniper Shot cast! Hit 1 enemy, cooldown: {cooldown}s");
+                renderer.Log($"[SKILL] Sniper Shot cast! Hit 1 enemy, cooldown: {skillSniperShot.Cooldown}s");
             }
             else
             {
-                renderer.Log($"[SKILL] Sniper Shot cast! No enemies in range, cooldown: {cooldown}s");
+                renderer.Log($"[SKILL] Sniper Shot cast! No enemies in range, cooldown: {skillSniperShot.Cooldown}s");
             }
         }
 
@@ -350,7 +408,7 @@ namespace BattleSystemECS.Systems
             if (currentCooldown <= 0f)
             {
                 // 自动释放冷却时间最短的技能
-                CastSkill(skillCrossSlash);
+                CastSkill(skillCrossSlash.Name);
             }
         }
     }

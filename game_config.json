@@ -7,8 +7,44 @@
     "AttackDamage": 10.0,
     "MaxHealth": 2000.0,
     "CurrentLevel": 1,
-    "UpgradeThreshold": 1000.0
+    "UpgradeThreshold": 1000.0,
+    "StartingSkills": ["Cross Slash", "Mega Explosion", "Sniper Shot"]
   },
+  "Skills": [
+    {
+      "Name": "Cross Slash",
+      "Description": "十字范围伤害 - 400% 伤害倍率，3x3 十字形范围",
+      "DamageMultiplier": 4.0,
+      "AreaWidth": 3,
+      "AreaHeight": 3,
+      "AttackRange": 3,
+      "Cooldown": 5.0,
+      "AutoCast": false,
+      "Hotkey": "1"
+    },
+    {
+      "Name": "Mega Explosion",
+      "Description": "3x3 范围爆炸伤害 - 400% 伤害倍率，9 格范围",
+      "DamageMultiplier": 4.0,
+      "AreaWidth": 3,
+      "AreaHeight": 3,
+      "AttackRange": 5,
+      "Cooldown": 10.0,
+      "AutoCast": false,
+      "Hotkey": "2"
+    },
+    {
+      "Name": "Sniper Shot",
+      "Description": "超远距离单体攻击 - 400% 伤害倍率，9 格攻击距离",
+      "DamageMultiplier": 4.0,
+      "AreaWidth": 1,
+      "AreaHeight": 1,
+      "AttackRange": 9,
+      "Cooldown": 8.0,
+      "AutoCast": false,
+      "Hotkey": "3"
+    }
+  ],
   "MonsterTypes": [
     {
       "Name": "Normal Slime",
