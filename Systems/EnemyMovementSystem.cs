@@ -22,8 +22,13 @@ namespace BattleSystemECS.Systems
 
             foreach (var entity in entities)
             {
-                // Skip player
                 if (entity.Id == 1) continue;
+
+                if (!entityManager.HasComponent<PositionComponent>(entity))
+                    continue;
+
+                if (!entityManager.HasComponent<EnemyComponent>(entity))
+                    continue;
 
                 var enemyPos = entityManager.GetComponent<PositionComponent>(entity);
                 var enemyHealth = entityManager.GetComponent<EnemyComponent>(entity);

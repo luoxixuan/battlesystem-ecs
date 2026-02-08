@@ -1,26 +1,30 @@
 using System;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
     public class GoldRewardSystem
     {
-        private EntityManager entityManager;
+        private EntityManager em;
         private IRenderer renderer;
-        private int playerId;
+        private Entity playerEntity;
 
         public GoldRewardSystem(EntityManager entityManager, IRenderer renderer, int playerId)
         {
-            this.entityManager = entityManager;
+            this.em = entityManager;
             this.renderer = renderer;
-            this.playerId = playerId;
+            this.playerEntity = new Entity(playerId);
         }
 
         public void Update()
         {
-            var gold = entityManager.GetComponent<GoldComponent>(new Entity(playerId));
-            var upgrade = entityManager.GetComponent<UpgradeComponent>(new Entity(playerId));
+            if (!em.HasComponent<GoldComponent>(playerEntity))
+                return;
+
+            var gold = em.GetComponent<GoldComponent>(playerEntity);
+            var upgrade = em.GetComponent<UpgradeComponent>(playerEntity);
 
             if (gold.Amount >= upgrade.NextUpgradeThreshold)
             {
@@ -28,7 +32,7 @@ namespace BattleSystemECS.Systems
             }
             else
             {
-                renderer.Log("[GOLD] Current gold: " + gold.Amount + " / " + upgrade.NextUpgradeThreshold + " (next upgrade)");
+                renderer.Log("[UPGRADE] Current gold: " + gold.Amount + " / " + upgrade.NextUpgradeThreshold + " (next upgrade)");
             }
         }
     }

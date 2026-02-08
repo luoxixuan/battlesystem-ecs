@@ -7,38 +7,58 @@ namespace BattleSystemECS.Systems
 {
     public class PlayerTowerAttackSystem
     {
-        private EntityManager entityManager;
-        private IRenderer renderer;
-        private int playerId;
+        private EntityManager em;
+        private Entity playerEntity;
+        private PlayerComponent player;
+        private PositionComponent playerPos;
+        private GoldComponent gold;
+        private UpgradeComponent upgrade;
         private GameConfig gameConfig;
+        private IRenderer renderer;
 
         public PlayerTowerAttackSystem(EntityManager entityManager, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
-            this.entityManager = entityManager;
+            this.em = entityManager;
             this.renderer = renderer;
-            this.playerId = playerId;
+            this.playerEntity = new Entity(playerId);
             this.gameConfig = gameConfig;
+
+            // 在构造函数中初始化缓存组件（每游戏初始化一次）
+            RefreshCache();
+        }
+
+        private void RefreshCache()
+        {
+            if (em.HasComponent<PlayerComponent>(playerEntity))
+                this.player = em.GetComponent<PlayerComponent>(playerEntity);
+
+            if (em.HasComponent<PositionComponent>(playerEntity))
+                this.playerPos = em.GetComponent<PositionComponent>(playerEntity);
+
+            if (em.HasComponent<GoldComponent>(playerEntity))
+                this.gold = em.GetComponent<GoldComponent>(playerEntity);
+
+            if (em.HasComponent<UpgradeComponent>(playerEntity))
+                this.upgrade = em.GetComponent<UpgradeComponent>(playerEntity);
         }
 
         public void Update()
         {
-            if (!entityManager.HasComponent<PlayerComponent>(new Entity(playerId)))
+            // 更新缓存组件（每帧）
+            RefreshCache();
+
+            // 检查是否可以继续执行
+            if (!em.HasComponent<PlayerComponent>(playerEntity))
                 return;
 
-            if (!entityManager.HasComponent<PositionComponent>(new Entity(playerId)))
+            if (!em.HasComponent<PositionComponent>(playerEntity))
                 return;
-
-            var player = entityManager.GetComponent<PlayerComponent>(new Entity(playerId));
-            var playerPos = entityManager.GetComponent<PositionComponent>(new Entity(playerId));
-
-            var upgrade = entityManager.GetComponent<UpgradeComponent>(new Entity(playerId));
-            var gold = entityManager.GetComponent<GoldComponent>(new Entity(playerId));
 
             // Calculate player stats with buff effects
             float attackDamage = player.AttackDamage;
             float attackRange = player.AttackRange;
 
-            if (entityManager.HasComponent<UpgradeComponent>(new Entity(playerId)))
+            if (em.HasComponent<UpgradeComponent>(playerEntity))
             {
                 foreach (string buff in upgrade.Buffs)
                 {
@@ -59,21 +79,21 @@ namespace BattleSystemECS.Systems
             }
 
             // Find and attack enemies in range
-            var enemies = entityManager.GetAllEntities();
+            var enemies = em.GetAllEntities();
             int enemiesAttacked = 0;
 
             foreach (var enemy in enemies)
             {
-                if (enemy.Id == playerId) continue;
+                if (enemy.Id == playerEntity.Id) continue;
 
-                if (!entityManager.HasComponent<PositionComponent>(enemy))
+                if (!em.HasComponent<PositionComponent>(enemy))
                     continue;
 
-                if (!entityManager.HasComponent<EnemyComponent>(enemy))
+                if (!em.HasComponent<EnemyComponent>(enemy))
                     continue;
 
-                var enemyPos = entityManager.GetComponent<PositionComponent>(enemy);
-                var enemyHealth = entityManager.GetComponent<EnemyComponent>(enemy);
+                var enemyPos = em.GetComponent<PositionComponent>(enemy);
+                var enemyHealth = em.GetComponent<EnemyComponent>(enemy);
 
                 // Skip dead enemies
                 if (enemyHealth.Health <= 0f)
@@ -85,19 +105,19 @@ namespace BattleSystemECS.Systems
                 {
                     // Attack enemy
                     enemyHealth.Health = Math.Max(0f, enemyHealth.Health - attackDamage);
-                    entityManager.SetComponent(enemy, enemyHealth);
+                    em.SetComponent(enemy, enemyHealth);
 
                     renderer.Log("[ATTACK] Player (Level " + player.CurrentLevel + ") attacks enemy " + enemy.Id + ", damage: " + attackDamage + ", position: x=" + enemyPos.X + ", y=" + enemyPos.Y);
 
                     if (enemyHealth.Health <= 0f)
                     {
-                        if (entityManager.HasComponent<GoldComponent>(new Entity(playerId)))
+                        if (em.HasComponent<GoldComponent>(playerEntity))
                         {
-                            var goldComp = entityManager.GetComponent<GoldComponent>(new Entity(playerId));
+                            var goldComp = em.GetComponent<GoldComponent>(playerEntity);
                             goldComp.Amount += enemyHealth.GoldReward;
-                            entityManager.SetComponent(new Entity(playerId), goldComp);
+                            em.SetComponent(playerEntity, goldComp);
 
-                            var monsterName = entityManager.GetName(enemy);
+                            var monsterName = em.GetName(enemy);
                             renderer.Log("[GOLD] Killed " + monsterName + ", gained " + enemyHealth.GoldReward + " gold");
                             renderer.Log("[GOLD] Total gold: " + goldComp.Amount);
                         }

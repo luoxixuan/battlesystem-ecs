@@ -41,7 +41,7 @@ namespace BattleSystemECS
             return entity != null ? $"Entity_{entity.Id}" : "Unknown";
         }
 
-        public void AddComponent<T>(Entity entity, T component) where T : struct
+        public void AddComponent<T>(Entity entity, T component)
         {
             if (entity == null) return;
 
@@ -56,7 +56,7 @@ namespace BattleSystemECS
             entityComponents[entityId][componentName] = component;
         }
 
-        public T GetComponent<T>(Entity entity) where T : struct
+        public T GetComponent<T>(Entity entity)
         {
             if (entity == null) return default(T);
 
@@ -78,7 +78,7 @@ namespace BattleSystemECS
             return default(T);
         }
 
-        public bool HasComponent<T>(Entity entity) where T : struct
+        public bool HasComponent<T>(Entity entity)
         {
             if (entity == null) return false;
 
@@ -88,11 +88,19 @@ namespace BattleSystemECS
             return entityComponents.ContainsKey(entityId) && entityComponents[entityId].ContainsKey(componentName);
         }
 
-        public void SetComponent<T>(Entity entity, T component) where T : struct
+        public void SetComponent<T>(Entity entity, T component)
         {
             if (entity == null) return;
 
-            AddComponent(entity, component);
+            int entityId = entity.Id;
+            string componentName = typeof(T).Name;
+
+            if (!entityComponents.ContainsKey(entityId))
+            {
+                entityComponents[entityId] = new Dictionary<string, object>();
+            }
+
+            entityComponents[entityId][componentName] = component;
         }
 
         public List<Entity> GetAllEntities()
