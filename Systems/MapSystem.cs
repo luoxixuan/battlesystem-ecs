@@ -15,7 +15,7 @@ namespace BattleSystemECS.Systems
         private IRenderer renderer;
         private Core.ComponentStore store;
         private int mapWidth = 10;
-        private int mapHeight = 50;
+        private int mapHeight = 20;  // 修改为 20
 
         public MapSystem(IRenderer renderer, Core.ComponentStore store)
         {

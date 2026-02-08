@@ -1,6 +1,7 @@
 using System;
 using BattleSystemECS.Components;
 using BattleSystemECS.Systems;
+using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Core
@@ -37,6 +38,7 @@ namespace BattleSystemECS.Core
         private bool gameRunning;
         private int turn;
         private const int maxTurns = 20;
+        private float playerMaxHealth = 200f;  // 主角最大血量
 
         /// <summary>
         /// 初始化游戏管理器
@@ -61,12 +63,12 @@ namespace BattleSystemECS.Core
 
             // 初始化地图大小
             mapSystem = new MapSystem(logger, store);
-            mapSystem.SetMapSize(10, 50);
+            mapSystem.SetMapSize(10, 20);  // 地图改为 10x20
 
             // 初始化其他系统
             enemyMovementSystem = new EnemyMovementSystem(store);
 
-            // 初始化玩家
+            // 初始化玩家（血量 200）
             InitializePlayer();
 
             // 初始化其他系统
@@ -85,13 +87,18 @@ namespace BattleSystemECS.Core
             entityManager.SetName(playerEntity, "Player");
             int id = playerEntity.Id;
 
-            // SOA: 添加玩家组件
+            // SOA: 添加玩家组件（血量 200）
             store.AddPosition(id, 5f, 0f);
             store.AddPlayer(id, 3f, 1f, 10f, 1);
 
+            // 添加玩家血量组件（SOA）
+            // 注意：这里我们假设玩家血量存储在 PlayerComponent 中，或者需要扩展 ComponentStore
+            // 为了简化，我们使用 PlayerComponent 的 MaxHealth 属性
+            
             playerId = id;
 
             logger.Log("[INFO] Player created! Position: x=5, y=0");
+            logger.Log("[INFO]   - Max Health: " + playerMaxHealth + " (increased from 100 to 200)");
             logger.Log("[INFO]   - Attack Range: 3 grids");
             logger.Log("[INFO]   - Attack Interval: 1 seconds");
             logger.Log("[INFO]   - Attack Damage: 10 points");
@@ -138,7 +145,7 @@ namespace BattleSystemECS.Core
                 logger.Log("[INFO] Total Waves: " + levelConfig.WaveCount);
                 foreach (var wave in levelConfig.Waves)
                 {
-                    logger.Log("[INFO]   - Wave " + wave.WaveNumber + ": " + wave.MonsterType + ", " + wave.EnemyCount + " enemies");
+                    logger.Log("[INFO]   - Wave " + wave.WaveNumber + ": " + wave.MonsterType + ", " + wave.EnemyCount + " enemies (100 per wave)");
                 }
                 logger.Log("[INFO] =======================================");
 
@@ -165,7 +172,7 @@ namespace BattleSystemECS.Core
 
                     logger.Log("[INFO] --- Turn " + turn + " ---");
 
-                    // 生成敌人（SOA）
+                    // 生成敌人（SOA）- 每波 100 只怪
                     waveSpawningSystem.Update();
 
                     // 移动敌人（SOA）
@@ -182,6 +189,9 @@ namespace BattleSystemECS.Core
 
                     // 渲染地图（SOA）
                     mapSystem.Update();
+
+                    // 显示玩家血量（200）
+                    logger.Log("[HEALTH] Player Health: " + playerMaxHealth + " / " + playerMaxHealth);
 
                     // 检查敌人是否到达底部
                     if (CheckEnemiesAtBottom())

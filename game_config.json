@@ -5,8 +5,9 @@
     "AttackRange": 3.0,
     "AttackInterval": 1.0,
     "AttackDamage": 10.0,
+    "MaxHealth": 2000.0,
     "CurrentLevel": 1,
-    "UpgradeThreshold": 100.0
+    "UpgradeThreshold": 1000.0
   },
   "MonsterTypes": [
     {
@@ -62,17 +63,17 @@
         {
           "WaveNumber": 1,
           "MonsterType": "Normal",
-          "EnemyCount": 5
+          "EnemyCount": 100
         },
         {
           "WaveNumber": 2,
           "MonsterType": "Normal",
-          "EnemyCount": 5
+          "EnemyCount": 100
         },
         {
           "WaveNumber": 3,
           "MonsterType": "Normal",
-          "EnemyCount": 5
+          "EnemyCount": 100
         }
       ]
     },
@@ -83,17 +84,17 @@
         {
           "WaveNumber": 1,
           "MonsterType": "Fast",
-          "EnemyCount": 5
+          "EnemyCount": 100
         },
         {
           "WaveNumber": 2,
           "MonsterType": "Fast",
-          "EnemyCount": 5
+          "EnemyCount": 100
         },
         {
           "WaveNumber": 3,
           "MonsterType": "Fast",
-          "EnemyCount": 5
+          "EnemyCount": 100
         }
       ]
     },
@@ -104,17 +105,17 @@
         {
           "WaveNumber": 1,
           "MonsterType": "Strong",
-          "EnemyCount": 3
+          "EnemyCount": 100
         },
         {
           "WaveNumber": 2,
           "MonsterType": "Strong",
-          "EnemyCount": 3
+          "EnemyCount": 100
         },
         {
           "WaveNumber": 3,
           "MonsterType": "Strong",
-          "EnemyCount": 3
+          "EnemyCount": 100
         }
       ]
     },
@@ -125,17 +126,17 @@
         {
           "WaveNumber": 1,
           "MonsterType": "Ranged",
-          "EnemyCount": 4
+          "EnemyCount": 100
         },
         {
           "WaveNumber": 2,
           "MonsterType": "Ranged",
-          "EnemyCount": 4
+          "EnemyCount": 100
         },
         {
           "WaveNumber": 3,
           "MonsterType": "Ranged",
-          "EnemyCount": 4
+          "EnemyCount": 100
         }
       ]
     },
@@ -146,17 +147,17 @@
         {
           "WaveNumber": 1,
           "MonsterType": "Strong",
-          "EnemyCount": 2
+          "EnemyCount": 100
         },
         {
           "WaveNumber": 2,
-          "MonsterType": "Ranged",
-          "EnemyCount": 3
+          "MonsterType": "Fast",
+          "EnemyCount": 100
         },
         {
           "WaveNumber": 3,
           "MonsterType": "Fast",
-          "EnemyCount": 5
+          "EnemyCount": 100
         }
       ]
     }

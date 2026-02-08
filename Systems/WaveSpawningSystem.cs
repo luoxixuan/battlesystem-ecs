@@ -9,6 +9,7 @@ namespace BattleSystemECS.Systems
     /// SOA (Struct of Arrays) 波次生成系统
     /// 直接访问 ComponentStore 的数组，无字典查询，无 struct 复制
     /// 性能提升：10-100 倍
+    /// 支持每波 100 只怪生成
     /// </summary>
     public class WaveSpawningSystem
     {
@@ -61,7 +62,7 @@ namespace BattleSystemECS.Systems
 
             if (enemiesSpawnedInWave < waveConfig.EnemyCount)
             {
-                // Spawn enemy (SOA 直接数组访问，无字典查询，无 struct 复制）
+                // 批量生成敌人：每波 100 只怪
                 var monsterConfig = gameConfig.GetMonsterConfig(waveConfig.MonsterType);
                 if (monsterConfig == null)
                 {
@@ -70,32 +71,38 @@ namespace BattleSystemECS.Systems
                 }
 
                 Random random = new Random();
-                float startX = (float)random.Next(0, 10);
-                float startY = 49f;
+                
+                // 批量生成 100 个敌人
+                for (int i = 0; i < 100; i++)
+                {
+                    // 计算随机位置（X：0-9，Y：19）
+                    float startX = (float)random.Next(0, 10);
+                    float startY = 19f;  // 放在地图中间位置
 
-                // SOA: 直接数组访问，无字典查询，无 struct 复制
-                int enemyId = store.AddEnemy(
-                    startX, startY,
-                    monsterConfig.MoveSpeed,
-                    monsterConfig.Health,
-                    monsterConfig.MaxHealth,
-                    monsterConfig.Damage,
-                    monsterConfig.GoldReward,
-                    currentWave
-                );
+                    // SOA: 直接数组访问，无字典查询，无 struct 复制
+                    int enemyId = store.AddEnemy(
+                        startX, startY,
+                        monsterConfig.MoveSpeed,
+                        monsterConfig.Health,
+                        monsterConfig.MaxHealth,
+                        monsterConfig.Damage,
+                        monsterConfig.GoldReward,
+                        currentWave
+                    );
 
-                string enemyName = $"{waveConfig.MonsterType}L{currentLevel}W{currentWave}E{enemiesSpawnedInWave}";
-                store.SetEntityName(enemyId, enemyName);
+                    string enemyName = $"{waveConfig.MonsterType}L{currentLevel}W{currentWave}E{enemiesSpawnedInWave + i}";
+                    store.SetEntityName(enemyId, enemyName);
+                    enemiesSpawnedInWave++;
+                }
 
-                enemiesSpawnedInWave++;
-                totalEnemiesSpawned++;
-
-                renderer.Log($"[SPAWN] Spawned {enemyName} at x={startX:F0}, y={startY:F0}");
+                totalEnemiesSpawned += 100;
+                
+                renderer.Log($"[SPAWN] Spawned {enemiesSpawnedInWave} enemies (batch 100) for Wave {currentWave}");
             }
             else
             {
                 // Wave complete
-                renderer.Log($"[SPAWN] Wave {currentWave} complete! Spawned {enemiesSpawnedInWave} enemies");
+                renderer.Log($"[SPAWN] Wave {currentWave} complete! Spawned {enemiesSpawnedInWave} enemies (batch 100 per wave)");
                 enemiesSpawnedInWave = 0;
                 currentWave++;
 
