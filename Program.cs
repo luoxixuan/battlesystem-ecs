@@ -32,8 +32,22 @@ namespace BattleSystemECS
             // Load configuration from JSON
             var gameConfig = GameConfigLoader.LoadConfig(logger);
 
+            // Initialize systems
+            var mapSystem = new MapSystem(logger);
+            mapSystem.SetMapSize(10, 50);
+
+            var playerTowerAttackSystem = new PlayerTowerAttackSystem(entityManager, logger, 1, gameConfig);
+
+            var enemyMovementSystem = new EnemyMovementSystem(entityManager, logger);
+
+            var goldRewardSystem = new GoldRewardSystem(entityManager, logger, 1);
+
+            var waveSpawningSystem = new WaveSpawningSystem(entityManager, logger, gameConfig);
+
+            var upgradeSystem = new UpgradeSystem(entityManager, logger, 1);
+
             // Create player
-            Entity playerEntity = CreatePlayer(entityManager, gameConfig.Player, logger);
+            var playerEntity = CreatePlayer(entityManager, gameConfig.Player, logger);
             int playerId = playerEntity.Id;
 
             // Game level loop
@@ -42,41 +56,18 @@ namespace BattleSystemECS
 
             while (currentLevel <= maxLevels)
             {
-                var levelConfig = gameConfig.GetLevelConfig(currentLevel);
-                if (levelConfig == null)
-                {
-                    logger.Log("[ERROR] Level " + currentLevel + " not found!");
-                    currentLevel++;
-                    continue;
-                }
+                waveSpawningSystem.SetLevel(currentLevel);
 
                 Console.WriteLine();
                 logger.Log("[INFO] ========== Level " + currentLevel + " ==========");
-                logger.Log("[INFO] Total Waves: " + levelConfig.WaveCount);
-                foreach (var wave in levelConfig.Waves)
-                {
-                    logger.Log("[INFO]   - Wave " + wave.WaveNumber + ": " + wave.MonsterType + ", " + wave.EnemyCount + " enemies");
-                }
-                logger.Log("[INFO] =======================================");
 
-                // Create enemies for current level
-                List<int> enemies = new List<int>();
-                foreach (var wave in levelConfig.Waves)
-                {
-                    for (int i = 0; i < wave.EnemyCount; i++)
-                    {
-                        int enemyId = CreateEnemy(entityManager, currentLevel, wave.WaveNumber, i, wave.MonsterType, gameConfig);
-                        if (enemyId > 0)
-                        {
-                            enemies.Add(enemyId);
-                        }
-                    }
-                }
+                // Set current level in wave spawning system
+                waveSpawningSystem.Update();
 
+                // Render initial map
                 Console.WriteLine();
-                logger.Log("[MAP] Current Map");
                 logger.Log("========================================");
-                RenderMap(logger, entityManager);
+                mapSystem.Update(entityManager);
                 logger.Log("========================================");
 
                 Console.WriteLine();
@@ -93,8 +84,26 @@ namespace BattleSystemECS
                     System.Threading.Thread.Sleep(1000);
 
                     logger.Log("[INFO] --- Turn " + turn + " ---");
-                    ProcessPlayerTurn(entityManager, logger, playerEntity, gameConfig);
 
+                    // Spawn enemies for current wave
+                    waveSpawningSystem.Update();
+
+                    // Move enemies
+                    enemyMovementSystem.Update();
+
+                    // Player attack
+                    playerTowerAttackSystem.Update();
+
+                    // Check upgrade
+                    goldRewardSystem.Update();
+
+                    // Apply upgrade
+                    upgradeSystem.Update();
+
+                    // Render map
+                    mapSystem.Update(entityManager);
+
+                    // Check enemies at bottom
                     if (CheckEnemiesAtBottom(entityManager, logger))
                     {
                         gameRunning = false;
@@ -127,7 +136,10 @@ namespace BattleSystemECS
 
             entityManager.AddComponent(playerEntity, new GoldComponent { Amount = 0f });
 
-            entityManager.AddComponent(playerEntity, new UpgradeComponent());
+            entityManager.AddComponent(playerEntity, new UpgradeComponent
+            {
+                NextUpgradeThreshold = playerConfig.UpgradeThreshold
+            });
 
             Console.WriteLine("[INFO] Player created! Position: x=5, y=0");
             logger.Log("[INFO]   - Attack Range: " + playerConfig.AttackRange + " grids");
@@ -139,180 +151,13 @@ namespace BattleSystemECS
             return playerEntity;
         }
 
-        private static int CreateEnemy(EntityManager entityManager, int levelNumber, int waveNumber, int enemyIndex, string monsterType, GameConfig gameConfig)
-        {
-            var monsterConfig = gameConfig.GetMonsterConfig(monsterType);
-            if (monsterConfig == null)
-            {
-                Console.WriteLine("[ERROR] Monster type '" + monsterType + "' not found!");
-                return 0;
-            }
-
-            var enemyEntity = entityManager.CreateEntity();
-            string enemyName = monsterType + "L" + levelNumber + "W" + waveNumber + "E" + enemyIndex;
-            entityManager.SetName(enemyEntity, enemyName);
-
-            Random random = new Random();
-            float startX = (float)random.Next(0, 10);
-            float startY = 49f;
-
-            entityManager.AddComponent(enemyEntity, new PositionComponent(startX, startY));
-
-            entityManager.AddComponent(enemyEntity, new EnemyComponent
-            {
-                MoveSpeed = monsterConfig.MoveSpeed,
-                Health = monsterConfig.Health,
-                MaxHealth = monsterConfig.MaxHealth,
-                Damage = monsterConfig.Damage,
-                GoldReward = monsterConfig.GoldReward,
-                WaveNumber = waveNumber
-            });
-
-            Console.WriteLine("[INFO] " + enemyName + " created! Position: x=" + startX + ", y=" + startY);
-
-            return enemyEntity.Id;
-        }
-
-        private static void ProcessPlayerTurn(EntityManager entityManager, IRenderer logger, Entity playerEntity, GameConfig gameConfig)
-        {
-            var player = entityManager.GetComponent<PlayerComponent>(playerEntity);
-            var playerPos = entityManager.GetComponent<PositionComponent>(playerEntity);
-            var gold = entityManager.GetComponent<GoldComponent>(playerEntity);
-            var upgrade = entityManager.GetComponent<UpgradeComponent>(playerEntity);
-
-            // Calculate player stats with buff effects
-            float attackDamage = player.AttackDamage;
-            float attackRange = player.AttackRange;
-            float attackSpeed = player.AttackSpeed;
-
-            // Apply Buffs
-            foreach (string buff in upgrade.Buffs)
-            {
-                if (buff == "Attack+10%")
-                {
-                    attackDamage *= 1.1f;
-                    logger.Log("[BUFF] Attack+10% applied: " + attackDamage + " damage");
-                }
-                else if (buff == "Defense+10%")
-                {
-                    // Defense reduces incoming damage (not implemented yet)
-                    logger.Log("[BUFF] Defense+10% applied (damage reduction)");
-                }
-                else if (buff == "Attack Speed+20%")
-                {
-                    attackSpeed *= 0.8f; // 20% faster = 0.8x interval
-                    logger.Log("[BUFF] Attack Speed+20% applied: " + attackSpeed + " attack interval");
-                }
-                else if (buff == "Crit Rate+5%")
-                {
-                    // Crit chance increased (not implemented yet)
-                    logger.Log("[BUFF] Crit Rate+5% applied (5% crit chance)");
-                }
-                else if (buff == "Health+20%")
-                {
-                    // Player health increased (not implemented yet)
-                    logger.Log("[BUFF] Health+20% applied (player health increased)");
-                }
-            }
-
-            // Move enemies
-            var enemies = entityManager.GetAllEntities();
-            foreach (var enemy in enemies)
-            {
-                if (enemy.Id == playerEntity.Id) continue;
-
-                var enemyPos = entityManager.GetComponent<PositionComponent>(enemy);
-                var enemyHealth = entityManager.GetComponent<EnemyComponent>(enemy);
-
-                // Skip dead enemies
-                if (enemyHealth.Health <= 0f)
-                    continue;
-
-                // Enemy moves downward
-                enemyPos.Y -= enemyHealth.MoveSpeed;
-                entityManager.SetComponent(enemy, enemyPos);
-            }
-
-            // Player attack
-            foreach (var enemy in enemies)
-            {
-                if (enemy.Id == playerEntity.Id) continue;
-
-                var enemyPos = entityManager.GetComponent<PositionComponent>(enemy);
-                var enemyHealth = entityManager.GetComponent<EnemyComponent>(enemy);
-
-                // Skip dead enemies
-                if (enemyHealth.Health <= 0f)
-                    continue;
-
-                // Check if in attack range
-                float distance = Math.Abs(enemyPos.X - playerPos.X);
-                if (distance <= attackRange && enemyPos.Y > playerPos.Y)
-                {
-                    float damage = attackDamage;
-                    enemyHealth.Health = Math.Max(0f, enemyHealth.Health - damage);
-                    entityManager.SetComponent(enemy, enemyHealth);
-
-                    var monsterName = entityManager.GetName(enemy);
-                    logger.Log("[ATTACK] Player attacks enemy " + enemy.Id + ", damage: " + damage + ", position: x=" + enemyPos.X + ", y=" + enemyPos.Y);
-
-                    if (enemyHealth.Health <= 0f)
-                    {
-                        gold.Amount += enemyHealth.GoldReward;
-                        entityManager.SetComponent(new Entity(1), gold);
-
-                        logger.Log("[GOLD] Killed " + monsterName + ", gained " + enemyHealth.GoldReward + " gold");
-                        logger.Log("[GOLD] Total gold: " + gold.Amount);
-
-                        if (gold.Amount >= upgrade.NextUpgradeThreshold)
-                        {
-                            ProcessUpgrade(entityManager, logger, playerEntity, upgrade);
-                        }
-                    }
-                }
-            }
-        }
-
-        private static void ProcessUpgrade(EntityManager entityManager, IRenderer logger, Entity playerEntity, UpgradeComponent upgrade)
-        {
-            var player = entityManager.GetComponent<PlayerComponent>(playerEntity);
-
-            player.CurrentLevel++;
-            player.AttackDamage += 5f;
-            player.AttackRange += 1f;
-            upgrade.NextUpgradeThreshold *= 1.5f;
-
-            entityManager.SetComponent(playerEntity, player);
-            entityManager.SetComponent(playerEntity, upgrade);
-
-            logger.Log("[UPGRADE] Player upgraded to level " + player.CurrentLevel + "!");
-            logger.Log("[UPGRADE] Attack damage increased to " + player.AttackDamage);
-            logger.Log("[UPGRADE] Attack range increased to " + player.AttackRange + " grids");
-            logger.Log("[UPGRADE] Next upgrade needs " + upgrade.NextUpgradeThreshold + " gold");
-
-            RandomlyGainBuff(upgrade);
-        }
-
-        private static void RandomlyGainBuff(UpgradeComponent upgrade)
-        {
-            string[] buffs = { "Attack+10%", "Defense+10%", "Attack Speed+20%", "Crit Rate+5%", "Health+20%" };
-            int randomIndex = new Random().Next(buffs.Length);
-            string newBuff = buffs[randomIndex];
-
-            if (!upgrade.Buffs.Contains(newBuff))
-            {
-                upgrade.Buffs.Add(newBuff);
-                Console.WriteLine("[BUFF] Gained new buff: " + newBuff + "!");
-            }
-        }
-
         private static bool CheckEnemiesAtBottom(EntityManager entityManager, IRenderer logger)
         {
             var enemies = entityManager.GetAllEntities();
 
             foreach (var enemy in enemies)
             {
-                if (enemy.Id == 1) continue;
+                if (enemy.Id == 1) continue; // Skip player
 
                 var pos = entityManager.GetComponent<PositionComponent>(enemy);
                 var enemyHealth = entityManager.GetComponent<EnemyComponent>(enemy);
@@ -324,50 +169,13 @@ namespace BattleSystemECS
                 // Check if reached bottom
                 if (pos.Y <= 0f)
                 {
-                    var enemyName = entityManager.GetName(enemy);
-                    logger.Log("[INFO] Enemy " + enemyName + " reached bottom (y=" + pos.Y + "), Game Over!");
+                    var monsterName = entityManager.GetName(enemy);
+                    logger.Log("[INFO] Enemy " + monsterName + " reached bottom (y=" + pos.Y + "), Game Over!");
                     return true;
                 }
             }
 
             return false;
-        }
-
-        private static void RenderMap(IRenderer logger, EntityManager entityManager)
-        {
-            logger.Log("[MAP] 10x50 map");
-            logger.Log("[MAP] P = Player, E = Enemy, . = Empty");
-
-            for (int y = 49; y >= 0; y--)
-            {
-                string row = "";
-                for (int x = 0; x < 10; x++)
-                {
-                    bool hasEnemy = false;
-
-                    var entities = entityManager.GetAllEntities();
-                    foreach (var entity in entities)
-                    {
-                        if (entity.Id == 1) continue;
-
-                        var pos = entityManager.GetComponent<PositionComponent>(entity);
-                        var posNotNull = entityManager.HasComponent<PositionComponent>(entity);
-                        if (posNotNull && Math.Abs(pos.X - x) < 0.5f && Math.Abs(pos.Y - y) < 0.5f)
-                        {
-                            hasEnemy = true;
-                            break;
-                        }
-                    }
-
-                    if (y == 0 && x == 5)
-                        row += "P ";
-                    else if (hasEnemy)
-                        row += "E ";
-                    else
-                        row += ". ";
-                }
-                Console.WriteLine("[MAP] " + row);
-            }
         }
     }
 }
