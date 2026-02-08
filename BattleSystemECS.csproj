@@ -11,19 +11,22 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- 核心文件 -->
+    <!-- Core files -->
     <Compile Include="Core\*.cs" />
 
-    <!-- 实体管理 -->
+    <!-- Config files -->
+    <Compile Include="Configs\*.cs" />
+
+    <!-- Entity manager -->
     <Compile Include="EntityManager.cs" />
 
-    <!-- 组件 -->
+    <!-- Components -->
     <Compile Include="Components\*.cs" />
 
-    <!-- 系统 -->
+    <!-- Systems -->
     <Compile Include="Systems\*.cs" />
 
-    <!-- 主程序 -->
+    <!-- Main program -->
     <Compile Include="Program.cs" />
   </ItemGroup>
 
