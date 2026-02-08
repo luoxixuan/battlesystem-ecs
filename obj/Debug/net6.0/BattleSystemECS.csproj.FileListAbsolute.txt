@@ -1,0 +1,14 @@
+F:\AI\BattleSystem-ECS\obj\Debug\net6.0\BattleSystemECS.GeneratedMSBuildEditorConfig.editorconfig
+F:\AI\BattleSystem-ECS\obj\Debug\net6.0\BattleSystemECS.AssemblyInfoInputs.cache
+F:\AI\BattleSystem-ECS\obj\Debug\net6.0\BattleSystemECS.AssemblyInfo.cs
+F:\AI\BattleSystem-ECS\obj\Debug\net6.0\BattleSystemECS.csproj.CoreCompileInputs.cache
+F:\AI\BattleSystem-ECS\bin\Debug\net6.0\BattleSystemECS.exe
+F:\AI\BattleSystem-ECS\bin\Debug\net6.0\BattleSystemECS.deps.json
+F:\AI\BattleSystem-ECS\bin\Debug\net6.0\BattleSystemECS.runtimeconfig.json
+F:\AI\BattleSystem-ECS\bin\Debug\net6.0\BattleSystemECS.dll
+F:\AI\BattleSystem-ECS\bin\Debug\net6.0\BattleSystemECS.pdb
+F:\AI\BattleSystem-ECS\obj\Debug\net6.0\BattleSystemECS.dll
+F:\AI\BattleSystem-ECS\obj\Debug\net6.0\refint\BattleSystemECS.dll
+F:\AI\BattleSystem-ECS\obj\Debug\net6.0\BattleSystemECS.pdb
+F:\AI\BattleSystem-ECS\obj\Debug\net6.0\BattleSystemECS.genruntimeconfig.cache
+F:\AI\BattleSystem-ECS\obj\Debug\net6.0\ref\BattleSystemECS.dll
