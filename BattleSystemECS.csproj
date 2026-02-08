@@ -17,9 +17,6 @@
     <!-- Core files -->
     <Compile Include="Core\*.cs" />
 
-    <!-- Entity manager -->
-    <Compile Include="EntityManager.cs" />
-
     <!-- Components -->
     <Compile Include="Components\*.cs" />
 

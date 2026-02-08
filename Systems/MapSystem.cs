@@ -1,6 +1,7 @@
 using System;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
@@ -12,11 +13,11 @@ namespace BattleSystemECS.Systems
     public class MapSystem
     {
         private IRenderer renderer;
-        private ComponentStore store;
+        private Core.ComponentStore store;
         private int mapWidth = 10;
         private int mapHeight = 50;
 
-        public MapSystem(IRenderer renderer, ComponentStore store)
+        public MapSystem(IRenderer renderer, Core.ComponentStore store)
         {
             this.renderer = renderer;
             this.store = store;
@@ -48,9 +49,10 @@ namespace BattleSystemECS.Systems
                         {
                             float px = store.PositionX[pid];
                             float py = store.PositionY[pid];
-                            if (Math.Abs(px - x) < 0.5f && Math.Abs(py - y) < 0.5f)
+                            if (System.Math.Abs(px - x) < 0.5f && System.Math.Abs(py - y) < 0.5f)
                             {
                                 hasPlayer = true;
+                                break;
                             }
                         }
                     }
@@ -63,7 +65,7 @@ namespace BattleSystemECS.Systems
                         float ey = store.PositionY[eid];
                         if (store.EnemyActive[eid])
                         {
-                            if (Math.Abs(ex - x) < 0.5f && Math.Abs(ey - y) < 0.5f)
+                            if (System.Math.Abs(ex - x) < 0.5f && System.Math.Abs(ey - y) < 0.5f)
                             {
                                 hasEnemy = true;
                                 break;

@@ -6,17 +6,17 @@ using BattleSystemECS.Config;
 namespace BattleSystemECS.Systems
 {
     /// <summary>
-    /// SOA (Struct of Arrays) 升级系统
+    /// SOA (Struct of Arrays) 玩家升级系统
     /// 直接访问 ComponentStore 的数组，无字典查询，无 struct 复制
     /// 性能提升：10-100 倍
     /// </summary>
     public class UpgradeSystem
     {
-        private ComponentStore store;
+        private Core.ComponentStore store;
         private IRenderer renderer;
         private int playerId;
 
-        public UpgradeSystem(ComponentStore store, IRenderer renderer, int playerId)
+        public UpgradeSystem(Core.ComponentStore store, IRenderer renderer, int playerId)
         {
             this.store = store;
             this.renderer = renderer;
@@ -25,9 +25,8 @@ namespace BattleSystemECS.Systems
 
         public void Update()
         {
-            // SOA 直接数组访问，无字典查询，无 struct 复制
-            float gold = store.PlayerGold[playerId];
-            float threshold = store.PlayerUpgradeThreshold[playerId];
+            float gold = store.GetPlayerGold(playerId);
+            float threshold = store.GetPlayerUpgradeThreshold(playerId);
 
             if (gold >= threshold)
             {
@@ -35,17 +34,16 @@ namespace BattleSystemECS.Systems
             }
             else
             {
-                renderer.Log($"[UPGRADE] Current gold: {gold} / {threshold} (next upgrade)");
+                renderer.Log($"[UPGRADE] Current gold: {gold:F1} / {threshold:F1} (next upgrade)");
             }
         }
 
         private void ProcessUpgrade()
         {
-            // SOA 直接数组访问，无字典查询，无 struct 复制
-            int level = store.PlayerCurrentLevel[playerId];
-            float attackDamage = store.PlayerAttackDamage[playerId];
-            float attackRange = store.PlayerAttackRange[playerId];
-            float threshold = store.PlayerUpgradeThreshold[playerId];
+            int level = store.GetPlayerLevel(playerId);
+            float attackDamage = store.GetPlayerAttackDamage(playerId);
+            float attackRange = store.GetPlayerAttackRange(playerId);
+            float threshold = store.GetPlayerUpgradeThreshold(playerId);
 
             // Upgrade player
             level++;
@@ -53,18 +51,16 @@ namespace BattleSystemECS.Systems
             attackRange += 1f;
             threshold *= 1.5f;
 
-            // SOA 直接数组更新，无字典查询，无 struct 复制
-            store.PlayerCurrentLevel[playerId] = level;
-            store.PlayerAttackDamage[playerId] = attackDamage;
-            store.PlayerAttackRange[playerId] = attackRange;
-            store.PlayerUpgradeThreshold[playerId] = threshold;
+            store.SetPlayerLevel(playerId, level);
+            store.SetPlayerAttackDamage(playerId, attackDamage);
+            store.SetPlayerAttackRange(playerId, attackRange);
+            store.SetPlayerUpgradeThreshold(playerId, threshold);
 
             renderer.Log($"[UPGRADE] Player upgraded to level {level}!");
             renderer.Log($"[UPGRADE] Attack damage increased to {attackDamage}");
             renderer.Log($"[UPGRADE] Attack range increased to {attackRange} grids");
-            renderer.Log($"[UPGRADE] Next upgrade needs {threshold} gold");
+            renderer.Log($"[UPGRADE] Next upgrade needs {threshold:F1} gold");
 
-            // Randomly gain buff
             RandomlyGainBuff();
         }
 
@@ -74,11 +70,10 @@ namespace BattleSystemECS.Systems
             int randomIndex = new Random().Next(buffs.Length);
             string newBuff = buffs[randomIndex];
 
-            // SOA 直接数组访问，无字典查询，无 struct 复制
-            var playerBuffs = store.PlayerBuffs[playerId];
+            var playerBuffs = store.GetPlayerBuffs(playerId);
             if (!playerBuffs.Contains(newBuff))
             {
-                playerBuffs.Add(newBuff);
+                store.AddPlayerBuff(playerId, newBuff);
                 Console.WriteLine($"[BUFF] Gained new buff: {newBuff}!");
             }
         }

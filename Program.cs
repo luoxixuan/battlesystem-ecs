@@ -1,4 +1,3 @@
-using BattleSystemECS.Systems;
 using BattleSystemECS.Core;
 
 namespace BattleSystemECS
@@ -8,7 +7,7 @@ namespace BattleSystemECS
         static void Main(string[] args)
         {
             // 创建游戏管理器（SOA 架构）
-            Systems.GameManager gameManager = new Systems.GameManager();
+            GameManager gameManager = new GameManager();
 
             // 初始化游戏
             gameManager.Initialize();

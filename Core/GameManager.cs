@@ -1,9 +1,9 @@
 using System;
+using BattleSystemECS.Components;
 using BattleSystemECS.Systems;
-using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 
-namespace BattleSystemECS.Systems
+namespace BattleSystemECS.Core
 {
     /// <summary>
     /// 游戏管理器 - 管理所有游戏逻辑

@@ -12,11 +12,11 @@ namespace BattleSystemECS.Systems
     /// </summary>
     public class PlayerTowerAttackSystem
     {
-        private ComponentStore store;
+        private Core.ComponentStore store;
         private IRenderer renderer;
         private int playerId;
 
-        public PlayerTowerAttackSystem(ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
+        public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
             this.store = store;
             this.renderer = renderer;
@@ -56,7 +56,7 @@ namespace BattleSystemECS.Systems
                 }
             }
 
-            // Find and attack enemies in range (SOA 迭代)
+            // Find and attack enemies in range (SOA 迭代）
             var activeEnemyIds = store.GetAllActiveEnemyIds();
             int enemiesAttacked = 0;
 
@@ -74,11 +74,11 @@ namespace BattleSystemECS.Systems
                     continue;
 
                 // Check if in attack range (直接数组计算，无复制）
-                float distance = Math.Abs(enemyX - playerX);
+                float distance = System.Math.Abs(enemyX - playerX);
                 if (distance <= finalAttackRange && enemyY > playerY)
                 {
                     // Attack enemy (SOA 直接数组访问，无 struct 复制）
-                    enemyHealth = Math.Max(0f, enemyHealth - finalAttackDamage);
+                    enemyHealth = System.Math.Max(0f, enemyHealth - finalAttackDamage);
                     store.SetEnemyHealth(enemyId, enemyHealth);
 
                     int goldReward = store.GetEnemyGoldReward(enemyId);

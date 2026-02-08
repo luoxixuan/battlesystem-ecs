@@ -12,7 +12,7 @@ namespace BattleSystemECS.Systems
     /// </summary>
     public class WaveSpawningSystem
     {
-        private ComponentStore store;
+        private Core.ComponentStore store;
         private IRenderer renderer;
         private GameConfig gameConfig;
 
@@ -21,7 +21,7 @@ namespace BattleSystemECS.Systems
         private int enemiesSpawnedInWave = 0;
         private int totalEnemiesSpawned = 0;
 
-        public WaveSpawningSystem(ComponentStore store, IRenderer renderer, GameConfig gameConfig)
+        public WaveSpawningSystem(Core.ComponentStore store, IRenderer renderer, GameConfig gameConfig)
         {
             this.store = store;
             this.renderer = renderer;
@@ -41,20 +41,21 @@ namespace BattleSystemECS.Systems
             var levelConfig = gameConfig.GetLevelConfig(currentLevel);
             if (levelConfig == null)
             {
-                renderer.Log($"[SPAWN] Level {currentLevel} not found!");
+                renderer.Log("[SPAWN] Level " + currentLevel + " not found!");
                 return;
             }
 
             if (currentWave > levelConfig.WaveCount)
             {
-                renderer.Log($"[SPAWN] Level {currentLevel} complete!");
+                renderer.Log("[SPAWN] Level " + currentLevel + " complete!");
+                renderer.Log("[SPAWN] Total enemies spawned: " + totalEnemiesSpawned);
                 return;
             }
 
             var waveConfig = levelConfig.Waves[currentWave - 1];
             if (waveConfig == null)
             {
-                renderer.Log($"[SPAWN] Wave {currentWave} not found!");
+                renderer.Log("[SPAWN] Wave " + currentWave + " not found!");
                 return;
             }
 
@@ -64,7 +65,7 @@ namespace BattleSystemECS.Systems
                 var monsterConfig = gameConfig.GetMonsterConfig(waveConfig.MonsterType);
                 if (monsterConfig == null)
                 {
-                    renderer.Log($"[SPAWN] Monster type '{waveConfig.MonsterType}' not found!");
+                    renderer.Log("[SPAWN] Monster type '" + waveConfig.MonsterType + "' not found!");
                     return;
                 }
 
@@ -72,7 +73,7 @@ namespace BattleSystemECS.Systems
                 float startX = (float)random.Next(0, 10);
                 float startY = 49f;
 
-                // SOA：直接数组访问，无 struct 复制
+                // SOA: 直接数组访问，无字典查询，无 struct 复制
                 int enemyId = store.AddEnemy(
                     startX, startY,
                     monsterConfig.MoveSpeed,
@@ -103,7 +104,6 @@ namespace BattleSystemECS.Systems
                     renderer.Log($"[SPAWN] Level {currentLevel} complete! Total enemies spawned: {totalEnemiesSpawned}");
                     currentLevel++;
                     currentWave = 1;
-                    totalEnemiesSpawned = 0;
                 }
             }
         }

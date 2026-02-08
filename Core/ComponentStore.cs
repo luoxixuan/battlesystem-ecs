@@ -60,12 +60,12 @@ namespace BattleSystemECS.Core
             get { return nextEntityId++; }
         }
 
-        public string GetName(int entityId)
+        public string GetEntityName(int entityId)
         {
-            return GetEntityName(entityId);
+            return GetName(entityId);
         }
 
-        public string GetEntityName(int entityId)
+        public string GetName(int entityId)
         {
             if (entityNames.ContainsKey(entityId))
             {
@@ -121,10 +121,28 @@ namespace BattleSystemECS.Core
             return PlayerAttackRange[playerId];
         }
 
+        public void SetPlayerAttackRange(int playerId, float range)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            PlayerAttackRange[playerId] = range;
+        }
+
+        public float GetPlayerAttackSpeed(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            return PlayerAttackSpeed[playerId];
+        }
+
         public float GetPlayerAttackDamage(int playerId)
         {
             if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
             return PlayerAttackDamage[playerId];
+        }
+
+        public void SetPlayerAttackDamage(int playerId, float damage)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            PlayerAttackDamage[playerId] = damage;
         }
 
         public float GetPlayerGold(int playerId)
@@ -209,36 +227,28 @@ namespace BattleSystemECS.Core
             EnemyHealth[enemyId] = health;
         }
 
-        public float GetEnemyMoveSpeed(int enemyId)
-        {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0f;
-            return EnemyMoveSpeed[enemyId];
-        }
-
-        public int GetEnemyGoldReward(int enemyId)
-        {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0;
-            return EnemyGoldReward[enemyId];
-        }
-
-        // ==================== SOA 直接数组访问方法（用于 System）====================
-
-        public float GetPlayerAttackSpeed(int playerId)
-        {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
-            return PlayerAttackSpeed[playerId];
-        }
-
         public float GetEnemyMaxHealth(int enemyId)
         {
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0f;
             return EnemyMaxHealth[enemyId];
         }
 
+        public float GetEnemyMoveSpeed(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0f;
+            return EnemyMoveSpeed[enemyId];
+        }
+
         public float GetEnemyDamage(int enemyId)
         {
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0f;
             return EnemyDamage[enemyId];
+        }
+
+        public int GetEnemyGoldReward(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0;
+            return EnemyGoldReward[enemyId];
         }
 
         // ==================== 实体查询 ====================
@@ -262,11 +272,11 @@ namespace BattleSystemECS.Core
         public List<int> GetAllActiveEnemyIds()
         {
             List<int> activeEnemies = new List<int>();
-            for (int entityId = 0; entityId < MAX_ENTITIES; entityId++)
+            for (int i = 0; i < MAX_ENTITIES; i++)
             {
-                if (EnemyActive[entityId])
+                if (EnemyActive[i])
                 {
-                    activeEnemies.Add(entityId);
+                    activeEnemies.Add(i);
                 }
             }
             return activeEnemies;

@@ -1,6 +1,6 @@
-using System;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
@@ -11,11 +11,11 @@ namespace BattleSystemECS.Systems
     /// </summary>
     public class GoldRewardSystem
     {
-        private ComponentStore store;
+        private Core.ComponentStore store;
         private IRenderer renderer;
         private int playerId;
 
-        public GoldRewardSystem(ComponentStore store, IRenderer renderer, int playerId)
+        public GoldRewardSystem(Core.ComponentStore store, IRenderer renderer, int playerId)
         {
             this.store = store;
             this.renderer = renderer;
@@ -30,11 +30,11 @@ namespace BattleSystemECS.Systems
 
             if (gold >= threshold)
             {
-                renderer.Log($"[GOLD] Gold threshold reached: {gold} / {threshold}");
+                renderer.Log($"[GOLD] Gold threshold reached: {gold:F1} / {threshold:F1}");
             }
             else
             {
-                renderer.Log($"[UPGRADE] Current gold: {gold} / {threshold} (next upgrade)");
+                renderer.Log($"[UPGRADE] Current gold: {gold:F1} / {threshold:F1} (next upgrade)");
             }
         }
     }

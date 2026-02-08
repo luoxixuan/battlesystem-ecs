@@ -1,6 +1,7 @@
 using System;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
@@ -11,16 +12,16 @@ namespace BattleSystemECS.Systems
     /// </summary>
     public class EnemyMovementSystem
     {
-        private ComponentStore store;
+        private Core.ComponentStore store;
 
-        public EnemyMovementSystem(ComponentStore store)
+        public EnemyMovementSystem(Core.ComponentStore store)
         {
             this.store = store;
         }
 
         public void Update()
         {
-            var activeEnemyIds = store.GetActiveEnemyIds();
+            var activeEnemyIds = store.GetAllActiveEnemyIds();
             int enemiesMoved = 0;
 
             foreach (int enemyId in activeEnemyIds)
@@ -37,7 +38,10 @@ namespace BattleSystemECS.Systems
                 }
             }
 
-            Console.WriteLine($"[MOVE] {enemiesMoved} enemies moved downward");
+            if (enemiesMoved > 0)
+            {
+                Console.WriteLine($"[MOVE] {enemiesMoved} enemies moved downward");
+            }
         }
     }
 }
