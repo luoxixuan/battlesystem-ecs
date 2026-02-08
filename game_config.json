@@ -1,0 +1,164 @@
+{
+  "Player": {
+    "Name": "Player",
+    "Type": "Tower",
+    "AttackRange": 3.0,
+    "AttackInterval": 1.0,
+    "AttackDamage": 10.0,
+    "CurrentLevel": 1,
+    "UpgradeThreshold": 100.0
+  },
+  "MonsterTypes": [
+    {
+      "Name": "Normal Slime",
+      "Type": "Normal",
+      "Health": 20.0,
+      "Damage": 5.0,
+      "MoveSpeed": 1.0,
+      "AttackRange": 1.0,
+      "AttackInterval": 1.5,
+      "GoldReward": 10,
+      "Skills": [ "Normal Attack" ]
+    },
+    {
+      "Name": "Fast Slime",
+      "Type": "Fast",
+      "Health": 15.0,
+      "Damage": 3.0,
+      "MoveSpeed": 2.0,
+      "AttackRange": 1.0,
+      "AttackInterval": 1.0,
+      "GoldReward": 15,
+      "Skills": [ "Normal Attack", "Quick Dash" ]
+    },
+    {
+      "Name": "Strong Slime",
+      "Type": "Strong",
+      "Health": 30.0,
+      "Damage": 8.0,
+      "MoveSpeed": 0.5,
+      "AttackRange": 2.0,
+      "AttackInterval": 2.0,
+      "GoldReward": 20,
+      "Skills": [ "Normal Attack", "Heavy Strike" ]
+    },
+    {
+      "Name": "Ranged Slime",
+      "Type": "Ranged",
+      "Health": 15.0,
+      "Damage": 6.0,
+      "MoveSpeed": 0.8,
+      "AttackRange": 5.0,
+      "AttackInterval": 1.2,
+      "GoldReward": 25,
+      "Skills": [ "Normal Attack", "Ranged Shot" ]
+    }
+  ],
+  "Levels": [
+    {
+      "LevelNumber": 1,
+      "WaveCount": 3,
+      "Waves": [
+        {
+          "WaveNumber": 1,
+          "MonsterType": "Normal",
+          "EnemyCount": 5
+        },
+        {
+          "WaveNumber": 2,
+          "MonsterType": "Normal",
+          "EnemyCount": 5
+        },
+        {
+          "WaveNumber": 3,
+          "MonsterType": "Normal",
+          "EnemyCount": 5
+        }
+      ]
+    },
+    {
+      "LevelNumber": 2,
+      "WaveCount": 3,
+      "Waves": [
+        {
+          "WaveNumber": 1,
+          "MonsterType": "Fast",
+          "EnemyCount": 5
+        },
+        {
+          "WaveNumber": 2,
+          "MonsterType": "Fast",
+          "EnemyCount": 5
+        },
+        {
+          "WaveNumber": 3,
+          "MonsterType": "Fast",
+          "EnemyCount": 5
+        }
+      ]
+    },
+    {
+      "LevelNumber": 3,
+      "WaveCount": 3,
+      "Waves": [
+        {
+          "WaveNumber": 1,
+          "MonsterType": "Strong",
+          "EnemyCount": 3
+        },
+        {
+          "WaveNumber": 2,
+          "MonsterType": "Strong",
+          "EnemyCount": 3
+        },
+        {
+          "WaveNumber": 3,
+          "MonsterType": "Strong",
+          "EnemyCount": 3
+        }
+      ]
+    },
+    {
+      "LevelNumber": 4,
+      "WaveCount": 3,
+      "Waves": [
+        {
+          "WaveNumber": 1,
+          "MonsterType": "Ranged",
+          "EnemyCount": 4
+        },
+        {
+          "WaveNumber": 2,
+          "MonsterType": "Ranged",
+          "EnemyCount": 4
+        },
+        {
+          "WaveNumber": 3,
+          "MonsterType": "Ranged",
+          "EnemyCount": 4
+        }
+      ]
+    },
+    {
+      "LevelNumber": 5,
+      "WaveCount": 3,
+      "Waves": [
+        {
+          "WaveNumber": 1,
+          "MonsterType": "Strong",
+          "EnemyCount": 2
+        },
+        {
+          "WaveNumber": 2,
+          "MonsterType": "Ranged",
+          "EnemyCount": 3
+        },
+        {
+          "WaveNumber": 3,
+          "MonsterType": "Fast",
+          "EnemyCount": 5
+        }
+      ]
+    }
+  ]
+}

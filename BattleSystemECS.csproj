@@ -11,11 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Core files -->
-    <Compile Include="Core\*.cs" />
-
     <!-- Config files -->
     <Compile Include="Configs\*.cs" />
+
+    <!-- Core files -->
+    <Compile Include="Core\*.cs" />
 
     <!-- Entity manager -->
     <Compile Include="EntityManager.cs" />
@@ -28,6 +28,11 @@
 
     <!-- Main program -->
     <Compile Include="Program.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copy JSON config to output directory -->
+    <None Update="game_config.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

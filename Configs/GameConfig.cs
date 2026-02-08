@@ -2,11 +2,29 @@ using System.Collections.Generic;
 
 namespace BattleSystemECS.Config
 {
-    public class LevelConfig
+    public class PlayerConfig
     {
-        public int LevelNumber { get; set; }
-        public int WaveCount { get; set; }
-        public List<WaveConfig> Waves { get; set; } = new List<WaveConfig>();
+        public string Name { get; set; }
+        public string Type { get; set; }
+        public float AttackRange { get; set; }
+        public float AttackInterval { get; set; }
+        public float AttackDamage { get; set; }
+        public int CurrentLevel { get; set; }
+        public float UpgradeThreshold { get; set; }
+    }
+
+    public class MonsterConfig
+    {
+        public string Name { get; set; }
+        public string Type { get; set; }
+        public float Health { get; set; }
+        public float MaxHealth { get; set; }
+        public float Damage { get; set; }
+        public float MoveSpeed { get; set; }
+        public float AttackRange { get; set; }
+        public float AttackInterval { get; set; }
+        public int GoldReward { get; set; }
+        public List<string> Skills { get; set; } = new List<string>();
     }
 
     public class WaveConfig
@@ -16,34 +34,11 @@ namespace BattleSystemECS.Config
         public int EnemyCount { get; set; }
     }
 
-    public class MonsterConfig
+    public class LevelConfig
     {
-        public string Name { get; set; }
-        public string Type { get; set; }
-
-        public float Health { get; set; }
-        public float MaxHealth { get; set; }
-        public float Damage { get; set; }
-
-        public float MoveSpeed { get; set; }
-        public float AttackRange { get; set; }
-        public float AttackInterval { get; set; }
-
-        public int GoldReward { get; set; }
-        public List<string> Skills { get; set; } = new List<string>();
-    }
-
-    public class PlayerConfig
-    {
-        public string Name { get; set; }
-        public string Type { get; set; }
-
-        public float AttackRange { get; set; }
-        public float AttackInterval { get; set; }
-        public float AttackDamage { get; set; }
-
-        public int CurrentLevel { get; set; }
-        public float UpgradeThreshold { get; set; }
+        public int LevelNumber { get; set; }
+        public int WaveCount { get; set; }
+        public List<WaveConfig> Waves { get; set; } = new List<WaveConfig>();
     }
 
     public class GameConfig
@@ -55,11 +50,13 @@ namespace BattleSystemECS.Config
 
         public GameConfig()
         {
+            Player = new PlayerConfig();
             InitializeDefaultConfig();
         }
 
         private void InitializeDefaultConfig()
         {
+            // Default monsters
             MonsterTypes.Add(new MonsterConfig
             {
                 Name = "Normal Slime",
@@ -73,18 +70,20 @@ namespace BattleSystemECS.Config
                 Skills = new List<string> { "Normal Attack" }
             });
 
-            Levels.Add(new LevelConfig
+            // Default levels
+            var level1 = new LevelConfig
             {
                 LevelNumber = 1,
                 WaveCount = 3,
-                Waves = new List<WaveConfig>
-                {
-                    new WaveConfig { WaveNumber = 1, MonsterType = "Normal", EnemyCount = 5 },
-                    new WaveConfig { WaveNumber = 2, MonsterType = "Normal", EnemyCount = 5 },
-                    new WaveConfig { WaveNumber = 3, MonsterType = "Normal", EnemyCount = 5 }
-                }
-            });
+                Waves = new List<WaveConfig>()
+            };
+            for (int i = 1; i <= 3; i++)
+            {
+                level1.Waves.Add(new WaveConfig { WaveNumber = i, MonsterType = "Normal", EnemyCount = 5 });
+            }
+            Levels.Add(level1);
 
+            // Default player
             Player = new PlayerConfig
             {
                 Name = "Player",
@@ -96,7 +95,10 @@ namespace BattleSystemECS.Config
                 UpgradeThreshold = 100f
             };
 
-            CurrentLevel = Levels[0];
+            if (Levels.Count > 0)
+            {
+                CurrentLevel = Levels[0];
+            }
         }
 
         public MonsterConfig GetMonsterConfig(string type)

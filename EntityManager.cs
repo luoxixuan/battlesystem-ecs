@@ -65,7 +65,14 @@ namespace BattleSystemECS
 
             if (entityComponents.ContainsKey(entityId) && entityComponents[entityId].ContainsKey(componentName))
             {
-                return (T)entityComponents[entityId][componentName];
+                try
+                {
+                    return (T)entityComponents[entityId][componentName];
+                }
+                catch
+                {
+                    return default(T);
+                }
             }
 
             return default(T);
@@ -83,6 +90,8 @@ namespace BattleSystemECS
 
         public void SetComponent<T>(Entity entity, T component) where T : struct
         {
+            if (entity == null) return;
+
             AddComponent(entity, component);
         }
 

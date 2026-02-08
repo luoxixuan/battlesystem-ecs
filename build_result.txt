@@ -1,0 +1,35 @@
+﻿  姝ｅ湪纭畾瑕佽繕鍘熺殑椤圭洰鈥?
+  宸茶繕鍘?F:\AI\BattleSystem-ECS\BattleSystemECS.csproj (鐢ㄦ椂 64 姣)銆?
+F:\AI\BattleSystem-ECS\Configs\GameConfig.cs(8,16): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淟evelConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Program.cs(252,73): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淧layerConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(11,45): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淚Renderer鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(104,24): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淧layerConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfig.cs(9,21): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淟evelConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(119,56): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淢onsterConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfig.cs(10,21): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淢onsterConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(147,24): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淢onsterConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfig.cs(11,16): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淧layerConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(165,56): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淟evelConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(191,24): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淟evelConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(202,56): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淲aveConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(238,24): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淲aveConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+
+鐢熸垚澶辫触銆?
+
+F:\AI\BattleSystem-ECS\Configs\GameConfig.cs(8,16): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淟evelConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Program.cs(252,73): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淧layerConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(11,45): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淚Renderer鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(104,24): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淧layerConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfig.cs(9,21): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淟evelConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(119,56): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淢onsterConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfig.cs(10,21): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淢onsterConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(147,24): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淢onsterConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfig.cs(11,16): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淧layerConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(165,56): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淟evelConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(191,24): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淟evelConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(202,56): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淲aveConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+F:\AI\BattleSystem-ECS\Configs\GameConfigLoader.cs(238,24): error CS0246: 鏈兘鎵惧埌绫诲瀷鎴栧懡鍚嶇┖闂村悕鈥淲aveConfig鈥?鏄惁缂哄皯 using 鎸囦护鎴栫▼搴忛泦寮曠敤?) [F:\AI\BattleSystem-ECS\BattleSystemECS.csproj]
+    0 涓鍛?
+    13 涓敊璇?
+
+宸茬敤鏃堕棿 00:00:01.78
