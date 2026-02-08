@@ -1,154 +1,99 @@
 using System;
 using System.Collections.Generic;
+using BattleSystemECS.Core;
 
 namespace BattleSystemECS
 {
-    /// <summary>
-    /// 实体管理器 - ECS 架构
-    /// </summary>
     public class EntityManager
     {
-        private Dictionary<int, Dictionary<Type, object>> entities;
-        private Dictionary<Type, HashSet<int>> componentIndex;
+        private Dictionary<int, string> entityNames;
+        private Dictionary<int, Dictionary<string, object>> entityComponents;
         private int nextEntityId = 1;
-        private HashSet<int> aliveEntities;
 
         public EntityManager()
         {
-            entities = new Dictionary<int, Dictionary<Type, object>>();
-            componentIndex = new Dictionary<Type, HashSet<int>>();
-            aliveEntities = new HashSet<int>();
+            this.entityNames = new Dictionary<int, string>();
+            this.entityComponents = new Dictionary<int, Dictionary<string, object>>();
         }
 
-        /// <summary>
-        /// 创建实体
-        /// </summary>
-        public int CreateEntity()
+        public Entity CreateEntity()
         {
             int entityId = nextEntityId++;
-            entities[entityId] = new Dictionary<Type, object>();
-            aliveEntities.Add(entityId);
-            return entityId;
+            entityNames[entityId] = $"Entity_{entityId}";
+            entityComponents[entityId] = new Dictionary<string, object>();
+            return new Entity(entityId);
         }
 
-        /// <summary>
-        /// 添加组件
-        /// </summary>
-        public void AddComponent<T>(int entityId, T component) where T : class
+        public void SetName(Entity entity, string name)
         {
-            if (!entities.ContainsKey(entityId))
-                return;
-
-            entities[entityId][typeof(T)] = component;
-
-            if (!componentIndex.ContainsKey(typeof(T)))
-                componentIndex[typeof(T)] = new HashSet<int>();
-
-            componentIndex[typeof(T)].Add(entityId);
-        }
-
-        /// <summary>
-        /// 获取组件
-        /// </summary>
-        public T GetComponent<T>(int entityId) where T : class
-        {
-            if (!entities.ContainsKey(entityId))
-                return null;
-
-            if (!entities[entityId].ContainsKey(typeof(T)))
-                return null;
-
-            return entities[entityId][typeof(T)] as T;
-        }
-
-        /// <summary>
-        /// 检查实体是否有组件
-        /// </summary>
-        public bool HasComponent<T>(int entityId) where T : class
-        {
-            if (!entities.ContainsKey(entityId))
-                return false;
-
-            return entities[entityId].ContainsKey(typeof(T));
-        }
-
-        /// <summary>
-        /// 设置组件
-        /// </summary>
-        public void SetComponent<T>(int entityId, T component) where T : class
-        {
-            if (!entities.ContainsKey(entityId))
-                return;
-
-            entities[entityId][typeof(T)] = component;
-        }
-
-        /// <summary>
-        /// 获取拥有特定组件的所有实体
-        /// </summary>
-        public HashSet<int> GetEntitiesWithComponent<T>() where T : class
-        {
-            if (!componentIndex.ContainsKey(typeof(T)))
-                return new HashSet<int>();
-
-            return new HashSet<int>(componentIndex[typeof(T)]);
-        }
-
-        /// <summary>
-        /// 检查实体是否存活
-        /// </summary>
-        public bool IsEntityAlive(int entityId)
-        {
-            return aliveEntities.Contains(entityId);
-        }
-
-        /// <summary>
-        /// 设置实体死亡
-        /// </summary>
-        public void SetEntityDead(int entityId)
-        {
-            aliveEntities.Remove(entityId);
-        }
-
-        /// <summary>
-        /// 获取所有存活的实体
-        /// </summary>
-        public HashSet<int> GetAliveEntities()
-        {
-            return new HashSet<int>(aliveEntities);
-        }
-
-        /// <summary>
-        /// 销毁实体
-        /// </summary>
-        public void DestroyEntity(int entityId)
-        {
-            if (entities.ContainsKey(entityId))
+            if (entity != null && entityNames.ContainsKey(entity.Id))
             {
-                // 从组件索引中移除
-                foreach (var componentType in entities[entityId].Keys)
-                {
-                    if (componentIndex.ContainsKey(componentType))
-                    {
-                        componentIndex[componentType].Remove(entityId);
-                    }
-                }
+                entityNames[entity.Id] = name;
+            }
+        }
 
-                entities.Remove(entityId);
+        public string GetName(Entity entity)
+        {
+            if (entity != null && entityNames.ContainsKey(entity.Id))
+            {
+                return entityNames[entity.Id];
+            }
+            return entity != null ? $"Entity_{entity.Id}" : "Unknown";
+        }
+
+        public void AddComponent<T>(Entity entity, T component) where T : struct
+        {
+            if (entity == null) return;
+
+            int entityId = entity.Id;
+            string componentName = typeof(T).Name;
+
+            if (!entityComponents.ContainsKey(entityId))
+            {
+                entityComponents[entityId] = new Dictionary<string, object>();
             }
 
-            aliveEntities.Remove(entityId);
+            entityComponents[entityId][componentName] = component;
         }
 
-        /// <summary>
-        /// 销毁所有实体
-        /// </summary>
-        public void DestroyAllEntities()
+        public T GetComponent<T>(Entity entity) where T : struct
         {
-            entities.Clear();
-            componentIndex.Clear();
-            aliveEntities.Clear();
-            nextEntityId = 1;
+            if (entity == null) return default(T);
+
+            int entityId = entity.Id;
+            string componentName = typeof(T).Name;
+
+            if (entityComponents.ContainsKey(entityId) && entityComponents[entityId].ContainsKey(componentName))
+            {
+                return (T)entityComponents[entityId][componentName];
+            }
+
+            return default(T);
+        }
+
+        public bool HasComponent<T>(Entity entity) where T : struct
+        {
+            if (entity == null) return false;
+
+            int entityId = entity.Id;
+            string componentName = typeof(T).Name;
+
+            return entityComponents.ContainsKey(entityId) && entityComponents[entityId].ContainsKey(componentName);
+        }
+
+        public void SetComponent<T>(Entity entity, T component) where T : struct
+        {
+            AddComponent(entity, component);
+        }
+
+        public List<Entity> GetAllEntities()
+        {
+            List<Entity> entities = new List<Entity>();
+            foreach (var kvp in entityNames)
+            {
+                entities.Add(new Entity(kvp.Key));
+            }
+            return entities;
         }
     }
 }

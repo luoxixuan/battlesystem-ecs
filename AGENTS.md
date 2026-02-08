@@ -1,158 +1,117 @@
-# 战斗系统 Demo - ECS 架构 - AGENTS.md
+# 肉鸽塔防游戏 - 项目开发规则
 
 ## 项目概述
-使用 **ECS（Entity Component System）** 架构实现的战斗系统，纯 C# 语言，可独立编译成 exe 运行。
+一个基于 ECS 架构的肉鸽塔防游戏，玩家作为防御塔，按波次生成敌人，击杀敌人获得金币，自动升级并获得随机技能/Buff。
 
-## 项目目标
-- 严格遵循 ECS 架构设计
-- Entity（实体）只作为 ID
-- Component（组件）只包含数据
-- System（系统）只包含逻辑
-- 战斗内容用战报日志输出
-- 方便排查逻辑是否正确
+## 游戏规格
+
+### 地图配置
+- **宽度**：10 格子
+- **高度**：50 格子
+- **地图类型**：纵向滚动地图
+
+### 角色配置
+- **玩家（防御塔）**：
+  - 位置：最下方中间位置 (x=5, y=0)
+  - 类型：防御塔（玩家本人）
+  - 攻击方式：自动攻击范围内的敌人
+  - 升级机制：金币达到阈值自动升级
+
+- **敌人**：
+  - 生成：按波次生成（不是连续）
+  - 移动：从上往下走（纵向移动）
+  - 生命值：不同波次可能有不同属性
+  - 奖励：击杀后给予金币
+
+### 游戏机制
+- **波次系统**：按波次生成敌人，每波可能有不同数量
+- **金币系统**：击杀敌人获得金币
+- **自动升级**：获得一定金币后自动升级
+- **随机技能/Buff**：升级时随机获得
 
 ## 技术栈
 - C# .NET 6.0
 - 控制台应用程序
 - ECS 架构
-- 纯 C# 实现，无外部依赖
-
-## ECS 架构规则
-
-### 核心原则
-1. **Entity（实体）**
-   - 只是 ID，不包含任何数据或逻辑
-   - 由 EntityManager 统一管理
-   - 通过 ID 引用
-
-2. **Component（组件）**
-   - 只包含数据，不包含任何逻辑
-   - 使用 class 实现
-   - 必须有清晰的命名：XxxComponent
-
-3. **System（系统）**
-   - 只包含逻辑，不包含数据
-   - 通过 EntityManager 操作实体和组件
-   - 处理拥有特定组件的实体
-
-### 数据流
-```
-Input (创建实体) → EntityManager
-                  ↓
-           添加组件
-                  ↓
-           System 处理
-                  ↓
-           更新组件
-                  ↓
-           日志输出
-```
+- 纯 C# 实现（无渲染）
 
 ## 开发规范
 
-### 组件开发
-- ✅ 只包含数据，不包含逻辑
-- ✅ 必须以 Component 结尾
-- ✅ 使用 class 实现
-- ✅ 所有字段必须是 public
-- ✅ 必须有构造函数
+### ECS 组件规范
+- 实现 `IComponentData` 接口
+- 只包含数据，不包含逻辑
+- 使用 struct 而不是 class
+- 组件必须有清晰的命名：XxxComponent
 
-```csharp
-public class HealthComponent
-{
-    public float Current { get; set; }
-    public float Max { get; set; }
+### ECS 系统规范
+- 继承 `SystemBase`
+- 使用 `Entities.ForEach()` 或 `IJobEntity`
+- 指定 `UpdateInGroup`
+- 系统职责单一，不耦合
 
-    public HealthComponent(float current, float max)
-    {
-        Current = current;
-        Max = max;
-    }
-}
-```
+### 渲染层规范
+- 实现 `IRenderer` 接口
+- 只负责输出，不包含逻辑
+- 战斗内容用战报日志输出
+- 地图用字符地图输出
 
-### 系统开发
-- ✅ 只包含逻辑，不包含数据
-- ✅ 必须以 System 结尾
-- ✅ 必须接收 EntityManager 作为构造参数
-- ✅ 所有逻辑都要有日志记录
+## 战斗日志规范
 
-```csharp
-public class DamageSystem
-{
-    private EntityManager entityManager;
-
-    public DamageSystem(EntityManager entityManager)
-    {
-        this.entityManager = entityManager;
-    }
-
-    public float CalculateDamage(int attackerId, int defenderId)
-    {
-        // 伤害计算逻辑
-    }
-}
-```
-
-### 日志规范
-- ✅ 所有战斗过程都要有日志
-- ✅ 使用统一的 BattleLogger
-- ✅ 日志级别：[INFO], [BATTLE], [DAMAGE], [DEATH], [WIN]
-- ✅ 伤害计算要记录详细信息
-
-## 战斗系统规则
-
-### 伤害公式
-```
-基础伤害 = 攻击力 - 防御力 * 0.5
-实际伤害 = max(1, 基础伤害)
-暴击伤害 = 实际伤害 * 1.5
-```
-
-### 暴击系统
-- 暴击几率：20%
-- 暴击倍率：1.5 倍
-- 暴击标记：在日志中显示 [暴击!]
-
-### 战斗流程
-1. 创建玩家和敌人实体
-2. 添加必要的组件
-3. 玩家攻击敌人
-4. 敌人攻击玩家
-5. 重复步骤 3-4，直到一方死亡
-6. 记录战斗结果
+- `[MAP]` - 地图视图
+- `[INFO]` - 一般信息
+- `[ENEMY]` - 敌人生成
+- `[WAVE]` - 波次信息
+- `[ATTACK]` - 攻击信息
+- `[DAMAGE]` - 伤害信息
+- `[DEATH]` - 死亡信息
+- `[GOLD]` - 金币获得
+- `[UPGRADE]` - 升级信息
+- `[SKILL]` - 技能获得
+- `[BUFF]` - Buff 获得
 
 ## 项目结构
 ```
-BattleSystem-ECS/
-├── Components.cs         # 所有组件定义
-├── EntityManager.cs     # ECS 核心：实体管理器
-├── BattleLogger.cs      # 日志系统
-├── DamageSystem.cs      # 伤害计算系统
-├── CombatSystem.cs      # 战斗逻辑系统
-├── Program.cs           # 主程序
-├── BattleSystemECS.csproj # 项目文件
-├── README.md            # 说明文档
-└── AGENTS.md           # 本文件
+TowerDefense-ECS/
+├── Components/      # ECS 数据组件
+├── Systems/         # ECS 逻辑系统
+├── Core/            # 核心
+├── Program.cs       # 主程序
+├── AGENTS.md        # 本文件
+└── README.md        # 说明文档
 ```
 
-## 注意事项
-- 严格遵循 ECS 架构
-- Component 不包含逻辑
-- System 不包含数据
-- 所有逻辑都要有日志
-- 纯 C# 实现，无渲染依赖
-
 ## 迭代记录
-- 2026-02-08: 初始化项目，实现 ECS 架构
-- 2026-02-08: 完成基础战斗功能
-- 2026-02-08: 添加战报日志系统
-- 2026-02-08: 完成文档编写
+- 2026-02-08: 项目初始化，改为肉鸽塔防游戏
+- 2026-02-08: 实现地图系统（10x50 网格）
+- 2026-02-08: 实现波次生成系统
+- 2026-02-08: 实现金币系统
+- 2026-02-08: 实现自动升级系统
+- 2026-02-08: 实现随机技能/Buff 系统
 
-## 下一步扩展
-- 添加技能系统
-- 实现 Buff/Debuff 机制
-- 支持团队战斗
-- 实现存档/读档
-- 添加装备系统
-- 实现战斗 AI
+## 下一步开发
+
+### 第 1 阶段：基础架构
+- [ ] 创建 ECS 项目结构
+- [ ] 创建地图组件（MapComponent, GridComponent）
+- [ ] 创建角色组件（PlayerComponent, EnemyComponent, WaveComponent）
+- [ ] 创建资源组件（GoldComponent）
+- [ ] 实现地图渲染系统（字符地图输出）
+
+### 第 2 阶段：角色系统
+- [ ] 实现玩家作为防御塔
+- [ ] 实现敌人纵向移动
+- [ ] 实现波次生成系统
+- [ ] 实现敌人属性系统（不同波次）
+
+### 第 3 阶段：战斗系统
+- [ ] 实现玩家自动攻击
+- [ ] 实现伤害计算
+- [ ] 实现死亡处理
+- [ ] 实现金币奖励系统
+
+### 第 4 阶段：升级系统
+- [ ] 实现金币系统
+- [ ] 实现升级阈值判断
+- [ ] 实现属性提升
+- [ ] 实现随机技能系统
+- [ ] 实现随机 Buff 系统

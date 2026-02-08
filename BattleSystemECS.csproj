@@ -7,6 +7,24 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <AssemblyName>BattleSystemECS</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 核心文件 -->
+    <Compile Include="Core\*.cs" />
+
+    <!-- 实体管理 -->
+    <Compile Include="EntityManager.cs" />
+
+    <!-- 组件 -->
+    <Compile Include="Components\*.cs" />
+
+    <!-- 系统 -->
+    <Compile Include="Systems\*.cs" />
+
+    <!-- 主程序 -->
+    <Compile Include="Program.cs" />
+  </ItemGroup>
 
 </Project>
