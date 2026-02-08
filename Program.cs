@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Systems;
 using BattleSystemECS.Core;
@@ -16,7 +15,7 @@ namespace BattleSystemECS
             Console.WriteLine("========================================");
             Console.WriteLine();
             Console.WriteLine("Press any key to start...");
-            
+
             try
             {
                 Console.ReadKey();
@@ -26,29 +25,43 @@ namespace BattleSystemECS
                 // Ignore key read errors when running in non-interactive mode
             }
 
-            var entityManager = new EntityManager();
-            var logger = new ConsoleLogger();
+            // Initialize ECS (SOA 架构）
+            var store = new ComponentStore();
+            var entityManager = new EntityManager(store);
+            IRenderer logger = new ConsoleLogger();
 
             // Load configuration from JSON
             var gameConfig = GameConfigLoader.LoadConfig(logger);
 
-            // Initialize systems
-            var mapSystem = new MapSystem(logger);
+            // Initialize systems (SOA 优化）
+            var mapSystem = new MapSystem(logger, store);
             mapSystem.SetMapSize(10, 50);
 
-            var playerTowerAttackSystem = new PlayerTowerAttackSystem(entityManager, logger, 1, gameConfig);
+            var playerTowerAttackSystem = new PlayerTowerAttackSystem(store, logger, 1, gameConfig);
 
-            var enemyMovementSystem = new EnemyMovementSystem(entityManager, logger);
+            var enemyMovementSystem = new EnemyMovementSystem(store);
 
-            var goldRewardSystem = new GoldRewardSystem(entityManager, logger, 1);
+            var goldRewardSystem = new GoldRewardSystem(store, logger, 1);
 
-            var waveSpawningSystem = new WaveSpawningSystem(entityManager, logger, gameConfig);
+            var waveSpawningSystem = new WaveSpawningSystem(store, logger, gameConfig);
 
-            var upgradeSystem = new UpgradeSystem(entityManager, logger, 1);
+            var upgradeSystem = new UpgradeSystem(store, logger, 1);
 
-            // Create player
-            var playerEntity = CreatePlayer(entityManager, gameConfig.Player, logger);
+            // Create player (SOA)
+            var playerEntity = entityManager.CreateEntity();
+            entityManager.SetName(playerEntity, "Player");
             int playerId = playerEntity.Id;
+
+            // SOA: 初始化玩家组件
+            store.AddPosition(playerId, 5f, 0f);
+            store.AddPlayer(playerId, 3f, 1f, 10f, 1);
+
+            Console.WriteLine("[INFO] Player created! Position: x=5, y=0");
+            logger.Log("[INFO]   - Attack Range: 3 grids");
+            logger.Log("[INFO]   - Attack Interval: 1 seconds");
+            logger.Log("[INFO]   - Attack Damage: 10 points");
+            logger.Log("[INFO]   - Current Level: 1");
+            logger.Log("[INFO]   - Upgrade Threshold: 100 gold");
 
             // Game level loop
             int currentLevel = 1;
@@ -56,18 +69,30 @@ namespace BattleSystemECS
 
             while (currentLevel <= maxLevels)
             {
-                waveSpawningSystem.SetLevel(currentLevel);
+                var levelConfig = gameConfig.GetLevelConfig(currentLevel);
+                if (levelConfig == null)
+                {
+                    logger.Log("[INFO] [ERROR] Level " + currentLevel + " not found!");
+                    currentLevel++;
+                    continue;
+                }
 
                 Console.WriteLine();
                 logger.Log("[INFO] ========== Level " + currentLevel + " ==========");
+                logger.Log("[INFO] Total Waves: " + levelConfig.WaveCount);
+                foreach (var wave in levelConfig.Waves)
+                {
+                    logger.Log("[INFO]   - Wave " + wave.WaveNumber + ": " + wave.MonsterType + ", " + wave.EnemyCount + " enemies");
+                }
+                logger.Log("[INFO] =======================================");
 
-                // Set current level in wave spawning system
-                waveSpawningSystem.Update();
+                // Set wave level
+                waveSpawningSystem.SetLevel(currentLevel);
 
-                // Render initial map
+                // Render initial map (SOA)
                 Console.WriteLine();
                 logger.Log("========================================");
-                mapSystem.Update(entityManager);
+                mapSystem.Update();
                 logger.Log("========================================");
 
                 Console.WriteLine();
@@ -85,26 +110,26 @@ namespace BattleSystemECS
 
                     logger.Log("[INFO] --- Turn " + turn + " ---");
 
-                    // Spawn enemies for current wave
+                    // Spawn enemies for current wave (SOA)
                     waveSpawningSystem.Update();
 
-                    // Move enemies
+                    // Move enemies (SOA)
                     enemyMovementSystem.Update();
 
-                    // Player attack
+                    // Player attack (SOA)
                     playerTowerAttackSystem.Update();
 
-                    // Check upgrade
+                    // Check upgrade (SOA)
                     goldRewardSystem.Update();
 
-                    // Apply upgrade
+                    // Apply upgrade (SOA)
                     upgradeSystem.Update();
 
-                    // Render map
-                    mapSystem.Update(entityManager);
+                    // Render map (SOA)
+                    mapSystem.Update();
 
                     // Check enemies at bottom
-                    if (CheckEnemiesAtBottom(entityManager, logger))
+                    if (CheckEnemiesAtBottom(store, logger))
                     {
                         gameRunning = false;
                         logger.Log("[INFO] Game Over! Enemy reached bottom.");
@@ -119,58 +144,18 @@ namespace BattleSystemECS
             Console.WriteLine();
         }
 
-        private static Entity CreatePlayer(EntityManager entityManager, PlayerConfig playerConfig, IRenderer logger)
+        private static bool CheckEnemiesAtBottom(ComponentStore store, IRenderer logger)
         {
-            var playerEntity = entityManager.CreateEntity();
-            entityManager.SetName(playerEntity, "Player");
+            var activeEnemyIds = store.GetAllActiveEnemyIds();
 
-            entityManager.AddComponent(playerEntity, new PositionComponent(5f, 0f));
-
-            entityManager.AddComponent(playerEntity, new PlayerComponent
+            foreach (var enemyId in activeEnemyIds)
             {
-                AttackRange = playerConfig.AttackRange,
-                AttackSpeed = playerConfig.AttackInterval,
-                AttackDamage = playerConfig.AttackDamage,
-                CurrentLevel = playerConfig.CurrentLevel
-            });
+                // SOA: 直接数组访问，无字典查询，无 struct 复制
+                float y = store.PositionY[enemyId];
 
-            entityManager.AddComponent(playerEntity, new GoldComponent { Amount = 0f });
-
-            entityManager.AddComponent(playerEntity, new UpgradeComponent
-            {
-                NextUpgradeThreshold = playerConfig.UpgradeThreshold
-            });
-
-            Console.WriteLine("[INFO] Player created! Position: x=5, y=0");
-            logger.Log("[INFO]   - Attack Range: " + playerConfig.AttackRange + " grids");
-            logger.Log("[INFO]   - Attack Interval: " + playerConfig.AttackInterval + " seconds");
-            logger.Log("[INFO]   - Attack Damage: " + playerConfig.AttackDamage + " points");
-            logger.Log("[INFO]   - Current Level: " + playerConfig.CurrentLevel);
-            logger.Log("[INFO]   - Upgrade Threshold: " + playerConfig.UpgradeThreshold + " gold");
-
-            return playerEntity;
-        }
-
-        private static bool CheckEnemiesAtBottom(EntityManager entityManager, IRenderer logger)
-        {
-            var enemies = entityManager.GetAllEntities();
-
-            foreach (var enemy in enemies)
-            {
-                if (enemy.Id == 1) continue; // Skip player
-
-                var pos = entityManager.GetComponent<PositionComponent>(enemy);
-                var enemyHealth = entityManager.GetComponent<EnemyComponent>(enemy);
-
-                // Skip dead enemies
-                if (enemyHealth.Health <= 0f)
-                    continue;
-
-                // Check if reached bottom
-                if (pos.Y <= 0f)
+                if (store.EnemyActive[enemyId] && y <= 0f)
                 {
-                    var monsterName = entityManager.GetName(enemy);
-                    logger.Log("[INFO] Enemy " + monsterName + " reached bottom (y=" + pos.Y + "), Game Over!");
+                    logger.Log("[INFO] Enemy " + new Entity(enemyId).ToString() + " reached bottom (y=" + y + "), Game Over!");
                     return true;
                 }
             }
