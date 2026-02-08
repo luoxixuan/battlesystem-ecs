@@ -93,7 +93,7 @@ namespace BattleSystemECS
                     System.Threading.Thread.Sleep(1000);
 
                     logger.Log("[INFO] --- Turn " + turn + " ---");
-                    ProcessPlayerTurn(entityManager, logger, playerEntity);
+                    ProcessPlayerTurn(entityManager, logger, playerEntity, gameConfig);
 
                     if (CheckEnemiesAtBottom(entityManager, logger))
                     {
@@ -127,10 +127,7 @@ namespace BattleSystemECS
 
             entityManager.AddComponent(playerEntity, new GoldComponent { Amount = 0f });
 
-            entityManager.AddComponent(playerEntity, new UpgradeComponent
-            {
-                NextUpgradeThreshold = playerConfig.UpgradeThreshold
-            });
+            entityManager.AddComponent(playerEntity, new UpgradeComponent());
 
             Console.WriteLine("[INFO] Player created! Position: x=5, y=0");
             logger.Log("[INFO]   - Attack Range: " + playerConfig.AttackRange + " grids");
@@ -176,18 +173,53 @@ namespace BattleSystemECS
             return enemyEntity.Id;
         }
 
-        private static void ProcessPlayerTurn(EntityManager entityManager, IRenderer logger, Entity playerEntity)
+        private static void ProcessPlayerTurn(EntityManager entityManager, IRenderer logger, Entity playerEntity, GameConfig gameConfig)
         {
             var player = entityManager.GetComponent<PlayerComponent>(playerEntity);
             var playerPos = entityManager.GetComponent<PositionComponent>(playerEntity);
             var gold = entityManager.GetComponent<GoldComponent>(playerEntity);
             var upgrade = entityManager.GetComponent<UpgradeComponent>(playerEntity);
 
+            // Calculate player stats with buff effects
+            float attackDamage = player.AttackDamage;
+            float attackRange = player.AttackRange;
+            float attackSpeed = player.AttackSpeed;
+
+            // Apply Buffs
+            foreach (string buff in upgrade.Buffs)
+            {
+                if (buff == "Attack+10%")
+                {
+                    attackDamage *= 1.1f;
+                    logger.Log("[BUFF] Attack+10% applied: " + attackDamage + " damage");
+                }
+                else if (buff == "Defense+10%")
+                {
+                    // Defense reduces incoming damage (not implemented yet)
+                    logger.Log("[BUFF] Defense+10% applied (damage reduction)");
+                }
+                else if (buff == "Attack Speed+20%")
+                {
+                    attackSpeed *= 0.8f; // 20% faster = 0.8x interval
+                    logger.Log("[BUFF] Attack Speed+20% applied: " + attackSpeed + " attack interval");
+                }
+                else if (buff == "Crit Rate+5%")
+                {
+                    // Crit chance increased (not implemented yet)
+                    logger.Log("[BUFF] Crit Rate+5% applied (5% crit chance)");
+                }
+                else if (buff == "Health+20%")
+                {
+                    // Player health increased (not implemented yet)
+                    logger.Log("[BUFF] Health+20% applied (player health increased)");
+                }
+            }
+
             // Move enemies
             var enemies = entityManager.GetAllEntities();
             foreach (var enemy in enemies)
             {
-                if (enemy.Id == playerEntity.Id) continue; // Skip player
+                if (enemy.Id == playerEntity.Id) continue;
 
                 var enemyPos = entityManager.GetComponent<PositionComponent>(enemy);
                 var enemyHealth = entityManager.GetComponent<EnemyComponent>(enemy);
@@ -204,7 +236,7 @@ namespace BattleSystemECS
             // Player attack
             foreach (var enemy in enemies)
             {
-                if (enemy.Id == playerEntity.Id) continue; // Skip player
+                if (enemy.Id == playerEntity.Id) continue;
 
                 var enemyPos = entityManager.GetComponent<PositionComponent>(enemy);
                 var enemyHealth = entityManager.GetComponent<EnemyComponent>(enemy);
@@ -215,9 +247,9 @@ namespace BattleSystemECS
 
                 // Check if in attack range
                 float distance = Math.Abs(enemyPos.X - playerPos.X);
-                if (distance <= player.AttackRange && enemyPos.Y > playerPos.Y)
+                if (distance <= attackRange && enemyPos.Y > playerPos.Y)
                 {
-                    float damage = player.AttackDamage;
+                    float damage = attackDamage;
                     enemyHealth.Health = Math.Max(0f, enemyHealth.Health - damage);
                     entityManager.SetComponent(enemy, enemyHealth);
 
@@ -227,7 +259,7 @@ namespace BattleSystemECS
                     if (enemyHealth.Health <= 0f)
                     {
                         gold.Amount += enemyHealth.GoldReward;
-                        entityManager.SetComponent(playerEntity, gold);
+                        entityManager.SetComponent(new Entity(1), gold);
 
                         logger.Log("[GOLD] Killed " + monsterName + ", gained " + enemyHealth.GoldReward + " gold");
                         logger.Log("[GOLD] Total gold: " + gold.Amount);
@@ -267,9 +299,9 @@ namespace BattleSystemECS
             int randomIndex = new Random().Next(buffs.Length);
             string newBuff = buffs[randomIndex];
 
-            if (!upgrade.Skills.Contains(newBuff))
+            if (!upgrade.Buffs.Contains(newBuff))
             {
-                upgrade.Skills.Add(newBuff);
+                upgrade.Buffs.Add(newBuff);
                 Console.WriteLine("[BUFF] Gained new buff: " + newBuff + "!");
             }
         }
@@ -280,7 +312,7 @@ namespace BattleSystemECS
 
             foreach (var enemy in enemies)
             {
-                if (enemy.Id == 1) continue; // Skip player
+                if (enemy.Id == 1) continue;
 
                 var pos = entityManager.GetComponent<PositionComponent>(enemy);
                 var enemyHealth = entityManager.GetComponent<EnemyComponent>(enemy);
@@ -292,8 +324,8 @@ namespace BattleSystemECS
                 // Check if reached bottom
                 if (pos.Y <= 0f)
                 {
-                    var monsterName = entityManager.GetName(enemy);
-                    logger.Log("[INFO] Enemy " + monsterName + " reached bottom (y=" + pos.Y + "), Game Over!");
+                    var enemyName = entityManager.GetName(enemy);
+                    logger.Log("[INFO] Enemy " + enemyName + " reached bottom (y=" + pos.Y + "), Game Over!");
                     return true;
                 }
             }
@@ -316,7 +348,7 @@ namespace BattleSystemECS
                     var entities = entityManager.GetAllEntities();
                     foreach (var entity in entities)
                     {
-                        if (entity.Id == 1) continue; // Skip player
+                        if (entity.Id == 1) continue;
 
                         var pos = entityManager.GetComponent<PositionComponent>(entity);
                         var posNotNull = entityManager.HasComponent<PositionComponent>(entity);
