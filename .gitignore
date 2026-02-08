@@ -42,9 +42,9 @@ x86/
 ehthumbs.db
 Thumbs.db
 
-# 日志文件
+# 日志文件（排除运行时生成的日志）
+# 注意：battle_log.txt 和其他文档文件会被跟踪
 *.log
-*.txt
 
 # 其他
 *.cache
