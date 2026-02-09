@@ -24,7 +24,8 @@ namespace BattleSystemECS.Core
         private GoldRewardSystem goldRewardSystem;
         private WaveSpawningSystem waveSpawningSystem;
         private UpgradeSystem upgradeSystem;
-        private SkillSystem skillSystem;  // 技能系统
+        private SkillSystem skillSystem;
+        private EnemyAttackSystem enemyAttackSystem;  // 添加敌人攻击系统
 
         // 渲染器
         private IRenderer logger;
@@ -59,28 +60,70 @@ namespace BattleSystemECS.Core
         /// </summary>
         public void Initialize()
         {
+            Console.WriteLine();
+            logger.Log("[BOOTSTRAP] ========== Game Initialization ==========");
+            logger.Log("[BOOTSTRAP] 1. Loading Game Configuration...");
+
             // 加载游戏配置
             gameConfig = GameConfigLoader.LoadConfig(logger);
 
+            logger.Log("[BOOTSTRAP]    - Configuration loaded successfully!");
+            logger.Log("[BOOTSTRAP]    - Monster Types: " + gameConfig.MonsterTypes.Count);
+            logger.Log("[BOOTSTRAP]    - Levels: " + gameConfig.Levels.Count);
+            logger.Log("[BOOTSTRAP]    - Skills: " + gameConfig.Skills.Count);
+
+            Console.WriteLine();
+            logger.Log("[BOOTSTRAP] 2. Initializing Game Systems...");
+
             // 初始化地图大小
+            logger.Log("[BOOTSTRAP]    - Creating MapSystem (10x20 map)...");
             mapSystem = new MapSystem(logger, store);
             mapSystem.SetMapSize(10, 20);  // 地图改为 10x20
+            logger.Log("[BOOTSTRAP]      MapSystem created successfully!");
 
             // 初始化其他系统
+            logger.Log("[BOOTSTRAP]    - Creating EnemyMovementSystem...");
             enemyMovementSystem = new EnemyMovementSystem(store);
+            logger.Log("[BOOTSTRAP]      EnemyMovementSystem created successfully!");
 
             // 初始化玩家（血量 200）
+            logger.Log("[BOOTSTRAP]    - Creating Player Entity...");
             InitializePlayer();
+            logger.Log("[BOOTSTRAP]      Player Entity created successfully!");
+
+            logger.Log("[BOOTSTRAP] 3. Initializing Player Skills (from config)...");
 
             // 初始化其他系统
+            logger.Log("[BOOTSTRAP]    - Creating PlayerTowerAttackSystem...");
             playerTowerAttackSystem = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
+            logger.Log("[BOOTSTRAP]      PlayerTowerAttackSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating GoldRewardSystem...");
             goldRewardSystem = new GoldRewardSystem(store, logger, playerId);
+            logger.Log("[BOOTSTRAP]      GoldRewardSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating WaveSpawningSystem...");
             waveSpawningSystem = new WaveSpawningSystem(store, logger, gameConfig);
+            logger.Log("[BOOTSTRAP]      WaveSpawningSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating UpgradeSystem...");
             upgradeSystem = new UpgradeSystem(store, logger, playerId);
+            logger.Log("[BOOTSTRAP]      UpgradeSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating SkillSystem (config-driven)...");
             skillSystem = new SkillSystem(store, logger, playerId, gameConfig);  // 初始化技能系统（从配置加载）
+            logger.Log("[BOOTSTRAP]      SkillSystem created successfully!");
 
             // 初始化玩家技能（从配置加载）
             skillSystem.InitializePlayerSkills();  // 初始化技能系统
+            logger.Log("[BOOTSTRAP]      Player Skills initialized successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating EnemyAttackSystem...");
+            enemyAttackSystem = new EnemyAttackSystem(store, logger, playerId);  // 初始化敌人攻击系统
+            logger.Log("[BOOTSTRAP]      EnemyAttackSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP] ========== Game Initialization Complete ==========");
+            Console.WriteLine();
         }
 
         /// <summary>
@@ -92,23 +135,35 @@ namespace BattleSystemECS.Core
             entityManager.SetName(playerEntity, "Player");
             int id = playerEntity.Id;
 
-            // SOA: 添加玩家组件（血量 200）
+            // SOA: 添加玩家组件（从配置加载）
             store.AddPosition(id, 5f, 0f);
-            store.AddPlayer(id, 3f, 1f, 10f, 1);
 
-            // 添加玩家血量组件（SOA）
-            // 注意：这里我们假设玩家血量存储在 PlayerComponent 中，或者需要扩展 ComponentStore
-            // 为了简化，我们使用 PlayerComponent 的 MaxHealth 属性
-            
+            // 从配置加载玩家属性
+            float attackRange = gameConfig.Player.AttackRange;
+            float attackSpeed = gameConfig.Player.AttackSpeed;
+            float attackDamage = gameConfig.Player.AttackDamage;
+            float maxHealth = gameConfig.Player.MaxHealth;
+            int currentLevel = gameConfig.Player.CurrentLevel;
+            float upgradeThreshold = gameConfig.Player.UpgradeThreshold;
+
+            // 添加玩家组件（SOA）
+            store.AddPlayer(id, attackRange, attackSpeed, attackDamage, currentLevel);
+            store.SetPlayerMaxHealth(id, maxHealth);
+            store.SetPlayerCurrentHealth(id, maxHealth);
+            store.SetPlayerUpgradeThreshold(id, upgradeThreshold);
+
             playerId = id;
 
+            logger.Log("[BOOTSTRAP]    - Creating Player Entity...");
             logger.Log("[INFO] Player created! Position: x=5, y=0");
-            logger.Log("[INFO]   - Max Health: " + playerMaxHealth + " (increased from 100 to 200)");
-            logger.Log("[INFO]   - Attack Range: 3 grids");
-            logger.Log("[INFO]   - Attack Interval: 1 seconds");
-            logger.Log("[INFO]   - Attack Damage: 10 points");
-            logger.Log("[INFO]   - Current Level: 1");
-            logger.Log("[INFO]   - Upgrade Threshold: 100 gold");
+            logger.Log("[INFO]   - Max Health: " + maxHealth + " (from config)");
+            logger.Log("[INFO]   - Current Health: " + maxHealth + " / " + maxHealth);
+            logger.Log("[INFO]   - Attack Range: " + attackRange + " grids");
+            logger.Log("[INFO]   - Attack Interval: " + attackSpeed + " seconds");
+            logger.Log("[INFO]   - Attack Damage: " + attackDamage + " points");
+            logger.Log("[INFO]   - Current Level: " + currentLevel);
+            logger.Log("[INFO]   - Upgrade Threshold: " + upgradeThreshold + " gold");
+            logger.Log("[BOOTSTRAP]      Player Entity created successfully!");
         }
 
         /// <summary>
@@ -183,8 +238,19 @@ namespace BattleSystemECS.Core
                     // 移动敌人（SOA）
                     enemyMovementSystem.Update();
 
+                    // 敌人攻击玩家（SOA）- 检查相邻敌人，减少玩家生命值
+                    enemyAttackSystem.Update();
+
                     // 玩家攻击（SOA）
                     playerTowerAttackSystem.Update();
+
+                    // 检查玩家是否存活
+                    if (!enemyAttackSystem.IsPlayerAlive())
+                    {
+                        logger.Log("[INFO] Player died! Game Over.");
+                        gameRunning = false;
+                        break;
+                    }
 
                     // 检查升级（SOA）
                     goldRewardSystem.Update();
@@ -195,19 +261,14 @@ namespace BattleSystemECS.Core
                     // 更新技能系统冷却
                     skillSystem.Update(1f);  // 每回合 1 秒
 
-                    // 手动释放技能（注释掉，防止重复执行）
-                    // 只在敌人数量 > 50 时自动释放技能，避免每个回合都释放
-                    var activeEnemyIds = store.GetActiveEnemyIds();
-                    if (activeEnemyIds.Count > 50)
-                    {
-                        // skillSystem.AutoCastSkill();  // 暂时注释掉，避免重复执行
-                    }
+                    // 自动释放技能（根据冷却时间）
+                    // skillSystem.AutoCastSkill();  // 暂时注释掉，避免重复执行
 
                     // 渲染地图（SOA）
                     mapSystem.Update();
 
                     // 显示玩家血量（200）
-                    logger.Log("[HEALTH] Player Health: " + playerMaxHealth + " / " + playerMaxHealth);
+                    logger.Log("[HEALTH] Player Health: " + store.GetPlayerCurrentHealth(playerId) + " / " + store.GetPlayerMaxHealth(playerId));
 
                     // 检查敌人是否到达底部
                     if (CheckEnemiesAtBottom())

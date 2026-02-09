@@ -7,6 +7,7 @@ namespace BattleSystemECS.Config
         public string Name { get; set; }
         public string Type { get; set; }
         public float AttackRange { get; set; }
+        public float AttackSpeed { get; set; }  // 添加缺失的 AttackSpeed 属性
         public float AttackInterval { get; set; }
         public float AttackDamage { get; set; }
         public float MaxHealth { get; set; }
