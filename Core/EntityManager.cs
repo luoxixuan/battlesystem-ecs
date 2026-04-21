@@ -28,7 +28,7 @@ namespace BattleSystemECS
 
         public Entity CreateEntity()
         {
-            int entityId = store.NextEntityId;
+            int entityId = store.CreateEntity();
             store.SetEntityName(entityId, $"Entity_{entityId}");
             return new Entity(entityId);
         }
@@ -148,7 +148,8 @@ namespace BattleSystemECS
             {
                 return (T)(object)new GoldComponent
                 {
-                    Amount = store.GetPlayerGold(entityId)
+                    CurrentGold = store.GetPlayerGold(entityId),
+                    TotalGold = store.GetPlayerTotalGold(entityId)
                 };
             }
             else if (componentName == "UpgradeComponent")
@@ -197,7 +198,7 @@ namespace BattleSystemECS
             else if (componentName == "GoldComponent")
             {
                 var gold = (GoldComponent)(object)component;
-                store.SetPlayerGold(entityId, gold.Amount);
+                store.SetPlayerGold(entityId, gold.CurrentGold);
             }
             else if (componentName == "UpgradeComponent")
             {
@@ -214,7 +215,7 @@ namespace BattleSystemECS
         public List<Entity> GetAllEntities()
         {
             List<Entity> entities = new List<Entity>();
-            for (int i = 1; i <= store.NextEntityId - 1; i++)
+            for (int i = 1; i < store.NextEntityId; i++)
             {
                 entities.Add(new Entity(i));
             }

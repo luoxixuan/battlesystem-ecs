@@ -14,9 +14,9 @@ namespace BattleSystemECS.Core
     public class ComponentStore
     {
         // 常量定义
-        private const int MAX_ENTITIES = 1000;
+        private const int MAX_ENTITIES = 100000;
         private const int MAX_PLAYERS = 10;
-        private const int MAX_MONSTERS = 1000;
+        private const int MAX_MONSTERS = 20000;
         private const int MAX_BUFFS = 10;
 
         // ==================== 位置组件的 SOA 存储 ====================
@@ -36,13 +36,23 @@ namespace BattleSystemECS.Core
         public List<string>[] PlayerBuffs = new List<string>[MAX_PLAYERS];
 
         // ==================== 敌人组件的 SOA 存储 ====================
-        public float[] EnemyHealth = new float[MAX_MONSTERS];
-        public float[] EnemyMaxHealth = new float[MAX_MONSTERS];
-        public float[] EnemyMoveSpeed = new float[MAX_MONSTERS];
-        public float[] EnemyDamage = new float[MAX_MONSTERS];
-        public int[] EnemyGoldReward = new int[MAX_MONSTERS];
-        public int[] EnemyWaveNumber = new int[MAX_MONSTERS];
-        public bool[] EnemyActive = new bool[MAX_MONSTERS];
+        public float[] EnemyHealth = new float[MAX_ENTITIES];
+        public float[] EnemyMaxHealth = new float[MAX_ENTITIES];
+        public float[] EnemyMoveSpeed = new float[MAX_ENTITIES];
+        public float[] EnemyDamage = new float[MAX_ENTITIES];
+        public int[] EnemyGoldReward = new int[MAX_ENTITIES];
+        public int[] EnemyWaveNumber = new int[MAX_ENTITIES];
+        public bool[] EnemyActive = new bool[MAX_ENTITIES];
+
+        // ==================== 塔组件的 SOA 存储 ====================
+        public string[] TowerType = new string[MAX_ENTITIES];
+        public float[] TowerAttackDamage = new float[MAX_ENTITIES];
+        public int[] TowerRange = new int[MAX_ENTITIES];
+        public float[] TowerAttackSpeed = new float[MAX_ENTITIES];
+        public int[] TowerLevel = new int[MAX_ENTITIES];
+        public float[] TowerUpgradeCost = new float[MAX_ENTITIES];
+        public bool[] TowerActive = new bool[MAX_ENTITIES];
+        public float[] TowerLastAttackTime = new float[MAX_ENTITIES];
 
         // ==================== 技能组件的 SOA 存储 ====================
         public string[] SkillName = new string[MAX_PLAYERS];
@@ -56,8 +66,9 @@ namespace BattleSystemECS.Core
         // ==================== 实体管理 ====================
         public int PlayerEntityId { get; private set; } = 1;
         public List<int> ActiveEnemyIds = new List<int>();
+        private Stack<int> freeEntityIds = new Stack<int>();
         public Dictionary<int, string> entityNames = new Dictionary<int, string>();
-        private int nextEntityId = 1;
+        private int nextEntityId = 2; // 从 2 开始，1 是玩家
 
         public ComponentStore()
         {
@@ -68,10 +79,27 @@ namespace BattleSystemECS.Core
             }
         }
 
-        public int NextEntityId
+        public int CreateEntity()
         {
-            get { return nextEntityId++; }
+            if (freeEntityIds.Count > 0)
+            {
+                return freeEntityIds.Pop();
+            }
+            return nextEntityId++;
         }
+
+        public void DestroyEntity(int entityId)
+        {
+            // 清理组件状态
+            PositionActive[entityId] = false;
+            EnemyActive[entityId] = false;
+            TowerActive[entityId] = false;
+            
+            // 回收 ID
+            freeEntityIds.Push(entityId);
+        }
+
+        public int NextEntityId => nextEntityId;
 
         public string GetEntityName(int entityId)
         {
@@ -164,6 +192,11 @@ namespace BattleSystemECS.Core
             return PlayerGold[playerId];
         }
 
+        public float GetPlayerTotalGold(int playerId)
+        {
+            return GetPlayerGold(playerId);
+        }
+
         public void SetPlayerGold(int playerId, float gold)
         {
             if (playerId < 0 || playerId >= MAX_PLAYERS) return;
@@ -210,7 +243,12 @@ namespace BattleSystemECS.Core
 
         public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber)
         {
-            int entityId = NextEntityId;
+            int entityId = CreateEntity();
+
+            if (entityId >= MAX_ENTITIES) 
+            {
+                return -1;
+            }
 
             PositionX[entityId] = startX;
             PositionY[entityId] = startY;
@@ -226,6 +264,25 @@ namespace BattleSystemECS.Core
 
             ActiveEnemyIds.Add(entityId);
             return entityId;
+        }
+
+        public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost)
+        {
+            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            TowerType[entityId] = type;
+            TowerAttackDamage[entityId] = damage;
+            TowerRange[entityId] = range;
+            TowerAttackSpeed[entityId] = speed;
+            TowerLevel[entityId] = level;
+            TowerUpgradeCost[entityId] = cost;
+            TowerActive[entityId] = true;
+            TowerLastAttackTime[entityId] = 0f;
+        }
+
+        public void RemoveTower(int entityId)
+        {
+            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            TowerActive[entityId] = false;
         }
 
         public float GetEnemyHealth(int enemyId)

@@ -25,7 +25,10 @@ namespace BattleSystemECS.Core
         private WaveSpawningSystem waveSpawningSystem;
         private UpgradeSystem upgradeSystem;
         private SkillSystem skillSystem;
-        private EnemyAttackSystem enemyAttackSystem;  // 添加敌人攻击系统
+        private EnemyAttackSystem enemyAttackSystem;
+        private TowerPlacementSystem towerPlacementSystem;  // 塔建造系统
+        private TowerAttackSystem towerAttackSystem;       // 塔攻击系统
+        private TowerUpgradeSystem towerUpgradeSystem;     // 塔升级系统
 
         // 渲染器
         private IRenderer logger;
@@ -85,6 +88,19 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]    - Creating EnemyMovementSystem...");
             enemyMovementSystem = new EnemyMovementSystem(store);
             logger.Log("[BOOTSTRAP]      EnemyMovementSystem created successfully!");
+
+            // 初始化塔防系统
+            logger.Log("[BOOTSTRAP]    - Creating TowerPlacementSystem...");
+            towerPlacementSystem = new TowerPlacementSystem(store, logger);
+            logger.Log("[BOOTSTRAP]      TowerPlacementSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating TowerAttackSystem...");
+            towerAttackSystem = new TowerAttackSystem(store, logger);
+            logger.Log("[BOOTSTRAP]      TowerAttackSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating TowerUpgradeSystem...");
+            towerUpgradeSystem = new TowerUpgradeSystem(store, logger);
+            logger.Log("[BOOTSTRAP]      TowerUpgradeSystem created successfully!");
 
             // 初始化玩家（血量 200）
             logger.Log("[BOOTSTRAP]    - Creating Player Entity...");
@@ -167,6 +183,15 @@ namespace BattleSystemECS.Core
         }
 
         /// <summary>
+        /// 运行性能基准测试
+        /// </summary>
+        public void RunBenchmark(int count)
+        {
+            var benchmark = new BenchmarkSystem(store);
+            benchmark.RunBenchmark(count);
+        }
+
+        /// <summary>
         /// 运行游戏主循环
         /// </summary>
         public void Run()
@@ -218,6 +243,17 @@ namespace BattleSystemECS.Core
                 mapSystem.Update();
                 logger.Log("========================================");
 
+                // [测试] 自动部署防御塔
+                logger.Log("[TEST] 自动部署防御塔...");
+                towerPlacementSystem.PlaceTower(2, 5, "弓箭塔", 15.0f, 3, 1.5f, 100f);
+                towerPlacementSystem.PlaceTower(7, 12, "魔法塔", 25.0f, 5, 0.8f, 200f);
+
+                // [测试] 升级塔
+                logger.Log("[TEST] 尝试升级塔...");
+                store.SetPlayerGold(store.PlayerEntityId, 500f); // 给金币
+                towerUpgradeSystem.UpgradeTower(2); // 升级第一座塔
+                towerUpgradeSystem.UpgradeTower(3); // 升级第二座塔
+
                 Console.WriteLine();
                 logger.Log("Game Start!");
 
@@ -243,6 +279,9 @@ namespace BattleSystemECS.Core
 
                     // 玩家攻击（SOA）
                     playerTowerAttackSystem.Update();
+
+                    // [测试] 塔攻击逻辑
+                    towerAttackSystem.Update(1.0f);
 
                     // 检查玩家是否存活
                     if (!enemyAttackSystem.IsPlayerAlive())

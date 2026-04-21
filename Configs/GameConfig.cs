@@ -30,6 +30,17 @@ namespace BattleSystemECS.Config
         public List<string> Skills { get; set; } = new List<string>();
     }
 
+    public class TowerConfig
+    {
+        public string Name { get; set; }
+        public string Type { get; set; }
+        public float Damage { get; set; }
+        public int Range { get; set; }
+        public float AttackSpeed { get; set; }
+        public float Cost { get; set; }
+        public float UpgradeCost { get; set; }
+    }
+
     public class WaveConfig
     {
         public int WaveNumber { get; set; }
@@ -62,6 +73,7 @@ namespace BattleSystemECS.Config
         public PlayerConfig Player { get; set; } = new PlayerConfig();
         public List<SkillConfig> Skills { get; set; } = new List<SkillConfig>();
         public List<MonsterConfig> MonsterTypes { get; set; } = new List<MonsterConfig>();
+        public List<TowerConfig> TowerTypes { get; set; } = new List<TowerConfig>();
         public List<LevelConfig> Levels { get; set; } = new List<LevelConfig>();
         public LevelConfig CurrentLevel { get; set; }  // 添加缺失的 CurrentLevel 属性
 
@@ -110,6 +122,40 @@ namespace BattleSystemECS.Config
                 Cooldown = 8f,
                 AutoCast = false,
                 Hotkey = "3"
+            });
+
+            // Default towers
+            TowerTypes.Add(new TowerConfig
+            {
+                Name = "Basic Tower",
+                Type = "Basic",
+                Damage = 10f,
+                Range = 3,
+                AttackSpeed = 1f,
+                Cost = 50f,
+                UpgradeCost = 30f
+            });
+
+            TowerTypes.Add(new TowerConfig
+            {
+                Name = "Sniper Tower",
+                Type = "Sniper",
+                Damage = 25f,
+                Range = 8,
+                AttackSpeed = 0.5f,
+                Cost = 100f,
+                UpgradeCost = 60f
+            });
+
+            TowerTypes.Add(new TowerConfig
+            {
+                Name = "AOE Tower",
+                Type = "AOE",
+                Damage = 8f,
+                Range = 2,
+                AttackSpeed = 1.5f,
+                Cost = 75f,
+                UpgradeCost = 45f
             });
 
             // Default monsters
@@ -210,6 +256,11 @@ namespace BattleSystemECS.Config
         public SkillConfig GetSkillConfig(string skillName)
         {
             return Skills.Find(s => s.Name == skillName);
+        }
+
+        public TowerConfig GetTowerConfig(string type)
+        {
+            return TowerTypes.Find(t => t.Type == type);
         }
     }
 }
