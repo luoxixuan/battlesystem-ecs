@@ -27,64 +27,58 @@ namespace BattleSystemECS.Systems
 
         public void Update(float deltaTime)
         {
-            // 遍历所有塔
-            for (int i = 0; i < store.NextEntityId; i++)
+            var activeEnemies = _activeEnemyList ?? store.GetAllActiveEnemyIds();
+
+            for (int ti = 0; ti < store.NextEntityId; ti++)
             {
-                if (!store.TowerActive[i]) continue;
+                if (!store.TowerActive[ti]) continue;
 
-                store.TowerLastAttackTime[i] += deltaTime;
+                store.TowerLastAttackTime[ti] += deltaTime;
 
-                // 检查是否满足攻击速度
-                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[i]);
-                if (store.TowerLastAttackTime[i] >= attackInterval)
+                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[ti]);
+                if (store.TowerLastAttackTime[ti] < attackInterval) continue;
+
+                float tx = store.PositionX[ti];
+                float ty = store.PositionY[ti];
+                int range = store.TowerRange[ti];
+                float damage = store.TowerAttackDamage[ti];
+                int rangeSq = range * range;
+
+                int bestTarget = -1;
+                float minDistSq = float.MaxValue;
+
+                // For-index loop over cached enemy list (no enumerator allocation)
+                for (int ei = 0; ei < activeEnemies.Count; ei++)
                 {
-                    // 寻找最近敌人
-                    int targetId = FindNearestEnemy(store.PositionX[i], store.PositionY[i], store.TowerRange[i]);
+                    int enemyId = activeEnemies[ei];
+                    if (!store.EnemyActive[enemyId]) continue;
 
-                    if (targetId != -1)
+                    float ex = store.PositionX[enemyId];
+                    float ey = store.PositionY[enemyId];
+
+                    float dx = ex - tx;
+                    float dy = ey - ty;
+
+                    float distSq = dx * dx + dy * dy;
+                    if (distSq > rangeSq) continue;
+                    if (distSq < minDistSq)
                     {
-                        // 执行攻击
-                        float damage = store.TowerAttackDamage[i];
-                        store.EnemyHealth[targetId] -= damage;
-                        store.TowerLastAttackTime[i] = 0f;
+                        minDistSq = distSq;
+                        bestTarget = enemyId;
+                    }
+                }
 
-                        // 检查敌人死亡
-                        if (store.EnemyHealth[targetId] <= 0)
-                        {
-                            store.EnemyActive[targetId] = false;
-                        }
+                store.TowerLastAttackTime[ti] = 0f;
+
+                if (bestTarget != -1)
+                {
+                    store.EnemyHealth[bestTarget] -= damage;
+                    if (store.EnemyHealth[bestTarget] <= 0)
+                    {
+                        store.EnemyActive[bestTarget] = false;
                     }
                 }
             }
-        }
-
-        private int FindNearestEnemy(float tx, float ty, int range)
-        {
-            int bestTarget = -1;
-            float minDistSq = float.MaxValue;
-            int rangeSq = range * range;
-
-            var activeEnemies = _activeEnemyList;
-            for (int i = 0; i < activeEnemies.Count; i++)
-            {
-                int enemyId = activeEnemies[i];
-                if (!store.EnemyActive[enemyId]) continue;
-
-                float ex = store.PositionX[enemyId];
-                float ey = store.PositionY[enemyId];
-
-                float dx = ex - tx;
-                float dy = ey - ty;
-                float distSq = dx * dx + dy * dy;
-
-                if (distSq <= rangeSq && distSq < minDistSq)
-                {
-                    minDistSq = distSq;
-                    bestTarget = enemyId;
-                }
-            }
-
-            return bestTarget;
         }
     }
 }

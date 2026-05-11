@@ -17,19 +17,37 @@ namespace BattleSystemECS.Systems
         private Core.ComponentStore store;
         private readonly int playerId;
 
+        // Cached per-turn to avoid per-frame store lookups
+        private List<int> _activeEnemyList;
+        private float _playerX;
+
         public EnemyMovementSystem(Core.ComponentStore store, int playerId)
         {
             this.store = store;
             this.playerId = playerId;
         }
 
+        public void SetTurn(int turn)
+        {
+            _activeEnemyList = store.GetAllActiveEnemyIds();
+            _playerX = store.PositionX[playerId];
+        }
+
         public void Update()
         {
-            var activeEnemyIds = store.GetAllActiveEnemyIds();
-            int enemiesMoved = 0;
-
-            foreach (int enemyId in activeEnemyIds)
+            if (_activeEnemyList == null)
             {
+                // Fallback for code that calls Update() without SetTurn()
+                _activeEnemyList = store.GetAllActiveEnemyIds();
+                _playerX = store.PositionX[playerId];
+            }
+
+            int enemiesMoved = 0;
+            var activeEnemyIds = _activeEnemyList;
+
+            for (int i = 0; i < activeEnemyIds.Count; i++)
+            {
+                int enemyId = activeEnemyIds[i];
                 if (!store.EnemyActive[enemyId])
                     continue;
 
@@ -42,7 +60,6 @@ namespace BattleSystemECS.Systems
                 int direction = -1;
                 float x = store.PositionX[enemyId];
                 float y = store.PositionY[enemyId];
-                float playerX = store.PositionX[playerId];
 
                 switch (actionEnum)
                 {

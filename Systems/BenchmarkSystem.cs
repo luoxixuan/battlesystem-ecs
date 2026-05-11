@@ -79,6 +79,7 @@ namespace BattleSystemECS.Systems
                 int turn = f + 6;
                 enemyAI.SetTurn(turn);
                 enemyAI.Update();
+                enemyMovement.SetTurn(turn);
                 enemyMovement.Update();
                 playerAttack.SetTurn(turn);
                 playerAttack.Update();
@@ -103,7 +104,7 @@ namespace BattleSystemECS.Systems
 
                 sw.Start(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedTicks;
                 sw.Restart(); enemyAI.SetTurn(turn); enemyAI.Update(); tEnemyAI += sw.ElapsedTicks;
-                sw.Restart(); enemyMovement.Update(); tMovement += sw.ElapsedTicks;
+                sw.Restart(); enemyMovement.SetTurn(turn); enemyMovement.Update(); tMovement += sw.ElapsedTicks;
                 sw.Restart(); playerAttack.SetTurn(turn); playerAttack.Update(); tPlayerAttack += sw.ElapsedTicks;
                 sw.Restart(); towerAttack.SetTurn(turn); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
                 sw.Restart(); gold.SetTurn(turn); gold.Update(); tGold += sw.ElapsedTicks;
@@ -136,7 +137,6 @@ namespace BattleSystemECS.Systems
 
         private void RunMicroBenchmark(int enemyCount, int frames)
         {
-            // Existing micro benchmark unchanged...
             Console.WriteLine($"\n[MICRO] EnemyAI.Update() cost breakdown: {enemyCount} enemies x {frames} frames");
 
             var logger = new ConsoleLogger();

@@ -14,8 +14,6 @@ namespace BattleSystemECS.Systems
     {
         private Core.ComponentStore store;
         private IRenderer renderer;
-        private List<int> _activeEnemyList;
-        private bool _turnCached;
 
         public GoldSystem(Core.ComponentStore store, IRenderer renderer)
         {
@@ -25,8 +23,8 @@ namespace BattleSystemECS.Systems
 
         public void SetTurn(int turn)
         {
-            _activeEnemyList = store.GetAllActiveEnemyIds();
-            _turnCached = true;
+            // Gold rewards for kills are handled by PlayerTowerAttackSystem and TowerAttackSystem.
+            // This system no longer scans the enemy list per turn.
         }
 
         /// <summary>
@@ -34,35 +32,8 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void Update()
         {
-            if (!_turnCached)
-            {
-                SetTurn(0);
-            }
-            // 检查击杀奖励
-            CheckKillRewards();
-        }
-
-        /// <summary>
-        /// 检查击杀奖励
-        /// </summary>
-        private void CheckKillRewards()
-        {
-            var activeEnemyIds = _activeEnemyList;
-            int playerEntityId = store.PlayerEntityId;
-
-            for (int i = 0; i < activeEnemyIds.Count; i++)
-            {
-                int enemyId = activeEnemyIds[i];
-                if (!store.EnemyActive[enemyId]) continue;
-
-                float enemyHealth = store.EnemyHealth[enemyId];
-                if (enemyHealth <= 0f)
-                {
-                    // 敌人已死亡，给予奖励
-                    store.PlayerGold[playerEntityId] += store.EnemyGoldReward[enemyId];
-                    store.EnemyActive[enemyId] = false;
-                }
-            }
+            // Gold reward logic moved to PlayerTowerAttackSystem and TowerAttackSystem
+            // to avoid double-counting and redundant scanning.
         }
 
         /// <summary>

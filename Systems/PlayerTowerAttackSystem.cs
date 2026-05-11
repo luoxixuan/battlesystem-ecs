@@ -45,11 +45,10 @@ namespace BattleSystemECS.Systems
         {
             if (!_turnCached)
             {
-                // Fallback for code that calls Update() without SetTurn()
                 SetTurn(0);
             }
 
-            var buffs = store.PlayerBuffs[playerId]; // direct array access
+            var buffs = store.PlayerBuffs[playerId];
 
             float finalAttackDamage = _attackDamage;
             float finalAttackRange = _attackRange;
@@ -73,6 +72,11 @@ namespace BattleSystemECS.Systems
             }
 
             var activeEnemyIds = _activeEnemyList;
+            int rangeSq = (int)(finalAttackRange * finalAttackRange);
+
+            // Accumulate gold and kill flags locally, then apply once
+            int goldToAdd = 0;
+            int killCount = 0;
 
             for (int i = 0; i < activeEnemyIds.Count; i++)
             {
@@ -84,9 +88,10 @@ namespace BattleSystemECS.Systems
                 if (enemyY <= _playerY) continue;
 
                 float dx = enemyX - _playerX;
-                if (dx * dx > finalAttackRange * finalAttackRange) continue;
+                float dxSq = dx * dx;
+                if (dxSq > rangeSq) continue;
 
-                float enemyHealth = store.EnemyHealth[enemyId]; // direct array access
+                float enemyHealth = store.EnemyHealth[enemyId];
                 if (enemyHealth <= 0f) continue;
 
                 enemyHealth -= finalAttackDamage;
@@ -94,9 +99,15 @@ namespace BattleSystemECS.Systems
 
                 if (enemyHealth <= 0f)
                 {
-                    store.PlayerGold[playerId] += store.EnemyGoldReward[enemyId];
+                    goldToAdd += store.EnemyGoldReward[enemyId];
+                    killCount++;
                     store.EnemyActive[enemyId] = false;
                 }
+            }
+
+            if (goldToAdd > 0)
+            {
+                store.PlayerGold[playerId] += goldToAdd;
             }
         }
     }
