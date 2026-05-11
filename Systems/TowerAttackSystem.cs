@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
 
@@ -11,11 +12,17 @@ namespace BattleSystemECS.Systems
     {
         private ComponentStore store;
         private IRenderer logger;
+        private List<int> _activeEnemyList;
 
         public TowerAttackSystem(ComponentStore store, IRenderer logger)
         {
             this.store = store;
             this.logger = logger;
+        }
+
+        public void SetTurn(int turn)
+        {
+            _activeEnemyList = store.GetAllActiveEnemyIds();
         }
 
         public void Update(float deltaTime)
@@ -39,15 +46,12 @@ namespace BattleSystemECS.Systems
                         // 执行攻击
                         float damage = store.TowerAttackDamage[i];
                         store.EnemyHealth[targetId] -= damage;
-                        
-                        logger.Log($"[TOWER] 塔 {i} 攻击敌人 {targetId}, 造成 {damage} 点伤害");
                         store.TowerLastAttackTime[i] = 0f;
 
                         // 检查敌人死亡
                         if (store.EnemyHealth[targetId] <= 0)
                         {
                             store.EnemyActive[targetId] = false;
-                            logger.Log($"[TOWER] 敌人 {targetId} 被击杀！");
                         }
                     }
                 }
@@ -60,16 +64,15 @@ namespace BattleSystemECS.Systems
             float minDistSq = float.MaxValue;
             int rangeSq = range * range;
 
-            // 遍历敌人列表
-            var activeEnemies = store.GetAllActiveEnemyIds();
-            foreach (var enemyId in activeEnemies)
+            var activeEnemies = _activeEnemyList;
+            for (int i = 0; i < activeEnemies.Count; i++)
             {
+                int enemyId = activeEnemies[i];
                 if (!store.EnemyActive[enemyId]) continue;
 
                 float ex = store.PositionX[enemyId];
                 float ey = store.PositionY[enemyId];
 
-                // 使用平方距离比较，避免开方运算
                 float dx = ex - tx;
                 float dy = ey - ty;
                 float distSq = dx * dx + dy * dy;

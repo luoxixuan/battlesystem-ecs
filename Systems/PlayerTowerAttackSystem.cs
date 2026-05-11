@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -17,6 +18,12 @@ namespace BattleSystemECS.Systems
         private int playerId;
         private static readonly Random critRandom = new Random();
 
+        // Cached per-turn to avoid per-frame store lookups
+        private float _playerX, _playerY;
+        private float _attackDamage, _attackRange;
+        private List<int> _activeEnemyList;
+        private bool _turnCached;
+
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
             this.store = store;
@@ -24,18 +31,28 @@ namespace BattleSystemECS.Systems
             this.playerId = playerId;
         }
 
+        public void SetTurn(int turn)
+        {
+            _playerX = store.PositionX[playerId];
+            _playerY = store.PositionY[playerId];
+            _attackDamage = store.GetPlayerAttackDamage(playerId);
+            _attackRange = store.GetPlayerAttackRange(playerId);
+            _activeEnemyList = store.GetAllActiveEnemyIds();
+            _turnCached = true;
+        }
+
         public void Update()
         {
-            // SOA 直接数组访问，无字典查询，无 struct 复制
-            float attackRange = store.GetPlayerAttackRange(playerId);
-            float attackDamage = store.GetPlayerAttackDamage(playerId);
-            float playerX = store.PositionX[playerId];
-            float playerY = store.PositionY[playerId];
-            var buffs = store.GetPlayerBuffs(playerId);
+            if (!_turnCached)
+            {
+                // Fallback for code that calls Update() without SetTurn()
+                SetTurn(0);
+            }
 
-            // Calculate player stats with buff effects
-            float finalAttackDamage = attackDamage;
-            float finalAttackRange = attackRange;
+            var buffs = store.PlayerBuffs[playerId]; // direct array access
+
+            float finalAttackDamage = _attackDamage;
+            float finalAttackRange = _attackRange;
 
             if (buffs.Count > 0)
             {
@@ -44,67 +61,42 @@ namespace BattleSystemECS.Systems
                     if (buff == "Attack+10%")
                     {
                         finalAttackDamage *= 1.1f;
-                        renderer.Log($"[BUFF] Attack+10% applied: {finalAttackDamage:F1} damage");
                     }
                     else if (buff == "Crit Rate+5%")
                     {
                         if (critRandom.NextDouble() < 0.05)
                         {
                             finalAttackDamage *= 2f;
-                            renderer.Log($"[BUFF] CRITICAL! Damage doubled: {finalAttackDamage:F1}");
                         }
                     }
                 }
             }
 
-            // Find and attack enemies in range (SOA 迭代）
-            var activeEnemyIds = store.GetAllActiveEnemyIds();
-            int enemiesAttacked = 0;
+            var activeEnemyIds = _activeEnemyList;
 
-            foreach (int enemyId in activeEnemyIds)
+            for (int i = 0; i < activeEnemyIds.Count; i++)
             {
+                int enemyId = activeEnemyIds[i];
                 if (enemyId == playerId) continue;
 
-                // SOA 直接数组访问，无字典查询，无 struct 复制
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
-                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyY <= _playerY) continue;
 
-                // Skip dead enemies
+                float dx = enemyX - _playerX;
+                if (dx * dx > finalAttackRange * finalAttackRange) continue;
+
+                float enemyHealth = store.EnemyHealth[enemyId]; // direct array access
+                if (enemyHealth <= 0f) continue;
+
+                enemyHealth -= finalAttackDamage;
+                store.EnemyHealth[enemyId] = enemyHealth;
+
                 if (enemyHealth <= 0f)
-                    continue;
-
-                // Check if in attack range (直接数组计算，无复制）
-                float distance = System.Math.Abs(enemyX - playerX);
-                if (distance <= finalAttackRange && enemyY > playerY)
                 {
-                    // Attack enemy (SOA 直接数组访问，无 struct 复制）
-                    enemyHealth = System.Math.Max(0f, enemyHealth - finalAttackDamage);
-                    store.SetEnemyHealth(enemyId, enemyHealth);
-
-                    int goldReward = store.GetEnemyGoldReward(enemyId);
-                    string enemyName = store.GetName(enemyId);
-
-                    renderer.Log($"[ATTACK] Player (Level {store.GetPlayerLevel(playerId)}) attacks enemy {enemyId}, damage: {finalAttackDamage:F1}, position: x={enemyX:F0}, y={enemyY:F0}");
-
-                    if (enemyHealth <= 0f)
-                    {
-                        // Add gold to player (SOA 直接数组访问，无 struct 复制）
-                        float currentGold = store.GetPlayerGold(playerId);
-                        float newGold = currentGold + goldReward;
-                        store.SetPlayerGold(playerId, newGold);
-
-                        renderer.Log($"[GOLD] Killed {enemyName}, gained {goldReward} gold");
-                        renderer.Log($"[GOLD] Total gold: {newGold:F1}");
-
-                        enemiesAttacked++;
-                    }
+                    store.PlayerGold[playerId] += store.EnemyGoldReward[enemyId];
+                    store.EnemyActive[enemyId] = false;
                 }
-            }
-
-            if (enemiesAttacked > 0)
-            {
-                renderer.Log($"[COMBAT] Attacked {enemiesAttacked} enemies this turn");
             }
         }
     }

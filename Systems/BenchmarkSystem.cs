@@ -76,15 +76,18 @@ namespace BattleSystemECS.Systems
             // Warm-up
             for (int f = 0; f < 5; f++)
             {
-                enemyAI.SetTurn(f + 6);
+                int turn = f + 6;
+                enemyAI.SetTurn(turn);
                 enemyAI.Update();
                 enemyMovement.Update();
+                playerAttack.SetTurn(turn);
                 playerAttack.Update();
+                towerAttack.SetTurn(turn);
+                towerAttack.Update(1f);
+                gold.SetTurn(turn);
+                gold.Update();
             }
 
-            ConsoleLogger.EnableLog = false;
-
-            // Ensure map rendering is OFF in benchmark (it prints 200 frames of ASCII map to console — pure text output, not game logic cost)
             ConsoleLogger.EnableLog = false;
 
             long tWaveSpawn = 0, tEnemyAI = 0, tMovement = 0;
@@ -101,9 +104,9 @@ namespace BattleSystemECS.Systems
                 sw.Start(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedTicks;
                 sw.Restart(); enemyAI.SetTurn(turn); enemyAI.Update(); tEnemyAI += sw.ElapsedTicks;
                 sw.Restart(); enemyMovement.Update(); tMovement += sw.ElapsedTicks;
-                sw.Restart(); playerAttack.Update(); tPlayerAttack += sw.ElapsedTicks;
-                sw.Restart(); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
-                sw.Restart(); gold.Update(); tGold += sw.ElapsedTicks;
+                sw.Restart(); playerAttack.SetTurn(turn); playerAttack.Update(); tPlayerAttack += sw.ElapsedTicks;
+                sw.Restart(); towerAttack.SetTurn(turn); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
+                sw.Restart(); gold.SetTurn(turn); gold.Update(); tGold += sw.ElapsedTicks;
                 sw.Restart(); upgrade.Update(); tUpgrade += sw.ElapsedTicks;
                 sw.Restart(); skill.Update(1f); tSkill += sw.ElapsedTicks;
                 /* map.Update() = skip: Console.WriteLine per frame is console I/O, not ECS logic */

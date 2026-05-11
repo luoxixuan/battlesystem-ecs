@@ -14,6 +14,8 @@ namespace BattleSystemECS.Systems
     {
         private Core.ComponentStore store;
         private IRenderer renderer;
+        private List<int> _activeEnemyList;
+        private bool _turnCached;
 
         public GoldSystem(Core.ComponentStore store, IRenderer renderer)
         {
@@ -21,11 +23,21 @@ namespace BattleSystemECS.Systems
             this.renderer = renderer;
         }
 
+        public void SetTurn(int turn)
+        {
+            _activeEnemyList = store.GetAllActiveEnemyIds();
+            _turnCached = true;
+        }
+
         /// <summary>
         /// 更新金币系统
         /// </summary>
         public void Update()
         {
+            if (!_turnCached)
+            {
+                SetTurn(0);
+            }
             // 检查击杀奖励
             CheckKillRewards();
         }
@@ -35,24 +47,19 @@ namespace BattleSystemECS.Systems
         /// </summary>
         private void CheckKillRewards()
         {
-            var activeEnemyIds = store.GetAllActiveEnemyIds();
-            var enemiesToCheck = new List<int>(activeEnemyIds);
+            var activeEnemyIds = _activeEnemyList;
+            int playerEntityId = store.PlayerEntityId;
 
-            foreach (int enemyId in enemiesToCheck)
+            for (int i = 0; i < activeEnemyIds.Count; i++)
             {
+                int enemyId = activeEnemyIds[i];
                 if (!store.EnemyActive[enemyId]) continue;
 
-                float enemyHealth = store.GetEnemyHealth(enemyId);
+                float enemyHealth = store.EnemyHealth[enemyId];
                 if (enemyHealth <= 0f)
                 {
                     // 敌人已死亡，给予奖励
-                    int goldReward = store.GetEnemyGoldReward(enemyId);
-                    float currentGold = store.GetPlayerGold(store.PlayerEntityId);
-                    store.SetPlayerGold(store.PlayerEntityId, currentGold + goldReward);
-
-                    renderer.Log($"[GOLD] 击杀敌人 {enemyId}，获得 {goldReward} 金币，当前金币: {currentGold + goldReward:F1}");
-                    
-                    // 标记敌人为非活跃
+                    store.PlayerGold[playerEntityId] += store.EnemyGoldReward[enemyId];
                     store.EnemyActive[enemyId] = false;
                 }
             }
