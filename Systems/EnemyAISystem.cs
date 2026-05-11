@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.Collections.Concurrent;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Components;
@@ -21,7 +23,11 @@ namespace BattleSystemECS.Systems
 
         private int currentTurn;
         // Per-enemy charge param (Param value from the BT node definition)
-        private readonly Dictionary<int, float> chargeParams = new Dictionary<int, float>();
+        private readonly ConcurrentDictionary<int, float> chargeParams = new ConcurrentDictionary<int, float>();
+
+        // Per-turn cached fields for cache locality
+        private List<int> _activeEnemyList;
+        private float _playerX, _playerY;
 
         public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig)
         {
@@ -37,6 +43,11 @@ namespace BattleSystemECS.Systems
         public void SetTurn(int turn)
         {
             currentTurn = turn;
+            // Cache player position once per turn
+            _playerX = store.PositionX[playerId];
+            _playerY = store.PositionY[playerId];
+            // Cache active enemy list once per turn
+            _activeEnemyList = store.GetAllActiveEnemyIds();
         }
 
         /// <summary>
@@ -45,61 +56,71 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void Update()
         {
-            var activeEnemyIds = store.GetAllActiveEnemyIds();
-            int evaluated = 0;
+            var activeEnemyIds = _activeEnemyList;
+            int count = activeEnemyIds.Count;
 
-            foreach (int enemyId in activeEnemyIds)
+            // Parallel batch processing: 256 enemies per batch for instruction cache locality
+            const int batchSize = 256;
+            int numBatches = (count + batchSize - 1) / batchSize;
+
+            // Each thread processes its own batch 鈥?no shared mutable state during BT evaluation
+            Parallel.For(0, numBatches, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                batchIdx =>
             {
-                if (!store.EnemyActive[enemyId])
-                    continue;
+                int start = batchIdx * batchSize;
+                int end = Math.Min(start + batchSize, count);
 
-                // O(1) array access — pre-cached at spawn time in WaveSpawningSystem
-                var cachedBt = store.EnemyBehaviorTree[enemyId];
-                string action;
-                if (cachedBt != null)
+                for (int i = start; i < end; i++)
                 {
-                    action = BTCachedTreeEvaluator.Evaluate(cachedBt, enemyId, store, playerId, currentTurn);
-                }
-                else
-                {
-                    // Fallback when no BT is configured — derive monsterType from stored name
-                    string monsterType = store.GetEnemyTypeName(enemyId);
-                    if (string.IsNullOrEmpty(monsterType))
-                        monsterType = store.GetName(enemyId);
-                    cachedBt = gameConfig.GetCachedBehaviorTree(monsterType);
+                    int enemyId = activeEnemyIds[i];
+                    if (!store.EnemyActive[enemyId])
+                        continue;
+
+                    // O(1) array access 鈥?pre-cached at spawn time in WaveSpawningSystem
+                    var cachedBt = store.EnemyBehaviorTree[enemyId];
+                    string action;
                     if (cachedBt != null)
                     {
                         action = BTCachedTreeEvaluator.Evaluate(cachedBt, enemyId, store, playerId, currentTurn);
                     }
                     else
                     {
-                        action = GetFallbackAction(enemyId);
+                        // Fallback when no BT is configured 鈥?derive monsterType from stored name
+                        string monsterType = store.GetEnemyTypeName(enemyId);
+                        if (string.IsNullOrEmpty(monsterType))
+                            monsterType = store.GetName(enemyId);
+                        cachedBt = gameConfig.GetCachedBehaviorTree(monsterType);
+                        if (cachedBt != null)
+                        {
+                            action = BTCachedTreeEvaluator.Evaluate(cachedBt, enemyId, store, playerId, currentTurn);
+                        }
+                        else
+                        {
+                            action = GetFallbackAction(enemyId);
+                        }
+                    }
+
+                    // Convert action string 鈫?enum (cached) and store
+                    EnemyActionType actionEnum = StringToActionEnum(action);
+                    store.SetEnemyActionEnum(enemyId, actionEnum);
+
+                    // Only call SetEnemyAIAction (string write) for attack actions.
+                    // MoveToTarget/Retreat/Dodge are read by EnemyMovementSystem via GetEnemyActionEnum,
+                    // which bypasses the string entirely.
+                    if (actionEnum == EnemyActionType.AttackMelee ||
+                        actionEnum == EnemyActionType.RangedAttack ||
+                        actionEnum == EnemyActionType.ChargeAttack)
+                    {
+                        store.SetEnemyAIAction(enemyId, action);
+                        InvokeExecuteActionEnum(enemyId, actionEnum);
+                    }
+                    else if (actionEnum == EnemyActionType.Dodge)
+                    {
+                        // Dodge has side effects but no string action needed
+                        InvokeExecuteActionEnum(enemyId, actionEnum);
                     }
                 }
-
-                store.SetEnemyAIAction(enemyId, action);
-
-                // Convert action string → enum and store
-                // Convert action string → enum (cached) and store
-                EnemyActionType actionEnum = StringToActionEnum(action);
-                store.SetEnemyActionEnum(enemyId, actionEnum);
-
-                // Only call for actions with side effects: MoveToTarget and Retreat are
-                // handled entirely by EnemyMovementSystem; Dodge/attack types need this.
-                if (actionEnum == EnemyActionType.AttackMelee ||
-                    actionEnum == EnemyActionType.RangedAttack ||
-                    actionEnum == EnemyActionType.ChargeAttack ||
-                    actionEnum == EnemyActionType.Dodge)
-                {
-                    InvokeExecuteActionEnum(enemyId, actionEnum);
-                }
-                evaluated++;
-            }
-
-            if (evaluated > 0)
-            {
-                logger.Log($"[AI] Evaluated {evaluated} enemies on turn {currentTurn}");
-            }
+            });
         }
 
         /// <summary>
@@ -109,8 +130,8 @@ namespace BattleSystemECS.Systems
         {
             float enemyX = store.PositionX[enemyId];
             float enemyY = store.PositionY[enemyId];
-            float playerX = store.PositionX[playerId];
-            float playerY = store.PositionY[playerId];
+            float playerX = _playerX;
+            float playerY = _playerY;
             float distance = Math.Abs(enemyX - playerX) + Math.Abs(enemyY - playerY);
 
             if (distance <= 1.5f)
@@ -122,7 +143,7 @@ namespace BattleSystemECS.Systems
         /// Convert action string to EnemyActionType enum using a static cache.
         /// Base action is extracted the same way as in InvokeExecuteAction.
         /// </summary>
-        private static EnemyActionType StringToActionEnum(string action)
+        public static EnemyActionType StringToActionEnum(string action)
         {
             if (string.IsNullOrEmpty(action))
                 return EnemyActionType.None;
@@ -156,8 +177,8 @@ namespace BattleSystemECS.Systems
             return result;
         }
 
-        // Static cache for StringToActionEnum — eliminates repeated switch per call
-        private static readonly Dictionary<string, EnemyActionType> actionCache = new Dictionary<string, EnemyActionType>();
+        // Static cache for StringToActionEnum 鈥?eliminates repeated switch per call
+        private static readonly ConcurrentDictionary<string, EnemyActionType> actionCache = new ConcurrentDictionary<string, EnemyActionType>();
 
         /// <summary>
         /// Execute the given action for the specified enemy using enum dispatch.
@@ -197,7 +218,7 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Legacy string-based execute — kept for backward compatibility.
+        /// Legacy string-based execute 鈥?kept for backward compatibility.
         /// </summary>
         public void InvokeExecuteAction(int enemyId, string action)
         {
@@ -331,7 +352,7 @@ namespace BattleSystemECS.Systems
                 });
 
                 store.SetEnemyAIChargeCounter(enemyId, 0);
-                chargeParams.Remove(enemyId);
+                chargeParams.TryRemove(enemyId, out _);
                 store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
 
                 logger.Log($"[AI] Enemy {enemyId} releases CHARGE for {chargedDamage} damage (3x)! HP: {remaining}");
