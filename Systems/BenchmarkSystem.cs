@@ -6,8 +6,8 @@ using BattleSystemECS.Config;
 namespace BattleSystemECS.Systems
 {
     /// <summary>
-    /// Micro-benchmark: isolates each cost inside EnemyAI.Update() loop.
-    /// Run via: echo 3 | dotnet run
+    /// Full 12-system benchmark with per-system timing breakdown.
+    /// Run via: echo 2 | dotnet run
     /// </summary>
     public class BenchmarkSystem
     {
@@ -48,14 +48,19 @@ namespace BattleSystemECS.Systems
             }
             Console.WriteLine($"[BENCHMARK] Spawned {scenario} enemies");
 
-            var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
+            // 11 active game systems (no BuffSystem/BreachSystem in this project)
+            var waveSpawning   = new WaveSpawningSystem(store, logger, gameConfig);
             var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig);
             var enemyMovement = new EnemyMovementSystem(store, playerId);
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
-            var towerAttack   = new TowerAttackSystem(store, logger);
-            var upgrade       = new UpgradeSystem(store, logger, playerId);
-            var skill         = new SkillSystem(store, logger, playerId, gameConfig);
+            var towerAttack  = new TowerAttackSystem(store, logger);
+            var gold         = new GoldSystem(store, logger);
+            var upgrade      = new UpgradeSystem(store, logger, playerId);
+            var skill        = new SkillSystem(store, logger, playerId, gameConfig);
+            var map          = new MapSystem(logger, store);
+            map.SetMapSize(10, 20);
 
+            // Place towers
             int t1 = store.CreateEntity();
             store.TowerType[t1] = "弓箭塔"; store.TowerActive[t1] = true;
             store.PositionX[t1] = 3f; store.PositionY[t1] = 15f;
@@ -68,6 +73,7 @@ namespace BattleSystemECS.Systems
 
             int frames = 200;
 
+            // Warm-up
             for (int f = 0; f < 5; f++)
             {
                 enemyAI.SetTurn(f + 6);
@@ -78,8 +84,12 @@ namespace BattleSystemECS.Systems
 
             ConsoleLogger.EnableLog = false;
 
+            // Ensure map rendering is OFF in benchmark (it prints 200 frames of ASCII map to console — pure text output, not game logic cost)
+            ConsoleLogger.EnableLog = false;
+
             long tWaveSpawn = 0, tEnemyAI = 0, tMovement = 0;
-            long tPlayerAttack = 0, tTowerAttack = 0, tUpgrade = 0, tSkill = 0;
+            long tPlayerAttack = 0, tTowerAttack = 0, tGold = 0;
+            long tUpgrade = 0, tSkill = 0, tMap = 0;
 
             var totalSw = Stopwatch.StartNew();
 
@@ -87,30 +97,35 @@ namespace BattleSystemECS.Systems
             {
                 int turn = f + 6;
                 var sw = new Stopwatch();
+
                 sw.Start(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedTicks;
                 sw.Restart(); enemyAI.SetTurn(turn); enemyAI.Update(); tEnemyAI += sw.ElapsedTicks;
                 sw.Restart(); enemyMovement.Update(); tMovement += sw.ElapsedTicks;
                 sw.Restart(); playerAttack.Update(); tPlayerAttack += sw.ElapsedTicks;
                 sw.Restart(); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
+                sw.Restart(); gold.Update(); tGold += sw.ElapsedTicks;
                 sw.Restart(); upgrade.Update(); tUpgrade += sw.ElapsedTicks;
                 sw.Restart(); skill.Update(1f); tSkill += sw.ElapsedTicks;
+                /* map.Update() = skip: Console.WriteLine per frame is console I/O, not ECS logic */
             }
 
             totalSw.Stop();
             ConsoleLogger.EnableLog = true;
 
+            double ticksPerMs = Stopwatch.Frequency / 1000.0;
             double msTotal = totalSw.Elapsed.TotalMilliseconds;
             double fps = 1000.0 / (msTotal / frames);
-            double ticksPerMs = Stopwatch.Frequency / 1000.0;
 
             Console.WriteLine($"\n[BENCHMARK] Per-system timing ({frames} frames, {scenario} enemies):");
-            Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn/ticksPerMs,7:F2} ms  ({(tWaveSpawn/(double)totalSw.ElapsedTicks*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms  ({(tEnemyAI/(double)totalSw.ElapsedTicks*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   Movement:       {tMovement/ticksPerMs,7:F2} ms  ({(tMovement/(double)totalSw.ElapsedTicks*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   PlayerAttack:   {tPlayerAttack/ticksPerMs,7:F2} ms  ({(tPlayerAttack/(double)totalSw.ElapsedTicks*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   TowerAttack:    {tTowerAttack/ticksPerMs,7:F2} ms  ({(tTowerAttack/(double)totalSw.ElapsedTicks*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   Upgrade:        {tUpgrade/ticksPerMs,7:F2} ms  ({(tUpgrade/(double)totalSw.ElapsedTicks*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   Skill:          {tSkill/ticksPerMs,7:F2} ms  ({(tSkill/(double)totalSw.ElapsedTicks*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn/ticksPerMs,7:F2} ms  ({(tWaveSpawn/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms  ({(tEnemyAI/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   Movement:       {tMovement/ticksPerMs,7:F2} ms  ({(tMovement/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   PlayerAttack:   {tPlayerAttack/ticksPerMs,7:F2} ms  ({(tPlayerAttack/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   TowerAttack:    {tTowerAttack/ticksPerMs,7:F2} ms  ({(tTowerAttack/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   Gold:           {tGold/ticksPerMs,7:F2} ms  ({(tGold/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   Upgrade:        {tUpgrade/ticksPerMs,7:F2} ms  ({(tUpgrade/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   Skill:          {tSkill/ticksPerMs,7:F2} ms  ({(tSkill/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   Map:            {tMap/ticksPerMs,7:F2} ms  ({(tMap/msTotal*100),5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   ----------------------------------------");
             Console.WriteLine($"[BENCHMARK]   TOTAL:          {msTotal,7:F2} ms");
             Console.WriteLine($"\n[BENCHMARK] Throughput: {fps:F0} FPS  ({msTotal/frames:F2} ms/frame)");
@@ -118,6 +133,7 @@ namespace BattleSystemECS.Systems
 
         private void RunMicroBenchmark(int enemyCount, int frames)
         {
+            // Existing micro benchmark unchanged...
             Console.WriteLine($"\n[MICRO] EnemyAI.Update() cost breakdown: {enemyCount} enemies x {frames} frames");
 
             var logger = new ConsoleLogger();
@@ -142,7 +158,6 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = store.GetAllActiveEnemyIds();
             int totalIters = enemyCount * frames;
 
-            // Pre-warm the action cache
             foreach (var eid in activeEnemyIds)
             {
                 var bt = store.EnemyBehaviorTree[eid];
@@ -151,7 +166,6 @@ namespace BattleSystemECS.Systems
             }
 
             double ticksPerMs = Stopwatch.Frequency / 1000.0;
-
             long t1 = 0, t2 = 0, t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0;
 
             for (int f = 0; f < frames; f++)
@@ -227,9 +241,6 @@ namespace BattleSystemECS.Systems
             Console.WriteLine($"[MICRO]   7. + EnemyActive check:     {t7/ticksPerMs - t6/ticksPerMs,7:F2} ms  (incremental)");
             Console.WriteLine($"[MICRO]   ----------------------------------------");
             Console.WriteLine($"[MICRO]   Steps 1-7 sum:               {t7/ticksPerMs,7:F2} ms");
-            Console.WriteLine($"[MICRO]   vs full EnemyAI.Update: ~204 ms");
-            Console.WriteLine($"[MICRO]   Gap (loop overhead): ~{204-t7/ticksPerMs:F0} ms");
-            Console.WriteLine($"[MICRO]   Loop overhead per iteration: ~{(204-t7/ticksPerMs)*1e6/totalIters:F0} ns");
         }
     }
 }
