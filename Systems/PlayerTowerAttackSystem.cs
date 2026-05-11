@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -23,6 +25,8 @@ namespace BattleSystemECS.Systems
         private float _attackDamage, _attackRange;
         private List<int> _activeEnemyList;
         private bool _turnCached;
+        private long _frameGoldAcc;
+        private int _rangeSq;
 
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
@@ -39,6 +43,8 @@ namespace BattleSystemECS.Systems
             _attackRange = store.GetPlayerAttackRange(playerId);
             _activeEnemyList = store.GetAllActiveEnemyIds();
             _turnCached = true;
+            _frameGoldAcc = 0;
+            _rangeSq = (int)(_attackRange * _attackRange);
         }
 
         public void Update()
@@ -51,7 +57,6 @@ namespace BattleSystemECS.Systems
             var buffs = store.PlayerBuffs[playerId];
 
             float finalAttackDamage = _attackDamage;
-            float finalAttackRange = _attackRange;
 
             if (buffs.Count > 0)
             {
@@ -71,43 +76,37 @@ namespace BattleSystemECS.Systems
                 }
             }
 
+            _frameGoldAcc = 0;
             var activeEnemyIds = _activeEnemyList;
-            int rangeSq = (int)(finalAttackRange * finalAttackRange);
 
-            // Accumulate gold and kill flags locally, then apply once
-            int goldToAdd = 0;
-            int killCount = 0;
-
-            for (int i = 0; i < activeEnemyIds.Count; i++)
+            Parallel.For(0, activeEnemyIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
             {
                 int enemyId = activeEnemyIds[i];
-                if (enemyId == playerId) continue;
+                if (enemyId == playerId) return;
 
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
-                if (enemyY <= _playerY) continue;
+                if (enemyY <= _playerY) return;
 
                 float dx = enemyX - _playerX;
-                float dxSq = dx * dx;
-                if (dxSq > rangeSq) continue;
+                if (dx * dx > _rangeSq) return;
 
                 float enemyHealth = store.EnemyHealth[enemyId];
-                if (enemyHealth <= 0f) continue;
+                if (enemyHealth <= 0f) return;
 
                 enemyHealth -= finalAttackDamage;
                 store.EnemyHealth[enemyId] = enemyHealth;
 
                 if (enemyHealth <= 0f)
                 {
-                    goldToAdd += store.EnemyGoldReward[enemyId];
-                    killCount++;
+                    Interlocked.Add(ref _frameGoldAcc, (long)store.EnemyGoldReward[enemyId]);
                     store.EnemyActive[enemyId] = false;
                 }
-            }
+            });
 
-            if (goldToAdd > 0)
+            if (_frameGoldAcc > 0)
             {
-                store.PlayerGold[playerId] += goldToAdd;
+                store.PlayerGold[playerId] += (int)_frameGoldAcc;
             }
         }
     }

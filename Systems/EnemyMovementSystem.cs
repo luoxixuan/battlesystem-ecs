@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -42,14 +43,13 @@ namespace BattleSystemECS.Systems
                 _playerX = store.PositionX[playerId];
             }
 
-            int enemiesMoved = 0;
             var activeEnemyIds = _activeEnemyList;
 
-            for (int i = 0; i < activeEnemyIds.Count; i++)
+            Parallel.For(0, activeEnemyIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
             {
                 int enemyId = activeEnemyIds[i];
                 if (!store.EnemyActive[enemyId])
-                    continue;
+                    return;
 
                 float moveSpeed = store.EnemyMoveSpeed[enemyId];
 
@@ -64,42 +64,30 @@ namespace BattleSystemECS.Systems
                 switch (actionEnum)
                 {
                     case EnemyActionType.MoveToTarget:
-                        // Move toward player on Y axis
                         direction = -1;
                         break;
 
                     case EnemyActionType.Retreat:
-                        // Move away from player (opposite direction)
                         direction = 1;
                         break;
 
                     case EnemyActionType.Dodge:
                         {
-                            // Dodge needs the direction suffix — read from string array for backward compat
                             string actionStr = store.GetEnemyAIAction(enemyId);
                             int dodgeDir = ParseDodgeDirection(actionStr);
                             store.PositionX[enemyId] = Math.Clamp(x + dodgeDir, 0f, 9f);
                             store.PositionY[enemyId] = y - moveSpeed * 0.5f;
-                            enemiesMoved++;
-                            continue;
+                            return;
                         }
 
                     case EnemyActionType.None:
                     default:
-                        // Fallback: no action set → move toward player
                         direction = -1;
                         break;
                 }
 
-                // For MoveToTarget, Retreat, and None (fallback) — apply Y movement
                 store.PositionY[enemyId] = y + direction * moveSpeed;
-                enemiesMoved++;
-            }
-
-            if (enemiesMoved > 0)
-            {
-                Console.WriteLine($"[MOVE] {enemiesMoved} enemies moved");
-            }
+            });
         }
 
         /// <summary>
