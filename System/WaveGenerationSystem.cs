@@ -12,6 +12,8 @@ namespace BattleSystemECS.Systems
     /// </summary>
     public class WaveGenerationSystem
     {
+        private static readonly Random _sharedRandom = new Random();
+
         private Core.ComponentStore store;
         private IRenderer renderer;
         private GameConfig gameConfig;
@@ -88,8 +90,7 @@ namespace BattleSystemECS.Systems
             }
 
             // 在顶部随机位置生成敌人
-            Random random = new Random();
-            float startX = (float)random.Next(0, 10);
+            float startX = (float)_sharedRandom.Next(0, 10);
             float startY = 19f;
 
             // 创建敌人实体

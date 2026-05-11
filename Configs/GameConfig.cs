@@ -100,6 +100,7 @@ namespace BattleSystemECS.Config
         public Dictionary<string, BehaviorTreeDef> BehaviorTrees { get; set; } = new Dictionary<string, BehaviorTreeDef>();
         private Dictionary<string, BehaviorTreeDef> _btCache = new Dictionary<string, BehaviorTreeDef>();
         private Dictionary<string, BattleSystemECS.Systems.BTCachedTree> _cachedBtCache = new Dictionary<string, BattleSystemECS.Systems.BTCachedTree>();
+        private Dictionary<string, MonsterConfig> _monsterCache = new Dictionary<string, MonsterConfig>();
 
         public GameConfig()
         {
@@ -269,7 +270,12 @@ namespace BattleSystemECS.Config
 
         public MonsterConfig GetMonsterConfig(string type)
         {
-            return MonsterTypes.Find(m => m.Type == type);
+            if (_monsterCache.TryGetValue(type, out var cached))
+                return cached;
+            var found = MonsterTypes.Find(m => m.Type == type);
+            if (found != null)
+                _monsterCache[type] = found;
+            return found;
         }
 
         public LevelConfig GetLevelConfig(int levelNumber)

@@ -12,6 +12,8 @@ namespace BattleSystemECS.Systems
     /// </summary>
     public class UpgradeSystem
     {
+        private static readonly Random _sharedRandom = new Random();
+
         private Core.ComponentStore store;
         private IRenderer renderer;
         private int playerId;
@@ -67,7 +69,7 @@ namespace BattleSystemECS.Systems
         private void RandomlyGainBuff()
         {
             string[] buffs = { "Attack+10%", "Defense+10%", "Attack Speed+20%", "Crit Rate+5%", "Health+20%" };
-            int randomIndex = new Random().Next(buffs.Length);
+            int randomIndex = _sharedRandom.Next(buffs.Length);
             string newBuff = buffs[randomIndex];
 
             var playerBuffs = store.GetPlayerBuffs(playerId);

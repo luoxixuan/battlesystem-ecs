@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Core.GAS;
 using BattleSystemECS.Systems;
 
 namespace BattleSystemECS.Core
@@ -75,6 +76,18 @@ namespace BattleSystemECS.Core
         public int[] SkillAttackRange = new int[MAX_PLAYERS];
         public float[] SkillCooldown = new float[MAX_PLAYERS];
         public float[] SkillCurrentCooldown = new float[MAX_PLAYERS];
+
+        // ==================== GAS 组件的 SOA 存储 ====================
+        public const int MAX_ABILITIES_PER_ENTITY = 5;
+        public const int MAX_ACTIVE_EFFECTS_PER_ENTITY = 8;
+
+        // Per-entity ability instances (SOA: first dimension = entity, second = slot)
+        public AbilityInstance[] AbilityInstances = new AbilityInstance[MAX_ENTITIES * MAX_ABILITIES_PER_ENTITY];
+        public int[] AbilityCount = new int[MAX_ENTITIES]; // how many abilities this entity has
+
+        // Per-entity active effects
+        public AppliedEffect[] ActiveEffects = new AppliedEffect[MAX_ENTITIES * MAX_ACTIVE_EFFECTS_PER_ENTITY];
+        public int[] ActiveEffectCount = new int[MAX_ENTITIES];
 
         // ==================== 实体管理 ====================
         public int PlayerEntityId { get; private set; } = 1;
@@ -565,5 +578,21 @@ namespace BattleSystemECS.Core
             if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
             return PlayerCurrentHealth[playerId] > 0f;
         }
+
+        // ==================== GAS 组件访问方法 ====================
+
+        public AbilityInstance GetAbility(int entityId, int slot) => AbilityInstances[entityId * MAX_ABILITIES_PER_ENTITY + slot];
+
+        public void SetAbility(int entityId, int slot, AbilityInstance inst) { AbilityInstances[entityId * MAX_ABILITIES_PER_ENTITY + slot] = inst; }
+
+        public void AddAbility(int entityId, GameplayAbilityDef def) { int slot = AbilityCount[entityId]; if (slot < MAX_ABILITIES_PER_ENTITY) { SetAbility(entityId, slot, new AbilityInstance(def)); AbilityCount[entityId]++; } }
+
+        public AppliedEffect GetEffect(int entityId, int slot) => ActiveEffects[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot];
+
+        public void SetEffect(int entityId, int slot, AppliedEffect eff) { ActiveEffects[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot] = eff; }
+
+        public int GetEffectCount(int entityId) => ActiveEffectCount[entityId];
+
+        public void AddEffect(int entityId, AppliedEffect eff) { int slot = ActiveEffectCount[entityId]; if (slot < MAX_ACTIVE_EFFECTS_PER_ENTITY) { SetEffect(entityId, slot, eff); ActiveEffectCount[entityId]++; } }
     }
 }

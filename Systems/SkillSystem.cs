@@ -2,356 +2,184 @@ using System;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
     /// <summary>
-    /// 技能释放系统 - SOA (Struct of Arrays) 优化，配置驱动
-    /// 从 JSON 配置加载技能数据，实现三种技能：
-    /// 1. 十字范围伤害技能（Cross Slash）
-    /// 2. 3x3 范围伤害技能（Mega Explosion）
-    /// 3. 攻击距离 9 的单体技能（Sniper Shot）
+    /// Skill system refactored to use the GAS (Gameplay Ability System) architecture.
+    /// Skills are stored as AbilityInstances in ComponentStore, one slot per ability.
+    /// Casting is driven by the GameplayAbilityDef data (area shape, radius, etc.)
+    /// instead of hard-coded string branching.
     /// </summary>
     public class SkillSystem
     {
-        private Core.ComponentStore store;
+        private ComponentStore store;
         private IRenderer renderer;
         private int playerId;
         private float deltaTime = 1f;
         private GameConfig gameConfig;
-        
-        // 技能数据（从配置加载）
-        private Config.SkillConfig skillCrossSlash;
-        private Config.SkillConfig skillMegaExplosion;
-        private Config.SkillConfig skillSniperShot;
 
-        public SkillSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
+        public SkillSystem(ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
             this.store = store;
             this.renderer = renderer;
             this.playerId = playerId;
             this.gameConfig = gameConfig;
-
-            // 从配置加载技能数据
-            LoadSkillsFromConfig();
         }
 
         /// <summary>
-        /// 从配置加载技能数据
-        /// </summary>
-        private void LoadSkillsFromConfig()
-        {
-            skillCrossSlash = gameConfig.GetSkillConfig("Cross Slash");
-            skillMegaExplosion = gameConfig.GetSkillConfig("Mega Explosion");
-            skillSniperShot = gameConfig.GetSkillConfig("Sniper Shot");
-
-            // 如果配置中没有找到技能，使用默认值
-            if (skillCrossSlash == null)
-            {
-                skillCrossSlash = new Config.SkillConfig
-                {
-                    Name = "Cross Slash",
-                    Description = "十字范围伤害 - 400% 伤害倍率，3x3 十字形范围",
-                    DamageMultiplier = 4f,
-                    AreaWidth = 3,
-                    AreaHeight = 3,
-                    AttackRange = 3,
-                    Cooldown = 5f
-                };
-            }
-
-            if (skillMegaExplosion == null)
-            {
-                skillMegaExplosion = new Config.SkillConfig
-                {
-                    Name = "Mega Explosion",
-                    Description = "3x3 范围伤害 - 400% 伤害倍率，9 格范围",
-                    DamageMultiplier = 4f,
-                    AreaWidth = 3,
-                    AreaHeight = 3,
-                    AttackRange = 5,
-                    Cooldown = 10f
-                };
-            }
-
-            if (skillSniperShot == null)
-            {
-                skillSniperShot = new Config.SkillConfig
-                {
-                    Name = "Sniper Shot",
-                    Description = "超远距离单体攻击 - 400% 伤害倍率，9 格攻击距离",
-                    DamageMultiplier = 4f,
-                    AreaWidth = 1,
-                    AreaHeight = 1,
-                    AttackRange = 9,
-                    Cooldown = 8f
-                };
-            }
-        }
-
-        /// <summary>
-        /// 初始化玩家技能
+        /// Initialize player abilities using GAS — adds one AbilityInstance per skill slot.
+        /// Replaces the old single-slot overwrite bug (InitializePlayerSkills called
+        /// SetSkillName three times on the same playerId, leaving only Sniper Shot equipped).
         /// </summary>
         public void InitializePlayerSkills()
         {
-            // 设置十字范围伤害技能
-            store.SetSkillName(playerId, skillCrossSlash.Name);
-            store.SetSkillDamageMultiplier(playerId, skillCrossSlash.DamageMultiplier);
-            store.SetSkillAreaWidth(playerId, skillCrossSlash.AreaWidth);
-            store.SetSkillAreaHeight(playerId, skillCrossSlash.AreaHeight);
-            store.SetSkillAttackRange(playerId, skillCrossSlash.AttackRange);
-            store.SetSkillCooldown(playerId, skillCrossSlash.Cooldown);
-            store.SetSkillCurrentCooldown(playerId, 0f); // 当前冷却 0 秒
+            // Define 3 abilities using GAS structure
+            var crossSlashDef = new GameplayAbilityDef(
+                "Cross Slash", "400% damage in cross shape",
+                5f, 0f,           // cooldown, cost
+                -1, 4f,           // no attribute multiplier, fixed 4× base damage
+                AbilityActivation.Instant,
+                1, 3,             // area shape 1=cross, radius 3
+                Array.Empty<int>()
+            );
+            store.AddAbility(playerId, crossSlashDef);
+            renderer.Log("[SKILL] Cross Slash ability registered (cooldown: 5s, cross area radius 3)");
 
-            renderer.Log("[SKILL] Cross Slash skill equipped from config!");
-            renderer.Log("[SKILL]   - Damage Multiplier: " + skillCrossSlash.DamageMultiplier);
-            renderer.Log("[SKILL]   - Area: " + skillCrossSlash.AreaWidth + "x" + skillCrossSlash.AreaHeight + " (Cross shape)");
-            renderer.Log("[SKILL]   - Attack Range: " + skillCrossSlash.AttackRange + " grids");
-            renderer.Log("[SKILL]   - Cooldown: " + skillCrossSlash.Cooldown + " seconds");
-            renderer.Log("[SKILL]   - Auto-cast: " + skillCrossSlash.AutoCast);
+            var megaExplosionDef = new GameplayAbilityDef(
+                "Mega Explosion", "3×3 area explosion",
+                7f, 0f,
+                -1, 3f,
+                AbilityActivation.Instant,
+                2, 1,             // area shape 2=box (3×3), radius 1
+                Array.Empty<int>()
+            );
+            store.AddAbility(playerId, megaExplosionDef);
+            renderer.Log("[SKILL] Mega Explosion ability registered (cooldown: 7s, 3×3 box area)");
 
-            // 设置 3x3 范围伤害技能
-            store.SetSkillName(playerId, skillMegaExplosion.Name);
-            store.SetSkillDamageMultiplier(playerId, skillMegaExplosion.DamageMultiplier);
-            store.SetSkillAreaWidth(playerId, skillMegaExplosion.AreaWidth);
-            store.SetSkillAreaHeight(playerId, skillMegaExplosion.AreaHeight);
-            store.SetSkillAttackRange(playerId, skillMegaExplosion.AttackRange);
-            store.SetSkillCooldown(playerId, skillMegaExplosion.Cooldown);
-            store.SetSkillCurrentCooldown(playerId, 0f); // 当前冷却 0 秒
+            var sniperShotDef = new GameplayAbilityDef(
+                "Sniper Shot", "Single target, 9-tile range",
+                8f, 0f,
+                -1, 6f,
+                AbilityActivation.Instant,
+                0, 9,             // area shape 0=single target, range 9
+                Array.Empty<int>()
+            );
+            store.AddAbility(playerId, sniperShotDef);
+            renderer.Log("[SKILL] Sniper Shot ability registered (cooldown: 8s, single target, range 9)");
 
-            renderer.Log("[SKILL] Mega Explosion skill equipped from config!");
-            renderer.Log("[SKILL]   - Damage Multiplier: " + skillMegaExplosion.DamageMultiplier);
-            renderer.Log("[SKILL]   - Area: " + skillMegaExplosion.AreaWidth + "x" + skillMegaExplosion.AreaHeight + " (Box shape)");
-            renderer.Log("[SKILL]   - Attack Range: " + skillMegaExplosion.AttackRange + " grids");
-            renderer.Log("[SKILL]   - Cooldown: " + skillMegaExplosion.Cooldown + " seconds");
-            renderer.Log("[SKILL]   - Auto-cast: " + skillMegaExplosion.AutoCast);
+            // Apply "Attack+10%" and "Crit Rate+5%" buffs via GameplayEffect
+            var attackBoost = new GameplayEffectDef("Attack+10%", EffectType.Instant,
+                AttributeSetDefinitions.ATTACK_DAMAGE, AttributeModifierOp.Multiply, 1.1f);
+            store.AddEffect(playerId, new AppliedEffect(attackBoost, playerId));
+            renderer.Log("[SKILL] Applied Effect: Attack+10% (instant, ×1.1)");
 
-            // 设置单体高伤害技能
-            store.SetSkillName(playerId, skillSniperShot.Name);
-            store.SetSkillDamageMultiplier(playerId, skillSniperShot.DamageMultiplier);
-            store.SetSkillAreaWidth(playerId, skillSniperShot.AreaWidth);
-            store.SetSkillAreaHeight(playerId, skillSniperShot.AreaHeight);
-            store.SetSkillAttackRange(playerId, skillSniperShot.AttackRange);
-            store.SetSkillCooldown(playerId, skillSniperShot.Cooldown);
-            store.SetSkillCurrentCooldown(playerId, 0f); // 当前冷却 0 秒
-
-            renderer.Log("[SKILL] Sniper Shot skill equipped from config!");
-            renderer.Log("[SKILL]   - Damage Multiplier: " + skillSniperShot.DamageMultiplier);
-            renderer.Log("[SKILL]   - Area: " + skillSniperShot.AreaWidth + "x" + skillSniperShot.AreaHeight + " (Single target)");
-            renderer.Log("[SKILL]   - Attack Range: " + skillSniperShot.AttackRange + " grids");
-            renderer.Log("[SKILL]   - Cooldown: " + skillSniperShot.Cooldown + " seconds");
-            renderer.Log("[SKILL]   - Auto-cast: " + skillSniperShot.AutoCast);
+            var critBoost = new GameplayEffectDef("Crit Rate+5%", EffectType.Instant,
+                AttributeSetDefinitions.CRIT_RATE, AttributeModifierOp.Add, 0.05f);
+            store.AddEffect(playerId, new AppliedEffect(critBoost, playerId));
+            renderer.Log("[SKILL] Applied Effect: Crit Rate+5% (instant, +0.05)");
         }
 
         /// <summary>
-        /// 更新技能冷却
+        /// Update cooldown timers for all abilities.
         /// </summary>
         public void Update(float deltaTime)
         {
             this.deltaTime = deltaTime;
-
-            // 更新技能冷却（所有三个技能共享一个冷却槽）
-            float currentCooldown = store.GetSkillCurrentCooldown(playerId);
-            if (currentCooldown > 0f)
+            int count = store.AbilityCount[playerId];
+            for (int slot = 0; slot < count; slot++)
             {
-                float newCooldown = System.Math.Max(0f, currentCooldown - deltaTime);
-                store.SetSkillCurrentCooldown(playerId, newCooldown);
+                var inst = store.GetAbility(playerId, slot);
+                if (inst.CurrentCooldown > 0f)
+                {
+                    inst.CurrentCooldown = Math.Max(0f, inst.CurrentCooldown - deltaTime);
+                    store.SetAbility(playerId, slot, inst);
+                }
             }
         }
 
         /// <summary>
-        /// 释放技能
+        /// Cast a named ability.  Dispatches to the ability's area-shape handler
+        /// so no string-based branching is needed per skill type.
         /// </summary>
         public void CastSkill(string skillName)
         {
-            float currentCooldown = store.GetSkillCurrentCooldown(playerId);
-            if (currentCooldown > 0f)
+            int count = store.AbilityCount[playerId];
+            for (int slot = 0; slot < count; slot++)
             {
-                renderer.Log($"[SKILL] Skill '{skillName}' is on cooldown! {currentCooldown:F1}s remaining");
-                return;
+                var inst = store.GetAbility(playerId, slot);
+                if (inst.Definition.Name == skillName)
+                {
+                    if (!inst.CanActivate())
+                    {
+                        renderer.Log($"[SKILL] '{skillName}' on cooldown: {inst.CurrentCooldown:F1}s remaining");
+                        return;
+                    }
+                    ExecuteAbility(inst.Definition, slot);
+                    return;
+                }
             }
+            renderer.Log($"[SKILL] Unknown ability: '{skillName}'");
+        }
 
-            // 获取玩家属性
+        /// <summary>
+        /// Execute an ability by its definition data — area shape drives the damage pattern.
+        /// </summary>
+        private void ExecuteAbility(GameplayAbilityDef def, int slot)
+        {
             float baseDamage = store.GetPlayerAttackDamage(playerId);
-            float attackRange = store.GetPlayerAttackRange(playerId);
+            // Use FixedBaseDamage multiplier when DamageMultiplierAttr == -1
+            float finalDamage = (def.DamageMultiplierAttr < 0)
+                ? baseDamage * def.FixedBaseDamage
+                : baseDamage; // attribute-based not wired up yet
+
             float playerX = store.PositionX[playerId];
             float playerY = store.PositionY[playerId];
 
-            // 根据技能名称释放不同技能
-            if (skillName == "Cross Slash" || skillName == skillCrossSlash.Name)
-            {
-                CastCrossSlash(baseDamage, playerX, playerY);
-            }
-            else if (skillName == "Mega Explosion" || skillName == skillMegaExplosion.Name)
-            {
-                CastMegaExplosion(baseDamage, playerX, playerY);
-            }
-            else if (skillName == "Sniper Shot" || skillName == skillSniperShot.Name)
-            {
-                CastSniperShot(baseDamage, playerX, playerY);
-            }
-            else
-            {
-                renderer.Log($"[SKILL] Unknown skill: '{skillName}'");
-            }
-        }
-
-        /// <summary>
-        /// 释放十字范围伤害技能
-        /// </summary>
-        private void CastCrossSlash(float baseDamage, float playerX, float playerY)
-        {
-            float damageMultiplier = skillCrossSlash.DamageMultiplier; // 400%
-            float finalDamage = baseDamage * damageMultiplier;
-            int range = skillCrossSlash.AttackRange;
-
-            // 十字形：中心 + 左右 + 上下
-            int[] xOffset = { 0, -1, 1, 0, 0 };
-            int[] yOffset = { 0, 0, 0, -1, 1 };
-
             int enemiesHit = 0;
 
-            // 获取所有活跃敌人
-            var activeEnemyIds = store.GetAllActiveEnemyIds();
-
-            foreach (int enemyId in activeEnemyIds)
+            switch (def.AreaShape)
             {
-                if (enemyId == playerId) continue;
-
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-                float enemyHealth = store.GetEnemyHealth(enemyId);
-
-                if (enemyHealth <= 0f)
-                    continue;
-
-                // 检查敌人是否在十字范围内
-                for (int i = 0; i < xOffset.Length; i++)
-                {
-                    float targetX = playerX + xOffset[i];
-                    float targetY = playerY + yOffset[i];
-
-                    // 检查敌人是否在十字范围内（位置匹配）
-                    if (System.Math.Abs(enemyX - targetX) < 0.5f && System.Math.Abs(enemyY - targetY) < 0.5f)
-                    {
-                        // 十字形技能：位置命中直接造成伤害，不额外检查距离
-                        // （target 已在玩家为中心的十字范围内）
-                        enemyHealth = System.Math.Max(0f, enemyHealth - finalDamage);
-                        store.SetEnemyHealth(enemyId, enemyHealth);
-                        enemiesHit++;
-
-                        renderer.Log($"[SKILL] Cross Slash hit enemy {enemyId} at ({enemyX:F0}, {enemyY:F0}), damage: {finalDamage:F1}");
-
-                        if (enemyHealth <= 0f)
-                        {
-                            store.TotalKills++;
-                            int goldReward = store.GetEnemyGoldReward(enemyId);
-                            float currentGold = store.GetPlayerGold(playerId);
-                            store.SetPlayerGold(playerId, currentGold + goldReward);
-
-                            renderer.Log($"[SKILL] Cross Slash killed enemy {enemyId}, gained {goldReward} gold");
-                        }
-                        break;
-                    }
-                }
+                case 0: // Single target
+                    enemiesHit = CastSingleTarget(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
+                    break;
+                case 1: // Cross (+) shape
+                    enemiesHit = CastCrossArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
+                    break;
+                case 2: // Box (3×3)
+                    enemiesHit = CastBoxArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
+                    break;
+                default:
+                    renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
+                    return;
             }
 
-            // 设置冷却
-            store.SetSkillCurrentCooldown(playerId, skillCrossSlash.Cooldown);
+            // Start cooldown
+            var inst = store.GetAbility(playerId, slot);
+            inst.CurrentCooldown = def.Cooldown;
+            store.SetAbility(playerId, slot, inst);
 
-            renderer.Log($"[SKILL] Cross Slash cast! Hit {enemiesHit} enemies, cooldown: {skillCrossSlash.Cooldown}s");
+            renderer.Log($"[SKILL] {def.Name} cast! Hit {enemiesHit} enemies, cooldown: {def.Cooldown}s");
         }
 
-        /// <summary>
-        /// 释放 3x3 范围伤害技能
-        /// </summary>
-        private void CastMegaExplosion(float baseDamage, float playerX, float playerY)
+        private int CastSingleTarget(float finalDamage, float playerX, float playerY, int range, string name)
         {
-            float damageMultiplier = skillMegaExplosion.DamageMultiplier; // 400%
-            float finalDamage = baseDamage * damageMultiplier;
-            int range = skillMegaExplosion.AttackRange;
-
-            // 3x3 方形：以玩家为中心，3x3 范围
-            int enemiesHit = 0;
-
-            // 获取所有活跃敌人
-            var activeEnemyIds = store.GetAllActiveEnemyIds();
-
-            foreach (int enemyId in activeEnemyIds)
-            {
-                if (enemyId == playerId) continue;
-
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-                float enemyHealth = store.GetEnemyHealth(enemyId);
-
-                if (enemyHealth <= 0f)
-                    continue;
-
-                // 检查敌人是否在 3x3 范围内
-                // 3x3 范围：从 (playerX -1, playerY -1) 到 (playerX + 1, playerY + 1)
-                if (enemyX >= playerX - 1f && enemyX <= playerX + 1f &&
-                    enemyY >= playerY - 1f && enemyY <= playerY + 1f)
-                {
-                    // 计算攻击距离
-                    float distance = System.Math.Abs(enemyX - playerX);
-                    if (distance <= range)
-                    {
-                        // 造成伤害
-                        enemyHealth = System.Math.Max(0f, enemyHealth - finalDamage);
-                        store.SetEnemyHealth(enemyId, enemyHealth);
-                        enemiesHit++;
-
-                        renderer.Log($"[SKILL] Mega Explosion hit enemy {enemyId} at ({enemyX:F0}, {enemyY:F0}), damage: {finalDamage:F1}");
-
-                        if (enemyHealth <= 0f)
-                        {
-                            // 击杀敌人，奖励金币
-                            int goldReward = store.GetEnemyGoldReward(enemyId);
-                            float currentGold = store.GetPlayerGold(playerId);
-                            store.SetPlayerGold(playerId, currentGold + goldReward);
-
-                            renderer.Log($"[SKILL] Mega Explosion killed enemy {enemyId}, gained {goldReward} gold");
-                        }
-                    }
-                }
-            }
-
-            // 设置冷却
-            store.SetSkillCurrentCooldown(playerId, skillMegaExplosion.Cooldown);
-
-            renderer.Log($"[SKILL] Mega Explosion cast! Hit {enemiesHit} enemies, cooldown: {skillMegaExplosion.Cooldown}s");
-        }
-
-        /// <summary>
-        /// 释放攻击距离 9 的单体技能
-        /// </summary>
-        private void CastSniperShot(float baseDamage, float playerX, float playerY)
-        {
-            float damageMultiplier = skillSniperShot.DamageMultiplier; // 400%
-            float finalDamage = baseDamage * damageMultiplier;
-            int range = skillSniperShot.AttackRange;
-
-            // 单体技能：只攻击距离最近的单个敌人
+            int hitCount = 0;
             float closestDistance = float.MaxValue;
             int closestEnemyId = -1;
 
-            // 获取所有活跃敌人
             var activeEnemyIds = store.GetAllActiveEnemyIds();
-
             foreach (int enemyId in activeEnemyIds)
             {
                 if (enemyId == playerId) continue;
+                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyHealth <= 0f) continue;
 
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
-                float enemyHealth = store.GetEnemyHealth(enemyId);
 
-                if (enemyHealth <= 0f)
-                    continue;
-
-                // 计算攻击距离（Y 轴向距离优先）
-                float distance = System.Math.Abs(enemyX - playerX) * 2f + (playerY - enemyY);
+                float distance = Math.Abs(enemyX - playerX) * 2f + (playerY - enemyY);
                 if (distance < closestDistance && distance <= range)
                 {
                     closestDistance = distance;
@@ -359,65 +187,118 @@ namespace BattleSystemECS.Systems
                 }
             }
 
-            // 攻击最近的敌人
             if (closestEnemyId != -1)
             {
                 float enemyX = store.PositionX[closestEnemyId];
                 float enemyY = store.PositionY[closestEnemyId];
                 float enemyHealth = store.GetEnemyHealth(closestEnemyId);
 
-                // 造成伤害
-                enemyHealth = System.Math.Max(0f, enemyHealth - finalDamage);
+                enemyHealth = Math.Max(0f, enemyHealth - finalDamage);
                 store.SetEnemyHealth(closestEnemyId, enemyHealth);
+                hitCount = 1;
 
-                renderer.Log($"[SKILL] Sniper Shot hit enemy {closestEnemyId} at ({enemyX:F0}, {enemyY:F0}), damage: {finalDamage:F1}, range: {range}");
+                renderer.Log($"[SKILL] {name} hit enemy {closestEnemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
 
-                if (enemyHealth <= 0f)
+                if (enemyHealth <= 0f) HandleKill(closestEnemyId);
+            }
+            return hitCount;
+        }
+
+        private int CastCrossArea(float finalDamage, float playerX, float playerY, int radius, string name)
+        {
+            // Cross shape: center + left/right + up/down within radius
+            int[] xOffset = { 0, -1, 1, 0, 0 };
+            int[] yOffset = { 0, 0, 0, -1, 1 };
+
+            int hitCount = 0;
+            var activeEnemyIds = store.GetAllActiveEnemyIds();
+
+            foreach (int enemyId in activeEnemyIds)
+            {
+                if (enemyId == playerId) continue;
+                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyHealth <= 0f) continue;
+
+                float enemyX = store.PositionX[enemyId];
+                float enemyY = store.PositionY[enemyId];
+
+                for (int i = 0; i < xOffset.Length; i++)
                 {
-                    // 击杀敌人，奖励金币
-                    int goldReward = store.GetEnemyGoldReward(closestEnemyId);
-                    float currentGold = store.GetPlayerGold(playerId);
-                    store.SetPlayerGold(playerId, currentGold + goldReward);
+                    float targetX = playerX + xOffset[i];
+                    float targetY = playerY + yOffset[i];
+                    if (Math.Abs(enemyX - targetX) < 0.5f && Math.Abs(enemyY - targetY) < 0.5f)
+                    {
+                        enemyHealth = Math.Max(0f, enemyHealth - finalDamage);
+                        store.SetEnemyHealth(enemyId, enemyHealth);
+                        hitCount++;
 
-                    renderer.Log($"[SKILL] Sniper Shot killed enemy {closestEnemyId}, gained {goldReward} gold");
+                        renderer.Log($"[SKILL] {name} hit enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
+
+                        if (enemyHealth <= 0f) HandleKill(enemyId);
+                        break;
+                    }
                 }
             }
-
-            // 设置冷却
-            store.SetSkillCurrentCooldown(playerId, skillSniperShot.Cooldown);
-
-            if (closestEnemyId != -1)
-            {
-                renderer.Log($"[SKILL] Sniper Shot cast! Hit 1 enemy, cooldown: {skillSniperShot.Cooldown}s");
-            }
-            else
-            {
-                renderer.Log($"[SKILL] Sniper Shot cast! No enemies in range, cooldown: {skillSniperShot.Cooldown}s");
-            }
+            return hitCount;
         }
 
-        /// <summary>
-        /// 自动释放技能（根据冷却时间）
-        /// </summary>
-        public void AutoCastSkill()
+        private int CastBoxArea(float finalDamage, float playerX, float playerY, int range, string name)
         {
-            float currentCooldown = store.GetSkillCurrentCooldown(playerId);
-            if (currentCooldown <= 0f)
+            // Box: (playerX-1..playerX+1, playerY-1..playerY+1) = 3×3
+            int hitCount = 0;
+            var activeEnemyIds = store.GetAllActiveEnemyIds();
+
+            foreach (int enemyId in activeEnemyIds)
             {
-                // 自动释放冷却时间最短的技能
-                CastSkill(skillCrossSlash.Name);
+                if (enemyId == playerId) continue;
+                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyHealth <= 0f) continue;
+
+                float enemyX = store.PositionX[enemyId];
+                float enemyY = store.PositionY[enemyId];
+
+                if (enemyX >= playerX - 1f && enemyX <= playerX + 1f &&
+                    enemyY >= playerY - 1f && enemyY <= playerY + 1f)
+                {
+                    float distance = Math.Abs(enemyX - playerX);
+                    if (distance <= range)
+                    {
+                        enemyHealth = Math.Max(0f, enemyHealth - finalDamage);
+                        store.SetEnemyHealth(enemyId, enemyHealth);
+                        hitCount++;
+
+                        renderer.Log($"[SKILL] {name} hit enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
+
+                        if (enemyHealth <= 0f) HandleKill(enemyId);
+                    }
+                }
             }
+            return hitCount;
+        }
+
+        private void HandleKill(int enemyId)
+        {
+            store.TotalKills++;
+            int goldReward = store.GetEnemyGoldReward(enemyId);
+            float currentGold = store.GetPlayerGold(playerId);
+            store.SetPlayerGold(playerId, currentGold + goldReward);
+            renderer.Log($"[SKILL] Killed enemy {enemyId}, gained {goldReward} gold");
         }
 
         /// <summary>
-        /// 自动释放最佳技能（用于测试兼容）
+        /// Auto-cast the first available ability (for benchmark compatibility).
         /// </summary>
         public void AutoCastBestSkill()
         {
-            float currentCooldown = store.GetSkillCurrentCooldown(playerId);
-            if (currentCooldown <= 0f)
+            int count = store.AbilityCount[playerId];
+            for (int slot = 0; slot < count; slot++)
             {
-                CastSkill(skillCrossSlash.Name);
+                var inst = store.GetAbility(playerId, slot);
+                if (inst.CanActivate())
+                {
+                    ExecuteAbility(inst.Definition, slot);
+                    return;
+                }
             }
         }
     }

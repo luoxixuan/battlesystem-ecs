@@ -16,6 +16,7 @@
 
     <!-- Core files -->
     <Compile Include="Core\*.cs" />
+    <Compile Include="Core\GAS\*.cs" />
 
     <!-- Components -->
     <Compile Include="Components\*.cs" />

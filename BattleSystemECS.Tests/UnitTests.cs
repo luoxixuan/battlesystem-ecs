@@ -302,6 +302,7 @@ namespace BattleSystemECS.Tests
             var (store, config, playerId) = CreateTestEnv();
             var renderer = new MockRenderer();
             var system = new SkillSystem(store, renderer, playerId, config);
+            system.InitializePlayerSkills();
 
             // Place enemy in Cross Slash range (player at 5,0; range=3)
             CreateEnemy(store, 5f, 3f);
@@ -317,6 +318,7 @@ namespace BattleSystemECS.Tests
             var (store, config, playerId) = CreateTestEnv();
             var renderer = new MockRenderer();
             var system = new SkillSystem(store, renderer, playerId, config);
+            system.InitializePlayerSkills();
 
             // Place an enemy, fire all 3 skills
             CreateEnemy(store, 5f, 3f);
@@ -347,6 +349,7 @@ namespace BattleSystemECS.Tests
             int enemyId = CreateEnemy(store, 5f, 1f, 10f);
 
             var system = new SkillSystem(store, renderer, playerId, config);
+            system.InitializePlayerSkills();
             system.CastSkill("Cross Slash");
 
             Assert.True(renderer.HasLogContaining("Cross Slash cast"),
