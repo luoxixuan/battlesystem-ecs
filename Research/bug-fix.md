@@ -1,238 +1,310 @@
-# BattleSystem-ECS 项目问题报告
+# BattleSystem-ECS Bug Fix Report
 
-## 概述
-扫描 F:\AI\BattleSystem-ECS 塔防项目完整代码，发现以下问题。分析覆盖 Core/, Systems/, Components/, Configs/ 等目录下的所有 .cs 源文件。
+**扫描时间**: 2026-05-12
+**项目路径**: F:\AI\BattleSystem-ECS
+**分析范围**: 所有 .cs 源文件（Core/, Systems/, System/, Components/, Configs/, Program.cs）
+**注意**: dotnet 未安装在当前环境，无法执行 `dotnet build`，以下为静态代码分析
 
 ---
 
-## HIGH — 严重问题（必须修复）
+## 【HIGH】严重问题
 
-### 1. ComponentStore 缺少塔系统必需方法
-**文件**: ComponentStore.cs
-**问题**: Systems/TowerAttackSystem.cs (第31行) 和 System/TowerPlacementSystem.cs (第70/76行) 调用了 ComponentStore 中不存在的方法：
-- `GetAllActiveTowerIds()` — 不存在
-- `IsTower(int)` — 不存在
-- `GetTowerType(int)` — 不存在
-- `GetTowerLevel(int)` — 不存在
-- `GetTowerAttackDamage(int)` — 不存在
-- `SetTowerLevel(int, int)` — 不存在
-- `SetTowerAttackDamage(int, float)` — 不存在
-- `SetTowerAttackSpeed(int, float)` — 不存在
-- `SetTowerUpgradeCost(int, float)` — 不存在
-- `SetGameStateCurrentWave/GetGameStateCurrentWave/SetGameStateIsGameRunning` — 不存在
-**推荐修复**: 在 ComponentStore 中补充所有缺失的方法，或统一塔/游戏状态的数据访问接口。建议使用与玩家/敌人相同的 SOA 数组模式管理塔数据。
+### 1. ComponentStore.GetAllActiveEnemyIds 返回内部可变列表引用
+**文件**: Core/ComponentStore.cs 第519行
+**问题**: `return ActiveEnemyIds;` 直接返回内部 List<int> 引用，调用方修改列表会直接污染 ComponentStore 内部状态
+**推荐修复**: `return new List<int>(ActiveEnemyIds);`
 
-### 2. 双塔攻击系统实现冲突
-**文件**: Systems/TowerAttackSystem.cs vs System/TowerAttackSystem.cs
-**问题**: 存在两个 TowerAttackSystem 实现，GameManager.cs (第98行) 使用 Systems/ 版本的构造函式 `TowerAttackSystem(store, logger)` 但该版本缺少 `GetAllActiveTowerIds()`；而 System/ 版本构造含 GameConfig 参数，且 `FindNearestEnemy` 和 `FindEnemiesInRange` 实现重复（两处逻辑几乎相同但独立维护）
-**推荐修复**: 删除重复实现，统一使用一个 TowerAttackSystem，确保所有依赖方法在 ComponentStore 中实现
+---
 
-### 3. 塔升级系统方法缺失
-**文件**: TowerUpgradeSystem.cs 第70行
-**问题**: `store.IsTower(towerId)` 在 ComponentStore 中不存在
-**推荐修复**: 在 ComponentStore 中实现 `IsTower(int)` 方法，通过 `TowerActive[entityId] && TowerType[entityId] != null` 判断
+### 2. ComponentStore.CreateEntity ID 越界风险
+**文件**: Core/ComponentStore.cs 第95-104行
+**问题**: `freeEntityIds.Pop()` 返回的 ID 可能 >= MAX_ENTITIES（被销毁实体的 ID 仍在 freeEntityIds 中但数组已释放）；另外第102行设置 `EnemyActionEnum[entityId]` 在 nextEntityId 自增前执行，若 entityId==nextEntityId==MAX_ENTITIES 会越界
+**推荐修复**: 出栈时验证 ID 有效性：`int entityId = freeEntityIds.Count > 0 ? freeEntityIds.Pop() : nextEntityId++; if (entityId >= MAX_ENTITIES) entityId = nextEntityId++;`
 
-### 4. WaveGenerationSystem 调用不存在的方法
-**文件**: System/WaveGenerationSystem.cs 第130行
-**问题**: `store.SetGameStateIsGameRunning(store.PlayerEntityId, false)` — ComponentStore 中不存在此方法
-**推荐修复**: 将游戏运行状态存储在 GameManager 而非 ComponentStore 中，或在 ComponentStore 中添加该方法
+---
 
-### 5. EnemyPathSystem 调用不存在方法
-**文件**: System/EnemyPathSystem.cs 第73行
-**问题**: `store.SetGameStateIsGameRunning(...)` — 方法不存在
-**推荐修复**: 同上
+### 3. GameManager 硬编码塔实体 ID
+**文件**: Core/GameManager.cs 第254-255行
+**问题**: `towerUpgradeSystem.UpgradeTower(2)` 和 `UpgradeTower(3)` 假设塔实体 ID 为 2 和 3，但 `PlaceTower` 调用 `store.CreateEntity()` 动态分配 ID，不一定为 2/3
+**推荐修复**: 保存 PlaceTower 返回值：`int towerId1 = towerPlacementSystem.PlaceTower(...); int towerId2 = towerPlacementSystem.PlaceTower(...); towerUpgradeSystem.UpgradeTower(towerId1);`
 
-### 6. GameStateSystem 调用大量不存在方法
-**文件**: System/GameStateSystem.cs
-**问题**: `SetGameStateCurrentWave`, `SetGameStateTotalWaves`, `GetGameStateCurrentWave`, `GetGameStateTotalWaves`, `GetGameStatePlayerHealth`, `SetGameStatePlayerHealth`, `SetGameStatePlayerMaxHealth`, `GetGameStateIsGameRunning` 等方法均不存在于 ComponentStore
-**推荐修复**: 重构游戏状态管理，统一状态存储方式
+---
 
-### 7. System/TowerPlacementSystem 使用未定义 Vector2
-**文件**: System/TowerPlacementSystem.cs 第131行
-**问题**: `List<Vector2>` — Vector2 类型未 using UnityEngine 且未定义本地 Vector2
-**推荐修复**: 定义本地 Vector2 struct 或使用 Tuple<float, float>
-
-### 8. System/TowerPlacementSystem.GetAllEntityIds 不存在
-**文件**: System/TowerPlacementSystem.cs 第112行
-**问题**: `store.GetAllEntityIds()` 在 ComponentStore 中不存在（只有 `GetAllActiveEnemyIds`）
-**推荐修复**: 实现 `GetAllEntityIds()` 方法或使用其他方式遍历所有实体
-
-### 9. System/TowerPlacementSystem.PlaceTower 塔ID分配错误
+### 4. System/TowerPlacementSystem.PlaceTower 使用 NextEntityId 而非 CreateEntity
 **文件**: System/TowerPlacementSystem.cs 第53行
-**问题**: `int towerId = store.NextEntityId;` 直接取 nextEntityId 而非通过 `CreateEntity()` 创建，导致位置冲突和ID管理混乱
-**推荐修复**: 使用 `store.CreateEntity()` 创建塔实体
+**问题**: `int towerId = store.NextEntityId;` 绕过实体 ID 回收机制，会产生 ID 冲突
+**推荐修复**: `int towerId = store.CreateEntity();`
 
 ---
 
-## MEDIUM — 中等优先级问题
-
-### 10. 双重金币奖励系统（逻辑重复）
-**文件**: PlayerTowerAttackSystem.cs 第97行 + GoldSystem.cs 第62行
-**问题**: 敌人死亡时在两处重复增加金币：`PlayerTowerAttackSystem` 在攻击命中后直接加金币，`GoldSystem` 在 `CheckKillRewards` 中再次对已死亡敌人加金币
-**推荐修复**: 仅保留一处金币奖励逻辑，建议在 GoldSystem 中统一处理
-
-### 11. SkillSystem.InitializePlayerSkills 覆盖问题
-**文件**: SkillSystem.cs 第98-143行
-**问题**: 该方法循环内依次设置三个技能（Cross Slash → Mega Explosion → Sniper Shot），由于所有技能共用同一个 playerId 槽位，最终只有最后一个技能（Sniper Shot）被保留，前两个技能被覆盖
-**推荐修复**: 将技能存储从单一玩家属性改为技能数组（SkillName[], SkillDamageMultiplier[] 等），或使用技能列表管理
-
-### 12. SkillSystem.CastSniperShot 距离计算错误
-**文件**: SkillSystem.cs 第354行
-**问题**: `distance = Math.Abs(enemyX - playerX) * 2f + (playerY - enemyY)` — 距离计算使用夸张的权重（X方向权重2，Y方向权重1），且未开平方根，导致有效攻击距离判断不准确
-**推荐修复**: 使用标准欧几里得距离：`Math.Sqrt((enemyX-playerX)^2 + (enemyY-playerY)^2)`
-
-### 13. SkillSystem.CastMegaExplosion 范围判断与攻击范围冗余
-**文件**: SkillSystem.cs 第293-298行
-**问题**: 先判断 `enemyX >= playerX - 1f && enemyX <= playerX + 1f`（已限定3x3范围），再判断 `distance <= range`（range=5），后者判断冗余
-**推荐修复**: 移除冗余的距离判断
-
-### 14. SkillSystem 未使用配置的 AutoCast 标志
-**文件**: SkillSystem.cs 整体
-**问题**: 每个 SkillConfig 都有 `AutoCast` 字段，但代码中从未检查该字段，所有技能都需要手动释放
-**推荐修复**: 在 `Update()` 中根据 AutoCast 字段自动释放就绪的技能
-
-### 15. UpgradeSystem 金币检查与扣费不同步
-**文件**: UpgradeSystem.cs 第28-34行
-**问题**: `ProcessUpgrade()` 检查 `gold >= threshold` 后执行升级，但如果在检查和扣费之间有其他系统修改金币，可能导致超额升级
-**推荐修复**: 在 ProcessUpgrade 内部再次检查金币余额，或使用原子操作
-
-### 16. Random 实例未复用
-**文件**: UpgradeSystem.cs 第70行, SkillSystem.cs 未使用 Random
-**问题**: `new Random().Next(...)` 每回合创建新实例，高频调用下可能有性能问题（虽然 C# Random 有内部锁保护）
-**推荐修复**: 使用共享的 static Random 或 Random.Shared (.NET 6+)
-
-### 17. ComponentStore.GetActiveEnemyIds 返回引用而非副本
-**文件**: ComponentStore.cs 第519行
-**问题**: `return ActiveEnemyIds;` 直接返回内部 List 引用，外部修改会影响内部状态
-**推荐修复**: 返回 `new List<int>(ActiveEnemyIds)` 副本（现有注释说是副本但实际不是）
-
-### 18. GridSpatialHash.Add 每次创建新 List
-**文件**: GridSpatialHash.cs 第37-39行
-**问题**: 当 cell 不存在时每次创建新的 `List<int>`，频繁 Add/Remove 会导致内存碎片
-**推荐修复**: 使用对象池复用 List，或使用数组+计数器的固定结构
-
-### 19. GameManager.Run 硬编码塔ID测试
-**文件**: GameManager.cs 第254-255行
-**问题**: `towerUpgradeSystem.UpgradeTower(2)` 和 `UpgradeTower(3)` — 硬编码假设塔实体ID为2和3，但实体ID由 `CreateEntity()` 动态分配，不一定连续
-**推荐修复**: 使用实际返回的塔ID
-
-### 20. GameManager.CheckEnemiesAtBottom O(n) 遍历
-**文件**: GameManager.cs 第334-349行
-**问题**: 每回合遍历所有活跃敌人检查是否到达底部，但此时敌人已在 EnemyMovementSystem 中移动，可在该系统中直接检测并处理
-**推荐修复**: 将"敌人到达底部"的检测逻辑整合到 EnemyMovementSystem 的移动更新中
+### 5. GameStateSystem 调用不存在的 ComponentStore 方法
+**文件**: System/GameStateSystem.cs 第31-35行
+**问题**: 调用 `store.SetGameStateCurrentWave()`, `SetGameStateTotalWaves()`, `SetGameStateIsGameRunning()`, `SetGameStatePlayerHealth()`, `SetGameStatePlayerMaxHealth()` — 这些方法在 ComponentStore 中不存在，会抛出运行时异常
+**推荐修复**: ComponentStore 添加这些方法，或使用现有字段（如 PlayerCurrentHealth 数组）直接访问
 
 ---
 
-## LOW — 轻微问题
-
-### 21. SOATowerType 存储为 string 而非 enum
-**文件**: ComponentStore.cs 第61行
-**问题**: `TowerType[]` 存储为 string，造成不必要的字符串分配和比较开销
-**推荐修复**: 定义 `TowerTypeEnum { None, ArrowTower, MagicTower, ... }` 并使用 `TowerTypeEnum[]`
-
-### 22. EnemyTypeName string 操作
-**文件**: ComponentStore.cs 第287-291行
-**问题**: `fullName.Substring(0, sepIdx)` 每敌人创建新字符串
-**推荐修复**: 在配置解析时预先提取并缓存类型名
-
-### 23. PlayerTowerAttackSystem critRandom 线程不安全
-**文件**: PlayerTowerAttackSystem.cs 第19行
-**问题**: `private static readonly Random critRandom = new Random();` — 跨线程访问 Random 实例不是线程安全的
-**推荐修复**: 使用 `Random.Shared` (.NET 6+) 或 ThreadLocal<Random>
-
-### 24. EventBus 单例模式实现
-**文件**: EventBus.cs 第16-17行
-**问题**: 使用 `private static readonly EventBus _instance = new EventBus();` 实现单例，构造函数是 public，允许外部 `new EventBus()`
-**推荐修复**: 将构造函数改为 private，或使用 `Lazy<T>` 延迟初始化
-
-### 25. GameEvents 常量未统一使用
-**文件**: 整体项目
-**问题**: GameEvents 定义了事件常量字符串（"enemy_killed", "wave_started" 等），但代码中多处直接使用字面字符串（如 "tower_attacked" 未在 GameEvents 中定义）
-**推荐修复**: 所有事件类型使用 GameEvents 常量
-
-### 26. BTCachedTreeEvaluator.Compare 默认运算符
-**文件**: BehaviorTreeEvaluator.cs 第150行
-**问题**: `default => lhs <= rhs` — 默认返回 true 的设计可能导致意外行为
-**推荐修复**: 默认抛出异常或返回 false
-
-### 27. MapSystem.RenderMap 每帧分配
-**文件**: MapSystem.cs 第61行
-**问题**: `var activeEnemyIds = store.GetAllActiveEnemyIds();` 每帧调用返回新 List（虽然是引用）
-**推荐修复**: 缓存并在内容变化时更新
-
-### 28. TowerPlacementSystem PlaceTower 双重跳跃检查
-**文件**: TowerPlacementSystem.cs (Systems/) 第34-41行
-**问题**: 遍历 `store.NextEntityId` 个实体检查位置冲突，但 ComponentStore 已有 `AddTower/RemoveTower` 状态管理，重复检查
-**推荐维护**: 统一使用 ComponentStore 的 TowerActive 数组判断
-
-### 29. ConsoleLogger 和 FileLogger 输出标签不一致
-**文件**: ConsoleLogger.cs vs FileLogger.cs
-**问题**: ConsoleLogger 所有消息加 `[INFO]` 前缀，FileLogger 也是，但某些系统（EnemyMovementSystem 等）自己加 `[MOVE]` 前缀后 Logger.Log 又加 `[INFO]`，导致日志标签重复
-**推荐修复**: Logger 只负责输出，标签由调用方控制
-
-### 30. StateMachine 未被实际使用
-**文件**: StateMachine.cs vs GameManager.cs
-**问题**: GameState enum 和 StateMachine 已定义，但 GameManager.Run() 使用 while(gameRunning) 布尔标志而非状态机
-**推荐修复**: 让 GameManager 使用 StateMachine 管理游戏状态转换
-
-### 31. 多处硬编码数值
-**文件**: 多个系统
-**问题**: 魔法数字散布各处：10（地图宽度）、20（地图高度）、1000（升级阈值）、1.5f（距离判断）等
-**推荐修复**: 统一在 GameConfig 或常量类中定义
+### 6. Systems/TowerAttackSystem.SetTurn 调用不存在方法
+**文件**: Systems/TowerAttackSystem.cs 第25行
+**问题**: `store.GetAllActiveTowerIds()` 在 ComponentStore 中不存在
+**推荐修复**: 使用现有 `store.NextEntityId` 遍历并检查 `store.TowerActive` 数组
 
 ---
 
-## INFO — 信息性问题
-
-### 32. TowerUpgradeSystem 与 System/TowerPlacementSystem.UpgradeTower 逻辑重复
-**问题**: 两个系统都有升级塔的逻辑，但实现细节略有不同（属性提升比例：前者+20%/\*1.2，后者按等级倍增）
-**推荐**: 统一升级公式
-
-### 33. 注释标注为"每波100只怪"但实际每批5只
-**文件**: WaveSpawningSystem.cs 第70-71行注释 vs 第82行
-**问题**: 注释说"每波100只"，代码实现是每批5只，每回合执行一次 Update 约需20回合完成一波
-**推荐**: 更新注释以反映实际行为
-
-### 34. 项目目录结构存在 System/ 和 Systems/ 双目录
-**问题**: System/ 和 Systems/ 两个目录可能造成混淆
-**推荐**: 统一使用 Systems/ 命名
-
-### 35. GetFallbackAction 未考虑玩家死亡状态
-**文件**: EnemyAISystem.cs 第135行
-**问题**: `distance = Math.Abs(enemyX - playerX) + Math.Abs(enemyY - playerY)` — 如果玩家已死亡，playerX/playerY 可能为0或其他默认值
-**推荐**: 检查玩家存活状态
-
-### 36. GameConfig.InitializeDefaultConfig 默认技能描述过长
-**文件**: GameConfig.cs 第55-60行
-**问题**: Description 字段包含详细中文描述，与 SkillSystem 中硬编码的描述重复
-**推荐**: 统一使用配置中的描述
-
-### 37. 组件接口 IComponentData 未被使用
-**文件**: Components/*.cs
-**问题**: 注释声明实现 IComponentData 接口但代码中未实际使用
-**推荐**: 实现接口或移除注释
-
-### 38. UpgradeSystem 升级后金币未重置
-**文件**: UpgradeSystem.cs 第41-64行
-**问题**: ProcessUpgrade 增加了等级和属性，但未扣除升级消耗的金币（threshold 仅用于判断，不扣费）
-**推荐**: 明确升级机制：升级是否需要消耗金币
+### 7. System/TowerAttackSystem 使用 DateTime.Now 作为攻击计时器
+**文件**: System/TowerAttackSystem.cs 第43行
+**问题**: `DateTime.Now` 慢且受系统时钟影响，不适合游戏帧时间
+**推荐修复**: 使用 `Core.Time.TotalTime` 或增量 `deltaTime` 参数
 
 ---
 
-## 统计摘要
+### 8. WaveGenerationSystem 每帧创建新 Random 实例
+**文件**: System/WaveGenerationSystem.cs 第91行
+**问题**: `new Random()` 每调用创建新实例，种子相同导致随机序列可预测
+**推荐修复**: 改为类成员字段 `_spawnRandom = new Random();` 复用
 
-| 严重级别 | 数量 |
-|---------|------|
-| HIGH    | 9    |
-| MEDIUM  | 11   |
-| LOW     | 10   |
-| INFO    | 8    |
-| **总计** | **38** |
+---
 
-## 最优先修复建议
+### 9. SkillSystem.InitializePlayerSkills 只保留最后一个技能
+**文件**: Systems/SkillSystem.cs 第97-144行
+**问题**: 连续三次调用 store.SetSkillName/SetSkillDamageMultiplier 等，后一次覆盖前一次，玩家只有 Sniper Shot
+**推荐修复**: PlayerSkillConfig 改为数组支持多技能，或创建 SkillComponent 数组存储每个技能
 
-1. **立即修复**: ComponentStore 缺失方法导致编译错误（问题1-9）
-2. **高优先级**: 双重金币奖励导致数值异常（问题10）
-3. **高优先级**: SkillSystem 技能初始化覆盖bug（问题11）
-4. **中优先级**: 塔攻击系统双重实现统一（问题2）
-5. **中优先级**: 游戏状态管理重构（问题4-6, 20）
+---
+
+### 10. ComponentStore.DestroyEntity 未从 ActiveEnemyIds 移除
+**文件**: Core/ComponentStore.cs 第106-121行
+**问题**: 销毁敌人时未调用 `ActiveEnemyIds.Remove(entityId)`，列表持续膨胀，O(n) 查找变慢且易越界
+**推荐修复**: `ActiveEnemyIds.Remove(entityId);`
+
+---
+
+### 11. ActiveEnemyIds 在迭代中被修改
+**文件**: Core/ComponentStore.cs 第511-514行（GetAllActiveEnemyIds）与 Systems/MapSystem.cs 第61行、Systems/PlayerTowerAttackSystem.cs 第44行 等
+**问题**: `GetAllActiveEnemyIds()` 返回内部列表引用，若调用方在 foreach 中修改（如 PlayerTowerAttackSystem.Parallel.For 中设置 `store.EnemyActive[enemyId] = false`），后续调用 GetAllActiveEnemyIds 可能返回错误数据
+**推荐修复**: 确保所有返回列表的地方都返回副本（见问题1）
+
+---
+
+### 12. EnemyAISystem 缓存失效逻辑错误
+**文件**: Systems/EnemyAISystem.cs 第52-67行
+**问题**: `SetTurn` 中 `_lastProcessedTurn != turn` 判断决定是否重置缓存，但当同一 turn 被多次调用时（如 GameManager 主循环中先调用 `enemyAISystem.SetTurn(turn)` 再调用其他系统），第二次调用 SetTurn 不触发缓存重置，导致 `_evalTurnCache` 保持旧值
+**推荐修复**: 移除 Turn 比较，每次 SetTurn 都重置缓存，或改用版本号机制
+
+---
+
+### 13. GameConfig MonsterTypes 用 List.Find 导致 O(n) 查询
+**文件**: Configs/GameConfig.cs 第270-273行
+**问题**: `MonsterTypes.Find(m => m.Type == type)` 每次 O(n)，应改用 Dictionary
+**推荐修复**: 添加 `Dictionary<string, MonsterConfig> _monsterCache`，初始化时构建
+
+---
+
+## 【MEDIUM】中等问题
+
+### 14. UpgradeSystem 每帧创建新 Random
+**文件**: Systems/UpgradeSystem.cs 第70行
+**问题**: `new Random().Next()` 每帧创建新实例，应使用静态共享实例
+**推荐修复**: `private static readonly Random _buffRandom = new Random();`
+
+---
+
+### 15. PlayerTowerAttackSystem critRandom 静态实例可预测
+**文件**: Systems/PlayerTowerAttackSystem.cs 第21行
+**问题**: `private static readonly Random critRandom = new Random();` 类加载时种子固定，同一运行内可预测（对游戏逻辑影响轻微）
+**推荐修复**: 种子可加入时间因素
+
+---
+
+### 16. System/TowerPlacementSystem 与 Systems/TowerPlacementSystem 并存且签名不同
+**文件**: System/TowerPlacementSystem.cs 第28行 vs Systems/TowerPlacementSystem.cs 第23行
+**问题**: 两个命名空间都有 TowerPlacementSystem，方法签名不同（8参数 vs 4参数），csproj 只编译 System/GoldSystem.cs，System/ 下其他文件是死代码，但 Systems/ 版本被使用
+**推荐修复**: 删除 System/ 目录下的重复类，统一使用 Systems/
+
+---
+
+### 17. ComponentStore.PlayerBuffs 数组元素直接赋值而非操作列表
+**文件**: Core/ComponentStore.cs 第175行
+**问题**: `PlayerBuffs[entityId] = new List<string>();` 丢弃旧列表引用，若外部持有旧列表引用会失效
+**推荐修复**: 使用 `PlayerBuffs[entityId].Clear();`
+
+---
+
+### 18. MapSystem.RenderMap 每帧分配新 List
+**文件**: Systems/MapSystem.cs 第61行
+**问题**: `store.GetAllActiveEnemyIds()` 每帧创建新列表（若修复问题1后），外层双层 for 循环 O(mapWidth*mapHeight*N)
+**推荐修复**: 缓存 enemy positions 在一帧内，避免重复遍历
+
+---
+
+### 19. TowerPlacementSystem.PlaceTower O(n) 位置检查
+**文件**: Systems/TowerPlacementSystem.cs 第34-41行
+**问题**: `for (int i = 0; i < store.NextEntityId; i++)` 每次 O(n) 遍历所有实体
+**推荐修复**: 使用 GridSpatialHash 或维护 occupied grid 数组 O(1) 查询
+
+---
+
+### 20. FileLogger 未指定编码
+**文件**: Core/FileLogger.cs 第61行
+**问题**: `File.AppendAllText` 默认编码可能因系统而异，中文乱码
+**推荐修复**: `File.AppendAllText(logFilePath, message + Environment.NewLine, System.Text.Encoding.UTF8);`
+
+---
+
+### 21. EntityManager.GetAllEntities 每帧分配
+**文件**: Core/EntityManager.cs 第215-223行
+**问题**: `new List<Entity>()` 每帧分配，应缓存或用数组
+**推荐修复**: 复用 List 或返回 `IEnumerable`
+
+---
+
+### 22. ComponentStore.EntityNames 用 Dictionary 而非数组
+**文件**: Core/ComponentStore.cs 第83行
+**问题**: entityNames 是独立 Dictionary，与 SOA 架构不符，但影响轻微（仅调试用）
+**推荐修复**: 可接受（诊断用），或移除使用 string 插值
+
+---
+
+### 23. EventBus 非线程安全
+**文件**: Core/EventBus.cs 第16-30行
+**问题**: Dictionary 和 List 操作无锁，多线程 Publish 可能报错
+**推荐修复**: 保持单线程使用（当前项目无多线程 EventBus），或添加 lock
+
+---
+
+### 24. System/WaveGenerationSystem 错误调用 GetLevelConfig
+**文件**: System/WaveGenerationSystem.cs 第69行
+**问题**: `GetLevelConfig(currentWave)` 参数应为 levelNumber 而非 waveNumber，波次用关卡配置查找会越界
+**推荐修复**: 关卡内波次配置通过 `GetLevelConfig(levelNumber).Waves[waveNumber-1]`
+
+---
+
+### 25. System/EnemyPathSystem 与 Systems/EnemyMovementSystem 职责重叠
+**文件**: System/EnemyPathSystem.cs vs Systems/EnemyMovementSystem.cs
+**问题**: 两者都移动敌人，但 System/ 版本未在 csproj 中编译，不可用；Systems/ 版本存在且使用
+**推荐修复**: 删除 System/EnemyPathSystem.cs
+
+---
+
+### 26. System/GameStateSystem 调用不存在方法 GetActiveEnemyCount
+**文件**: System/GameStateSystem.cs 第57行
+**问题**: `store.GetActiveEnemyCount()` — ComponentStore 存在此方法（line 522），但 System/GameStateSystem 不在 csproj 中编译
+**推荐修复**: 删除 System/ 目录
+
+---
+
+### 27. ComponentStore.AddToSpatialHash/GetEnemiesNear 是空桩
+**文件**: Core/ComponentStore.cs 第494-496行
+**问题**: GridSpatialHash 功能未实现，相关调用无效
+**推荐修复**: 实现 GridSpatialHash 或移除空方法
+
+---
+
+### 28. Systems/TowerAttackSystem.TowerActive 访问越界风险
+**文件**: Systems/TowerAttackSystem.cs 第32行
+**问题**: `for (int ti = 0; ti < store.NextEntityId; ti++)` 若 TowerActive 数组被扩展但 store.NextEntityId 不同步，可能越界
+**推荐修复**: 直接遍历 `ActiveTowerIds`（需实现）或限制 ti < MAX_ENTITIES
+
+---
+
+## 【LOW】轻微问题
+
+### 29. ComponentStore.GetName 用 Dictionary.ContainsKey 双重查找
+**文件**: Core/ComponentStore.cs 第132-137行
+**问题**: `ContainsKey` 后再 `entityNames[entityId]` 查两次
+**推荐修复**: `entityNames.TryGetValue(entityId, out string name) ? name : $"Entity_{entityId}";`
+
+---
+
+### 30. GameManager.SetMapSize 魔法数字
+**文件**: Core/GameManager.cs 第84行
+**问题**: `mapSystem.SetMapSize(10, 20)` 硬编码地图尺寸
+**推荐修复**: 从 GameConfig 读取
+
+---
+
+### 31. SkillSystem buff 字符串硬编码
+**文件**: Systems/SkillSystem.cs 第65-76行
+**问题**: Buff 类型用字符串比较，应改为 enum
+**推荐修复**: 定义 `BuffType` enum，使用 `switch`
+
+---
+
+### 32. GameEvents 定义了 20+ 事件但大部分未使用
+**文件**: Core/GameEvents.cs
+**问题**: 大量事件定义如 `EnemyDodged`, `EnemyCharging` 等未在 EventBus 中订阅
+**推荐修复**: 清理未使用事件或补充订阅逻辑
+
+---
+
+### 33. EnemyMovementSystem Dodge 分支有副作用
+**文件**: Systems/EnemyMovementSystem.cs 第72-79行
+**问题**: Dodge 分支提前 return，switch 外的 direction=-1 和 PositionY 更新不执行，但其他分支（MoveToTarget/None/default）也 fall through 到 direction=-1，Dodge 和其他分支行为不一致
+**推荐修复**: 统一移动逻辑，移除 early return
+
+---
+
+### 34. BTCachedTreeBuilder 用 List 构建 indexMap 后再查 Dictionary
+**文件**: Systems/BehaviorTreeEvaluator.cs 第170-173行
+**问题**: `nodeIds` 是 List 而 `indexMap` 是 Dictionary，字符串 key 查找 O(1)，但逻辑稍冗余
+**推荐修复**: 可接受（仅启动时调用一次）
+
+---
+
+### 35. GameConfig._btCache 和 _cachedBtCache 可能重复构建
+**文件**: Configs/GameConfig.cs 第101-102行
+**问题**: `GetCachedBehaviorTree` 先查 `_cachedBtCache` 再调 `GetBehaviorTree` 查 `_btCache`，两层缓存但逻辑正确
+**推荐修复**: 可接受
+
+---
+
+## 【INFO】信息级
+
+### 36. GameConfig.MonsterTypes.Find 使用线性搜索
+**文件**: Configs/GameConfig.cs 第272行
+**问题**: `List.Find` O(n)，建议小规模数据可接受
+**推荐修复**: 数据量大时改用 Dictionary
+
+---
+
+### 37. Systems/SkillSystem.CastSkill 冷却检测用 float 相等
+**文件**: Systems/SkillSystem.cs 第168行
+**问题**: `currentCooldown > 0f` 用浮点数比较，可能因精度问题判断错误
+**推荐修复**: `currentCooldown > 0.001f`
+
+---
+
+### 38. ComponentStore 中 MAX_BUFFS=10 常量定义但未使用
+**文件**: Core/ComponentStore.cs 第21行
+**推荐修复**: 使用此常量限制 Buff 数组大小或移除
+
+---
+
+### 39. Systems/GridSpatialHash.cs 为空文件
+**文件**: Systems/GridSpatialHash.cs
+**推荐修复**: 实现空间哈希或删除
+
+---
+
+### 40. csproj EnableDefaultCompileItems=false 导致 Systems/UpgradeSystem.cs 可能不被编译
+**文件**: BattleSystemECS.csproj 第10行
+**问题**: `EnableDefaultCompileItems=false` 配合手动的 `Compile Include`，需确认 UpgradeSystem 在列表中
+**推荐修复**: 确认 UpgradeSystem 被正确编译（现有 csproj 未显式列出）
+
+---
+
+## 汇总
+
+| 严重度 | 数量 |
+|--------|------|
+| HIGH   | 13   |
+| MEDIUM | 18   |
+| LOW    | 9    |
+| INFO   | 5    |
+| **合计** | **45** |
+
+### 优先修复建议
+1. **立即修复**: 问题 1, 2, 3, 5, 10, 12（数据正确性/崩溃问题）
+2. **尽快修复**: 问题 6, 7, 8, 9, 11, 13, 14, 24（功能性问题）
+3. **后续优化**: 问题 15, 16, 17, 18, 19, 26, 27（代码质量）
+4. **架构改进**: 删除 System/ 目录重复代码、实现 GridSpatialHash、SkillSystem 多技能支持

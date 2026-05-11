@@ -243,16 +243,16 @@ namespace BattleSystemECS.Core
                 mapSystem.Update();
                 logger.Log("========================================");
 
-                // [测试] 自动部署防御塔
+                // [测试] 自动部署防御塔（PlaceTower 返回真实 ID，不再硬编码 — Bug #3）
                 logger.Log("[TEST] 自动部署防御塔...");
-                towerPlacementSystem.PlaceTower(2, 5, "弓箭塔", 15.0f, 3, 1.5f, 100f);
-                towerPlacementSystem.PlaceTower(7, 12, "魔法塔", 25.0f, 5, 0.8f, 200f);
+                int towerId1 = towerPlacementSystem.PlaceTower(2, 5, "弓箭塔", 15.0f, 3, 1.5f, 100f);
+                int towerId2 = towerPlacementSystem.PlaceTower(7, 12, "魔法塔", 25.0f, 5, 0.8f, 200f);
 
-                // [测试] 升级塔
+                // [测试] 升级塔（使用真实分配的 ID）
                 logger.Log("[TEST] 尝试升级塔...");
                 store.SetPlayerGold(store.PlayerEntityId, 500f); // 给金币
-                towerUpgradeSystem.UpgradeTower(2); // 升级第一座塔
-                towerUpgradeSystem.UpgradeTower(3); // 升级第二座塔
+                if (towerId1 >= 0) towerUpgradeSystem.UpgradeTower(towerId1);
+                if (towerId2 >= 0) towerUpgradeSystem.UpgradeTower(towerId2);
 
                 Console.WriteLine();
                 logger.Log("Game Start!");

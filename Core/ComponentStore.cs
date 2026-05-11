@@ -116,6 +116,9 @@ namespace BattleSystemECS.Core
             EnemyAIChargeCounter[entityId] = 0;
             EnemyAILastAttackTurn[entityId] = 0;
 
+            // 从活跃敌人列表移除（Bug #10）
+            ActiveEnemyIds.Remove(entityId);
+
             // 回收 ID
             freeEntityIds.Push(entityId);
         }
@@ -515,7 +518,8 @@ namespace BattleSystemECS.Core
 
         public List<int> GetAllActiveEnemyIds()
         {
-            // 使用维护中的 ActiveEnemyIds 列表，O(active) 而非 O(MAX_ENTITIES)
+            // 返回内部列表引用。调用方应在 SetTurn 时缓存一次，不要在循环中重复调用。
+            // 如需副本用于外部修改，请自行 new List<int>(GetAllActiveEnemyIds())
             return ActiveEnemyIds;
         }
 

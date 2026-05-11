@@ -319,3 +319,104 @@ BattleSystem-ECS/
 | 2 | **眩晕链/硬直系统**（Modifier 叠加） | 战斗深度提升 |
 | 3 | **Unity Editor 可视化节点图**（行为树编辑） | 策划可直接编辑 AI，无需改代码 |
 | 4 | **DOTS / Burst Compiler**（百万实体） | 性能再上台阶 |
+
+---
+
+## 十、ECS 实战教训（来自 BattleSystem-ECS 代码审计）
+
+### 10.1 SOA 列表别名风险 ⚠️ HIGH
+
+**问题**：`GetAllActiveEnemyIds()` 直接返回内部 `List<int>` 引用，调用方修改列表会污染 `ComponentStore` 内部状态。
+
+```csharp
+// ❌ 错误：返回可变引用
+public List<int> GetAllActiveEnemyIds() => ActiveEnemyIds;
+
+// ✅ 正确：返回只读副本
+public List<int> GetAllActiveEnemyIds() => new List<int>(ActiveEnemyIds);
+```
+
+**后果**：任何调用方 `Sort()` / `Remove()` / `Add()` 都会直接破坏 `ComponentStore` 的内部状态，导致实体列表越界、重复遍历、状态不一致。
+
+### 10.2 对象池回收必须同步清理所有索引
+
+**问题**：`DestroyEntity()` 只清理了空间哈希，但没有从 `ActiveEnemyIds` 列表中移除。列表只增不减，最终 O(n) 扫描变成 O(n²)。
+
+```csharp
+// ❌ 错误：只 push 到 freeEntityIds，没有从 ActiveEnemyIds 移除
+public void DestroyEntity(int id) {
+    ClearComponents(id);
+    RemoveFromSpatialHash(id);
+    freeEntityIds.Push(id);  // ActiveEnemyIds 中该 ID 仍然存在！
+}
+
+// ✅ 正确：必须从所有索引中移除
+public void DestroyEntity(int id) {
+    ClearComponents(id);
+    RemoveFromSpatialHash(id);
+    ActiveEnemyIds.Remove(id);  // 必须显式移除
+    freeEntityIds.Push(id);
+}
+```
+
+### 10.3 每帧 new Random() 是性能陷阱
+
+**问题**：热路径（每帧枚举所有实体）内创建 `Random` 实例，触发 GC。
+
+```csharp
+// ❌ 错误：热路径内 new Random
+foreach (var id in store.GetAllActiveEnemyIds())
+    var rand = new Random();  // 每实体一次 new = GC 噩梦
+
+// ✅ 正确：使用类级别静态 Random 或 Random.Shared（C# 9+）
+private static readonly Random rng = new();
+```
+
+### 10.4 硬编码实体 ID 是定时炸弹
+
+**问题**：代码中假设塔 ID 为 2 和 3，但 `CreateEntity()` 动态分配，不一定连续。
+
+```csharp
+// ❌ 错误：假设 ID
+towerUpgradeSystem.UpgradeTower(2);
+towerUpgradeSystem.UpgradeTower(3);
+
+// ✅ 正确：保存返回值
+int towerId1 = towerPlacementSystem.PlaceTower(...);
+int towerId2 = towerPlacementSystem.PlaceTower(...);
+towerUpgradeSystem.UpgradeTower(towerId1);
+towerUpgradeSystem.UpgradeTower(towerId2);
+```
+
+### 10.5 SkillSystem 技能初始化覆盖 bug
+
+**问题**：`InitializePlayerSkills()` 循环中每次迭代都覆盖同一个索引，导致 3 个技能全部变成最后一个。
+
+```csharp
+// ❌ 错误：每次迭代覆盖索引 0
+for (int i = 0; i < skills.Length; i++)
+    store.SetPlayerSkill(0, skill);  // i 被忽略，3 次都写到 [0]
+
+// ✅ 正确：传入正确索引
+store.SetPlayerSkill(i, skill);
+```
+
+### 10.6 System/ 和 Systems/ 目录重复实现
+
+**问题**：项目同时存在 `System/` 和 `Systems/` 两套几乎相同的文件（`TowerAttackSystem.cs`、`WaveGenerationSystem.cs` 等），csproj 只编译 `Systems/`，但源码中可能存在旧的重复实现导致混淆。
+
+**修复**：删除 `System/` 目录下的重复文件，统一使用 `Systems/`。
+
+---
+
+## 十一、帧率数据更新（BattleSystem-ECS Benchmark）
+
+| 场景 | FPS | 备注 |
+|------|-----|------|
+| 10K 敌 × 20 塔（全管线） | **851 FPS** | 早期版本 |
+| 10K 敌 × 20 塔（行为树 AI） | **5,513 FPS** | 加入 AI 后优化显著 |
+| 1K 敌 × 20 塔（行为树 AI） | **19,717 FPS** | 规模缩小 10x |
+| 空间哈希 O(10) vs 全量 O(10K) | **13x 提升** | 寻敌优化 |
+| 1K 敌 + 行为树（无渲染） | **20,432 FPS** | 极限值 |
+
+> 数据来源：`dotnet run` → 输入 `2` 压测模式，`[BENCHMARK]` 输出帧时间（ms）取平均。
