@@ -57,7 +57,8 @@ namespace BattleSystemECS.Systems
         private int FindNearestEnemy(float tx, float ty, int range)
         {
             int bestTarget = -1;
-            float minDistance = float.MaxValue;
+            float minDistSq = float.MaxValue;
+            int rangeSq = range * range;
 
             // 遍历敌人列表
             var activeEnemies = store.GetAllActiveEnemyIds();
@@ -67,13 +68,15 @@ namespace BattleSystemECS.Systems
 
                 float ex = store.PositionX[enemyId];
                 float ey = store.PositionY[enemyId];
-                
-                // 使用欧几里得距离计算
-                float distance = (float)Math.Sqrt(Math.Pow(ex - tx, 2) + Math.Pow(ey - ty, 2));
 
-                if (distance <= range && distance < minDistance)
+                // 使用平方距离比较，避免开方运算
+                float dx = ex - tx;
+                float dy = ey - ty;
+                float distSq = dx * dx + dy * dy;
+
+                if (distSq <= rangeSq && distSq < minDistSq)
                 {
-                    minDistance = distance;
+                    minDistSq = distSq;
                     bestTarget = enemyId;
                 }
             }

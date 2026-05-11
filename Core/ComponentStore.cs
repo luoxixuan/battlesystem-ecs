@@ -50,6 +50,7 @@ namespace BattleSystemECS.Core
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
         public int[] EnemyAIChargeCounter = new int[MAX_ENTITIES];
         public int[] EnemyAILastAttackTurn = new int[MAX_ENTITIES];
+        public string[] EnemyTypeName = new string[MAX_ENTITIES];
 
         // ==================== 塔组件的 SOA 存储 ====================
         public string[] TowerType = new string[MAX_ENTITIES];
@@ -253,7 +254,7 @@ namespace BattleSystemECS.Core
 
         // ==================== 敌人组件访问 ====================
 
-        public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber)
+        public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber, string fullName = null)
         {
             int entityId = CreateEntity();
 
@@ -273,6 +274,13 @@ namespace BattleSystemECS.Core
             EnemyGoldReward[entityId] = goldReward;
             EnemyWaveNumber[entityId] = waveNumber;
             EnemyActive[entityId] = true;
+
+            // 缓存怪物类型名（如 "NormalL1W1E0" -> "Normal"），避免每帧解析
+            if (fullName != null)
+            {
+                int sepIdx = fullName.IndexOf('L');
+                EnemyTypeName[entityId] = (sepIdx > 0) ? fullName.Substring(0, sepIdx) : fullName;
+            }
 
             ActiveEnemyIds.Add(entityId);
             return entityId;
@@ -339,6 +347,12 @@ namespace BattleSystemECS.Core
         {
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return "";
             return EnemyAIAction[enemyId];
+        }
+
+        public string GetEnemyTypeName(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return "";
+            return EnemyTypeName[enemyId] ?? "";
         }
 
         public void SetEnemyAIAction(int enemyId, string action)

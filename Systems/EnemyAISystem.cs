@@ -52,12 +52,10 @@ namespace BattleSystemECS.Systems
                 if (!store.EnemyActive[enemyId])
                     continue;
 
-                // Derive monster type from entity name, e.g. "NormalL1W1E0" -> "Normal"
-                string fullName = store.GetName(enemyId);
-                string monsterType = fullName;
-                int sepIdx = fullName.IndexOf('L');
-                if (sepIdx > 0)
-                    monsterType = fullName.Substring(0, sepIdx);
+                // 从缓存的 EnemyTypeName 数组获取怪物类型，避免每帧字符串解析
+                string monsterType = store.GetEnemyTypeName(enemyId);
+                if (string.IsNullOrEmpty(monsterType))
+                    monsterType = store.GetName(enemyId);
 
                 // Look up cached (array-based) behavior tree for this monster type
                 var cachedBt = gameConfig.GetCachedBehaviorTree(monsterType);

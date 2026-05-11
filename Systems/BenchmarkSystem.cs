@@ -62,7 +62,7 @@ namespace BattleSystemECS.Systems
             var towerAttack   = new TowerAttackSystem(store, logger);
             var upgrade       = new UpgradeSystem(store, logger, playerId);
             var skill         = new SkillSystem(store, logger, playerId, gameConfig);
-            // MapSystem omitted: pure text renderer, not part of game logic hot path
+            // MapSystem omitted: pure text output, not game logic
 
             // Place towers so TowerAttack has something to do
             int t1 = store.CreateEntity();
@@ -94,6 +94,9 @@ namespace BattleSystemECS.Systems
                 playerAttack.Update();
             }
 
+            // Silence all logger output during the timed run — IO distorts benchmark
+            ConsoleLogger.EnableLog = false;
+
             // --- Timed run ---
             stopwatch.Restart();
 
@@ -122,11 +125,12 @@ namespace BattleSystemECS.Systems
 
                 // 7. Skill system (auto-cast on cooldown)
                 skill.Update(1f);
-
-                // 8. MapSystem skipped — pure text output, not game logic
             }
 
             stopwatch.Stop();
+
+            // Restore logging for benchmark result output
+            ConsoleLogger.EnableLog = true;
 
             double msTotal = stopwatch.Elapsed.TotalMilliseconds;
             double msPerFrame = msTotal / frames;

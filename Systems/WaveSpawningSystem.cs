@@ -83,6 +83,7 @@ namespace BattleSystemECS.Systems
                     float startX = (float)random.Next(0, 10);
                     float startY = 19f;  // 放在地图中间位置
 
+                    string enemyName = $"{waveConfig.MonsterType}L{currentLevel}W{currentWave}E{enemiesSpawnedInWave + i}";
                     // SOA: 直接数组访问，无字典查询，无 struct 复制
                     int enemyId = store.AddEnemy(
                         startX, startY,
@@ -91,10 +92,9 @@ namespace BattleSystemECS.Systems
                         monsterConfig.MaxHealth,
                         monsterConfig.Damage,
                         monsterConfig.GoldReward,
-                        currentWave
+                        currentWave,
+                        enemyName
                     );
-
-                    string enemyName = $"{waveConfig.MonsterType}L{currentLevel}W{currentWave}E{enemiesSpawnedInWave + i}";
                     store.SetEntityName(enemyId, enemyName);
                     enemiesSpawnedInWave++;
                 }
