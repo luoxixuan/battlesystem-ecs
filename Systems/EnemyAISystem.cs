@@ -29,6 +29,15 @@ namespace BattleSystemECS.Systems
         private List<int> _activeEnemyList;
         private float _playerX, _playerY;
 
+        // BT evaluation cache — avoids redundant re-evaluation when state is unchanged.
+        // Only invalidated when turn actually changes (not on every SetTurn call).
+        // _lastProcessedTurn: tracks which turn was last processed; only invalidate when turn changes.
+        private int _lastProcessedTurn = -1;
+        private int _evalTurnCache = -1;
+        private float _playerHealthCache = -1;
+        private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
+        private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
+
         public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig)
         {
             this.store = store;
@@ -48,6 +57,14 @@ namespace BattleSystemECS.Systems
             _playerY = store.PositionY[playerId];
             // Cache active enemy list once per turn
             _activeEnemyList = store.GetAllActiveEnemyIds();
+            // Cache current player health for BT evaluation
+            _playerHealthCache = store.PlayerCurrentHealth[playerId];
+            // Only invalidate turn cache when turn actually changes
+            if (_lastProcessedTurn != turn)
+            {
+                _evalTurnCache = -1;
+                _lastProcessedTurn = turn;
+            }
         }
 
         /// <summary>
@@ -63,7 +80,7 @@ namespace BattleSystemECS.Systems
             const int batchSize = 256;
             int numBatches = (count + batchSize - 1) / batchSize;
 
-            // Each thread processes its own batch 鈥?no shared mutable state during BT evaluation
+            // Each thread processes its own batch — no shared mutable state during BT evaluation
             Parallel.For(0, numBatches, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
                 batchIdx =>
             {
@@ -76,8 +93,22 @@ namespace BattleSystemECS.Systems
                     if (!store.EnemyActive[enemyId])
                         continue;
 
-                    // O(1) array access 鈥?pre-cached at spawn time in WaveSpawningSystem
+                    // O(1) array access — pre-cached at spawn time in WaveSpawningSystem
                     var cachedBt = store.EnemyBehaviorTree[enemyId];
+
+                    // Check BT evaluation cache: skip if enemy health, player health, and turn are unchanged
+                    float enemyHealth = store.EnemyHealth[enemyId];
+                    float playerHealth = store.PlayerCurrentHealth[playerId];
+                    if (_evalTurnCache == currentTurn &&
+                        _enemyHealthCache[enemyId] == enemyHealth &&
+                        _playerHealthCache == playerHealth)
+                    {
+                        // Cache hit: reuse last action without re-evaluating BT
+                        store.SetEnemyActionEnum(enemyId, _lastActionCache[enemyId]);
+                        continue;
+                    }
+
+                    // Cache miss: evaluate behavior tree
                     string action;
                     if (cachedBt != null)
                     {
@@ -85,7 +116,7 @@ namespace BattleSystemECS.Systems
                     }
                     else
                     {
-                        // Fallback when no BT is configured 鈥?derive monsterType from stored name
+                        // Fallback when no BT is configured — derive monsterType from stored name
                         string monsterType = store.GetEnemyTypeName(enemyId);
                         if (string.IsNullOrEmpty(monsterType))
                             monsterType = store.GetName(enemyId);
@@ -100,9 +131,13 @@ namespace BattleSystemECS.Systems
                         }
                     }
 
-                    // Convert action string 鈫?enum (cached) and store
+                    // Convert action string — enum (cached) and store
                     EnemyActionType actionEnum = StringToActionEnum(action);
                     store.SetEnemyActionEnum(enemyId, actionEnum);
+
+                    // Update cache
+                    _enemyHealthCache[enemyId] = enemyHealth;
+                    _lastActionCache[enemyId] = actionEnum;
 
                     // Only call SetEnemyAIAction (string write) for attack actions.
                     // MoveToTarget/Retreat/Dodge are read by EnemyMovementSystem via GetEnemyActionEnum,
@@ -121,6 +156,9 @@ namespace BattleSystemECS.Systems
                     }
                 }
             });
+
+            // Update turn cache after all enemies processed
+            _evalTurnCache = currentTurn;
         }
 
         /// <summary>
@@ -177,7 +215,7 @@ namespace BattleSystemECS.Systems
             return result;
         }
 
-        // Static cache for StringToActionEnum 鈥?eliminates repeated switch per call
+        // Static cache for StringToActionEnum — eliminates repeated switch per call
         private static readonly ConcurrentDictionary<string, EnemyActionType> actionCache = new ConcurrentDictionary<string, EnemyActionType>();
 
         /// <summary>
@@ -218,7 +256,7 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Legacy string-based execute 鈥?kept for backward compatibility.
+        /// Legacy string-based execute — kept for backward compatibility.
         /// </summary>
         public void InvokeExecuteAction(int enemyId, string action)
         {

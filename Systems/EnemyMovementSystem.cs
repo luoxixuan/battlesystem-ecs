@@ -61,12 +61,10 @@ namespace BattleSystemECS.Systems
                 float x = store.PositionX[enemyId];
                 float y = store.PositionY[enemyId];
 
+                // Simplified switch: only Retreat needs special handling.
+                // MoveToTarget, None, and default all fall through to direction = -1.
                 switch (actionEnum)
                 {
-                    case EnemyActionType.MoveToTarget:
-                        direction = -1;
-                        break;
-
                     case EnemyActionType.Retreat:
                         direction = 1;
                         break;
@@ -80,10 +78,7 @@ namespace BattleSystemECS.Systems
                             return;
                         }
 
-                    case EnemyActionType.None:
-                    default:
-                        direction = -1;
-                        break;
+                    // MoveToTarget, None, and default: use direction = -1 (already set)
                 }
 
                 store.PositionY[enemyId] = y + direction * moveSpeed;
