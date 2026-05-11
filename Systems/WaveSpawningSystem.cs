@@ -21,6 +21,7 @@ namespace BattleSystemECS.Systems
         private int currentLevel = 1;
         private int enemiesSpawnedInWave = 0;
         private int totalEnemiesSpawned = 0;
+        private Random _spawnRandom;
 
         public WaveSpawningSystem(Core.ComponentStore store, IRenderer renderer, GameConfig gameConfig)
         {
@@ -74,8 +75,9 @@ namespace BattleSystemECS.Systems
                     return;
                 }
 
-                Random random = new Random();
-                
+                _spawnRandom ??= new Random();
+                Random random = _spawnRandom;
+
                 // 批量生成 5 个敌人
                 for (int i = 0; i < 5; i++)
                 {
@@ -96,11 +98,13 @@ namespace BattleSystemECS.Systems
                         enemyName
                     );
                     store.SetEntityName(enemyId, enemyName);
+                    // Cache the behavior tree on the enemy — O(1) array access per frame instead of Dictionary+string lookup
+                    store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(waveConfig.MonsterType);
                     enemiesSpawnedInWave++;
                 }
 
                 totalEnemiesSpawned += 5;
-                
+
                 renderer.Log($"[SPAWN] Spawned {enemiesSpawnedInWave} enemies (batch 5) for Wave {currentWave}");
             }
             else

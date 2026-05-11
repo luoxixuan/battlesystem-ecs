@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Systems
 {
@@ -52,13 +53,8 @@ namespace BattleSystemECS.Systems
                 if (!store.EnemyActive[enemyId])
                     continue;
 
-                // 从缓存的 EnemyTypeName 数组获取怪物类型，避免每帧字符串解析
-                string monsterType = store.GetEnemyTypeName(enemyId);
-                if (string.IsNullOrEmpty(monsterType))
-                    monsterType = store.GetName(enemyId);
-
-                // Look up cached (array-based) behavior tree for this monster type
-                var cachedBt = gameConfig.GetCachedBehaviorTree(monsterType);
+                // O(1) array access — pre-cached at spawn time in WaveSpawningSystem
+                var cachedBt = store.EnemyBehaviorTree[enemyId];
                 string action;
                 if (cachedBt != null)
                 {
@@ -66,12 +62,28 @@ namespace BattleSystemECS.Systems
                 }
                 else
                 {
-                    // Fallback when no BT is configured
-                    action = GetFallbackAction(enemyId);
+                    // Fallback when no BT is configured — derive monsterType from stored name
+                    string monsterType = store.GetEnemyTypeName(enemyId);
+                    if (string.IsNullOrEmpty(monsterType))
+                        monsterType = store.GetName(enemyId);
+                    cachedBt = gameConfig.GetCachedBehaviorTree(monsterType);
+                    if (cachedBt != null)
+                    {
+                        action = BTCachedTreeEvaluator.Evaluate(cachedBt, enemyId, store, playerId, currentTurn);
+                    }
+                    else
+                    {
+                        action = GetFallbackAction(enemyId);
+                    }
                 }
 
                 store.SetEnemyAIAction(enemyId, action);
-                ExecuteAction(enemyId, action);
+
+                // Convert action string → enum and store
+                EnemyActionType actionEnum = StringToActionEnum(action);
+                store.SetEnemyActionEnum(enemyId, actionEnum);
+
+                InvokeExecuteActionEnum(enemyId, actionEnum);
                 evaluated++;
             }
 
@@ -98,14 +110,83 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Execute the given action for the specified enemy.
+        /// Convert action string to EnemyActionType enum.
+        /// Base action is extracted the same way as in InvokeExecuteAction.
         /// </summary>
-        private void ExecuteAction(int enemyId, string action)
+        private static EnemyActionType StringToActionEnum(string action)
+        {
+            if (string.IsNullOrEmpty(action))
+                return EnemyActionType.None;
+
+            string baseAction = action;
+            int underscoreIdx = action.LastIndexOf('_');
+            if (underscoreIdx > 0 && underscoreIdx < action.Length - 1)
+            {
+                string suffix = action.Substring(underscoreIdx + 1);
+                if (float.TryParse(suffix, out _))
+                {
+                    baseAction = action.Substring(0, underscoreIdx);
+                }
+            }
+
+            return baseAction switch
+            {
+                "move_to_target" => EnemyActionType.MoveToTarget,
+                "attack_melee" => EnemyActionType.AttackMelee,
+                "ranged_attack" => EnemyActionType.RangedAttack,
+                "charge_attack" => EnemyActionType.ChargeAttack,
+                "dodge" => EnemyActionType.Dodge,
+                "retreat" => EnemyActionType.Retreat,
+                _ => EnemyActionType.None,
+            };
+        }
+
+        /// <summary>
+        /// Execute the given action for the specified enemy using enum dispatch.
+        /// </summary>
+        public void InvokeExecuteActionEnum(int enemyId, EnemyActionType actionEnum)
+        {
+            switch (actionEnum)
+            {
+                case EnemyActionType.MoveToTarget:
+                    break;
+
+                case EnemyActionType.AttackMelee:
+                    ExecuteMeleeAttack(enemyId);
+                    break;
+
+                case EnemyActionType.RangedAttack:
+                    ExecuteRangedAttack(enemyId);
+                    break;
+
+                case EnemyActionType.ChargeAttack:
+                    // param is stored separately in chargeParams; charge_attack_N → use N
+                    {
+                        float param = chargeParams.TryGetValue(enemyId, out var p) ? p : 0f;
+                        ExecuteChargeAttack(enemyId, param);
+                    }
+                    break;
+
+                case EnemyActionType.Dodge:
+                    break;
+
+                case EnemyActionType.Retreat:
+                    break;
+
+                case EnemyActionType.None:
+                default:
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Legacy string-based execute — kept for backward compatibility.
+        /// </summary>
+        public void InvokeExecuteAction(int enemyId, string action)
         {
             if (string.IsNullOrEmpty(action))
                 return;
 
-            // Parse action and optional numeric suffix (e.g. "dodge_1", "charge_attack_3")
             string baseAction = action;
             float param = 0f;
 

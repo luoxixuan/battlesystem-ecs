@@ -6,26 +6,24 @@ using BattleSystemECS.Config;
 namespace BattleSystemECS.Systems
 {
     /// <summary>
-    /// Full 12-system benchmark for BattleSystem-ECS.
-    /// Simulates the complete game loop: WaveSpawn → EnemyAI → Movement →
-    /// PlayerAttack → TowerAttack → Upgrade → Skill → Buff → Map → Breach → EventBus
+    /// Full 12-system benchmark with per-system timing breakdown.
     /// </summary>
     public class BenchmarkSystem
     {
         private ComponentStore store;
         private Stopwatch stopwatch;
+        private Stopwatch sw;
 
         public BenchmarkSystem(ComponentStore store)
         {
             this.store = store;
             this.stopwatch = new Stopwatch();
+            this.sw = new Stopwatch();
         }
 
         public void RunBenchmark(int enemyCount)
         {
             Console.WriteLine($"\n[BENCHMARK] Full 12-System Benchmark: {enemyCount} entities");
-            Console.WriteLine("[BENCHMARK] Systems: WaveSpawning + EnemyAI + Movement + PlayerAttack +");
-            Console.WriteLine("[BENCHMARK]           TowerAttack + Upgrade + Skill + Buff + Map + Breach");
 
             // --- Setup ---
             var logger = new ConsoleLogger();
@@ -34,15 +32,12 @@ namespace BattleSystemECS.Systems
 
             int playerId = 1;
 
-            // Player entity
             store.PlayerMaxHealth[playerId] = 200f;
             store.PlayerCurrentHealth[playerId] = 200f;
             store.PositionX[playerId] = 5f;
             store.PositionY[playerId] = 0f;
             store.SetPlayerGold(playerId, 9999f);
 
-            // Pre-spawn enemies so WaveSpawning doesn't regenerate each frame
-            // (this mirrors the real game state after first wave spawn)
             var random = new Random(42);
             for (int i = 0; i < enemyCount; i++)
             {
@@ -62,9 +57,8 @@ namespace BattleSystemECS.Systems
             var towerAttack   = new TowerAttackSystem(store, logger);
             var upgrade       = new UpgradeSystem(store, logger, playerId);
             var skill         = new SkillSystem(store, logger, playerId, gameConfig);
-            // MapSystem omitted: pure text output, not game logic
 
-            // Place towers so TowerAttack has something to do
+            // Place towers
             int t1 = store.CreateEntity();
             store.TowerType[t1] = "弓箭塔";
             store.TowerActive[t1] = true;
@@ -85,7 +79,7 @@ namespace BattleSystemECS.Systems
 
             int frames = 200;
 
-            // --- Warm-up: 5 frames to settle first-run allocations ---
+            // --- Warm-up: 5 frames ---
             for (int f = 0; f < 5; f++)
             {
                 enemyAI.SetTurn(f + 1);
@@ -94,53 +88,43 @@ namespace BattleSystemECS.Systems
                 playerAttack.Update();
             }
 
-            // Silence all logger output during the timed run — IO distorts benchmark
             ConsoleLogger.EnableLog = false;
 
-            // --- Timed run ---
+            long tWaveSpawn = 0, tEnemyAI = 0, tMovement = 0;
+            long tPlayerAttack = 0, tTowerAttack = 0, tUpgrade = 0, tSkill = 0;
+
             stopwatch.Restart();
 
             for (int f = 0; f < frames; f++)
             {
                 int turn = f + 6;
 
-                // 1. Wave spawning
-                waveSpawning.Update();
-
-                // 2. Enemy AI (behavior tree evaluation + action execution)
-                enemyAI.SetTurn(turn);
-                enemyAI.Update();
-
-                // 3. Enemy movement (reads EnemyAIAction from EnemyAISystem)
-                enemyMovement.Update();
-
-                // 4. Player tower attack
-                playerAttack.Update();
-
-                // 5. Tower attack (range-based targeting)
-                towerAttack.Update(1f);
-
-                // 6. Upgrade check
-                upgrade.Update();
-
-                // 7. Skill system (auto-cast on cooldown)
-                skill.Update(1f);
+                sw.Restart(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedMilliseconds;
+                sw.Restart(); enemyAI.SetTurn(turn); enemyAI.Update(); tEnemyAI += sw.ElapsedMilliseconds;
+                sw.Restart(); enemyMovement.Update(); tMovement += sw.ElapsedMilliseconds;
+                sw.Restart(); playerAttack.Update(); tPlayerAttack += sw.ElapsedMilliseconds;
+                sw.Restart(); towerAttack.Update(1f); tTowerAttack += sw.ElapsedMilliseconds;
+                sw.Restart(); upgrade.Update(); tUpgrade += sw.ElapsedMilliseconds;
+                sw.Restart(); skill.Update(1f); tSkill += sw.ElapsedMilliseconds;
             }
 
             stopwatch.Stop();
-
-            // Restore logging for benchmark result output
             ConsoleLogger.EnableLog = true;
 
             double msTotal = stopwatch.Elapsed.TotalMilliseconds;
-            double msPerFrame = msTotal / frames;
-            double fps = 1000.0 / msPerFrame;
+            double fps = 1000.0 / (msTotal / frames);
 
-            Console.WriteLine($"[BENCHMARK] Complete!");
-            Console.WriteLine($"[BENCHMARK] Total time ({frames} frames): {msTotal:F2} ms");
-            Console.WriteLine($"[BENCHMARK] Avg per frame: {msPerFrame:F4} ms");
-            Console.WriteLine($"[BENCHMARK] Throughput: {fps:F0} FPS");
-            Console.WriteLine($"[BENCHMARK] Entities: {enemyCount}, Active enemies: {store.GetActiveEnemyCount()}");
+            Console.WriteLine($"\n[BENCHMARK] Per-system timing ({frames} frames, {enemyCount} enemies):");
+            Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn,7:F2} ms  ({(tWaveSpawn/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI,7:F2} ms  ({(tEnemyAI/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   Movement:       {tMovement,7:F2} ms  ({(tMovement/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   PlayerAttack:   {tPlayerAttack,7:F2} ms  ({(tPlayerAttack/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   TowerAttack:    {tTowerAttack,7:F2} ms  ({(tTowerAttack/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   Upgrade:        {tUpgrade,7:F2} ms  ({(tUpgrade/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   Skill:          {tSkill,7:F2} ms  ({(tSkill/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   ----------------------------------------");
+            Console.WriteLine($"[BENCHMARK]   TOTAL:          {msTotal,7:F2} ms");
+            Console.WriteLine($"\n[BENCHMARK] Throughput: {fps:F0} FPS  ({msTotal/frames:F2} ms/frame)");
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Systems;
 
 namespace BattleSystemECS.Core
 {
@@ -51,6 +52,10 @@ namespace BattleSystemECS.Core
         public int[] EnemyAIChargeCounter = new int[MAX_ENTITIES];
         public int[] EnemyAILastAttackTurn = new int[MAX_ENTITIES];
         public string[] EnemyTypeName = new string[MAX_ENTITIES];
+        // Pre-cached behavior tree per enemy — set once at spawn in WaveSpawningSystem
+        public BTCachedTree[] EnemyBehaviorTree = new BTCachedTree[MAX_ENTITIES];
+        // Optimized action type as enum — avoids string comparison per frame
+        public EnemyActionType[] EnemyActionEnum = new EnemyActionType[MAX_ENTITIES];
 
         // ==================== 塔组件的 SOA 存储 ====================
         public string[] TowerType = new string[MAX_ENTITIES];
@@ -93,7 +98,9 @@ namespace BattleSystemECS.Core
             {
                 return freeEntityIds.Pop();
             }
-            return nextEntityId++;
+            int entityId = nextEntityId++;
+            EnemyActionEnum[entityId] = EnemyActionType.None;
+            return entityId;
         }
 
         public void DestroyEntity(int entityId)
@@ -105,6 +112,7 @@ namespace BattleSystemECS.Core
 
             // 清理敌人 AI 状态
             EnemyAIAction[entityId] = "";
+            EnemyActionEnum[entityId] = EnemyActionType.None;
             EnemyAIChargeCounter[entityId] = 0;
             EnemyAILastAttackTurn[entityId] = 0;
 
@@ -383,6 +391,18 @@ namespace BattleSystemECS.Core
         {
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
             EnemyAILastAttackTurn[enemyId] = turn;
+        }
+
+        public EnemyActionType GetEnemyActionEnum(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return EnemyActionType.None;
+            return EnemyActionEnum[enemyId];
+        }
+
+        public void SetEnemyActionEnum(int enemyId, EnemyActionType action)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            EnemyActionEnum[enemyId] = action;
         }
 
         // ==================== 技能组件 SOA 访问方法 ====================

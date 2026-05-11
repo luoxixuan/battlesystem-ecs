@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -9,7 +10,7 @@ namespace BattleSystemECS.Systems
     /// SOA (Struct of Arrays) 敌人移动系统
     /// 直接访问 ComponentStore 的数组，无字典查询，无 struct 复制
     /// 性能提升：10-100 倍
-    /// Movement direction is driven by EnemyAISystem via EnemyAIAction.
+    /// Movement direction is driven by EnemyAISystem via EnemyActionEnum.
     /// </summary>
     public class EnemyMovementSystem
     {
@@ -33,7 +34,9 @@ namespace BattleSystemECS.Systems
                     continue;
 
                 float moveSpeed = store.EnemyMoveSpeed[enemyId];
-                string action = store.GetEnemyAIAction(enemyId);
+
+                // Enum-based action dispatch — O(1) per enemy, no string comparison
+                EnemyActionType actionEnum = store.GetEnemyActionEnum(enemyId);
 
                 // Default: move toward player (direction = -1, toward y=0)
                 int direction = -1;
@@ -41,55 +44,37 @@ namespace BattleSystemECS.Systems
                 float y = store.PositionY[enemyId];
                 float playerX = store.PositionX[playerId];
 
-                if (!string.IsNullOrEmpty(action))
+                switch (actionEnum)
                 {
-                    if (action == "move_to_target")
-                    {
+                    case EnemyActionType.MoveToTarget:
                         // Move toward player on Y axis
                         direction = -1;
-                    }
-                    else if (action == "retreat")
-                    {
+                        break;
+
+                    case EnemyActionType.Retreat:
                         // Move away from player (opposite direction)
                         direction = 1;
-                    }
-                    else if (action == "dodge_1")
-                    {
-                        // Dodge perpendicular: move +1 on X (right), reset Y move
-                        store.PositionX[enemyId] = Math.Clamp(x + 1f, 0f, 9f);
-                        store.PositionY[enemyId] = y - moveSpeed * 0.5f;
-                        enemiesMoved++;
-                        continue;
-                    }
-                    else if (action == "dodge_-1")
-                    {
-                        // Dodge perpendicular: move -1 on X (left), reset Y move
-                        store.PositionX[enemyId] = Math.Clamp(x - 1f, 0f, 9f);
-                        store.PositionY[enemyId] = y - moveSpeed * 0.5f;
-                        enemiesMoved++;
-                        continue;
-                    }
-                    else if (action == "dodge")
-                    {
-                        // Default dodge right
-                        store.PositionX[enemyId] = Math.Clamp(x + 1f, 0f, 9f);
-                        store.PositionY[enemyId] = y - moveSpeed * 0.5f;
-                        enemiesMoved++;
-                        continue;
-                    }
-                    else
-                    {
-                        // Any other action (attack_melee, ranged_attack, charge_attack): hold position
-                        continue;
-                    }
-                }
-                else
-                {
-                    // Fallback: no action set → move toward player
-                    direction = -1;
+                        break;
+
+                    case EnemyActionType.Dodge:
+                        {
+                            // Dodge needs the direction suffix — read from string array for backward compat
+                            string actionStr = store.GetEnemyAIAction(enemyId);
+                            int dodgeDir = ParseDodgeDirection(actionStr);
+                            store.PositionX[enemyId] = Math.Clamp(x + dodgeDir, 0f, 9f);
+                            store.PositionY[enemyId] = y - moveSpeed * 0.5f;
+                            enemiesMoved++;
+                            continue;
+                        }
+
+                    case EnemyActionType.None:
+                    default:
+                        // Fallback: no action set → move toward player
+                        direction = -1;
+                        break;
                 }
 
-                // Apply Y movement
+                // For MoveToTarget, Retreat, and None (fallback) — apply Y movement
                 store.PositionY[enemyId] = y + direction * moveSpeed;
                 enemiesMoved++;
             }
@@ -98,6 +83,25 @@ namespace BattleSystemECS.Systems
             {
                 Console.WriteLine($"[MOVE] {enemiesMoved} enemies moved");
             }
+        }
+
+        /// <summary>
+        /// Parse dodge direction from action string suffix (e.g. "dodge_1" → +1, "dodge_-1" → -1, "dodge" → +1).
+        /// Kept for backward compatibility with the dodge parameter only.
+        /// </summary>
+        private static int ParseDodgeDirection(string action)
+        {
+            if (string.IsNullOrEmpty(action))
+                return 1;
+
+            int underscoreIdx = action.LastIndexOf('_');
+            if (underscoreIdx > 0 && underscoreIdx < action.Length - 1)
+            {
+                string suffix = action.Substring(underscoreIdx + 1);
+                if (int.TryParse(suffix, out int dir))
+                    return dir;
+            }
+            return 1; // default dodge right
         }
     }
 }
