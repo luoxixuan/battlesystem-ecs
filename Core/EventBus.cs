@@ -36,6 +36,10 @@ namespace BattleSystemECS.Core
         /// </summary>
         public void Publish(string eventType, object data = null)
         {
+            // Fast path: no handlers registered for this event type at all
+            if (handlers.Count == 0)
+                return;
+
             if (handlers.TryGetValue(eventType, out var list))
             {
                 // Iterate a copy in case handler unsubscribes during execution

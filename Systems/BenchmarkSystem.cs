@@ -46,6 +46,8 @@ namespace BattleSystemECS.Systems
                 int id = store.AddEnemy(x, y, 1f, 100f, 100f, 10f, 10, 1);
                 store.SetEnemyAIAction(id, "");
                 store.SetEntityName(id, $"NormalL1W1E{i}");
+                // Pre-cache BT so EnemyAISystem reads from SOA array (O(1)) instead of calling GetCachedBehaviorTree
+                store.EnemyBehaviorTree[id] = gameConfig.GetCachedBehaviorTree("Normal");
             }
             Console.WriteLine($"[BENCHMARK] Spawned {enemyCount} enemies");
 

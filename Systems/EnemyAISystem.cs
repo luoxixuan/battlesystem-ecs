@@ -80,10 +80,19 @@ namespace BattleSystemECS.Systems
                 store.SetEnemyAIAction(enemyId, action);
 
                 // Convert action string → enum and store
+                // Convert action string → enum (cached) and store
                 EnemyActionType actionEnum = StringToActionEnum(action);
                 store.SetEnemyActionEnum(enemyId, actionEnum);
 
-                InvokeExecuteActionEnum(enemyId, actionEnum);
+                // Only call for actions with side effects: MoveToTarget and Retreat are
+                // handled entirely by EnemyMovementSystem; Dodge/attack types need this.
+                if (actionEnum == EnemyActionType.AttackMelee ||
+                    actionEnum == EnemyActionType.RangedAttack ||
+                    actionEnum == EnemyActionType.ChargeAttack ||
+                    actionEnum == EnemyActionType.Dodge)
+                {
+                    InvokeExecuteActionEnum(enemyId, actionEnum);
+                }
                 evaluated++;
             }
 
@@ -110,13 +119,16 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Convert action string to EnemyActionType enum.
+        /// Convert action string to EnemyActionType enum using a static cache.
         /// Base action is extracted the same way as in InvokeExecuteAction.
         /// </summary>
         private static EnemyActionType StringToActionEnum(string action)
         {
             if (string.IsNullOrEmpty(action))
                 return EnemyActionType.None;
+
+            if (actionCache.TryGetValue(action, out var cached))
+                return cached;
 
             string baseAction = action;
             int underscoreIdx = action.LastIndexOf('_');
@@ -129,7 +141,7 @@ namespace BattleSystemECS.Systems
                 }
             }
 
-            return baseAction switch
+            EnemyActionType result = baseAction switch
             {
                 "move_to_target" => EnemyActionType.MoveToTarget,
                 "attack_melee" => EnemyActionType.AttackMelee,
@@ -139,7 +151,13 @@ namespace BattleSystemECS.Systems
                 "retreat" => EnemyActionType.Retreat,
                 _ => EnemyActionType.None,
             };
+
+            actionCache[action] = result;
+            return result;
         }
+
+        // Static cache for StringToActionEnum — eliminates repeated switch per call
+        private static readonly Dictionary<string, EnemyActionType> actionCache = new Dictionary<string, EnemyActionType>();
 
         /// <summary>
         /// Execute the given action for the specified enemy using enum dispatch.
@@ -160,7 +178,6 @@ namespace BattleSystemECS.Systems
                     break;
 
                 case EnemyActionType.ChargeAttack:
-                    // param is stored separately in chargeParams; charge_attack_N → use N
                     {
                         float param = chargeParams.TryGetValue(enemyId, out var p) ? p : 0f;
                         ExecuteChargeAttack(enemyId, param);

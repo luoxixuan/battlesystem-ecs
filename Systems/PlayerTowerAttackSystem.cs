@@ -15,6 +15,7 @@ namespace BattleSystemECS.Systems
         private Core.ComponentStore store;
         private IRenderer renderer;
         private int playerId;
+        private static readonly Random critRandom = new Random();
 
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
@@ -47,7 +48,7 @@ namespace BattleSystemECS.Systems
                     }
                     else if (buff == "Crit Rate+5%")
                     {
-                        if (new Random().NextDouble() < 0.05)
+                        if (critRandom.NextDouble() < 0.05)
                         {
                             finalAttackDamage *= 2f;
                             renderer.Log($"[BUFF] CRITICAL! Damage doubled: {finalAttackDamage:F1}");
