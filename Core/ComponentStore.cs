@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
@@ -92,6 +92,7 @@ namespace BattleSystemECS.Core
         // ==================== 实体管理 ====================
         public int PlayerEntityId { get; private set; } = 1;
         public List<int> ActiveEnemyIds = new List<int>();
+        public List<int> ActiveTowerIds = new List<int>();
         private Stack<int> freeEntityIds = new Stack<int>();
         public Dictionary<int, string> entityNames = new Dictionary<int, string>();
         private int nextEntityId = 2; // 从 2 开始，1 是玩家
@@ -129,8 +130,18 @@ namespace BattleSystemECS.Core
             EnemyAIChargeCounter[entityId] = 0;
             EnemyAILastAttackTurn[entityId] = 0;
 
-            // 从活跃敌人列表移除（Bug #10）
             ActiveEnemyIds.Remove(entityId);
+
+            // 清理塔状态
+            if (TowerActive[entityId])
+            {
+                TowerActive[entityId] = false;
+                ActiveTowerIds.Remove(entityId);
+            }
+            else
+            {
+                TowerActive[entityId] = false;
+            }
 
             // 回收 ID
             freeEntityIds.Push(entityId);
@@ -321,12 +332,14 @@ namespace BattleSystemECS.Core
             TowerUpgradeCost[entityId] = cost;
             TowerActive[entityId] = true;
             TowerLastAttackTime[entityId] = 0f;
+            ActiveTowerIds.Add(entityId);
         }
 
         public void RemoveTower(int entityId)
         {
             if (entityId < 0 || entityId >= MAX_ENTITIES) return;
             TowerActive[entityId] = false;
+            ActiveTowerIds.Remove(entityId);
         }
 
         public float GetEnemyHealth(int enemyId)

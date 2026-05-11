@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
 
@@ -28,20 +29,21 @@ namespace BattleSystemECS.Systems
         public void Update(float deltaTime)
         {
             var activeEnemies = _activeEnemyList ?? store.GetAllActiveEnemyIds();
+            var activeTowerIds = store.ActiveTowerIds;
 
-            for (int ti = 0; ti < store.NextEntityId; ti++)
+            Parallel.For(0, activeTowerIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, ti =>
             {
-                if (!store.TowerActive[ti]) continue;
+                int towerId = activeTowerIds[ti];
 
-                store.TowerLastAttackTime[ti] += deltaTime;
+                store.TowerLastAttackTime[towerId] += deltaTime;
 
-                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[ti]);
-                if (store.TowerLastAttackTime[ti] < attackInterval) continue;
+                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId]);
+                if (store.TowerLastAttackTime[towerId] < attackInterval) return;
 
-                float tx = store.PositionX[ti];
-                float ty = store.PositionY[ti];
-                int range = store.TowerRange[ti];
-                float damage = store.TowerAttackDamage[ti];
+                float tx = store.PositionX[towerId];
+                float ty = store.PositionY[towerId];
+                int range = store.TowerRange[towerId];
+                float damage = store.TowerAttackDamage[towerId];
                 int rangeSq = range * range;
 
                 int bestTarget = -1;
@@ -68,7 +70,7 @@ namespace BattleSystemECS.Systems
                     }
                 }
 
-                store.TowerLastAttackTime[ti] = 0f;
+                store.TowerLastAttackTime[towerId] = 0f;
 
                 if (bestTarget != -1)
                 {
@@ -78,7 +80,7 @@ namespace BattleSystemECS.Systems
                         store.EnemyActive[bestTarget] = false;
                     }
                 }
-            }
+            });
         }
     }
 }
