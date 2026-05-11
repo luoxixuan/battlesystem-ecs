@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using BattleSystemECS.Components;
 using BattleSystemECS.Systems;
 using BattleSystemECS.Core;
@@ -21,11 +21,11 @@ namespace BattleSystemECS.Core
         private MapSystem mapSystem;
         private PlayerTowerAttackSystem playerTowerAttackSystem;
         private EnemyMovementSystem enemyMovementSystem;
-        private GoldRewardSystem goldRewardSystem;
+        private GoldSystem goldSystem;
         private WaveSpawningSystem waveSpawningSystem;
         private UpgradeSystem upgradeSystem;
         private SkillSystem skillSystem;
-        private EnemyAttackSystem enemyAttackSystem;
+        private EnemyAISystem enemyAISystem;
         private TowerPlacementSystem towerPlacementSystem;  // 塔建造系统
         private TowerAttackSystem towerAttackSystem;       // 塔攻击系统
         private TowerUpgradeSystem towerUpgradeSystem;     // 塔升级系统
@@ -86,7 +86,7 @@ namespace BattleSystemECS.Core
 
             // 初始化其他系统
             logger.Log("[BOOTSTRAP]    - Creating EnemyMovementSystem...");
-            enemyMovementSystem = new EnemyMovementSystem(store);
+            enemyMovementSystem = new EnemyMovementSystem(store, playerId);
             logger.Log("[BOOTSTRAP]      EnemyMovementSystem created successfully!");
 
             // 初始化塔防系统
@@ -114,9 +114,9 @@ namespace BattleSystemECS.Core
             playerTowerAttackSystem = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
             logger.Log("[BOOTSTRAP]      PlayerTowerAttackSystem created successfully!");
 
-            logger.Log("[BOOTSTRAP]    - Creating GoldRewardSystem...");
-            goldRewardSystem = new GoldRewardSystem(store, logger, playerId);
-            logger.Log("[BOOTSTRAP]      GoldRewardSystem created successfully!");
+            logger.Log("[BOOTSTRAP]    - Creating GoldSystem...");
+            goldSystem = new GoldSystem(store, logger);
+            logger.Log("[BOOTSTRAP]      GoldSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating WaveSpawningSystem...");
             waveSpawningSystem = new WaveSpawningSystem(store, logger, gameConfig);
@@ -134,9 +134,9 @@ namespace BattleSystemECS.Core
             skillSystem.InitializePlayerSkills();  // 初始化技能系统
             logger.Log("[BOOTSTRAP]      Player Skills initialized successfully!");
 
-            logger.Log("[BOOTSTRAP]    - Creating EnemyAttackSystem...");
-            enemyAttackSystem = new EnemyAttackSystem(store, logger, playerId);  // 初始化敌人攻击系统
-            logger.Log("[BOOTSTRAP]      EnemyAttackSystem created successfully!");
+            logger.Log("[BOOTSTRAP]    - Creating EnemyAISystem...");
+            enemyAISystem = new EnemyAISystem(store, logger, playerId, gameConfig);  // 初始化敌人 AI 系统（行为树驱动）
+            logger.Log("[BOOTSTRAP]      EnemyAISystem created successfully!");
 
             logger.Log("[BOOTSTRAP] ========== Game Initialization Complete ==========");
             Console.WriteLine();
@@ -271,11 +271,12 @@ namespace BattleSystemECS.Core
                     // 生成敌人（SOA）- 每波 100 只怪
                     waveSpawningSystem.Update();
 
+                    // 敌人 AI 评估（行为树）- 在移动之前执行
+                    enemyAISystem.SetTurn(turn);
+                    enemyAISystem.Update();
+
                     // 移动敌人（SOA）
                     enemyMovementSystem.Update();
-
-                    // 敌人攻击玩家（SOA）- 检查相邻敌人，减少玩家生命值
-                    enemyAttackSystem.Update();
 
                     // 玩家攻击（SOA）
                     playerTowerAttackSystem.Update();
@@ -284,7 +285,7 @@ namespace BattleSystemECS.Core
                     towerAttackSystem.Update(1.0f);
 
                     // 检查玩家是否存活
-                    if (!enemyAttackSystem.IsPlayerAlive())
+                    if (!store.IsPlayerAlive(playerId))
                     {
                         logger.Log("[INFO] Player died! Game Over.");
                         gameRunning = false;
@@ -292,7 +293,7 @@ namespace BattleSystemECS.Core
                     }
 
                     // 检查升级（SOA）
-                    goldRewardSystem.Update();
+                    goldSystem.Update();
 
                     // 应用升级（SOA）
                     upgradeSystem.Update();

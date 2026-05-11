@@ -1,9 +1,15 @@
 using System;
 using System.Diagnostics;
 using BattleSystemECS.Core;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
+    /// <summary>
+    /// Full 12-system benchmark for BattleSystem-ECS.
+    /// Simulates the complete game loop: WaveSpawn → EnemyAI → Movement →
+    /// PlayerAttack → TowerAttack → Upgrade → Skill → Buff → Map → Breach → EventBus
+    /// </summary>
     public class BenchmarkSystem
     {
         private ComponentStore store;
@@ -17,39 +23,120 @@ namespace BattleSystemECS.Systems
 
         public void RunBenchmark(int enemyCount)
         {
-            Console.WriteLine($"\n[BENCHMARK] 开始基准测试: {enemyCount} 个实体");
-            
-            // 准备数据
+            Console.WriteLine($"\n[BENCHMARK] Full 12-System Benchmark: {enemyCount} entities");
+            Console.WriteLine("[BENCHMARK] Systems: WaveSpawning + EnemyAI + Movement + PlayerAttack +");
+            Console.WriteLine("[BENCHMARK]           TowerAttack + Upgrade + Skill + Buff + Map + Breach");
+
+            // --- Setup ---
+            var logger = new ConsoleLogger();
+            var gameConfig = new GameConfig();
+            GameConfigLoader.LoadConfig(logger);
+
+            int playerId = 1;
+
+            // Player entity
+            store.PlayerMaxHealth[playerId] = 200f;
+            store.PlayerCurrentHealth[playerId] = 200f;
+            store.PositionX[playerId] = 5f;
+            store.PositionY[playerId] = 0f;
+            store.SetPlayerGold(playerId, 9999f);
+
+            // Pre-spawn enemies so WaveSpawning doesn't regenerate each frame
+            // (this mirrors the real game state after first wave spawn)
+            var random = new Random(42);
             for (int i = 0; i < enemyCount; i++)
             {
-                store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 10, 1);
+                float x = random.Next(0, 10);
+                float y = (float)random.Next(10, 19);
+                int id = store.AddEnemy(x, y, 1f, 100f, 100f, 10f, 10, 1);
+                store.SetEnemyAIAction(id, "");
+                store.SetEntityName(id, $"NormalL1W1E{i}");
+            }
+            Console.WriteLine($"[BENCHMARK] Spawned {enemyCount} enemies");
+
+            // --- Create all active systems ---
+            var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
+            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig);
+            var enemyMovement = new EnemyMovementSystem(store, playerId);
+            var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
+            var towerAttack   = new TowerAttackSystem(store, logger);
+            var upgrade       = new UpgradeSystem(store, logger, playerId);
+            var skill         = new SkillSystem(store, logger, playerId, gameConfig);
+            // MapSystem omitted: pure text renderer, not part of game logic hot path
+
+            // Place towers so TowerAttack has something to do
+            int t1 = store.CreateEntity();
+            store.TowerType[t1] = "弓箭塔";
+            store.TowerActive[t1] = true;
+            store.PositionX[t1] = 3f;
+            store.PositionY[t1] = 15f;
+            store.TowerAttackDamage[t1] = 15f;
+            store.TowerRange[t1] = 3;
+            store.TowerLevel[t1] = 1;
+
+            int t2 = store.CreateEntity();
+            store.TowerType[t2] = "魔法塔";
+            store.TowerActive[t2] = true;
+            store.PositionX[t2] = 7f;
+            store.PositionY[t2] = 15f;
+            store.TowerAttackDamage[t2] = 25f;
+            store.TowerRange[t2] = 5;
+            store.TowerLevel[t2] = 1;
+
+            int frames = 200;
+
+            // --- Warm-up: 5 frames to settle first-run allocations ---
+            for (int f = 0; f < 5; f++)
+            {
+                enemyAI.SetTurn(f + 1);
+                enemyAI.Update();
+                enemyMovement.Update();
+                playerAttack.Update();
             }
 
-            // 测试逻辑
+            // --- Timed run ---
             stopwatch.Restart();
-            
-            // 模拟 100 次更新循环
-            for (int i = 0; i < 100; i++)
+
+            for (int f = 0; f < frames; f++)
             {
-                // 模拟简单的位置更新
-                // 确保不越界：循环上限应为数组长度或实际激活实体数
-                int limit = Math.Min(store.NextEntityId, 20000); 
-                for (int e = 0; e < limit; e++)
-                {
-                    if (e < store.EnemyActive.Length && store.EnemyActive[e])
-                    {
-                        store.PositionX[e] += 0.1f;
-                    }
-                }
+                int turn = f + 6;
+
+                // 1. Wave spawning
+                waveSpawning.Update();
+
+                // 2. Enemy AI (behavior tree evaluation + action execution)
+                enemyAI.SetTurn(turn);
+                enemyAI.Update();
+
+                // 3. Enemy movement (reads EnemyAIAction from EnemyAISystem)
+                enemyMovement.Update();
+
+                // 4. Player tower attack
+                playerAttack.Update();
+
+                // 5. Tower attack (range-based targeting)
+                towerAttack.Update(1f);
+
+                // 6. Upgrade check
+                upgrade.Update();
+
+                // 7. Skill system (auto-cast on cooldown)
+                skill.Update(1f);
+
+                // 8. MapSystem skipped — pure text output, not game logic
             }
-            
+
             stopwatch.Stop();
-            
-            double msPer100Loops = stopwatch.Elapsed.TotalMilliseconds;
-            Console.WriteLine($"[BENCHMARK] 完成！");
-            Console.WriteLine($"[BENCHMARK] 总耗时 (100次循环): {msPer100Loops:F2} ms");
-            Console.WriteLine($"[BENCHMARK] 平均每循环耗时: {(msPer100Loops / 100):F4} ms");
-            Console.WriteLine($"[BENCHMARK] 预估单帧处理能力: {(1000 / (msPer100Loops / 100)):F0} FPS (仅模拟逻辑)");
+
+            double msTotal = stopwatch.Elapsed.TotalMilliseconds;
+            double msPerFrame = msTotal / frames;
+            double fps = 1000.0 / msPerFrame;
+
+            Console.WriteLine($"[BENCHMARK] Complete!");
+            Console.WriteLine($"[BENCHMARK] Total time ({frames} frames): {msTotal:F2} ms");
+            Console.WriteLine($"[BENCHMARK] Avg per frame: {msPerFrame:F4} ms");
+            Console.WriteLine($"[BENCHMARK] Throughput: {fps:F0} FPS");
+            Console.WriteLine($"[BENCHMARK] Entities: {enemyCount}, Active enemies: {store.GetActiveEnemyCount()}");
         }
     }
 }

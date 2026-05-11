@@ -1,0 +1,12 @@
+{
+  "Name": "Normal Slime",
+  "Type": "Normal",
+  "Health": 20,
+  "MaxHealth": 20,
+  "Damage": 5,
+  "MoveSpeed": 1,
+  "AttackRange": 1,
+  "AttackInterval": 1.5,
+  "GoldReward": 10,
+  "Skills": ["Normal Attack"]
+}

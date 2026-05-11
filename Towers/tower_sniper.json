@@ -1,0 +1,9 @@
+{
+  "Name": "Sniper Tower",
+  "Type": "Sniper",
+  "Damage": 25,
+  "Range": 8,
+  "AttackSpeed": 0.5,
+  "Cost": 100,
+  "UpgradeCost": 60
+}

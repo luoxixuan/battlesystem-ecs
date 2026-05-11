@@ -29,6 +29,10 @@ namespace BattleSystemECS.Systems
             this.gameConfig = gameConfig;
         }
 
+        public int GetCurrentWave() => currentWave;
+        public int GetCurrentLevel() => currentLevel;
+        public int GetTotalEnemiesSpawned() => totalEnemiesSpawned;
+
         public void SetLevel(int levelNumber)
         {
             currentLevel = levelNumber;
@@ -72,8 +76,8 @@ namespace BattleSystemECS.Systems
 
                 Random random = new Random();
                 
-                // 批量生成 100 个敌人
-                for (int i = 0; i < 100; i++)
+                // 批量生成 5 个敌人
+                for (int i = 0; i < 5; i++)
                 {
                     // 计算随机位置（X：0-9，Y：19）
                     float startX = (float)random.Next(0, 10);
@@ -95,9 +99,9 @@ namespace BattleSystemECS.Systems
                     enemiesSpawnedInWave++;
                 }
 
-                totalEnemiesSpawned += 100;
+                totalEnemiesSpawned += 5;
                 
-                renderer.Log($"[SPAWN] Spawned {enemiesSpawnedInWave} enemies (batch 100) for Wave {currentWave}");
+                renderer.Log($"[SPAWN] Spawned {enemiesSpawnedInWave} enemies (batch 5) for Wave {currentWave}");
             }
             else
             {

@@ -231,30 +231,27 @@ namespace BattleSystemECS.Systems
                     float targetX = playerX + xOffset[i];
                     float targetY = playerY + yOffset[i];
 
+                    // 检查敌人是否在十字范围内（位置匹配）
                     if (System.Math.Abs(enemyX - targetX) < 0.5f && System.Math.Abs(enemyY - targetY) < 0.5f)
                     {
-                        // 计算攻击距离
-                        float distance = System.Math.Abs(targetX - playerX);
-                        if (distance <= range)
+                        // 十字形技能：位置命中直接造成伤害，不额外检查距离
+                        // （target 已在玩家为中心的十字范围内）
+                        enemyHealth = System.Math.Max(0f, enemyHealth - finalDamage);
+                        store.SetEnemyHealth(enemyId, enemyHealth);
+                        enemiesHit++;
+
+                        renderer.Log($"[SKILL] Cross Slash hit enemy {enemyId} at ({enemyX:F0}, {enemyY:F0}), damage: {finalDamage:F1}");
+
+                        if (enemyHealth <= 0f)
                         {
-                            // 造成伤害
-                            enemyHealth = System.Math.Max(0f, enemyHealth - finalDamage);
-                            store.SetEnemyHealth(enemyId, enemyHealth);
-                            enemiesHit++;
+                            store.TotalKills++;
+                            int goldReward = store.GetEnemyGoldReward(enemyId);
+                            float currentGold = store.GetPlayerGold(playerId);
+                            store.SetPlayerGold(playerId, currentGold + goldReward);
 
-                            renderer.Log($"[SKILL] Cross Slash hit enemy {enemyId} at ({enemyX:F0}, {enemyY:F0}), damage: {finalDamage:F1}");
-
-                            if (enemyHealth <= 0f)
-                            {
-                                // 击杀敌人，奖励金币
-                                int goldReward = store.GetEnemyGoldReward(enemyId);
-                                float currentGold = store.GetPlayerGold(playerId);
-                                store.SetPlayerGold(playerId, currentGold + goldReward);
-
-                                renderer.Log($"[SKILL] Cross Slash killed enemy {enemyId}, gained {goldReward} gold");
-                            }
-                            break;
+                            renderer.Log($"[SKILL] Cross Slash killed enemy {enemyId}, gained {goldReward} gold");
                         }
+                        break;
                     }
                 }
             }
@@ -408,6 +405,18 @@ namespace BattleSystemECS.Systems
             if (currentCooldown <= 0f)
             {
                 // 自动释放冷却时间最短的技能
+                CastSkill(skillCrossSlash.Name);
+            }
+        }
+
+        /// <summary>
+        /// 自动释放最佳技能（用于测试兼容）
+        /// </summary>
+        public void AutoCastBestSkill()
+        {
+            float currentCooldown = store.GetSkillCurrentCooldown(playerId);
+            if (currentCooldown <= 0f)
+            {
                 CastSkill(skillCrossSlash.Name);
             }
         }

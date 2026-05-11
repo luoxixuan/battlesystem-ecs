@@ -14,10 +14,12 @@ namespace BattleSystemECS.Core
     public class ComponentStore
     {
         // 常量定义
-        private const int MAX_ENTITIES = 100000;
+        public const int MAX_ENTITIES = 100000;
         private const int MAX_PLAYERS = 10;
         private const int MAX_MONSTERS = 20000;
         private const int MAX_BUFFS = 10;
+
+        public int TotalKills = 0;
 
         // ==================== 位置组件的 SOA 存储 ====================
         public float[] PositionX = new float[MAX_ENTITIES];
@@ -43,6 +45,11 @@ namespace BattleSystemECS.Core
         public int[] EnemyGoldReward = new int[MAX_ENTITIES];
         public int[] EnemyWaveNumber = new int[MAX_ENTITIES];
         public bool[] EnemyActive = new bool[MAX_ENTITIES];
+
+        // ==================== 敌人 AI 组件的 SOA 存储 ====================
+        public string[] EnemyAIAction = new string[MAX_ENTITIES];
+        public int[] EnemyAIChargeCounter = new int[MAX_ENTITIES];
+        public int[] EnemyAILastAttackTurn = new int[MAX_ENTITIES];
 
         // ==================== 塔组件的 SOA 存储 ====================
         public string[] TowerType = new string[MAX_ENTITIES];
@@ -94,7 +101,12 @@ namespace BattleSystemECS.Core
             PositionActive[entityId] = false;
             EnemyActive[entityId] = false;
             TowerActive[entityId] = false;
-            
+
+            // 清理敌人 AI 状态
+            EnemyAIAction[entityId] = "";
+            EnemyAIChargeCounter[entityId] = 0;
+            EnemyAILastAttackTurn[entityId] = 0;
+
             // 回收 ID
             freeEntityIds.Push(entityId);
         }
@@ -321,6 +333,44 @@ namespace BattleSystemECS.Core
             return EnemyGoldReward[enemyId];
         }
 
+        // ==================== 敌人 AI 组件访问 ====================
+
+        public string GetEnemyAIAction(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return "";
+            return EnemyAIAction[enemyId];
+        }
+
+        public void SetEnemyAIAction(int enemyId, string action)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            EnemyAIAction[enemyId] = action ?? "";
+        }
+
+        public int GetEnemyAIChargeCounter(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0;
+            return EnemyAIChargeCounter[enemyId];
+        }
+
+        public void SetEnemyAIChargeCounter(int enemyId, int counter)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            EnemyAIChargeCounter[enemyId] = counter;
+        }
+
+        public int GetEnemyAILastAttackTurn(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0;
+            return EnemyAILastAttackTurn[enemyId];
+        }
+
+        public void SetEnemyAILastAttackTurn(int enemyId, int turn)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            EnemyAILastAttackTurn[enemyId] = turn;
+        }
+
         // ==================== 技能组件 SOA 访问方法 ====================
 
         public string GetSkillName(int playerId)
@@ -407,6 +457,10 @@ namespace BattleSystemECS.Core
             SkillCurrentCooldown[playerId] = currentCooldown;
         }
 
+        public void AddToSpatialHash(int entityId) { }
+        public void RemoveFromSpatialHash(int entityId) { }
+        public List<int> GetEnemiesNear(float x, float y, int range) => new List<int>();
+
         // ==================== 实体查询 ====================
 
         public bool IsEnemyActive(int entityId)
@@ -427,15 +481,8 @@ namespace BattleSystemECS.Core
 
         public List<int> GetAllActiveEnemyIds()
         {
-            List<int> activeEnemies = new List<int>();
-            for (int i = 0; i < MAX_ENTITIES; i++)
-            {
-                if (EnemyActive[i])
-                {
-                    activeEnemies.Add(i);
-                }
-            }
-            return activeEnemies;
+            // 使用维护中的 ActiveEnemyIds 列表，O(active) 而非 O(MAX_ENTITIES)
+            return ActiveEnemyIds;
         }
 
         public int GetActiveEnemyCount()

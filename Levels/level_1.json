@@ -1,0 +1,11 @@
+{
+  "LevelNumber": 1,
+  "Name": "First Stand",
+  "Description": "A few slimes approach. Easy first contact.",
+  "WaveCount": 3,
+  "Waves": [
+    { "WaveNumber": 1, "MonsterType": "Normal", "EnemyCount": 6 },
+    { "WaveNumber": 2, "MonsterType": "Normal", "EnemyCount": 8 },
+    { "WaveNumber": 3, "MonsterType": "Normal", "EnemyCount": 10 }
+  ]
+}

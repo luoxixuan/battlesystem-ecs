@@ -1,0 +1,9 @@
+{
+  "Name": "AOE Tower",
+  "Type": "AOE",
+  "Damage": 8,
+  "Range": 2,
+  "AttackSpeed": 1.5,
+  "Cost": 75,
+  "UpgradeCost": 45
+}

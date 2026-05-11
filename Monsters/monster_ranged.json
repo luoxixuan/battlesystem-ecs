@@ -1,0 +1,12 @@
+{
+  "Name": "Ranged Slime",
+  "Type": "Ranged",
+  "Health": 15,
+  "MaxHealth": 15,
+  "Damage": 6,
+  "MoveSpeed": 0.8,
+  "AttackRange": 5,
+  "AttackInterval": 1.2,
+  "GoldReward": 25,
+  "Skills": ["Normal Attack", "Ranged Shot"]
+}

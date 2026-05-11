@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using BattleSystemECS.Core;
+using BattleSystemECS.Systems;
 
 namespace BattleSystemECS.Config
 {
@@ -31,9 +32,13 @@ namespace BattleSystemECS.Config
 
                 var gameConfig = ParseGameConfig(jsonContent);
 
+                // Load behavior trees
+                LoadBehaviorTrees(gameConfig, renderer);
+
                 renderer.Log("[CONFIG] Successfully loaded configuration from " + CONFIG_FILE);
                 renderer.Log("[CONFIG]   - " + gameConfig.MonsterTypes.Count + " monster types");
                 renderer.Log("[CONFIG]   - " + gameConfig.Levels.Count + " levels");
+                renderer.Log("[CONFIG]   - " + gameConfig.BehaviorTrees.Count + " behavior trees");
 
                 return gameConfig;
             }
@@ -44,7 +49,124 @@ namespace BattleSystemECS.Config
             }
         }
 
-        private static GameConfig GetDefaultConfig()
+        private static void LoadBehaviorTrees(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string btFile = "Configs/behavior_trees.json";
+            try
+            {
+                if (!File.Exists(btFile))
+                {
+                    renderer.Log("[BT] Behavior trees file not found: " + btFile + ", using empty map");
+                    return;
+                }
+                string json = File.ReadAllText(btFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[BT] Behavior trees file is empty: " + btFile);
+                    return;
+                }
+                ParseBehaviorTrees(gameConfig, json);
+                renderer.Log("[BT] Loaded " + gameConfig.BehaviorTrees.Count + " behavior trees from " + btFile);
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[BT] Failed to load behavior trees: " + ex.Message);
+            }
+        }
+
+        private static void ParseBehaviorTrees(GameConfig gameConfig, string jsonArray)
+        {
+            int pos = 0;
+            while (pos < jsonArray.Length)
+            {
+                while (pos < jsonArray.Length && (char.IsWhiteSpace(jsonArray[pos]) || jsonArray[pos] == ',')) pos++;
+                if (pos >= jsonArray.Length) break;
+                if (jsonArray[pos] == '{')
+                {
+                    int objEnd = FindMatchingBrace(jsonArray, pos);
+                    if (objEnd == -1) break;
+                    string btJson = jsonArray.Substring(pos, objEnd - pos);
+                    var bt = ParseOneBehaviorTree(btJson);
+                    if (bt != null && !string.IsNullOrEmpty(bt.MonsterType))
+                        gameConfig.BehaviorTrees[bt.MonsterType] = bt;
+                    pos = objEnd + 1;
+                }
+                else
+                {
+                    pos++;
+                }
+            }
+        }
+
+        private static BehaviorTreeDef ParseOneBehaviorTree(string json)
+        {
+            var bt = new BehaviorTreeDef();
+            bt.Nodes = new Dictionary<string, BTNodeDef>();
+
+            bt.MonsterType = ExtractString(json, "MonsterType");
+            bt.RootId = ExtractString(json, "RootId");
+
+            // Parse Nodes object
+            string nodesKeyPattern = "\"Nodes\":";
+            int nodesIdx = json.IndexOf(nodesKeyPattern);
+            if (nodesIdx == -1) return bt;
+
+            int nodesBrace = json.IndexOf("{", nodesIdx);
+            if (nodesBrace == -1) return bt;
+            int nodesEnd = FindMatchingBrace(json, nodesBrace);
+            if (nodesEnd == -1) return bt;
+
+            string nodesJson = json.Substring(nodesBrace + 1, nodesEnd - nodesBrace - 1);
+
+            int nodePos = 0;
+            while (nodePos < nodesJson.Length)
+            {
+                while (nodePos < nodesJson.Length && (char.IsWhiteSpace(nodesJson[nodePos]) || nodesJson[nodePos] == ',')) nodePos++;
+                if (nodePos >= nodesJson.Length) break;
+                if (nodesJson[nodePos] == '"')
+                {
+                    // Key: "nodeId"
+                    int keyStart = nodePos + 1;
+                    int keyEnd = nodesJson.IndexOf('"', keyStart);
+                    if (keyEnd == -1) break;
+                    string nodeId = nodesJson.Substring(keyStart, keyEnd - keyStart);
+                    nodePos = keyEnd + 1;
+
+                    // Find :
+                    while (nodePos < nodesJson.Length && nodesJson[nodePos] != ':') nodePos++;
+                    if (nodePos >= nodesJson.Length) break;
+                    nodePos++;
+                    while (nodePos < nodesJson.Length && char.IsWhiteSpace(nodesJson[nodePos])) nodePos++;
+                    if (nodesJson[nodePos] != '{') { nodePos++; continue; }
+
+                    int nodeObjEnd = FindMatchingBrace(nodesJson, nodePos);
+                    if (nodeObjEnd == -1) break;
+                    string nodeObjJson = nodesJson.Substring(nodePos, nodeObjEnd - nodePos);
+
+                    var nodeDef = new BTNodeDef
+                    {
+                        Id = nodeId,
+                        Type = ExtractString(nodeObjJson, "Type"),
+                        Action = ExtractString(nodeObjJson, "Action"),
+                        Condition = ExtractString(nodeObjJson, "Condition"),
+                        Operator = ExtractString(nodeObjJson, "Operator"),
+                        Value = ExtractFloat(nodeObjJson, "Value"),
+                        Param = ExtractFloat(nodeObjJson, "Param"),
+                        Children = ParseStringArray(nodeObjJson, "Children")?.ToArray()
+                    };
+                    bt.Nodes[nodeId] = nodeDef;
+                    nodePos = nodeObjEnd + 1;
+                }
+                else
+                {
+                    nodePos++;
+                }
+            }
+
+            return bt;
+        }
+
+        public static GameConfig GetDefaultConfig()
         {
             var gameConfig = new GameConfig();
             
@@ -55,8 +177,10 @@ namespace BattleSystemECS.Config
                 AttackRange = 3f,
                 AttackInterval = 1f,
                 AttackDamage = 10f,
+                MaxHealth = 200f,
                 CurrentLevel = 1,
-                UpgradeThreshold = 100f
+                UpgradeThreshold = 100f,
+                StartingSkills = new List<string> { "Cross Slash", "Mega Explosion", "Sniper Shot" }
             };
 
             var defaultMonster = new MonsterConfig

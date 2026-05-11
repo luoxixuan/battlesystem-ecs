@@ -1,0 +1,12 @@
+{
+  "LevelNumber": 5,
+  "Name": "Final Onslaught",
+  "Description": "All slime types unite. This is the final battle!",
+  "WaveCount": 4,
+  "Waves": [
+    { "WaveNumber": 1, "MonsterType": "Normal", "EnemyCount": 20 },
+    { "WaveNumber": 2, "MonsterType": "Fast",   "EnemyCount": 20 },
+    { "WaveNumber": 3, "MonsterType": "Ranged", "EnemyCount": 15 },
+    { "WaveNumber": 4, "MonsterType": "Strong", "EnemyCount": 15 }
+  ]
+}

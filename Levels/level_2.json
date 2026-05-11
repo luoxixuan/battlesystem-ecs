@@ -1,0 +1,11 @@
+{
+  "LevelNumber": 2,
+  "Name": "Rapid Assault",
+  "Description": "Fast slimes! They move twice as fast. Build defenses wisely.",
+  "WaveCount": 3,
+  "Waves": [
+    { "WaveNumber": 1, "MonsterType": "Fast",   "EnemyCount": 15 },
+    { "WaveNumber": 2, "MonsterType": "Normal", "EnemyCount": 20 },
+    { "WaveNumber": 3, "MonsterType": "Fast",   "EnemyCount": 15 }
+  ]
+}

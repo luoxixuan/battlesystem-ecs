@@ -1,0 +1,207 @@
+[
+  {
+    "MonsterType": "Normal",
+    "Description": "Move toward player, attack when adjacent (distance <= 3)",
+    "RootId": "root",
+    "Nodes": {
+      "root": {
+        "Id": "root",
+        "Type": "Selector",
+        "Children": ["seq_attack", "act_move"]
+      },
+      "seq_attack": {
+        "Id": "seq_attack",
+        "Type": "Sequence",
+        "Children": ["cond_range", "act_melee"]
+      },
+      "cond_range": {
+        "Id": "cond_range",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 3.0
+      },
+      "act_melee": {
+        "Id": "act_melee",
+        "Type": "Action",
+        "Action": "attack_melee"
+      },
+      "act_move": {
+        "Id": "act_move",
+        "Type": "Action",
+        "Action": "move_to_target"
+      }
+    }
+  },
+  {
+    "MonsterType": "Fast",
+    "Description": "Dodge when low HP, otherwise attack then move",
+    "RootId": "root",
+    "Nodes": {
+      "root": {
+        "Id": "root",
+        "Type": "Selector",
+        "Children": ["seq_dodge", "seq_attack", "act_move"]
+      },
+      "seq_dodge": {
+        "Id": "seq_dodge",
+        "Type": "Sequence",
+        "Children": ["cond_lowhp", "act_dodge"]
+      },
+      "cond_lowhp": {
+        "Id": "cond_lowhp",
+        "Type": "Condition",
+        "Condition": "health_below",
+        "Operator": "<=",
+        "Value": 0.3
+      },
+      "act_dodge": {
+        "Id": "act_dodge",
+        "Type": "Action",
+        "Action": "dodge_1"
+      },
+      "seq_attack": {
+        "Id": "seq_attack",
+        "Type": "Sequence",
+        "Children": ["cond_range", "act_melee"]
+      },
+      "cond_range": {
+        "Id": "cond_range",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 3.0
+      },
+      "act_melee": {
+        "Id": "act_melee",
+        "Type": "Action",
+        "Action": "attack_melee"
+      },
+      "act_move": {
+        "Id": "act_move",
+        "Type": "Action",
+        "Action": "move_to_target"
+      }
+    }
+  },
+  {
+    "MonsterType": "Strong",
+    "Description": "Retreat at low HP, charge attack at range 3, melee at range 1, otherwise move",
+    "RootId": "root",
+    "Nodes": {
+      "root": {
+        "Id": "root",
+        "Type": "Selector",
+        "Children": ["seq_retreat", "seq_charge", "seq_melee", "act_move"]
+      },
+      "seq_retreat": {
+        "Id": "seq_retreat",
+        "Type": "Sequence",
+        "Children": ["cond_lowhp", "act_retreat"]
+      },
+      "cond_lowhp": {
+        "Id": "cond_lowhp",
+        "Type": "Condition",
+        "Condition": "health_below",
+        "Operator": "<=",
+        "Value": 0.4
+      },
+      "act_retreat": {
+        "Id": "act_retreat",
+        "Type": "Action",
+        "Action": "retreat"
+      },
+      "seq_charge": {
+        "Id": "seq_charge",
+        "Type": "Sequence",
+        "Children": ["cond_range3", "act_charge"]
+      },
+      "cond_range3": {
+        "Id": "cond_range3",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 3.0
+      },
+      "act_charge": {
+        "Id": "act_charge",
+        "Type": "Action",
+        "Action": "charge_attack",
+        "Param": 3.0
+      },
+      "seq_melee": {
+        "Id": "seq_melee",
+        "Type": "Sequence",
+        "Children": ["cond_range1", "act_melee"]
+      },
+      "cond_range1": {
+        "Id": "cond_range1",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 1.0
+      },
+      "act_melee": {
+        "Id": "act_melee",
+        "Type": "Action",
+        "Action": "attack_melee"
+      },
+      "act_move": {
+        "Id": "act_move",
+        "Type": "Action",
+        "Action": "move_to_target"
+      }
+    }
+  },
+  {
+    "MonsterType": "Ranged",
+    "Description": "Ranged attack at distance 5, melee at close range, otherwise move",
+    "RootId": "root",
+    "Nodes": {
+      "root": {
+        "Id": "root",
+        "Type": "Selector",
+        "Children": ["seq_ranged", "seq_melee", "act_move"]
+      },
+      "seq_ranged": {
+        "Id": "seq_ranged",
+        "Type": "Sequence",
+        "Children": ["cond_range5", "act_ranged"]
+      },
+      "cond_range5": {
+        "Id": "cond_range5",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 5.0
+      },
+      "act_ranged": {
+        "Id": "act_ranged",
+        "Type": "Action",
+        "Action": "ranged_attack"
+      },
+      "seq_melee": {
+        "Id": "seq_melee",
+        "Type": "Sequence",
+        "Children": ["cond_range1", "act_melee"]
+      },
+      "cond_range1": {
+        "Id": "cond_range1",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 1.0
+      },
+      "act_melee": {
+        "Id": "act_melee",
+        "Type": "Action",
+        "Action": "attack_melee"
+      },
+      "act_move": {
+        "Id": "act_move",
+        "Type": "Action",
+        "Action": "move_to_target"
+      }
+    }
+  }
+]

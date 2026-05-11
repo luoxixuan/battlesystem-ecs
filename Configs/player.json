@@ -1,0 +1,12 @@
+{
+  "Name": "Player",
+  "Type": "Tower",
+  "AttackRange": 3,
+  "AttackInterval": 1,
+  "AttackDamage": 10,
+  "MaxHealth": 200,
+  "CurrentLevel": 1,
+  "StartGold": 300,
+  "UpgradeThreshold": 1000,
+  "StartingSkills": ["Cross Slash", "Mega Explosion", "Sniper Shot"]
+}

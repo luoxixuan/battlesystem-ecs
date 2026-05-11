@@ -1,0 +1,94 @@
+[
+  {
+    "Name": "Cross Slash",
+    "Description": "十字范围伤害 - 瞄准最近敌人为中心，十字形 5 格范围",
+    "AreaShape": "cross",
+    "AreaWidth": 3,
+    "AreaHeight": 3,
+    "AttackRange": 3,
+    "Cooldown": 5,
+    "DamageMultiplier": 1,
+    "AutoCast": false,
+    "Hotkey": "1",
+    "Modifiers": [
+      {
+        "Name": "CrossSlashDamage",
+        "Type": "Damage",
+        "Duration": 0,
+        "StackingType": "None",
+        "StackLimitCount": 0,
+        "Value": 40,
+        "EffectTag": "Normal"
+      }
+    ]
+  },
+  {
+    "Name": "Mega Explosion",
+    "Description": "3x3 范围爆炸 - 9 格范围，高伤害",
+    "AreaShape": "box",
+    "AreaWidth": 3,
+    "AreaHeight": 3,
+    "AttackRange": 5,
+    "Cooldown": 10,
+    "DamageMultiplier": 1,
+    "AutoCast": false,
+    "Hotkey": "2",
+    "Modifiers": [
+      {
+        "Name": "MegaExplosionDamage",
+        "Type": "Damage",
+        "Duration": 0,
+        "StackingType": "None",
+        "StackLimitCount": 0,
+        "Value": 40,
+        "EffectTag": "Normal"
+      }
+    ]
+  },
+  {
+    "Name": "Sniper Shot",
+    "Description": "超远距离单体狙击 - 攻击距离 9 格",
+    "AreaShape": "single",
+    "AreaWidth": 1,
+    "AreaHeight": 1,
+    "AttackRange": 9,
+    "Cooldown": 8,
+    "DamageMultiplier": 1,
+    "AutoCast": false,
+    "Hotkey": "3",
+    "Modifiers": [
+      {
+        "Name": "SniperShotDamage",
+        "Type": "Damage",
+        "Duration": 0,
+        "StackingType": "None",
+        "StackLimitCount": 0,
+        "Value": 40,
+        "EffectTag": "Normal"
+      }
+    ]
+  },
+  {
+    "Name": "Poison Nova",
+    "Description": "圆形范围毒雾 - 持续 5 秒，每秒造成 DoT 伤害",
+    "AreaShape": "box",
+    "AreaWidth": 5,
+    "AreaHeight": 5,
+    "AttackRange": 4,
+    "Cooldown": 15,
+    "DamageMultiplier": 1,
+    "AutoCast": false,
+    "Hotkey": "4",
+    "Modifiers": [
+      {
+        "Name": "PoisonNovaDot",
+        "Type": "Debuff",
+        "Duration": 5000,
+        "StackingType": "Duration",
+        "StackLimitCount": 3,
+        "Value": 8,
+        "EffectTag": "Poison"
+      }
+    ]
+  }
+]

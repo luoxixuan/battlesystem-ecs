@@ -23,6 +23,9 @@
     <!-- Systems -->
     <Compile Include="Systems\*.cs" />
 
+    <!-- Specific System files needed (GoldSystem) -->
+    <Compile Include="System\GoldSystem.cs" />
+
     <!-- Main program -->
     <Compile Include="Program.cs" />
   </ItemGroup>

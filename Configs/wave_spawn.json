@@ -1,0 +1,7 @@
+{
+  "spawnBatchSize": 5,
+  "waveDelayTurns": 3,
+  "spawnY": 49.0,
+  "spawnXMin": 0.0,
+  "spawnXMax": 9.0
+}

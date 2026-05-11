@@ -1,0 +1,12 @@
+{
+  "Name": "Fast Slime",
+  "Type": "Fast",
+  "Health": 15,
+  "MaxHealth": 15,
+  "Damage": 3,
+  "MoveSpeed": 2,
+  "AttackRange": 1,
+  "AttackInterval": 1,
+  "GoldReward": 15,
+  "Skills": ["Normal Attack", "Quick Dash"]
+}

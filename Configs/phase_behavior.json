@@ -1,0 +1,36 @@
+{
+  "BuildPhase": {
+    "description": "建造阶段 - 放置/升级防御塔",
+    "enterMessage": "Initial Construction Phase — Build your defenses!",
+    "autoAdvance": false,
+    "unlockTowers": [],
+    "unlockAbilities": []
+  },
+  "WavePhase": {
+    "description": "战斗波次阶段",
+    "intermissionDelayMs": 300,
+    "waveStartMessage": "Fight!",
+    "turnIntervalMs": 500
+  },
+  "Intermission": {
+    "description": "波次间隔暂停",
+    "intermissionDelayMs": 300,
+    "nextWaveMessage": "Preparing next wave..."
+  },
+  "LevelComplete": {
+    "description": "关卡完成",
+    "enterMessage": "Level {levelNumber} cleared!",
+    "autoAdvanceToBuild": true,
+    "advanceDelayMs": 0
+  },
+  "GameOver": {
+    "description": "游戏结束",
+    "enterMessage": "GAME OVER",
+    "showStats": true
+  },
+  "Victory": {
+    "description": "通关胜利",
+    "enterMessage": "VICTORY — All levels cleared!",
+    "showStats": true
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "LevelNumber": 4,
+  "Name": "Death from Afar",
+  "Description": "Ranged slimes attack from distance. Expand your defense line!",
+  "WaveCount": 3,
+  "Waves": [
+    { "WaveNumber": 1, "MonsterType": "Normal", "EnemyCount": 15 },
+    { "WaveNumber": 2, "MonsterType": "Ranged", "EnemyCount": 20 },
+    { "WaveNumber": 3, "MonsterType": "Ranged", "EnemyCount": 15 }
+  ]
+}

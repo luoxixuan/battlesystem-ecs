@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;

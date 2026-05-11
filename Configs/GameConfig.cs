@@ -7,7 +7,7 @@ namespace BattleSystemECS.Config
         public string Name { get; set; }
         public string Type { get; set; }
         public float AttackRange { get; set; }
-        public float AttackSpeed { get; set; }  // 添加缺失的 AttackSpeed 属性
+        public float AttackSpeed { get; set; }
         public float AttackInterval { get; set; }
         public float AttackDamage { get; set; }
         public float MaxHealth { get; set; }
@@ -68,6 +68,25 @@ namespace BattleSystemECS.Config
         public string Hotkey { get; set; }
     }
 
+    public class BehaviorTreeDef
+    {
+        public string MonsterType;
+        public string RootId;
+        public Dictionary<string, BTNodeDef> Nodes;
+    }
+
+    public class BTNodeDef
+    {
+        public string Id;
+        public string Type;
+        public string Action;
+        public string Condition;
+        public string Operator;
+        public float Value;
+        public float Param;
+        public string[] Children;
+    }
+
     public class GameConfig
     {
         public PlayerConfig Player { get; set; } = new PlayerConfig();
@@ -75,7 +94,12 @@ namespace BattleSystemECS.Config
         public List<MonsterConfig> MonsterTypes { get; set; } = new List<MonsterConfig>();
         public List<TowerConfig> TowerTypes { get; set; } = new List<TowerConfig>();
         public List<LevelConfig> Levels { get; set; } = new List<LevelConfig>();
-        public LevelConfig CurrentLevel { get; set; }  // 添加缺失的 CurrentLevel 属性
+        public LevelConfig CurrentLevel { get; set; }
+
+        // Behavior tree definitions keyed by monster type
+        public Dictionary<string, BehaviorTreeDef> BehaviorTrees { get; set; } = new Dictionary<string, BehaviorTreeDef>();
+        private Dictionary<string, BehaviorTreeDef> _btCache = new Dictionary<string, BehaviorTreeDef>();
+        private Dictionary<string, BattleSystemECS.Systems.BTCachedTree> _cachedBtCache = new Dictionary<string, BattleSystemECS.Systems.BTCachedTree>();
 
         public GameConfig()
         {
@@ -261,6 +285,35 @@ namespace BattleSystemECS.Config
         public TowerConfig GetTowerConfig(string type)
         {
             return TowerTypes.Find(t => t.Type == type);
+        }
+
+        public BehaviorTreeDef GetBehaviorTree(string monsterType)
+        {
+            if (string.IsNullOrEmpty(monsterType)) return null;
+            if (_btCache.TryGetValue(monsterType, out var cached))
+                return cached;
+            if (BehaviorTrees.TryGetValue(monsterType, out var bt))
+            {
+                _btCache[monsterType] = bt;
+                return bt;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Returns the pre-built O(1) cached behavior tree for this monster type.
+        /// Builds the cache on first call; subsequent calls are O(1) dictionary hit.
+        /// </summary>
+        public BattleSystemECS.Systems.BTCachedTree GetCachedBehaviorTree(string monsterType)
+        {
+            if (string.IsNullOrEmpty(monsterType)) return null;
+            if (_cachedBtCache.TryGetValue(monsterType, out var cached))
+                return cached;
+            var bt = GetBehaviorTree(monsterType);
+            if (bt == null) return null;
+            var cachedBt = BattleSystemECS.Systems.BTCachedTreeBuilder.Build(bt);
+            _cachedBtCache[monsterType] = cachedBt;
+            return cachedBt;
         }
     }
 }
