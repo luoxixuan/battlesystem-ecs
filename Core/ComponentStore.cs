@@ -132,16 +132,12 @@ namespace BattleSystemECS.Core
 
             ActiveEnemyIds.Remove(entityId);
 
-            // 清理塔状态
+            // 清理塔状态（检查必须在设置 false 之前）
             if (TowerActive[entityId])
             {
-                TowerActive[entityId] = false;
                 ActiveTowerIds.Remove(entityId);
             }
-            else
-            {
-                TowerActive[entityId] = false;
-            }
+            TowerActive[entityId] = false;
 
             // 回收 ID
             freeEntityIds.Push(entityId);
@@ -544,9 +540,8 @@ namespace BattleSystemECS.Core
 
         public List<int> GetAllActiveEnemyIds()
         {
-            // 返回内部列表引用。调用方应在 SetTurn 时缓存一次，不要在循环中重复调用。
-            // 如需副本用于外部修改，请自行 new List<int>(GetAllActiveEnemyIds())
-            return ActiveEnemyIds;
+            // 返回副本，避免调用方修改内部列表导致并行遍历时 InvalidOperationException
+            return new List<int>(ActiveEnemyIds);
         }
 
         public int GetActiveEnemyCount()
