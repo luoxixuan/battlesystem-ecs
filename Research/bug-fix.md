@@ -173,7 +173,8 @@
 
 ### 19. TowerPlacementSystem.PlaceTower O(n) 位置检查
 **文件**: Systems/TowerPlacementSystem.cs
-**状态**: ⚠️ 未修复
+**状态**: ✅ 已修复（commit f803566）
+**说明**: PlaceTower 现在遍历 ActiveTowerIds 而非 NextEntityId（全量扫描）
 
 ---
 
