@@ -32,9 +32,13 @@ namespace BattleSystemECS.Systems
         /// Initialize player abilities using GAS — adds one AbilityInstance per skill slot.
         /// Replaces the old single-slot overwrite bug (InitializePlayerSkills called
         /// SetSkillName three times on the same playerId, leaving only Sniper Shot equipped).
+        /// Bug#9 fix: Clear existing abilities before re-initializing to prevent accumulation.
         /// </summary>
         public void InitializePlayerSkills()
         {
+            // Bug#9: Reset abilities before re-init (game restart scenario)
+            store.ResetPlayerAbilities(playerId);
+
             // Define 3 abilities using GAS structure
             var crossSlashDef = new GameplayAbilityDef(
                 "Cross Slash", "400% damage in cross shape",
