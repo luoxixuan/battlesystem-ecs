@@ -33,6 +33,9 @@ namespace BattleSystemECS.Systems
             renderer.Log($"[MAP] {mapWidth}x{mapHeight} map");
             renderer.Log("[MAP] P = Player, E = Enemy, . = Empty");
 
+            // Cache active enemies once — was called 200x per frame (10 cols × 20 rows) before
+            var activeEnemyIds = store.GetAllActiveEnemyIds();
+
             for (int y = mapHeight - 1; y >= 0; y--)
             {
                 string row = "";
@@ -41,31 +44,28 @@ namespace BattleSystemECS.Systems
                     bool hasPlayer = false;
                     bool hasEnemy = false;
 
-                    // 检查玩家位置（SOA 直接数组访问，无查询）
+                    // 检查玩家位置 — 直接比较格子坐标，避免逐格遍历
                     if (store.PlayerEntityId >= 0)
                     {
                         int pid = store.PlayerEntityId;
                         if (store.PositionActive[pid])
                         {
-                            float px = store.PositionX[pid];
-                            float py = store.PositionY[pid];
-                            if (System.Math.Abs(px - x) < 0.5f && System.Math.Abs(py - y) < 0.5f)
-                            {
+                            int px = (int)Math.Round(store.PositionX[pid]);
+                            int py = (int)Math.Round(store.PositionY[pid]);
+                            if (px == x && py == y)
                                 hasPlayer = true;
-                                break;
-                            }
                         }
                     }
 
-                    // 检查敌人位置（SOA 直接数组访问，无查询）
-                    var activeEnemyIds = store.GetAllActiveEnemyIds();
-                    foreach (int eid in activeEnemyIds)
+                    // 检查敌人位置（复用一个 list 引用）
+                    if (!hasPlayer)
                     {
-                        float ex = store.PositionX[eid];
-                        float ey = store.PositionY[eid];
-                        if (store.EnemyActive[eid])
+                        foreach (int eid in activeEnemyIds)
                         {
-                            if (System.Math.Abs(ex - x) < 0.5f && System.Math.Abs(ey - y) < 0.5f)
+                            if (!store.EnemyActive[eid]) continue;
+                            int ex = (int)Math.Round(store.PositionX[eid]);
+                            int ey = (int)Math.Round(store.PositionY[eid]);
+                            if (ex == x && ey == y)
                             {
                                 hasEnemy = true;
                                 break;
