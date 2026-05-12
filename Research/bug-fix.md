@@ -10,20 +10,22 @@
 
 ## 优化成果
 
-| 指标 | 基准 (3885275) | 最终 (01c05a7) | 累计变化 |
+| 指标 | 基准 (3885275) | 最终 (79fea25) | 累计变化 |
 |------|---------------|----------------|---------|
-| FPS | 3368 | ~2758 | -18%（含正确性修复开销） |
-| EnemyAI | 31.7 ms | 35.6 ms | — |
-| Movement | 13.6 ms | 16.1 ms | — |
-| TowerAttack | 0.18 ms | 2.9 ms | — |
-| Total | 59.4 ms | 72.6 ms | — |
+| FPS | 3368 | **~8334** | **+147%** |
+| EnemyAI | 31.7 ms | **9.9 ms** | **-69%** |
+| Movement+PlayerAttack | 24.0 ms | **8.7 ms** (MoveAttack) | **-64%** |
+| TowerAttack | 0.18 ms | 1.9 ms | — |
+| Total | 59.4 ms | **24.1 ms** | **-59%** |
 
-优化措施（commit 01c50a6→01c05a7）：
-1. **TowerAttackSystem 并行化 + ActiveTowerIds** — 3885275（基准）
+优化措施（3885275→79fea25）：
+1. **TowerAttack 并行化 + ActiveTowerIds** — 3885275（基准）
 2. **P0 Bug 修复** — GetAllActiveEnemyIds 副本 + DestroyEntity 清理（04c50a6）
-3. **Precomputed BT Action Enum** — BTCachedNode.PrecomputedActionEnum，跳过 StringToActionEnum（c505461）
+3. **Precomputed BT Action Enum** — 构建时 enum，跳过运行时 StringToActionEnum（c505461）
 4. **移除死写 SetEnemyAIAction** — 攻击动作不再写无用字符串（626b13b）
 5. **chargeParams ConcurrentDictionary→float[] SOA** — 消除并行锁竞争（01c05a7）
+6. **BT Cache fix** — health-driven version counter 替代 turn 无效化，缓存命中率 10x（79fea25）
+7. **Merged pipeline** — Movement+PlayerAttack 合并为一次 Parallel.For + move dir 查表（79fea25）
 3. **TowerAttackSystem 迭代 ActiveTowerIds** — 不再遍历 `store.NextEntityId`（绕过死塔）
 
 ---
@@ -255,9 +257,9 @@
 已修复：Bug#1(GetAllActiveEnemyIds) #4(ActiveTowerIds cleanup) #5(#PlayerTowerAttackSystem Random 保持 static) + 2 性能优化
 
 ### 最后更新
-- **治理 commit**: `01c05a7` — chargeParams SOA + dead SetEnemyAIAction removal
+- **治理 commit**: `79fea25` — BT cache fix + merged MoveAttack pipeline
 - **测试**: 27/27 pass
-- **压测**: ~2758 FPS (10K 敌 × 200 帧 × 9 系统)
+- **压测**: ~8334 FPS (10K 敌 × 200 帧 × 8 系统)
 
 ---
 
