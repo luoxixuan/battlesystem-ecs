@@ -153,9 +153,8 @@
 
 ### 18. MapSystem.RenderMap 每帧分配新 List
 **文件**: Systems/MapSystem.cs
-**状态**: ⚠️ 未修复
-
----
+**状态**: ✅ 已修复（commit 390d587）
+**说明**: GetAllActiveEnemyIds 移到 for(y) 外层（200→1 次/帧），玩家/敌人位置检查改为 Math.Round() 直接比较---
 
 ### 19. TowerPlacementSystem.PlaceTower O(n) 位置检查
 **文件**: Systems/TowerPlacementSystem.cs
@@ -245,7 +244,7 @@
 | 严重度 | 总数 | 已修复 | 未修复 |
 |--------|------|--------|--------|
 | HIGH   | 13   | 2      | 11     |
-| MEDIUM | 18   | 1      | 17     |
+| MEDIUM | 18   | 2      | 16     |
 | LOW    | 9    | 0      | 9      |
 | INFO   | 5    | 0      | 5      |
 | **合计** | **45** | **3** | **42** |
