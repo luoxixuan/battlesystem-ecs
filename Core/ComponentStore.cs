@@ -111,11 +111,23 @@ namespace BattleSystemECS.Core
         {
             if (freeEntityIds.Count > 0)
             {
-                return freeEntityIds.Pop();
+                int entityId = freeEntityIds.Pop();
+                // Bug #2 fix: validate recycled ID is within valid range
+                if (entityId >= 0 && entityId < MAX_ENTITIES)
+                {
+                    EnemyActionEnum[entityId] = EnemyActionType.None;
+                    return entityId;
+                }
+                // Invalid recycled ID — fall through to fresh allocation
             }
-            int entityId = nextEntityId++;
-            EnemyActionEnum[entityId] = EnemyActionType.None;
-            return entityId;
+            int entityId2 = nextEntityId++;
+            // Bug #2 fix: return -1 if we would exceed MAX_ENTITIES
+            if (entityId2 >= MAX_ENTITIES)
+            {
+                return -1;
+            }
+            EnemyActionEnum[entityId2] = EnemyActionType.None;
+            return entityId2;
         }
 
         public void DestroyEntity(int entityId)

@@ -58,7 +58,7 @@ namespace BattleSystemECS.Core
         {
             try
             {
-                File.AppendAllText(logFilePath, message + Environment.NewLine);
+                File.AppendAllText(logFilePath, message + Environment.NewLine, System.Text.Encoding.UTF8);
             }
             catch (Exception ex)
             {
@@ -73,7 +73,7 @@ namespace BattleSystemECS.Core
         {
             try
             {
-                File.WriteAllText(logFilePath, "");
+                File.WriteAllText(logFilePath, "", System.Text.Encoding.UTF8);
                 Console.WriteLine($"[INFO] 日志文件已清空: {logFilePath}");
             }
             catch (Exception ex)
