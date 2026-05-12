@@ -183,10 +183,13 @@ namespace BattleSystemECS.Systems
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                float distance = Math.Abs(enemyX - playerX) * 2f + (playerY - enemyY);
-                if (distance < closestDistance && distance <= range)
+                // Bug fix: use correct Euclidean distance (squared, no sqrt needed for comparison)
+                float dx = enemyX - playerX;
+                float dy = enemyY - playerY;
+                float distSq = dx * dx + dy * dy;
+                if (distSq < closestDistance && distSq <= range * range)
                 {
-                    closestDistance = distance;
+                    closestDistance = distSq;
                     closestEnemyId = enemyId;
                 }
             }
