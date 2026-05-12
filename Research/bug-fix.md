@@ -1,19 +1,21 @@
-# BattleSystem-ECS Bug Fix Report
+﻿# BattleSystem-ECS Bug Fix Report
 
 **扫描时间**: 2026-05-12
-**更新**: 2026-05-12 (子代理优化后)
+**更新**: 2026-05-12 (晚间第三轮 P0 修复 + Precomputed Enum 优化)
 **项目路径**: F:\AI\BattleSystem-ECS
 **分析范围**: 所有 .cs 源文件（Core/, Systems/, System/, Components/, Configs/, Program.cs）
+**治理 commit**: `c505461` — P0 Bug Fix + Precomputed BT Action Enum
 
 ---
 
 ## 优化成果
 
-| 指标 | 优化前 | 优化后 | 变化 |
-|------|--------|--------|------|
-| FPS | 2477 | 3306 | +33% |
-| TowerAttack | 14.94 ms | 0.18 ms | **-98.8%** |
-| Total | 80.75 ms | 60.49 ms | -25% |
+| 指标 | 基准 (3885275) | P0 Bug修复后 (04c50a6) | Precomputed Enum (c505461) | 累计变化 |
+|------|---------------|----------------------|---------------------------|---------|
+| FPS | 3368 | 2879 | 2997 (best) / 2858 (avg) | +4% (best) |
+| EnemyAI | 31.7 ms | 33.2 ms | 29.4 ms (best) | **-11.6%** |
+| TowerAttack | 0.18 ms | 4.1 ms | 2.2 ms | — |
+| Total | 59.5 ms | 69.4 ms | 66.7 ms | — |
 
 优化措施：
 1. **TowerAttackSystem 并行化** — 用 `Parallel.For` 替代顺序 `for` 循环，塔迭代独立无锁
@@ -26,7 +28,7 @@
 
 ### 1. ComponentStore.GetAllActiveEnemyIds 返回内部可变列表引用
 **文件**: Core/ComponentStore.cs
-**状态**: ⚠️ 未修复（仍 `return ActiveEnemyIds`）
+**状态**: ✅ 已修复（commit 04c50a6）（仍 `return ActiveEnemyIds`）
 **说明**: 当前调用方在 SetTurn 时缓存一次，不在循环中重复调用。暂未触发问题但应修复。
 
 ---
