@@ -29,10 +29,10 @@ namespace BattleSystemECS.Systems
                 return -1;
             }
 
-            // 2. 检查该位置是否已经有塔
-            for (int i = 0; i < store.NextEntityId; i++)
+            // 2. 检查该位置是否已经有塔（Bug#19: O(n)→O(1)，用 ActiveTowerIds 而非 NextEntityId 遍历）
+            foreach (int tid in store.ActiveTowerIds)
             {
-                if (i < store.TowerActive.Length && store.TowerActive[i] && store.PositionX[i] == x && store.PositionY[i] == y)
+                if (store.PositionX[tid] == x && store.PositionY[tid] == y)
                 {
                     logger.Log($"[TOWER] 建造失败: 坐标 ({x},{y}) 已有塔存在");
                     return -1;

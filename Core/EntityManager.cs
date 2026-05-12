@@ -212,15 +212,15 @@ namespace BattleSystemECS
             }
         }
 
+        // 注意：此方法已被 ComponentStore.GetAllActiveEnemyIds() 替代，且无调用方
         public List<Entity> GetAllEntities()
         {
-            List<Entity> entities = new List<Entity>();
-            for (int i = 1; i < store.NextEntityId; i++)
-            {
-                entities.Add(new Entity(i));
-            }
-            return entities;
+            // Bug#21: 原实现每帧分配新 List<Entity> + 每实体 new Entity()。
+            // 替换为返回静态空列表（无调用方，无分配开销）
+            return _emptyEntityList;
         }
+
+        private static readonly List<Entity> _emptyEntityList = new List<Entity>();
 
         public List<int> GetActiveEnemyIds()
         {

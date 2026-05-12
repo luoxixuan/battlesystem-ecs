@@ -161,7 +161,8 @@
 
 ### 17. ComponentStore.PlayerBuffs 数组元素直接赋值而非操作列表
 **文件**: Core/ComponentStore.cs
-**状态**: ⚠️ 未修复
+**状态**: ✅ 已修复（commit bb9e200）
+**说明**: `PlayerBuffs[entityId]` 直接访问已改为 `GetPlayerBuffs()` 返回防御性副本（`new List<string>(PlayerBuffs[playerId])`），外部调用方 BenchmarkSystem.cs 和 PlayerTowerAttackSystem.cs 也已改为调用 `GetPlayerBuffs()` 而非直接访问字段。
 
 ---
 
