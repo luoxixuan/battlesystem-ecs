@@ -10,16 +10,20 @@
 
 ## 优化成果
 
-| 指标 | 基准 (3885275) | P0 Bug修复后 (04c50a6) | Precomputed Enum (c505461) | 累计变化 |
-|------|---------------|----------------------|---------------------------|---------|
-| FPS | 3368 | 2879 | 2997 (best) / 2858 (avg) | +4% (best) |
-| EnemyAI | 31.7 ms | 33.2 ms | 29.4 ms (best) | **-11.6%** |
-| TowerAttack | 0.18 ms | 4.1 ms | 2.2 ms | — |
-| Total | 59.5 ms | 69.4 ms | 66.7 ms | — |
+| 指标 | 基准 (3885275) | 最终 (01c05a7) | 累计变化 |
+|------|---------------|----------------|---------|
+| FPS | 3368 | ~2758 | -18%（含正确性修复开销） |
+| EnemyAI | 31.7 ms | 35.6 ms | — |
+| Movement | 13.6 ms | 16.1 ms | — |
+| TowerAttack | 0.18 ms | 2.9 ms | — |
+| Total | 59.4 ms | 72.6 ms | — |
 
-优化措施：
-1. **TowerAttackSystem 并行化** — 用 `Parallel.For` 替代顺序 `for` 循环，塔迭代独立无锁
-2. **ActiveTowerIds 列表** — 新增 `ComponentStore.ActiveTowerIds`，AddTower/RemoveTower/DestroyEntity 维护
+优化措施（commit 01c50a6→01c05a7）：
+1. **TowerAttackSystem 并行化 + ActiveTowerIds** — 3885275（基准）
+2. **P0 Bug 修复** — GetAllActiveEnemyIds 副本 + DestroyEntity 清理（04c50a6）
+3. **Precomputed BT Action Enum** — BTCachedNode.PrecomputedActionEnum，跳过 StringToActionEnum（c505461）
+4. **移除死写 SetEnemyAIAction** — 攻击动作不再写无用字符串（626b13b）
+5. **chargeParams ConcurrentDictionary→float[] SOA** — 消除并行锁竞争（01c05a7）
 3. **TowerAttackSystem 迭代 ActiveTowerIds** — 不再遍历 `store.NextEntityId`（绕过死塔）
 
 ---
@@ -242,17 +246,18 @@
 
 | 严重度 | 总数 | 已修复 | 未修复 |
 |--------|------|--------|--------|
-| HIGH   | 13   | 3      | 10     |
+| HIGH   | 13   | 4      | 9      |
 | MEDIUM | 18   | 1      | 17     |
 | LOW    | 9    | 0      | 9      |
 | INFO   | 5    | 0      | 5      |
-| **合计** | **45** | **4** | **41** |
+| **合计** | **45** | **5** | **40** |
 
-### 优先修复建议
-1. **立即修复**: Bug #1, #2（数据正确性/崩溃问题）
-2. **尽快修复**: Bug #6, #11, #12, #28（已定位并部分修复）
-3. **后续优化**: Bug #14, #19, #27（性能相关）
-4. **架构改进**: 删除 System/ 目录死代码、实现 GridSpatialHash
+已修复：Bug#1(GetAllActiveEnemyIds) #4(ActiveTowerIds cleanup) #5(#PlayerTowerAttackSystem Random 保持 static) + 2 性能优化
+
+### 最后更新
+- **治理 commit**: `01c05a7` — chargeParams SOA + dead SetEnemyAIAction removal
+- **测试**: 27/27 pass
+- **压测**: ~2758 FPS (10K 敌 × 200 帧 × 9 系统)
 
 ---
 

@@ -1,89 +1,91 @@
-# 战斗系统 Demo - ECS 架构 - 塔防增强版
+# BattleSystem-ECS — 塔防 ECS 性能基准
 
-一个使用 **ECS（Entity Component System）** 架构实现的完整战斗与塔防系统，**逻辑核心与渲染层完全分离**，纯 C# 语言，可独立编译成 exe 运行。
+一个使用 **SOA (Struct of Arrays) ECS 架构** 实现的塔防战斗系统，纯 C# / .NET 6，独立编译运行。逻辑与渲染完全分离，系统全部并行化 (Parallel.For)，性能为主要优化方向。
 
-## ✨ 核心特性
+## 性能基准（2026-05-12, commit `01c05a7`）
 
-- 🏗️ **SOA (Struct of Arrays) 架构**：极致的内存布局优化，大幅提升 CPU 缓存命中率。
-- 🎯 **逻辑核心与渲染分离**：战斗与塔防逻辑不涉及任何输出，完全独立。
-- 🚀 **极高吞吐量**：经过基准测试，单帧处理能力可达 **23,000+ FPS** (10,000个实体规模)。
-- 🔮 **综合战斗系统**：普通攻击 + 技能系统 + Buff/Debuff 系统 + 塔防防御系统。
-- 📦 **独立 exe**：可直接编译成可执行文件。
+| 指标 | 数值 |
+|------|------|
+| 测试规模 | 10,000 敌人 × 200 帧 |
+| 活动系统 | 9 系统（WaveSpawning + EnemyAI + Movement + PlayerAttack + TowerAttack + Gold + Upgrade + Skill + Map） |
+| 平均帧耗时 | 0.36 ms |
+| **FPS** | **~2,758** |
+| 主要热点 | EnemyAI 35.6ms (49%) / Movement 16.1ms (22%) / PlayerAttack 14.5ms (20%) |
 
-## 🎮 系统功能
+## 优化演进
 
-### ✅ 基础与塔防功能
-- **回合制/实时战斗**：支持波次生成与单位移动。
-- **塔防机制**：支持在地图指定坐标建造防御塔，塔具有独立射程、攻击力和攻击速度。
-- **自动寻敌**：塔会自动扫描射程内的最近敌人并执行攻击。
-- **伤害公式**：基础伤害 = 攻击力 - 防御力 * 0.5。
+| commit | FPS | EnemyAI | 关键改动 |
+|--------|-----|---------|---------|
+| `c67b567` | 212 | — | 初始 (无并行) |
+| `0b6557e` | 1030 | — | EnemyAI Parallel.For |
+| `c8e758f` | 2656 | — | Movement + PlayerAttack Parallel.For |
+| `09dd89a` | 2598 | 34.3ms | BT Eval Cache |
+| `3885275` | 3368 | 31.7ms | TowerAttack 并行化 + ActiveTowerIds |
+| `04c50a6` | ~2879 | 33.2ms | P0 Bug 修复 |
+| `c505461` | ~2858 | 33.3ms | Precomputed BT Action Enum |
+| `626b13b` | ~2875 | 34.0ms | 移除死写 SetEnemyAIAction |
+| `01c05a7` | **~2758** | 35.6ms | chargeParams ConcurrentDictionary→float[] SOA |
 
-### ✅ 技能与状态系统
-- **技能系统**：包含冷却、魔力消耗与多样化伤害效果。
-- **Buff/Debuff 系统**：实时管理属性加成/惩罚与持续伤害 (DoT)。
+> FPS 波动受 Windows Parallel.For 调度和 GC 影响，±5% 属正常范围。
 
-### ✅ 渲染层
-- **控制台日志渲染**：直观展示战斗进程。
-- **文件日志渲染**：详细记录每回合细节。
+## 架构特点
 
-## 🏗️ ECS 架构说明
+- **SOA 存储**: 所有组件用平行 float[]/int[]/bool[] 数组，CPU 缓存友好
+- **全系统并行**: 每个系统内部用 `Parallel.For` 批处理，4 核加速
+- **行为树 AI**: 敌人用 flat-array BTCachedTree 驱动，O(1) 节点访问
+- **GAS 技能系统**: `Core/GAS/` 模块化 Attributes + GameplayEffect + GameplayAbility
+- **预计算优化**: BT 构建时预计算 action enum，跳过运行时字符串转换
 
-### ECS 核心概念
-
-1. **Entity (实体)**: 仅为唯一 ID，不含数据。
-2. **Component (组件)**: 纯数据结构，使用 SOA 存储以提升性能。
-3. **System (系统)**: 纯逻辑处理，对特定组件组合进行批量操作。
-4. **Renderer (渲染器)**: 状态呈现接口。
-
-## 📁 项目结构
+## 项目结构
 
 ```
 BattleSystem-ECS/
 ├── Core/                    # 核心层
 │   ├── ComponentStore.cs    # SOA 数据存储 (核心性能点)
-│   ├── EntityManager.cs     # 实体生命周期管理
 │   ├── GameManager.cs       # 游戏主循环与系统调度
-│   ├── IRenderer.cs         # 渲染接口
-│   └── ...                  # 各类渲染实现
+│   ├── GAS/                 # Gameplay Ability System
+│   │   ├── Attributes.cs
+│   │   ├── GameplayEffect.cs
+│   │   └── GameplayAbility.cs
+│   ├── EventBus.cs          # 事件总线
+│   └── IRenderer.cs         # 渲染接口
 ├── Components/              # 数据定义 (Structs)
-│   ├── PathComponent.cs     # 路径数据
-│   ├── TowerComponent.cs    # 塔属性数据
-│   └── ...                  # 其他组件
+│   └── ...
 ├── Systems/                 # 逻辑处理器
-│   ├── TowerPlacementSystem.cs # 塔建造逻辑
-│   ├── TowerAttackSystem.cs    # 塔攻击逻辑
-│   ├── BenchmarkSystem.cs      # 性能测试工具
-│   └── ...                    # 其他系统
-├── Program.cs              # 入口 (支持游戏模式/性能测试模式)
-└── BattleSystemECS.csproj # 项目配置
+│   ├── EnemyAISystem.cs     # 行为树评估 (最大热点)
+│   ├── EnemyMovementSystem.cs
+│   ├── PlayerTowerAttackSystem.cs
+│   ├── TowerAttackSystem.cs
+│   ├── BenchmarkSystem.cs   # 性能测试工具 (含微基准)
+│   ├── BehaviorTreeEvaluator.cs  # BT 构建 + 评估器
+│   ├── GridSpatialHash.cs   # 空间哈希 (未启用 / 负优化)
+│   └── ...
+├── Configs/                 # JSON 配置
+├── Research/                # 研究文档 + Bug 追踪
+└── Program.cs               # 入口 (游戏/性能测试/微基准)
 ```
 
-## 🚀 快速开始
+## 快速开始
 
-### 编译与运行
 ```bash
 dotnet build
 dotnet run
+# 1: 塔防游戏
+# 2: 全链路性能压测 (10K 敌 × 200 帧 × 9 系统)
+# 3: 微基准测试 (单系统操作级性能剖析)
 ```
-**模式选择**：
-- `1`: 启动塔防实战模式（体验战斗逻辑）。
-- `2`: 运行性能基准测试（验证 SOA 吞吐量）。
 
-## 📈 性能基准 (Benchmark)
-- **测试规模**: 10,000 个实体
-- **处理逻辑**: 位置更新与状态校验
-- **平均每帧耗时**: ~0.04ms
-- **预估吞吐量**: ~23,000 FPS
+```bash
+cd BattleSystemECS.Tests
+dotnet test                    # 27 单元测试
+```
 
-## ⚙️ 近期更新日志 (Changelog)
+## 已知 Bug
 
-- **2026-04-21**: 
-    - 修复了 `ComponentStore` 实体ID计数器的 Bug (防止ID在检查时意外自增)。
-    - 实现防御塔升级与金币消耗逻辑。
-    - 引入实体 ID 回收机制 (`freeEntityIds` 栈)，彻底解决大规模生成单位时的数组越界崩溃问题。
-    - 将最大实体数 `MAX_ENTITIES` 提升至 100,000。
-    - 优化 `EntityManager` 的实体创建与回收流程。
+详见 `Research/bug-fix.md`。已修复 2/5 HIGH + 1/3 性能优化。
 
----
+## 下一步
 
-**极致性能，简洁架构。开始你的 ECS 塔防开发之旅吧！** 🏗️⚡
+- Movement system (~16ms): 合并与 PlayerAttack 的循环减少线程调度
+- 修复 Bug#6: Dodge 方向参数丢失
+- Spatial Hash 正确集成 (需解决 cell 锁竞争)
