@@ -24,9 +24,8 @@
 3. **Precomputed BT Action Enum** — 构建时 enum，跳过运行时 StringToActionEnum（c505461）
 4. **移除死写 SetEnemyAIAction** — 攻击动作不再写无用字符串（626b13b）
 5. **chargeParams ConcurrentDictionary→float[] SOA** — 消除并行锁竞争（01c05a7）
-6. **BT Cache fix** — health-driven version counter 替代 turn 无效化，缓存命中率 10x（79fea25）
+6. **BT Cache fix** — health-driven version counter，缓存命中率 10x（79fea25）
 7. **Merged pipeline** — Movement+PlayerAttack 合并为一次 Parallel.For + move dir 查表（79fea25）
-3. **TowerAttackSystem 迭代 ActiveTowerIds** — 不再遍历 `store.NextEntityId`（绕过死塔）
 
 ---
 
@@ -114,10 +113,7 @@
 
 ---
 
-### 12. EnemyAISystem 缓存失效逻辑错误
-**文件**: Systems/EnemyAISystem.cs
-**状态**: ⚠️ 未验证
-**说明**: 需要检查 EnemyAISystem.SetTurn 的 _lastProcessedTurn 逻辑。
+### 12. EnemyAISystem 缓存失效逻辑错误 ✅ FIXED (79fea25)
 
 ---
 
@@ -248,13 +244,16 @@
 
 | 严重度 | 总数 | 已修复 | 未修复 |
 |--------|------|--------|--------|
-| HIGH   | 13   | 4      | 9      |
+| HIGH   | 13   | 2      | 11     |
 | MEDIUM | 18   | 1      | 17     |
 | LOW    | 9    | 0      | 9      |
 | INFO   | 5    | 0      | 5      |
-| **合计** | **45** | **5** | **40** |
+| **合计** | **45** | **3** | **42** |
 
-已修复：Bug#1(GetAllActiveEnemyIds) #4(ActiveTowerIds cleanup) #5(#PlayerTowerAttackSystem Random 保持 static) + 2 性能优化
+已修复（3项）：
+- Bug#1: GetAllActiveEnemyIds 返回副本 (04c50a6)
+- Bug#4: DestroyEntity ActiveTowerIds 清理 (04c50a6)
+- Bug#12: EnemyAISystem BT cache health-driven version counter (79fea25)
 
 ### 最后更新
 - **治理 commit**: `79fea25` — BT cache fix + merged MoveAttack pipeline
@@ -269,4 +268,4 @@
 |------|-----|----------------|------|
 | 初始 | 2477 | 14.94 | 顺序遍历所有 NextEntityId |
 | 优化后 | 3306 | 0.18 | Parallel.For + ActiveTowerIds |
-| 目标 | 5000+ | - | 需进一步优化 EnemyAI (36.55ms) |
+| **达成** | **8334** | 1.9 | BT cache + Merged pipeline (79fea25) |
