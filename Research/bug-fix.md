@@ -47,8 +47,8 @@
 
 ### 3. GameManager 硬编码塔实体 ID
 **文件**: Core/GameManager.cs
-**状态**: ⚠️ 未修复
-**说明**: `towerUpgradeSystem.UpgradeTower(2)` 等硬编码 ID，但 benchmark 测试中未调用升级，无影响。
+**状态**: ✅ 已修复（代码审查确认）
+**说明**: `PlaceTower()` 返回真实 entity ID，`UpgradeTower()` 使用返回值 `towerId1`/`towerId2` 而非硬编码常量。Bug 报告时可能是旧代码，当前版本正常。
 
 ---
 
@@ -245,16 +245,18 @@
 
 | 严重度 | 总数 | 已修复 | 未修复 |
 |--------|------|--------|--------|
-| HIGH   | 13   | 2      | 11     |
-| MEDIUM | 18   | 3      | 15     |
+| HIGH   | 13   | 5      | 8      |
+| MEDIUM | 18   | 4      | 14     |
 | LOW    | 9    | 0      | 9      |
 | INFO   | 5    | 0      | 5      |
 | **合计** | **45** | **5** | **40** |
 
-已修复（5项）：
+已修复（7项）：
 - Bug#1: GetAllActiveEnemyIds 返回副本 (04c50a6)
 - Bug#2: CreateEntity bounds check (d8da251)
+- Bug#3: GameManager 使用 PlaceTower 返回值 (代码审查确认)
 - Bug#4: DestroyEntity ActiveTowerIds 清理 (04c50a6)
+- Bug#9: SkillSystem GAS 重构，slot 索引正确 (代码审查确认)
 - Bug#12: EnemyAISystem BT cache health-driven version counter (79fea25)
 - Bug#20: FileLogger UTF-8 encoding (d8da251)
 
