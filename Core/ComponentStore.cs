@@ -47,6 +47,7 @@ namespace BattleSystemECS.Core
         public int[] EnemyGoldReward = new int[MAX_ENTITIES];
         public int[] EnemyWaveNumber = new int[MAX_ENTITIES];
         public bool[] EnemyActive = new bool[MAX_ENTITIES];
+        public float[] EnemyChargeParam = new float[MAX_ENTITIES]; // SOA: replaces ConcurrentDictionary in EnemyAISystem
 
         // ==================== 敌人 AI 组件的 SOA 存储 ====================
         public string[] EnemyAIAction = new string[MAX_ENTITIES];

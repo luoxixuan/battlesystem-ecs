@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
@@ -22,8 +22,7 @@ namespace BattleSystemECS.Systems
         private readonly GameConfig gameConfig;
 
         private int currentTurn;
-        // Per-enemy charge param (Param value from the BT node definition)
-        private readonly ConcurrentDictionary<int, float> chargeParams = new ConcurrentDictionary<int, float>();
+        // SOA charge param — stored in store.EnemyChargeParam[] for zero-allocation array access
 
         // Per-turn cached fields for cache locality
         private List<int> _activeEnemyList;
@@ -237,7 +236,7 @@ namespace BattleSystemECS.Systems
 
                 case EnemyActionType.ChargeAttack:
                     {
-                        float param = chargeParams.TryGetValue(enemyId, out var p) ? p : 0f;
+                        float param = store.EnemyChargeParam[enemyId];
                         ExecuteChargeAttack(enemyId, param);
                     }
                     break;
@@ -355,7 +354,7 @@ namespace BattleSystemECS.Systems
             if (counter < requiredTurns)
             {
                 store.SetEnemyAIChargeCounter(enemyId, counter + 1);
-                chargeParams[enemyId] = param;
+                store.EnemyChargeParam[enemyId] = param;
 
                 EventBus.Instance.Publish(GameEvents.EnemyCharging, new EnemyChargingEvent
                 {
@@ -389,7 +388,7 @@ namespace BattleSystemECS.Systems
                 });
 
                 store.SetEnemyAIChargeCounter(enemyId, 0);
-                chargeParams.TryRemove(enemyId, out _);
+                store.EnemyChargeParam[enemyId] = 0f;
                 store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
 
                 logger.Log($"[AI] Enemy {enemyId} releases CHARGE for {chargedDamage} damage (3x)! HP: {remaining}");
