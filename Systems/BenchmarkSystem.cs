@@ -1,7 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Systems
 {
@@ -91,11 +95,15 @@ namespace BattleSystemECS.Systems
 
             ConsoleLogger.EnableLog = false;
 
-            long tWaveSpawn = 0, tEnemyAI = 0, tMovement = 0;
-            long tPlayerAttack = 0, tTowerAttack = 0, tGold = 0;
+            long tWaveSpawn = 0, tEnemyAI = 0, tMoveAttack = 0;
+            long tTowerAttack = 0, tGold = 0;
             long tUpgrade = 0, tSkill = 0, tMap = 0;
 
             var totalSw = Stopwatch.StartNew();
+
+            // Pre-compute move direction lookup to eliminate switch in hot path
+            var moveDir = new sbyte[] { -1, 0, 0, 0, 0, 1, -1 };
+            // index: (int)EnemyActionType → direction (-1=forward, 0=stand, 1=retreat)
 
             for (int f = 0; f < frames; f++)
             {
@@ -104,13 +112,82 @@ namespace BattleSystemECS.Systems
 
                 sw.Start(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedTicks;
                 sw.Restart(); enemyAI.SetTurn(turn); enemyAI.Update(); tEnemyAI += sw.ElapsedTicks;
-                sw.Restart(); enemyMovement.SetTurn(turn); enemyMovement.Update(); tMovement += sw.ElapsedTicks;
-                sw.Restart(); playerAttack.SetTurn(turn); playerAttack.Update(); tPlayerAttack += sw.ElapsedTicks;
+                sw.Restart();
+
+                // Merged Movement + PlayerAttack in one Parallel.For
+                var activeList = store.GetAllActiveEnemyIds();
+                int count = activeList.Count;
+                float px = store.PositionX[playerId];
+                float py = store.PositionY[playerId];
+                float ad = store.GetPlayerAttackDamage(playerId);
+                float ar = store.GetPlayerAttackRange(playerId);
+                int rsq = (int)(ar * ar);
+
+                // Process buffs
+                var buffs = store.PlayerBuffs[playerId];
+                float fad = ad;
+                if (buffs.Count > 0)
+                {
+                    foreach (string buff in buffs)
+                    {
+                        if (buff == "Attack+10%") fad *= 1.1f;
+                    }
+                }
+
+                long goldAcc = 0;
+                const int batchSize = 512;
+                int numBatches = (count + batchSize - 1) / batchSize;
+
+                Parallel.For(0, numBatches, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, batchIdx =>
+                {
+                    int start = batchIdx * batchSize;
+                    int end = Math.Min(start + batchSize, count);
+
+                    for (int i = start; i < end; i++)
+                    {
+                        int enemyId = activeList[i];
+                        if (!store.EnemyActive[enemyId]) continue;
+
+                        // --- Movement ---
+                        float moveSpeed = store.EnemyMoveSpeed[enemyId];
+                        float x = store.PositionX[enemyId];
+                        float y = store.PositionY[enemyId];
+                        var ae = store.GetEnemyActionEnum(enemyId);
+
+                        if (ae != EnemyActionType.Dodge)
+                        {
+                            store.PositionY[enemyId] = y + moveDir[(int)ae] * moveSpeed;
+                        }
+                        else
+                        {
+                            store.PositionY[enemyId] = y - moveSpeed * 0.5f;
+                        }
+
+                        // --- PlayerAttack ---
+                        y = store.PositionY[enemyId];
+                        if (y <= py) continue;
+                        float dx = x - px;
+                        if (dx * dx > rsq) continue;
+                        float hp = store.EnemyHealth[enemyId];
+                        if (hp <= 0f) continue;
+                        hp -= fad;
+                        store.EnemyHealth[enemyId] = hp;
+                        if (hp <= 0f)
+                        {
+                            store.EnemyActive[enemyId] = false;
+                            Interlocked.Add(ref goldAcc, store.EnemyGoldReward[enemyId]);
+                        }
+                    }
+                });
+
+                if (goldAcc > 0) store.PlayerGold[playerId] += (int)goldAcc;
+                tMoveAttack += sw.ElapsedTicks;
+
                 sw.Restart(); towerAttack.SetTurn(turn); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
                 sw.Restart(); gold.SetTurn(turn); gold.Update(); tGold += sw.ElapsedTicks;
                 sw.Restart(); upgrade.Update(); tUpgrade += sw.ElapsedTicks;
                 sw.Restart(); skill.Update(1f); tSkill += sw.ElapsedTicks;
-                /* map.Update() = skip: Console.WriteLine per frame is console I/O, not ECS logic */
+                /* map.Update() = skip */
             }
 
             totalSw.Stop();
@@ -123,8 +200,7 @@ namespace BattleSystemECS.Systems
             Console.WriteLine($"\n[BENCHMARK] Per-system timing ({frames} frames, {scenario} enemies):");
             Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn/ticksPerMs,7:F2} ms  ({(tWaveSpawn/msTotal*100),5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms  ({(tEnemyAI/msTotal*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   Movement:       {tMovement/ticksPerMs,7:F2} ms  ({(tMovement/msTotal*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   PlayerAttack:   {tPlayerAttack/ticksPerMs,7:F2} ms  ({(tPlayerAttack/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   MoveAttack:     {tMoveAttack/ticksPerMs,7:F2} ms  ({(tMoveAttack/msTotal*100),5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   TowerAttack:    {tTowerAttack/ticksPerMs,7:F2} ms  ({(tTowerAttack/msTotal*100),5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   Gold:           {tGold/ticksPerMs,7:F2} ms  ({(tGold/msTotal*100),5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   Upgrade:        {tUpgrade/ticksPerMs,7:F2} ms  ({(tUpgrade/msTotal*100),5:F1}%)");

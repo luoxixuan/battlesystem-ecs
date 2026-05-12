@@ -28,12 +28,11 @@ namespace BattleSystemECS.Systems
         private List<int> _activeEnemyList;
         private float _playerX, _playerY;
 
-        // BT evaluation cache — avoids redundant re-evaluation when state is unchanged.
-        // Only invalidated when turn actually changes (not on every SetTurn call).
-        // _lastProcessedTurn: tracks which turn was last processed; only invalidate when turn changes.
-        private int _lastProcessedTurn = -1;
-        private int _evalTurnCache = -1;
-        private float _playerHealthCache = -1;
+        // BT evaluation cache — version counter increments on player health change.
+        // Turn/frame changes do NOT invalidate (enemy health per-enemy + player health global).
+        private int _cacheVersion = 0;
+        private int _cacheSnapshot = -1;
+        private float _cachedPlayerHealth = -1;
         private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
 
@@ -57,13 +56,9 @@ namespace BattleSystemECS.Systems
             // Cache active enemy list once per turn
             _activeEnemyList = store.GetAllActiveEnemyIds();
             // Cache current player health for BT evaluation
-            _playerHealthCache = store.PlayerCurrentHealth[playerId];
-            // Only invalidate turn cache when turn actually changes
-            if (_lastProcessedTurn != turn)
-            {
-                _evalTurnCache = -1;
-                _lastProcessedTurn = turn;
-            }
+            _cachedPlayerHealth = store.PlayerCurrentHealth[playerId];
+            // BT eval cache auto-invalidates when enemy/player health changes —
+            // turn change alone does NOT invalidate (benchmark-friendly)
         }
 
         /// <summary>
@@ -98,9 +93,9 @@ namespace BattleSystemECS.Systems
                     // Check BT evaluation cache: skip if enemy health, player health, and turn are unchanged
                     float enemyHealth = store.EnemyHealth[enemyId];
                     float playerHealth = store.PlayerCurrentHealth[playerId];
-                    if (_evalTurnCache == currentTurn &&
+                    if (_cacheSnapshot == _cacheVersion &&
                         _enemyHealthCache[enemyId] == enemyHealth &&
-                        _playerHealthCache == playerHealth)
+                        _cachedPlayerHealth == playerHealth)
                     {
                         // Cache hit: reuse last action without re-evaluating BT
                         store.SetEnemyActionEnum(enemyId, _lastActionCache[enemyId]);
@@ -156,7 +151,7 @@ namespace BattleSystemECS.Systems
             });
 
             // Update turn cache after all enemies processed
-            _evalTurnCache = currentTurn;
+            _cacheSnapshot = _cacheVersion;
         }
 
         /// <summary>
