@@ -530,10 +530,6 @@ namespace BattleSystemECS.Core
             SkillCurrentCooldown[playerId] = currentCooldown;
         }
 
-        public void AddToSpatialHash(int entityId) { }
-        public void RemoveFromSpatialHash(int entityId) { }
-        public List<int> GetEnemiesNear(float x, float y, int range) => new List<int>();
-
         // ==================== 实体查询 ====================
 
         public bool IsEnemyActive(int entityId)

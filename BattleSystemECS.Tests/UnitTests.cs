@@ -279,7 +279,6 @@ namespace BattleSystemECS.Tests
             store.PositionY[enemyId] = y;
             store.SetEnemyHealth(enemyId, health);
             store.EnemyGoldReward[enemyId] = goldReward;
-            store.AddToSpatialHash(enemyId);  // Register in spatial hash (required for GetEnemiesNear)
             return enemyId;
         }
 
