@@ -1,10 +1,23 @@
 ﻿# BattleSystem-ECS Bug Fix Report
 
 **扫描时间**: 2026-05-12
-**更新**: 2026-05-12 (晚间第三轮 P0 修复 + Precomputed Enum 优化)
+**更新**: 2026-05-12 20:12（晚间第四轮 — 构建/压测确认 + 文档同步）
 **项目路径**: F:\AI\BattleSystem-ECS
-**分析范围**: 所有 .cs 源文件（Core/, Systems/, System/, Components/, Configs/, Program.cs）
-**治理 commit**: `c505461` — P0 Bug Fix + Precomputed BT Action Enum
+**治理 commit**: `92233f6` — 确认 Bug#3/#9 已修复，汇总表更新
+
+---
+
+## 当前基准（2026-05-12 20:12）
+
+| 指标 | 数值 | 备注 |
+|------|------|------|
+| FPS | **~9007** | 10K 敌 × 200 帧 × 8 系统 |
+| EnemyAI | 7.8–8.6 ms | 含行为树求值 |
+| MoveAttack | 9.0–9.1 ms | Movement + PlayerAttack 合并 |
+| TowerAttack | 1.5 ms | ActiveTowerIds 并行遍历 |
+| TOTAL | ~22 ms | |
+| 测试 | **27/27 pass** | dotnet test |
+| 构建 | **0 warnings 0 errors** | dotnet build |
 
 ---
 
