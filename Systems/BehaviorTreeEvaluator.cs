@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Systems
 {
@@ -28,6 +29,7 @@ namespace BattleSystemECS.Systems
         public string Operator;
         public float Value;
         public int[] Children;      // indices into BTCachedTree.Nodes
+        public EnemyActionType PrecomputedActionEnum; // precomputed at build time; None if not Action
     }
 
     // ============================================================
@@ -36,6 +38,9 @@ namespace BattleSystemECS.Systems
 
     public static class BTCachedTreeEvaluator
     {
+        /// <summary>
+        /// Evaluate behavior tree and return action string (backward-compatible, no out overhead).
+        /// </summary>
         public static string Evaluate(
             BTCachedTree bt,
             int enemyId,
@@ -64,7 +69,7 @@ namespace BattleSystemECS.Systems
                         var child = bt.Nodes[childIdx];
                         if (child.Type == BTNodeType.Condition &&
                             !EvaluateCondition(child, enemyId, store, playerId))
-                            return ""; // condition false → sequence fails
+                            return "";
                         if (child.Type == BTNodeType.Action)
                         {
                             var a = child.Action ?? "";
@@ -80,7 +85,7 @@ namespace BattleSystemECS.Systems
                         if (child.Type == BTNodeType.Condition)
                         {
                             if (!EvaluateCondition(child, enemyId, store, playerId))
-                                continue; // condition false → try next child
+                                continue;
                         }
                         else if (child.Type == BTNodeType.Action)
                         {
@@ -99,6 +104,98 @@ namespace BattleSystemECS.Systems
                     return node.Action ?? "";
 
                 default:
+                    return "";
+            }
+        }
+
+        /// <summary>
+        /// Evaluate behavior tree and return both action string and precomputed enum.
+        /// Eliminates the need for StringToActionEnum() in the hot path.
+        /// </summary>
+        public static string EvaluateWithEnum(
+            BTCachedTree bt,
+            int enemyId,
+            ComponentStore store,
+            int playerId,
+            int turn,
+            out EnemyActionType precomputedEnum)
+        {
+            var root = bt?.Root;
+            if (root == null)
+            {
+                precomputedEnum = EnemyActionType.None;
+                return "";
+            }
+            return EvaluateNodeWithEnum(root, bt, enemyId, store, playerId, turn, out precomputedEnum);
+        }
+
+        private static string EvaluateNodeWithEnum(
+            BTCachedNode node,
+            BTCachedTree bt,
+            int enemyId,
+            ComponentStore store,
+            int playerId,
+            int turn,
+            out EnemyActionType precomputedEnum)
+        {
+            switch (node.Type)
+            {
+                case BTNodeType.Sequence:
+                    foreach (int childIdx in node.Children)
+                    {
+                        var child = bt.Nodes[childIdx];
+                        if (child.Type == BTNodeType.Condition &&
+                            !EvaluateCondition(child, enemyId, store, playerId))
+                        {
+                            precomputedEnum = EnemyActionType.None;
+                            return "";
+                        }
+                        if (child.Type == BTNodeType.Action)
+                        {
+                            var a = child.Action ?? "";
+                            if (!string.IsNullOrEmpty(a))
+                            {
+                                precomputedEnum = child.PrecomputedActionEnum;
+                                return a;
+                            }
+                        }
+                    }
+                    precomputedEnum = EnemyActionType.None;
+                    return "";
+
+                case BTNodeType.Selector:
+                    foreach (int childIdx in node.Children)
+                    {
+                        var child = bt.Nodes[childIdx];
+                        if (child.Type == BTNodeType.Condition)
+                        {
+                            if (!EvaluateCondition(child, enemyId, store, playerId))
+                                continue;
+                        }
+                        else if (child.Type == BTNodeType.Action)
+                        {
+                            var a = child.Action ?? "";
+                            if (!string.IsNullOrEmpty(a))
+                            {
+                                precomputedEnum = child.PrecomputedActionEnum;
+                                return a;
+                            }
+                        }
+                        else if (child.Type == BTNodeType.Sequence)
+                        {
+                            var result = EvaluateNodeWithEnum(child, bt, enemyId, store, playerId, turn, out precomputedEnum);
+                            if (!string.IsNullOrEmpty(result)) return result;
+                        }
+                    }
+                    precomputedEnum = EnemyActionType.None;
+                    return "";
+
+                case BTNodeType.Action:
+                    precomputedEnum = node.PrecomputedActionEnum;
+                    return node.Action ?? "";
+
+                default:
+                    precomputedEnum = EnemyActionType.None;
                     return "";
             }
         }
@@ -159,6 +256,31 @@ namespace BattleSystemECS.Systems
 
     public static class BTCachedTreeBuilder
     {
+        /// <summary>
+        /// Convert action string to EnemyActionType at build time.
+        /// Same mapping as EnemyAISystem.StringToActionEnum — eliminates per-frame conversion.
+        /// </summary>
+        private static EnemyActionType MapActionToEnum(string action)
+        {
+            if (string.IsNullOrEmpty(action))
+                return EnemyActionType.None;
+
+            // Extract base action (strip parameter suffix like "(2)")
+            int idx = action.IndexOf('(');
+            string baseAction = idx >= 0 ? action.Substring(0, idx) : action;
+
+            return baseAction switch
+            {
+                "move_to_target" => EnemyActionType.MoveToTarget,
+                "attack_melee"   => EnemyActionType.AttackMelee,
+                "ranged_attack"  => EnemyActionType.RangedAttack,
+                "charge_attack"  => EnemyActionType.ChargeAttack,
+                "dodge"          => EnemyActionType.Dodge,
+                "retreat"        => EnemyActionType.Retreat,
+                _                => EnemyActionType.None,
+            };
+        }
+
         public static BTCachedTree Build(BehaviorTreeDef bt)
         {
             if (bt == null || bt.Nodes == null || string.IsNullOrEmpty(bt.RootId))
@@ -192,7 +314,8 @@ namespace BattleSystemECS.Systems
                     Condition = n.Condition,
                     Operator = n.Operator ?? "<=",
                     Value = n.Value,
-                    Children = childIndices
+                    Children = childIndices,
+                    PrecomputedActionEnum = n.Type == "Action" ? MapActionToEnum(n.Action) : EnemyActionType.None
                 };
             }
 
