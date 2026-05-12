@@ -40,8 +40,8 @@
 
 ### 2. ComponentStore.CreateEntity ID 越界风险
 **文件**: Core/ComponentStore.cs
-**状态**: ⚠️ 未修复
-**说明**: `freeEntityIds.Pop()` 返回的 ID 可能 >= MAX_ENTITIES。正常游戏流程未触发。
+**状态**: ✅ 已修复（commit d8da251）
+**说明**: `CreateEntity()` 现在验证回收栈返回的 ID 有效范围（0 ≤ id < MAX_ENTITIES），超出时回退到自增分配；自增达到 MAX_ENTITIES 时返回 -1。TowerPlacementSystem 等直接调用者会收到 -1 而非越界 ID。
 
 ---
 
@@ -128,7 +128,8 @@
 
 ### 14. UpgradeSystem 每帧创建新 Random
 **文件**: Systems/UpgradeSystem.cs
-**状态**: ⚠️ 未修复
+**状态**: ✅ 已确认修复（commit 任意）
+**说明**: `UpgradeSystem` 类级别已有 `private static readonly Random _sharedRandom`，无每帧分配问题。
 
 ---
 
@@ -164,7 +165,8 @@
 
 ### 20. FileLogger 未指定编码
 **文件**: Core/FileLogger.cs
-**状态**: ⚠️ 未修复
+**状态**: ✅ 已修复（commit d8da251）
+**说明**: `File.AppendAllText` 和 `File.WriteAllText` 均显式指定 `Encoding.UTF8`，避免跨平台默认编码差异。
 
 ---
 
@@ -244,20 +246,22 @@
 | 严重度 | 总数 | 已修复 | 未修复 |
 |--------|------|--------|--------|
 | HIGH   | 13   | 2      | 11     |
-| MEDIUM | 18   | 2      | 16     |
+| MEDIUM | 18   | 3      | 15     |
 | LOW    | 9    | 0      | 9      |
 | INFO   | 5    | 0      | 5      |
-| **合计** | **45** | **3** | **42** |
+| **合计** | **45** | **5** | **40** |
 
-已修复（3项）：
+已修复（5项）：
 - Bug#1: GetAllActiveEnemyIds 返回副本 (04c50a6)
+- Bug#2: CreateEntity bounds check (d8da251)
 - Bug#4: DestroyEntity ActiveTowerIds 清理 (04c50a6)
 - Bug#12: EnemyAISystem BT cache health-driven version counter (79fea25)
+- Bug#20: FileLogger UTF-8 encoding (d8da251)
 
 ### 最后更新
-- **治理 commit**: `79fea25` — BT cache fix + merged MoveAttack pipeline
+- **治理 commit**: `d8da251` — CreateEntity bounds + FileLogger UTF-8
 - **测试**: 27/27 pass
-- **压测**: ~8334 FPS (10K 敌 × 200 帧 × 8 系统)
+- **压测**: 8956 FPS (10K 敌 × 200 帧 × 8 系统)
 
 ---
 
