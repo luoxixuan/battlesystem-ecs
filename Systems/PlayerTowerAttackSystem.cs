@@ -54,7 +54,7 @@ namespace BattleSystemECS.Systems
                 SetTurn(0);
             }
 
-            var buffs = store.PlayerBuffs[playerId];
+            var buffs = store.GetPlayerBuffs(playerId);
 
             float finalAttackDamage = _attackDamage;
 

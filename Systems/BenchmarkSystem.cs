@@ -124,7 +124,7 @@ namespace BattleSystemECS.Systems
                 int rsq = (int)(ar * ar);
 
                 // Process buffs
-                var buffs = store.PlayerBuffs[playerId];
+                var buffs = store.GetPlayerBuffs(playerId);
                 float fad = ad;
                 if (buffs.Count > 0)
                 {

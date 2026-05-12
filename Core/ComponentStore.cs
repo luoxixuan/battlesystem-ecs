@@ -275,7 +275,8 @@ namespace BattleSystemECS.Core
         public List<string> GetPlayerBuffs(int playerId)
         {
             if (playerId < 0 || playerId >= MAX_PLAYERS) return new List<string>();
-            return PlayerBuffs[playerId];
+            // ✅ Bug#17 fix: return a defensive copy to prevent external mutation
+            return new List<string>(PlayerBuffs[playerId]);
         }
 
         public void AddPlayerBuff(int playerId, string buff)
