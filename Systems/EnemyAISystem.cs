@@ -139,14 +139,13 @@ namespace BattleSystemECS.Systems
                     _enemyHealthCache[enemyId] = enemyHealth;
                     _lastActionCache[enemyId] = actionEnum;
 
-                    // Only call SetEnemyAIAction (string write) for attack actions.
-                    // MoveToTarget/Retreat/Dodge are read by EnemyMovementSystem via GetEnemyActionEnum,
-                    // which bypasses the string entirely.
+                    // InvokeExecuteActionEnum uses enum dispatch — string action not in hot path.
+                    // (SetEnemyAIAction is only read by Dodge in EnemyMovementSystem, but Dodge
+                    //  never calls SetEnemyAIAction — see Bug#6 in research/bug-fix.md)
                     if (actionEnum == EnemyActionType.AttackMelee ||
                         actionEnum == EnemyActionType.RangedAttack ||
                         actionEnum == EnemyActionType.ChargeAttack)
                     {
-                        store.SetEnemyAIAction(enemyId, action);
                         InvokeExecuteActionEnum(enemyId, actionEnum);
                     }
                     else if (actionEnum == EnemyActionType.Dodge)

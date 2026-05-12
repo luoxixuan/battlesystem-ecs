@@ -169,7 +169,7 @@ namespace BattleSystemECS.Systems
             }
 
             double ticksPerMs = Stopwatch.Frequency / 1000.0;
-            long t1 = 0, t2 = 0, t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0;
+            long t1 = 0, t2 = 0, t3 = 0, t4 = 0, t5 = 0, t6 = 0;
 
             for (int f = 0; f < frames; f++)
             {
@@ -196,7 +196,7 @@ namespace BattleSystemECS.Systems
                 {
                     var bt = store.EnemyBehaviorTree[enemyId];
                     string a = BTCachedTreeEvaluator.Evaluate(bt, enemyId, store, playerId, f + 1);
-                    store.SetEnemyAIAction(enemyId, a);
+                    var _e = EnemyAISystem.StringToActionEnum(a);
                 }
                 t4 += Stopwatch.GetTimestamp() - start;
 
@@ -205,21 +205,10 @@ namespace BattleSystemECS.Systems
                 {
                     var bt = store.EnemyBehaviorTree[enemyId];
                     string a = BTCachedTreeEvaluator.Evaluate(bt, enemyId, store, playerId, f + 1);
-                    store.SetEnemyAIAction(enemyId, a);
-                    var _e = EnemyAISystem.StringToActionEnum(a);
-                }
-                t5 += Stopwatch.GetTimestamp() - start;
-
-                start = Stopwatch.GetTimestamp();
-                foreach (int enemyId in activeEnemyIds)
-                {
-                    var bt = store.EnemyBehaviorTree[enemyId];
-                    string a = BTCachedTreeEvaluator.Evaluate(bt, enemyId, store, playerId, f + 1);
-                    store.SetEnemyAIAction(enemyId, a);
                     var e = EnemyAISystem.StringToActionEnum(a);
                     store.SetEnemyActionEnum(enemyId, e);
                 }
-                t6 += Stopwatch.GetTimestamp() - start;
+                t5 += Stopwatch.GetTimestamp() - start;
 
                 start = Stopwatch.GetTimestamp();
                 foreach (int enemyId in activeEnemyIds)
@@ -227,23 +216,21 @@ namespace BattleSystemECS.Systems
                     if (!store.EnemyActive[enemyId]) continue;
                     var bt = store.EnemyBehaviorTree[enemyId];
                     string a = BTCachedTreeEvaluator.Evaluate(bt, enemyId, store, playerId, f + 1);
-                    store.SetEnemyAIAction(enemyId, a);
                     var e = EnemyAISystem.StringToActionEnum(a);
                     store.SetEnemyActionEnum(enemyId, e);
                 }
-                t7 += Stopwatch.GetTimestamp() - start;
+                t6 += Stopwatch.GetTimestamp() - start;
             }
 
             Console.WriteLine($"[MICRO] Per-operation incremental cost ({totalIters:N0} iterations):");
             Console.WriteLine($"[MICRO]   1. Empty foreach:           {t1/ticksPerMs,7:F2} ms");
             Console.WriteLine($"[MICRO]   2. + EnemyBehaviorTree[] r: {t2/ticksPerMs - t1/ticksPerMs,7:F2} ms  (incremental)");
             Console.WriteLine($"[MICRO]   3. + BTCachedTreeEval:       {t3/ticksPerMs - t2/ticksPerMs,7:F2} ms  (incremental)");
-            Console.WriteLine($"[MICRO]   4. + SetEnemyAIAction(str):  {t4/ticksPerMs - t3/ticksPerMs,7:F2} ms  (incremental)");
-            Console.WriteLine($"[MICRO]   5. + StringToActionEnum:    {t5/ticksPerMs - t4/ticksPerMs,7:F2} ms  (incremental)");
-            Console.WriteLine($"[MICRO]   6. + SetEnemyActionEnum:    {t6/ticksPerMs - t5/ticksPerMs,7:F2} ms  (incremental)");
-            Console.WriteLine($"[MICRO]   7. + EnemyActive check:     {t7/ticksPerMs - t6/ticksPerMs,7:F2} ms  (incremental)");
+            Console.WriteLine($"[MICRO]   4. + StringToActionEnum:    {t4/ticksPerMs - t3/ticksPerMs,7:F2} ms  (incremental)");
+            Console.WriteLine($"[MICRO]   5. + SetEnemyActionEnum:    {t5/ticksPerMs - t4/ticksPerMs,7:F2} ms  (incremental)");
+            Console.WriteLine($"[MICRO]   6. + EnemyActive check:     {t6/ticksPerMs - t5/ticksPerMs,7:F2} ms  (incremental)");
             Console.WriteLine($"[MICRO]   ----------------------------------------");
-            Console.WriteLine($"[MICRO]   Steps 1-7 sum:               {t7/ticksPerMs,7:F2} ms");
+            Console.WriteLine($"[MICRO]   Steps 1-6 sum:               {t6/ticksPerMs,7:F2} ms");
         }
     }
 }
