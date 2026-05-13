@@ -106,15 +106,22 @@ DestroyPlayerOwnedEffect(id)
 
 ## 执行顺序
 
-| # | 优先级 | 任务 | 状态 |
-|---|--------|------|------|
-| 1 | 最高 | 主循环补 SetTurn(turn) | pending |
-| 2 | 最高 | 并行系统两阶段死亡解析 | pending |
-| 3 | 最高 | 禁止并行段直接改 active list / EventBus | pending |
-| 4 | 最高 | SkillSystem 击杀统一 DestroyEntity | pending |
-| 5 | 高 | ComponentStore 生命周期字段收口 | pending |
-| 6 | 高 | DestroyEntity 完整清理 | pending |
-| 7 | 高 | GameConfigLoader 完整解析 | pending |
-| 8 | 高 | EventBus 并行安全改造 | pending |
-| 9 | 中 | 击杀奖励集中化 | pending |
-| 10 | 中 | Benchmark 真实系统链路 | pending |
+| # | 优先级 | 任务 | 状态 | 备注 |
+|---|--------|------|------|------|
+| 1 | 最高 | 主循环补 SetTurn(turn) | ✅ 已完成 | `commit 743664c` GameManager 每回合调用 SetTurn |
+| 2 | 最高 | 并行系统两阶段死亡解析 | ✅ 已完成 | `commit e474f1c` PlayerTowerAttack/TowerAttack 并行收集→串行 ResolveDeaths |
+| 3 | 最高 | 禁止并行段直接改 active list / EventBus | ⚠️ 部分完成 | EventBus 已加锁（`afb988d`），但 ComponentStore.ActiveEnemyIds/ActiveTowerIds 仍是 public 非线程安全 |
+| 4 | 最高 | SkillSystem 击杀统一 DestroyEntity | ✅ 已完成 | `commit 10d53c4` HandleKill 走 ResolveEnemiesKilledThisFrame |
+| 5 | 高 | ComponentStore 生命周期字段收口 | ✅ 已完成 | `commit 840bc3e` ActiveEnemyIds/TowerIds 暴露为 IReadOnlyList |
+| 6 | 高 | DestroyEntity 完整清理 | ✅ 已完成 | `commit c0d85cf` 清所有 archetype 字段 |
+| 7 | 高 | GameConfigLoader 完整解析 | ✅ 已完成 | `commit 736746c` 解析 MaxHealth / StartingSkills |
+| 8 | 高 | EventBus 并行安全改造 | ✅ 已完成 | `commit afb988d` lock + snapshot iteration + Reset() |
+| 9 | 中 | 击杀奖励集中化 | ✅ 已完成 | 与 #2/#4 同 commit，已统一到两阶段死亡解析 |
+| 10 | 中 | Benchmark 真实系统链路 | ❌ 未完成 | 仍手写热路径，非真实系统调用链 |
+
+---
+
+## ⚠️ 未完全解决项
+
+### #3 并行段直接改 active list（部分完成）
+`ActiveEnemyIds` / `ActiveTowerIds` 仍暴露为 `public List<int>`（IReadOnlyList 包装），但 DestroyEntity 仍直接修改这些 list。`e474f1c` 的两阶段模式解决了并行系统直接调用 DestroyEntity 的问题，但 ComponentStore 内部的 freeEntityIds Stack 仍非线程安全。
