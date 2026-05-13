@@ -1,117 +1,145 @@
-# 肉鸽塔防游戏 - 项目开发规则
+# BattleSystem-ECS — 项目开发规则
+
+---
 
 ## 项目概述
-一个基于 ECS 架构的肉鸽塔防游戏，玩家作为防御塔，按波次生成敌人，击杀敌人获得金币，自动升级并获得随机技能/Buff。
 
-## 游戏规格
+基于 **SOA (Struct of Arrays) ECS 架构**的塔防战斗系统，纯 C# / .NET 6。逻辑与渲染完全分离，全系统并行化 (Parallel.For)，性能为首要优化目标。
 
-### 地图配置
-- **宽度**：10 格子
-- **高度**：50 格子
-- **地图类型**：纵向滚动地图
+---
 
-### 角色配置
-- **玩家（防御塔）**：
-  - 位置：最下方中间位置 (x=5, y=0)
-  - 类型：防御塔（玩家本人）
-  - 攻击方式：自动攻击范围内的敌人
-  - 升级机制：金币达到阈值自动升级
+## 性能基准
 
-- **敌人**：
-  - 生成：按波次生成（不是连续）
-  - 移动：从上往下走（纵向移动）
-  - 生命值：不同波次可能有不同属性
-  - 奖励：击杀后给予金币
+| 指标 | 数值 |
+|------|------|
+| 测试规模 | 10,000 敌人 × 200 帧 × 8 系统 |
+| **FPS** | **~8,300**（±5% 正常波动） |
+| 平均帧耗时 | ~0.12 ms |
+| 主要热点 | EnemyAI ~10ms / MoveAttack ~8ms / TowerAttack ~1.8ms |
 
-### 游戏机制
-- **波次系统**：按波次生成敌人，每波可能有不同数量
-- **金币系统**：击杀敌人获得金币
-- **自动升级**：获得一定金币后自动升级
-- **随机技能/Buff**：升级时随机获得
-
-## 技术栈
-- C# .NET 6.0
-- 控制台应用程序
-- ECS 架构
-- 纯 C# 实现（无渲染）
+---
 
 ## 开发规范
 
 ### ECS 组件规范
-- 实现 `IComponentData` 接口
-- 只包含数据，不包含逻辑
-- 使用 struct 而不是 class
-- 组件必须有清晰的命名：XxxComponent
+- 所有组件数据存储在 `Core/ComponentStore.cs`，使用平行 `float[]/int[]/bool[]` 数组（SOA）
+- 不使用 class 组件，使用直接数组访问
+- 组件命名：`XxxComponent`（如 `HealthComponent`）但实际实现为 SOA 数组字段
 
 ### ECS 系统规范
-- 继承 `SystemBase`
-- 使用 `Entities.ForEach()` 或 `IJobEntity`
-- 指定 `UpdateInGroup`
-- 系统职责单一，不耦合
+- 系统位于 `Systems/` 目录，每个系统职责单一
+- 热路径使用 `Parallel.For` 批处理，支持 `MaxDegreeOfParallelism`
+- 避免每帧分配：`GetAllActiveEnemyIds()` 在 `SetTurn` 时缓存
+- 禁止在系统热路径中使用 `new Random()`，使用类级 `static readonly Random`
 
 ### 渲染层规范
-- 实现 `IRenderer` 接口
-- 只负责输出，不包含逻辑
-- 战斗内容用战报日志输出
-- 地图用字符地图输出
+- 实现 `IRenderer` 接口，逻辑核心通过接口调用渲染
+- 控制台输出用 `[SYSTEM]` 前缀区分系统日志
 
-## 战斗日志规范
+---
 
-- `[MAP]` - 地图视图
-- `[INFO]` - 一般信息
-- `[ENEMY]` - 敌人生成
-- `[WAVE]` - 波次信息
-- `[ATTACK]` - 攻击信息
-- `[DAMAGE]` - 伤害信息
-- `[DEATH]` - 死亡信息
-- `[GOLD]` - 金币获得
-- `[UPGRADE]` - 升级信息
-- `[SKILL]` - 技能获得
-- `[BUFF]` - Buff 获得
+## 每次改动后必做清单
+
+> 严格按顺序执行，才能提交 git。
+
+1. **`dotnet build`** — 确认 0 warnings 0 errors
+2. **`dotnet test BattleSystemECS.Tests`** — 确认 27/27 测试全部通过
+3. **`echo 2 | dotnet run`** — 运行全链路压测，确认 FPS 没有下降（允许 ±5% 误差）
+4. **验证通过后** → `git add -A && git commit -m "描述"`
+5. **commit 完成后立即** → `git push`
+
+### 项目文档同步
+
+每次完成代码修改后（commit 前），必须同步更新以下文档：
+- `AGENTS.md` — 本文件（若规则有变化）
+- `README.md` — 项目说明（性能数字、功能列表更新）
+- `docs/architecture.md` — 架构文档（系统结构、关键设计变更）
+- `docs/bug-fix.md` — Bug 追踪（若有 Bug 修复）
+
+顺序：**代码完成 → 验证通过 → 更新文档 → git commit → git push**
+
+### 禁止事项
+
+- ❌ 禁止在 build/test/压测未全部通过的情况下提交 git
+- ❌ 禁止跳过压测直接提交
+- ❌ 禁止 `git reset` / `rebase` 前不 commit 当前改动
+
+### git 提交风格
+
+每次 commit 应为**原子性最小改动**，一个 commit 只做一件事：
+- ✅ `fix: DestroyEntity remove from ActiveEnemyIds`
+- ❌ `fix and perf various issues`
+
+---
 
 ## 项目结构
+
 ```
-TowerDefense-ECS/
-├── Components/      # ECS 数据组件
-├── Systems/         # ECS 逻辑系统
-├── Core/            # 核心
-├── Program.cs       # 主程序
-├── AGENTS.md        # 本文件
-└── README.md        # 说明文档
+BattleSystem-ECS/
+├── Core/
+│   ├── ComponentStore.cs     # SOA 数据存储（所有组件的 SOA 数组）
+│   ├── GameManager.cs        # 游戏主循环与系统调度
+│   ├── EntityManager.cs
+│   ├── EventBus.cs
+│   ├── IRenderer.cs / ConsoleLogger.cs / FileLogger.cs
+│   └── GAS/                  # Gameplay Ability System
+│       ├── Attributes.cs
+│       ├── GameplayEffect.cs
+│       └── GameplayAbility.cs
+├── Components/
+│   ├── Components.cs         # 基础组件定义
+│   ├── SkillComponent.cs
+│   └── BuffDebuffComponents.cs
+├── Systems/
+│   ├── EnemyAISystem.cs       # 行为树评估 + 攻击执行（BT cache）
+│   ├── EnemyMovementSystem.cs
+│   ├── PlayerTowerAttackSystem.cs
+│   ├── TowerAttackSystem.cs
+│   ├── TowerPlacementSystem.cs
+│   ├── TowerUpgradeSystem.cs
+│   ├── WaveSpawningSystem.cs   # 波次生成（含 OnWaveComplete 事件）
+│   ├── UpgradeSystem.cs        # 玩家升级
+│   ├── SkillSystem.cs          # GAS 技能系统
+│   ├── TechTreeSystem.cs       # 科技树（3分支 × 5节点）
+│   ├── GoldSystem.cs
+│   ├── MapSystem.cs
+│   ├── BenchmarkSystem.cs      # 全链路压测
+│   ├── BehaviorTreeEvaluator.cs
+│   └── GridSpatialHash.cs      # 空桩（未启用）
+├── Configs/
+│   ├── game_config.json        # 怪物类型、等级、波次
+│   ├── behavior_trees.json     # 行为树定义
+│   ├── tech_tree.json          # 科技树节点
+│   ├── skills.json
+│   ├── tower_placement.json
+│   └── TechTreeDef.cs          # 科技树配置结构
+├── docs/
+│   ├── architecture.md         # 完整架构文档
+│   └── bug-fix.md              # Bug 追踪（45 项，27 已修复）
+├── Research/
+│   ├── tower_defense_knowledge.md  # 自动更新的塔防知识库
+│   └── findings/               # 爬取原始数据
+├── BattleSystemECS.Tests/
+│   └── ...                     # 27 单元测试
+└── Program.cs                  # 入口（游戏/压测/微基准）
 ```
 
-## 迭代记录
-- 2026-02-08: 项目初始化，改为肉鸽塔防游戏
-- 2026-02-08: 实现地图系统（10x50 网格）
-- 2026-02-08: 实现波次生成系统
-- 2026-02-08: 实现金币系统
-- 2026-02-08: 实现自动升级系统
-- 2026-02-08: 实现随机技能/Buff 系统
+---
 
-## 下一步开发
+## 核心设计决策
 
-### 第 1 阶段：基础架构
-- [ ] 创建 ECS 项目结构
-- [ ] 创建地图组件（MapComponent, GridComponent）
-- [ ] 创建角色组件（PlayerComponent, EnemyComponent, WaveComponent）
-- [ ] 创建资源组件（GoldComponent）
-- [ ] 实现地图渲染系统（字符地图输出）
+1. **ActiveTowerIds 而非遍历全量**: `TowerAttackSystem` 只遍历活跃塔，避免 `NextEntityId` 范围外的空数据
+2. **BTCachedTree 预缓存**: `WaveSpawningSystem` 时将 BT 存到 `store.EnemyBehaviorTree`，`EnemyAISystem` 无需 Dictionary 查找
+3. **ActionEnum 预计算**: BT 构建时转换 string→enum，热路径无字符串比较
+4. **并行合并 MoveAttack**: `BenchmarkSystem` 内置 merged pipeline，单独计时
+5. **科技树效果缓存**: `TechTreeSystem` 内部字段存储 computed multiplier
 
-### 第 2 阶段：角色系统
-- [ ] 实现玩家作为防御塔
-- [ ] 实现敌人纵向移动
-- [ ] 实现波次生成系统
-- [ ] 实现敌人属性系统（不同波次）
+---
 
-### 第 3 阶段：战斗系统
-- [ ] 实现玩家自动攻击
-- [ ] 实现伤害计算
-- [ ] 实现死亡处理
-- [ ] 实现金币奖励系统
+## 已废弃模块（勿引用）
 
-### 第 4 阶段：升级系统
-- [ ] 实现金币系统
-- [ ] 实现升级阈值判断
-- [ ] 实现属性提升
-- [ ] 实现随机技能系统
-- [ ] 实现随机 Buff 系统
+| 路径 | 状态 |
+|------|------|
+| `System/` (大写) | 未编译，旧版本死代码 |
+| `GridSpatialHash.cs` | 空桩，range=3 场景是反模式 |
+| `Components/Components.cs` | 老架构，新代码直接用 ComponentStore 数组 |
