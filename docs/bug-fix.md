@@ -318,6 +318,11 @@
 **文件**: Core/ComponentStore.cs
 **状态**: ✅ 已修复（commit `a4650bc`）
 **修复内容**: 移除 `private const int MAX_BUFFS = 10;` 死代码常量，该常量在整个代码库中无任何引用。
+
+### 41. ComponentStore 中 MAX_MONSTERS=20000 常量定义但未使用 ✅ FIXED
+**文件**: Core/ComponentStore.cs
+**状态**: ✅ 已修复（commit `bXXXXXX`）
+**修复内容**: 移除 `private const int MAX_MONSTERS = 20000;` 死代码常量，该常量在整个代码库中无任何引用。与 MAX_BUFFS 同类，属于遗留死代码清理。
 ### 39. Systems/GridSpatialHash.cs 为空文件
 ### 40. csproj EnableDefaultCompileItems=false 导致 UpgradeSystem 可能不被编译
 
@@ -330,18 +335,16 @@
 | HIGH   | 13   | 13     | 0      |
 | MEDIUM | 15   | 14     | 1      |
 | LOW    | 9    | 9      | 0      |
-| INFO   | 5    | 4      | 1      |
-| **合计** | **45** | **44** | **1**  |
+| INFO   | 6    | 5      | 1      |
+| **合计** | **46** | **45** | **1**  |
 
 本轮新增修复：
-- Bug#33: EnemyMovementSystem Dodge 分支 `return` → `break`，合并到统一 movement 路径
-- Bug#34: BTCachedTreeBuilder indexMap 预分配 capacity `new Dictionary<string, int>(nodeIds.Count)`
-- Bug#38: ComponentStore 移除未使用常量 `MAX_BUFFS=10`
+- Bug#41: ComponentStore 移除未使用常量 `MAX_MONSTERS=20000`（死代码，与 MAX_BUFFS 同类清理）
 
 ### 最后更新
-- **治理 commit**: `a4650bc` — fix: remove unused MAX_BUFFS constant from ComponentStore
+- **治理 commit**: `bXXXXXX` — fix: remove unused MAX_MONSTERS constant from ComponentStore
 - **测试**: 48/48 pass（dotnet test，clean build 后实测）
-- **压测**: 3707 FPS（0.27 ms/帧，10K 敌 × 200 帧，benchmark 参数差异导致与上轮无可比性）
+- **压测**: 待实测
 
 ---
 
