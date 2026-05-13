@@ -272,6 +272,8 @@ namespace BattleSystemECS.Core
                 while (gameRunning && turn < maxTurns)
                 {
                     turn++;
+                    store.BeginFrame(); // Reset two-phase queues each turn
+
                     System.Threading.Thread.Sleep(1000);
 
                     logger.Log("[INFO] --- Turn " + turn + " ---");

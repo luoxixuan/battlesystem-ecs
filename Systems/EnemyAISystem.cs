@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
+using System.Threading;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Components;
@@ -19,6 +20,10 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore store;
         private readonly IRenderer logger;
         private readonly int playerId;
+
+        // Two-phase: collect damage/events in parallel, resolve serially after Parallel.For
+        private ConcurrentBag<(float damage, int enemyId, int turn)> _playerDamageQueue = new ConcurrentBag<(float, int, int)>();
+        private ConcurrentBag<(string eventType, object eventData)> _eventQueue = new ConcurrentBag<(string, object)>();
         private readonly GameConfig gameConfig;
 
         private int currentTurn;
@@ -133,22 +138,27 @@ namespace BattleSystemECS.Systems
                     _enemyHealthCache[enemyId] = enemyHealth;
                     _lastActionCache[enemyId] = actionEnum;
 
-                    // InvokeExecuteActionEnum uses enum dispatch — string action not in hot path.
-                    // (SetEnemyAIAction is only read by Dodge in EnemyMovementSystem, but Dodge
-                    //  never calls SetEnemyAIAction — see Bug#6 in research/bug-fix.md)
-                    if (actionEnum == EnemyActionType.AttackMelee ||
-                        actionEnum == EnemyActionType.RangedAttack ||
-                        actionEnum == EnemyActionType.ChargeAttack)
-                    {
-                        InvokeExecuteActionEnum(enemyId, actionEnum);
-                    }
-                    else if (actionEnum == EnemyActionType.Dodge)
-                    {
-                        // Dodge has side effects but no string action needed
-                        InvokeExecuteActionEnum(enemyId, actionEnum);
-                    }
+
                 }
             });
+
+            // Serial action execution — damage/event must be applied serially to avoid race conditions.
+            // Two-phase: BT eval is parallel (safe), action execution is serial (correct).
+            foreach (var enemyId in activeEnemyIds)
+            {
+                if (!store.EnemyActive[enemyId]) continue;
+                var actionEnum = store.GetEnemyActionEnum(enemyId);
+                if (actionEnum == EnemyActionType.AttackMelee ||
+                    actionEnum == EnemyActionType.RangedAttack ||
+                    actionEnum == EnemyActionType.ChargeAttack)
+                {
+                    InvokeExecuteActionEnum(enemyId, actionEnum);
+                }
+                else if (actionEnum == EnemyActionType.Dodge)
+                {
+                    InvokeExecuteActionEnum(enemyId, actionEnum);
+                }
+            }
 
             // Update turn cache after all enemies processed
             _cacheSnapshot = _cacheVersion;
