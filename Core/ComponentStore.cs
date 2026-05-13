@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
@@ -101,6 +102,41 @@ namespace BattleSystemECS.Core
         private Stack<int> freeEntityIds = new Stack<int>();
         public Dictionary<int, string> entityNames = new Dictionary<int, string>();
         private int nextEntityId = 2; // 从 2 开始，1 是玩家
+
+        // ── Two-phase death resolution (Thread-safe) ──────────────────────────
+        // Parallel systems collect deaths here; serial ResolveEnemiesKilledThisFrame() processes them.
+        private ConcurrentBag<(int enemyId, int playerId)> _deathQueue = new ConcurrentBag<(int, int)>();
+
+        public void BeginFrame()
+        {
+            // Reset for a new frame — called at the start of each game turn
+            _deathQueue = new ConcurrentBag<(int, int)>();
+        }
+
+        /// <summary>
+        /// Queue an enemy death from a parallel context. Thread-safe.
+        /// Must be matched with a later call to ResolveEnemiesKilledThisFrame().
+        /// </summary>
+        public void QueueEnemyDeath(int enemyId, int playerId)
+        {
+            _deathQueue.Add((enemyId, playerId));
+        }
+
+
+        /// <summary>
+        /// Serially process all queued enemy deaths this frame.
+        /// Call once per turn AFTER all parallel systems have run.
+        /// </summary>
+        public void ResolveEnemiesKilledThisFrame()
+        {
+            foreach (var (enemyId, playerId) in _deathQueue)
+            {
+                if (!EnemyActive[enemyId]) continue; // already destroyed this frame
+                TotalKills++;
+                PlayerGold[playerId] += EnemyGoldReward[enemyId];
+                DestroyEntity(enemyId);
+            }
+        }
 
         public ComponentStore()
         {

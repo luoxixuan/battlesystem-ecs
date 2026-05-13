@@ -8,6 +8,7 @@ namespace BattleSystemECS.Systems
 {
     /// <summary>
     /// 塔攻击系统 - 负责处理塔寻找目标并攻击敌人的逻辑
+    /// Two-phase: parallel collect, serial resolve (Bug#2 thread-safety fix)
     /// </summary>
     public class TowerAttackSystem
     {
@@ -31,6 +32,7 @@ namespace BattleSystemECS.Systems
             var activeEnemies = _activeEnemyList ?? store.GetAllActiveEnemyIds();
             var activeTowerIds = store.ActiveTowerIds;
 
+            // Phase 1 (parallel): collect damage events only — no structural mutations
             Parallel.For(0, activeTowerIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, ti =>
             {
                 int towerId = activeTowerIds[ti];
@@ -77,12 +79,14 @@ namespace BattleSystemECS.Systems
                     store.EnemyHealth[bestTarget] -= damage;
                     if (store.EnemyHealth[bestTarget] <= 0)
                     {
-                        // Use DestroyEntity instead of directly setting EnemyActive=false
-                        // so ActiveEnemyIds list stays consistent (Bug#9 / stale enemy list fix)
-                        store.DestroyEntity(bestTarget);
+                        // Two-phase: queue death for serial resolution
+                        store.QueueEnemyDeath(bestTarget, store.PlayerEntityId);
                     }
                 }
             });
+
+            // Phase 2 (serial): resolve deaths and destroy entities
+            store.ResolveEnemiesKilledThisFrame();
         }
     }
 }

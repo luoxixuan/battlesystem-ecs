@@ -25,7 +25,6 @@ namespace BattleSystemECS.Systems
         private float _attackDamage, _attackRange;
         private List<int> _activeEnemyList;
         private bool _turnCached;
-        private long _frameGoldAcc;
         private int _rangeSq;
 
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
@@ -43,7 +42,6 @@ namespace BattleSystemECS.Systems
             _attackRange = store.GetPlayerAttackRange(playerId);
             _activeEnemyList = store.GetAllActiveEnemyIds();
             _turnCached = true;
-            _frameGoldAcc = 0;
             _rangeSq = (int)(_attackRange * _attackRange);
         }
 
@@ -78,9 +76,9 @@ namespace BattleSystemECS.Systems
                 }
             }
 
-            _frameGoldAcc = 0;
             var activeEnemyIds = _activeEnemyList;
 
+            // Phase 1 (parallel): collect damage events only — no structural mutations
             Parallel.For(0, activeEnemyIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
             {
                 int enemyId = activeEnemyIds[i];
@@ -98,20 +96,15 @@ namespace BattleSystemECS.Systems
 
                 enemyHealth -= finalAttackDamage;
                 store.EnemyHealth[enemyId] = enemyHealth;
-
                 if (enemyHealth <= 0f)
                 {
-                    Interlocked.Add(ref _frameGoldAcc, (long)store.EnemyGoldReward[enemyId]);
-                    // Use DestroyEntity instead of directly setting EnemyActive=false
-                    // so ActiveEnemyIds list stays consistent (Bug#9 / stale enemy list fix)
-                    store.DestroyEntity(enemyId);
+                    // Two-phase: queue death for serial resolution (Bug#2 thread-safety fix)
+                    store.QueueEnemyDeath(enemyId, playerId);
                 }
             });
 
-            if (_frameGoldAcc > 0)
-            {
-                store.PlayerGold[playerId] += (int)_frameGoldAcc;
-            }
+            // Phase 2 (serial): resolve deaths, award gold, destroy entities
+            store.ResolveEnemiesKilledThisFrame();
         }
     }
 }
