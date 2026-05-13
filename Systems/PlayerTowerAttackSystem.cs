@@ -28,8 +28,8 @@ namespace BattleSystemECS.Systems
         private bool _turnCached;
         private int _rangeSq;
 
-        // Two-phase: damage collected in parallel, applied serially
-        private ConcurrentBag<(int enemyId, float newHealth)> _damageQueue = new ConcurrentBag<(int, float)>();
+        // Two-phase: damage collected in parallel (enemyId, damage), applied serially with -= to accumulate correctly
+        private ConcurrentBag<(int enemyId, float damage)> _damageQueue = new ConcurrentBag<(int, float)>();
 
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
@@ -98,16 +98,15 @@ namespace BattleSystemECS.Systems
                 float enemyHealth = store.EnemyHealth[enemyId];
                 if (enemyHealth <= 0f) return;
 
-                float newHealth = enemyHealth - finalAttackDamage;
-                _damageQueue.Add((enemyId, newHealth));
+                _damageQueue.Add((enemyId, finalAttackDamage));
             });
 
             // Phase 2 (serial): apply collected damage, then resolve deaths
-            foreach (var (enemyId, newHealth) in _damageQueue)
+            foreach (var (enemyId, damage) in _damageQueue)
             {
                 if (!store.EnemyActive[enemyId]) continue;
-                store.EnemyHealth[enemyId] = newHealth;
-                if (newHealth <= 0f)
+                store.EnemyHealth[enemyId] -= damage;
+                if (store.EnemyHealth[enemyId] <= 0f)
                 {
                     store.QueueEnemyDeath(enemyId, playerId);
                 }
