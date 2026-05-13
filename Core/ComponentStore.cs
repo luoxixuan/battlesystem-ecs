@@ -170,6 +170,7 @@ namespace BattleSystemECS.Core
 
         public string GetName(int entityId)
         {
+            // Bug#29 fix: TryGetValue is a single hash lookup vs ContainsKey+indexer double lookup
             if (entityNames.TryGetValue(entityId, out string name))
             {
                 return name;

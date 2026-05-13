@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -115,7 +115,7 @@ namespace BattleSystemECS.Systems
                 var inst = store.GetAbility(playerId, slot);
                 if (inst.Definition.Name == skillName)
                 {
-                    if (!inst.CanActivate())
+                    if (inst.CurrentCooldown > 0.0001f)
                     {
                         renderer.Log($"[SKILL] '{skillName}' on cooldown: {inst.CurrentCooldown:F1}s remaining");
                         return;
