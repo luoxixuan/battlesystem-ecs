@@ -569,9 +569,9 @@ namespace BattleSystemECS.Tests
             var config = new GameConfig();
             var buffs = config.UpgradeBuffs;
             // 默认值包含 Attack、Speed、Crit
-            Assert.Contains("Attack+5%", buffs);
-            Assert.Contains("Speed+5%", buffs);
-            Assert.Contains("Crit+3%", buffs);
+            Assert.Contains("Attack+10%", buffs);
+            Assert.Contains("Crit Rate+5%", buffs);
+            Assert.Contains("Defense+10%", buffs);
         }
 
         // ─── Bug#31: Update 触发升级后玩家获得 buff ──────────────────────────────

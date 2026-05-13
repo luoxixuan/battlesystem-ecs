@@ -1,22 +1,18 @@
 # BattleSystem-ECS Bug Fix Report
 
 **扫描时间**: 2026-05-13
-**更新**: 2026-05-13 12:26（第二十二轮 — Bug#31: UpgradeSystem buff 硬编码 → GameConfig.UpgradeBuffs，9775 FPS，无性能回退）
+**更新**: 2026-05-13 13:28（第二十三轮 — BenchmarkSystem AddTower、UpgradeBuffs 默认值统一、47 测试）
 **项目路径**: F:\AI\BattleSystem-ECS
-**治理 commit**: `5052fd1` — Bug#29 GetName 单次 TryGetValue + Bug#37 冷却 epsilon
+**治理 commit**: `af8b061` — 42 meaningful tests + BenchmarkSystem AddTower + UpgradeBuffs defaults
 
 ---
 
-## 当前基准（2026-05-13 10:52）
+## 当前基准（2026-05-13 13:28）
 
 | 指标 | 数值 | 备注 |
 |------|------|------|
-| FPS | **~9563** | 10K 敌 × 200 帧 × 8 系统 |
-| EnemyAI | 6.66 ms | 含行为树求值 |
-| MoveAttack | 7.60 ms | Movement + PlayerAttack 合并 |
-| TowerAttack | 1.44 ms | ActiveTowerIds 并行遍历 |
-| TOTAL | 20.91 ms | |
-| 测试 | **40/40 pass** | dotnet test（删除空 UnitTest1.cs，新增 13 个回归测试） |
+| FPS | **~8859** | 10K 敌 × 200 帧 × 8 系统 |
+| 测试 | **47/47 pass** | dotnet test（新增 5 个 UpgradeSystem 测试、AddEnemy 负 ID 测试） |
 | 构建 | **0 warnings 0 errors** | dotnet build |
 
 ---
@@ -50,7 +46,7 @@
 
 ### 1. ComponentStore.GetAllActiveEnemyIds 返回内部可变列表引用
 **文件**: Core/ComponentStore.cs
-**状态**: ✅ 已修复（commit 04c50a6）（仍 `return ActiveEnemyIds`）
+**状态**: ✅ 已修复（commit 04c50a6）（返回 `new List<int>(ActiveEnemyIds)` 防御性副本）
 **说明**: 当前调用方在 SetTurn 时缓存一次，不在循环中重复调用。暂未触发问题但应修复。
 
 ---
