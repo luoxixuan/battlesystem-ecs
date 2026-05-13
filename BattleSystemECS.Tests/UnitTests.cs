@@ -257,7 +257,7 @@ namespace BattleSystemECS.Tests
         private void MakeEnemy(ComponentStore store, int id, float x, float y, float hp = 10f, int gold = 10)
         {
             store.EnemyActive[id] = true;
-            store.ActiveEnemyIds.Add(id);
+            store.AddActiveEnemyId(id);
             store.PositionX[id] = x;
             store.PositionY[id] = y;
             store.SetEnemyHealth(id, hp);

@@ -97,11 +97,19 @@ namespace BattleSystemECS.Core
 
         // ==================== 实体管理 ====================
         public int PlayerEntityId { get; private set; } = 1;
-        public List<int> ActiveEnemyIds = new List<int>();
-        public List<int> ActiveTowerIds = new List<int>();
+        private List<int> _activeEnemyIds = new List<int>();
+        private List<int> _activeTowerIds = new List<int>();
         private Stack<int> freeEntityIds = new Stack<int>();
         public Dictionary<int, string> entityNames = new Dictionary<int, string>();
         private int nextEntityId = 2; // 从 2 开始，1 是玩家
+
+        // Expose as read-only snapshots — parallel code reads only, writes go through internal API
+        public IReadOnlyList<int> ActiveEnemyIds => _activeEnemyIds;
+        public IReadOnlyList<int> ActiveTowerIds => _activeTowerIds;
+
+        // For test setup only — use AddEnemy() / DestroyEntity() in production code
+        public void AddActiveEnemyId(int id) => _activeEnemyIds.Add(id);
+        public void AddActiveTowerId(int id) => _activeTowerIds.Add(id);
 
         // ── Two-phase death resolution (Thread-safe) ──────────────────────────
         // Parallel systems collect deaths here; serial ResolveEnemiesKilledThisFrame() processes them.
@@ -176,7 +184,7 @@ namespace BattleSystemECS.Core
             // 清理敌人状态（先检查再标记 false）
             if (EnemyActive[entityId])
             {
-                ActiveEnemyIds.Remove(entityId);
+                _activeEnemyIds.Remove(entityId);
             }
             EnemyActive[entityId] = false;
             PositionActive[entityId] = false;
@@ -190,7 +198,7 @@ namespace BattleSystemECS.Core
             // 清理塔状态（先检查再标记 false — Bug#30 fix）
             if (TowerActive[entityId])
             {
-                ActiveTowerIds.Remove(entityId);
+                _activeTowerIds.Remove(entityId);
             }
             TowerActive[entityId] = false;
 
@@ -370,7 +378,7 @@ namespace BattleSystemECS.Core
                 EnemyTypeName[entityId] = (sepIdx > 0) ? fullName.Substring(0, sepIdx) : fullName;
             }
 
-            ActiveEnemyIds.Add(entityId);
+            _activeEnemyIds.Add(entityId);
             return entityId;
         }
 
@@ -385,14 +393,14 @@ namespace BattleSystemECS.Core
             TowerUpgradeCost[entityId] = cost;
             TowerActive[entityId] = true;
             TowerLastAttackTime[entityId] = 0f;
-            ActiveTowerIds.Add(entityId);
+            _activeTowerIds.Add(entityId);
         }
 
         public void RemoveTower(int entityId)
         {
             if (entityId < 0 || entityId >= MAX_ENTITIES) return;
             TowerActive[entityId] = false;
-            ActiveTowerIds.Remove(entityId);
+            _activeTowerIds.Remove(entityId);
         }
 
         public float GetEnemyHealth(int enemyId)
