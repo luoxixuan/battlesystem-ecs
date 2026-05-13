@@ -21,9 +21,6 @@ namespace BattleSystemECS.Systems
         private readonly IRenderer logger;
         private readonly int playerId;
 
-        // Two-phase: collect damage/events in parallel, resolve serially after Parallel.For
-        private ConcurrentBag<(float damage, int enemyId, int turn)> _playerDamageQueue = new ConcurrentBag<(float, int, int)>();
-        private ConcurrentBag<(string eventType, object eventData)> _eventQueue = new ConcurrentBag<(string, object)>();
         private readonly GameConfig gameConfig;
 
         private int currentTurn;
