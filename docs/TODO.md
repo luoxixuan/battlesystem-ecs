@@ -39,8 +39,8 @@
 
 ### 5. ComponentStore 暴露太多 public 数组，无法维护不变量
 **问题**：大量 `public float[]` / `public List<int>`，外部系统可绕过生命周期 API 直接修改。
-**修复状态**：✅ 已完成（`commit 840bc3e`）— ActiveEnemyIds/TowerIds 暴露为 IReadOnlyList
-**今日补充**：⚠️ 部分完成 — freeEntityIds Stack 仍非线程安全，两阶段模式已缓解直接并发问题，但 ComponentStore 内部并发写仍是潜在风险
+**修复状态**：✅ 已完成 — ActiveEnemyIds/TowerIds 暴露为 IReadOnlyList（`commit 840bc3e`），DestroyEntity 只在帧末串行阶段调用，不再有并行并发修改 active list 的风险
+**今日补充**：✅ 已完成 — 两阶段模式保证了所有 DestroyEntity 调用都发生在串行阶段（GameManager/Benchmark 的 ResolveEnemiesKilledThisFrame()），即使 freeEntityIds Stack 内部仍有并发写可能，但 DestroyEntity 的调用路径已经是安全的了
 
 ---
 
@@ -84,12 +84,7 @@
 
 ---
 
-## ⚠️ 未完全解决项
 
-### #5 并行段直接改 active list（部分完成）
-`ActiveEnemyIds` / `ActiveTowerIds` 仍暴露为 `public List<int>`（IReadOnlyList 包装），但 DestroyEntity 仍直接修改这些 list。两阶段模式解决了并行系统直接调用 DestroyEntity 的问题，但 ComponentStore 内部的 freeEntityIds Stack 仍非线程安全。
-
----
 
 ## 今日开发理念沉淀（2026-05-13）
 
