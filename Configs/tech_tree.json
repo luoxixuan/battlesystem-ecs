@@ -1,0 +1,152 @@
+{
+  "researchPointsPerWave": 1,
+  "branches": [
+    {
+      "id": "offense",
+      "name": "⚔️ 进攻",
+      "color": "#FF6B6B",
+      "nodes": [
+        {
+          "id": "sharpened_blade",
+          "name": "锋利 I",
+          "description": "攻击力 +10%",
+          "cost": 1,
+          "prerequisites": [],
+          "effects": [{ "type": "attack_damage_mult", "value": 0.10 }]
+        },
+        {
+          "id": "sharpened_blade_2",
+          "name": "锋利 II",
+          "description": "攻击力 +15%",
+          "cost": 2,
+          "prerequisites": ["sharpened_blade"],
+          "effects": [{ "type": "attack_damage_mult", "value": 0.15 }]
+        },
+        {
+          "id": "rapid_fire",
+          "name": "连射",
+          "description": "攻击速度 +20%",
+          "cost": 2,
+          "prerequisites": ["sharpened_blade"],
+          "effects": [{ "type": "attack_speed_mult", "value": 0.20 }]
+        },
+        {
+          "id": "lethal_strike",
+          "name": "致命打击",
+          "description": "暴击率 +10%，暴击伤害 +25%",
+          "cost": 3,
+          "prerequisites": ["sharpened_blade_2", "rapid_fire"],
+          "effects": [
+            { "type": "crit_rate_add", "value": 0.10 },
+            { "type": "crit_damage_mult", "value": 0.25 }
+          ]
+        },
+        {
+          "id": "piercing_shot",
+          "name": "穿刺射击",
+          "description": "攻击无视目标 30% 护甲",
+          "cost": 4,
+          "prerequisites": ["lethal_strike"],
+          "effects": [{ "type": "armor_penetration", "value": 0.30 }]
+        }
+      ]
+    },
+    {
+      "id": "defense",
+      "name": "🛡️ 防御",
+      "color": "#4ECDC4",
+      "nodes": [
+        {
+          "id": "iron_skin",
+          "name": "铁壁 I",
+          "description": "最大生命 +15%",
+          "cost": 1,
+          "prerequisites": [],
+          "effects": [{ "type": "max_health_mult", "value": 0.15 }]
+        },
+        {
+          "id": "iron_skin_2",
+          "name": "铁壁 II",
+          "description": "受到伤害 -10%",
+          "cost": 2,
+          "prerequisites": ["iron_skin"],
+          "effects": [{ "type": "damage_taken_mult", "value": -0.10 }]
+        },
+        {
+          "id": "second_wind",
+          "name": "喘息",
+          "description": "生命低于 30% 时回复 15% 最大生命",
+          "cost": 2,
+          "prerequisites": ["iron_skin"],
+          "effects": [{ "type": "low_hp_regen", "value": 0.15 }]
+        },
+        {
+          "id": "fortress",
+          "name": "堡垒",
+          "description": "护甲 +5，免疫击退",
+          "cost": 3,
+          "prerequisites": ["iron_skin_2", "second_wind"],
+          "effects": [
+            { "type": "armor_add", "value": 5 },
+            { "type": "immunity_knockback", "value": 1 }
+          ]
+        },
+        {
+          "id": "immortal",
+          "name": "不朽",
+          "description": "死亡时复活一次，回复 50% 生命（每波一次）",
+          "cost": 4,
+          "prerequisites": ["fortress"],
+          "effects": [{ "type": "respawn_once", "value": 0.50 }]
+        }
+      ]
+    },
+    {
+      "id": "economy",
+      "name": "💰 经济",
+      "color": "#FFE66D",
+      "nodes": [
+        {
+          "id": "treasure_hunter",
+          "name": "盗墓",
+          "description": "击杀敌人额外获得 20% 金币",
+          "cost": 1,
+          "prerequisites": [],
+          "effects": [{ "type": "gold_on_kill_mult", "value": 0.20 }]
+        },
+        {
+          "id": "efficient_killing",
+          "name": "高效击杀",
+          "description": "击杀经验 +1",
+          "cost": 1,
+          "prerequisites": [],
+          "effects": [{ "type": "experience_on_kill_add", "value": 1 }]
+        },
+        {
+          "id": "investment",
+          "name": "理财",
+          "description": "波次结算时额外获得 50 金币",
+          "cost": 2,
+          "prerequisites": ["treasure_hunter"],
+          "effects": [{ "type": "gold_on_wave_bonus", "value": 50 }]
+        },
+        {
+          "id": "merchant_caravan",
+          "name": "商队",
+          "description": "所有收益 +15%",
+          "cost": 3,
+          "prerequisites": ["investment", "efficient_killing"],
+          "effects": [{ "type": "all_income_mult", "value": 0.15 }]
+        },
+        {
+          "id": "gold_rush",
+          "name": "淘金热",
+          "description": "击杀精英怪额外获得 100 金币",
+          "cost": 4,
+          "prerequisites": ["merchant_caravan"],
+          "effects": [{ "type": "gold_on_elite_kill", "value": 100 }]
+        }
+      ]
+    }
+  ]
+}

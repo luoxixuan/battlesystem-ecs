@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -22,6 +23,11 @@ namespace BattleSystemECS.Systems
         private int enemiesSpawnedInWave = 0;
         private int totalEnemiesSpawned = 0;
         private Random _spawnRandom;
+
+        /// <summary>
+        /// Fired when a wave completes (not level complete).
+        /// </summary>
+        public event System.Action OnWaveComplete;
 
         public WaveSpawningSystem(Core.ComponentStore store, IRenderer renderer, GameConfig gameConfig)
         {
@@ -113,6 +119,7 @@ namespace BattleSystemECS.Systems
                 renderer.Log($"[SPAWN] Wave {currentWave} complete! Spawned {enemiesSpawnedInWave} enemies (batch 100 per wave)");
                 enemiesSpawnedInWave = 0;
                 currentWave++;
+                OnWaveComplete?.Invoke();
 
                 if (currentWave > levelConfig.WaveCount)
                 {

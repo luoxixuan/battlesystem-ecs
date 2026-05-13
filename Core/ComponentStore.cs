@@ -39,6 +39,10 @@ namespace BattleSystemECS.Core
         public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         public List<string>[] PlayerBuffs = new List<string>[MAX_PLAYERS];
 
+        // ==================== 科技树组件的 SOA 存储 ====================
+        public int[] PlayerResearchPoints = new int[MAX_PLAYERS];
+        public HashSet<string>[] PlayerUnlockedTechs = new HashSet<string>[MAX_PLAYERS];
+
         // ==================== 敌人组件的 SOA 存储 ====================
         public float[] EnemyHealth = new float[MAX_ENTITIES];
         public float[] EnemyMaxHealth = new float[MAX_ENTITIES];
@@ -104,6 +108,7 @@ namespace BattleSystemECS.Core
             for (int i = 0; i < MAX_PLAYERS; i++)
             {
                 PlayerBuffs[i] = new List<string>();
+                PlayerUnlockedTechs[i] = new HashSet<string>();
             }
         }
 
@@ -615,5 +620,37 @@ namespace BattleSystemECS.Core
         public int GetEffectCount(int entityId) => ActiveEffectCount[entityId];
 
         public void AddEffect(int entityId, AppliedEffect eff) { int slot = ActiveEffectCount[entityId]; if (slot < MAX_ACTIVE_EFFECTS_PER_ENTITY) { SetEffect(entityId, slot, eff); ActiveEffectCount[entityId]++; } }
+
+        // ==================== 科技树组件访问方法 ====================
+
+        public int GetResearchPoints(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            return PlayerResearchPoints[playerId];
+        }
+
+        public void AddResearchPoints(int playerId, int amount)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            PlayerResearchPoints[playerId] += amount;
+        }
+
+        public bool IsTechUnlocked(int playerId, string nodeId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
+            return PlayerUnlockedTechs[playerId].Contains(nodeId);
+        }
+
+        public void UnlockTech(int playerId, string nodeId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            PlayerUnlockedTechs[playerId].Add(nodeId);
+        }
+
+        public HashSet<string> GetUnlockedTechs(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return new HashSet<string>();
+            return PlayerUnlockedTechs[playerId];
+        }
     }
 }

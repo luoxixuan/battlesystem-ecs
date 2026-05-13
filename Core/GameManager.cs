@@ -29,6 +29,7 @@ namespace BattleSystemECS.Core
         private TowerPlacementSystem towerPlacementSystem;  // 塔建造系统
         private TowerAttackSystem towerAttackSystem;       // 塔攻击系统
         private TowerUpgradeSystem towerUpgradeSystem;     // 塔升级系统
+        private TechTreeSystem techTreeSystem;            // 科技树系统
 
         // 渲染器
         private IRenderer logger;
@@ -137,6 +138,14 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]    - Creating EnemyAISystem...");
             enemyAISystem = new EnemyAISystem(store, logger, playerId, gameConfig);  // 初始化敌人 AI 系统（行为树驱动）
             logger.Log("[BOOTSTRAP]      EnemyAISystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating TechTreeSystem...");
+            var techConfig = TechTreeSystem.LoadConfig(logger);
+            techTreeSystem = new TechTreeSystem(store, logger, playerId, techConfig);
+            logger.Log("[BOOTSTRAP]      TechTreeSystem created successfully!");
+
+            // 订阅波次完成事件 → 产出研究点数
+            waveSpawningSystem.OnWaveComplete += () => techTreeSystem.OnWaveComplete();
 
             logger.Log("[BOOTSTRAP] ========== Game Initialization Complete ==========");
             Console.WriteLine();
