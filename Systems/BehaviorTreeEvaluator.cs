@@ -290,14 +290,15 @@ namespace BattleSystemECS.Systems
 
             // Index: nodeId → array index
             var nodeIds = new List<string>(bt.Nodes.Keys);
-            var indexMap = new Dictionary<string, int>();
+            var indexMap = new Dictionary<string, int>(nodeIds.Count);
             for (int i = 0; i < nodeIds.Count; i++)
                 indexMap[nodeIds[i]] = i;
 
-            // Flatten nodes into array
+            // Flatten nodes into array — single pass over bt.Nodes
             cached.Nodes = new BTCachedNode[nodeIds.Count];
             foreach (var kvp in bt.Nodes)
             {
+                int nodeIdx = indexMap[kvp.Key];
                 var n = kvp.Value;
                 int[] childIndices = (n.Children == null || n.Children.Length == 0)
                     ? Array.Empty<int>()
@@ -306,7 +307,7 @@ namespace BattleSystemECS.Systems
                         .Where(idx => idx >= 0)
                         .ToArray();
 
-                cached.Nodes[indexMap[kvp.Key]] = new BTCachedNode
+                cached.Nodes[nodeIdx] = new BTCachedNode
                 {
                     Id = n.Id,
                     Type = Enum.TryParse<BTNodeType>(n.Type, out var t) ? t : BTNodeType.Action,

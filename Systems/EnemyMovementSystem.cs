@@ -77,7 +77,7 @@ namespace BattleSystemECS.Systems
                             int dodgeDir = ParseDodgeDirection(actionStr);
                             store.PositionX[enemyId] = Math.Clamp(x + dodgeDir, 0f, mapWidthMinusOne);
                             store.PositionY[enemyId] = y - moveSpeed * 0.5f;
-                            return;
+                            break;
                         }
 
                     // MoveToTarget, None, and default: use direction = -1 (already set)
