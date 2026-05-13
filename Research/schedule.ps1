@@ -4,29 +4,30 @@
 
 $ErrorActionPreference = "Stop"
 
-# Load local secrets (not committed to git)
+$taskName = "TD-Research-Crawler"
+$wrapperScript = "F:\AI\BattleSystem-ECS\Research\crawler_wrapper.ps1"
+$workingDir = "F:\AI\BattleSystem-ECS\Research"
+$logDir = "F:\AI\BattleSystem-ECS\Research\logs"
+
+# Load environment before registering tasks
 $configEnv = Join-Path $PSScriptRoot "config_env.ps1"
 if (Test-Path $configEnv) {
     Write-Host "[*] Loading environment config..."
     . $configEnv
+    if ($env:GITHUB_TOKEN) { Write-Host "[+] GITHUB_TOKEN loaded" }
+} else {
+    Write-Host "[!] config_env.ps1 not found — token will not be available"
 }
-
-$taskName = "TD-Research-Crawler"
-$scriptPath = "F:\AI\BattleSystem-ECS\Research\crawler.py"
-$pythonExe = (Get-Command python).Source
-$workingDir = "F:\AI\BattleSystem-ECS\Research"
-$logDir = "F:\AI\BattleSystem-ECS\Research\logs"
 
 # Create log directory
 if (-not (Test-Path $logDir)) {
     New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 }
 
+Write-Host ""
 Write-Host "=== TD Research Crawler Scheduler ==="
-Write-Host "Python: $pythonExe"
-Write-Host "Script: $scriptPath"
-Write-Host "Logs:   $logDir"
-if ($env:GITHUB_TOKEN) { Write-Host "GitHub Token: SET" } else { Write-Host "GitHub Token: NOT SET" }
+Write-Host "Wrapper:  $wrapperScript"
+Write-Host "Logs:     $logDir"
 Write-Host ""
 
 # Remove existing task if present
@@ -36,20 +37,13 @@ if ($existing) {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
 }
 
-# Build environment variables for scheduled task (including GitHub token if set)
-$taskEnv = @{}
-if ($env:GITHUB_TOKEN) { $taskEnv["GITHUB_TOKEN"] = $env:GITHUB_TOKEN }
+# Create the scheduled task action (use wrapper so config_env.ps1 is sourced)
+$action = New-ScheduledTaskAction `
+    -Execute "powershell.exe" `
+    -Argument "-ExecutionPolicy Bypass -File `"$wrapperScript`"" `
+    -WorkingDirectory $workingDir
 
-# Create the scheduled task action
-$actionParams = @{
-    Execute = $pythonExe
-    Argument = "-u `"$scriptPath`" --light"
-    WorkingDirectory = $workingDir
-}
-if ($taskEnv.Count -gt 0) { $actionParams["Environment"] = $taskEnv }
-$action = New-ScheduledTaskAction @actionParams
-
-# Trigger: every 2 hours, starting now
+# Trigger: every 2 hours, starting 1 minute from now
 $trigger = New-ScheduledTaskTrigger `
     -Once `
     -At (Get-Date).AddMinutes(1) `
@@ -74,24 +68,21 @@ Register-ScheduledTask `
     -RunLevel Limited `
     -Force
 
-Write-Host "[+] Task '$taskName' created successfully!"
-Write-Host "[+] Runs every 2 hours (light mode: search only)."
+Write-Host "[+] Task '$taskName' registered (every 2 hours)"
 Write-Host ""
 
 # Also create a daily deep-dive task
 $deepTaskName = "TD-Research-DeepDive"
+$deepWrapper = "F:\AI\BattleSystem-ECS\Research\crawler_deep_wrapper.ps1"
 $deepExisting = Get-ScheduledTask -TaskName $deepTaskName -ErrorAction SilentlyContinue
 if ($deepExisting) {
     Unregister-ScheduledTask -TaskName $deepTaskName -Confirm:$false
 }
 
-$deepActionParams = @{
-    Execute = $pythonExe
-    Argument = "-u `"$scriptPath`""
-    WorkingDirectory = $workingDir
-}
-if ($taskEnv.Count -gt 0) { $deepActionParams["Environment"] = $taskEnv }
-$deepAction = New-ScheduledTaskAction @deepActionParams
+$deepAction = New-ScheduledTaskAction `
+    -Execute "powershell.exe" `
+    -Argument "-ExecutionPolicy Bypass -File `"$deepWrapper`"" `
+    -WorkingDirectory $workingDir
 
 $deepTrigger = New-ScheduledTaskTrigger -Daily -At "02:00"
 
@@ -111,7 +102,7 @@ Register-ScheduledTask `
     -RunLevel Limited `
     -Force
 
-Write-Host "[+] Deep-dive task '$deepTaskName' created (daily at 2:00 AM)."
+Write-Host "[+] Task '$deepTaskName' registered (daily at 02:00 AM)"
 Write-Host ""
 Write-Host "Manual commands:"
 Write-Host "  Start:  schtasks /run /tn '$taskName'"
