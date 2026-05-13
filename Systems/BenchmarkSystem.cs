@@ -27,6 +27,12 @@ namespace BattleSystemECS.Systems
                 return;
             }
 
+            if (scenario == 4)
+            {
+                RunRealSystemChainBenchmark(10000, 200);
+                return;
+            }
+
             Console.WriteLine($"\n[BENCHMARK] Full 12-System Benchmark: {scenario} entities");
 
             var logger = new ConsoleLogger();
@@ -75,20 +81,17 @@ namespace BattleSystemECS.Systems
 
             int frames = 200;
 
-            // Warm-up
+            // Warm-up (BeginFrame is optional since Resolve clears _deathQueue)
             for (int f = 0; f < 5; f++)
             {
                 int turn = f + 6;
-                enemyAI.SetTurn(turn);
-                enemyAI.Update();
-                enemyMovement.SetTurn(turn);
-                enemyMovement.Update();
-                playerAttack.SetTurn(turn);
-                playerAttack.Update();
-                towerAttack.SetTurn(turn);
-                towerAttack.Update(1f);
-                gold.SetTurn(turn);
-                gold.Update();
+                store.BeginFrame();
+                enemyAI.SetTurn(turn); enemyAI.Update();
+                enemyMovement.SetTurn(turn); enemyMovement.Update();
+                playerAttack.SetTurn(turn); playerAttack.Update();
+                towerAttack.SetTurn(turn); towerAttack.Update(1f);
+                gold.SetTurn(turn); gold.Update();
+                store.ResolveEnemiesKilledThisFrame();
             }
 
             ConsoleLogger.EnableLog = false;
@@ -106,6 +109,7 @@ namespace BattleSystemECS.Systems
             for (int f = 0; f < frames; f++)
             {
                 int turn = f + 6;
+                store.BeginFrame(); // BeginFrame called each frame so Resolve clears _deathQueue
                 var sw = new Stopwatch();
 
                 sw.Start(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedTicks;
@@ -303,6 +307,95 @@ namespace BattleSystemECS.Systems
             Console.WriteLine($"[MICRO]   6. + EnemyActive check:     {t6/ticksPerMs - t5/ticksPerMs,7:F2} ms  (incremental)");
             Console.WriteLine($"[MICRO]   ----------------------------------------");
             Console.WriteLine($"[MICRO]   Steps 1-6 sum:               {t6/ticksPerMs,7:F2} ms");
+        }
+
+        // ── Mode 4: Real system-chain benchmark ──────────────────────────────────
+        private void RunRealSystemChainBenchmark(int scenario, int frames)
+        {
+            Console.WriteLine($"\n[BENCHMARK] Real System Chain: {scenario} enemies x {frames} frames");
+            Console.WriteLine("[BENCHMARK] Using actual system.Update() calls, not hand-merged loops.");
+
+            var logger = new ConsoleLogger();
+            var gameConfig = new GameConfig();
+            GameConfigLoader.LoadConfig(logger);
+
+            int playerId = 1;
+            store.PlayerMaxHealth[playerId] = 200f;
+            store.PlayerCurrentHealth[playerId] = 200f;
+            store.PositionX[playerId] = 5f;
+            store.PositionY[playerId] = 0f;
+            store.SetPlayerGold(playerId, 9999f);
+
+            var random = new Random(42);
+            for (int i = 0; i < scenario; i++)
+            {
+                float x = random.Next(0, 10);
+                float y = (float)random.Next(10, 19);
+                int id = store.AddEnemy(x, y, 1f, 100f, 100f, 10f, 10, 1);
+                store.SetEnemyAIAction(id, "");
+                store.SetEntityName(id, $"NormalL1W1E{i}");
+                store.EnemyBehaviorTree[id] = gameConfig.GetCachedBehaviorTree("Normal");
+            }
+
+            int t1 = store.CreateEntity();
+            store.AddTower(t1, "弓箭塔", 15f, 3, 1f, 1, 50f);
+            store.PositionX[t1] = 3f; store.PositionY[t1] = 15f;
+
+            int t2 = store.CreateEntity();
+            store.AddTower(t2, "魔法塔", 25f, 5, 1f, 1, 100f);
+            store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
+
+            var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
+            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig);
+            var enemyMovement = new EnemyMovementSystem(store, playerId);
+            var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
+            var towerAttack   = new TowerAttackSystem(store, logger);
+            var gold          = new GoldSystem(store, logger);
+            var upgrade       = new UpgradeSystem(store, logger, playerId, gameConfig);
+            var skill         = new SkillSystem(store, logger, playerId, gameConfig);
+
+            long tWaveSpawn = 0, tEnemyAI = 0, tMoveAttack = 0;
+            long tPlayerAttack = 0, tTowerAttack = 0, tGold = 0, tUpgrade = 0, tSkill = 0;
+
+            ConsoleLogger.EnableLog = false;
+            var totalSw = Stopwatch.StartNew();
+
+            for (int f = 0; f < frames; f++)
+            {
+                int turn = f + 6;
+                store.BeginFrame();
+                var sw = new Stopwatch();
+
+                sw.Start(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedTicks;
+                sw.Restart(); enemyAI.SetTurn(turn); enemyAI.Update(); tEnemyAI += sw.ElapsedTicks;
+                sw.Restart(); enemyMovement.SetTurn(turn); enemyMovement.Update(); tMoveAttack += sw.ElapsedTicks;
+                sw.Restart(); playerAttack.SetTurn(turn); playerAttack.Update(); tPlayerAttack += sw.ElapsedTicks;
+                sw.Restart(); towerAttack.SetTurn(turn); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
+                sw.Restart(); gold.SetTurn(turn); gold.Update(); tGold += sw.ElapsedTicks;
+                sw.Restart(); upgrade.Update(); tUpgrade += sw.ElapsedTicks;
+                sw.Restart(); skill.Update(1f); tSkill += sw.ElapsedTicks;
+                store.ResolveEnemiesKilledThisFrame();
+            }
+
+            totalSw.Stop();
+            ConsoleLogger.EnableLog = true;
+
+            double ticksPerMs = Stopwatch.Frequency / 1000.0;
+            double msTotal = totalSw.Elapsed.TotalMilliseconds;
+            double fps = 1000.0 / (msTotal / frames);
+
+            Console.WriteLine($"\n[BENCHMARK] Real-system-chain timing ({frames} frames, {scenario} enemies):");
+            Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn/ticksPerMs,7:F2} ms");
+            Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms");
+            Console.WriteLine($"[BENCHMARK]   EnemyMovement: {tMoveAttack/ticksPerMs,7:F2} ms");
+            Console.WriteLine($"[BENCHMARK]   PlayerAttack:  {tPlayerAttack/ticksPerMs,7:F2} ms");
+            Console.WriteLine($"[BENCHMARK]   TowerAttack:    {tTowerAttack/ticksPerMs,7:F2} ms");
+            Console.WriteLine($"[BENCHMARK]   Gold:           {tGold/ticksPerMs,7:F2} ms");
+            Console.WriteLine($"[BENCHMARK]   Upgrade:        {tUpgrade/ticksPerMs,7:F2} ms");
+            Console.WriteLine($"[BENCHMARK]   Skill:          {tSkill/ticksPerMs,7:F2} ms");
+            Console.WriteLine($"[BENCHMARK]   ----------------------------------------");
+            Console.WriteLine($"[BENCHMARK]   TOTAL:          {msTotal,7:F2} ms");
+            Console.WriteLine($"\n[BENCHMARK] Throughput: {fps:F0} FPS  ({msTotal/frames:F2} ms/frame)");
         }
     }
 }

@@ -141,6 +141,8 @@ namespace BattleSystemECS.Core
                 PlayerGold[playerId] += EnemyGoldReward[enemyId];
                 DestroyEntity(enemyId);
             }
+            // EndFrame: clear after processing so BeginFrame is optional
+            _deathQueue = new ConcurrentBag<(int, int)>();
         }
 
         public ComponentStore()
