@@ -47,6 +47,8 @@ namespace BattleSystemECS.Systems
             _rangeSq = (int)(_attackRange * _attackRange);
         }
 
+        public int GetCachedEnemyCount() => _activeEnemyList != null ? _activeEnemyList.Count : 0;
+
         public void Update()
         {
             if (!_turnCached)

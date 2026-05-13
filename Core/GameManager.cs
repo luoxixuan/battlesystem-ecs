@@ -284,9 +284,11 @@ namespace BattleSystemECS.Core
                     enemyAISystem.Update();
 
                     // 移动敌人（SOA）
+                    enemyMovementSystem.SetTurn(turn);
                     enemyMovementSystem.Update();
 
                     // 玩家攻击（SOA）
+                    playerTowerAttackSystem.SetTurn(turn);
                     playerTowerAttackSystem.Update();
 
                     // [测试] 塔攻击逻辑
