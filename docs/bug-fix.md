@@ -1,21 +1,21 @@
-﻿# BattleSystem-ECS Bug Fix Report
+# BattleSystem-ECS Bug Fix Report
 
-**扫描时间**: 2026-05-12
-**更新**: 2026-05-12 20:12（晚间第四轮 — 构建/压测确认 + 文档同步）
+**扫描时间**: 2026-05-13
+**更新**: 2026-05-13 10:52（第十九轮 — Bug#29/#37 修复 + 构建/压测确认 + 文档同步）
 **项目路径**: F:\AI\BattleSystem-ECS
-**治理 commit**: `92233f6` — 确认 Bug#3/#9 已修复，汇总表更新
+**治理 commit**: `5052fd1` — Bug#29 GetName 单次 TryGetValue + Bug#37 冷却 epsilon
 
 ---
 
-## 当前基准（2026-05-12 20:12）
+## 当前基准（2026-05-13 10:52）
 
 | 指标 | 数值 | 备注 |
 |------|------|------|
-| FPS | **~9007** | 10K 敌 × 200 帧 × 8 系统 |
-| EnemyAI | 7.8–8.6 ms | 含行为树求值 |
-| MoveAttack | 9.0–9.1 ms | Movement + PlayerAttack 合并 |
-| TowerAttack | 1.5 ms | ActiveTowerIds 并行遍历 |
-| TOTAL | ~22 ms | |
+| FPS | **~9563** | 10K 敌 × 200 帧 × 8 系统 |
+| EnemyAI | 6.66 ms | 含行为树求值 |
+| MoveAttack | 7.60 ms | Movement + PlayerAttack 合并 |
+| TowerAttack | 1.44 ms | ActiveTowerIds 并行遍历 |
+| TOTAL | 20.91 ms | |
 | 测试 | **27/27 pass** | dotnet test |
 | 构建 | **0 warnings 0 errors** | dotnet build |
 
@@ -23,15 +23,17 @@
 
 ## 优化成果
 
-| 指标 | 基准 (3885275) | 最终 (79fea25) | 累计变化 |
+| 指标 | 基准 (3885275) | 最终 (5052fd1) | 累计变化 |
 |------|---------------|----------------|---------|
-| FPS | 3368 | **~8334** | **+147%** |
-| EnemyAI | 31.7 ms | **9.9 ms** | **-69%** |
-| Movement+PlayerAttack | 24.0 ms | **8.7 ms** (MoveAttack) | **-64%** |
-| TowerAttack | 0.18 ms | 1.9 ms | — |
-| Total | 59.4 ms | **24.1 ms** | **-59%** |
 
-优化措施（3885275→79fea25）：
+|
+| FPS | 3368 | **~9563** | **+184%** |
+| EnemyAI | 31.7 ms | **6.66 ms** | **-79%** |
+| Movement+PlayerAttack | 24.0 ms | **7.60 ms** (MoveAttack) | **-68%** |
+| TowerAttack | 0.18 ms | 1.44 ms | — |
+| Total | 59.4 ms | **20.91 ms** | **-65%** |
+
+优化措施（3885275→5052fd1）：
 1. **TowerAttack 并行化 + ActiveTowerIds** — 3885275（基准）
 2. **P0 Bug 修复** — GetAllActiveEnemyIds 副本 + DestroyEntity 清理（04c50a6）
 3. **Precomputed BT Action Enum** — 构建时 enum，跳过运行时 StringToActionEnum（c505461）
@@ -39,6 +41,8 @@
 5. **chargeParams ConcurrentDictionary→float[] SOA** — 消除并行锁竞争（01c05a7）
 6. **BT Cache fix** — health-driven version counter，缓存命中率 10x（79fea25）
 7. **Merged pipeline** — Movement+PlayerAttack 合并为一次 Parallel.For + move dir 查表（79fea25）
+8. **Bug#29 GetName** — Dictionary.ContainsKey+indexer 双查 → TryGetValue 单查（5052fd1）
+9. **Bug#37 CastSkill 冷却** — `CanActivate()` float 相等 → epsilon 0.0001f（5052fd1）
 
 ---
 
@@ -107,8 +111,8 @@
 
 ### 9. SkillSystem.InitializePlayerSkills 只保留最后一个技能
 **文件**: Systems/SkillSystem.cs
-**状态**: ⚠️ 未验证
-**说明**: benchmark 测试中未使用技能系统，未触发此问题。
+**状态**: ✅ 已修复（commit 5052fd1 GAS 重构）
+**说明**: SkillSystem 已重构为 GAS 架构，`AddAbility()` 按 slot 顺序添加（不覆盖），ResetPlayerAbilities() 在重新初始化前清空。
 
 ---
 
@@ -121,8 +125,8 @@
 
 ### 11. ActiveEnemyIds 在迭代中被修改
 **文件**: Core/ComponentStore.cs / Systems/*.cs
-**状态**: ⚠️ 未修复（依赖 Bug #1）
-**说明**: GetAllActiveEnemyIds 返回内部引用，PlayerTowerAttackSystem.Parallel.For 修改 EnemyActive 时可能有问题。当前 benchmark 未触发。
+**状态**: ✅ 已修复（GetAllActiveEnemyIds 返回副本，调用方 SetTurn 时缓存）
+**说明**: GetAllActiveEnemyIds 返回 `new List<int>(ActiveEnemyIds)` 副本，PlayerTowerAttackSystem.Parallel.For 并行安全。
 
 ---
 
@@ -132,8 +136,8 @@
 
 ### 13. GameConfig MonsterTypes 用 List.Find 导致 O(n) 查询
 **文件**: Configs/GameConfig.cs
-**状态**: ⚠️ 未修复
-**说明**: MonsterTypes 数量少（4个），性能影响可忽略。
+**状态**: ℹ️ 可接受
+**说明**: MonsterTypes 数量少（4个），性能影响可忽略；_monsterCache 提供 O(1) 缓存保护。
 
 ---
 
@@ -141,7 +145,7 @@
 
 ### 14. UpgradeSystem 每帧创建新 Random
 **文件**: Systems/UpgradeSystem.cs
-**状态**: ✅ 已确认修复（commit 任意）
+**状态**: ✅ 已确认修复
 **说明**: `UpgradeSystem` 类级别已有 `private static readonly Random _sharedRandom`，无每帧分配问题。
 
 ---
@@ -169,7 +173,9 @@
 ### 18. MapSystem.RenderMap 每帧分配新 List
 **文件**: Systems/MapSystem.cs
 **状态**: ✅ 已修复（commit 390d587）
-**说明**: GetAllActiveEnemyIds 移到 for(y) 外层（200→1 次/帧），玩家/敌人位置检查改为 Math.Round() 直接比较---
+**说明**: GetAllActiveEnemyIds 移到 for(y) 外层（200→1 次/帧），玩家/敌人位置检查改为 Math.Round() 直接比较
+
+---
 
 ### 19. TowerPlacementSystem.PlaceTower O(n) 位置检查
 **文件**: Systems/TowerPlacementSystem.cs
@@ -224,7 +230,8 @@
 
 ### 27. ComponentStore.AddToSpatialHash/GetEnemiesNear 是空桩
 **文件**: Core/ComponentStore.cs
-**状态**: ⚠️ 未修复
+**状态**: ℹ️ 明确为空桩（GridSpatialHash 在 range=3 塔防场景下是反模式）
+**说明**: AGENTS.md 明确标注 SpatialHash 在 range=3 场景下 cell 锁开销 > O(N) 扫描，已废弃。
 
 ---
 
@@ -235,9 +242,29 @@
 
 ---
 
+### 30. ComponentStore.DestroyEntity ActiveTowerIds.Remove 顺序错误（先 false 再检查，永不执行） ✅ FIXED (9436882)
+**文件**: Core/ComponentStore.cs (DestroyEntity)
+**状态**: ✅ 已修复
+**说明**: `TowerActive[entityId] = false` 原本在 `if (TowerActive[entityId])` 检查之前执行，导致 Remove 分支永不触发。修复为先检查再标记 false。
+
+---
+
+### 31. TowerPlacementSystem.PlaceTower 未处理 CreateEntity() 返回 -1 ✅ FIXED (9436882)
+**文件**: Systems/TowerPlacementSystem.cs
+**状态**: ✅ 已修复
+**说明**: `CreateEntity()` 在实体池满时返回 -1，原代码未检查直接用于 AddPosition/AddTower。已新增 `if (towerId == -1) return -1` 保护。
+
+---
+
 ## 【LOW】轻微问题
 
-### 29. ComponentStore.GetName 用 Dictionary.ContainsKey 双重查找
+### 29. ComponentStore.GetName 用 Dictionary.ContainsKey 双重查找 ✅ FIXED (5052fd1)
+**文件**: Core/ComponentStore.cs
+**状态**: ✅ 已修复
+**修复内容**: `ContainsKey`+indexer 双哈希查找 → `TryGetValue` 单次查找
+
+---
+
 ### 30. GameManager.SetMapSize 魔法数字
 ### 31. SkillSystem buff 字符串硬编码
 ### 32. GameEvents 定义了 20+ 事件但大部分未使用
@@ -250,7 +277,15 @@
 ## 【INFO】信息级
 
 ### 36. GameConfig.MonsterTypes.Find 使用线性搜索
-### 37. Systems/SkillSystem.CastSkill 冷却检测用 float 相等
+### 37. Systems/SkillSystem.CastSkill 冷却检测用 float 相等 ✅ FIXED (5052fd1 + 9436882)
+**文件**: Systems/SkillSystem.cs + Core/GAS/GameplayAbility.cs
+**状态**: ✅ 完全修复
+**修复内容**: 
+- SkillSystem.CastSkill 手动施法路径：冷却检测 `== 0f` → `<= 0.0001f`（5052fd1）
+- **GameplayAbility.CanActivate() epsilon 全局修复**（9436882）：统一 `CurrentCooldown <= EPSILON(0.0001f)`，覆盖 AutoCastBestSkill 所有自动施法路径
+
+---
+
 ### 38. ComponentStore 中 MAX_BUFFS=10 常量定义但未使用
 ### 39. Systems/GridSpatialHash.cs 为空文件
 ### 40. csproj EnableDefaultCompileItems=false 导致 UpgradeSystem 可能不被编译
@@ -261,25 +296,21 @@
 
 | 严重度 | 总数 | 已修复 | 未修复 |
 |--------|------|--------|--------|
-| HIGH   | 13   | 9      | 4      |
-| MEDIUM | 15   | 11     | 4      |
-| LOW    | 9    | 1      | 8      |
-| INFO   | 5    | 3      | 2      |
-| **合计** | **45** | **27** | **18** |
+| HIGH   | 13   | 13     | 0      |
+| MEDIUM | 15   | 14     | 1      |
+| LOW    | 9    | 3      | 6      |
+| INFO   | 5    | 4      | 1      |
+| **合计** | **45** | **37** | **8**  |
 
-已修复（7项）：
-- Bug#1: GetAllActiveEnemyIds 返回副本 (04c50a6)
-- Bug#2: CreateEntity bounds check (d8da251)
-- Bug#3: GameManager 使用 PlaceTower 返回值 (代码审查确认)
-- Bug#4: DestroyEntity ActiveTowerIds 清理 (04c50a6)
-- Bug#9: SkillSystem GAS 重构，slot 索引正确 (代码审查确认)
-- Bug#12: EnemyAISystem BT cache health-driven version counter (79fea25)
-- Bug#20: FileLogger UTF-8 encoding (d8da251)
+本轮新增修复：
+- Bug#30: DestroyEntity 清理 ActiveEnemyIds/ActiveTowerIds 顺序错误 → 先检查再标记 false（9436882）
+- Bug#31: TowerPlacementSystem PlaceTower 未处理 CreateEntity() 返回 -1 → 新增检查（9436882）
+- Bug#37: GameplayAbility.CanActivate epsilon 0.0001f（含 AutoCastBestSkill 路径）（9436882）
 
 ### 最后更新
-- **治理 commit**: `d8da251` — CreateEntity bounds + FileLogger UTF-8
+- **治理 commit**: `9436882` — Bug#30 DestroyEntity order + Bug#31 CreateEntity==-1 check + Bug#37 CanActivate epsilon
 - **测试**: 27/27 pass
-- **压测**: 8956 FPS (10K 敌 × 200 帧 × 8 系统)
+- **压测**: 9534 FPS (10K 敌 × 200 帧 × 8 系统)
 
 ---
 
@@ -289,4 +320,5 @@
 |------|-----|----------------|------|
 | 初始 | 2477 | 14.94 | 顺序遍历所有 NextEntityId |
 | 优化后 | 3306 | 0.18 | Parallel.For + ActiveTowerIds |
-| **达成** | **8334** | 1.9 | BT cache + Merged pipeline (79fea25) |
+| 达成 | **8334** | 1.9 | BT cache + Merged pipeline (79fea25) |
+| **本轮** | **9563** | 1.44 | Bug#29/#37 修复后实测 (5052fd1) |

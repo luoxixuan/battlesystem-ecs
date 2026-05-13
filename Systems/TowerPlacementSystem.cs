@@ -41,6 +41,11 @@ namespace BattleSystemECS.Systems
 
             // 3. 创建塔实体（使用 CreateEntity 而不是 NextEntityId — Bug #4）
             int towerId = store.CreateEntity();
+            if (towerId == -1)
+            {
+                logger.Log("[TOWER] 建造失败: 实体创建失败（实体池已满或ID冲突）");
+                return -1;
+            }
 
             store.AddPosition(towerId, x, y);
             store.AddTower(towerId, type, damage, range, speed, 1, cost);

@@ -44,7 +44,9 @@ namespace BattleSystemECS.Core.GAS
             CurrentCooldown = 0f;
         }
 
-        public bool CanActivate() => CurrentCooldown <= 0f;
+        // Bug#37: use epsilon instead of float equality to avoid floating-point residual
+        private const float EPSILON = 0.0001f;
+        public bool CanActivate() => CurrentCooldown <= EPSILON;
 
         public void Activate() { if (CanActivate()) CurrentCooldown = Definition.Cooldown; }
     }

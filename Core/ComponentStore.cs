@@ -137,10 +137,13 @@ namespace BattleSystemECS.Core
 
         public void DestroyEntity(int entityId)
         {
-            // 清理组件状态
-            PositionActive[entityId] = false;
+            // 清理敌人状态（先检查再标记 false）
+            if (EnemyActive[entityId])
+            {
+                ActiveEnemyIds.Remove(entityId);
+            }
             EnemyActive[entityId] = false;
-            TowerActive[entityId] = false;
+            PositionActive[entityId] = false;
 
             // 清理敌人 AI 状态
             EnemyAIAction[entityId] = "";
@@ -148,9 +151,7 @@ namespace BattleSystemECS.Core
             EnemyAIChargeCounter[entityId] = 0;
             EnemyAILastAttackTurn[entityId] = 0;
 
-            ActiveEnemyIds.Remove(entityId);
-
-            // 清理塔状态（检查必须在设置 false 之前）
+            // 清理塔状态（先检查再标记 false — Bug#30 fix）
             if (TowerActive[entityId])
             {
                 ActiveTowerIds.Remove(entityId);
