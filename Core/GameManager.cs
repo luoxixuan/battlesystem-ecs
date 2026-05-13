@@ -44,7 +44,6 @@ namespace BattleSystemECS.Core
         private bool gameRunning;
         private int turn;
         private const int maxTurns = 20;
-        private float playerMaxHealth = 200f;  // 主角最大血量
 
         /// <summary>
         /// 初始化游戏管理器
