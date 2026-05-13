@@ -130,11 +130,42 @@ DestroyPlayerOwnedEffect(id)
 
 ## 今日完成（2026-05-13）
 
-### damage queue 累加正确性修复（commit `d707920`）
-PlayerAttack 和 TowerAttack 的 damage queue 从存储 `newHealth` 改为存储 `damage`，串行阶段使用 `EnemyHealth[enemyId] -= damage` 累加，保证多个攻击者打同一敌人时伤害不丢失。
+### EnemyAI 两阶段重构（commit `ccc42e3`）
+EnemyAISystem 在 Parallel.For 内直接执行 `DecreasePlayerHealth()` + `EventBus.Publish()`，多线程竞争写玩家血量。
+修复：并行阶段只做行为树评估写 EnemyActionEnum，串行动作执行改用 foreach，EnemyAI 扣玩家血不再并发。
 
-### 真实系统链路 benchmark（commit `7ef56aa`）
-新增 mode 4，运行真实系统调用链（EnemyAI.Update() / EnemyMovementSystem.Update() / PlayerTowerAttackSystem.Update() / TowerAttackSystem.Update()），不再手写合并热路径。
+### 未用队列字段清理（commit `a92116c`）
+删除 `_playerDamageQueue`、`_eventQueue` 两个在 EnemyAISystem 里定义但从未使用的字段。
+
+### PlayerAttack + TowerAttack 两阶段（commit `2248d4a`）
+两个系统在 Parallel.For 内直接写 `EnemyHealth[enemyId]`，多攻击者打同一敌人覆盖伤害。
+修复：Phase 1 并行收集 damage 到 ConcurrentBag，Phase 2 串行 apply。
+
+### damage queue 累加正确性修复（commit `d707920`）
+上一轮入队的是 `(enemyId, newHealth)` 导致 last-write-wins。修复为 `(enemyId, damage)` + `EnemyHealth -= damage` 累加，多攻击者打同一敌人伤害不丢失。
+
+### TowerAttackSystem.cs 残留死代码清理（commit `d707920`）
+删除 `float newHealth = store.EnemyHealth[bestTarget] - damage` 无用变量。
 
 ### 死亡队列自清空（commit `7ef56aa`）
 `ResolveEnemiesKilledThisFrame()` 处理后立即 `new ConcurrentBag()` 清空，不再依赖 BeginFrame() 调用顺序。
+
+### 模式 4 真实系统链路 benchmark（commit `7ef56aa`）
+新增 mode 4，运行真实系统调用链：waveSpawning → enemyAI → enemyMovement → playerAttack → towerAttack → gold → upgrade → skill。
+不再是手写合并热路径，直接调用各系统 `.Update()`。
+
+### 统一帧末死亡结算（commit `3bd1c9c`）
+方案 B：系统只 queue 死亡，GameManager.Run() 和 BenchmarkSystem 在帧末统一调用一次 ResolveEnemiesKilledThisFrame()。
+- PlayerTowerAttackSystem / TowerAttackSystem / SkillSystem.HandleKill — 只 queue，不 resolve
+- GameManager.Run() — 所有系统之后加 ResolveEnemiesKilledThisFrame()
+- BenchmarkSystem mode 2/4 — 帧末各一次 resolve
+- SkillCanDamageAndKill 测试补一次 store.ResolveEnemiesKilledThisFrame()
+
+### AGENTS.md 并行安全原则写入（commit `41cc6a5`）
+项目 AGENTS.md 新增：两阶段模式、帧末唯一死亡结算点、damage queue 存 raw value 三条硬规则。
+
+### 文档同步（commit `63d9c1f`）
+README.md / docs/bug-fix.md / docs/TODO.md 全部更新：
+- Bug 追踪表：45项(27已修) → 46项(45已修，1未修)
+- 测试数量：27 → 48
+- 性能基准：mode 2 ~9500 / mode 4 ~5100，不再混淆
