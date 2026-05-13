@@ -105,6 +105,10 @@ namespace BattleSystemECS.Config
         // Buff definitions for UpgradeSystem (Bug#31 fix: was hardcoded strings)
         public List<string> UpgradeBuffs { get; set; } = new List<string> { "Attack+10%", "Crit Rate+5%", "Defense+10%" };
 
+        // Map dimensions (Bug#30 fix: magic numbers 10 and 20 in GameManager/EnemyMovementSystem)
+        public int MapWidth { get; set; } = 10;
+        public int MapHeight { get; set; } = 20;
+
         public GameConfig()
         {
             InitializeDefaultConfig();

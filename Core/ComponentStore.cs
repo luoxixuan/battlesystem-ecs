@@ -181,28 +181,49 @@ namespace BattleSystemECS.Core
 
         public void DestroyEntity(int entityId)
         {
-            // 清理敌人状态（先检查再标记 false）
-            if (EnemyActive[entityId])
+            // ── Phase 1: determine archetype ────────────────────────────────────────
+            bool wasEnemy = EnemyActive[entityId];
+            bool wasTower = TowerActive[entityId];
+
+            // ── Phase 2: shared state cleanup ─────────────────────────────────────
+            PositionActive[entityId] = false;
+            if (entityNames.Remove(entityId)) { /* removed */ }
+
+            // ── Phase 3: archetype-specific cleanup ────────────────────────────────
+            if (wasEnemy)
             {
                 _activeEnemyIds.Remove(entityId);
+                EnemyActive[entityId] = false;
+
+                EnemyHealth[entityId] = 0f;
+                EnemyMaxHealth[entityId] = 0f;
+                EnemyMoveSpeed[entityId] = 0f;
+                EnemyDamage[entityId] = 0f;
+                EnemyGoldReward[entityId] = 0;
+                EnemyWaveNumber[entityId] = 0;
+                EnemyChargeParam[entityId] = 0f;
+                EnemyBehaviorTree[entityId] = null;
+                EnemyTypeName[entityId] = null;
+                EnemyAIAction[entityId] = null;
+                EnemyActionEnum[entityId] = EnemyActionType.None;
+                EnemyAIChargeCounter[entityId] = 0;
+                EnemyAILastAttackTurn[entityId] = 0;
             }
-            EnemyActive[entityId] = false;
-            PositionActive[entityId] = false;
 
-            // 清理敌人 AI 状态
-            EnemyAIAction[entityId] = "";
-            EnemyActionEnum[entityId] = EnemyActionType.None;
-            EnemyAIChargeCounter[entityId] = 0;
-            EnemyAILastAttackTurn[entityId] = 0;
-
-            // 清理塔状态（先检查再标记 false — Bug#30 fix）
-            if (TowerActive[entityId])
+            if (wasTower)
             {
                 _activeTowerIds.Remove(entityId);
+                TowerActive[entityId] = false;
+                TowerType[entityId] = null;
+                TowerAttackDamage[entityId] = 0f;
+                TowerRange[entityId] = 0;
+                TowerAttackSpeed[entityId] = 0f;
+                TowerLevel[entityId] = 0;
+                TowerUpgradeCost[entityId] = 0f;
+                TowerLastAttackTime[entityId] = 0f;
             }
-            TowerActive[entityId] = false;
 
-            // 回收 ID
+            // ── Phase 4: recycle ID ───────────────────────────────────────────────
             freeEntityIds.Push(entityId);
         }
 
