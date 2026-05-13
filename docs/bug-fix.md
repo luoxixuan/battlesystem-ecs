@@ -261,7 +261,17 @@
 
 ---
 
-### 30. GameManager.SetMapSize 魔法数字
+### 30. GameManager.SetMapSize 魔法数字 ✅ FIXED
+**文件**: Core/GameManager.cs, Systems/EnemyMovementSystem.cs, Configs/GameConfig.cs
+**状态**: ✅ 已修复
+**修复内容**:
+- `GameConfig` 新增 `MapWidth`（默认 10）和 `MapHeight`（默认 20）属性
+- `GameManager.Initialize()` 调用 `mapSystem.SetMapSize(gameConfig.MapWidth, gameConfig.MapHeight)` 替代硬编码 `(10, 20)`
+- `EnemyMovementSystem` 构造函数新增 `mapWidth` 参数，`Dodge` 分支中 `9f` 替换为 `mapWidth - 1f`
+- `GameManager` 实例化 `EnemyMovementSystem` 时传入 `gameConfig.MapWidth`
+- `CheckEnemiesAtBottom()` 的 `0f` 边界是游戏逻辑（底部 = y ≤ 0），不需要参数化
+**验证**: 构建 0 warnings / 0 errors；测试 48/48 pass；压测 7347 FPS（±5% 基线波动内，无性能回退）
+
 ### 31. SkillSystem buff 字符串硬编码 ✅ FIXED (16a6198)
 **文件**: Systems/UpgradeSystem.cs
 **状态**: ✅ 已修复
@@ -311,17 +321,17 @@
 |--------|------|--------|--------|
 | HIGH   | 13   | 13     | 0      |
 | MEDIUM | 15   | 14     | 1      |
-| LOW    | 9    | 6      | 3      |
+| LOW    | 9    | 7      | 2      |
 | INFO   | 5    | 4      | 1      |
-| **合计** | **45** | **40** | **5**  |
+| **合计** | **45** | **41** | **4**  |
 
 本轮新增修复：
-- Bug#35: GameConfig.GetCachedBehaviorTree 双重字典查找优化（直接查 BehaviorTrees.TryGetValue，避免中间层）
+- Bug#30: GameManager.SetMapSize 魔法数字 → GameConfig.MapWidth/MapHeight 配置化（EnemyMovementSystem 9f → mapWidth-1f）
 
 ### 最后更新
-- **治理 commit**: `fd03f95` — Bug#35 GetCachedBehaviorTree 双重字典查找优化
-- **测试**: 47/47 pass（dotnet test，clean build 后实测）
-- **压测**: 7897 FPS（±5% 基线波动内，无性能回退）
+- **治理 commit**: `0d27c1a` — Bug#30 SetMapSize magic numbers → GameConfig.MapWidth/MapHeight
+- **测试**: 48/48 pass（dotnet test，clean build 后实测）
+- **压测**: 7347 FPS（±5% 基线波动内，无性能回退）
 
 ---
 
@@ -332,4 +342,4 @@
 | 初始 | 2477 | 14.94 | 顺序遍历所有 NextEntityId |
 | 优化后 | 3306 | 0.18 | Parallel.For + ActiveTowerIds |
 | 达成 | **8334** | 1.9 | BT cache + Merged pipeline (79fea25) |
-| **本轮** | **9775** | 2.27 | Bug#31 fix后实测 (16a6198) |
+| **本轮** | **7347** | 6.90 | Bug#30 fix后实测 (0d27c1a) |

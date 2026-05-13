@@ -172,13 +172,11 @@ namespace BattleSystemECS.Systems
                         store.EnemyHealth[enemyId] = hp;
                         if (hp <= 0f)
                         {
-                            store.EnemyActive[enemyId] = false;
-                            Interlocked.Add(ref goldAcc, store.EnemyGoldReward[enemyId]);
+                            store.QueueEnemyDeath(enemyId, playerId);
                         }
                     }
                 });
-
-                if (goldAcc > 0) store.PlayerGold[playerId] += (int)goldAcc;
+                store.ResolveEnemiesKilledThisFrame();
                 tMoveAttack += sw.ElapsedTicks;
 
                 sw.Restart(); towerAttack.SetTurn(turn); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
