@@ -282,6 +282,8 @@ namespace BattleSystemECS.Config
             player.AttackDamage = ExtractFloat(json, "AttackDamage");
             player.CurrentLevel = ExtractInt(json, "CurrentLevel");
             player.UpgradeThreshold = ExtractFloat(json, "UpgradeThreshold");
+            player.MaxHealth = ExtractFloat(json, "MaxHealth");
+            player.StartingSkills = ExtractStringList(json, "StartingSkills");
 
             return player;
         }

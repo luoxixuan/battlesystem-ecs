@@ -51,6 +51,9 @@ namespace BattleSystemECS.Core
         /// NOTE: Do NOT call Publish from within a Parallel.For — events in parallel
         /// execution contexts should be queued and dispatched serially on the main thread.
         /// This EventBus is designed for main-thread / serial event dispatch only.
+        ///
+        /// NOTE: Handlers are invoked inside the lock — keep them fast. For expensive
+        /// operations, queue results and process after lock release.
         /// </summary>
         public void Publish(string eventType, object data = null)
         {

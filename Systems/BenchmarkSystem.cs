@@ -132,7 +132,7 @@ namespace BattleSystemECS.Systems
                     }
                 }
 
-                long goldAcc = 0;
+                // long goldAcc = 0; // kept for future gold accumulation tracking
                 const int batchSize = 512;
                 int numBatches = (count + batchSize - 1) / batchSize;
 

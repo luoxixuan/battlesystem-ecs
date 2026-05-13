@@ -12,7 +12,7 @@
 | 指标 | 数值 | 备注 |
 |------|------|------|
 | 测试 | **48/48 pass** | dotnet test |
-| 构建 | **0 warnings 0 errors** | dotnet build |
+| 构建 | **0 errors / 2 net6.0 EOL warnings** | dotnet build（net6.0 已 EOL，建议升级到 net9.0） |
 
 ---
 
