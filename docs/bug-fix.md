@@ -285,9 +285,15 @@
 **修复内容**: 通过全代码库 `Publish`/`Subscribe` 调用点扫描，确认仅有 3 个事件在用：`PlayerDamaged`、`EnemyCharging`、`EnemyChargeReleased`。已删除 18 个未使用事件常量，以及 9 个未使用的 DTO 类（`EnemyKilledEvent`、`WaveEvent`、`PlayerUpgradedEvent`、`LevelEvent`、`GameOverEvent`、`TowerEvent`、`GoldChangedEvent`、`EnemySpawnedEvent`、`EnemyChargingEvent` 的空桩版本）。保留的 DTO 已补全字段（`EnemyChargeReleasedEvent` 新增 `EnemyId` 和 `Damage` 字段）。
 **验证**: 构建 0 warnings / 0 errors；测试 47/47 pass；压测稳定在 ±5% 基线波动内（7134-8010 FPS，多轮实测）
 
-### 33. EnemyMovementSystem Dodge 分支有副作用
+### 33. EnemyMovementSystem Dodge 分支有副作用 ✅ FIXED (3f98b2f)
+**文件**: Systems/EnemyMovementSystem.cs
+**状态**: ✅ 已修复
+**修复内容**: `case EnemyActionType.Dodge` 分支末尾 `return` 改为 `break`，使 Dodge 动作在修改 X 坐标后合并到统一的 `store.PositionY[enemyId] = y + direction * moveSpeed` 路径，修复"Dodge 后敌人不向下移动"的副作用。
 
-### 34. BTCachedTreeBuilder 用 List 构建 indexMap 后再查 Dictionary
+### 34. BTCachedTreeBuilder 用 List 构建 indexMap 后再查 Dictionary ✅ FIXED (3f98b2f)
+**文件**: Systems/BehaviorTreeEvaluator.cs (BTCachedTreeBuilder.Build)
+**状态**: ✅ 已修复
+**修复内容**: `indexMap` 字典初始化从 `new Dictionary<string, int>()` 改为 `new Dictionary<string, int>(nodeIds.Count)` 预分配容量，避免动态扩容开销；同时 `cached.Nodes[nodeIdx]` 赋值从 `indexMap[kvp.Key]` 重复查询改为 `nodeIdx` 变量直接使用。
 
 ### 35. GameConfig.GetCachedBehaviorTree 调用 GetBehaviorTree 造成双重字典查找 ✅ FIXED
 **文件**: Configs/GameConfig.cs
@@ -321,17 +327,18 @@
 |--------|------|--------|--------|
 | HIGH   | 13   | 13     | 0      |
 | MEDIUM | 15   | 14     | 1      |
-| LOW    | 9    | 7      | 2      |
+| LOW    | 9    | 9      | 0      |
 | INFO   | 5    | 4      | 1      |
-| **合计** | **45** | **41** | **4**  |
+| **合计** | **45** | **43** | **2**  |
 
 本轮新增修复：
-- Bug#30: GameManager.SetMapSize 魔法数字 → GameConfig.MapWidth/MapHeight 配置化（EnemyMovementSystem 9f → mapWidth-1f）
+- Bug#33: EnemyMovementSystem Dodge 分支 `return` → `break`，合并到统一 movement 路径
+- Bug#34: BTCachedTreeBuilder indexMap 预分配 capacity `new Dictionary<string, int>(nodeIds.Count)`
 
 ### 最后更新
-- **治理 commit**: `0d27c1a` — Bug#30 SetMapSize magic numbers → GameConfig.MapWidth/MapHeight
+- **治理 commit**: `3f98b2f` — fix: EnemyMovementSystem.Dodge remove early-return side effect; BTCachedTreeBuilder indexMap init capacity
 - **测试**: 48/48 pass（dotnet test，clean build 后实测）
-- **压测**: 7347 FPS（±5% 基线波动内，无性能回退）
+- **压测**: ~7347 FPS（±5% 基线波动内，无性能回退）
 
 ---
 
