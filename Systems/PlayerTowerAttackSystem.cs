@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Concurrent;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -26,6 +27,9 @@ namespace BattleSystemECS.Systems
         private List<int> _activeEnemyList;
         private bool _turnCached;
         private int _rangeSq;
+
+        // Two-phase: damage collected in parallel, applied serially
+        private ConcurrentBag<(int enemyId, float newHealth)> _damageQueue = new ConcurrentBag<(int, float)>();
 
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
@@ -94,16 +98,21 @@ namespace BattleSystemECS.Systems
                 float enemyHealth = store.EnemyHealth[enemyId];
                 if (enemyHealth <= 0f) return;
 
-                enemyHealth -= finalAttackDamage;
-                store.EnemyHealth[enemyId] = enemyHealth;
-                if (enemyHealth <= 0f)
-                {
-                    // Two-phase: queue death for serial resolution (Bug#2 thread-safety fix)
-                    store.QueueEnemyDeath(enemyId, playerId);
-                }
+                float newHealth = enemyHealth - finalAttackDamage;
+                _damageQueue.Add((enemyId, newHealth));
             });
 
-            // Phase 2 (serial): resolve deaths, award gold, destroy entities
+            // Phase 2 (serial): apply collected damage, then resolve deaths
+            foreach (var (enemyId, newHealth) in _damageQueue)
+            {
+                if (!store.EnemyActive[enemyId]) continue;
+                store.EnemyHealth[enemyId] = newHealth;
+                if (newHealth <= 0f)
+                {
+                    store.QueueEnemyDeath(enemyId, playerId);
+                }
+            }
+            _damageQueue = new ConcurrentBag<(int, float)>(); // reset for next turn
             store.ResolveEnemiesKilledThisFrame();
         }
     }

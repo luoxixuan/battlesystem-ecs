@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
@@ -15,6 +16,9 @@ namespace BattleSystemECS.Systems
         private ComponentStore store;
         private IRenderer logger;
         private List<int> _activeEnemyList;
+
+        // Two-phase: damage collected in parallel, applied serially
+        private ConcurrentBag<(int enemyId, float newHealth, int playerId)> _damageQueue = new ConcurrentBag<(int, float, int)>();
 
         public TowerAttackSystem(ComponentStore store, IRenderer logger)
         {
@@ -76,16 +80,22 @@ namespace BattleSystemECS.Systems
 
                 if (bestTarget != -1)
                 {
-                    store.EnemyHealth[bestTarget] -= damage;
-                    if (store.EnemyHealth[bestTarget] <= 0)
-                    {
-                        // Two-phase: queue death for serial resolution
-                        store.QueueEnemyDeath(bestTarget, store.PlayerEntityId);
-                    }
+                    float newHealth = store.EnemyHealth[bestTarget] - damage;
+                    _damageQueue.Add((bestTarget, newHealth, store.PlayerEntityId));
                 }
             });
 
-            // Phase 2 (serial): resolve deaths and destroy entities
+            // Phase 2 (serial): apply collected damage, then resolve deaths
+            foreach (var (enemyId, newHealth, playerId) in _damageQueue)
+            {
+                if (!store.EnemyActive[enemyId]) continue;
+                store.EnemyHealth[enemyId] = newHealth;
+                if (newHealth <= 0f)
+                {
+                    store.QueueEnemyDeath(enemyId, playerId);
+                }
+            }
+            _damageQueue = new ConcurrentBag<(int, float, int)>(); // reset for next turn
             store.ResolveEnemiesKilledThisFrame();
         }
     }
