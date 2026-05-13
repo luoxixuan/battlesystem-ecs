@@ -266,11 +266,8 @@ namespace BattleSystemECS.Config
             };
 
             // Default upgrade buffs (Bug#31 fix: moved from UpgradeSystem hardcoded strings)
-            UpgradeBuffs.Add("Attack+10%");
-            UpgradeBuffs.Add("Defense+10%");
-            UpgradeBuffs.Add("Attack Speed+20%");
-            UpgradeBuffs.Add("Crit Rate+5%");
-            UpgradeBuffs.Add("Health+20%");
+            // Field initializer provides the canonical 3 buffs: Attack+5%, Speed+5%, Crit+3%
+            // Do NOT add more here —会导致重复累计
 
             if (Levels.Count > 0)
             {

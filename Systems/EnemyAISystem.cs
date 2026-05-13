@@ -390,18 +390,4 @@ namespace BattleSystemECS.Systems
             }
         }
     }
-
-    public class EnemyChargingEvent
-    {
-        public int EnemyId;
-        public int Turn;
-        public float Damage;
-    }
-
-    public class EnemyChargeReleasedEvent
-    {
-        public int EnemyId;
-        public int Turn;
-        public float Damage;
-    }
 }
