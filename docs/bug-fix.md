@@ -3,7 +3,7 @@
 **扫描时间**: 2026-05-13
 **更新**: 2026-05-13 13:28（第二十三轮 — BenchmarkSystem AddTower、UpgradeBuffs 默认值统一、47 测试）
 **项目路径**: F:\AI\BattleSystem-ECS
-**治理 commit**: `af8b061` — 42 meaningful tests + BenchmarkSystem AddTower + UpgradeBuffs defaults
+**治理 commit**: `fd03f95` — UpgradeBuffs 统一为 Attack+10%/Crit Rate+5%/Defense+10%，docs 同步
 
 ---
 
@@ -13,7 +13,7 @@
 |------|------|------|
 | FPS | **~8859** | 10K 敌 × 200 帧 × 8 系统 |
 | 测试 | **47/47 pass** | dotnet test（新增 5 个 UpgradeSystem 测试、AddEnemy 负 ID 测试） |
-| 构建 | **0 warnings 0 errors** | dotnet build |
+| 构建 | **0 warnings 0 errors** | dotnet build（无 net6.0 EOL warning） |
 
 ---
 

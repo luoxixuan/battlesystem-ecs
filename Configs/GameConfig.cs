@@ -266,8 +266,8 @@ namespace BattleSystemECS.Config
             };
 
             // Default upgrade buffs (Bug#31 fix: moved from UpgradeSystem hardcoded strings)
-            // Field initializer provides the canonical 3 buffs: Attack+5%, Speed+5%, Crit+3%
-            // Do NOT add more here —会导致重复累计
+            // Field initializer provides the canonical 3 buffs: Attack+10%, Crit Rate+5%, Defense+10%
+            // These match the buff names consumed by PlayerTowerAttackSystem.cs
 
             if (Levels.Count > 0)
             {
@@ -322,8 +322,10 @@ namespace BattleSystemECS.Config
             if (string.IsNullOrEmpty(monsterType)) return null;
             if (_cachedBtCache.TryGetValue(monsterType, out var cached))
                 return cached;
-            var bt = GetBehaviorTree(monsterType);
-            if (bt == null) return null;
+            // Bug#35 fix: query BehaviorTrees directly instead of via GetBehaviorTree()
+            // to avoid the double dictionary lookup (BehaviorTrees.TryGetValue + _btCache.TryGetValue).
+            // The _btCache still works as a side effect for GetBehaviorTree() callers.
+            if (!BehaviorTrees.TryGetValue(monsterType, out var bt)) return null;
             var cachedBt = BattleSystemECS.Systems.BTCachedTreeBuilder.Build(bt);
             _cachedBtCache[monsterType] = cachedBt;
             return cachedBt;
