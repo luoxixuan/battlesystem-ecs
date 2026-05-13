@@ -87,9 +87,10 @@ BattleSystem-ECS/
 │       ├── GameplayEffect.cs
 │       └── GameplayAbility.cs
 ├── Components/
-│   ├── Components.cs         # 基础组件定义
-│   ├── SkillComponent.cs
-│   └── BuffDebuffComponents.cs
+│   ├── BuffData.cs
+│   ├── EnemyActionType.cs
+│   ├── EnemyComponent.cs
+│   └── SkillComponent.cs
 ├── Systems/
 │   ├── EnemyAISystem.cs       # 行为树评估 + 攻击执行（BT cache）
 │   ├── EnemyMovementSystem.cs
@@ -105,7 +106,7 @@ BattleSystem-ECS/
 │   ├── MapSystem.cs
 │   ├── BenchmarkSystem.cs      # 全链路压测
 │   ├── BehaviorTreeEvaluator.cs
-│   └── GridSpatialHash.cs      # 空桩（未启用）
+│   └── BehaviorTreeNodes.cs
 ├── Configs/
 │   ├── game_config.json        # 怪物类型、等级、波次
 │   ├── behavior_trees.json     # 行为树定义

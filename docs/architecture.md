@@ -218,13 +218,15 @@ GameManager.Run() → while(gameRunning) → 每回合:
 
 ---
 
-## 12. 已废弃/未启用
+## 12. 已删除（2026-05-13）
 
-| 路径 | 状态 | 说明 |
-|------|------|------|
-| `System/` (大写) | 未编译 | 旧版本死代码，`Systems/` 是实际使用的 |
-| `GridSpatialHash.cs` | 空桩 | 未接入，Spatial Hash 在 range=3 场景是反模式 |
-| `Components/Components.cs` | 老架构 | 新代码直接用 `ComponentStore` 数组，不走组件类 |
+| 路径 | 原状态 | 说明 |
+|------|--------|------|
+| `System/` (大写) | 未编译 | 全目录已删除，原 5 个死文件 |
+| `GridSpatialHash.cs` | 空桩 | 已删除，Spatial Hash 在 range=3 场景是反模式 |
+| `Components/Components.cs` | 老架构 | 已删除 |
+| `Components/BuffDebuffComponents.cs` | 老架构 | 已删除 |
+| `Components/GameStateComponent.cs` 等 9 个 | 老架构 | 已删除（仅保留 BuffData/EnemyActionType/EnemyComponent/SkillComponent）|
 
 ---
 
@@ -232,6 +234,7 @@ GameManager.Run() → while(gameRunning) → 每回合:
 
 | 日期 | commit | 变更 |
 |------|--------|------|
+| 2026-05-13 | `c4c360b` | 清理死代码（System/、GridSpatialHash、9个旧组件、EntityManager精简） |
 | 2026-05-13 | `2ce3352` | README 更新（添加 TechTree） |
 | 2026-05-13 | `5e01a26` | 新增科技树系统（3分支 × 5节点） |
 | 2026-05-12 | `79fea25` | BT Cache fix + Merged pipeline，FPS 8334 |

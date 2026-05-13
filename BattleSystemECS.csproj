@@ -18,21 +18,20 @@
     <Compile Include="Core\*.cs" />
     <Compile Include="Core\GAS\*.cs" />
 
-    <!-- Components -->
-    <Compile Include="Components\*.cs" />
+    <!-- Components (only actively referenced files) -->
+    <Compile Include="Components\BuffData.cs" />
+    <Compile Include="Components\EnemyActionType.cs" />
+    <Compile Include="Components\EnemyComponent.cs" />
+    <Compile Include="Components\SkillComponent.cs" />
 
     <!-- Systems -->
     <Compile Include="Systems\*.cs" />
-
-    <!-- Specific System files needed (GoldSystem) -->
-    <Compile Include="System\GoldSystem.cs" />
 
     <!-- Main program -->
     <Compile Include="Program.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Copy JSON config to output directory -->
     <None Update="game_config.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
