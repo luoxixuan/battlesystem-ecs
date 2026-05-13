@@ -20,8 +20,6 @@ namespace BattleSystemECS.Core
         public const int MAX_ENTITIES = 100000;
         private const int MAX_PLAYERS = 10;
         private const int MAX_MONSTERS = 20000;
-        private const int MAX_BUFFS = 10;
-
         public int TotalKills = 0;
 
         // ==================== 位置组件的 SOA 存储 ====================
