@@ -17,15 +17,17 @@ namespace BattleSystemECS.Systems
     {
         private Core.ComponentStore store;
         private readonly int playerId;
+        private readonly float mapWidthMinusOne;  // Bug#30: replace magic number 9f
 
         // Cached per-turn to avoid per-frame store lookups
         private List<int> _activeEnemyList;
         private float _playerX;
 
-        public EnemyMovementSystem(Core.ComponentStore store, int playerId)
+        public EnemyMovementSystem(Core.ComponentStore store, int playerId, int mapWidth = 10)
         {
             this.store = store;
             this.playerId = playerId;
+            this.mapWidthMinusOne = mapWidth - 1f;
         }
 
         public void SetTurn(int turn)
@@ -73,7 +75,7 @@ namespace BattleSystemECS.Systems
                         {
                             string actionStr = store.GetEnemyAIAction(enemyId);
                             int dodgeDir = ParseDodgeDirection(actionStr);
-                            store.PositionX[enemyId] = Math.Clamp(x + dodgeDir, 0f, 9f);
+                            store.PositionX[enemyId] = Math.Clamp(x + dodgeDir, 0f, mapWidthMinusOne);
                             store.PositionY[enemyId] = y - moveSpeed * 0.5f;
                             return;
                         }

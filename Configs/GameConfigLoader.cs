@@ -507,6 +507,25 @@ namespace BattleSystemECS.Config
             return null;
         }
 
+        private static List<string> ExtractStringList(string json, string key)
+        {
+            var list = new List<string>();
+            int keyIndex = json.IndexOf(key);
+            if (keyIndex == -1) return list;
+
+            int arrayStart = json.IndexOf("[", keyIndex);
+            if (arrayStart == -1) return list;
+
+            int depth = 0;
+            int start = arrayStart + 1;
+            for (int i = arrayStart; i < json.Length; i++)
+            {
+                if (json[i] == '[') depth++;
+                else if (json[i] == ']') { depth--; if (depth == 0) { string arr = json.Substring(start, i - start); var matches = System.Text.RegularExpressions.Regex.Matches(arr, "\"[^\"]*\""); foreach (System.Text.RegularExpressions.Match m in matches) list.Add(m.Value.Trim('\"')); break; } }
+            }
+            return list;
+        }
+
         private static float ExtractFloat(string json, string key)
         {
             string value = ExtractString(json, key);

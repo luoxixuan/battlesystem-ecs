@@ -81,12 +81,12 @@ namespace BattleSystemECS.Core
             // 初始化地图大小
             logger.Log("[BOOTSTRAP]    - Creating MapSystem (10x20 map)...");
             mapSystem = new MapSystem(logger, store);
-            mapSystem.SetMapSize(10, 20);  // 地图改为 10x20
+            mapSystem.SetMapSize(gameConfig.MapWidth, gameConfig.MapHeight);  // Bug#30: use config values instead of magic numbers
             logger.Log("[BOOTSTRAP]      MapSystem created successfully!");
 
             // 初始化其他系统
             logger.Log("[BOOTSTRAP]    - Creating EnemyMovementSystem...");
-            enemyMovementSystem = new EnemyMovementSystem(store, playerId);
+            enemyMovementSystem = new EnemyMovementSystem(store, playerId, gameConfig.MapWidth);
             logger.Log("[BOOTSTRAP]      EnemyMovementSystem created successfully!");
 
             // 初始化塔防系统
