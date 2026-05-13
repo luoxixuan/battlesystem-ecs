@@ -395,6 +395,7 @@ namespace BattleSystemECS.Tests
             var sys = new SkillSystem(store, r, pid, config);
             sys.InitializePlayerSkills();
             sys.CastSkill("Cross Slash");
+            store.ResolveEnemiesKilledThisFrame(); // frame-end death resolution
             Assert.True(r.HasLogContaining("Cross Slash cast"));
             Assert.True(r.HasLogContaining("hit"));
             Assert.True(store.GetPlayerGold(pid) > 0);

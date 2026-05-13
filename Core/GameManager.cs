@@ -296,6 +296,9 @@ namespace BattleSystemECS.Core
                     // [测试] 塔攻击逻辑
                     towerAttackSystem.Update(1.0f);
 
+                    // 统一帧末死亡结算（所有攻击系统已完成伤害/死亡入队）
+                    store.ResolveEnemiesKilledThisFrame();
+
                     // 检查玩家是否存活
                     if (!store.IsPlayerAlive(playerId))
                     {

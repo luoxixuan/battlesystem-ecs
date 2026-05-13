@@ -283,9 +283,8 @@ namespace BattleSystemECS.Systems
 
         private void HandleKill(int enemyId)
         {
-            // Queue death for serial resolution (consistency with PlayerAttack/TowerAttack two-phase pattern)
+            // Queue death for serial resolution — ResolveEnemiesKilledThisFrame() called at frame end
             store.QueueEnemyDeath(enemyId, playerId);
-            store.ResolveEnemiesKilledThisFrame();
             renderer.Log($"[SKILL] Killed enemy {enemyId}");
         }
 

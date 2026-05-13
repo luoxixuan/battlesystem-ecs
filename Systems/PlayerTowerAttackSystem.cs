@@ -102,6 +102,7 @@ namespace BattleSystemECS.Systems
             });
 
             // Phase 2 (serial): apply collected damage, then resolve deaths
+            // Phase 2 (serial): apply damage, queue deaths. Resolve happens at frame end in GameManager/Benchmark.
             foreach (var (enemyId, damage) in _damageQueue)
             {
                 if (!store.EnemyActive[enemyId]) continue;
@@ -111,8 +112,8 @@ namespace BattleSystemECS.Systems
                     store.QueueEnemyDeath(enemyId, playerId);
                 }
             }
-            _damageQueue = new ConcurrentBag<(int, float)>(); // reset for next turn
-            store.ResolveEnemiesKilledThisFrame();
+            // Damage queue reset remains here to keep memory bounded per frame
+            _damageQueue = new ConcurrentBag<(int, float)>();
         }
     }
 }
