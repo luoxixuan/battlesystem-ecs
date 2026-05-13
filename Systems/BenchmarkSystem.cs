@@ -64,13 +64,13 @@ namespace BattleSystemECS.Systems
             var map          = new MapSystem(logger, store);
             map.SetMapSize(10, 20);
 
-            // Place towers �?use AddTower so ActiveTowerIds is populated (matching real game flow)
+            // Place towers — use AddTower so ActiveTowerIds is populated (matching real game flow)
             int t1 = store.CreateEntity();
-            store.AddTower(t1, "弓箭�?, 15f, 3, 1f, 1, 50f);
+            store.AddTower(t1, "弓箭塔", 15f, 3, 1f, 1, 50f);
             store.PositionX[t1] = 3f; store.PositionY[t1] = 15f;
 
             int t2 = store.CreateEntity();
-            store.AddTower(t2, "魔法�?, 25f, 5, 1f, 1, 100f);
+            store.AddTower(t2, "魔法塔", 25f, 5, 1f, 1, 100f);
             store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
 
             int frames = 200;
@@ -101,7 +101,7 @@ namespace BattleSystemECS.Systems
 
             // Pre-compute move direction lookup to eliminate switch in hot path
             var moveDir = new sbyte[] { -1, 0, 0, 0, 0, 1, -1 };
-            // index: (int)EnemyActionType �?direction (-1=forward, 0=stand, 1=retreat)
+            // index: (int)EnemyActionType → direction (-1=forward, 0=stand, 1=retreat)
 
             for (int f = 0; f < frames; f++)
             {
@@ -194,14 +194,14 @@ namespace BattleSystemECS.Systems
             double fps = 1000.0 / (msTotal / frames);
 
             Console.WriteLine($"\n[BENCHMARK] Per-system timing ({frames} frames, {scenario} enemies):");
-            Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn/ticksPerMs,7:F2} ms  ({(tWaveSpawn/msTotal*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms  ({(tEnemyAI/msTotal*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   MoveAttack:     {tMoveAttack/ticksPerMs,7:F2} ms  ({(tMoveAttack/msTotal*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   TowerAttack:    {tTowerAttack/ticksPerMs,7:F2} ms  ({(tTowerAttack/msTotal*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   Gold:           {tGold/ticksPerMs,7:F2} ms  ({(tGold/msTotal*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   Upgrade:        {tUpgrade/ticksPerMs,7:F2} ms  ({(tUpgrade/msTotal*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   Skill:          {tSkill/ticksPerMs,7:F2} ms  ({(tSkill/msTotal*100),5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   Map:            {tMap/ticksPerMs,7:F2} ms  ({(tMap/msTotal*100),5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn/ticksPerMs,7:F2} ms  ({tWaveSpawn/ticksPerMs/msTotal*100,5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms  ({tEnemyAI/ticksPerMs/msTotal*100,5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   MoveAttack:     {tMoveAttack/ticksPerMs,7:F2} ms  ({tMoveAttack/ticksPerMs/msTotal*100,5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   TowerAttack:    {tTowerAttack/ticksPerMs,7:F2} ms  ({tTowerAttack/ticksPerMs/msTotal*100,5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   Gold:           {tGold/ticksPerMs,7:F2} ms  ({tGold/ticksPerMs/msTotal*100,5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   Upgrade:        {tUpgrade/ticksPerMs,7:F2} ms  ({tUpgrade/ticksPerMs/msTotal*100,5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   Skill:          {tSkill/ticksPerMs,7:F2} ms  ({tSkill/ticksPerMs/msTotal*100,5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   Map:            {tMap/ticksPerMs,7:F2} ms  ({tMap/ticksPerMs/msTotal*100,5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   ----------------------------------------");
             Console.WriteLine($"[BENCHMARK]   TOTAL:          {msTotal,7:F2} ms");
             Console.WriteLine($"\n[BENCHMARK] Throughput: {fps:F0} FPS  ({msTotal/frames:F2} ms/frame)");
