@@ -4,26 +4,25 @@
 
 ---
 
-## 性能基准（2026-05-13, commit `ff89e9a`）
+## 性能基准（2026-05-13, commit `d707920`）
 
 | 指标 | 数值 |
 |------|------|
-| 测试规模 | 10,000 敌人 × 200 帧 × 8 系统 |
-| 平均帧耗时 | ~0.12 ms |
-| **FPS** | **~8,300**（±5% 正常波动） |
-| 主要热点 | EnemyAI ~10ms / MoveAttack ~8ms / TowerAttack ~1.8ms |
+| 测试规模 | 10,000 敌人 × 200 帧 |
+| **mode 4**（真实系统链路） | **~4900 FPS**，TOTAL ~41ms |
+| **mode 2**（合并热路径） | **~9300 FPS**，TOTAL ~21ms |
+| 主要热点（mode 4） | EnemyAI ~14ms / PlayerAttack ~16ms / TowerAttack ~5ms |
 
-> 性能波动受 Windows Parallel.For 调度和 GC 影响，±5% 属正常范围。
+> 真实系统链路（mode 4）是主要参考指标，因为它直接调用 `EnemyAISystem.Update()` / `EnemyMovementSystem.Update()` / `PlayerTowerAttackSystem.Update()` / `TowerAttackSystem.Update()`。mode 2 是手写合并热路径，参考价值次之。
 
 ## 优化演进（关键节点）
 
-| commit | FPS | 关键改动 |
-|--------|-----|---------|
+| commit | FPS (mode 4) | 关键改动 |
+|--------|--------------|---------|
 | `c67b567` | 212 | 初始（无并行） |
-| `0b6557e` | 1030 | EnemyAI Parallel.For |
 | `3885275` | 3368 | TowerAttack 并行化 + ActiveTowerIds |
-| `79fea25` | **8334** | BT Cache fix + Merged pipeline |
-| `ff89e9a` | ~8300 | TechTree + 持续优化 |
+| `ccc42e3` | ~4900 | EnemyAI 两阶段 + BeginFrame 每回合 |
+| `d707920` | ~4900 | PlayerAttack/TowerAttack damage 累加修正 |
 
 ---
 
@@ -82,10 +81,10 @@ BattleSystem-ECS/
 │   └── TechTreeDef.cs          # 科技树配置结构
 ├── Research/
 │   ├── tower_defense_knowledge.md  # 自动更新的塔防知识库（21 repos）
-│   ├── bug-fix.md              # Bug 追踪（45 项，27 已修复）
+│   ├── bug-fix.md              # Bug 追踪（46 项，45 已修复，1 未修复）
 │   └── findings/               # 爬取原始数据
 ├── BattleSystemECS.Tests/
-│   └── ...                     # 27 单元测试
+│   └── ...                     # 48 单元测试
 └── Program.cs                  # 入口（游戏/压测/微基准）
 ```
 
@@ -100,8 +99,9 @@ dotnet build
 # 运行
 dotnet run
 # 1: 塔防游戏
-# 2: 全链路性能压测（10K 敌 × 200 帧 × 8 系统）
+# 2: 全链路性能压测（10K 敌 × 200 帧，真实系统调用链）
 # 3: 微基准测试（单系统操作级性能剖析）
+# 4: 合并热路径压测（手写合并，FPS 更高，非主要参考）
 
 # 测试
 cd BattleSystemECS.Tests
@@ -126,15 +126,18 @@ dotnet test
 
 ## Bug 追踪
 
-详见 `Research/bug-fix.md`。
+详见 `docs/bug-fix.md`。
 
 | 严重度 | 总数 | 已修复 | 未修复 |
 |--------|------|--------|--------|
-| HIGH | 13 | 9 | 4 |
-| MEDIUM | 15 | 11 | 4 |
-| LOW | 9 | 1 | 8 |
-| INFO | 5 | 3 | 2 |
-| **合计** | **45** | **27** | **18** |
+| HIGH   | 13   | 13     | 0      |
+| MEDIUM | 15   | 14     | 1      |
+| LOW    | 9    | 9      | 0      |
+| INFO   | 6    | 5      | 1      |
+| **合计** | **46** | **45** | **1** |
+
+> ⚠️ mode 4（真实系统链路 benchmark）才是主要性能指标，mode 2 是合并热路径，两者不再混淆。
+> ✅ 2026-05-13：PlayerAttack/TowerAttack damage queue 改为 damage 累加（`d707920`），死亡队列自清空（`7ef56aa`），EnemyAI 两阶段（`ccc42e3`）
 
 ---
 

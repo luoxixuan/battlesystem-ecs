@@ -117,7 +117,7 @@ DestroyPlayerOwnedEffect(id)
 | 7 | 高 | GameConfigLoader 完整解析 | ✅ 已完成 | `commit 736746c` 解析 MaxHealth / StartingSkills |
 | 8 | 高 | EventBus 并行安全改造 | ✅ 已完成 | `commit afb988d` lock + snapshot iteration + Reset() |
 | 9 | 中 | 击杀奖励集中化 | ✅ 已完成 | 与 #2/#4 同 commit，已统一到两阶段死亡解析 |
-| 10 | 中 | Benchmark 真实系统链路 | ❌ 未完成 | 仍手写热路径，非真实系统调用链 |
+| 10 | 中 | Benchmark 真实系统链路 | ✅ 已完成 | `commit 7ef56aa` mode 4 真实系统链路 benchmark |
 
 ---
 
@@ -125,3 +125,16 @@ DestroyPlayerOwnedEffect(id)
 
 ### #3 并行段直接改 active list（部分完成）
 `ActiveEnemyIds` / `ActiveTowerIds` 仍暴露为 `public List<int>`（IReadOnlyList 包装），但 DestroyEntity 仍直接修改这些 list。`e474f1c` 的两阶段模式解决了并行系统直接调用 DestroyEntity 的问题，但 ComponentStore 内部的 freeEntityIds Stack 仍非线程安全。
+
+---
+
+## 今日完成（2026-05-13）
+
+### damage queue 累加正确性修复（commit `d707920`）
+PlayerAttack 和 TowerAttack 的 damage queue 从存储 `newHealth` 改为存储 `damage`，串行阶段使用 `EnemyHealth[enemyId] -= damage` 累加，保证多个攻击者打同一敌人时伤害不丢失。
+
+### 真实系统链路 benchmark（commit `7ef56aa`）
+新增 mode 4，运行真实系统调用链（EnemyAI.Update() / EnemyMovementSystem.Update() / PlayerTowerAttackSystem.Update() / TowerAttackSystem.Update()），不再手写合并热路径。
+
+### 死亡队列自清空（commit `7ef56aa`）
+`ResolveEnemiesKilledThisFrame()` 处理后立即 `new ConcurrentBag()` 清空，不再依赖 BeginFrame() 调用顺序。
