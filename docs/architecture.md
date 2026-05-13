@@ -1,7 +1,7 @@
 # BattleSystem-ECS 架构文档
 
 > 每次修改架构或业务逻辑后，必须同步更新此文档。
-> 最后更新：2026-05-13（commit `2ce3352`）
+> 最后更新：2026-05-13（commit `69bb49b`）
 
 ---
 
@@ -10,7 +10,9 @@
 - **语言**: C# / .NET 6
 - **架构**: SOA (Struct of Arrays) ECS
 - **定位**: 塔防战斗系统性能基准，逻辑与渲染完全分离
-- **性能目标**: 10K 敌 × 200 帧 × 8 系统 ≥ 8,000 FPS
+- **性能目标**: 10K 敌 × 200 帧 ≥ 5,000 FPS（mode 4 真实系统链路）
+- **性能基准**: mode 2 ~9500 FPS（合并热路径参考）/ mode 4 ~5100 FPS（真实系统链路主指标）
+- **测试覆盖**: 48 单元测试
 
 ---
 
@@ -18,9 +20,40 @@
 
 1. **SOA 优先**: 所有组件用平行数组（`float[]`, `int[]`, `bool[]`），连续内存访问，CPU 缓存命中率高
 2. **并行化**: 每个系统内部使用 `Parallel.For` 批处理，最大化多核利用率
-3. **零分配热路径**: `GetAllActiveEnemyIds()` 返回副本，`ActiveEnemyIds` 用 List 但读取路径无锁
-4. **配置驱动**: 技能、科技树、怪物类型、行为树均从 JSON 加载，代码只负责逻辑
-5. **事件解耦**: 系统间通过 `EventBus` 解耦，避免直接调用
+3. **两阶段安全**: 所有并行写共享状态遵循"并行收集 → 串行 apply"模式（见第 2 节）
+4. **零分配热路径**: `GetAllActiveEnemyIds()` 返回副本，`ActiveEnemyIds` 用 List 但读取路径无锁
+5. **配置驱动**: 技能、科技树、怪物类型、行为树均从 JSON 加载，代码只负责逻辑
+6. **帧末统一结算**: 实体生命周期（DestroyEntity/奖励结算）统一在帧末由调度层处理
+
+---
+
+## 并行安全原则（两阶段模式）
+
+所有涉及并行写共享状态的系统，必须遵循**两阶段模式**：
+
+```
+并行段（Parallel.For）
+  → 只读组件数据，收集 damage/death 事件到 ConcurrentBag
+  → 禁止写 EnemyHealth / PlayerHealth / ActiveEnemyIds / ActiveTowerIds / EventBus
+
+串行段（帧末统一结算）
+  → 从 ConcurrentBag 取出事件，串行 apply damage（`enemyHealth -= damage`）
+  → QueueEnemyDeath → ResolveEnemiesKilledThisFrame() 统一销毁实体 + 结算奖励
+```
+
+调用链：
+```
+GameManager.Run() / BenchmarkSystem
+  → BeginFrame()（重置 queues）
+  → 各系统 Update()（只 queue，不 resolve）
+  → ResolveEnemiesKilledThisFrame()（统一结算，死亡队列自清空）
+```
+
+**关键原则**：
+- **damage queue 存 raw value**：`(enemyId, damage)` + `enemyHealth -= damage` 累加
+  - ❌ 禁止存 `(enemyId, newHealth)`，否则 last-write-wins，多攻击者丢伤害
+- **帧末唯一死亡结算点**：系统只 queue，GameManager/Benchmark 统一 resolve
+- **EnemyAI 两阶段**：并行段做 BT 评估 + 写 EnemyActionEnum，串行段执行动作（含 EventBus.Publish）
 
 ---
 
@@ -104,15 +137,15 @@ List<int> ActiveTowerIds             // 仅活跃塔 ID（并行遍历用）
 | 系统 | 文件 | 职责 | 关键设计 |
 |------|------|------|---------|
 | WaveSpawningSystem | Systems/ | 波次生成 | `OnWaveComplete` 事件触发科技树点数产出 |
-| EnemyAISystem | Systems/ | 行为树评估 | BTCachedTree + health-driven version cache；action enum 预计算 |
+| EnemyAISystem | Systems/ | 行为树评估 | **两阶段**：并行 BT 评估写 EnemyActionEnum，串行动作执行（含 EventBus.Publish） |
 | EnemyMovementSystem | Systems/ | 敌人移动 | `EnemyActionEnum` 驱动方向；Dodge 分支有副作用 |
-| PlayerTowerAttackSystem | Systems/ | 玩家攻击 | `SetTurn` 缓存攻击范围，buff 解析每帧执行 |
-| TowerAttackSystem | Systems/ | 塔攻击 | 遍历 `ActiveTowerIds`（非 NextEntityId 全量扫描）|
+| PlayerTowerAttackSystem | Systems/ | 玩家攻击 | **两阶段**：并行收集 `(enemyId, damage)`，串行 `enemyHealth -= damage` + queue 死亡 |
+| TowerAttackSystem | Systems/ | 塔攻击 | **两阶段**：遍历 `ActiveTowerIds`，并行收集 damage，串行 apply + queue 死亡 |
 | UpgradeSystem | Systems/ | 玩家升级 | 等级阈值触发；`_sharedRandom` 类级单例 |
-| SkillSystem | Systems/ | 技能施放 | GAS 架构；AreaShape (0=单体/1=十字/2=矩形) |
+| SkillSystem | Systems/ | 技能施放 | GAS 架构；AreaShape 驱动；**只 queue 死亡，帧末统一 resolve** |
 | TechTreeSystem | Systems/ | 科技树 | 前置依赖检查；效果缓存在 `TechTreeSystem` 字段 |
 | GoldSystem | Systems/ | 金币结算 | 击杀产金；`Interlocked.Add` 并行安全 |
-| BenchmarkSystem | Systems/ | 性能压测 | 内置 merged pipeline（MoveAttack）单独计量 |
+| BenchmarkSystem | Systems/ | 性能压测 | **dual mode**：mode 2 合并热路径 / mode 4 真实系统链路，各独立计时 |
 
 ---
 
