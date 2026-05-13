@@ -170,9 +170,9 @@ namespace BattleSystemECS.Core
 
         public string GetName(int entityId)
         {
-            if (entityNames.ContainsKey(entityId))
+            if (entityNames.TryGetValue(entityId, out string name))
             {
-                return entityNames[entityId];
+                return name;
             }
             return $"Entity_{entityId}";
         }

@@ -4,6 +4,13 @@
 
 $ErrorActionPreference = "Stop"
 
+# Load local secrets (not committed to git)
+$configEnv = Join-Path $PSScriptRoot "config_env.ps1"
+if (Test-Path $configEnv) {
+    Write-Host "[*] Loading environment config..."
+    . $configEnv
+}
+
 $taskName = "TD-Research-Crawler"
 $scriptPath = "F:\AI\BattleSystem-ECS\Research\crawler.py"
 $pythonExe = (Get-Command python).Source
@@ -19,6 +26,7 @@ Write-Host "=== TD Research Crawler Scheduler ==="
 Write-Host "Python: $pythonExe"
 Write-Host "Script: $scriptPath"
 Write-Host "Logs:   $logDir"
+if ($env:GITHUB_TOKEN) { Write-Host "GitHub Token: SET" } else { Write-Host "GitHub Token: NOT SET" }
 Write-Host ""
 
 # Remove existing task if present
@@ -28,11 +36,18 @@ if ($existing) {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
 }
 
+# Build environment variables for scheduled task (including GitHub token if set)
+$taskEnv = @{}
+if ($env:GITHUB_TOKEN) { $taskEnv["GITHUB_TOKEN"] = $env:GITHUB_TOKEN }
+
 # Create the scheduled task action
-$action = New-ScheduledTaskAction `
-    -Execute $pythonExe `
-    -Argument "-u `"$scriptPath`" --light" `
-    -WorkingDirectory $workingDir
+$actionParams = @{
+    Execute = $pythonExe
+    Argument = "-u `"$scriptPath`" --light"
+    WorkingDirectory = $workingDir
+}
+if ($taskEnv.Count -gt 0) { $actionParams["Environment"] = $taskEnv }
+$action = New-ScheduledTaskAction @actionParams
 
 # Trigger: every 2 hours, starting now
 $trigger = New-ScheduledTaskTrigger `
@@ -55,7 +70,7 @@ Register-ScheduledTask `
     -Action $action `
     -Trigger $trigger `
     -Settings $settings `
-    -Description "Crawls GitHub for high-star tower defense projects every 6 hours" `
+    -Description "Crawls GitHub for high-star tower defense projects every 2 hours" `
     -RunLevel Limited `
     -Force
 
@@ -70,10 +85,13 @@ if ($deepExisting) {
     Unregister-ScheduledTask -TaskName $deepTaskName -Confirm:$false
 }
 
-$deepAction = New-ScheduledTaskAction `
-    -Execute $pythonExe `
-    -Argument "-u `"$scriptPath`"" `
-    -WorkingDirectory $workingDir
+$deepActionParams = @{
+    Execute = $pythonExe
+    Argument = "-u `"$scriptPath`""
+    WorkingDirectory = $workingDir
+}
+if ($taskEnv.Count -gt 0) { $deepActionParams["Environment"] = $taskEnv }
+$deepAction = New-ScheduledTaskAction @deepActionParams
 
 $deepTrigger = New-ScheduledTaskTrigger -Daily -At "02:00"
 
