@@ -242,14 +242,14 @@
 
 ---
 
-### 30. ComponentStore.DestroyEntity ActiveTowerIds.Remove 顺序错误（先 false 再检查，永不执行） ✅ FIXED (9436882)
+### 30. ComponentStore.DestroyEntity ActiveTowerIds.Remove 顺序错误（先 false 再检查，永不执行） ✅ FIXED (60865d2)
 **文件**: Core/ComponentStore.cs (DestroyEntity)
 **状态**: ✅ 已修复
 **说明**: `TowerActive[entityId] = false` 原本在 `if (TowerActive[entityId])` 检查之前执行，导致 Remove 分支永不触发。修复为先检查再标记 false。
 
 ---
 
-### 31. TowerPlacementSystem.PlaceTower 未处理 CreateEntity() 返回 -1 ✅ FIXED (9436882)
+### 31. TowerPlacementSystem.PlaceTower 未处理 CreateEntity() 返回 -1 ✅ FIXED (60865d2)
 **文件**: Systems/TowerPlacementSystem.cs
 **状态**: ✅ 已修复
 **说明**: `CreateEntity()` 在实体池满时返回 -1，原代码未检查直接用于 AddPosition/AddTower。已新增 `if (towerId == -1) return -1` 保护。
@@ -277,12 +277,12 @@
 ## 【INFO】信息级
 
 ### 36. GameConfig.MonsterTypes.Find 使用线性搜索
-### 37. Systems/SkillSystem.CastSkill 冷却检测用 float 相等 ✅ FIXED (5052fd1 + 9436882)
+### 37. Systems/SkillSystem.CastSkill 冷却检测用 float 相等 ✅ FIXED (5052fd1 + 60865d2)
 **文件**: Systems/SkillSystem.cs + Core/GAS/GameplayAbility.cs
 **状态**: ✅ 完全修复
 **修复内容**: 
 - SkillSystem.CastSkill 手动施法路径：冷却检测 `== 0f` → `<= 0.0001f`（5052fd1）
-- **GameplayAbility.CanActivate() epsilon 全局修复**（9436882）：统一 `CurrentCooldown <= EPSILON(0.0001f)`，覆盖 AutoCastBestSkill 所有自动施法路径
+- **GameplayAbility.CanActivate() epsilon 全局修复**（60865d2）：统一 `CurrentCooldown <= EPSILON(0.0001f)`，覆盖 AutoCastBestSkill 所有自动施法路径
 
 ---
 
@@ -303,12 +303,12 @@
 | **合计** | **45** | **37** | **8**  |
 
 本轮新增修复：
-- Bug#30: DestroyEntity 清理 ActiveEnemyIds/ActiveTowerIds 顺序错误 → 先检查再标记 false（9436882）
-- Bug#31: TowerPlacementSystem PlaceTower 未处理 CreateEntity() 返回 -1 → 新增检查（9436882）
-- Bug#37: GameplayAbility.CanActivate epsilon 0.0001f（含 AutoCastBestSkill 路径）（9436882）
+- Bug#30: DestroyEntity 清理 ActiveEnemyIds/ActiveTowerIds 顺序错误 → 先检查再标记 false（60865d2）
+- Bug#31: TowerPlacementSystem PlaceTower 未处理 CreateEntity() 返回 -1 → 新增检查（60865d2）
+- Bug#37: GameplayAbility.CanActivate epsilon 0.0001f（含 AutoCastBestSkill 路径）（60865d2）
 
 ### 最后更新
-- **治理 commit**: `9436882` — Bug#30 DestroyEntity order + Bug#31 CreateEntity==-1 check + Bug#37 CanActivate epsilon
+- **治理 commit**: `60865d2` — Bug#30 DestroyEntity order + Bug#31 CreateEntity==-1 check + Bug#37 CanActivate epsilon
 - **测试**: 27/27 pass
 - **压测**: 9534 FPS (10K 敌 × 200 帧 × 8 系统)
 
