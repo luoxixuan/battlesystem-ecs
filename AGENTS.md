@@ -8,14 +8,14 @@
 
 ---
 
-## 性能基准
+## 性能基准（2026-05-13, commit `3bd1c9c`）
 
-| 指标 | 数值 |
-|------|------|
-| 测试规模 | 10,000 敌人 × 200 帧 × 8 系统 |
-| **FPS** | **~8,300**（±5% 正常波动） |
-| 平均帧耗时 | ~0.12 ms |
-| 主要热点 | EnemyAI ~10ms / MoveAttack ~8ms / TowerAttack ~1.8ms |
+| benchmark | FPS | 说明 |
+|-----------|-----|------|
+| mode 2（合并热路径） | ~9500 | 手写合并热路径，参考用 |
+| mode 4（真实系统链路） | ~5100 | **主指标**，直接调用各系统 `.Update()` |
+
+mode 2 和 mode 4 是不同的语义，**不要再用一个 FPS 代表全部性能**。
 
 ---
 
@@ -43,10 +43,11 @@
 > 严格按顺序执行，才能提交 git。
 
 1. **`dotnet build`** — 确认 0 warnings 0 errors
-2. **`dotnet test BattleSystemECS.Tests`** — 确认 27/27 测试全部通过
-3. **`echo 2 | dotnet run`** — 运行全链路压测，确认 FPS 没有下降（允许 ±5% 误差）
-4. **验证通过后** → `git add -A && git commit -m "描述"`
-5. **commit 完成后立即** → `git push`
+2. **`dotnet test BattleSystemECS.Tests`** — 确认 48/48 测试全部通过
+3. **`echo 2 | dotnet run`** — 运行合并热路径压测（mode 2），确认 FPS 没有下降（允许 ±5% 误差）
+4. **`echo 4 | dotnet run`** — 运行真实系统链路压测（mode 4），确认主指标没有下降
+5. **验证通过后** → `git add -A && git commit -m "描述"`
+6. **commit 完成后立即** → `git push`
 
 ### 项目文档同步
 
@@ -115,8 +116,7 @@ BattleSystem-ECS/
 │   ├── tower_placement.json
 │   └── TechTreeDef.cs          # 科技树配置结构
 ├── docs/
-│   ├── architecture.md         # 完整架构文档
-│   └── bug-fix.md              # Bug 追踪（45 项，27 已修复）
+│   ├── bug-fix.md              # Bug 追踪（46 项，45 已修复，1 未修复）
 ├── Research/
 │   ├── tower_defense_knowledge.md  # 自动更新的塔防知识库
 │   └── findings/               # 爬取原始数据
@@ -134,6 +134,37 @@ BattleSystem-ECS/
 3. **ActionEnum 预计算**: BT 构建时转换 string→enum，热路径无字符串比较
 4. **并行合并 MoveAttack**: `BenchmarkSystem` 内置 merged pipeline，单独计时
 5. **科技树效果缓存**: `TechTreeSystem` 内部字段存储 computed multiplier
+
+---
+
+## 并行安全原则
+
+> 所有涉及并行写共享状态的改动，必须遵循以下原则，否则拒绝合并。
+
+### 两阶段模式（Two-Phase Pattern）
+
+并行段**只读不写**，只收集信息；结构写操作（DestroyEntity、DecreasePlayerHealth、EventBus.Publish）全部推迟到串行阶段，按确定顺序执行。
+
+例外：本地只读计算（如 damage 估算）可以在并行段执行。
+
+### 帧末唯一死亡结算点
+
+实体销毁（DestroyEntity / QueueEnemyDeath）和奖励结算由帧调度层统一在帧末执行。
+系统只负责产生"伤害/死亡事件"，不直接调用 ResolveEnemiesKilledThisFrame()。
+
+调用链：
+```
+GameManager.Run() / BenchmarkSystem
+  → BeginFrame()
+  → 各系统 Update()（只 queue，不 resolve）
+  → ResolveEnemiesKilledThisFrame()（统一结算）
+```
+
+### damage queue 存 raw value，不存 derived value
+
+并行收集阶段入队的数据必须是 `(enemyId, damage)`，而不是 `(enemyId, newHealth)`。
+串行 apply 必须用 `EnemyHealth[enemyId] -= damage`，而不是 `EnemyHealth[enemyId] = newHealth`。
+后者是 last-write-wins，多攻击者打同一目标会丢伤害。
 
 ---
 
