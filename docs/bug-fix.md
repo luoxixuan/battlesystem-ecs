@@ -1,7 +1,7 @@
 # BattleSystem-ECS Bug Fix Report
 
 **扫描时间**: 2026-05-13
-**更新**: 2026-05-13 10:52（第十九轮 — Bug#29/#37 修复 + 构建/压测确认 + 文档同步）
+**更新**: 2026-05-13 12:00（第二十轮 — 测试改进：删除空 UnitTest1.cs，重写 UnitTests.cs 添加 13 个回归测试，覆盖 Bug#9/#11/#21/#30/#31/#37，push github）
 **项目路径**: F:\AI\BattleSystem-ECS
 **治理 commit**: `5052fd1` — Bug#29 GetName 单次 TryGetValue + Bug#37 冷却 epsilon
 
@@ -16,7 +16,7 @@
 | MoveAttack | 7.60 ms | Movement + PlayerAttack 合并 |
 | TowerAttack | 1.44 ms | ActiveTowerIds 并行遍历 |
 | TOTAL | 20.91 ms | |
-| 测试 | **27/27 pass** | dotnet test |
+| 测试 | **40/40 pass** | dotnet test（删除空 UnitTest1.cs，新增 13 个回归测试） |
 | 构建 | **0 warnings 0 errors** | dotnet build |
 
 ---
