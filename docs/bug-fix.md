@@ -147,7 +147,8 @@
 
 ### 15. PlayerTowerAttackSystem critRandom 静态实例可预测
 **文件**: Systems/PlayerTowerAttackSystem.cs
-**状态**: ℹ️ 低优先级（游戏逻辑影响轻微）
+**状态**: ✅ 已修复
+**说明**: `private static readonly Random critRandom = new Random();` 在声明处初始化，不再分离初始化逻辑。随机性在单局游戏中影响轻微（游戏逻辑层面），但代码形式上已规范化。
 
 ---
 
