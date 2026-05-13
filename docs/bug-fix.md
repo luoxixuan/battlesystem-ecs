@@ -276,8 +276,14 @@
 **验证**: 构建 0 warnings / 0 errors；测试 47/47 pass；压测稳定在 ±5% 基线波动内（7134-8010 FPS，多轮实测）
 
 ### 33. EnemyMovementSystem Dodge 分支有副作用
+
 ### 34. BTCachedTreeBuilder 用 List 构建 indexMap 后再查 Dictionary
-### 35. GameConfig._btCache 和 _cachedBtCache 可能重复构建
+
+### 35. GameConfig.GetCachedBehaviorTree 调用 GetBehaviorTree 造成双重字典查找 ✅ FIXED
+**文件**: Configs/GameConfig.cs
+**状态**: ✅ 已修复
+**修复内容**: `GetCachedBehaviorTree()` 原本通过 `GetBehaviorTree()` 查询，再在里面查 `_btCache` 和 `BehaviorTrees`，造成双倍字典查找。现改为直接查询 `BehaviorTrees.TryGetValue()`，避免中间层。
+**验证**: 构建 0 warnings / 0 errors；测试 47/47 pass；压测 7897 FPS（±5% 基线波动内，无性能回退）
 
 ---
 
@@ -305,19 +311,17 @@
 |--------|------|--------|--------|
 | HIGH   | 13   | 13     | 0      |
 | MEDIUM | 15   | 14     | 1      |
-| LOW    | 9    | 5      | 4      |
+| LOW    | 9    | 6      | 3      |
 | INFO   | 5    | 4      | 1      |
-| **合计** | **45** | **39** | **6**  |
+| **合计** | **45** | **40** | **5**  |
 
 本轮新增修复：
-- Bug#32: GameEvents 20+ 未使用事件 → 仅保留 3 个活跃事件 + 3 个 DTO（清理 18 事件 + 9 DTO 空桩）
-- Bug#31: UpgradeSystem buff 硬编码 → GameConfig.UpgradeBuffs（16a6198）
-- Bug#37: GameplayAbility.CanActivate epsilon 0.0001f（含 AutoCastBestSkill 路径）（60865d2）
+- Bug#35: GameConfig.GetCachedBehaviorTree 双重字典查找优化（直接查 BehaviorTrees.TryGetValue，避免中间层）
 
 ### 最后更新
-- **治理 commit**: `_HEAD` — Bug#32 GameEvents 未使用事件清理（20+ → 3 活跃事件 + 3 DTO）
+- **治理 commit**: `fd03f95` — Bug#35 GetCachedBehaviorTree 双重字典查找优化
 - **测试**: 47/47 pass（dotnet test，clean build 后实测）
-- **压测**: 7134–8010 FPS（10K 敌 × 200 帧 × 8 系统，多轮 clean 后实测，±5% 基线波动）
+- **压测**: 7897 FPS（±5% 基线波动内，无性能回退）
 
 ---
 
