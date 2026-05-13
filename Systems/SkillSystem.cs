@@ -283,11 +283,10 @@ namespace BattleSystemECS.Systems
 
         private void HandleKill(int enemyId)
         {
-            store.TotalKills++;
-            int goldReward = store.GetEnemyGoldReward(enemyId);
-            float currentGold = store.GetPlayerGold(playerId);
-            store.SetPlayerGold(playerId, currentGold + goldReward);
-            renderer.Log($"[SKILL] Killed enemy {enemyId}, gained {goldReward} gold");
+            // Queue death for serial resolution (consistency with PlayerAttack/TowerAttack two-phase pattern)
+            store.QueueEnemyDeath(enemyId, playerId);
+            store.ResolveEnemiesKilledThisFrame();
+            renderer.Log($"[SKILL] Killed enemy {enemyId}");
         }
 
         /// <summary>
