@@ -59,7 +59,7 @@ namespace BattleSystemECS.Systems
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
             var towerAttack  = new TowerAttackSystem(store, logger);
             var gold         = new GoldSystem(store, logger);
-            var upgrade      = new UpgradeSystem(store, logger, playerId);
+            var upgrade      = new UpgradeSystem(store, logger, playerId, gameConfig);
             var skill        = new SkillSystem(store, logger, playerId, gameConfig);
             var map          = new MapSystem(logger, store);
             map.SetMapSize(10, 20);

@@ -102,6 +102,9 @@ namespace BattleSystemECS.Config
         private Dictionary<string, BattleSystemECS.Systems.BTCachedTree> _cachedBtCache = new Dictionary<string, BattleSystemECS.Systems.BTCachedTree>();
         private Dictionary<string, MonsterConfig> _monsterCache = new Dictionary<string, MonsterConfig>();
 
+        // Buff definitions for UpgradeSystem (Bug#31 fix: was hardcoded strings)
+        public List<string> UpgradeBuffs { get; set; } = new List<string>();
+
         public GameConfig()
         {
             InitializeDefaultConfig();
@@ -262,6 +265,13 @@ namespace BattleSystemECS.Config
                 StartingSkills = new List<string> { "Cross Slash", "Mega Explosion", "Sniper Shot" }
             };
 
+            // Default upgrade buffs (Bug#31 fix: moved from UpgradeSystem hardcoded strings)
+            UpgradeBuffs.Add("Attack+10%");
+            UpgradeBuffs.Add("Defense+10%");
+            UpgradeBuffs.Add("Attack Speed+20%");
+            UpgradeBuffs.Add("Crit Rate+5%");
+            UpgradeBuffs.Add("Health+20%");
+
             if (Levels.Count > 0)
             {
                 CurrentLevel = Levels[0];
@@ -321,5 +331,10 @@ namespace BattleSystemECS.Config
             _cachedBtCache[monsterType] = cachedBt;
             return cachedBt;
         }
+
+        /// <summary>
+        /// Returns upgrade buff options (Bug#31 fix: was hardcoded in UpgradeSystem).
+        /// </summary>
+        public IReadOnlyList<string> GetUpgradeBuffs() => UpgradeBuffs;
     }
 }

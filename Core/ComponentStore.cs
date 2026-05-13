@@ -310,7 +310,7 @@ namespace BattleSystemECS.Core
         {
             int entityId = CreateEntity();
 
-            if (entityId >= MAX_ENTITIES) 
+            if (entityId < 0 || entityId >= MAX_ENTITIES) 
             {
                 return -1;
             }
@@ -613,7 +613,7 @@ namespace BattleSystemECS.Core
         public void AddAbility(int entityId, GameplayAbilityDef def) { int slot = AbilityCount[entityId]; if (slot < MAX_ABILITIES_PER_ENTITY) { SetAbility(entityId, slot, new AbilityInstance(def)); AbilityCount[entityId]++; } }
 
         // Bug#9: Reset abilities for entity — clears all slots (used before re-initializing)
-        public void ResetPlayerAbilities(int entityId) { AbilityCount[entityId] = 0; }
+        public void ResetPlayerAbilities(int entityId) { AbilityCount[entityId] = 0; ActiveEffectCount[entityId] = 0; }
 
         public AppliedEffect GetEffect(int entityId, int slot) => ActiveEffects[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot];
 

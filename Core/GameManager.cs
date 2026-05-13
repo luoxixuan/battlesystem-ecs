@@ -123,7 +123,7 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]      WaveSpawningSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating UpgradeSystem...");
-            upgradeSystem = new UpgradeSystem(store, logger, playerId);
+            upgradeSystem = new UpgradeSystem(store, logger, playerId, gameConfig);
             logger.Log("[BOOTSTRAP]      UpgradeSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating SkillSystem (config-driven)...");

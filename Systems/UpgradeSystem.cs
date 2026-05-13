@@ -17,12 +17,14 @@ namespace BattleSystemECS.Systems
         private Core.ComponentStore store;
         private IRenderer renderer;
         private int playerId;
+        private GameConfig gameConfig;
 
-        public UpgradeSystem(Core.ComponentStore store, IRenderer renderer, int playerId)
+        public UpgradeSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
             this.store = store;
             this.renderer = renderer;
             this.playerId = playerId;
+            this.gameConfig = gameConfig;
         }
 
         public void Update()
@@ -68,8 +70,9 @@ namespace BattleSystemECS.Systems
 
         private void RandomlyGainBuff()
         {
-            string[] buffs = { "Attack+10%", "Defense+10%", "Attack Speed+20%", "Crit Rate+5%", "Health+20%" };
-            int randomIndex = _sharedRandom.Next(buffs.Length);
+            var buffs = gameConfig.GetUpgradeBuffs();
+            if (buffs == null || buffs.Count == 0) return;
+            int randomIndex = _sharedRandom.Next(buffs.Count);
             string newBuff = buffs[randomIndex];
 
             var playerBuffs = store.GetPlayerBuffs(playerId);
