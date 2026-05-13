@@ -213,7 +213,6 @@ namespace BattleSystemECS.Systems
 
         private int CastCrossArea(float finalDamage, float playerX, float playerY, int radius, string name)
         {
-            // Cross shape: center + left/right + up/down within radius
             int[] xOffset = { 0, -1, 1, 0, 0 };
             int[] yOffset = { 0, 0, 0, -1, 1 };
 
@@ -251,7 +250,6 @@ namespace BattleSystemECS.Systems
 
         private int CastBoxArea(float finalDamage, float playerX, float playerY, int range, string name)
         {
-            // Box: (playerX-1..playerX+1, playerY-1..playerY+1) = 3×3
             int hitCount = 0;
             var activeEnemyIds = store.GetAllActiveEnemyIds();
 
