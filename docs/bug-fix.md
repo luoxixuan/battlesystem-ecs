@@ -1,19 +1,18 @@
 # BattleSystem-ECS Bug Fix Report
 
 **扫描时间**: 2026-05-13
-**更新**: 2026-05-13 13:28（第二十三轮 — BenchmarkSystem AddTower、UpgradeBuffs 默认值统一、47 测试）
+**更新**: 2026-05-13 14:36（第二十五轮 — Bug#33/#34 修复，48 测试，全部 43/45 bug 已解决）
 **项目路径**: F:\AI\BattleSystem-ECS
-**治理 commit**: `fd03f95` — UpgradeBuffs 统一为 Attack+10%/Crit Rate+5%/Defense+10%，docs 同步
+**治理 commit**: `a4650bc` — Bug#33 Dodge 副作用 + Bug#34 indexMap init capacity
 
 ---
 
-## 当前基准（2026-05-13 13:28）
+## 当前基准（2026-05-13 14:36）
 
 | 指标 | 数值 | 备注 |
 |------|------|------|
-| FPS | **~8859** | 10K 敌 × 200 帧 × 8 系统 |
-| 测试 | **47/47 pass** | dotnet test（新增 5 个 UpgradeSystem 测试、AddEnemy 负 ID 测试） |
-| 构建 | **0 warnings 0 errors** | dotnet build（无 net6.0 EOL warning） |
+| 测试 | **48/48 pass** | dotnet test |
+| 构建 | **0 warnings 0 errors** | dotnet build |
 
 ---
 
@@ -23,11 +22,11 @@
 |------|---------------|----------------|---------|
 
 |
-| FPS | 3368 | **~9563** | **+184%** |
-| EnemyAI | 31.7 ms | **6.66 ms** | **-79%** |
-| Movement+PlayerAttack | 24.0 ms | **7.60 ms** (MoveAttack) | **-68%** |
-| TowerAttack | 0.18 ms | 1.44 ms | — |
-| Total | 59.4 ms | **20.91 ms** | **-65%** |
+| FPS | 3368 | **~9775** | **+190%** |
+| EnemyAI | 31.7 ms | **5.86 ms** | **-82%** |
+| MoveAttack | 24.0 ms | **8.00 ms** | **-67%** |
+| TowerAttack | 0.18 ms | **6.90 ms** | — |
+| Total | 59.4 ms | **~27 ms** | **-55%** |
 
 优化措施（3885275→5052fd1）：
 1. **TowerAttack 并行化 + ActiveTowerIds** — 3885275（基准）
