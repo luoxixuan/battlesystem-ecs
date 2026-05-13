@@ -100,7 +100,9 @@ namespace BattleSystemECS.Systems
                 if (enemyHealth <= 0f)
                 {
                     Interlocked.Add(ref _frameGoldAcc, (long)store.EnemyGoldReward[enemyId]);
-                    store.EnemyActive[enemyId] = false;
+                    // Use DestroyEntity instead of directly setting EnemyActive=false
+                    // so ActiveEnemyIds list stays consistent (Bug#9 / stale enemy list fix)
+                    store.DestroyEntity(enemyId);
                 }
             });
 

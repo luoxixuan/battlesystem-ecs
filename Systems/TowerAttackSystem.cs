@@ -77,7 +77,9 @@ namespace BattleSystemECS.Systems
                     store.EnemyHealth[bestTarget] -= damage;
                     if (store.EnemyHealth[bestTarget] <= 0)
                     {
-                        store.EnemyActive[bestTarget] = false;
+                        // Use DestroyEntity instead of directly setting EnemyActive=false
+                        // so ActiveEnemyIds list stays consistent (Bug#9 / stale enemy list fix)
+                        store.DestroyEntity(bestTarget);
                     }
                 }
             });
