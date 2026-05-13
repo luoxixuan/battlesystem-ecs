@@ -340,9 +340,15 @@ namespace BattleSystemECS.Tests
             MakeEnemy(store, eid, 5f, 3f);
             sys.AutoCastBestSkill();
 
-            var slot = store.GetAbility(pid, 0);
-            slot.CurrentCooldown = 1.0f;
-            store.SetAbility(pid, 0, slot);
+            var slot0 = store.GetAbility(pid, 0);
+            var slot1 = store.GetAbility(pid, 1);
+            var slot2 = store.GetAbility(pid, 2);
+            slot0.CurrentCooldown = 1.0f;
+            slot1.CurrentCooldown = 1.0f;
+            slot2.CurrentCooldown = 1.0f;
+            store.SetAbility(pid, 0, slot0);
+            store.SetAbility(pid, 1, slot1);
+            store.SetAbility(pid, 2, slot2);
             int before = r.Logs.Count;
 
             int eid2 = store.CreateEntity();
