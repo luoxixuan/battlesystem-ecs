@@ -64,16 +64,14 @@ namespace BattleSystemECS.Systems
             var map          = new MapSystem(logger, store);
             map.SetMapSize(10, 20);
 
-            // Place towers
+            // Place towers — use AddTower so ActiveTowerIds is populated (matching real game flow)
             int t1 = store.CreateEntity();
-            store.TowerType[t1] = "弓箭塔"; store.TowerActive[t1] = true;
+            store.AddTower(t1, "弓箭塔", 15f, 3, 1f, 1, 50f);
             store.PositionX[t1] = 3f; store.PositionY[t1] = 15f;
-            store.TowerAttackDamage[t1] = 15f; store.TowerRange[t1] = 3; store.TowerLevel[t1] = 1;
 
             int t2 = store.CreateEntity();
-            store.TowerType[t2] = "魔法塔"; store.TowerActive[t2] = true;
+            store.AddTower(t2, "魔法塔", 25f, 5, 1f, 1, 100f);
             store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
-            store.TowerAttackDamage[t2] = 25f; store.TowerRange[t2] = 5; store.TowerLevel[t2] = 1;
 
             int frames = 200;
 

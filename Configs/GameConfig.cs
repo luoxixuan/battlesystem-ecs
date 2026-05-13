@@ -103,7 +103,7 @@ namespace BattleSystemECS.Config
         private Dictionary<string, MonsterConfig> _monsterCache = new Dictionary<string, MonsterConfig>();
 
         // Buff definitions for UpgradeSystem (Bug#31 fix: was hardcoded strings)
-        public List<string> UpgradeBuffs { get; set; } = new List<string>();
+        public List<string> UpgradeBuffs { get; set; } = new List<string> { "Attack+5%", "Speed+5%", "Crit+3%" };
 
         public GameConfig()
         {

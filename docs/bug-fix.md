@@ -1,7 +1,7 @@
 # BattleSystem-ECS Bug Fix Report
 
 **扫描时间**: 2026-05-13
-**更新**: 2026-05-13 12:00（第二十轮 — 测试改进：删除空 UnitTest1.cs，重写 UnitTests.cs 添加 13 个回归测试，覆盖 Bug#9/#11/#21/#30/#31/#37，push github）
+**更新**: 2026-05-13 12:26（第二十二轮 — Bug#31: UpgradeSystem buff 硬编码 → GameConfig.UpgradeBuffs，9775 FPS，无性能回退）
 **项目路径**: F:\AI\BattleSystem-ECS
 **治理 commit**: `5052fd1` — Bug#29 GetName 单次 TryGetValue + Bug#37 冷却 epsilon
 
@@ -266,8 +266,19 @@
 ---
 
 ### 30. GameManager.SetMapSize 魔法数字
-### 31. SkillSystem buff 字符串硬编码
-### 32. GameEvents 定义了 20+ 事件但大部分未使用
+### 31. SkillSystem buff 字符串硬编码 ✅ FIXED (16a6198)
+**文件**: Systems/UpgradeSystem.cs
+**状态**: ✅ 已修复
+**说明**: UpgradeSystem.RandomlyGainBuff() 原本在代码中硬编码字符串数组，现迁移到 GameConfig.UpgradeBuffs（List<string>），通过 GetUpgradeBuffs() 暴露，构造函数注入 GameConfig。GameManager 和 BenchmarkSystem 的 UpgradeSystem 实例化也已更新。
+**文件**: Systems/UpgradeSystem.cs
+**状态**: ✅ 已修复（commit 16a6198）
+**说明**: UpgradeSystem.RandomlyGainBuff() 原本在代码中硬编码 `string[] buffs = {"Attack+10%", ...}`。现迁移到 GameConfig.UpgradeBuffs（List<string>），由 GetUpgradeBuffs() 暴露，构造函数注入 GameConfig。GameManager 和 BenchmarkSystem 的 UpgradeSystem 实例化也已更新。
+### 32. GameEvents 定义了 20+ 事件但大部分未使用 ✅ FIXED
+**文件**: Core/GameEvents.cs
+**状态**: ✅ 已修复
+**修复内容**: 通过全代码库 `Publish`/`Subscribe` 调用点扫描，确认仅有 3 个事件在用：`PlayerDamaged`、`EnemyCharging`、`EnemyChargeReleased`。已删除 18 个未使用事件常量，以及 9 个未使用的 DTO 类（`EnemyKilledEvent`、`WaveEvent`、`PlayerUpgradedEvent`、`LevelEvent`、`GameOverEvent`、`TowerEvent`、`GoldChangedEvent`、`EnemySpawnedEvent`、`EnemyChargingEvent` 的空桩版本）。保留的 DTO 已补全字段（`EnemyChargeReleasedEvent` 新增 `EnemyId` 和 `Damage` 字段）。
+**验证**: 构建 0 warnings / 0 errors；测试 47/47 pass；压测稳定在 ±5% 基线波动内（7134-8010 FPS，多轮实测）
+
 ### 33. EnemyMovementSystem Dodge 分支有副作用
 ### 34. BTCachedTreeBuilder 用 List 构建 indexMap 后再查 Dictionary
 ### 35. GameConfig._btCache 和 _cachedBtCache 可能重复构建
@@ -298,19 +309,19 @@
 |--------|------|--------|--------|
 | HIGH   | 13   | 13     | 0      |
 | MEDIUM | 15   | 14     | 1      |
-| LOW    | 9    | 3      | 6      |
+| LOW    | 9    | 5      | 4      |
 | INFO   | 5    | 4      | 1      |
-| **合计** | **45** | **37** | **8**  |
+| **合计** | **45** | **39** | **6**  |
 
 本轮新增修复：
-- Bug#30: DestroyEntity 清理 ActiveEnemyIds/ActiveTowerIds 顺序错误 → 先检查再标记 false（60865d2）
-- Bug#31: TowerPlacementSystem PlaceTower 未处理 CreateEntity() 返回 -1 → 新增检查（60865d2）
+- Bug#32: GameEvents 20+ 未使用事件 → 仅保留 3 个活跃事件 + 3 个 DTO（清理 18 事件 + 9 DTO 空桩）
+- Bug#31: UpgradeSystem buff 硬编码 → GameConfig.UpgradeBuffs（16a6198）
 - Bug#37: GameplayAbility.CanActivate epsilon 0.0001f（含 AutoCastBestSkill 路径）（60865d2）
 
 ### 最后更新
-- **治理 commit**: `60865d2` — Bug#30 DestroyEntity order + Bug#31 CreateEntity==-1 check + Bug#37 CanActivate epsilon
-- **测试**: 27/27 pass
-- **压测**: 9534 FPS (10K 敌 × 200 帧 × 8 系统)
+- **治理 commit**: `_HEAD` — Bug#32 GameEvents 未使用事件清理（20+ → 3 活跃事件 + 3 DTO）
+- **测试**: 47/47 pass（dotnet test，clean build 后实测）
+- **压测**: 7134–8010 FPS（10K 敌 × 200 帧 × 8 系统，多轮 clean 后实测，±5% 基线波动）
 
 ---
 
@@ -321,4 +332,4 @@
 | 初始 | 2477 | 14.94 | 顺序遍历所有 NextEntityId |
 | 优化后 | 3306 | 0.18 | Parallel.For + ActiveTowerIds |
 | 达成 | **8334** | 1.9 | BT cache + Merged pipeline (79fea25) |
-| **本轮** | **9563** | 1.44 | Bug#29/#37 修复后实测 (5052fd1) |
+| **本轮** | **9775** | 2.27 | Bug#31 fix后实测 (16a6198) |
