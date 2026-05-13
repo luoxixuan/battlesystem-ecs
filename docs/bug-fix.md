@@ -1,16 +1,17 @@
 # BattleSystem-ECS Bug Fix Report
 
 **扫描时间**: 2026-05-13
-**更新**: 2026-05-13 14:36（第二十五轮 — Bug#33/#34 修复，48 测试，全部 43/45 bug 已解决）
+**更新**: 2026-05-13 18:52（第二十六轮 — EnemyAI 两阶段重构，串行动作执行，BeginFrame 每回合，删除未使用队列字段）
 **项目路径**: F:\AI\BattleSystem-ECS
-**治理 commit**: `a4650bc` — Bug#33 Dodge 副作用 + Bug#34 indexMap init capacity
+**治理 commit**: `a92116c` — EnemyAI two-phase + cleanup
 
 ---
 
-## 当前基准（2026-05-13 14:36）
+## 当前基准（2026-05-13 18:52）
 
 | 指标 | 数值 | 备注 |
 |------|------|------|
+| FPS | **~3800** | 10K 敌 × 200 帧，Release，压测稳定 |
 | 测试 | **48/48 pass** | dotnet test |
 | 构建 | **0 errors / 2 net6.0 EOL warnings** | dotnet build（net6.0 已 EOL，建议升级到 net9.0） |
 
@@ -22,11 +23,11 @@
 |------|---------------|----------------|---------|
 
 |
-| FPS | 3368 | **~9775** | **+190%** |
-| EnemyAI | 31.7 ms | **5.86 ms** | **-82%** |
-| MoveAttack | 24.0 ms | **8.00 ms** | **-67%** |
-| TowerAttack | 0.18 ms | **6.90 ms** | — |
-| Total | 59.4 ms | **~27 ms** | **-55%** |
+| FPS | 3368 | **~3800** | **+13%** |
+| EnemyAI | 31.7 ms | **1.93 ms** | **-94%** |
+| MoveAttack | 24.0 ms | **25.74 ms** | — |
+| TowerAttack | 0.18 ms | **19.19 ms** | — |
+| Total | 59.4 ms | **~52 ms** | — |
 
 优化措施（3885275→5052fd1）：
 1. **TowerAttack 并行化 + ActiveTowerIds** — 3885275（基准）
