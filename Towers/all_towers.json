@@ -1,0 +1,1352 @@
+﻿[
+    {
+        "UpgradeCost":  18,
+        "Name":  "Energy Pulse",
+        "Damage":  8,
+        "Type":  "Energy",
+        "Cost":  30,
+        "AttackSpeed":  0.5,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  45,
+        "Name":  "Energy Tesla",
+        "Damage":  12,
+        "Type":  "Energy",
+        "Cost":  75,
+        "AttackSpeed":  0.65,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  72,
+        "Name":  "Energy Plasma",
+        "Damage":  16,
+        "Type":  "Energy",
+        "Cost":  120,
+        "AttackSpeed":  0.8,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  99,
+        "Name":  "Energy Ion",
+        "Damage":  20,
+        "Type":  "Energy",
+        "Cost":  165,
+        "AttackSpeed":  0.95,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  126,
+        "Name":  "Energy Fusion",
+        "Damage":  24,
+        "Type":  "Energy",
+        "Cost":  210,
+        "AttackSpeed":  1.1,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  153,
+        "Name":  "Energy Quantum",
+        "Damage":  28,
+        "Type":  "Energy",
+        "Cost":  255,
+        "AttackSpeed":  1.25,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  180,
+        "Name":  "Energy Singularity",
+        "Damage":  32,
+        "Type":  "Energy",
+        "Cost":  300,
+        "AttackSpeed":  1.4,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  207,
+        "Name":  "Energy Void",
+        "Damage":  36,
+        "Type":  "Energy",
+        "Cost":  345,
+        "AttackSpeed":  1.55,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  234,
+        "Name":  "Energy Nebula",
+        "Damage":  40,
+        "Type":  "Energy",
+        "Cost":  390,
+        "AttackSpeed":  1.7,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  261,
+        "Name":  "Energy Photon",
+        "Damage":  44,
+        "Type":  "Energy",
+        "Cost":  435,
+        "AttackSpeed":  1.85,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  288,
+        "Name":  "Arc-11",
+        "Damage":  48,
+        "Type":  "Energy",
+        "Cost":  480,
+        "AttackSpeed":  0.5,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  315,
+        "Name":  "Ember-12",
+        "Damage":  52,
+        "Type":  "Energy",
+        "Cost":  525,
+        "AttackSpeed":  0.65,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  342,
+        "Name":  "Flux-13",
+        "Damage":  56,
+        "Type":  "Energy",
+        "Cost":  570,
+        "AttackSpeed":  0.8,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  369,
+        "Name":  "Surge-14",
+        "Damage":  60,
+        "Type":  "Energy",
+        "Cost":  615,
+        "AttackSpeed":  0.95,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  396,
+        "Name":  "Storm-15",
+        "Damage":  64,
+        "Type":  "Energy",
+        "Cost":  660,
+        "AttackSpeed":  1.1,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  423,
+        "Name":  "Blast-16",
+        "Damage":  68,
+        "Type":  "Energy",
+        "Cost":  705,
+        "AttackSpeed":  1.25,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  450,
+        "Name":  "Bolt-17",
+        "Damage":  72,
+        "Type":  "Energy",
+        "Cost":  750,
+        "AttackSpeed":  1.4,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  477,
+        "Name":  "Shock-18",
+        "Damage":  76,
+        "Type":  "Energy",
+        "Cost":  795,
+        "AttackSpeed":  1.55,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  504,
+        "Name":  "Aura-19",
+        "Damage":  80,
+        "Type":  "Energy",
+        "Cost":  840,
+        "AttackSpeed":  1.7,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  531,
+        "Name":  "Core-20",
+        "Damage":  84,
+        "Type":  "Energy",
+        "Cost":  885,
+        "AttackSpeed":  1.85,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  558,
+        "Name":  "Nova-21",
+        "Damage":  88,
+        "Type":  "Energy",
+        "Cost":  930,
+        "AttackSpeed":  0.5,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  585,
+        "Name":  "Spark-22",
+        "Damage":  92,
+        "Type":  "Energy",
+        "Cost":  975,
+        "AttackSpeed":  0.65,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  612,
+        "Name":  "Ray-23",
+        "Damage":  96,
+        "Type":  "Energy",
+        "Cost":  1020,
+        "AttackSpeed":  0.8,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  639,
+        "Name":  "Beam-24",
+        "Damage":  100,
+        "Type":  "Energy",
+        "Cost":  1065,
+        "AttackSpeed":  0.95,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  666,
+        "Name":  "Wave-25",
+        "Damage":  104,
+        "Type":  "Energy",
+        "Cost":  1110,
+        "AttackSpeed":  1.1,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  693,
+        "Name":  "Pulse-26",
+        "Damage":  108,
+        "Type":  "Energy",
+        "Cost":  1155,
+        "AttackSpeed":  1.25,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  720,
+        "Name":  "Vector-27",
+        "Damage":  112,
+        "Type":  "Energy",
+        "Cost":  1200,
+        "AttackSpeed":  1.4,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  747,
+        "Name":  "Matrix-28",
+        "Damage":  116,
+        "Type":  "Energy",
+        "Cost":  1245,
+        "AttackSpeed":  1.55,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  774,
+        "Name":  "Reactor-29",
+        "Damage":  120,
+        "Type":  "Energy",
+        "Cost":  1290,
+        "AttackSpeed":  1.7,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  801,
+        "Name":  "Capacitor-30",
+        "Damage":  124,
+        "Type":  "Energy",
+        "Cost":  1335,
+        "AttackSpeed":  1.85,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  828,
+        "Name":  "Dynamo-31",
+        "Damage":  128,
+        "Type":  "Energy",
+        "Cost":  1380,
+        "AttackSpeed":  0.5,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  855,
+        "Name":  "Node-32",
+        "Damage":  132,
+        "Type":  "Energy",
+        "Cost":  1425,
+        "AttackSpeed":  0.65,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  882,
+        "Name":  "Grid-33",
+        "Damage":  136,
+        "Type":  "Energy",
+        "Cost":  1470,
+        "AttackSpeed":  0.8,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  909,
+        "Name":  "Array-34",
+        "Damage":  140,
+        "Type":  "Energy",
+        "Cost":  1515,
+        "AttackSpeed":  0.95,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  936,
+        "Name":  "Module-35",
+        "Damage":  144,
+        "Type":  "Energy",
+        "Cost":  1560,
+        "AttackSpeed":  1.1,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  963,
+        "Name":  "Unit-36",
+        "Damage":  148,
+        "Type":  "Energy",
+        "Cost":  1605,
+        "AttackSpeed":  1.25,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  990,
+        "Name":  "Station-37",
+        "Damage":  152,
+        "Type":  "Energy",
+        "Cost":  1650,
+        "AttackSpeed":  1.4,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  1017,
+        "Name":  "Hub-38",
+        "Damage":  156,
+        "Type":  "Energy",
+        "Cost":  1695,
+        "AttackSpeed":  1.55,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  1044,
+        "Name":  "Nexus-39",
+        "Damage":  160,
+        "Type":  "Energy",
+        "Cost":  1740,
+        "AttackSpeed":  1.7,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  1071,
+        "Name":  "Prime-40",
+        "Damage":  164,
+        "Type":  "Energy",
+        "Cost":  1785,
+        "AttackSpeed":  1.85,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  24,
+        "Name":  "Heavy Cannon",
+        "Damage":  10,
+        "Type":  "Weapon",
+        "Cost":  40,
+        "AttackSpeed":  0.4,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  53,
+        "Name":  "Heavy Railgun",
+        "Damage":  15,
+        "Type":  "Weapon",
+        "Cost":  88,
+        "AttackSpeed":  0.52,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  82,
+        "Name":  "Heavy Laser",
+        "Damage":  20,
+        "Type":  "Weapon",
+        "Cost":  136,
+        "AttackSpeed":  0.64,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  110,
+        "Name":  "Heavy Missile",
+        "Damage":  25,
+        "Type":  "Weapon",
+        "Cost":  184,
+        "AttackSpeed":  0.76,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  139,
+        "Name":  "Heavy Swarm",
+        "Damage":  30,
+        "Type":  "Weapon",
+        "Cost":  232,
+        "AttackSpeed":  0.88,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  168,
+        "Name":  "Heavy Nano",
+        "Damage":  35,
+        "Type":  "Weapon",
+        "Cost":  280,
+        "AttackSpeed":  1,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  197,
+        "Name":  "Heavy Acid",
+        "Damage":  40,
+        "Type":  "Weapon",
+        "Cost":  328,
+        "AttackSpeed":  1.12,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  226,
+        "Name":  "Heavy Cryo",
+        "Damage":  45,
+        "Type":  "Weapon",
+        "Cost":  376,
+        "AttackSpeed":  1.24,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  254,
+        "Name":  "Heavy Fire",
+        "Damage":  50,
+        "Type":  "Weapon",
+        "Cost":  424,
+        "AttackSpeed":  1.36,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  283,
+        "Name":  "Heavy Shock",
+        "Damage":  55,
+        "Type":  "Weapon",
+        "Cost":  472,
+        "AttackSpeed":  1.48,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  312,
+        "Name":  "Launcher-11",
+        "Damage":  60,
+        "Type":  "Weapon",
+        "Cost":  520,
+        "AttackSpeed":  1.6,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  341,
+        "Name":  "Cannon-12",
+        "Damage":  65,
+        "Type":  "Weapon",
+        "Cost":  568,
+        "AttackSpeed":  1.72,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  370,
+        "Name":  "Repeater-13",
+        "Damage":  70,
+        "Type":  "Weapon",
+        "Cost":  616,
+        "AttackSpeed":  0.4,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  398,
+        "Name":  "Splitter-14",
+        "Damage":  75,
+        "Type":  "Weapon",
+        "Cost":  664,
+        "AttackSpeed":  0.52,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  427,
+        "Name":  "Needler-15",
+        "Damage":  80,
+        "Type":  "Weapon",
+        "Cost":  712,
+        "AttackSpeed":  0.64,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  456,
+        "Name":  "Repeater-16",
+        "Damage":  85,
+        "Type":  "Weapon",
+        "Cost":  760,
+        "AttackSpeed":  0.76,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  485,
+        "Name":  "Gatling-17",
+        "Damage":  90,
+        "Type":  "Weapon",
+        "Cost":  808,
+        "AttackSpeed":  0.88,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  514,
+        "Name":  "Cannon-18",
+        "Damage":  95,
+        "Type":  "Weapon",
+        "Cost":  856,
+        "AttackSpeed":  1,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  542,
+        "Name":  "Turret-19",
+        "Damage":  100,
+        "Type":  "Weapon",
+        "Cost":  904,
+        "AttackSpeed":  1.12,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  571,
+        "Name":  "Pod-20",
+        "Damage":  105,
+        "Type":  "Weapon",
+        "Cost":  952,
+        "AttackSpeed":  1.24,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  600,
+        "Name":  "Battery-21",
+        "Damage":  110,
+        "Type":  "Weapon",
+        "Cost":  1000,
+        "AttackSpeed":  1.36,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  629,
+        "Name":  "Cannon-22",
+        "Damage":  115,
+        "Type":  "Weapon",
+        "Cost":  1048,
+        "AttackSpeed":  1.48,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  658,
+        "Name":  "Rail-23",
+        "Damage":  120,
+        "Type":  "Weapon",
+        "Cost":  1096,
+        "AttackSpeed":  1.6,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  686,
+        "Name":  "Gun-24",
+        "Damage":  125,
+        "Type":  "Weapon",
+        "Cost":  1144,
+        "AttackSpeed":  1.72,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  715,
+        "Name":  "Discharger-25",
+        "Damage":  130,
+        "Type":  "Weapon",
+        "Cost":  1192,
+        "AttackSpeed":  0.4,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  744,
+        "Name":  "Thrower-26",
+        "Damage":  135,
+        "Type":  "Weapon",
+        "Cost":  1240,
+        "AttackSpeed":  0.52,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  773,
+        "Name":  "Cannon-27",
+        "Damage":  140,
+        "Type":  "Weapon",
+        "Cost":  1288,
+        "AttackSpeed":  0.64,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  802,
+        "Name":  "Cluster-28",
+        "Damage":  145,
+        "Type":  "Weapon",
+        "Cost":  1336,
+        "AttackSpeed":  0.76,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  830,
+        "Name":  "Rail-29",
+        "Damage":  150,
+        "Type":  "Weapon",
+        "Cost":  1384,
+        "AttackSpeed":  0.88,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  859,
+        "Name":  "Auto-30",
+        "Damage":  155,
+        "Type":  "Weapon",
+        "Cost":  1432,
+        "AttackSpeed":  1,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  888,
+        "Name":  "Cannon-31",
+        "Damage":  160,
+        "Type":  "Weapon",
+        "Cost":  1480,
+        "AttackSpeed":  1.12,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  917,
+        "Name":  "Railgun-32",
+        "Damage":  165,
+        "Type":  "Weapon",
+        "Cost":  1528,
+        "AttackSpeed":  1.24,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  946,
+        "Name":  "Laser-33",
+        "Damage":  170,
+        "Type":  "Weapon",
+        "Cost":  1576,
+        "AttackSpeed":  1.36,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  974,
+        "Name":  "Missile-34",
+        "Damage":  175,
+        "Type":  "Weapon",
+        "Cost":  1624,
+        "AttackSpeed":  1.48,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  1003,
+        "Name":  "Swarm-35",
+        "Damage":  180,
+        "Type":  "Weapon",
+        "Cost":  1672,
+        "AttackSpeed":  1.6,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  1032,
+        "Name":  "Nano-36",
+        "Damage":  185,
+        "Type":  "Weapon",
+        "Cost":  1720,
+        "AttackSpeed":  1.72,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  1061,
+        "Name":  "Acid-37",
+        "Damage":  190,
+        "Type":  "Weapon",
+        "Cost":  1768,
+        "AttackSpeed":  0.4,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  1090,
+        "Name":  "Cryo-38",
+        "Damage":  195,
+        "Type":  "Weapon",
+        "Cost":  1816,
+        "AttackSpeed":  0.52,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  1118,
+        "Name":  "Fire-39",
+        "Damage":  200,
+        "Type":  "Weapon",
+        "Cost":  1864,
+        "AttackSpeed":  0.64,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  1147,
+        "Name":  "Shock-40",
+        "Damage":  205,
+        "Type":  "Weapon",
+        "Cost":  1912,
+        "AttackSpeed":  0.76,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  21,
+        "Name":  "Fortified Bastion",
+        "Damage":  5,
+        "Type":  "Defense",
+        "Cost":  35,
+        "AttackSpeed":  0.6,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  45,
+        "Name":  "Fortified Shield",
+        "Damage":  8,
+        "Type":  "Defense",
+        "Cost":  75,
+        "AttackSpeed":  0.7,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  69,
+        "Name":  "Fortified Wall",
+        "Damage":  11,
+        "Type":  "Defense",
+        "Cost":  115,
+        "AttackSpeed":  0.8,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  93,
+        "Name":  "Fortified Barricade",
+        "Damage":  14,
+        "Type":  "Defense",
+        "Cost":  155,
+        "AttackSpeed":  0.9,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  117,
+        "Name":  "Fortified Drone",
+        "Damage":  17,
+        "Type":  "Defense",
+        "Cost":  195,
+        "AttackSpeed":  1,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  141,
+        "Name":  "Fortified Repair",
+        "Damage":  20,
+        "Type":  "Defense",
+        "Cost":  235,
+        "AttackSpeed":  1.1,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  165,
+        "Name":  "Fortified Decoy",
+        "Damage":  23,
+        "Type":  "Defense",
+        "Cost":  275,
+        "AttackSpeed":  1.2,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  189,
+        "Name":  "Fortified Hologram",
+        "Damage":  26,
+        "Type":  "Defense",
+        "Cost":  315,
+        "AttackSpeed":  1.3,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  213,
+        "Name":  "Fortified Phase",
+        "Damage":  29,
+        "Type":  "Defense",
+        "Cost":  355,
+        "AttackSpeed":  0.6,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  237,
+        "Name":  "Fortified Guardian",
+        "Damage":  32,
+        "Type":  "Defense",
+        "Cost":  395,
+        "AttackSpeed":  0.7,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  261,
+        "Name":  "Fortress-11",
+        "Damage":  35,
+        "Type":  "Defense",
+        "Cost":  435,
+        "AttackSpeed":  0.8,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  285,
+        "Name":  "Bunker-12",
+        "Damage":  38,
+        "Type":  "Defense",
+        "Cost":  475,
+        "AttackSpeed":  0.9,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  309,
+        "Name":  "Citadel-13",
+        "Damage":  41,
+        "Type":  "Defense",
+        "Cost":  515,
+        "AttackSpeed":  1,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  333,
+        "Name":  "Rampart-14",
+        "Damage":  44,
+        "Type":  "Defense",
+        "Cost":  555,
+        "AttackSpeed":  1.1,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  357,
+        "Name":  "Tower-15",
+        "Damage":  47,
+        "Type":  "Defense",
+        "Cost":  595,
+        "AttackSpeed":  1.2,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  381,
+        "Name":  "Sentry-16",
+        "Damage":  50,
+        "Type":  "Defense",
+        "Cost":  635,
+        "AttackSpeed":  1.3,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  405,
+        "Name":  "Watchtower-17",
+        "Damage":  53,
+        "Type":  "Defense",
+        "Cost":  675,
+        "AttackSpeed":  0.6,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  429,
+        "Name":  "Outpost-18",
+        "Damage":  56,
+        "Type":  "Defense",
+        "Cost":  715,
+        "AttackSpeed":  0.7,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  453,
+        "Name":  "Fort-19",
+        "Damage":  59,
+        "Type":  "Defense",
+        "Cost":  755,
+        "AttackSpeed":  0.8,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  477,
+        "Name":  "Hold-20",
+        "Damage":  62,
+        "Type":  "Defense",
+        "Cost":  795,
+        "AttackSpeed":  0.9,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  501,
+        "Name":  "Aegis-21",
+        "Damage":  65,
+        "Type":  "Defense",
+        "Cost":  835,
+        "AttackSpeed":  1,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  525,
+        "Name":  "Barrier-22",
+        "Damage":  68,
+        "Type":  "Defense",
+        "Cost":  875,
+        "AttackSpeed":  1.1,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  549,
+        "Name":  "Wall-23",
+        "Damage":  71,
+        "Type":  "Defense",
+        "Cost":  915,
+        "AttackSpeed":  1.2,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  573,
+        "Name":  "Bulwark-24",
+        "Damage":  74,
+        "Type":  "Defense",
+        "Cost":  955,
+        "AttackSpeed":  1.3,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  597,
+        "Name":  "Blockade-25",
+        "Damage":  77,
+        "Type":  "Defense",
+        "Cost":  995,
+        "AttackSpeed":  0.6,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  621,
+        "Name":  "Keep-26",
+        "Damage":  80,
+        "Type":  "Defense",
+        "Cost":  1035,
+        "AttackSpeed":  0.7,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  645,
+        "Name":  "Hold-27",
+        "Damage":  83,
+        "Type":  "Defense",
+        "Cost":  1075,
+        "AttackSpeed":  0.8,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  669,
+        "Name":  "Defense-28",
+        "Damage":  86,
+        "Type":  "Defense",
+        "Cost":  1115,
+        "AttackSpeed":  0.9,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  693,
+        "Name":  "Fort-29",
+        "Damage":  89,
+        "Type":  "Defense",
+        "Cost":  1155,
+        "AttackSpeed":  1,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  717,
+        "Name":  "Rampart-30",
+        "Damage":  92,
+        "Type":  "Defense",
+        "Cost":  1195,
+        "AttackSpeed":  1.1,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  741,
+        "Name":  "Plating-31",
+        "Damage":  95,
+        "Type":  "Defense",
+        "Cost":  1235,
+        "AttackSpeed":  1.2,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  765,
+        "Name":  "Alloy-32",
+        "Damage":  98,
+        "Type":  "Defense",
+        "Cost":  1275,
+        "AttackSpeed":  1.3,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  789,
+        "Name":  "Titan-33",
+        "Damage":  101,
+        "Type":  "Defense",
+        "Cost":  1315,
+        "AttackSpeed":  0.6,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  813,
+        "Name":  "Armored-34",
+        "Damage":  104,
+        "Type":  "Defense",
+        "Cost":  1355,
+        "AttackSpeed":  0.7,
+        "Range":  2
+    },
+    {
+        "UpgradeCost":  837,
+        "Name":  "Hardened-35",
+        "Damage":  107,
+        "Type":  "Defense",
+        "Cost":  1395,
+        "AttackSpeed":  0.8,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  30,
+        "Name":  "Cyber Gravity",
+        "Damage":  12,
+        "Type":  "Special",
+        "Cost":  50,
+        "AttackSpeed":  0.3,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  60,
+        "Name":  "Cyber EMP",
+        "Damage":  17,
+        "Type":  "Special",
+        "Cost":  100,
+        "AttackSpeed":  0.4,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  90,
+        "Name":  "Cyber Blackout",
+        "Damage":  22,
+        "Type":  "Special",
+        "Cost":  150,
+        "AttackSpeed":  0.5,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  120,
+        "Name":  "Cyber Warp",
+        "Damage":  27,
+        "Type":  "Special",
+        "Cost":  200,
+        "AttackSpeed":  0.6,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  150,
+        "Name":  "Cyber Hack",
+        "Damage":  32,
+        "Type":  "Special",
+        "Cost":  250,
+        "AttackSpeed":  0.7,
+        "Range":  7
+    },
+    {
+        "UpgradeCost":  180,
+        "Name":  "Cyber Virus",
+        "Damage":  37,
+        "Type":  "Special",
+        "Cost":  300,
+        "AttackSpeed":  0.8,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  210,
+        "Name":  "Cyber Leech",
+        "Damage":  42,
+        "Type":  "Special",
+        "Cost":  350,
+        "AttackSpeed":  0.9,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  240,
+        "Name":  "Cyber Drain",
+        "Damage":  47,
+        "Type":  "Special",
+        "Cost":  400,
+        "AttackSpeed":  1,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  270,
+        "Name":  "Cyber Overclock",
+        "Damage":  52,
+        "Type":  "Special",
+        "Cost":  450,
+        "AttackSpeed":  1.1,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  300,
+        "Name":  "Cyber Doom",
+        "Damage":  57,
+        "Type":  "Special",
+        "Cost":  500,
+        "AttackSpeed":  1.2,
+        "Range":  7
+    },
+    {
+        "UpgradeCost":  330,
+        "Name":  "Singularity-11",
+        "Damage":  62,
+        "Type":  "Special",
+        "Cost":  550,
+        "AttackSpeed":  0.3,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  360,
+        "Name":  "Null-12",
+        "Damage":  67,
+        "Type":  "Special",
+        "Cost":  600,
+        "AttackSpeed":  0.4,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  390,
+        "Name":  "Pandemonium-13",
+        "Damage":  72,
+        "Type":  "Special",
+        "Cost":  650,
+        "AttackSpeed":  0.5,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  420,
+        "Name":  "Chaos-14",
+        "Damage":  77,
+        "Type":  "Special",
+        "Cost":  700,
+        "AttackSpeed":  0.6,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  450,
+        "Name":  "Abyss-15",
+        "Damage":  82,
+        "Type":  "Special",
+        "Cost":  750,
+        "AttackSpeed":  0.7,
+        "Range":  7
+    },
+    {
+        "UpgradeCost":  480,
+        "Name":  "Rift-16",
+        "Damage":  87,
+        "Type":  "Special",
+        "Cost":  800,
+        "AttackSpeed":  0.8,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  510,
+        "Name":  "Breach-17",
+        "Damage":  92,
+        "Type":  "Special",
+        "Cost":  850,
+        "AttackSpeed":  0.9,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  540,
+        "Name":  "Glitch-18",
+        "Damage":  97,
+        "Type":  "Special",
+        "Cost":  900,
+        "AttackSpeed":  1,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  570,
+        "Name":  "Corrupt-19",
+        "Damage":  102,
+        "Type":  "Special",
+        "Cost":  950,
+        "AttackSpeed":  1.1,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  600,
+        "Name":  "Infect-20",
+        "Damage":  107,
+        "Type":  "Special",
+        "Cost":  1000,
+        "AttackSpeed":  1.2,
+        "Range":  7
+    },
+    {
+        "UpgradeCost":  630,
+        "Name":  "Nano-21",
+        "Damage":  112,
+        "Type":  "Special",
+        "Cost":  1050,
+        "AttackSpeed":  0.3,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  660,
+        "Name":  "Swarm-22",
+        "Damage":  117,
+        "Type":  "Special",
+        "Cost":  1100,
+        "AttackSpeed":  0.4,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  690,
+        "Name":  "Acid-23",
+        "Damage":  122,
+        "Type":  "Special",
+        "Cost":  1150,
+        "AttackSpeed":  0.5,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  720,
+        "Name":  "Plague-24",
+        "Damage":  127,
+        "Type":  "Special",
+        "Cost":  1200,
+        "AttackSpeed":  0.6,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  750,
+        "Name":  "Toxic-25",
+        "Damage":  132,
+        "Type":  "Special",
+        "Cost":  1250,
+        "AttackSpeed":  0.7,
+        "Range":  7
+    },
+    {
+        "UpgradeCost":  780,
+        "Name":  "Corrosive-26",
+        "Damage":  137,
+        "Type":  "Special",
+        "Cost":  1300,
+        "AttackSpeed":  0.8,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  810,
+        "Name":  "Venom-27",
+        "Damage":  142,
+        "Type":  "Special",
+        "Cost":  1350,
+        "AttackSpeed":  0.9,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  840,
+        "Name":  "Poison-28",
+        "Damage":  147,
+        "Type":  "Special",
+        "Cost":  1400,
+        "AttackSpeed":  1,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  870,
+        "Name":  "Burn-29",
+        "Damage":  152,
+        "Type":  "Special",
+        "Cost":  1450,
+        "AttackSpeed":  1.1,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  900,
+        "Name":  "Freeze-30",
+        "Damage":  157,
+        "Type":  "Special",
+        "Cost":  1500,
+        "AttackSpeed":  1.2,
+        "Range":  7
+    },
+    {
+        "UpgradeCost":  930,
+        "Name":  "Paradox-31",
+        "Damage":  162,
+        "Type":  "Special",
+        "Cost":  1550,
+        "AttackSpeed":  0.3,
+        "Range":  3
+    },
+    {
+        "UpgradeCost":  960,
+        "Name":  "Anomaly-32",
+        "Damage":  167,
+        "Type":  "Special",
+        "Cost":  1600,
+        "AttackSpeed":  0.4,
+        "Range":  4
+    },
+    {
+        "UpgradeCost":  990,
+        "Name":  "Distortion-33",
+        "Damage":  172,
+        "Type":  "Special",
+        "Cost":  1650,
+        "AttackSpeed":  0.5,
+        "Range":  5
+    },
+    {
+        "UpgradeCost":  1020,
+        "Name":  "Fractal-34",
+        "Damage":  177,
+        "Type":  "Special",
+        "Cost":  1700,
+        "AttackSpeed":  0.6,
+        "Range":  6
+    },
+    {
+        "UpgradeCost":  1050,
+        "Name":  "Echo-35",
+        "Damage":  182,
+        "Type":  "Special",
+        "Cost":  1750,
+        "AttackSpeed":  0.7,
+        "Range":  7
+    }
+]
