@@ -1,0 +1,12 @@
+{
+  "Name": "Nano Swarm",
+  "Type": "Swarm",
+  "Health": 8,
+  "MaxHealth": 8,
+  "Damage": 2,
+  "MoveSpeed": 1.5,
+  "AttackRange": 1,
+  "AttackInterval": 0.5,
+  "GoldReward": 5,
+  "Skills": ["Normal Attack"]
+}

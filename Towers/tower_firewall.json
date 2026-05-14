@@ -1,0 +1,9 @@
+{
+  "Name": "Firewall Bastion",
+  "Type": "Firewall",
+  "Damage": 14,
+  "Range": 2,
+  "AttackSpeed": 0.7,
+  "Cost": 95,
+  "UpgradeCost": 60
+}

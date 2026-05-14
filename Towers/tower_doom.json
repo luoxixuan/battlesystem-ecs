@@ -1,0 +1,9 @@
+{
+  "Name": "Doom Core",
+  "Type": "Doom",
+  "Damage": 30,
+  "Range": 2,
+  "AttackSpeed": 0.4,
+  "Cost": 150,
+  "UpgradeCost": 100
+}

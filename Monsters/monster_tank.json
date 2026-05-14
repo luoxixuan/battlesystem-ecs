@@ -1,0 +1,12 @@
+{
+  "Name": "Tank Drone",
+  "Type": "Heavy",
+  "Health": 200,
+  "MaxHealth": 200,
+  "Damage": 10,
+  "MoveSpeed": 0.4,
+  "AttackRange": 2,
+  "AttackInterval": 2.5,
+  "GoldReward": 50,
+  "Skills": ["Normal Attack", "Armor Plating"]
+}

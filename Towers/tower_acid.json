@@ -1,0 +1,9 @@
+{
+  "Name": "Acid Sprayer",
+  "Type": "Acid",
+  "Damage": 10,
+  "Range": 3,
+  "AttackSpeed": 0.8,
+  "Cost": 65,
+  "UpgradeCost": 40
+}

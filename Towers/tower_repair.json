@@ -1,0 +1,9 @@
+{
+  "Name": "Repair Drone",
+  "Type": "Repair",
+  "Damage": 5,
+  "Range": 4,
+  "AttackSpeed": 1.5,
+  "Cost": 70,
+  "UpgradeCost": 45
+}

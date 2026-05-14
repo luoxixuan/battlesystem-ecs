@@ -1,12 +1,14 @@
 {
   "LevelNumber": 5,
-  "Name": "Final Onslaught",
-  "Description": "All slime types unite. This is the final battle!",
-  "WaveCount": 4,
+  "Name": "Corporate Warfare",
+  "Description": "Mega Corp Enforcer leads an army. The final stand.",
+  "WaveCount": 6,
   "Waves": [
-    { "WaveNumber": 1, "MonsterType": "Normal", "EnemyCount": 20 },
-    { "WaveNumber": 2, "MonsterType": "Fast",   "EnemyCount": 20 },
-    { "WaveNumber": 3, "MonsterType": "Ranged", "EnemyCount": 15 },
-    { "WaveNumber": 4, "MonsterType": "Strong", "EnemyCount": 15 }
+    { "WaveNumber": 1, "MonsterType": "Heavy", "EnemyCount": 12 },
+    { "WaveNumber": 2, "MonsterType": "Summoner", "EnemyCount": 8 },
+    { "WaveNumber": 3, "MonsterType": "Exo", "EnemyCount": 10 },
+    { "WaveNumber": 4, "MonsterType": "Support", "EnemyCount": 10 },
+    { "WaveNumber": 5, "MonsterType": "Boss", "EnemyCount": 2 },
+    { "WaveNumber": 6, "MonsterType": "Boss", "EnemyCount": 1 }
   ]
 }

@@ -1,0 +1,9 @@
+{
+  "Name": "Plasma Lathe",
+  "Type": "Plasma",
+  "Damage": 20,
+  "Range": 2,
+  "AttackSpeed": 0.6,
+  "Cost": 90,
+  "UpgradeCost": 55
+}

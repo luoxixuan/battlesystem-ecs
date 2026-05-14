@@ -1,0 +1,9 @@
+{
+  "Name": "Pulse Cannon",
+  "Type": "Pulse",
+  "Damage": 12,
+  "Range": 3,
+  "AttackSpeed": 1,
+  "Cost": 50,
+  "UpgradeCost": 30
+}

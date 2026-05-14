@@ -1,0 +1,12 @@
+{
+  "Name": "Glitch Runner",
+  "Type": "Normal",
+  "Health": 30,
+  "MaxHealth": 30,
+  "Damage": 5,
+  "MoveSpeed": 1.2,
+  "AttackRange": 1,
+  "AttackInterval": 1.5,
+  "GoldReward": 10,
+  "Skills": ["Normal Attack"]
+}

@@ -1,0 +1,12 @@
+{
+  "Name": "Chrome Stalker",
+  "Type": "Fast",
+  "Health": 20,
+  "MaxHealth": 20,
+  "Damage": 4,
+  "MoveSpeed": 2.5,
+  "AttackRange": 1,
+  "AttackInterval": 1,
+  "GoldReward": 15,
+  "Skills": ["Normal Attack", "Quick Dash"]
+}

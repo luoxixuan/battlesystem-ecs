@@ -1,0 +1,9 @@
+{
+  "Name": "Cryo Node",
+  "Type": "Cryo",
+  "Damage": 6,
+  "Range": 3,
+  "AttackSpeed": 1,
+  "Cost": 55,
+  "UpgradeCost": 35
+}

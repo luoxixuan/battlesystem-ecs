@@ -1,0 +1,12 @@
+{
+  "Name": "Mega Corp Enforcer",
+  "Type": "Boss",
+  "Health": 1500,
+  "MaxHealth": 1500,
+  "Damage": 25,
+  "MoveSpeed": 0.6,
+  "AttackRange": 2,
+  "AttackInterval": 2,
+  "GoldReward": 200,
+  "Skills": ["Normal Attack", "Corporate Strike", "Shield Wall", "Rage Mode"]
+}

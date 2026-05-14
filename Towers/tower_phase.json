@@ -1,0 +1,9 @@
+{
+  "Name": "Phase Shift Tower",
+  "Type": "Phase",
+  "Damage": 18,
+  "Range": 4,
+  "AttackSpeed": 0.6,
+  "Cost": 110,
+  "UpgradeCost": 70
+}

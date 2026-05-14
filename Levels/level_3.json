@@ -1,11 +1,13 @@
 {
   "LevelNumber": 3,
-  "Name": "Heavy Hitters",
-  "Description": "Strong slimes with high HP. You'll need upgraded towers!",
-  "WaveCount": 3,
+  "Name": "Blackout Protocol",
+  "Description": "Stealth Infiltrators slip past. Medic Drones keep the wave alive.",
+  "WaveCount": 5,
   "Waves": [
-    { "WaveNumber": 1, "MonsterType": "Strong", "EnemyCount": 10 },
-    { "WaveNumber": 2, "MonsterType": "Strong", "EnemyCount": 15 },
-    { "WaveNumber": 3, "MonsterType": "Fast",   "EnemyCount": 20 }
+    { "WaveNumber": 1, "MonsterType": "Stealth", "EnemyCount": 12 },
+    { "WaveNumber": 2, "MonsterType": "Healer", "EnemyCount": 8 },
+    { "WaveNumber": 3, "MonsterType": "Stealth", "EnemyCount": 15 },
+    { "WaveNumber": 4, "MonsterType": "Healer", "EnemyCount": 10 },
+    { "WaveNumber": 5, "MonsterType": "Clone", "EnemyCount": 15 }
   ]
 }

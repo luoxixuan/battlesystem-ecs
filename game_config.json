@@ -8,23 +8,176 @@
     "MaxHealth": 200,
     "CurrentLevel": 1,
     "UpgradeThreshold": 1000,
-    "StartingSkills": ["Cross Slash", "Mega Explosion", "Sniper Shot"]
+    "StartingSkills": [
+      "Circuit Breaker",
+      "Plasma Surge",
+      "Railgun Shot",
+      "Ion Storm",
+      "Cyber Worm",
+      "Firewall Burst",
+      "Phase Dash",
+      "Overclock",
+      "System Crash",
+      "Null Zone",
+      "Data Leech",
+      "Warp Gate",
+      "Blackout Protocol",
+      "Neural Spike",
+      "Doom Bomb"
+    ]
   },
+  "Towers": [
+    {
+      "Name": "Pulse Cannon",
+      "Type": "Pulse",
+      "Damage": 12,
+      "Range": 3,
+      "AttackSpeed": 1,
+      "Cost": 50,
+      "UpgradeCost": 30
+    },
+    {
+      "Name": "Tesla Coil",
+      "Type": "Tesla",
+      "Damage": 8,
+      "Range": 4,
+      "AttackSpeed": 1.5,
+      "Cost": 70,
+      "UpgradeCost": 40
+    },
+    {
+      "Name": "Plasma Lathe",
+      "Type": "Plasma",
+      "Damage": 20,
+      "Range": 2,
+      "AttackSpeed": 0.6,
+      "Cost": 90,
+      "UpgradeCost": 55
+    },
+    {
+      "Name": "Cryo Node",
+      "Type": "Cryo",
+      "Damage": 6,
+      "Range": 3,
+      "AttackSpeed": 1,
+      "Cost": 55,
+      "UpgradeCost": 35
+    },
+    {
+      "Name": "Acid Sprayer",
+      "Type": "Acid",
+      "Damage": 10,
+      "Range": 3,
+      "AttackSpeed": 0.8,
+      "Cost": 65,
+      "UpgradeCost": 40
+    },
+    {
+      "Name": "Nano Swarm",
+      "Type": "Nano",
+      "Damage": 5,
+      "Range": 4,
+      "AttackSpeed": 2,
+      "Cost": 80,
+      "UpgradeCost": 50
+    },
+    {
+      "Name": "Stun Grid",
+      "Type": "Stun",
+      "Damage": 7,
+      "Range": 3,
+      "AttackSpeed": 1.2,
+      "Cost": 60,
+      "UpgradeCost": 35
+    },
+    {
+      "Name": "EMP Tower",
+      "Type": "EMP",
+      "Damage": 15,
+      "Range": 2,
+      "AttackSpeed": 0.5,
+      "Cost": 100,
+      "UpgradeCost": 60
+    },
+    {
+      "Name": "Gravity Well",
+      "Type": "Gravity",
+      "Damage": 9,
+      "Range": 5,
+      "AttackSpeed": 0.7,
+      "Cost": 85,
+      "UpgradeCost": 55
+    },
+    {
+      "Name": "Cyber Leech",
+      "Type": "Leech",
+      "Damage": 11,
+      "Range": 3,
+      "AttackSpeed": 0.9,
+      "Cost": 75,
+      "UpgradeCost": 45
+    },
+    {
+      "Name": "Firewall Bastion",
+      "Type": "Firewall",
+      "Damage": 14,
+      "Range": 2,
+      "AttackSpeed": 0.7,
+      "Cost": 95,
+      "UpgradeCost": 60
+    },
+    {
+      "Name": "Repair Drone",
+      "Type": "Repair",
+      "Damage": 5,
+      "Range": 4,
+      "AttackSpeed": 1.5,
+      "Cost": 70,
+      "UpgradeCost": 45
+    },
+    {
+      "Name": "Hologram Decoy",
+      "Type": "Hologram",
+      "Damage": 8,
+      "Range": 3,
+      "AttackSpeed": 1,
+      "Cost": 55,
+      "UpgradeCost": 30
+    },
+    {
+      "Name": "Phase Shift Tower",
+      "Type": "Phase",
+      "Damage": 18,
+      "Range": 4,
+      "AttackSpeed": 0.6,
+      "Cost": 110,
+      "UpgradeCost": 70
+    },
+    {
+      "Name": "Doom Core",
+      "Type": "Doom",
+      "Damage": 30,
+      "Range": 2,
+      "AttackSpeed": 0.4,
+      "Cost": 150,
+      "UpgradeCost": 100
+    }
+  ],
   "Skills": [
     {
-      "Name": "Cross Slash",
-      "Description": "十字范围伤害 - 400% 伤害倍率，3x3 十字形范围",
-      "DamageMultiplier": 4,
+      "Name": "Circuit Breaker",
+      "Description": "3x3 范围电流冲击 - 250% 伤害倍率",
+      "DamageMultiplier": 2.5,
       "AreaWidth": 3,
       "AreaHeight": 3,
-      "AttackRange": 3,
+      "AttackRange": 4,
       "Cooldown": 5,
       "AutoCast": false,
       "Hotkey": "1"
     },
     {
-      "Name": "Mega Explosion",
-      "Description": "3x3 范围爆炸伤害 - 400% 伤害倍率，9 格范围",
+      "Name": "Plasma Surge",
+      "Description": "3x3 等离子爆炸 - 400% 伤害倍率",
       "DamageMultiplier": 4,
       "AreaWidth": 3,
       "AreaHeight": 3,
@@ -34,171 +187,457 @@
       "Hotkey": "2"
     },
     {
-      "Name": "Sniper Shot",
-      "Description": "超远距离单体攻击 - 400% 伤害倍率，9 格攻击距离",
-      "DamageMultiplier": 4,
+      "Name": "Railgun Shot",
+      "Description": "超远距离单体狙击 - 500% 伤害倍率，12 格射程",
+      "DamageMultiplier": 5,
       "AreaWidth": 1,
       "AreaHeight": 1,
-      "AttackRange": 9,
+      "AttackRange": 12,
       "Cooldown": 8,
       "AutoCast": false,
       "Hotkey": "3"
+    },
+    {
+      "Name": "Ion Storm",
+      "Description": "5x5 大范围离子风暴 - 300% 伤害倍率",
+      "DamageMultiplier": 3,
+      "AreaWidth": 5,
+      "AreaHeight": 5,
+      "AttackRange": 6,
+      "Cooldown": 15,
+      "AutoCast": false,
+      "Hotkey": "4"
+    },
+    {
+      "Name": "Cyber Worm",
+      "Description": "2x2 蠕虫病毒感染 - 200% 伤害倍率，持续伤害",
+      "DamageMultiplier": 2,
+      "AreaWidth": 2,
+      "AreaHeight": 2,
+      "AttackRange": 5,
+      "Cooldown": 6,
+      "AutoCast": false,
+      "Hotkey": "5"
+    },
+    {
+      "Name": "Firewall Burst",
+      "Description": "3x3 防火墙爆破 - 350% 伤害倍率",
+      "DamageMultiplier": 3.5,
+      "AreaWidth": 3,
+      "AreaHeight": 3,
+      "AttackRange": 4,
+      "Cooldown": 7,
+      "AutoCast": false,
+      "Hotkey": "6"
+    },
+    {
+      "Name": "Phase Dash",
+      "Description": "单体相位突袭 - 450% 伤害倍率",
+      "DamageMultiplier": 4.5,
+      "AreaWidth": 1,
+      "AreaHeight": 1,
+      "AttackRange": 7,
+      "Cooldown": 9,
+      "AutoCast": false,
+      "Hotkey": "7"
+    },
+    {
+      "Name": "Overclock",
+      "Description": "2x2 超频打击 - 280% 伤害倍率",
+      "DamageMultiplier": 2.8,
+      "AreaWidth": 2,
+      "AreaHeight": 2,
+      "AttackRange": 4,
+      "Cooldown": 5,
+      "AutoCast": false,
+      "Hotkey": "8"
+    },
+    {
+      "Name": "System Crash",
+      "Description": "3x3 系统崩溃 - 400% 伤害倍率",
+      "DamageMultiplier": 4,
+      "AreaWidth": 3,
+      "AreaHeight": 3,
+      "AttackRange": 5,
+      "Cooldown": 12,
+      "AutoCast": false,
+      "Hotkey": "9"
+    },
+    {
+      "Name": "Null Zone",
+      "Description": "4x4 虚空领域 - 200% 伤害倍率，持续 3 秒",
+      "DamageMultiplier": 2,
+      "AreaWidth": 4,
+      "AreaHeight": 4,
+      "AttackRange": 5,
+      "Cooldown": 14,
+      "AutoCast": false,
+      "Hotkey": "Q"
+    },
+    {
+      "Name": "Data Leech",
+      "Description": "单体数据抽取 - 150% 伤害，回复等量生命",
+      "DamageMultiplier": 1.5,
+      "AreaWidth": 1,
+      "AreaHeight": 1,
+      "AttackRange": 6,
+      "Cooldown": 4,
+      "AutoCast": false,
+      "Hotkey": "W"
+    },
+    {
+      "Name": "Warp Gate",
+      "Description": "3x3 空间折叠打击 - 350% 伤害倍率",
+      "DamageMultiplier": 3.5,
+      "AreaWidth": 3,
+      "AreaHeight": 3,
+      "AttackRange": 8,
+      "Cooldown": 11,
+      "AutoCast": false,
+      "Hotkey": "E"
+    },
+    {
+      "Name": "Blackout Protocol",
+      "Description": "5x5 全屏停电打击 - 250% 伤害倍率",
+      "DamageMultiplier": 2.5,
+      "AreaWidth": 5,
+      "AreaHeight": 5,
+      "AttackRange": 6,
+      "Cooldown": 16,
+      "AutoCast": false,
+      "Hotkey": "R"
+    },
+    {
+      "Name": "Neural Spike",
+      "Description": "单体神经冲击 - 500% 伤害倍率",
+      "DamageMultiplier": 5,
+      "AreaWidth": 1,
+      "AreaHeight": 1,
+      "AttackRange": 10,
+      "Cooldown": 10,
+      "AutoCast": false,
+      "Hotkey": "T"
+    },
+    {
+      "Name": "Doom Bomb",
+      "Description": "3x3 毁灭炸弹 - 600% 伤害倍率",
+      "DamageMultiplier": 6,
+      "AreaWidth": 3,
+      "AreaHeight": 3,
+      "AttackRange": 7,
+      "Cooldown": 18,
+      "AutoCast": false,
+      "Hotkey": "Y"
     }
   ],
   "MonsterTypes": [
     {
-      "Name": "Normal Slime",
+      "Name": "Glitch Runner",
       "Type": "Normal",
-      "Health": 20,
-      "MaxHealth": 20,
+      "Health": 30,
+      "MaxHealth": 30,
       "Damage": 5,
-      "MoveSpeed": 1,
+      "MoveSpeed": 1.2,
       "AttackRange": 1,
       "AttackInterval": 1.5,
       "GoldReward": 10,
-      "Skills": [ "Normal Attack" ]
+      "Skills": ["Normal Attack"]
     },
     {
-      "Name": "Fast Slime",
+      "Name": "Chrome Stalker",
       "Type": "Fast",
-      "Health": 15,
-      "MaxHealth": 15,
-      "Damage": 3,
-      "MoveSpeed": 2,
+      "Health": 20,
+      "MaxHealth": 20,
+      "Damage": 4,
+      "MoveSpeed": 2.5,
       "AttackRange": 1,
       "AttackInterval": 1,
       "GoldReward": 15,
-      "Skills": [ "Normal Attack", "Quick Dash" ]
+      "Skills": ["Normal Attack", "Quick Dash"]
     },
     {
-      "Name": "Strong Slime",
+      "Name": "Plasma Wraith",
       "Type": "Strong",
-      "Health": 30,
-      "MaxHealth": 30,
-      "Damage": 8,
-      "MoveSpeed": 0.5,
+      "Health": 80,
+      "MaxHealth": 80,
+      "Damage": 12,
+      "MoveSpeed": 0.6,
       "AttackRange": 2,
       "AttackInterval": 2,
-      "GoldReward": 20,
-      "Skills": [ "Normal Attack", "Heavy Strike" ]
+      "GoldReward": 30,
+      "Skills": ["Normal Attack", "Heavy Strike"]
     },
     {
-      "Name": "Ranged Slime",
-      "Type": "Ranged",
-      "Health": 15,
-      "MaxHealth": 15,
-      "Damage": 6,
-      "MoveSpeed": 0.8,
-      "AttackRange": 5,
+      "Name": "Nano Swarm",
+      "Type": "Swarm",
+      "Health": 8,
+      "MaxHealth": 8,
+      "Damage": 2,
+      "MoveSpeed": 1.5,
+      "AttackRange": 1,
+      "AttackInterval": 0.5,
+      "GoldReward": 5,
+      "Skills": ["Normal Attack"]
+    },
+    {
+      "Name": "Shock Drone",
+      "Type": "Electric",
+      "Health": 25,
+      "MaxHealth": 25,
+      "Damage": 8,
+      "MoveSpeed": 1.8,
+      "AttackRange": 1,
       "AttackInterval": 1.2,
+      "GoldReward": 18,
+      "Skills": ["Normal Attack", "Chain Lightning"]
+    },
+    {
+      "Name": "Stealth Infiltrator",
+      "Type": "Stealth",
+      "Health": 35,
+      "MaxHealth": 35,
+      "Damage": 10,
+      "MoveSpeed": 1.5,
+      "AttackRange": 1,
+      "AttackInterval": 1.5,
       "GoldReward": 25,
-      "Skills": [ "Normal Attack", "Ranged Shot" ]
+      "Skills": ["Normal Attack", "Backstab"]
+    },
+    {
+      "Name": "Medic Drone",
+      "Type": "Healer",
+      "Health": 40,
+      "MaxHealth": 40,
+      "Damage": 3,
+      "MoveSpeed": 0.8,
+      "AttackRange": 4,
+      "AttackInterval": 3,
+      "GoldReward": 20,
+      "Skills": ["Normal Attack", "Repair Wave"]
+    },
+    {
+      "Name": "Shield Bearer",
+      "Type": "Tank",
+      "Health": 120,
+      "MaxHealth": 120,
+      "Damage": 6,
+      "MoveSpeed": 0.5,
+      "AttackRange": 1,
+      "AttackInterval": 2,
+      "GoldReward": 35,
+      "Skills": ["Normal Attack", "Shield Block"]
+    },
+    {
+      "Name": "Mirror Bot",
+      "Type": "Clone",
+      "Health": 30,
+      "MaxHealth": 30,
+      "Damage": 7,
+      "MoveSpeed": 1.2,
+      "AttackRange": 1,
+      "AttackInterval": 1.3,
+      "GoldReward": 22,
+      "Skills": ["Normal Attack", "Clone Image"]
+    },
+    {
+      "Name": "Phantom Slicer",
+      "Type": " Assassin",
+      "Health": 28,
+      "MaxHealth": 28,
+      "Damage": 15,
+      "MoveSpeed": 2,
+      "AttackRange": 1,
+      "AttackInterval": 1,
+      "GoldReward": 28,
+      "Skills": ["Normal Attack", "Vital Strike"]
+    },
+    {
+      "Name": "Tank Drone",
+      "Type": "Heavy",
+      "Health": 200,
+      "MaxHealth": 200,
+      "Damage": 10,
+      "MoveSpeed": 0.4,
+      "AttackRange": 2,
+      "AttackInterval": 2.5,
+      "GoldReward": 50,
+      "Skills": ["Normal Attack", "Armor plating"]
+    },
+    {
+      "Name": "Healer Bot",
+      "Type": "Support",
+      "Health": 45,
+      "MaxHealth": 45,
+      "Damage": 5,
+      "MoveSpeed": 0.9,
+      "AttackRange": 5,
+      "AttackInterval": 2.5,
+      "GoldReward": 30,
+      "Skills": ["Normal Attack", "Healing Pulse"]
+    },
+    {
+      "Name": "Speed Virus",
+      "Type": "Virus",
+      "Health": 18,
+      "MaxHealth": 18,
+      "Damage": 6,
+      "MoveSpeed": 3,
+      "AttackRange": 1,
+      "AttackInterval": 0.8,
+      "GoldReward": 16,
+      "Skills": ["Normal Attack", "Haste"]
+    },
+    {
+      "Name": "Heavy Exo",
+      "Type": "Exo",
+      "Health": 150,
+      "MaxHealth": 150,
+      "Damage": 15,
+      "MoveSpeed": 0.5,
+      "AttackRange": 1,
+      "AttackInterval": 2,
+      "GoldReward": 45,
+      "Skills": ["Normal Attack", "Seismic Slam"]
+    },
+    {
+      "Name": "Summoner Bot",
+      "Type": "Summoner",
+      "Health": 60,
+      "MaxHealth": 60,
+      "Damage": 8,
+      "MoveSpeed": 0.8,
+      "AttackRange": 4,
+      "AttackInterval": 2,
+      "GoldReward": 35,
+      "Skills": ["Normal Attack", "Spawn Drone"]
+    },
+    {
+      "Name": "Cryo Warden",
+      "Type": "Cryo",
+      "Health": 70,
+      "MaxHealth": 70,
+      "Damage": 9,
+      "MoveSpeed": 0.9,
+      "AttackRange": 1,
+      "AttackInterval": 1.8,
+      "GoldReward": 28,
+      "Skills": ["Normal Attack", "Freeze Aura"]
+    },
+    {
+      "Name": "Fire Elemental",
+      "Type": "Fire",
+      "Health": 55,
+      "MaxHealth": 55,
+      "Damage": 14,
+      "MoveSpeed": 1,
+      "AttackRange": 2,
+      "AttackInterval": 1.5,
+      "GoldReward": 32,
+      "Skills": ["Normal Attack", "Flame Burst"]
+    },
+    {
+      "Name": "Silence Drone",
+      "Type": "Debuff",
+      "Health": 35,
+      "MaxHealth": 35,
+      "Damage": 5,
+      "MoveSpeed": 1.3,
+      "AttackRange": 3,
+      "AttackInterval": 2,
+      "GoldReward": 22,
+      "Skills": ["Normal Attack", "Silence Pulse"]
+    },
+    {
+      "Name": "Mega Corp Enforcer",
+      "Type": "Boss",
+      "Health": 1500,
+      "MaxHealth": 1500,
+      "Damage": 25,
+      "MoveSpeed": 0.6,
+      "AttackRange": 2,
+      "AttackInterval": 2,
+      "GoldReward": 200,
+      "Skills": ["Normal Attack", "Corporate Strike", "Shield Wall", "Rage Mode"]
+    },
+    {
+      "Name": "Doom Mech",
+      "Type": "Boss",
+      "Health": 2000,
+      "MaxHealth": 2000,
+      "Damage": 40,
+      "MoveSpeed": 0.3,
+      "AttackRange": 3,
+      "AttackInterval": 3,
+      "GoldReward": 500,
+      "Skills": ["Normal Attack", "Missile Barrage", "Doom Laser", "Emergency Repair"]
     }
   ],
   "Levels": [
     {
       "LevelNumber": 1,
-      "WaveCount": 3,
+      "Name": "Neon District",
+      "Description": "Glitch Runners and Chrome Stalkers flood the streets. A taste of what's to come.",
+      "WaveCount": 5,
       "Waves": [
-        {
-          "WaveNumber": 1,
-          "MonsterType": "Normal",
-          "EnemyCount": 100
-        },
-        {
-          "WaveNumber": 2,
-          "MonsterType": "Normal",
-          "EnemyCount": 100
-        },
-        {
-          "WaveNumber": 3,
-          "MonsterType": "Normal",
-          "EnemyCount": 100
-        }
+        { "WaveNumber": 1, "MonsterType": "Normal", "EnemyCount": 12 },
+        { "WaveNumber": 2, "MonsterType": "Normal", "EnemyCount": 15 },
+        { "WaveNumber": 3, "MonsterType": "Fast", "EnemyCount": 10 },
+        { "WaveNumber": 4, "MonsterType": "Fast", "EnemyCount": 12 },
+        { "WaveNumber": 5, "MonsterType": "Electric", "EnemyCount": 8 }
       ]
     },
     {
       "LevelNumber": 2,
-      "WaveCount": 3,
+      "Name": "Data Center Siege",
+      "Description": "Defend the core. Nano Swarms overwhelm, then Shield Bearers push through.",
+      "WaveCount": 5,
       "Waves": [
-        {
-          "WaveNumber": 1,
-          "MonsterType": "Fast",
-          "EnemyCount": 100
-        },
-        {
-          "WaveNumber": 2,
-          "MonsterType": "Fast",
-          "EnemyCount": 100
-        },
-        {
-          "WaveNumber": 3,
-          "MonsterType": "Fast",
-          "EnemyCount": 100
-        }
+        { "WaveNumber": 1, "MonsterType": "Swarm", "EnemyCount": 25 },
+        { "WaveNumber": 2, "MonsterType": "Swarm", "EnemyCount": 30 },
+        { "WaveNumber": 3, "MonsterType": "Tank", "EnemyCount": 8 },
+        { "WaveNumber": 4, "MonsterType": "Tank", "EnemyCount": 10 },
+        { "WaveNumber": 5, "MonsterType": "Heavy", "EnemyCount": 5 }
       ]
     },
     {
       "LevelNumber": 3,
-      "WaveCount": 3,
+      "Name": "Blackout Protocol",
+      "Description": "Stealth Infiltrators slip past. Medic Drones keep the wave alive.",
+      "WaveCount": 5,
       "Waves": [
-        {
-          "WaveNumber": 1,
-          "MonsterType": "Strong",
-          "EnemyCount": 100
-        },
-        {
-          "WaveNumber": 2,
-          "MonsterType": "Strong",
-          "EnemyCount": 100
-        },
-        {
-          "WaveNumber": 3,
-          "MonsterType": "Strong",
-          "EnemyCount": 100
-        }
+        { "WaveNumber": 1, "MonsterType": "Stealth", "EnemyCount": 12 },
+        { "WaveNumber": 2, "MonsterType": "Healer", "EnemyCount": 8 },
+        { "WaveNumber": 3, "MonsterType": "Stealth", "EnemyCount": 15 },
+        { "WaveNumber": 4, "MonsterType": "Healer", "EnemyCount": 10 },
+        { "WaveNumber": 5, "MonsterType": "Clone", "EnemyCount": 15 }
       ]
     },
     {
       "LevelNumber": 4,
-      "WaveCount": 3,
+      "Name": "Elemental Chaos",
+      "Description": "Fire Elementals and Cryo Wardens alternate. Temperature warfare.",
+      "WaveCount": 6,
       "Waves": [
-        {
-          "WaveNumber": 1,
-          "MonsterType": "Ranged",
-          "EnemyCount": 100
-        },
-        {
-          "WaveNumber": 2,
-          "MonsterType": "Ranged",
-          "EnemyCount": 100
-        },
-        {
-          "WaveNumber": 3,
-          "MonsterType": "Ranged",
-          "EnemyCount": 100
-        }
+        { "WaveNumber": 1, "MonsterType": "Fire", "EnemyCount": 10 },
+        { "WaveNumber": 2, "MonsterType": "Cryo", "EnemyCount": 10 },
+        { "WaveNumber": 3, "MonsterType": "Fire", "EnemyCount": 15 },
+        { "WaveNumber": 4, "MonsterType": "Cryo", "EnemyCount": 15 },
+        { "WaveNumber": 5, "MonsterType": "Virus", "EnemyCount": 20 },
+        { "WaveNumber": 6, "MonsterType": "Debuff", "EnemyCount": 12 }
       ]
     },
     {
       "LevelNumber": 5,
-      "WaveCount": 3,
+      "Name": "Corporate Warfare",
+      "Description": "Mega Corp Enforcer leads an army. The final stand.",
+      "WaveCount": 6,
       "Waves": [
-        {
-          "WaveNumber": 1,
-          "MonsterType": "Strong",
-          "EnemyCount": 100
-        },
-        {
-          "WaveNumber": 2,
-          "MonsterType": "Fast",
-          "EnemyCount": 100
-        },
-        {
-          "WaveNumber": 3,
-          "MonsterType": "Fast",
-          "EnemyCount": 100
-        }
+        { "WaveNumber": 1, "MonsterType": "Heavy", "EnemyCount": 12 },
+        { "WaveNumber": 2, "MonsterType": "Summoner", "EnemyCount": 8 },
+        { "WaveNumber": 3, "MonsterType": "Exo", "EnemyCount": 10 },
+        { "WaveNumber": 4, "MonsterType": "Support", "EnemyCount": 10 },
+        { "WaveNumber": 5, "MonsterType": "Boss", "EnemyCount": 2 },
+        { "WaveNumber": 6, "MonsterType": "Boss", "EnemyCount": 1 }
       ]
     }
   ]

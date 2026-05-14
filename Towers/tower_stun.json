@@ -1,0 +1,9 @@
+{
+  "Name": "Stun Grid",
+  "Type": "Stun",
+  "Damage": 7,
+  "Range": 3,
+  "AttackSpeed": 1.2,
+  "Cost": 60,
+  "UpgradeCost": 35
+}

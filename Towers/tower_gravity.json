@@ -1,0 +1,9 @@
+{
+  "Name": "Gravity Well",
+  "Type": "Gravity",
+  "Damage": 9,
+  "Range": 5,
+  "AttackSpeed": 0.7,
+  "Cost": 85,
+  "UpgradeCost": 55
+}

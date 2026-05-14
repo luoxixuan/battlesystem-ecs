@@ -1,0 +1,12 @@
+{
+  "Name": "Summoner Bot",
+  "Type": "Summoner",
+  "Health": 60,
+  "MaxHealth": 60,
+  "Damage": 8,
+  "MoveSpeed": 0.8,
+  "AttackRange": 4,
+  "AttackInterval": 2,
+  "GoldReward": 35,
+  "Skills": ["Normal Attack", "Spawn Drone"]
+}

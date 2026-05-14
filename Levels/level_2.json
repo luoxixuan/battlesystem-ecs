@@ -1,11 +1,13 @@
 {
   "LevelNumber": 2,
-  "Name": "Rapid Assault",
-  "Description": "Fast slimes! They move twice as fast. Build defenses wisely.",
-  "WaveCount": 3,
+  "Name": "Data Center Siege",
+  "Description": "Defend the core. Nano Swarms overwhelm, then Shield Bearers push through.",
+  "WaveCount": 5,
   "Waves": [
-    { "WaveNumber": 1, "MonsterType": "Fast",   "EnemyCount": 15 },
-    { "WaveNumber": 2, "MonsterType": "Normal", "EnemyCount": 20 },
-    { "WaveNumber": 3, "MonsterType": "Fast",   "EnemyCount": 15 }
+    { "WaveNumber": 1, "MonsterType": "Swarm", "EnemyCount": 25 },
+    { "WaveNumber": 2, "MonsterType": "Swarm", "EnemyCount": 30 },
+    { "WaveNumber": 3, "MonsterType": "Tank", "EnemyCount": 8 },
+    { "WaveNumber": 4, "MonsterType": "Tank", "EnemyCount": 10 },
+    { "WaveNumber": 5, "MonsterType": "Heavy", "EnemyCount": 5 }
   ]
 }

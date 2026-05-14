@@ -1,11 +1,13 @@
 {
   "LevelNumber": 1,
-  "Name": "First Stand",
-  "Description": "A few slimes approach. Easy first contact.",
-  "WaveCount": 3,
+  "Name": "Neon District",
+  "Description": "Glitch Runners and Chrome Stalkers flood the streets. A taste of what's to come.",
+  "WaveCount": 5,
   "Waves": [
-    { "WaveNumber": 1, "MonsterType": "Normal", "EnemyCount": 6 },
-    { "WaveNumber": 2, "MonsterType": "Normal", "EnemyCount": 8 },
-    { "WaveNumber": 3, "MonsterType": "Normal", "EnemyCount": 10 }
+    { "WaveNumber": 1, "MonsterType": "Normal", "EnemyCount": 12 },
+    { "WaveNumber": 2, "MonsterType": "Normal", "EnemyCount": 15 },
+    { "WaveNumber": 3, "MonsterType": "Fast", "EnemyCount": 10 },
+    { "WaveNumber": 4, "MonsterType": "Fast", "EnemyCount": 12 },
+    { "WaveNumber": 5, "MonsterType": "Electric", "EnemyCount": 8 }
   ]
 }

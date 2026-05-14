@@ -1,0 +1,9 @@
+{
+  "Name": "Hologram Decoy",
+  "Type": "Hologram",
+  "Damage": 8,
+  "Range": 3,
+  "AttackSpeed": 1,
+  "Cost": 55,
+  "UpgradeCost": 30
+}

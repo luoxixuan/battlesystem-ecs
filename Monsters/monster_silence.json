@@ -1,0 +1,12 @@
+{
+  "Name": "Silence Drone",
+  "Type": "Debuff",
+  "Health": 35,
+  "MaxHealth": 35,
+  "Damage": 5,
+  "MoveSpeed": 1.3,
+  "AttackRange": 3,
+  "AttackInterval": 2,
+  "GoldReward": 22,
+  "Skills": ["Normal Attack", "Silence Pulse"]
+}

@@ -1,0 +1,9 @@
+{
+  "Name": "Cyber Leech",
+  "Type": "Leech",
+  "Damage": 11,
+  "Range": 3,
+  "AttackSpeed": 0.9,
+  "Cost": 75,
+  "UpgradeCost": 45
+}

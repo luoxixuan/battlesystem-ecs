@@ -1,0 +1,12 @@
+{
+  "Name": "Doom Mech",
+  "Type": "Boss",
+  "Health": 2000,
+  "MaxHealth": 2000,
+  "Damage": 40,
+  "MoveSpeed": 0.3,
+  "AttackRange": 3,
+  "AttackInterval": 3,
+  "GoldReward": 500,
+  "Skills": ["Normal Attack", "Missile Barrage", "Doom Laser", "Emergency Repair"]
+}
