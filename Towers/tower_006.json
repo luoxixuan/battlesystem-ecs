@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":15,"Name":"Nano Grid #6","Damage":8,"Type":"Nano","Cost":25,"AttackSpeed":1.4,"Range":6}
+{
+  "Name": "Nano Swarm",
+  "Type": "Tower",
+  "Damage": 10,
+  "Range": 8,
+  "AttackSpeed": 3.5,
+  "Cost": 200,
+  "UpgradeCost": 120
+}

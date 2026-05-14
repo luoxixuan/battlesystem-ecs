@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":20,"Name":"Doom Array #15","Damage":15,"Type":"Doom","Cost":34,"AttackSpeed":1.25,"Range":15}
+{
+  "Name": "Doom Core",
+  "Type": "Tower",
+  "Damage": 100,
+  "Range": 2,
+  "AttackSpeed": 0.4,
+  "Cost": 450,
+  "UpgradeCost": 270
+}

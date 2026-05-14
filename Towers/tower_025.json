@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":26,"Name":"Mech Swarm #25","Damage":23,"Type":"Mech","Cost":44,"AttackSpeed":1.25,"Range":10}
+{
+  "Name": "Missile Pod",
+  "Type": "Tower",
+  "Damage": 60,
+  "Range": 9,
+  "AttackSpeed": 0.7,
+  "Cost": 330,
+  "UpgradeCost": 198
+}

@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":29,"Name":"Acid Decoy #30","Damage":27,"Type":"Acid","Cost":49,"AttackSpeed":0.5,"Range":15}
+{
+  "Name": "Shock Tower",
+  "Type": "Tower",
+  "Damage": 16,
+  "Range": 6,
+  "AttackSpeed": 2.8,
+  "Cost": 165,
+  "UpgradeCost": 99
+}

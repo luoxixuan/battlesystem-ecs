@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":22,"Name":"Cyber Field #18","Damage":21,"Type":"Cyber","Cost":37,"AttackSpeed":1.7,"Range":3}
+{
+  "Name": "Fusion Reactor",
+  "Type": "Tower",
+  "Damage": 50,
+  "Range": 4,
+  "AttackSpeed": 1.1,
+  "Cost": 310,
+  "UpgradeCost": 186
+}

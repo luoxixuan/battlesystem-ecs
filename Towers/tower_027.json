@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":28,"Name":"Tesla Tower #27","Damage":28,"Type":"Tesla","Cost":46,"AttackSpeed":1.55,"Range":12}
+{
+  "Name": "Acid Hose",
+  "Type": "Tower",
+  "Damage": 38,
+  "Range": 4,
+  "AttackSpeed": 1.4,
+  "Cost": 200,
+  "UpgradeCost": 120
+}

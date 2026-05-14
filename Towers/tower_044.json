@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":38,"Name":"Hacker Sprayer #44","Damage":48,"Type":"Hacker","Cost":63,"AttackSpeed":1.1,"Range":14}
+{
+  "Name": "Swarm Nest",
+  "Type": "Tower",
+  "Damage": 6,
+  "Range": 7,
+  "AttackSpeed": 5.0,
+  "Cost": 310,
+  "UpgradeCost": 186
+}

@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":23,"Name":"Shock Blaster #20","Damage":19,"Type":"Shock","Cost":39,"AttackSpeed":0.5,"Range":5}
+{
+  "Name": "Void Generator",
+  "Type": "Tower",
+  "Damage": 65,
+  "Range": 5,
+  "AttackSpeed": 0.75,
+  "Cost": 350,
+  "UpgradeCost": 210
+}

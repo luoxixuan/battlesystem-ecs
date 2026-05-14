@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":35,"Name":"Doom Blaster #40","Damage":35,"Type":"Doom","Cost":59,"AttackSpeed":0.5,"Range":10}
+{
+  "Name": "Photon Blaster",
+  "Type": "Tower",
+  "Damage": 62,
+  "Range": 6,
+  "AttackSpeed": 1.0,
+  "Cost": 340,
+  "UpgradeCost": 204
+}

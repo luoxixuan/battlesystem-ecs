@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":41,"Name":"Drone Drone #49","Damage":53,"Type":"Drone","Cost":68,"AttackSpeed":1.85,"Range":4}
+{
+  "Name": "Cyber Array",
+  "Type": "Tower",
+  "Damage": 72,
+  "Range": 7,
+  "AttackSpeed": 0.85,
+  "Cost": 400,
+  "UpgradeCost": 240
+}

@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":34,"Name":"Repair Emitter #37","Damage":37,"Type":"Repair","Cost":56,"AttackSpeed":1.55,"Range":7}
+{
+  "Name": "Quantum Sphere",
+  "Type": "Tower",
+  "Damage": 25,
+  "Range": 10,
+  "AttackSpeed": 1.8,
+  "Cost": 320,
+  "UpgradeCost": 192
+}

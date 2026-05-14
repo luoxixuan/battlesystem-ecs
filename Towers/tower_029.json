@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":29,"Name":"Cryo Drone #29","Damage":33,"Type":"Cryo","Cost":48,"AttackSpeed":1.85,"Range":14}
+{
+  "Name": "Fire Spitter",
+  "Type": "Tower",
+  "Damage": 48,
+  "Range": 4,
+  "AttackSpeed": 1.0,
+  "Cost": 215,
+  "UpgradeCost": 129
+}

@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":38,"Name":"Shock Swarm #45","Damage":39,"Type":"Shock","Cost":64,"AttackSpeed":1.25,"Range":15}
+{
+  "Name": "Acid Jet",
+  "Type": "Tower",
+  "Damage": 33,
+  "Range": 5,
+  "AttackSpeed": 1.7,
+  "Cost": 190,
+  "UpgradeCost": 114
+}

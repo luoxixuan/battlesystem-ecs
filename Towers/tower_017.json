@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":22,"Name":"Ion Emitter #17","Damage":19,"Type":"Ion","Cost":36,"AttackSpeed":1.55,"Range":2}
+{
+  "Name": "Ion Storm Tower",
+  "Type": "Tower",
+  "Damage": 18,
+  "Range": 9,
+  "AttackSpeed": 2.2,
+  "Cost": 240,
+  "UpgradeCost": 144
+}

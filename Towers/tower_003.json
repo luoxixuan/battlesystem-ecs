@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":13,"Name":"Plasma Node #3","Damage":7,"Type":"Plasma","Cost":22,"AttackSpeed":0.95,"Range":3}
+{
+  "Name": "Plasma Lathe",
+  "Type": "Tower",
+  "Damage": 55,
+  "Range": 3,
+  "AttackSpeed": 1.2,
+  "Cost": 220,
+  "UpgradeCost": 132
+}

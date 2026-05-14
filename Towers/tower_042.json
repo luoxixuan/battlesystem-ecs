@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":37,"Name":"Ion Coil #42","Damage":41,"Type":"Ion","Cost":61,"AttackSpeed":0.8,"Range":12}
+{
+  "Name": "Laser Cannon",
+  "Type": "Tower",
+  "Damage": 52,
+  "Range": 8,
+  "AttackSpeed": 1.0,
+  "Cost": 295,
+  "UpgradeCost": 177
+}

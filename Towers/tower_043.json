@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":37,"Name":"Cyber Node #43","Damage":45,"Type":"Cyber","Cost":62,"AttackSpeed":0.95,"Range":13}
+{
+  "Name": "Missile Battery",
+  "Type": "Tower",
+  "Damage": 85,
+  "Range": 10,
+  "AttackSpeed": 0.45,
+  "Cost": 480,
+  "UpgradeCost": 288
+}

@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":33,"Name":"Firewall Turret #36","Damage":34,"Type":"Firewall","Cost":55,"AttackSpeed":1.4,"Range":6}
+{
+  "Name": "Fusion Core",
+  "Type": "Tower",
+  "Damage": 88,
+  "Range": 4,
+  "AttackSpeed": 0.55,
+  "Cost": 440,
+  "UpgradeCost": 264
+}

@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":26,"Name":"Drone Sprayer #24","Damage":28,"Type":"Drone","Cost":43,"AttackSpeed":1.1,"Range":9}
+{
+  "Name": "Laser Array",
+  "Type": "Tower",
+  "Damage": 22,
+  "Range": 6,
+  "AttackSpeed": 3.0,
+  "Cost": 230,
+  "UpgradeCost": 138
+}

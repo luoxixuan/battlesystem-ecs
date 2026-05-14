@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":39,"Name":"Neon Grid #46","Damage":43,"Type":"Neon","Cost":65,"AttackSpeed":1.4,"Range":1}
+{
+  "Name": "Cryo Spout",
+  "Type": "Tower",
+  "Damage": 20,
+  "Range": 6,
+  "AttackSpeed": 2.2,
+  "Cost": 155,
+  "UpgradeCost": 93
+}

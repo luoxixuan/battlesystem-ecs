@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":32,"Name":"Gravity Beacon #34","Damage":38,"Type":"Gravity","Cost":53,"AttackSpeed":1.1,"Range":4}
+{
+  "Name": "Pulse Sphere",
+  "Type": "Tower",
+  "Damage": 14,
+  "Range": 8,
+  "AttackSpeed": 2.0,
+  "Cost": 170,
+  "UpgradeCost": 102
+}

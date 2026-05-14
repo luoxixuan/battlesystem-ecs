@@ -1,4 +1,4 @@
-﻿{
+{
     "MonsterTypes":  [
                          {
                              "MoveSpeed":  0.3,
@@ -4159,21 +4159,21 @@
                    "AttackRange":  3,
                    "MaxHealth":  200,
                    "StartingSkills":  [
-                                          "Circuit Breaker",
-                                          "Plasma Surge",
-                                          "Railgun Shot",
-                                          "Ion Storm",
-                                          "Cyber Worm",
-                                          "Firewall Burst",
-                                          "Phase Dash",
-                                          "Overclock Strike",
-                                          "System Crash",
-                                          "Null Zone",
-                                          "Data Leech",
-                                          "Warp Gate",
-                                          "Blackout Protocol",
-                                          "Neural Spike",
-                                          "Doom Bomb"
+                                          "Circuit Breaker #1",
+                                          "Plasma Surge #2",
+                                          "Railgun Shot #3",
+                                          "Ion Storm #4",
+                                          "Cyber Worm #5",
+                                          "Firewall Burst #6",
+                                          "Phase Dash #7",
+                                          "Overclock Strike #8",
+                                          "System Crash #9",
+                                          "Null Zone #10",
+                                          "Data Leech #11",
+                                          "Warp Gate #12",
+                                          "Blackout Protocol #13",
+                                          "Neural Spike #14",
+                                          "Doom Bomb #15"
                                       ],
                    "Name":  "Player",
                    "AttackDamage":  10,

@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":25,"Name":"Chrome Coil #22","Damage":23,"Type":"Chrome","Cost":41,"AttackSpeed":0.8,"Range":7}
+{
+  "Name": "Photon Lance",
+  "Type": "Tower",
+  "Damage": 80,
+  "Range": 11,
+  "AttackSpeed": 0.5,
+  "Cost": 420,
+  "UpgradeCost": 252
+}

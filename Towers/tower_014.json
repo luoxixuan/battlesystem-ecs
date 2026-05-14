@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":20,"Name":"Phase Beacon #14","Damage":18,"Type":"Phase","Cost":33,"AttackSpeed":1.1,"Range":14}
+{
+  "Name": "Phase Shift Tower",
+  "Type": "Tower",
+  "Damage": 45,
+  "Range": 5,
+  "AttackSpeed": 0.9,
+  "Cost": 280,
+  "UpgradeCost": 168
+}

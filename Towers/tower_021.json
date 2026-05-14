@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":24,"Name":"Neon Cannon #21","Damage":21,"Type":"Neon","Cost":40,"AttackSpeed":0.65,"Range":6}
+{
+  "Name": "Nebula Emitter",
+  "Type": "Tower",
+  "Damage": 28,
+  "Range": 7,
+  "AttackSpeed": 1.6,
+  "Cost": 195,
+  "UpgradeCost": 117
+}

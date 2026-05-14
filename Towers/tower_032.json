@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":31,"Name":"Stun Lance #32","Damage":32,"Type":"Stun","Cost":51,"AttackSpeed":0.8,"Range":2}
+{
+  "Name": "Plasma Drill",
+  "Type": "Tower",
+  "Damage": 75,
+  "Range": 3,
+  "AttackSpeed": 0.8,
+  "Cost": 360,
+  "UpgradeCost": 216
+}

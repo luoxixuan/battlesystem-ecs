@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":27,"Name":"Pulse Grid #26","Damage":26,"Type":"Pulse","Cost":45,"AttackSpeed":1.4,"Range":11}
+{
+  "Name": "Swarm Hive",
+  "Type": "Tower",
+  "Damage": 8,
+  "Range": 8,
+  "AttackSpeed": 4.5,
+  "Cost": 270,
+  "UpgradeCost": 162
+}

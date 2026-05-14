@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":32,"Name":"Leech Array #35","Damage":31,"Type":"Leech","Cost":54,"AttackSpeed":1.25,"Range":5}
+{
+  "Name": "Ion Cannon",
+  "Type": "Tower",
+  "Damage": 55,
+  "Range": 6,
+  "AttackSpeed": 0.9,
+  "Cost": 305,
+  "UpgradeCost": 183
+}

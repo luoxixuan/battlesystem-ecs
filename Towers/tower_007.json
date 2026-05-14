@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":16,"Name":"Stun Tower #7","Damage":10,"Type":"Stun","Cost":26,"AttackSpeed":1.55,"Range":7}
+{
+  "Name": "Stun Grid",
+  "Type": "Tower",
+  "Damage": 8,
+  "Range": 7,
+  "AttackSpeed": 4.0,
+  "Cost": 160,
+  "UpgradeCost": 80
+}

@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":16,"Name":"EMP Bastion #8","Damage":11,"Type":"EMP","Cost":27,"AttackSpeed":1.7,"Range":8}
+{
+  "Name": "EMP Tower",
+  "Type": "Tower",
+  "Damage": 5,
+  "Range": 10,
+  "AttackSpeed": 0.5,
+  "Cost": 250,
+  "UpgradeCost": 150
+}

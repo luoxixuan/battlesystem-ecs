@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":40,"Name":"Chrome Tower #47","Damage":46,"Type":"Chrome","Cost":66,"AttackSpeed":1.55,"Range":2}
+{
+  "Name": "Fire Jet",
+  "Type": "Tower",
+  "Damage": 58,
+  "Range": 4,
+  "AttackSpeed": 1.1,
+  "Cost": 265,
+  "UpgradeCost": 159
+}

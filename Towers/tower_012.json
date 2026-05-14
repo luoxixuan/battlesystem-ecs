@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":19,"Name":"Repair Lance #12","Damage":14,"Type":"Repair","Cost":31,"AttackSpeed":0.8,"Range":12}
+{
+  "Name": "Repair Drone",
+  "Type": "Tower",
+  "Damage": 5,
+  "Range": 7,
+  "AttackSpeed": 1.0,
+  "Cost": 130,
+  "UpgradeCost": 65
+}

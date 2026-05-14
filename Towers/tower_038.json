@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":34,"Name":"Hologram Field #38","Damage":40,"Type":"Hologram","Cost":57,"AttackSpeed":1.7,"Range":8}
+{
+  "Name": "Void Sphere",
+  "Type": "Tower",
+  "Damage": 40,
+  "Range": 7,
+  "AttackSpeed": 1.2,
+  "Cost": 275,
+  "UpgradeCost": 165
+}

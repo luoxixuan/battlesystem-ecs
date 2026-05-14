@@ -263,6 +263,31 @@ namespace BattleSystemECS.Config
                 }
             }
 
+            int skillsStart = jsonContent.IndexOf("\"Skills\"");
+            if (skillsStart != -1)
+            {
+                int playerEnd = -1;
+                int playerStartIdx = jsonContent.IndexOf("\"Player\"");
+                if (playerStartIdx != -1)
+                {
+                    int pBrace = jsonContent.IndexOf("{", playerStartIdx);
+                    if (pBrace != -1)
+                        playerEnd = FindMatchingBrace(jsonContent, pBrace);
+                }
+                int skillsSearchStart = (playerEnd > skillsStart) ? playerEnd : skillsStart;
+                int skillsStartBracket = jsonContent.IndexOf("[", skillsSearchStart);
+                if (skillsStartBracket != -1)
+                {
+                    int skillsEndBracket = FindMatchingBrace(jsonContent, skillsStartBracket);
+                    if (skillsEndBracket != -1)
+                    {
+                        int diff = skillsEndBracket - skillsStartBracket;
+                        string skillsJson = jsonContent.Substring(skillsStartBracket, diff);
+                        gameConfig.Skills = ParseSkillConfigs(skillsJson);
+                    }
+                }
+            }
+
             if (gameConfig.Levels.Count > 0)
             {
                 gameConfig.CurrentLevel = gameConfig.Levels[0];
@@ -568,6 +593,46 @@ namespace BattleSystemECS.Config
             }
 
             return -1;
+        }
+
+        private static List<SkillConfig> ParseSkillConfigs(string jsonArray)
+        {
+            var skills = new List<SkillConfig>();
+            int pos = 0;
+            while (pos < jsonArray.Length)
+            {
+                while (pos < jsonArray.Length && (char.IsWhiteSpace(jsonArray[pos]) || jsonArray[pos] == ',')) pos++;
+                if (pos >= jsonArray.Length) break;
+                if (jsonArray[pos] == '{')
+                {
+                    int objEnd = FindMatchingBrace(jsonArray, pos);
+                    if (objEnd == -1) break;
+                    string skillJson = jsonArray.Substring(pos, objEnd - pos);
+                    skills.Add(ParseSkillConfig(skillJson));
+                    pos = objEnd + 1;
+                }
+                else { pos++; }
+            }
+            return skills;
+        }
+
+        private static SkillConfig ParseSkillConfig(string json)
+        {
+            var skill = new SkillConfig();
+            skill.Name = ExtractString(json, "Name");
+            skill.Description = ExtractString(json, "Description");
+            skill.DamageMultiplier = ExtractFloat(json, "DamageMultiplier");
+            skill.AreaWidth = ExtractInt(json, "AreaWidth");
+            skill.AreaHeight = ExtractInt(json, "AreaHeight");
+            skill.AttackRange = ExtractInt(json, "AttackRange");
+            skill.Cooldown = ExtractFloat(json, "Cooldown");
+            string autoCastStr = ExtractString(json, "AutoCast");
+            bool autoCast = false;
+            if (!string.IsNullOrEmpty(autoCastStr))
+                bool.TryParse(autoCastStr, out autoCast);
+            skill.AutoCast = autoCast;
+            skill.Hotkey = ExtractString(json, "Hotkey");
+            return skill;
         }
     }
 }

@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":28,"Name":"Plasma Bastion #28","Damage":30,"Type":"Plasma","Cost":47,"AttackSpeed":1.7,"Range":13}
+{
+  "Name": "Cryo Cannon",
+  "Type": "Tower",
+  "Damage": 32,
+  "Range": 5,
+  "AttackSpeed": 1.3,
+  "Cost": 185,
+  "UpgradeCost": 111
+}

@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":35,"Name":"Phase Matrix #39","Damage":43,"Type":"Phase","Cost":58,"AttackSpeed":1.85,"Range":9}
+{
+  "Name": "Nebula Spout",
+  "Type": "Tower",
+  "Damage": 18,
+  "Range": 9,
+  "AttackSpeed": 2.5,
+  "Cost": 220,
+  "UpgradeCost": 132
+}

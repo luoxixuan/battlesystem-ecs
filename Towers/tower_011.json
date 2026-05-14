@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":18,"Name":"Firewall Core #11","Damage":13,"Type":"Firewall","Cost":30,"AttackSpeed":0.65,"Range":11}
+{
+  "Name": "Firewall Bastion",
+  "Type": "Tower",
+  "Damage": 35,
+  "Range": 3,
+  "AttackSpeed": 1.8,
+  "Cost": 210,
+  "UpgradeCost": 126
+}

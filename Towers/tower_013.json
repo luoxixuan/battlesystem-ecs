@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":19,"Name":"Hologram Storm #13","Damage":16,"Type":"Hologram","Cost":32,"AttackSpeed":0.95,"Range":13}
+{
+  "Name": "Hologram Decoy",
+  "Type": "Tower",
+  "Damage": 3,
+  "Range": 12,
+  "AttackSpeed": 5.0,
+  "Cost": 90,
+  "UpgradeCost": 45
+}

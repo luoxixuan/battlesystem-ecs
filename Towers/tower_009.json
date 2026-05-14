@@ -1,1 +1,9 @@
-﻿{"UpgradeCost":17,"Name":"Gravity Drone #9","Damage":13,"Type":"Gravity","Cost":28,"AttackSpeed":1.85,"Range":9}
+{
+  "Name": "Gravity Well",
+  "Type": "Tower",
+  "Damage": 20,
+  "Range": 6,
+  "AttackSpeed": 0.7,
+  "Cost": 300,
+  "UpgradeCost": 180
+}
