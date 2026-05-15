@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -96,26 +98,38 @@ namespace BattleSystemECS.Core
         public int PlayerEntityId { get; private set; } = 1;
         private List<int> _activeEnemyIds = new List<int>();
         private List<int> _activeTowerIds = new List<int>();
-        private Stack<int> freeEntityIds = new Stack<int>();
-        public Dictionary<int, string> entityNames = new Dictionary<int, string>();
         private int nextEntityId = 2; // 从 2 开始，1 是玩家
 
         // Expose as read-only snapshots — parallel code reads only, writes go through internal API
-        public IReadOnlyList<int> ActiveEnemyIds => _activeEnemyIds;
-        public IReadOnlyList<int> ActiveTowerIds => _activeTowerIds;
+        // M-3 fix: return .ToList() snapshot instead of live reference to internal List
+        public IReadOnlyList<int> ActiveEnemyIds => _activeEnemyIds.ToList();
+        public IReadOnlyList<int> ActiveTowerIds => _activeTowerIds.ToList();
+
+        private readonly ConcurrentStack<int> freeEntityIds = new ConcurrentStack<int>();
+        private readonly Dictionary<int, string> entityNames = new Dictionary<int, string>();
+        private readonly object entityNamesLock = new object(); // H-1: thread-safe access to entityNames
 
         // For test setup only — use AddEnemy() / DestroyEntity() in production code
         public void AddActiveEnemyId(int id) => _activeEnemyIds.Add(id);
         public void AddActiveTowerId(int id) => _activeTowerIds.Add(id);
 
         // ── Two-phase death resolution (Thread-safe) ──────────────────────────
-        // Parallel systems collect deaths here; serial ResolveEnemiesKilledThisFrame() processes them.
         private ConcurrentBag<(int enemyId, int playerId)> _deathQueue = new ConcurrentBag<(int, int)>();
+
+        private bool _deathQueueResolved = false;
 
         public void BeginFrame()
         {
+            // M-1 fix: detect programming error — BeginFrame called without Resolve
+            if (_deathQueue != null && !_deathQueue.IsEmpty && !_deathQueueResolved)
+            {
+                throw new InvalidOperationException(
+                    "BeginFrame() called but ResolveEnemiesKilledThisFrame() was not called " +
+                    "for the previous frame. Deaths may have been discarded.");
+            }
             // Reset for a new frame — called at the start of each game turn
             _deathQueue = new ConcurrentBag<(int, int)>();
+            _deathQueueResolved = false;
         }
 
         /// <summary>
@@ -146,6 +160,7 @@ namespace BattleSystemECS.Core
             }
             // EndFrame: clear after processing so BeginFrame is optional
             _deathQueue = new ConcurrentBag<(int, int)>();
+            _deathQueueResolved = true;
         }
 
         public ComponentStore()
@@ -160,23 +175,17 @@ namespace BattleSystemECS.Core
 
         public int CreateEntity()
         {
-            if (freeEntityIds.Count > 0)
+            // H-1 fix: ConcurrentStack is thread-safe
+            if (freeEntityIds.TryPop(out int entityId))
             {
-                int entityId = freeEntityIds.Pop();
-                // Bug #2 fix: validate recycled ID is within valid range
                 if (entityId >= 0 && entityId < MAX_ENTITIES)
                 {
                     EnemyActionEnum[entityId] = EnemyActionType.None;
                     return entityId;
                 }
-                // Invalid recycled ID — fall through to fresh allocation
             }
-            int entityId2 = nextEntityId++;
-            // Bug #2 fix: return -1 if we would exceed MAX_ENTITIES
-            if (entityId2 >= MAX_ENTITIES)
-            {
-                return -1;
-            }
+            int entityId2 = Interlocked.Increment(ref nextEntityId) - 1;
+            if (entityId2 >= MAX_ENTITIES) return -1;
             EnemyActionEnum[entityId2] = EnemyActionType.None;
             return entityId2;
         }
@@ -189,7 +198,11 @@ namespace BattleSystemECS.Core
 
             // ── Phase 2: shared state cleanup ─────────────────────────────────────
             PositionActive[entityId] = false;
-            if (entityNames.Remove(entityId)) { /* removed */ }
+            // H-1 fix: lock around dictionary removal (thread-safe)
+            lock (entityNamesLock)
+            {
+                entityNames.Remove(entityId);
+            }
 
             // ── Phase 3: archetype-specific cleanup ────────────────────────────────
             if (wasEnemy)
@@ -238,17 +251,25 @@ namespace BattleSystemECS.Core
 
         public string GetName(int entityId)
         {
+            // H-1 fix: lock around dictionary read (thread-safe)
             // Bug#29 fix: TryGetValue is a single hash lookup vs ContainsKey+indexer double lookup
-            if (entityNames.TryGetValue(entityId, out string name))
+            lock (entityNamesLock)
             {
-                return name;
+                if (entityNames.TryGetValue(entityId, out string name))
+                {
+                    return name;
+                }
             }
             return $"Entity_{entityId}";
         }
 
         public void SetEntityName(int entityId, string name)
         {
-            entityNames[entityId] = name;
+            // H-1 fix: lock around dictionary write (thread-safe)
+            lock (entityNamesLock)
+            {
+                entityNames[entityId] = name;
+            }
         }
 
         // ==================== 位置组件访问 ====================
@@ -719,7 +740,8 @@ namespace BattleSystemECS.Core
         public HashSet<string> GetUnlockedTechs(int playerId)
         {
             if (playerId < 0 || playerId >= MAX_PLAYERS) return new HashSet<string>();
-            return PlayerUnlockedTechs[playerId];
+            // L-1 fix: return a defensive copy to prevent external mutation
+            return new HashSet<string>(PlayerUnlockedTechs[playerId]);
         }
     }
 }
