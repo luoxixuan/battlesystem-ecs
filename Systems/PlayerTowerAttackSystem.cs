@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,7 +19,9 @@ namespace BattleSystemECS.Systems
         private Core.ComponentStore store;
         private IRenderer renderer;
         private int playerId;
-        private static readonly Random critRandom = new Random();
+
+        // H-2 fix: per-instance Random instead of static (static Random is not thread-safe)
+        private readonly Random critRandom = new Random();
 
         // Cached per-turn to avoid per-frame store lookups
         private float _playerX, _playerY;
@@ -59,8 +61,8 @@ namespace BattleSystemECS.Systems
             }
 
             var buffs = store.GetPlayerBuffs(playerId);
-
-            float finalAttackDamage = _attackDamage;
+            float baseDamage = _attackDamage;
+            bool hasCritBuff = false;
 
             if (buffs.Count > 0)
             {
@@ -68,14 +70,11 @@ namespace BattleSystemECS.Systems
                 {
                     if (buff == "Attack+10%")
                     {
-                        finalAttackDamage *= 1.1f;
+                        baseDamage *= 1.1f;
                     }
                     else if (buff == "Crit Rate+5%")
                     {
-                        if (critRandom.NextDouble() < 0.05)
-                        {
-                            finalAttackDamage *= 2f;
-                        }
+                        hasCritBuff = true;
                     }
                 }
             }
@@ -98,11 +97,17 @@ namespace BattleSystemECS.Systems
                 float enemyHealth = store.EnemyHealth[enemyId];
                 if (enemyHealth <= 0f) return;
 
-                _damageQueue.Add((enemyId, finalAttackDamage));
+                // H-3 fix: crit rolled per-enemy inside parallel loop, not once per frame globally.
+                float finalDamage = baseDamage;
+                if (hasCritBuff && critRandom.NextDouble() < 0.05)
+                {
+                    finalDamage *= 2f;
+                }
+
+                _damageQueue.Add((enemyId, finalDamage));
             });
 
-            // Phase 2 (serial): apply collected damage, then resolve deaths
-            // Phase 2 (serial): apply damage, queue deaths. Resolve happens at frame end in GameManager/Benchmark.
+            // Phase 2 (serial): apply collected damage, then queue deaths
             foreach (var (enemyId, damage) in _damageQueue)
             {
                 if (!store.EnemyActive[enemyId]) continue;
@@ -112,6 +117,7 @@ namespace BattleSystemECS.Systems
                     store.QueueEnemyDeath(enemyId, playerId);
                 }
             }
+
             // Damage queue reset remains here to keep memory bounded per frame
             _damageQueue = new ConcurrentBag<(int, float)>();
         }

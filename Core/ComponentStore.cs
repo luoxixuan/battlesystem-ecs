@@ -124,6 +124,9 @@ namespace BattleSystemECS.Core
         /// </summary>
         public void QueueEnemyDeath(int enemyId, int playerId)
         {
+            // H-11 fix: validate IDs are within valid range before queueing
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
             _deathQueue.Add((enemyId, playerId));
         }
 
