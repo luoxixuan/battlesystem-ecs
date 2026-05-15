@@ -33,6 +33,7 @@ namespace BattleSystemECS.Systems
         private float _goldOnWaveBonus = 0f;
         private float _lowHpRegenThreshold = 0f;  // if > 0, hp pct below which regen kicks in
         private float _lowHpRegenValue = 0f;
+        private const float LOW_HP_REGEN_THRESHOLD = 0.30f;
         private bool _hasRespawn = false;
         private float _respawnHpPct = 0f;
 
@@ -168,7 +169,7 @@ namespace BattleSystemECS.Systems
                     case "armor_penetration":       _armorPenetration += eff.value; break;
                     case "gold_on_wave_bonus":      _goldOnWaveBonus += eff.value; break;
                     case "low_hp_regen":
-                        _lowHpRegenThreshold = 0.30f;
+                        _lowHpRegenThreshold = LOW_HP_REGEN_THRESHOLD;
                         _lowHpRegenValue = eff.value;
                         break;
                     case "immunity_knockback":

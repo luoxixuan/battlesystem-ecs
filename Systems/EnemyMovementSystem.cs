@@ -80,7 +80,9 @@ namespace BattleSystemECS.Systems
                             break;
                         }
 
-                    // MoveToTarget, None, and default: use direction = -1 (already set)
+                    default:
+                        // Default: move toward player (direction = -1, toward y=0)
+                        break;
                 }
 
                 store.PositionY[enemyId] = y + direction * moveSpeed;

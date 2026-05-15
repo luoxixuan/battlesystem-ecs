@@ -22,7 +22,7 @@ namespace BattleSystemECS.Config
                 }
 
                 string jsonContent = File.ReadAllText(CONFIG_FILE);
-                
+
                 if (string.IsNullOrWhiteSpace(jsonContent))
                 {
                     renderer.Log("[CONFIG] Configuration file is empty: " + CONFIG_FILE);
@@ -34,6 +34,13 @@ namespace BattleSystemECS.Config
 
                 // Load behavior trees
                 LoadBehaviorTrees(gameConfig, renderer);
+
+                if (gameConfig == null)
+                {
+                    renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
+                    renderer.Log("[CONFIG] Using default configuration");
+                    return GetDefaultConfig();
+                }
 
                 renderer.Log("[CONFIG] Successfully loaded configuration from " + CONFIG_FILE);
                 renderer.Log("[CONFIG]   - " + gameConfig.MonsterTypes.Count + " monster types");
@@ -169,7 +176,7 @@ namespace BattleSystemECS.Config
         public static GameConfig GetDefaultConfig()
         {
             var gameConfig = new GameConfig();
-            
+
             gameConfig.Player = new PlayerConfig
             {
                 Name = "Player",
@@ -217,7 +224,7 @@ namespace BattleSystemECS.Config
         private static GameConfig ParseGameConfig(string jsonContent)
         {
             var gameConfig = new GameConfig();
-            
+
             int playerStart = jsonContent.IndexOf("\"Player\"");
             if (playerStart != -1)
             {
