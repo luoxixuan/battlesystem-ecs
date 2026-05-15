@@ -4,14 +4,17 @@
 
 ---
 
-## 性能基准（2026-05-13, commit `d707920`）
+## 性能基准（2026-05-15, commit `223c84d`）
 
 | 指标 | 数值 |
 |------|------|
-| 测试规模 | 10,000 敌人 × 200 帧 |
-| **mode 4**（真实系统链路） | **~4900 FPS**，TOTAL ~41ms |
-| **mode 2**（合并热路径） | **~9300 FPS**，TOTAL ~21ms |
-| 主要热点（mode 4） | EnemyAI ~14ms / PlayerAttack ~16ms / TowerAttack ~5ms |
+| 测试规模 | 10,000 敌人 × 200 帧 × 150 塔 |
+| **mode 4**（真实系统链路） | **~4000 FPS**，TOTAL ~49ms |
+| **mode 2**（合并热路径） | **~9500 FPS**，TOTAL ~21ms |
+| 主要热点（mode 4） | EnemyAI ~22ms / PlayerAttack ~7ms / TowerAttack ~5ms |
+
+> 2026-05-15：10x 扩展（150 塔 × 200 怪物）后性能下降属预期，EnemyAI 两阶段模式稳定支撑规模扩展。
+> 2026-05-13：`d707920` 基准 ~4900 FPS（10K 敌 × 200 帧 × 5 塔），本基准为 10x 塔数量后结果。
 
 > 真实系统链路（mode 4）是主要参考指标，因为它直接调用 `EnemyAISystem.Update()` / `EnemyMovementSystem.Update()` / `PlayerTowerAttackSystem.Update()` / `TowerAttackSystem.Update()`。mode 2 是手写合并热路径，参考价值次之。
 
@@ -23,6 +26,9 @@
 | `3885275` | 3368 | TowerAttack 并行化 + ActiveTowerIds |
 | `ccc42e3` | ~4900 | EnemyAI 两阶段 + BeginFrame 每回合 |
 | `d707920` | ~4900 | PlayerAttack/TowerAttack damage 累加修正 |
+| `223c84d` | ~4000 | 10x 扩展（150 塔 × 200 怪物）后 EnemyAI ~22ms |
+
+> `223c84d` 是 10x 规模（150 塔）后基准，与 5 塔基准 `d707920`（~4900 FPS）不可直接对比。
 
 ---
 
@@ -131,10 +137,10 @@ dotnet test
 | 严重度 | 总数 | 已修复 | 未修复 |
 |--------|------|--------|--------|
 | HIGH   | 13   | 13     | 0      |
-| MEDIUM | 15   | 14     | 1      |
+| MEDIUM | 15   | 15     | 0      |
 | LOW    | 9    | 9      | 0      |
-| INFO   | 6    | 5      | 1      |
-| **合计** | **46** | **45** | **1** |
+| INFO   | 6    | 6      | 0      |
+| **合计** | **46** | **46** | **0** |
 
 > ⚠️ mode 4（真实系统链路 benchmark）才是主要性能指标，mode 2 是合并热路径，两者不再混淆。
 > ✅ 2026-05-13：PlayerAttack/TowerAttack damage queue 改为 damage 累加（`d707920`），死亡队列自清空（`7ef56aa`），EnemyAI 两阶段（`ccc42e3`）

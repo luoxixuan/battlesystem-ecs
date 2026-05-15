@@ -22,24 +22,27 @@
 
 ---
 
-## 二、Bug 追踪（46 项，45 已修复，1 未修复）
+## 二、Bug 追踪（46 项，全部已修复）
 
 ### 2.1 汇总
 
 | 严重度 | 总数 | 已修复 | 未修复 |
 |--------|------|--------|--------|
 | HIGH   | 13   | 13     | 0      |
-| MEDIUM | 15   | 14     | 1      |
+| MEDIUM | 15   | 15     | 0      |
 | LOW    | 9    | 9      | 0      |
-| INFO   | 6    | 5      | 1      |
-| **合计** | **46** | **45** | **1** |
+| INFO   | 6    | 6      | 0      |
+| **合计** | **46** | **46** | **0** |
+
+> 2026-05-15：#39（GridSpatialHash 空文件）和 #40（csproj 编译项）均已确认已修复/非问题，46/46 全部解决。
 
 ### 2.2 未修复项
 
-| Bug# | 严重度 | 描述 |
-|------|--------|------|
-| #39 | INFO | `Systems/GridSpatialHash.cs` 为空文件（死代码） |
-| #40 | MEDIUM | `csproj EnableDefaultCompileItems=false` 导致 UpgradeSystem 可能不被编译 |
+| Bug# | 严重度 | 描述 | 状态 |
+|------|--------|------|------|
+| — | — | 无 | 全部已修复 |
+
+> 2026-05-15 心跳核查：#39（GridSpatialHash.cs 空文件）已于 `7f02a52` 删除；#40（csproj EnableDefaultCompileItems）实际不成立，UpgradeSystem.cs 由 `Compile Include="Systems\*.cs"` 显式包含。
 
 ---
 
@@ -272,15 +275,15 @@
 **状态**: ✅ 已修复（commit `a4650bc` 同类清理）
 **修复内容**: 移除 `private const int MAX_MONSTERS = 20000;` 死代码常量，与 MAX_BUFFS 同类，属于遗留死代码清理。
 
-#### 39. Systems/GridSpatialHash.cs 为空文件
+#### 39. Systems/GridSpatialHash.cs 为空文件 ✅ FIXED
 **文件**: Systems/GridSpatialHash.cs
-**状态**: ❌ 未修复
-**说明**: 空文件，应删除。
+**状态**: ✅ 已删除（commit `7f02a52` — "cleanup: delete dead code — System/ (5 files), GridSpatialHash, 9 old Components"）
+**说明**: 空文件已删除，不再存在于代码库。
 
-#### 40. csproj EnableDefaultCompileItems=false 导致 UpgradeSystem 可能不被编译
+#### 40. csproj EnableDefaultCompileItems=false 导致 UpgradeSystem 可能不被编译 ✅ NOT A BUG
 **文件**: BattleSystemECS.csproj
-**状态**: ❌ 未修复
-**说明**: `EnableDefaultCompileItems=false` 可能导致 UpgradeSystem.cs 不被默认编译。
+**状态**: ✅ 确认不成立
+**说明**: `EnableDefaultCompileItems=false` 后，csproj 显式使用 `Compile Include="Systems\*.cs"` 包含所有 Systems 目录文件，UpgradeSystem.cs 在其中，不存在漏编译问题。
 
 ---
 
