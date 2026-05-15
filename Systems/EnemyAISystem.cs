@@ -69,9 +69,6 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void Update()
         {
-            // Invalidate BT eval cache once per frame turn — enemies must re-evaluate behavior
-            _cacheVersion++;
-
             var activeEnemyIds = _activeEnemyList;
             int count = activeEnemyIds.Count;
 
