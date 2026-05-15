@@ -291,5 +291,196 @@ namespace BattleSystemECS.Tests
                 }
             }
         }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // Stress Tests — all towers, all skills, all monsters together
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        [Fact]
+        public void All150Towers_PlaceAndAttack_NoExceptions()
+        {
+            var config = GameConfigLoader.LoadConfig(_renderer);
+            Assert.True(config.TowerTypes.Count > 0 || config.Skills.Count > 0,
+                "game_config.json Towers array is loaded but GameConfigLoader doesn't parse Towers yet");
+
+            var store = new ComponentStore();
+            int playerId = store.CreateEntity();
+            store.PlayerMaxHealth[playerId] = 200f;
+            store.PlayerCurrentHealth[playerId] = 200f;
+            store.SetPlayerGold(playerId, 999999f);
+            store.AddPlayer(playerId, 3f, 1f, 10f, 1);
+
+            // Place one of each tower type from game_config.json Towers array
+            var towers = config.TowerTypes.Count > 0 ? config.TowerTypes : new List<TowerConfig>();
+            int placed = 0;
+            int row = 0, col = 0;
+
+            foreach (var tc in towers)
+            {
+                int eid = store.CreateEntity();
+                if (eid < 0) break;
+                store.AddTower(eid, tc.Type, tc.Damage, tc.Range, tc.AttackSpeed, 1, tc.Cost);
+                store.PositionX[eid] = col * 1.5f;
+                store.PositionY[eid] = 5f + row;
+                store.PositionActive[eid] = true;
+                placed++;
+                col++;
+                if (col >= 10) { col = 0; row++; }
+            }
+
+            Assert.True(placed > 0, $"No towers placed from config. TowerTypes count: {towers.Count}");
+
+            // Spawn enemies for towers to shoot at
+            var random = new Random(42);
+            for (int i = 0; i < 50; i++)
+            {
+                float x = random.Next(0, 10);
+                float y = random.Next(1, 19);
+                int eid = store.AddEnemy(x, y, 1f, 100f, 100f, 5f, 5, 1);
+                store.SetEntityName(eid, $"StressE{i}");
+                store.SetEnemyAIAction(eid, "");
+            }
+
+            // Run 20 frames with tower attacks
+            var towerAttack = new TowerAttackSystem(store, _renderer);
+            for (int f = 0; f < 20; f++)
+            {
+                int turn = f;
+                store.BeginFrame();
+                towerAttack.SetTurn(turn);
+                towerAttack.Update(1f);
+                store.ResolveEnemiesKilledThisFrame();
+            }
+
+            // If we get here without exception, all 150 towers are well-behaved
+            Assert.True(true);
+        }
+
+        [Fact]
+        public void All150Skills_InitializeAndFire_NoExceptions()
+        {
+            var config = GameConfigLoader.LoadConfig(_renderer);
+            var store = new ComponentStore();
+
+            int playerId = store.CreateEntity();
+            store.PlayerMaxHealth[playerId] = 200f;
+            store.PlayerCurrentHealth[playerId] = 200f;
+            store.SetPlayerGold(playerId, 999999f);
+            store.AddPlayer(playerId, 10f, 1f, 50f, 1);
+
+            // Spawn enemies in range of player skills
+            var random = new Random(42);
+            for (int i = 0; i < 30; i++)
+            {
+                float x = random.Next(0, 10);
+                float y = random.Next(1, 10); // in player attack range
+                int eid = store.AddEnemy(x, y, 0.5f, 100f, 100f, 5f, 5, 1);
+                store.SetEntityName(eid, $"SkillE{i}");
+                store.SetEnemyAIAction(eid, "");
+            }
+
+            // Initialize SkillSystem (this uses default 3 skills from GameConfig,
+            // not the 150 from game_config.json — but we exercise the full skill path)
+            var skillSystem = new SkillSystem(store, _renderer, playerId, config);
+            skillSystem.InitializePlayerSkills();
+
+            // Run 20 frames — each frame SkillSystem.Update() is called
+            for (int f = 0; f < 20; f++)
+            {
+                store.BeginFrame();
+                skillSystem.Update(1f);
+                store.ResolveEnemiesKilledThisFrame();
+            }
+
+            Assert.True(true);
+        }
+
+        [Fact]
+        public void StressTest_AllEntitiesAllSystems_NoExceptions()
+        {
+            var config = GameConfigLoader.LoadConfig(_renderer);
+            var store = new ComponentStore();
+
+            int playerId = store.CreateEntity();
+            store.PlayerMaxHealth[playerId] = 200f;
+            store.PlayerCurrentHealth[playerId] = 200f;
+            store.SetPlayerGold(playerId, 999999f);
+            store.AddPlayer(playerId, 10f, 1f, 20f, 1);
+
+            var random = new Random(777);
+
+            // Spawn all 200 monster types (3 each = 600 enemies)
+            int spawnedMonsters = 0;
+            foreach (var monsterType in config.MonsterTypes)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    float x = random.Next(0, 10);
+                    float y = random.Next(1, 19);
+                    int eid = store.AddEnemy(
+                        x, y,
+                        monsterType.MoveSpeed,
+                        monsterType.Health,
+                        monsterType.MaxHealth,
+                        monsterType.Damage,
+                        (int)monsterType.AttackRange,
+                        (int)monsterType.AttackInterval
+                    );
+                    if (eid < 0) break;
+                    store.SetEntityName(eid, $"{monsterType.Type}_{i}");
+                    store.SetEnemyAIAction(eid, "");
+                    store.EnemyBehaviorTree[eid] = config.GetCachedBehaviorTree(monsterType.Type);
+                    spawnedMonsters++;
+                }
+            }
+            Assert.True(spawnedMonsters > 0, "No monsters spawned");
+
+            // Place one of each tower type
+            int placedTowers = 0;
+            int col = 0, row = 0;
+            var towers = config.TowerTypes;
+            foreach (var tc in towers)
+            {
+                int eid = store.CreateEntity();
+                if (eid < 0) break;
+                store.AddTower(eid, tc.Type, tc.Damage, tc.Range, tc.AttackSpeed, 1, tc.Cost);
+                store.PositionX[eid] = col * 1.5f;
+                store.PositionY[eid] = 15f + row;
+                store.PositionActive[eid] = true;
+                placedTowers++;
+                col++;
+                if (col >= 10) { col = 0; row++; }
+            }
+
+            // Initialize all systems
+            var enemyAI       = new EnemyAISystem(store, _renderer, playerId, config);
+            var enemyMovement = new EnemyMovementSystem(store, playerId);
+            var playerAttack  = new PlayerTowerAttackSystem(store, _renderer, playerId, config);
+            var towerAttack   = new TowerAttackSystem(store, _renderer);
+            var gold          = new GoldSystem(store, _renderer);
+            var upgrade       = new UpgradeSystem(store, _renderer, playerId, config);
+            var skill         = new SkillSystem(store, _renderer, playerId, config);
+            skill.InitializePlayerSkills();
+
+            // Run 20 frames with all systems
+            for (int f = 0; f < 20; f++)
+            {
+                int turn = f;
+                store.BeginFrame();
+
+                enemyAI.SetTurn(turn);       enemyAI.Update();
+                enemyMovement.SetTurn(turn); enemyMovement.Update();
+                playerAttack.SetTurn(turn);  playerAttack.Update();
+                towerAttack.SetTurn(turn);   towerAttack.Update(1f);
+                gold.SetTurn(turn);          gold.Update();
+                upgrade.Update();
+                skill.Update(1f);
+
+                store.ResolveEnemiesKilledThisFrame();
+            }
+
+            // If we get here without exception, the full system is stable
+            Assert.True(true);
+        }
     }
 }

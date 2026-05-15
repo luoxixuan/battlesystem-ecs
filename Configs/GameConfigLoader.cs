@@ -288,12 +288,63 @@ namespace BattleSystemECS.Config
                 }
             }
 
+            // Parse "Towers" array (game_config.json uses "Towers" key, not "TowerTypes")
+            int towersStart = jsonContent.IndexOf("\"Towers\"");
+            if (towersStart != -1)
+            {
+                int towersSearchStart = skillsStart != -1 && skillsStart < towersStart ? skillsStart : towersStart;
+                int towersStartBracket = jsonContent.IndexOf("[", towersStart);
+                if (towersStartBracket != -1)
+                {
+                    int towersEndBracket = FindMatchingBrace(jsonContent, towersStartBracket);
+                    if (towersEndBracket != -1)
+                    {
+                        string towersJson = jsonContent.Substring(towersStartBracket, towersEndBracket - towersStartBracket);
+                        gameConfig.TowerTypes = ParseTowerConfigs(towersJson);
+                    }
+                }
+            }
+
             if (gameConfig.Levels.Count > 0)
             {
                 gameConfig.CurrentLevel = gameConfig.Levels[0];
             }
 
             return gameConfig;
+        }
+
+        private static List<TowerConfig> ParseTowerConfigs(string jsonArray)
+        {
+            var towers = new List<TowerConfig>();
+            int pos = 0;
+            while (pos < jsonArray.Length)
+            {
+                while (pos < jsonArray.Length && (char.IsWhiteSpace(jsonArray[pos]) || jsonArray[pos] == ',')) pos++;
+                if (pos >= jsonArray.Length) break;
+                if (jsonArray[pos] == '{')
+                {
+                    int objEnd = FindMatchingBrace(jsonArray, pos);
+                    if (objEnd == -1) break;
+                    string towerJson = jsonArray.Substring(pos, objEnd - pos);
+                    towers.Add(ParseTowerConfig(towerJson));
+                    pos = objEnd + 1;
+                }
+                else { pos++; }
+            }
+            return towers;
+        }
+
+        private static TowerConfig ParseTowerConfig(string json)
+        {
+            var tower = new TowerConfig();
+            tower.Name = ExtractString(json, "Name");
+            tower.Type = ExtractString(json, "Type");
+            tower.Damage = ExtractFloat(json, "Damage");
+            tower.Range = ExtractInt(json, "Range");
+            tower.AttackSpeed = ExtractFloat(json, "AttackSpeed");
+            tower.Cost = ExtractFloat(json, "Cost");
+            tower.UpgradeCost = ExtractFloat(json, "UpgradeCost");
+            return tower;
         }
 
         private static PlayerConfig ParsePlayerConfig(string json)
