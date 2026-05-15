@@ -694,22 +694,53 @@ namespace BattleSystemECS.Core
 
         // ==================== GAS 组件访问方法 ====================
 
-        public AbilityInstance GetAbility(int entityId, int slot) => AbilityInstances[entityId * MAX_ABILITIES_PER_ENTITY + slot];
+        public AbilityInstance GetAbility(int entityId, int slot) {
+            if (entityId < 0 || entityId >= MAX_ENTITIES) return default;
+            if (slot < 0 || slot >= MAX_ABILITIES_PER_ENTITY) return default;
+            return AbilityInstances[entityId * MAX_ABILITIES_PER_ENTITY + slot];
+        }
 
-        public void SetAbility(int entityId, int slot, AbilityInstance inst) { AbilityInstances[entityId * MAX_ABILITIES_PER_ENTITY + slot] = inst; }
+        public void SetAbility(int entityId, int slot, AbilityInstance inst) {
+            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (slot < 0 || slot >= MAX_ABILITIES_PER_ENTITY) return;
+            AbilityInstances[entityId * MAX_ABILITIES_PER_ENTITY + slot] = inst;
+        }
 
-        public void AddAbility(int entityId, GameplayAbilityDef def) { int slot = AbilityCount[entityId]; if (slot < MAX_ABILITIES_PER_ENTITY) { SetAbility(entityId, slot, new AbilityInstance(def)); AbilityCount[entityId]++; } }
+        public void AddAbility(int entityId, GameplayAbilityDef def) {
+            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            int slot = AbilityCount[entityId];
+            if (slot < MAX_ABILITIES_PER_ENTITY) { SetAbility(entityId, slot, new AbilityInstance(def)); AbilityCount[entityId]++; }
+        }
 
         // Bug#9: Reset abilities for entity — clears all slots (used before re-initializing)
-        public void ResetPlayerAbilities(int entityId) { AbilityCount[entityId] = 0; ActiveEffectCount[entityId] = 0; }
+        public void ResetPlayerAbilities(int entityId) {
+            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            AbilityCount[entityId] = 0;
+            ActiveEffectCount[entityId] = 0;
+        }
 
-        public AppliedEffect GetEffect(int entityId, int slot) => ActiveEffects[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot];
+        public AppliedEffect GetEffect(int entityId, int slot) {
+            if (entityId < 0 || entityId >= MAX_ENTITIES) return default;
+            if (slot < 0 || slot >= MAX_ACTIVE_EFFECTS_PER_ENTITY) return default;
+            return ActiveEffects[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot];
+        }
 
-        public void SetEffect(int entityId, int slot, AppliedEffect eff) { ActiveEffects[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot] = eff; }
+        public void SetEffect(int entityId, int slot, AppliedEffect eff) {
+            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (slot < 0 || slot >= MAX_ACTIVE_EFFECTS_PER_ENTITY) return;
+            ActiveEffects[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot] = eff;
+        }
 
-        public int GetEffectCount(int entityId) => ActiveEffectCount[entityId];
+        public int GetEffectCount(int entityId) {
+            if (entityId < 0 || entityId >= MAX_ENTITIES) return 0;
+            return ActiveEffectCount[entityId];
+        }
 
-        public void AddEffect(int entityId, AppliedEffect eff) { int slot = ActiveEffectCount[entityId]; if (slot < MAX_ACTIVE_EFFECTS_PER_ENTITY) { SetEffect(entityId, slot, eff); ActiveEffectCount[entityId]++; } }
+        public void AddEffect(int entityId, AppliedEffect eff) {
+            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            int slot = ActiveEffectCount[entityId];
+            if (slot < MAX_ACTIVE_EFFECTS_PER_ENTITY) { SetEffect(entityId, slot, eff); ActiveEffectCount[entityId]++; }
+        }
 
         // ==================== 科技树组件访问方法 ====================
 

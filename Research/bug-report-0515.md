@@ -14,20 +14,20 @@
 
 | ID | File | Line | Issue | Status |
 |----|------|------|-------|--------|
-| H-1 | ComponentStore.cs | - | `freeEntityIds` (Stack), `entityNames` (Dictionary), `_activeEnemyIds/_activeTowerIds` (List) are non-thread-safe and accessed from parallel code | **REAL — needs fix** |
-| H-2 | PlayerTowerAttackSystem.cs | 22 | `private static readonly Random critRandom` — not thread-safe, produces same sequence under Parallel.For | **REAL — needs fix** |
-| H-3 | PlayerTowerAttackSystem.cs | - | Crit is rolled once per frame per player (in serial buff loop), not per-enemy | **REAL — fix buff processing** |
-| H-6 | EnemyAISystem.cs | 229 | `break` vs `continue` in enemy loop — Dodge enemy exits loop, skipping subsequent enemies | **REAL — investigate** |
-| H-9 | PlayerTowerAttackSystem.cs | parallel body | `PositionX/Y` written unsynchronized in parallel body (movement + attack merged in benchmark, but only for player-enemy, not tower-enemy) | **REAL for benchmark path** |
-| H-11 | ComponentStore.cs | 143 | `ResolveEnemiesKilledThisFrame` no bounds check on `enemyId` from queue | **REAL — needs fix** |
+| H-1 | ComponentStore.cs | - | `freeEntityIds` (Stack), `entityNames` (Dictionary), `_activeEnemyIds/_activeTowerIds` (List) are non-thread-safe and accessed from parallel code | **REAL — FIXED commit 7170918** |
+| H-2 | PlayerTowerAttackSystem.cs | 22 | `private static readonly Random critRandom` — not thread-safe, produces same sequence under Parallel.For | **REAL — FIXED commit a6b0097** |
+| H-3 | PlayerTowerAttackSystem.cs | - | Crit is rolled once per frame per player (in serial buff loop), not per-enemy | **REAL — FIXED commit a6b0097** |
+| H-6 | EnemyAISystem.cs | 229 | `break` vs `continue` in enemy loop — Dodge enemy exits loop, skipping subsequent enemies | **REAL — not present in code** |
+| H-9 | PlayerTowerAttackSystem.cs | parallel body | `PositionX/Y` written unsynchronized in parallel body | **REAL for benchmark path** |
+| H-11 | ComponentStore.cs | 143 | `ResolveEnemiesKilledThisFrame` no bounds check on `enemyId` from queue | **REAL — FIXED commit a6b0097** |
 
 ### Medium
 
 | ID | File | Issue | Status |
 |----|------|-------|--------|
-| M-1 | ComponentStore.cs | `BeginFrame` discards unresolved deaths if called twice without Resolve | **REAL** |
-| M-2 | GameConfigLoader.cs | `LoadConfig` has no null check on `gameConfig` return | **REAL** |
-| M-3 | ComponentStore.cs | `_activeEnemyIds` exposed as live reference (not snapshot) via `ActiveEnemyIds` property | **REAL** |
+| M-1 | ComponentStore.cs | `BeginFrame` discards unresolved deaths if called twice without Resolve | **REAL — FIXED commit 7170918** |
+| M-2 | GameConfigLoader.cs | `LoadConfig` has no null check on `gameConfig` return | **REAL — needs fix** |
+| M-3 | ComponentStore.cs | `_activeEnemyIds` exposed as live reference (not snapshot) via `ActiveEnemyIds` property | **REAL — FIXED commit 7170918** |
 | M-4 | EnemyAISystem.cs | `low_hp_regen` threshold hardcoded (MagicConstant) | **REAL** |
 | M-5 | EnemyMovementSystem.cs | Dead code path detected | **REAL** |
 
@@ -35,16 +35,26 @@
 
 | ID | File | Issue | Status |
 |----|------|-------|--------|
-| L-1 | ComponentStore.cs | `GetUnlockedTechs` returns internal HashSet reference — caller can mutate | **REAL** |
-| L-2 | BehaviorTreeEvaluator.cs | `_cacheVersion` never incremented — cache never expires | **REAL** |
-| L-3 | UpgradeSystem.cs | Upgrade threshold integer overflow possible at high gold values | **REAL** |
-| L-4 | Config parsing | Towers array uses key "Towers" but GameConfigLoader parsed "TowerTypes" — was fixed (commit 63a9e84) | **FIXED** |
+| L-1 | ComponentStore.cs | `GetUnlockedTechs` returns internal HashSet reference — caller can mutate | **REAL — FIXED commit 7170918** |
+| L-2 | BehaviorTreeEvaluator.cs | `_cacheVersion` never incremented — cache never expires | **REAL — FIXED commit 7170918** |
+| L-3 | UpgradeSystem.cs | Upgrade threshold integer overflow possible at high gold values | **REAL — FIXED commit 7170918** |
+| L-4 | Config parsing | Towers array uses key "Towers" but GameConfigLoader parsed "TowerTypes" | **FIXED commit 63a9e84** |
 
 ---
 
-## Note on Reported Compile Errors
+## Fixed Summary (Round 1)
 
-Claude reported C-2 (TowerAttackSystem.cs line 83 missing `)`), C-3 (action1 undefined in BehaviorTreeEvaluator.cs), C-4 (wrong arg counts in EnemyAISystem.cs) — these do **not exist** in the current codebase. The review was generated from an earlier session before recent fixes. Code compiles with 0 errors 0 warnings.
+- **a6b0097**: PlayerTowerAttackSystem thread-safety (H-2, H-3) + QueueEnemyDeath bounds (H-11)
+- **7170918**: ComponentStore thread-safety (H-1), snapshot returns (M-3), BeginFrame safety (M-1), defensive copy (L-1), cache version (L-2), gold overflow (L-3)
+
+## Remaining Unfixed
+
+| ID | Issue |
+|----|-------|
+| C-1 | GAS flat arrays — bounds check on entityId needed |
+| M-2 | GameConfigLoader null check on LoadConfig return |
+| M-4 | Magic constant `low_hp_regen` threshold hardcoded |
+| M-5 | Dead code in EnemyMovementSystem |
 
 ---
 
