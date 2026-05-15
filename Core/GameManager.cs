@@ -299,6 +299,9 @@ namespace BattleSystemECS.Core
                     // [测试] 塔攻击逻辑
                     towerAttackSystem.Update(1.0f);
 
+                    // 技能系统串行段伤害结算（两阶段：并行收集 → 串行 apply）
+                    skillSystem.ResolveSkillDamage();
+
                     // 统一帧末死亡结算（所有攻击系统已完成伤害/死亡入队）
                     store.ResolveEnemiesKilledThisFrame();
 

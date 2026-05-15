@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
@@ -21,6 +22,8 @@ namespace BattleSystemECS.Systems
         private float deltaTime = 1f;
         private GameConfig gameConfig;
         private List<int> _activeEnemyList;
+        // Two-phase pattern: collect damage in parallel phase, resolve in serial phase
+        private ConcurrentBag<(int enemyId, float damage)> _skillDamageQueue = new();
 
         public SkillSystem(ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
@@ -213,15 +216,11 @@ namespace BattleSystemECS.Systems
             {
                 float enemyX = store.PositionX[closestEnemyId];
                 float enemyY = store.PositionY[closestEnemyId];
-                float enemyHealth = store.GetEnemyHealth(closestEnemyId);
 
-                enemyHealth = Math.Max(0f, enemyHealth - finalDamage);
-                store.SetEnemyHealth(closestEnemyId, enemyHealth);
+                _skillDamageQueue.Add((closestEnemyId, finalDamage));
                 hitCount = 1;
 
-                renderer.Log($"[SKILL] {name} hit enemy {closestEnemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
-
-                if (enemyHealth <= 0f) HandleKill(closestEnemyId);
+                renderer.Log($"[SKILL] {name} queued damage for enemy {closestEnemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
             }
             return hitCount;
         }
@@ -247,13 +246,10 @@ namespace BattleSystemECS.Systems
 
                 if (inHorizontalArm || inVerticalArm)
                 {
-                    enemyHealth = Math.Max(0f, enemyHealth - finalDamage);
-                    store.SetEnemyHealth(enemyId, enemyHealth);
+                    _skillDamageQueue.Add((enemyId, finalDamage));
                     hitCount++;
 
-                    renderer.Log($"[SKILL] {name} hit enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
-
-                    if (enemyHealth <= 0f) HandleKill(enemyId);
+                    renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
                 }
             }
             return hitCount;
@@ -276,17 +272,10 @@ namespace BattleSystemECS.Systems
                 if (enemyX >= playerX - (float)range && enemyX <= playerX + (float)range &&
                     enemyY >= playerY - (float)range && enemyY <= playerY + (float)range)
                 {
-                    float distance = Math.Abs(enemyX - playerX);
-                    if (distance <= range)
-                    {
-                        enemyHealth = Math.Max(0f, enemyHealth - finalDamage);
-                        store.SetEnemyHealth(enemyId, enemyHealth);
-                        hitCount++;
+                    _skillDamageQueue.Add((enemyId, finalDamage));
+                    hitCount++;
 
-                        renderer.Log($"[SKILL] {name} hit enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
-
-                        if (enemyHealth <= 0f) HandleKill(enemyId);
-                    }
+                    renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
                 }
             }
             return hitCount;
@@ -297,6 +286,29 @@ namespace BattleSystemECS.Systems
             // Queue death for serial resolution — ResolveEnemiesKilledThisFrame() called at frame end
             store.QueueEnemyDeath(enemyId, playerId);
             renderer.Log($"[SKILL] Killed enemy {enemyId}");
+        }
+
+        /// <summary>
+        /// Serial-phase damage resolution. Called from GameManager.Run() after all attack systems
+        /// have finished their Update(), before ResolveEnemiesKilledThisFrame().
+        /// Follows the two-phase pattern: parallel collect → serial apply.
+        /// </summary>
+        public void ResolveSkillDamage()
+        {
+            foreach (var (enemyId, damage) in _skillDamageQueue)
+            {
+                if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) continue;
+                float currentHealth = store.EnemyHealth[enemyId];
+                if (currentHealth <= 0f) continue; // already dead this frame
+
+                float newHealth = Math.Max(0f, currentHealth - damage);
+                store.EnemyHealth[enemyId] = newHealth;
+
+                if (newHealth <= 0f)
+                    HandleKill(enemyId);
+            }
+            // Reset for next frame
+            _skillDamageQueue = new ConcurrentBag<(int, float)>();
         }
 
         /// <summary>

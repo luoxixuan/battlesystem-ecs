@@ -481,7 +481,7 @@ namespace BattleSystemECS.Core
         {
             if (entityId < 0 || entityId >= MAX_ENTITIES) return;
             TowerActive[entityId] = false;
-            _activeTowerIds.Remove(entityId);
+            lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
         }
 
         public float GetEnemyHealth(int enemyId)
