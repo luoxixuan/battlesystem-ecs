@@ -213,9 +213,6 @@ namespace BattleSystemECS.Systems
 
         private int CastCrossArea(float finalDamage, float playerX, float playerY, int radius, string name)
         {
-            int[] xOffset = { 0, -1, 1, 0, 0 };
-            int[] yOffset = { 0, 0, 0, -1, 1 };
-
             int hitCount = 0;
             var activeEnemyIds = store.GetAllActiveEnemyIds();
 
@@ -228,21 +225,20 @@ namespace BattleSystemECS.Systems
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                for (int i = 0; i < xOffset.Length; i++)
+                // Check cross shape: all points with |dx| <= radius on horizontal arm
+                // or |dy| <= radius on vertical arm
+                bool inHorizontalArm = Math.Abs(enemyY - playerY) < 0.5f && Math.Abs(enemyX - playerX) <= radius;
+                bool inVerticalArm = Math.Abs(enemyX - playerX) < 0.5f && Math.Abs(enemyY - playerY) <= radius;
+
+                if (inHorizontalArm || inVerticalArm)
                 {
-                    float targetX = playerX + xOffset[i];
-                    float targetY = playerY + yOffset[i];
-                    if (Math.Abs(enemyX - targetX) < 0.5f && Math.Abs(enemyY - targetY) < 0.5f)
-                    {
-                        enemyHealth = Math.Max(0f, enemyHealth - finalDamage);
-                        store.SetEnemyHealth(enemyId, enemyHealth);
-                        hitCount++;
+                    enemyHealth = Math.Max(0f, enemyHealth - finalDamage);
+                    store.SetEnemyHealth(enemyId, enemyHealth);
+                    hitCount++;
 
-                        renderer.Log($"[SKILL] {name} hit enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
+                    renderer.Log($"[SKILL] {name} hit enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
 
-                        if (enemyHealth <= 0f) HandleKill(enemyId);
-                        break;
-                    }
+                    if (enemyHealth <= 0f) HandleKill(enemyId);
                 }
             }
             return hitCount;
@@ -262,8 +258,8 @@ namespace BattleSystemECS.Systems
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                if (enemyX >= playerX - 1f && enemyX <= playerX + 1f &&
-                    enemyY >= playerY - 1f && enemyY <= playerY + 1f)
+                if (enemyX >= playerX - (float)range && enemyX <= playerX + (float)range &&
+                    enemyY >= playerY - (float)range && enemyY <= playerY + (float)range)
                 {
                     float distance = Math.Abs(enemyX - playerX);
                     if (distance <= range)

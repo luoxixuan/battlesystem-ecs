@@ -52,6 +52,7 @@ namespace BattleSystemECS.Core
         public int[] EnemyWaveNumber = new int[MAX_ENTITIES];
         public bool[] EnemyActive = new bool[MAX_ENTITIES];
         public float[] EnemyChargeParam = new float[MAX_ENTITIES]; // SOA: replaces ConcurrentDictionary in EnemyAISystem
+        public int[] EnemySpawnFrame = new int[MAX_ENTITIES];
 
         // ==================== 敌人 AI 组件的 SOA 存储 ====================
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
@@ -99,6 +100,7 @@ namespace BattleSystemECS.Core
         private List<int> _activeEnemyIds = new List<int>();
         private List<int> _activeTowerIds = new List<int>();
         private int nextEntityId = 2; // 从 2 开始，1 是玩家
+        public int CurrentFrame { get; private set; } = 0;
 
         // Expose as read-only snapshots — parallel code reads only, writes go through internal API
         // M-3 fix: return .ToList() snapshot instead of live reference to internal List
@@ -130,6 +132,7 @@ namespace BattleSystemECS.Core
             // Reset for a new frame — called at the start of each game turn
             _deathQueue = new ConcurrentBag<(int, int)>();
             _deathQueueResolved = false;
+            CurrentFrame++;
         }
 
         /// <summary>
@@ -414,6 +417,7 @@ namespace BattleSystemECS.Core
             EnemyGoldReward[entityId] = goldReward;
             EnemyWaveNumber[entityId] = waveNumber;
             EnemyActive[entityId] = true;
+            EnemySpawnFrame[entityId] = CurrentFrame;
 
             // 缓存怪物类型名（如 "NormalL1W1E0" -> "Normal"），避免每帧解析
             if (fullName != null)
