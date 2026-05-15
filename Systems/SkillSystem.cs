@@ -88,11 +88,15 @@ namespace BattleSystemECS.Systems
             var attackBoost = new GameplayEffectDef("Attack+10%", EffectType.Instant,
                 AttributeSetDefinitions.ATTACK_DAMAGE, AttributeModifierOp.Multiply, 1.1f);
             store.AddEffect(playerId, new AppliedEffect(attackBoost, playerId));
+            // Sync to bit flags for O(1) hot-path queries
+            store.AddBuff(playerId, BuffType.AttackBoost);
             renderer.Log("[SKILL] Applied Effect: Attack+10% (instant, ×1.1)");
 
             var critBoost = new GameplayEffectDef("Crit Rate+5%", EffectType.Instant,
                 AttributeSetDefinitions.CRIT_RATE, AttributeModifierOp.Add, 0.05f);
             store.AddEffect(playerId, new AppliedEffect(critBoost, playerId));
+            // Sync to bit flags for O(1) hot-path queries
+            store.AddBuff(playerId, BuffType.CritRateBoost);
             renderer.Log("[SKILL] Applied Effect: Crit Rate+5% (instant, +0.05)");
         }
 

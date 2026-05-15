@@ -39,6 +39,9 @@ namespace BattleSystemECS.Core
         public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         public List<string>[] PlayerBuffs = new List<string>[MAX_PLAYERS];
 
+        // Perf: bit-flag buff storage — O(1) lookup, no GC allocation per frame
+        public BuffType[] PlayerBuffFlags = new BuffType[MAX_PLAYERS];
+
         // ==================== 科技树组件的 SOA 存储 ====================
         public int[] PlayerResearchPoints = new int[MAX_PLAYERS];
         public HashSet<string>[] PlayerUnlockedTechs = new HashSet<string>[MAX_PLAYERS];
@@ -174,6 +177,7 @@ namespace BattleSystemECS.Core
             {
                 PlayerBuffs[i] = new List<string>();
                 PlayerUnlockedTechs[i] = new HashSet<string>();
+                PlayerBuffFlags[i] = BuffType.None;
             }
         }
 
@@ -308,6 +312,7 @@ namespace BattleSystemECS.Core
             PlayerGold[entityId] = 0f;
             PlayerUpgradeThreshold[entityId] = 1000f;  // 提高到 1000 以更快升级测试技能
             PlayerBuffs[entityId] = new List<string>();
+            PlayerBuffFlags[entityId] = BuffType.None;
 
             PlayerEntityId = entityId;
         }
@@ -384,6 +389,31 @@ namespace BattleSystemECS.Core
             PlayerBuffs[playerId].Add(buff);
         }
 
+        // ── O(1) buff flag helpers (perf: eliminates per-frame GC) ──────────
+        public void AddBuff(int playerId, BuffType buff)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            PlayerBuffFlags[playerId] |= buff;
+        }
+
+        public bool HasBuff(int playerId, BuffType buff)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
+            return (PlayerBuffFlags[playerId] & buff) != 0;
+        }
+
+        public float GetAttackBuffMultiplier(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 1f;
+            return (PlayerBuffFlags[playerId] & BuffType.AttackBoost) != 0 ? 1.1f : 1f;
+        }
+
+        public bool HasCritRateBuff(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
+            return (PlayerBuffFlags[playerId] & BuffType.CritRateBoost) != 0;
+        }
+
         public float GetPlayerUpgradeThreshold(int playerId)
         {
             if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
@@ -427,7 +457,8 @@ namespace BattleSystemECS.Core
                 EnemyTypeName[entityId] = (sepIdx > 0) ? fullName.Substring(0, sepIdx) : fullName;
             }
 
-            _activeEnemyIds.Add(entityId);
+            // H-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
+            lock (activeIdsLock) { _activeEnemyIds.Add(entityId); }
             return entityId;
         }
 
@@ -442,7 +473,8 @@ namespace BattleSystemECS.Core
             TowerUpgradeCost[entityId] = cost;
             TowerActive[entityId] = true;
             TowerLastAttackTime[entityId] = 0f;
-            _activeTowerIds.Add(entityId);
+            // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
+            lock (activeIdsLock) { _activeTowerIds.Add(entityId); }
         }
 
         public void RemoveTower(int entityId)

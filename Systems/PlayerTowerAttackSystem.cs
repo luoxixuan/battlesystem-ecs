@@ -60,24 +60,9 @@ namespace BattleSystemECS.Systems
                 SetTurn(0);
             }
 
-            var buffs = store.GetPlayerBuffs(playerId);
-            float baseDamage = _attackDamage;
-            bool hasCritBuff = false;
-
-            if (buffs.Count > 0)
-            {
-                foreach (string buff in buffs)
-                {
-                    if (buff == "Attack+10%")
-                    {
-                        baseDamage *= 1.1f;
-                    }
-                    else if (buff == "Crit Rate+5%")
-                    {
-                        hasCritBuff = true;
-                    }
-                }
-            }
+            // O(1) bit-flag check — no GC, no string comparison
+            float baseDamage = _attackDamage * store.GetAttackBuffMultiplier(playerId);
+            bool hasCritBuff = store.HasCritRateBuff(playerId);
 
             var activeEnemyIds = _activeEnemyList;
 

@@ -4,6 +4,18 @@ using System.Collections.Generic;
 namespace BattleSystemECS.Components
 {
     /// <summary>
+    /// Player buff type as bit flags — O(1) query instead of O(n) string list traversal.
+    /// </summary>
+    [Flags]
+    public enum BuffType
+    {
+        None = 0,
+        AttackBoost = 1 << 0,    // "Attack+10%" → damage × 1.1
+        CritRateBoost = 1 << 1,  // "Crit Rate+5%" → crit chance +5%
+        DefenseBoost = 1 << 2,   // "Defense+10%" → future use
+    }
+
+    /// <summary>
     /// Buff/Debuff data attached to an entity.
     /// </summary>
     public struct BuffData

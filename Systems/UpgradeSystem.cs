@@ -79,6 +79,13 @@ namespace BattleSystemECS.Systems
             if (!playerBuffs.Contains(newBuff))
             {
                 store.AddPlayerBuff(playerId, newBuff);
+                // Sync to bit flags for O(1) hot-path queries
+                if (newBuff == "Attack+10%")
+                    store.AddBuff(playerId, BuffType.AttackBoost);
+                else if (newBuff == "Crit Rate+5%")
+                    store.AddBuff(playerId, BuffType.CritRateBoost);
+                else if (newBuff == "Defense+10%")
+                    store.AddBuff(playerId, BuffType.DefenseBoost);
                 Console.WriteLine($"[BUFF] Gained new buff: {newBuff}!");
             }
         }
