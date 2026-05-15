@@ -20,8 +20,8 @@ namespace BattleSystemECS.Systems
         private IRenderer renderer;
         private int playerId;
 
-        // H-2 fix: per-instance Random instead of static (static Random is not thread-safe)
-        private readonly Random critRandom = new Random();
+        // BUG-1 fix: use System.Random.Shared (thread-safe in .NET 6+, eliminates Random corruption in Parallel.For)
+        private static readonly Random critRandom = System.Random.Shared;
 
         // Cached per-turn to avoid per-frame store lookups
         private float _playerX, _playerY;

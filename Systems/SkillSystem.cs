@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -19,6 +20,7 @@ namespace BattleSystemECS.Systems
         private int playerId;
         private float deltaTime = 1f;
         private GameConfig gameConfig;
+        private List<int> _activeEnemyList;
 
         public SkillSystem(ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
@@ -26,6 +28,15 @@ namespace BattleSystemECS.Systems
             this.renderer = renderer;
             this.playerId = playerId;
             this.gameConfig = gameConfig;
+        }
+
+        /// <summary>
+        /// Cache active enemy list at turn start — eliminates 3× GetAllActiveEnemyIds() allocations per skill cast.
+        /// Consistent with PlayerTowerAttackSystem, EnemyAISystem, and EnemyMovementSystem SetTurn patterns.
+        /// </summary>
+        public void SetTurn(int turn)
+        {
+            this._activeEnemyList = store.GetAllActiveEnemyIds();
         }
 
         /// <summary>
@@ -173,7 +184,7 @@ namespace BattleSystemECS.Systems
             float closestDistance = float.MaxValue;
             int closestEnemyId = -1;
 
-            var activeEnemyIds = store.GetAllActiveEnemyIds();
+            var activeEnemyIds = _activeEnemyList ?? store.GetAllActiveEnemyIds();
             foreach (int enemyId in activeEnemyIds)
             {
                 if (enemyId == playerId) continue;
@@ -214,7 +225,7 @@ namespace BattleSystemECS.Systems
         private int CastCrossArea(float finalDamage, float playerX, float playerY, int radius, string name)
         {
             int hitCount = 0;
-            var activeEnemyIds = store.GetAllActiveEnemyIds();
+            var activeEnemyIds = _activeEnemyList ?? store.GetAllActiveEnemyIds();
 
             foreach (int enemyId in activeEnemyIds)
             {
@@ -247,7 +258,7 @@ namespace BattleSystemECS.Systems
         private int CastBoxArea(float finalDamage, float playerX, float playerY, int range, string name)
         {
             int hitCount = 0;
-            var activeEnemyIds = store.GetAllActiveEnemyIds();
+            var activeEnemyIds = _activeEnemyList ?? store.GetAllActiveEnemyIds();
 
             foreach (int enemyId in activeEnemyIds)
             {

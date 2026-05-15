@@ -293,6 +293,9 @@ namespace BattleSystemECS.Core
                     playerTowerAttackSystem.SetTurn(turn);
                     playerTowerAttackSystem.Update();
 
+                    // 技能系统缓存（与玩家攻击/敌人AI保持一致的 SetTurn 模式）
+                    skillSystem.SetTurn(turn);
+
                     // [测试] 塔攻击逻辑
                     towerAttackSystem.Update(1.0f);
 

@@ -72,13 +72,7 @@ namespace BattleSystemECS.Systems
                         break;
 
                     case EnemyActionType.Dodge:
-                        {
-                            string actionStr = store.GetEnemyAIAction(enemyId);
-                            int dodgeDir = ParseDodgeDirection(actionStr);
-                            store.PositionX[enemyId] = Math.Clamp(x + dodgeDir, 0f, mapWidthMinusOne);
-                            store.PositionY[enemyId] = y - moveSpeed * 0.5f;
-                            break;
-                        }
+                        break;
 
                     default:
                         // Default: move toward player (direction = -1, toward y=0)

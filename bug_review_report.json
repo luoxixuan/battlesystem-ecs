@@ -1,0 +1,181 @@
+{
+  "project": "BattleSystem-ECS",
+  "reviewDate": "2026-05-16",
+  "summary": {
+    "totalBugs": 14,
+    "high": 4,
+    "medium": 6,
+    "low": 4
+  },
+  "bugs": [
+    {
+      "id": "BUG-H-1",
+      "severity": "HIGH",
+      "category": "race_condition",
+      "title": "Non-thread-safe Random used inside Parallel.For",
+      "file": "Systems/PlayerTowerAttackSystem.cs",
+      "line": 24,
+      "description": "A per-instance Random field (critRandom) is used inside a Parallel.For loop at line 102. Random is NOT thread-safe; concurrent calls corrupt internal state, producing duplicate or biased random values. Multiple threads access critRandom.NextDouble() simultaneously without synchronization.",
+      "impact": "Corrupted random state can cause crashes, duplicate damage rolls, or non-deterministic game behavior. Crit rate may apply incorrectly or cause out-of-bounds if internal state becomes invalid.",
+      "fix": "Use System.Random.Shared (thread-safe in .NET 6+) instead, or pre-generate random values serially before the parallel loop."
+    },
+    {
+      "id": "BUG-H-2",
+      "severity": "HIGH",
+      "category": "race_condition",
+      "title": "_activeEnemyIds.Remove() and _activeTowerIds.Remove() called without locks in DestroyEntity",
+      "file": "Core/ComponentStore.cs",
+      "lines": [213, 233],
+      "description": "List<T>.Remove() is not thread-safe. If DestroyEntity() is called concurrently from multiple threads (e.g., QueueEnemyDeath being invoked from multiple parallel systems in the same frame), List internal state can be corrupted, causing ArgumentException or missing removals.",
+      "impact": "Data corruption of entity tracking lists. Enemies may remain in active lists after destruction, causing OOB array access on subsequent frames or duplicate death processing.",
+      "fix": "Use a thread-safe collection (ConcurrentBag, lock around Remove, or ConcurrentDictionary<int, bool>) for _activeEnemyIds and _activeTowerIds."
+    },
+    {
+      "id": "BUG-H-3",
+      "severity": "HIGH",
+      "category": "null_reference",
+      "title": "SkillSystem kills use local health variable, not store state",
+      "file": "Systems/SkillSystem.cs",
+      "lines": [203, 209],
+      "description": "In CastSingleTarget(), a local copy of enemy health is modified (enemyHealth = Math.Max(0f, enemyHealth - finalDamage)), but SetEnemyHealth is never called. HandleKill checks the local variable, which is correct, but other code reading store.EnemyHealth[enemyId] after this will see the old health value. This can cause a second kill event if another system reads health.",
+      "impact": "Enemy health state inconsistency: store.EnemyHealth shows old value while kill is queued. Multiple systems (TowerAttack, PlayerTowerAttack) may double-process the same enemy.",
+      "fix": "Call store.SetEnemyHealth(closestEnemyId, enemyHealth) before HandleKill(), or use the two-phase pattern: set health, then queue death."
+    },
+    {
+      "id": "BUG-H-4",
+      "severity": "HIGH",
+      "category": "logic_error",
+      "title": "Cross/Area skill health modification never persists to store",
+      "file": "Systems/SkillSystem.cs",
+      "lines": [235, 237, 267, 268],
+      "description": "In CastCrossArea() and CastBoxArea(), a local enemyHealth variable is decremented and HandleKill is called, but store.SetEnemyHealth() is never invoked. The store continues to show full health. If multiple skills hit the same enemy, only the first skill's damage is effectively applied (because subsequent checks use store.GetEnemyHealth which returns the unchanged value).",
+      "impact": "Skill damage is lost when multiple area-effect skills hit the same enemy in one frame. This is a significant gameplay bug where skill damage is effectively reduced by ~50% or more.",
+      "fix": "Call store.SetEnemyHealth(enemyId, enemyHealth) after each health reduction in CastCrossArea and CastBoxArea."
+    },
+    {
+      "id": "BUG-M-1",
+      "severity": "MEDIUM",
+      "category": "performance",
+      "title": "O(n) tower placement check creates defensive copy every iteration",
+      "file": "Systems/TowerPlacementSystem.cs",
+      "line": 33,
+      "description": "PlaceTower iterates over store.ActiveTowerIds (which calls _activeEnemyIds.ToList() and returns a new List) to check if a tower already exists at a position. This is O(n) per placement check. The .ToList() is called on every iteration, creating unnecessary allocations.",
+      "impact": "Performance degradation with many towers. Each placement does O(n) list iteration with repeated defensive copy overhead.",
+      "fix": "Use a spatial hash or position-indexed dictionary for O(1) tower lookup by position. Alternatively, cache the snapshot once per call."
+    },
+    {
+      "id": "BUG-M-2",
+      "severity": "MEDIUM",
+      "category": "performance",
+      "title": "GetActiveEnemyCount creates two defensive copies",
+      "file": "Core/ComponentStore.cs",
+      "line": 659,
+      "description": "GetActiveEnemyCount() accesses ActiveEnemyIds which calls _activeEnemyIds.ToList(), creating one copy, then .Count accesses that copy. This is done every call (potentially every frame).",
+      "impact": "Unnecessary memory allocation every time active enemy count is queried.",
+      "fix": "Add a private counter that tracks active enemy count, updated in AddEnemy/DestroyEntity, or directly return _activeEnemyIds.Count in GetActiveEnemyCount."
+    },
+    {
+      "id": "BUG-M-3",
+      "severity": "MEDIUM",
+      "category": "logic_error",
+      "title": "Cache invalidation variable _cacheVersion is never incremented",
+      "file": "Systems/EnemyAISystem.cs",
+      "lines": [35, 98, 161],
+      "description": "_cacheVersion is declared (line 35) and checked in cache validation (line 98), but it is never incremented anywhere in the code. _cacheSnapshot = _cacheVersion at line 161 means _cacheSnapshot always equals _cacheVersion (0), so cache validation depends only on enemy/player health comparison.",
+      "impact": "The cache versioning mechanism is dead code. While the current health-based cache invalidation appears functional, this makes future cache invalidation logic error-prone.",
+      "fix": "Either remove _cacheVersion/_cacheSnapshot entirely (if health-based invalidation is sufficient), or properly increment _cacheVersion when player health or game state changes."
+    },
+    {
+      "id": "BUG-M-4",
+      "severity": "MEDIUM",
+      "category": "logic_error",
+      "title": "ResolveEnemiesKilledThisFrame modifies shared state (TotalKills, PlayerGold) without synchronization",
+      "file": "Core/ComponentStore.cs",
+      "lines": [157, 160, 161],
+      "description": "ResolveEnemiesKilledThisFrame runs serially and modifies TotalKills and PlayerGold[playerId] directly. While the method is called serially from GameManager/Benchmark, the store's shared state fields are not protected. If this method were ever called from multiple contexts or if another system modified TotalKills, there would be a race.",
+      "impact": "Current code is safe because it's called once per frame serially, but this is fragile. Any future parallelization of death resolution would introduce a data race.",
+      "fix": "Use Interlocked operations for TotalKills (Interlocked.Increment). Use Interlocked for PlayerGold accumulation, or defer gold updates to a queue processed serially."
+    },
+    {
+      "id": "BUG-M-5",
+      "severity": "MEDIUM",
+      "category": "logic_error",
+      "title": "WaveSpawningSystem.Update() enemy name generation off-by-one between batches",
+      "file": "Systems/WaveSpawningSystem.cs",
+      "line": 94,
+      "description": "Inside the batch loop (i=0..4), enemies are named using enemiesSpawnedInWave + i. After the batch completes, enemiesSpawnedInWave increments by 5. But at the start of the NEXT batch, the previous enemiesSpawnedInWave value was already incremented. Names are E0-E4 for first batch, E5-E9 for second, etc. While names are unique within a wave, the first enemy of wave 2 would be named E100 (if wave 1 had 100 enemies), which is correct — but the name generation inside the loop using the pre-incremented value means the pattern is slightly confusing and error-prone for future modifications.",
+      "impact": "Minor: enemy names are technically unique and correct, but the naming logic is fragile and could easily break if loop order changes.",
+      "fix": "Refactor to compute name after incrementing enemiesSpawnedInWave, or use a separate running counter for naming."
+    },
+    {
+      "id": "BUG-M-6",
+      "severity": "MEDIUM",
+      "category": "index_out_of_bounds",
+      "title": "BTCachedTreeEvaluator accesses array index without bounds check on childIdx",
+      "file": "Systems/BehaviorTreeEvaluator.cs",
+      "lines": [69, 84, 146, 169],
+      "description": "When iterating node.Children and accessing bt.Nodes[childIdx], there is no check that childIdx is within bt.Nodes.Length. If the behavior tree JSON contains a child reference to a non-existent node ID, this would throw IndexOutOfRangeException. BTCachedTreeBuilder.TryGetValue returns -1 for unknown nodes (line 306), which is filtered by Where(idx >= 0), but if Nodes array was built with fewer elements than max index, access would OOB.",
+      "impact": "Malformed or manually edited behavior_trees.json could cause runtime crashes.",
+      "fix": "Add bounds check before array access: if (childIdx >= 0 && childIdx < bt.Nodes.Length). In BTCachedTreeBuilder, add validation that all child indices are valid."
+    },
+    {
+      "id": "BUG-L-1",
+      "severity": "LOW",
+      "category": "logic_error",
+      "title": "CastBoxArea has redundant inner distance check",
+      "file": "Systems/SkillSystem.cs",
+      "lines": [264, 265],
+      "description": "CastBoxArea checks 'distance <= range' after already verifying enemyX and enemyY are within playerX±range and playerY±range. The additional dx check is redundant since if Y is within range and X is within range, the maximum distance is sqrt(2*range^2) which is always > range. The condition is always true for any enemy in the box.",
+      "impact": "The redundant check has no effect (always true for valid box members). Minor logic confusion, no gameplay impact.",
+      "fix": "Remove the redundant inner distance check, or clarify the intent if the box is meant to be circular."
+    },
+    {
+      "id": "BUG-L-2",
+      "severity": "LOW",
+      "category": "logic_error",
+      "title": "TowerAttackSystem always uses PlayerEntityId for gold reward",
+      "file": "Systems/TowerAttackSystem.cs",
+      "line": 83,
+      "description": "_damageQueue.Add((bestTarget, damage, store.PlayerEntityId)) always uses PlayerEntityId as the player who gets gold. In a multiplayer scenario (multiple players), towers would always credit kills to player 1, not the player who owns the tower.",
+      "impact": "Multiplayer gold distribution would be incorrect. In single-player, no impact.",
+      "fix": "Track which player placed each tower, and use that playerId for the gold reward."
+    },
+    {
+      "id": "BUG-L-3",
+      "severity": "LOW",
+      "category": "null_reference",
+      "title": "GameConfigLoader returns potentially null GameConfig in some code paths",
+      "file": "Configs/GameConfigLoader.cs",
+      "lines": [38, 176],
+      "description": "ParseGameConfig constructs a GameConfig and sets fields, but returns it even if major sections (MonsterTypes, Levels) are empty. GameManager uses gameConfig.GetLevelConfig which returns null if Levels is empty, leading to silent early returns in WaveSpawningSystem. No explicit null check at GameManager initialization.",
+      "impact": "If config file is malformed or sections are missing, game may start with 0 monsters/levels without clear error message. Silent failure rather than explicit error.",
+      "fix": "Add validation in GameConfigLoader.ParseGameConfig to return null or throw if required sections are missing. Add null check in GameManager.Initialize."
+    },
+    {
+      "id": "BUG-L-4",
+      "severity": "LOW",
+      "category": "logic_error",
+      "title": "EnemyMovementSystem ParseDodgeDirection is defined but never called",
+      "file": "Systems/EnemyMovementSystem.cs",
+      "lines": [90, 74],
+      "description": "ParseDodgeDirection() method is defined but never used. The Dodge case in the switch statement (line 74) does nothing, so all dodge actions result in zero movement (direction stays at -1, the default). The intended dodge functionality is unimplemented.",
+      "impact": "Dodge action type has no gameplay effect. Enemies with dodge behavior behave identically to enemies with move_to_target. Cosmetic only.",
+      "fix": "Either implement the dodge movement logic, or remove the ParseDodgeDirection method to avoid dead code."
+    }
+  ],
+  "excludedFiles": [
+    "Systems/BenchmarkSystem.cs - excluded per task requirements",
+    "BattleSystemECS.Tests/ - excluded per task requirements"
+  ],
+  "notes": [
+    "The two-phase pattern (parallel collect, serial resolve) is well-implemented in TowerAttackSystem and PlayerTowerAttackSystem.",
+    "ComponentStore bounds checking is thorough and consistent across all public methods.",
+    "The BTCachedTree optimization eliminates per-frame dictionary lookups — architecturally sound.",
+    "Bug#2 (TowerAttackSystem thread-safety) was already fixed per AGENTS.md. H-1 (EntityManager locks) also appears fixed.",
+    "Bug#9 (SkillSystem initialization overwrite) is fixed with ResetPlayerAbilities.",
+    "Bug#17 (GetPlayerBuffs defensive copy) is fixed.",
+    "Bug#19 (TowerPlacement O(n) lookup) is still present — see BUG-M-1.",
+    "Bug#29 (GetName TryGetValue) is fixed.",
+    "Bug#30 (magic numbers in map size) is fixed."
+  ]
+}

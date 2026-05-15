@@ -396,5 +396,23 @@ namespace BattleSystemECS.Systems
                 logger.Log($"[AI] Enemy {enemyId} releases CHARGE for {chargedDamage} damage (3x)! HP: {remaining}");
             }
         }
+        /// <summary>
+        /// Parse dodge direction from action string suffix (e.g. "dodge_1" → +1, "dodge_-1" → -1, "dodge" → +1).
+        /// Kept for backward compatibility with the dodge parameter only.
+        /// </summary>
+        private static int ParseDodgeDirection(string action)
+        {
+            if (string.IsNullOrEmpty(action))
+                return 1;
+
+            int underscoreIdx = action.LastIndexOf('_');
+            if (underscoreIdx > 0 && underscoreIdx < action.Length - 1)
+            {
+                string suffix = action.Substring(underscoreIdx + 1);
+                if (int.TryParse(suffix, out int dir))
+                    return dir;
+            }
+            return 1; // default dodge right
+        }
     }
 }

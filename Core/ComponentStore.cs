@@ -110,6 +110,7 @@ namespace BattleSystemECS.Core
         private readonly ConcurrentStack<int> freeEntityIds = new ConcurrentStack<int>();
         private readonly Dictionary<int, string> entityNames = new Dictionary<int, string>();
         private readonly object entityNamesLock = new object(); // H-1: thread-safe access to entityNames
+        private readonly object activeIdsLock = new object(); // BUG-2: thread-safe _activeEnemyIds/_activeTowerIds removal
 
         // For test setup only — use AddEnemy() / DestroyEntity() in production code
         public void AddActiveEnemyId(int id) => _activeEnemyIds.Add(id);
@@ -210,7 +211,7 @@ namespace BattleSystemECS.Core
             // ── Phase 3: archetype-specific cleanup ────────────────────────────────
             if (wasEnemy)
             {
-                _activeEnemyIds.Remove(entityId);
+                lock (activeIdsLock) { _activeEnemyIds.Remove(entityId); }
                 EnemyActive[entityId] = false;
 
                 EnemyHealth[entityId] = 0f;
@@ -230,7 +231,7 @@ namespace BattleSystemECS.Core
 
             if (wasTower)
             {
-                _activeTowerIds.Remove(entityId);
+                lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
                 TowerActive[entityId] = false;
                 TowerType[entityId] = null;
                 TowerAttackDamage[entityId] = 0f;
@@ -644,13 +645,14 @@ namespace BattleSystemECS.Core
 
         public List<int> GetActiveEnemyIds()
         {
-            return new List<int>(ActiveEnemyIds);
+            // Returns a defensive copy of the internal list — caller modifications don't affect internal state
+            return new List<int>(_activeEnemyIds);
         }
 
         public List<int> GetAllActiveEnemyIds()
         {
-            // 返回副本，避免调用方修改内部列表导致并行遍历时 InvalidOperationException
-            return new List<int>(ActiveEnemyIds);
+            // Returns a single defensive copy — avoids double allocation from ActiveEnemyIds.ToList() + new List<int>(...)
+            return new List<int>(_activeEnemyIds);
         }
 
         public int GetActiveEnemyCount()
