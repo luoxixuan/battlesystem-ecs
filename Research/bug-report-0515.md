@@ -1,61 +1,45 @@
 # BattleSystem-ECS Bug Report (Claude Code Review — 2026-05-15)
 
-## Review Round 1 Findings
+## Review Round 2 — After Fixes
 
----
-
-### Critical
+### All Findings
 
 | ID | File | Line | Issue | Status |
 |----|------|------|-------|--------|
-| C-1 | ComponentStore.cs | 673-688 | GAS flat arrays have no bounds checking on `entityId` — bad ID corrupts memory | **REAL — needs fix** |
+| C-1 | ComponentStore.cs | 673-688 | GAS flat arrays no bounds check on entityId | **FIXED commit 0159d46** |
+| H-1 | ComponentStore.cs | - | Non-thread-safe Stack/Dictionary/List in parallel context | **FIXED commit 7170918** |
+| H-2 | PlayerTowerAttackSystem.cs | 22 | static Random not thread-safe under Parallel.For | **FIXED commit a6b0097** |
+| H-3 | PlayerTowerAttackSystem.cs | - | Crit rolled once per frame, not per-enemy | **FIXED commit a6b0097** |
+| H-6 | EnemyAISystem.cs | 229 | break in switch — not a bug (code was correct) | **NOT A BUG** |
+| H-9 | PlayerTowerAttackSystem.cs | parallel | PositionX/Y unsynchronized write in benchmark path | **NOT FIXED — benchmark-only path** |
+| H-11 | ComponentStore.cs | 143 | QueueEnemyDeath no bounds check | **FIXED commit a6b0097** |
+| M-1 | ComponentStore.cs | - | BeginFrame discards unresolved deaths | **FIXED commit 7170918** |
+| M-2 | GameConfigLoader.cs | - | LoadConfig returns without null check | **FIXED commit 9a0996d** |
+| M-3 | ComponentStore.cs | - | ActiveEnemyIds/TowerIds expose live list reference | **FIXED commit 7170918** |
+| M-4 | TechTreeSystem.cs | - | `low_hp_regen` hardcoded magic constant | **FIXED commit 9a0996d** |
+| M-5 | EnemyMovementSystem.cs | - | Dead code / misleading comment | **FIXED commit 9a0996d** |
+| L-1 | ComponentStore.cs | - | GetUnlockedTechs returns internal HashSet | **FIXED commit 7170918** |
+| L-2 | BehaviorTreeEvaluator.cs | - | _cacheVersion never incremented | **FIXED commit 7170918** |
+| L-3 | UpgradeSystem.cs | - | Gold threshold overflow possible | **FIXED commit 7170918** |
+| L-4 | Config | - | Towers key mismatch | **FIXED commit 63a9e84** |
 
-### High
+### Fixed Commits (chronological)
 
-| ID | File | Line | Issue | Status |
-|----|------|------|-------|--------|
-| H-1 | ComponentStore.cs | - | `freeEntityIds` (Stack), `entityNames` (Dictionary), `_activeEnemyIds/_activeTowerIds` (List) are non-thread-safe and accessed from parallel code | **REAL — FIXED commit 7170918** |
-| H-2 | PlayerTowerAttackSystem.cs | 22 | `private static readonly Random critRandom` — not thread-safe, produces same sequence under Parallel.For | **REAL — FIXED commit a6b0097** |
-| H-3 | PlayerTowerAttackSystem.cs | - | Crit is rolled once per frame per player (in serial buff loop), not per-enemy | **REAL — FIXED commit a6b0097** |
-| H-6 | EnemyAISystem.cs | 229 | `break` vs `continue` in enemy loop — Dodge enemy exits loop, skipping subsequent enemies | **REAL — not present in code** |
-| H-9 | PlayerTowerAttackSystem.cs | parallel body | `PositionX/Y` written unsynchronized in parallel body | **REAL for benchmark path** |
-| H-11 | ComponentStore.cs | 143 | `ResolveEnemiesKilledThisFrame` no bounds check on `enemyId` from queue | **REAL — FIXED commit a6b0097** |
+| Commit | Description |
+|--------|-------------|
+| `63a9e84` | Stress tests + Towers array parsing fix |
+| `a6b0097` | H-2/H-3/H-11: crit Random + crit per-enemy + QueueEnemyDeath bounds |
+| `7170918` | H-1/M-1/M-3/L-1/L-2/L-3: thread-safety, snapshot returns, BeginFrame guard |
+| `0159d46` | C-1: GAS array bounds checking |
+| `9a0996d` | M-2/M-4/M-5: null check, magic constant, dead code |
 
-### Medium
+### Remaining Notes
 
-| ID | File | Issue | Status |
-|----|------|-------|--------|
-| M-1 | ComponentStore.cs | `BeginFrame` discards unresolved deaths if called twice without Resolve | **REAL — FIXED commit 7170918** |
-| M-2 | GameConfigLoader.cs | `LoadConfig` has no null check on `gameConfig` return | **REAL — needs fix** |
-| M-3 | ComponentStore.cs | `_activeEnemyIds` exposed as live reference (not snapshot) via `ActiveEnemyIds` property | **REAL — FIXED commit 7170918** |
-| M-4 | EnemyAISystem.cs | `low_hp_regen` threshold hardcoded (MagicConstant) | **REAL** |
-| M-5 | EnemyMovementSystem.cs | Dead code path detected | **REAL** |
-
-### Low
-
-| ID | File | Issue | Status |
-|----|------|-------|--------|
-| L-1 | ComponentStore.cs | `GetUnlockedTechs` returns internal HashSet reference — caller can mutate | **REAL — FIXED commit 7170918** |
-| L-2 | BehaviorTreeEvaluator.cs | `_cacheVersion` never incremented — cache never expires | **REAL — FIXED commit 7170918** |
-| L-3 | UpgradeSystem.cs | Upgrade threshold integer overflow possible at high gold values | **REAL — FIXED commit 7170918** |
-| L-4 | Config parsing | Towers array uses key "Towers" but GameConfigLoader parsed "TowerTypes" | **FIXED commit 63a9e84** |
-
----
-
-## Fixed Summary (Round 1)
-
-- **a6b0097**: PlayerTowerAttackSystem thread-safety (H-2, H-3) + QueueEnemyDeath bounds (H-11)
-- **7170918**: ComponentStore thread-safety (H-1), snapshot returns (M-3), BeginFrame safety (M-1), defensive copy (L-1), cache version (L-2), gold overflow (L-3)
-
-## Remaining Unfixed
-
-| ID | Issue |
-|----|-------|
-| C-1 | GAS flat arrays — bounds check on entityId needed |
-| M-2 | GameConfigLoader null check on LoadConfig return |
-| M-4 | Magic constant `low_hp_regen` threshold hardcoded |
-| M-5 | Dead code in EnemyMovementSystem |
+- **H-9** (PositionX/Y unsynchronized in benchmark path): The merged hot path in BenchmarkSystem writes `PositionY` directly — this is in the benchmark only, not in the game systems. Game systems do not have this issue.
+- **H-6**: Confirmed not a bug — `break` in `switch` is correct C# behavior. Claude's original report was a false positive.
+- **C-1**: GAS arrays in ComponentStore (`AbilityInstances`, `ActiveEffects`) now have full bounds checking on `entityId` and `slot`.
 
 ---
 
 *Report generated by: Claude Code review via WSL at /root/.npm-global/bin/claude-code*
+*Updated: 2026-05-15 after Round 2 fixes*
