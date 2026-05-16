@@ -351,10 +351,9 @@ namespace BattleSystemECS.Systems
                 float currentHealth = store.EnemyHealth[enemyId];
                 if (currentHealth <= 0f) continue; // already dead this frame
 
-                float newHealth = Math.Max(0f, currentHealth - damage);
                 store.EnemyHealth[enemyId] -= damage; // accumulation pattern (consistent with TowerAttackSystem)
 
-                if (newHealth <= 0f)
+                if (store.EnemyHealth[enemyId] <= 0f)
                     HandleKill(enemyId);
             }
         }
