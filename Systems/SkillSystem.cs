@@ -25,6 +25,10 @@ namespace BattleSystemECS.Systems
         private List<int> _activeEnemyList;
         // Two-phase pattern: collect damage in parallel phase, resolve in serial phase
         private ConcurrentBag<(int enemyId, float damage)> _skillDamageQueue = new();
+        // GC elimination: field-level bags pre-allocated, cleared before each use
+        private ConcurrentBag<(int enemyId, float distSq)> _singleTargetCandidates = new();
+        private ConcurrentBag<int> _crossAreaHits = new();
+        private ConcurrentBag<int> _boxAreaHits = new();
 
         public SkillSystem(ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
@@ -193,10 +197,7 @@ namespace BattleSystemECS.Systems
 
             int rangeSq = range * range;
 
-            // Parallel phase: find closest enemy within range
-            // Each thread finds its local closest, we reduce in serial
-            var candidates = new ConcurrentBag<(int enemyId, float distSq)>();
-
+            _singleTargetCandidates.Clear();
             Parallel.ForEach(activeEnemyIds, enemyId =>
             {
                 if (enemyId == playerId) return;
@@ -211,14 +212,14 @@ namespace BattleSystemECS.Systems
                 float distSq = dx * dx + dy * dy;
                 if (distSq <= rangeSq)
                 {
-                    candidates.Add((enemyId, distSq));
+                    _singleTargetCandidates.Add((enemyId, distSq));
                 }
             });
 
             // Serial phase: find global closest
             int closestEnemyId = -1;
             float closestDistSq = float.MaxValue;
-            foreach (var (enemyId, distSq) in candidates)
+            foreach (var (enemyId, distSq) in _singleTargetCandidates)
             {
                 if (distSq < closestDistSq)
                 {
@@ -246,7 +247,7 @@ namespace BattleSystemECS.Systems
             if (activeEnemyIds == null) return 0;
 
             // Parallel phase: collect all enemies in cross area
-            var hits = new ConcurrentBag<int>();
+            _crossAreaHits.Clear();
 
             Parallel.ForEach(activeEnemyIds, enemyId =>
             {
@@ -264,13 +265,13 @@ namespace BattleSystemECS.Systems
 
                 if (inHorizontalArm || inVerticalArm)
                 {
-                    hits.Add(enemyId);
+                    _crossAreaHits.Add(enemyId);
                 }
             });
 
             // Serial phase: apply damage
             int hitCount = 0;
-            foreach (int enemyId in hits)
+            foreach (int enemyId in _crossAreaHits)
             {
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
@@ -294,7 +295,7 @@ namespace BattleSystemECS.Systems
             float yMax = playerY + (float)range;
 
             // Parallel phase: collect all enemies in box area
-            var hits = new ConcurrentBag<int>();
+            _boxAreaHits.Clear();
 
             Parallel.ForEach(activeEnemyIds, enemyId =>
             {
@@ -308,13 +309,13 @@ namespace BattleSystemECS.Systems
                 if (enemyX >= xMin && enemyX <= xMax &&
                     enemyY >= yMin && enemyY <= yMax)
                 {
-                    hits.Add(enemyId);
+                    _boxAreaHits.Add(enemyId);
                 }
             });
 
             // Serial phase: apply damage
             int hitCount = 0;
-            foreach (int enemyId in hits)
+            foreach (int enemyId in _boxAreaHits)
             {
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];

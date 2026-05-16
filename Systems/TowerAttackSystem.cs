@@ -110,10 +110,9 @@ namespace BattleSystemECS.Systems
                     }
                 }
 
-                store.TowerLastAttackTime[towerId] = 0f;
-
                 if (bestTarget != -1)
                 {
+                    store.TowerLastAttackTime[towerId] = 0f;
                     bag.Add((bestTarget, store.TowerAttackDamage[towerId], store.PlayerEntityId));
                 }
             });
