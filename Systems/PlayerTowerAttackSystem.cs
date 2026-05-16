@@ -19,6 +19,7 @@ namespace BattleSystemECS.Systems
         private Core.ComponentStore store;
         private IRenderer renderer;
         private int playerId;
+        private TechTreeSystem techTreeSystem;
 
         // BUG-1 fix: use System.Random.Shared (thread-safe in .NET 6+, eliminates Random corruption in Parallel.For)
         private static readonly Random critRandom = System.Random.Shared;
@@ -30,14 +31,24 @@ namespace BattleSystemECS.Systems
         private bool _turnCached;
         private int _rangeSq;
 
+        // Cached crit stats (updated on SetTurn to avoid per-enemy tech tree calls)
+        private float _critRateBonus;
+        private float _critDamageBonus;  // additive bonus to ×2, e.g. 0.25 → ×2.25
+
         // Two-phase: damage collected in parallel (enemyId, damage), applied serially with -= to accumulate correctly
         private ConcurrentBag<(int enemyId, float damage)> _damageQueue = new ConcurrentBag<(int, float)>();
 
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
+            : this(store, renderer, playerId, gameConfig, null)
+        {
+        }
+
+        public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem)
         {
             this.store = store;
             this.renderer = renderer;
             this.playerId = playerId;
+            this.techTreeSystem = techTreeSystem;
         }
 
         public void SetTurn(int turn)
@@ -49,6 +60,10 @@ namespace BattleSystemECS.Systems
             _activeEnemyList = store.GetAllActiveEnemyIds();
             _turnCached = true;
             _rangeSq = (int)(_attackRange * _attackRange);
+
+            // Cache crit bonuses from tech tree (avoid per-enemy calls in hot path)
+            _critRateBonus = techTreeSystem != null ? techTreeSystem.GetCritRateBonus() : 0f;
+            _critDamageBonus = techTreeSystem != null ? techTreeSystem.GetCritDamageMult() : 1f;
         }
 
         public int GetCachedEnemyCount() => _activeEnemyList != null ? _activeEnemyList.Count : 0;
@@ -84,9 +99,9 @@ namespace BattleSystemECS.Systems
 
                 // H-3 fix: crit rolled per-enemy inside parallel loop, not once per frame globally.
                 float finalDamage = baseDamage;
-                if (hasCritBuff && critRandom.NextDouble() < 0.05)
+                if (hasCritBuff && critRandom.NextDouble() < (0.05f + _critRateBonus))
                 {
-                    finalDamage *= 2f;
+                    finalDamage *= (1f + _critDamageBonus);
                 }
 
                 _damageQueue.Add((enemyId, finalDamage));

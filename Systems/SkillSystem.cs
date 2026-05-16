@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -187,28 +188,41 @@ namespace BattleSystemECS.Systems
 
         private int CastSingleTarget(float finalDamage, float playerX, float playerY, int range, string name)
         {
-            int hitCount = 0;
-            float closestDistance = float.MaxValue;
-            int closestEnemyId = -1;
-
             var activeEnemyIds = _activeEnemyList ?? store.GetAllActiveEnemyIds();
             if (activeEnemyIds == null) return 0;
-            foreach (int enemyId in activeEnemyIds)
+
+            int rangeSq = range * range;
+
+            // Parallel phase: find closest enemy within range
+            // Each thread finds its local closest, we reduce in serial
+            var candidates = new ConcurrentBag<(int enemyId, float distSq)>();
+
+            Parallel.ForEach(activeEnemyIds, enemyId =>
             {
-                if (enemyId == playerId) continue;
+                if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) continue;
+                if (enemyHealth <= 0f) return;
 
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                // Bug fix: use correct Euclidean distance (squared, no sqrt needed for comparison)
                 float dx = enemyX - playerX;
                 float dy = enemyY - playerY;
                 float distSq = dx * dx + dy * dy;
-                if (distSq < closestDistance && distSq <= range * range)
+                if (distSq <= rangeSq)
                 {
-                    closestDistance = distSq;
+                    candidates.Add((enemyId, distSq));
+                }
+            });
+
+            // Serial phase: find global closest
+            int closestEnemyId = -1;
+            float closestDistSq = float.MaxValue;
+            foreach (var (enemyId, distSq) in candidates)
+            {
+                if (distSq < closestDistSq)
+                {
+                    closestDistSq = distSq;
                     closestEnemyId = enemyId;
                 }
             }
@@ -219,24 +233,26 @@ namespace BattleSystemECS.Systems
                 float enemyY = store.PositionY[closestEnemyId];
 
                 _skillDamageQueue.Add((closestEnemyId, finalDamage));
-                hitCount = 1;
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {closestEnemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
+                return 1;
             }
-            return hitCount;
+            return 0;
         }
 
         private int CastCrossArea(float finalDamage, float playerX, float playerY, int radius, string name)
         {
-            int hitCount = 0;
             var activeEnemyIds = _activeEnemyList ?? store.GetAllActiveEnemyIds();
             if (activeEnemyIds == null) return 0;
 
-            foreach (int enemyId in activeEnemyIds)
+            // Parallel phase: collect all enemies in cross area
+            var hits = new ConcurrentBag<int>();
+
+            Parallel.ForEach(activeEnemyIds, enemyId =>
             {
-                if (enemyId == playerId) continue;
+                if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) continue;
+                if (enemyHealth <= 0f) return;
 
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
@@ -248,38 +264,65 @@ namespace BattleSystemECS.Systems
 
                 if (inHorizontalArm || inVerticalArm)
                 {
-                    _skillDamageQueue.Add((enemyId, finalDamage));
-                    hitCount++;
-
-                    renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
+                    hits.Add(enemyId);
                 }
+            });
+
+            // Serial phase: apply damage
+            int hitCount = 0;
+            foreach (int enemyId in hits)
+            {
+                float enemyX = store.PositionX[enemyId];
+                float enemyY = store.PositionY[enemyId];
+
+                _skillDamageQueue.Add((enemyId, finalDamage));
+                hitCount++;
+
+                renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
             }
             return hitCount;
         }
 
         private int CastBoxArea(float finalDamage, float playerX, float playerY, int range, string name)
         {
-            int hitCount = 0;
             var activeEnemyIds = _activeEnemyList ?? store.GetAllActiveEnemyIds();
             if (activeEnemyIds == null) return 0;
 
-            foreach (int enemyId in activeEnemyIds)
+            float xMin = playerX - (float)range;
+            float xMax = playerX + (float)range;
+            float yMin = playerY - (float)range;
+            float yMax = playerY + (float)range;
+
+            // Parallel phase: collect all enemies in box area
+            var hits = new ConcurrentBag<int>();
+
+            Parallel.ForEach(activeEnemyIds, enemyId =>
             {
-                if (enemyId == playerId) continue;
+                if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) continue;
+                if (enemyHealth <= 0f) return;
 
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                if (enemyX >= playerX - (float)range && enemyX <= playerX + (float)range &&
-                    enemyY >= playerY - (float)range && enemyY <= playerY + (float)range)
+                if (enemyX >= xMin && enemyX <= xMax &&
+                    enemyY >= yMin && enemyY <= yMax)
                 {
-                    _skillDamageQueue.Add((enemyId, finalDamage));
-                    hitCount++;
-
-                    renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
+                    hits.Add(enemyId);
                 }
+            });
+
+            // Serial phase: apply damage
+            int hitCount = 0;
+            foreach (int enemyId in hits)
+            {
+                float enemyX = store.PositionX[enemyId];
+                float enemyY = store.PositionY[enemyId];
+
+                _skillDamageQueue.Add((enemyId, finalDamage));
+                hitCount++;
+
+                renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
             }
             return hitCount;
         }
