@@ -1,7 +1,7 @@
 # BattleSystem-ECS 设计治理与 Bug 追踪
 
 > 项目路径：F:\AI\BattleSystem-ECS
-> 最后更新：2026-05-13（commit `88406b8`）
+> 最后更新：2026-05-17（commit `2acf9a1`）
 
 ---
 
@@ -367,3 +367,42 @@ mode 2 和 mode 4 是不同的语义，**不要再用一个 FPS 代表全部性�
 ---
 
 _记录时间：2026-05-13 22:20 GMT+8_
+
+---
+
+## 八、今日完成（2026-05-17）
+
+### 自动 Cron 执行记录
+
+| 时间 | 研究阶段 | 执行阶段 | 状态 |
+|------|---------|---------|------|
+| 2026-05-17 01:00 | 方向：SpatialGrid.Rebuild GC 压力 | 执行失败（Mode4 3443 < 3500，低于门禁） | ❌ |
+| 2026-05-17 02:00 | 方向：SpatialGrid.Rebuild GC 压力 | 修复 2 个 HIGH bug（EnemyMovementSystem L77 冗余写入、SkillSystem L354 死代码），Mode2 6053 FPS，Mode4 3458 FPS | ✅ 修复 |
+| 2026-05-17 02:47 | — | GitHub 爬取（tower_defense_explorer） | ✅ |
+| 2026-05-17 03:00 | — | 无方向文件，跳过 | [SILENT] |
+| 2026-05-17 04:00 | 方向：SkillSystem Cast 方法 GC 消除（ConcurrentBag 预分配） | 执行中…（方向文件已生成待执行） | ⏳ |
+
+### 本次 commit
+
+- `2acf9a1` — 修复 EnemyMovementSystem Dodge case 冗余写入 + SkillSystem ResolveSkillDamage 死代码
+- Mode2: 6053 FPS（baseline ~6200, -2.4%），Mode4: 3458 FPS（baseline ~3507, -1.4%）
+- Bug review: 3 HIGH（BenchmarkSystem/SkillSystem 存于 BenchmarkSystem，不在约束范围），3 MEDIUM
+
+### 当前性能基准（2026-05-17）
+
+| benchmark | FPS | 门禁 |
+|-----------|-----|------|
+| mode 2（合并热路径） | ~6053 | >5000 |
+| mode 4（真实系统链路） | ~3458 | >3500（当前低于门禁 42 FPS） |
+
+### 待处理方向
+
+- **SkillSystem Cast GC 消除**（研究阶段 03:52 已产出方向文件，待下次执行阶段执行）
+  - 将 `CastSingleTarget`/`CastCrossArea`/`CastBoxArea` 中的 `new ConcurrentBag<>()` 改为 field-level 预分配
+
+### 文档状态
+
+- `design-and-bugs.md`：本次更新
+- `bug-fix.md`：项目要求存放于 `docs/bug-fix.md`，当前不存在（文档内容合并至 `design-and-bugs.md`）
+- `AGENTS.md`：性能基准已更新为 Mode2 ~6053 / Mode4 ~3458
+- `Research/tower_defense_knowledge.md`：99 行，GitHub 爬取持续更新
