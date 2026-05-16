@@ -33,8 +33,15 @@ namespace BattleSystemECS.Systems
 
         public void Update(float deltaTime)
         {
-            var activeEnemies = _activeEnemyList ?? store.GetAllActiveEnemyIds();
             var activeTowerIds = store.ActiveTowerIds;
+
+            // Phase 0: rebuild spatial grid once per frame — O(enemies), called once outside Parallel.For
+            store.RebuildSpatialGrid();
+
+            // Phase 1 (parallel): collect damage events only — no structural mutations.
+            // Capture current bag into local so threads keep writing to the same bag reference
+            // even after we swap _damageQueue below. This prevents orphaned-bag damage drops.
+            var bag = _damageQueue;
 
             // Phase 1 (parallel): collect damage events only — no structural mutations
             Parallel.For(0, activeTowerIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, ti =>
@@ -49,16 +56,17 @@ namespace BattleSystemECS.Systems
                 float tx = store.PositionX[towerId];
                 float ty = store.PositionY[towerId];
                 int range = store.TowerRange[towerId];
-                float damage = store.TowerAttackDamage[towerId];
-                int rangeSq = range * range;
+
+                // Spatial grid: query O(cells) instead of O(enemies)
+                var candidates = new System.Collections.Generic.List<int>(64);
+                store.SpatialGrid.GetEnemiesInRange(store, tx, ty, range, candidates);
 
                 int bestTarget = -1;
                 float minDistSq = float.MaxValue;
 
-                // For-index loop over cached enemy list (no enumerator allocation)
-                for (int ei = 0; ei < activeEnemies.Count; ei++)
+                for (int ci = 0; ci < candidates.Count; ci++)
                 {
-                    int enemyId = activeEnemies[ei];
+                    int enemyId = candidates[ci];
                     if (!store.EnemyActive[enemyId]) continue;
 
                     float ex = store.PositionX[enemyId];
@@ -68,7 +76,6 @@ namespace BattleSystemECS.Systems
                     float dy = ey - ty;
 
                     float distSq = dx * dx + dy * dy;
-                    if (distSq > rangeSq) continue;
                     if (distSq < minDistSq)
                     {
                         minDistSq = distSq;
@@ -80,12 +87,12 @@ namespace BattleSystemECS.Systems
 
                 if (bestTarget != -1)
                 {
-                    _damageQueue.Add((bestTarget, damage, store.PlayerEntityId));
+                    bag.Add((bestTarget, store.TowerAttackDamage[towerId], store.PlayerEntityId));
                 }
             });
 
             // Phase 2 (serial): apply damage, queue deaths. Resolve happens at frame end in GameManager/Benchmark.
-            foreach (var (enemyId, damage, playerId) in _damageQueue)
+            foreach (var (enemyId, damage, playerId) in bag)
             {
                 if (!store.EnemyActive[enemyId]) continue;
                 store.EnemyHealth[enemyId] -= damage;
@@ -94,7 +101,9 @@ namespace BattleSystemECS.Systems
                     store.QueueEnemyDeath(enemyId, playerId);
                 }
             }
-            // Damage queue reset remains here to keep memory bounded per frame
+            // Atomic swap: next frame's threads will capture the new bag via _damageQueue,
+            // while this frame's threads (which captured 'bag' above) keep draining to 'bag'.
+            System.Threading.Thread.MemoryBarrier(); // ensure bag drain completes before swap
             _damageQueue = new ConcurrentBag<(int, float, int)>();
         }
     }

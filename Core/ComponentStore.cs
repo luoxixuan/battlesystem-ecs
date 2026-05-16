@@ -110,6 +110,23 @@ namespace BattleSystemECS.Core
         public IReadOnlyList<int> ActiveEnemyIds => _activeEnemyIds.ToList();
         public IReadOnlyList<int> ActiveTowerIds => _activeTowerIds.ToList();
 
+        // Spatial Grid — O(1) range query for TowerAttackSystem
+        private readonly SpatialGrid _spatialGrid = new SpatialGrid();
+
+        /// <summary>
+        /// Rebuild spatial grid for current frame — O(enemies). Call once per frame,
+        /// before TowerAttackSystem queries it.
+        /// </summary>
+        public void RebuildSpatialGrid()
+        {
+            _spatialGrid.Rebuild(this, _activeEnemyIds);
+        }
+
+        /// <summary>
+        /// Get the spatial grid for range queries. Call only after RebuildSpatialGrid().
+        /// </summary>
+        public SpatialGrid SpatialGrid => _spatialGrid;
+
         private readonly ConcurrentStack<int> freeEntityIds = new ConcurrentStack<int>();
         private readonly Dictionary<int, string> entityNames = new Dictionary<int, string>();
         private readonly object entityNamesLock = new object(); // H-1: thread-safe access to entityNames
