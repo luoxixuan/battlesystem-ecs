@@ -37,6 +37,8 @@ namespace BattleSystemECS.Systems
         private float _cachedPlayerHealth = -1;
         private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
+        // Action string cache for Dodge direction parsing — string stays in cache when action is Dodge
+        private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
 
         public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig)
         {
@@ -134,8 +136,7 @@ namespace BattleSystemECS.Systems
                     // Update cache
                     _enemyHealthCache[enemyId] = enemyHealth;
                     _lastActionCache[enemyId] = actionEnum;
-
-
+                    _lastActionStringCache[enemyId] = action;
                 }
             });
 
@@ -153,7 +154,14 @@ namespace BattleSystemECS.Systems
                 }
                 else if (actionEnum == EnemyActionType.Dodge)
                 {
-                    InvokeExecuteActionEnum(enemyId, actionEnum);
+                    // Retrieve cached action string and parse dodge direction
+                    string cachedAction = _lastActionStringCache[enemyId] ?? "dodge";
+                    int dodgeDir = ParseDodgeDirection(cachedAction);
+                    // Store direction in EnemyChargeParam for EnemyMovementSystem to read
+                    store.EnemyChargeParam[enemyId] = dodgeDir;
+                    // Inline lateral X movement here to avoid extra array read in EnemyMovementSystem parallel loop
+                    float enemyX = store.PositionX[enemyId];
+                    store.PositionX[enemyId] = enemyX + dodgeDir * store.EnemyMoveSpeed[enemyId];
                 }
             }
 

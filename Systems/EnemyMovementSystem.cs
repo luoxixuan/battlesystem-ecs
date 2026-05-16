@@ -72,6 +72,9 @@ namespace BattleSystemECS.Systems
                         break;
 
                     case EnemyActionType.Dodge:
+                        // X-axis lateral dodge is handled inline in EnemyAISystem (serial).
+                        // Here we still apply forward Y movement toward player.
+                        store.PositionY[enemyId] = y + direction * moveSpeed;
                         break;
 
                     default:
