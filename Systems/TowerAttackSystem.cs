@@ -17,6 +17,9 @@ namespace BattleSystemECS.Systems
         private IRenderer logger;
         private List<int> _activeEnemyList;
 
+        // GC elimination: per-tower reusable candidate lists, pre-allocated in SetTurn
+        private List<int>[] _towerCandidates = Array.Empty<List<int>>();
+
         // Two-phase: damage collected in parallel (enemyId, damage, playerId), applied serially with -= to accumulate
         private ConcurrentBag<(int enemyId, float damage, int playerId)> _damageQueue = new ConcurrentBag<(int, float, int)>();
 
@@ -29,11 +32,34 @@ namespace BattleSystemECS.Systems
         public void SetTurn(int turn)
         {
             _activeEnemyList = store.GetAllActiveEnemyIds();
+
+            // Ensure _towerCandidates is large enough; each slot is a reusable List<int>
+            var towerIds = store.ActiveTowerIds;
+            if (_towerCandidates.Length < towerIds.Count)
+            {
+                var newArr = new List<int>[towerIds.Count];
+                Array.Copy(_towerCandidates, newArr, _towerCandidates.Length);
+                for (int i = _towerCandidates.Length; i < newArr.Length; i++)
+                    newArr[i] = new List<int>(128);
+                _towerCandidates = newArr;
+            }
         }
 
         public void Update(float deltaTime)
         {
             var activeTowerIds = store.ActiveTowerIds;
+
+            // Defensive: ensure _towerCandidates covers all towers before parallel loop.
+            // Safe to call every frame — SetTurn also calls this; extra invocation is a no-op
+            // when length is already sufficient.
+            if (_towerCandidates.Length < activeTowerIds.Count)
+            {
+                var newArr = new List<int>[activeTowerIds.Count];
+                Array.Copy(_towerCandidates, newArr, _towerCandidates.Length);
+                for (int i = _towerCandidates.Length; i < newArr.Length; i++)
+                    newArr[i] = new List<int>(128);
+                _towerCandidates = newArr;
+            }
 
             // Phase 0: rebuild spatial grid once per frame — O(enemies), called once outside Parallel.For
             store.RebuildSpatialGrid();
@@ -57,8 +83,9 @@ namespace BattleSystemECS.Systems
                 float ty = store.PositionY[towerId];
                 int range = store.TowerRange[towerId];
 
-                // Spatial grid: query O(cells) instead of O(enemies)
-                var candidates = new System.Collections.Generic.List<int>(64);
+                // Spatial grid: query O(cells) instead of O(enemies) — reuse pre-allocated list
+                var candidates = _towerCandidates[ti];
+                candidates.Clear();
                 store.SpatialGrid.GetEnemiesInRange(store, tx, ty, range, candidates);
 
                 int bestTarget = -1;
