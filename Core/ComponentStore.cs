@@ -689,7 +689,7 @@ namespace BattleSystemECS.Core
 
         public int GetActiveEnemyCount()
         {
-            return ActiveEnemyIds.Count;
+            return _activeEnemyIds.Count;
         }
 
         // ==================== 玩家生命值访问方法 ====================

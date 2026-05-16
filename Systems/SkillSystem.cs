@@ -192,6 +192,7 @@ namespace BattleSystemECS.Systems
             int closestEnemyId = -1;
 
             var activeEnemyIds = _activeEnemyList ?? store.GetAllActiveEnemyIds();
+            if (activeEnemyIds == null) return 0;
             foreach (int enemyId in activeEnemyIds)
             {
                 if (enemyId == playerId) continue;
@@ -229,6 +230,7 @@ namespace BattleSystemECS.Systems
         {
             int hitCount = 0;
             var activeEnemyIds = _activeEnemyList ?? store.GetAllActiveEnemyIds();
+            if (activeEnemyIds == null) return 0;
 
             foreach (int enemyId in activeEnemyIds)
             {
@@ -259,6 +261,7 @@ namespace BattleSystemECS.Systems
         {
             int hitCount = 0;
             var activeEnemyIds = _activeEnemyList ?? store.GetAllActiveEnemyIds();
+            if (activeEnemyIds == null) return 0;
 
             foreach (int enemyId in activeEnemyIds)
             {
@@ -302,7 +305,7 @@ namespace BattleSystemECS.Systems
                 if (currentHealth <= 0f) continue; // already dead this frame
 
                 float newHealth = Math.Max(0f, currentHealth - damage);
-                store.EnemyHealth[enemyId] = newHealth;
+                store.EnemyHealth[enemyId] -= damage; // accumulation pattern (consistent with TowerAttackSystem)
 
                 if (newHealth <= 0f)
                     HandleKill(enemyId);

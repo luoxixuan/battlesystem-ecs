@@ -103,6 +103,11 @@ namespace BattleSystemECS.Systems
                         currentWave,
                         enemyName
                     );
+                    if (enemyId < 0)
+                    {
+                        renderer.Log($"[SPAWN] Failed to spawn enemy (entity pool exhausted)");
+                        continue;
+                    }
                     store.SetEntityName(enemyId, enemyName);
                     // Cache the behavior tree on the enemy — O(1) array access per frame instead of Dictionary+string lookup
                     store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(waveConfig.MonsterType);
