@@ -146,6 +146,7 @@ namespace BattleSystemECS.Core
         {
             int centerGx = (int)Math.Floor(towerX);
             int centerGy = (int)Math.Floor(towerY);
+            float rangeSq = range * range;
 
             for (int dx = -range; dx <= range; dx++)
             {
@@ -170,7 +171,6 @@ namespace BattleSystemECS.Core
                         float ddx = ex - towerX;
                         float ddy = ey - towerY;
                         float distSq = ddx * ddx + ddy * ddy;
-                        float rangeSq = range * range;
                         if (distSq <= rangeSq)
                         {
                             output.Add(eid);
