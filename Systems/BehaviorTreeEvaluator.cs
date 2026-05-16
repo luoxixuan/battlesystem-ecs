@@ -206,6 +206,7 @@ namespace BattleSystemECS.Systems
             ComponentStore store,
             int playerId)
         {
+            if (store == null) return false;
             switch (node.Condition)
             {
                 case "target_in_range":
@@ -300,12 +301,17 @@ namespace BattleSystemECS.Systems
             {
                 int nodeIdx = indexMap[kvp.Key];
                 var n = kvp.Value;
-                int[] childIndices = (n.Children == null || n.Children.Length == 0)
-                    ? Array.Empty<int>()
-                    : n.Children
-                        .Select(c => indexMap.TryGetValue(c, out var idx) ? idx : -1)
-                        .Where(idx => idx >= 0)
-                        .ToArray();
+            int[] childIndices = (n.Children == null || n.Children.Length == 0)
+                ? Array.Empty<int>()
+                : n.Children
+                    .Select(c => indexMap.TryGetValue(c, out var idx) ? idx : -1)
+                    .ToArray();
+            for (int ci = 0; ci < childIndices.Length; ci++)
+            {
+                if (childIndices[ci] < 0)
+                    Console.WriteLine($"[BT-WARN] Node '{n.Id}' references unknown child ID '{n.Children[ci]}' — dropped from cached tree");
+            }
+            childIndices = childIndices.Where(idx => idx >= 0).ToArray();
 
                 cached.Nodes[nodeIdx] = new BTCachedNode
                 {
