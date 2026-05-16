@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using BattleSystemECS.Core;
 
 namespace BattleSystemECS.Core
@@ -8,24 +9,62 @@ namespace BattleSystemECS.Core
     /// 空间分区网格 — 将敌人按整数坐标 (gx, gy) 哈希到单元格，
     /// 支持 O(1) 范围查询替代 O(N) 全量遍历。
     /// 
-    /// 地图尺寸 10×20，cell 大小 1×1 与网格坐标系对齐。
-    /// 网格在每帧开始时整体重建（O(enemies)），之后所有塔查询均为 O(1) 哈希。
+    /// 使用固定尺寸 int[] 数组替代 Dictionary+List，消除每帧 GC 分配。
+    /// 仅清空脏格子（上一帧实际有敌人的格子），减少 Array.Clear 开销。
     /// </summary>
     public class SpatialGrid
     {
         /// <summary>cell 大小 = 1 格 = 1 坐标系单位，与 MapSystem 网格对齐</summary>
         private const float CellSize = 1f;
 
-        /// <summary>
-        /// (gx, gy) → 该格子内所有敌人 ID 列表。
-        /// gx = floor(x / CellSize), gy = floor(y / CellSize)。
-        /// </summary>
-        private Dictionary<(int gx, int gy), List<int>> _grid
-            = new Dictionary<(int, int), List<int>>(1024);
+        /// <summary>每个格子最多容纳的敌人数量（超出则跳过）</summary>
+        private const int CellCapacity = 16;
 
-        /// <summary>稀疏格子集合（避免空格子查询）</summary>
-        private HashSet<(int gx, int gy)> _activeCells
-            = new HashSet<(int, int)>();
+        /// <summary>地图宽度（gx 范围）</summary>
+        private int _mapWidth = 10;
+
+        /// <summary>地图高度（gy 范围）</summary>
+        private int _mapHeight = 20;
+
+        /// <summary>
+        /// 格子敌人数组。使用 flat index: index = cellIndex * CellCapacity + offset。
+        /// </summary>
+        private int[] _gridData;
+
+        /// <summary>每个格子的实际敌人数量</summary>
+        private int[] _cellCounts;
+
+        /// <summary>
+        /// 上一帧有敌人的格子索引列表（用于仅清脏格子）。
+        /// </summary>
+        private int[] _prevActiveCells;
+
+        /// <summary>上一帧活跃格子数量</summary>
+        private int _prevActiveCellCount;
+
+        /// <summary>
+        /// 本帧有敌人的格子索引（用于下一帧的脏追踪）。
+        /// </summary>
+        private int[] _currActiveCells;
+
+        /// <summary>本帧活跃格子数量</summary>
+        private int _currActiveCellCount;
+
+        public SpatialGrid()
+        {
+            Allocate(10, 20);
+        }
+
+        private void Allocate(int width, int height)
+        {
+            _mapWidth = width;
+            _mapHeight = height;
+            int total = width * height;
+            _gridData = new int[total * CellCapacity];
+            _cellCounts = new int[total];
+            _prevActiveCells = new int[total];
+            _currActiveCells = new int[total];
+        }
 
         /// <summary>
         /// 整体重建网格 — O(enemies)。
@@ -33,8 +72,20 @@ namespace BattleSystemECS.Core
         /// </summary>
         public void Rebuild(ComponentStore store, IReadOnlyList<int> enemyIds)
         {
-            _grid.Clear();
-            _activeCells.Clear();
+            int total = _mapWidth * _mapHeight;
+
+            // 仅清空上一帧有敌人的格子（而非全量 Array.Clear）
+            for (int i = 0; i < _prevActiveCellCount; i++)
+            {
+                int idx = _prevActiveCells[i];
+                int baseOff = idx * CellCapacity;
+                for (int j = 0; j < _cellCounts[idx]; j++)
+                    _gridData[baseOff + j] = 0;
+                _cellCounts[idx] = 0;
+            }
+
+            // 重建本帧网格
+            _currActiveCellCount = 0;
 
             for (int i = 0; i < enemyIds.Count; i++)
             {
@@ -44,26 +95,46 @@ namespace BattleSystemECS.Core
                 int gx = (int)Math.Floor(store.PositionX[eid]);
                 int gy = (int)Math.Floor(store.PositionY[eid]);
 
-                if (!_grid.TryGetValue((gx, gy), out var list))
+                if (gx < 0 || gx >= _mapWidth || gy < 0 || gy >= _mapHeight) continue;
+
+                int cellIndex = gy * _mapWidth + gx;
+                int count = _cellCounts[cellIndex];
+                if (count < CellCapacity)
                 {
-                    list = new List<int>(4);
-                    _grid[(gx, gy)] = list;
-                    _activeCells.Add((gx, gy));
+                    _gridData[cellIndex * CellCapacity + count] = eid;
+                    _cellCounts[cellIndex] = count + 1;
+
+                    // 首次向该格子添加敌人：记录到 _currActiveCells
+                    if (count == 0)
+                    {
+                        _currActiveCells[_currActiveCellCount++] = cellIndex;
+                    }
                 }
-                list.Add(eid);
             }
+
+            // 交换：当前帧的活跃格子成为下一帧的"上一帧活跃格子"
+            int[] tmp = _prevActiveCells;
+            _prevActiveCells = _currActiveCells;
+            _currActiveCells = tmp;
+            _prevActiveCellCount = _currActiveCellCount;
         }
 
         /// <summary>
-        /// 查询指定格子内的所有敌人 ID — O(1) 哈希。
+        /// 查询指定格子内的所有敌人 ID — O(1) 索引。
         /// </summary>
         public void GetEnemiesAtPoint(float x, float y, List<int> output)
         {
             int gx = (int)Math.Floor(x);
             int gy = (int)Math.Floor(y);
-            if (!_grid.TryGetValue((gx, gy), out var list)) return;
-            for (int i = 0; i < list.Count; i++)
-                output.Add(list[i]);
+            if (gx < 0 || gx >= _mapWidth || gy < 0 || gy >= _mapHeight) return;
+
+            int cellIndex = gy * _mapWidth + gx;
+            int count = _cellCounts[cellIndex];
+            if (count == 0) return;
+
+            int baseOffset = cellIndex * CellCapacity;
+            for (int i = 0; i < count; i++)
+                output.Add(_gridData[baseOffset + i]);
         }
 
         /// <summary>
@@ -79,15 +150,21 @@ namespace BattleSystemECS.Core
             for (int dx = -range; dx <= range; dx++)
             {
                 int gx = centerGx + dx;
+                if (gx < 0 || gx >= _mapWidth) continue;
+
                 for (int dy = -range; dy <= range; dy++)
                 {
                     int gy = centerGy + dy;
-                    if (!_grid.TryGetValue((gx, gy), out var list)) continue;
+                    if (gy < 0 || gy >= _mapHeight) continue;
 
-                    for (int i = 0; i < list.Count; i++)
+                    int cellIndex = gy * _mapWidth + gx;
+                    int count = _cellCounts[cellIndex];
+                    if (count == 0) continue;
+
+                    int baseOffset = cellIndex * CellCapacity;
+                    for (int i = 0; i < count; i++)
                     {
-                        int eid = list[i];
-                        // Bounding-box filter (already close cell-level)
+                        int eid = _gridData[baseOffset + i];
                         float ex = store.PositionX[eid];
                         float ey = store.PositionY[eid];
                         float ddx = ex - towerX;
