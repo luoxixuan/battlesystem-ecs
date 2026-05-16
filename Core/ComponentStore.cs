@@ -105,10 +105,10 @@ namespace BattleSystemECS.Core
         private int nextEntityId = 2; // 从 2 开始，1 是玩家
         public int CurrentFrame { get; private set; } = 0;
 
-        // Expose as read-only snapshots — parallel code reads only, writes go through internal API
-        // M-3 fix: return .ToList() snapshot instead of live reference to internal List
-        public IReadOnlyList<int> ActiveEnemyIds => _activeEnemyIds.ToList();
-        public IReadOnlyList<int> ActiveTowerIds => _activeTowerIds.ToList();
+        // Expose as read-only references — zero allocation on read. All writes go through internal API (Add/Remove).
+        // Caller responsibility: read-only access only. Consistent with ref-return patterns in ECS frameworks.
+        public IReadOnlyList<int> ActiveEnemyIds => _activeEnemyIds;
+        public IReadOnlyList<int> ActiveTowerIds => _activeTowerIds;
 
         // Spatial Grid — O(1) range query for TowerAttackSystem
         private readonly SpatialGrid _spatialGrid = new SpatialGrid();
