@@ -341,7 +341,11 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void ResolveSkillDamage()
         {
-            foreach (var (enemyId, damage) in _skillDamageQueue)
+            // Capture bag, swap, then iterate — prevents damage added during apply
+            // from being silently dropped (ConcurrentBag swap bug).
+            var captured = _skillDamageQueue;
+            _skillDamageQueue = new ConcurrentBag<(int, float)>();
+            foreach (var (enemyId, damage) in captured)
             {
                 if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) continue;
                 float currentHealth = store.EnemyHealth[enemyId];
@@ -353,8 +357,6 @@ namespace BattleSystemECS.Systems
                 if (newHealth <= 0f)
                     HandleKill(enemyId);
             }
-            // Reset for next frame
-            _skillDamageQueue = new ConcurrentBag<(int, float)>();
         }
 
         /// <summary>

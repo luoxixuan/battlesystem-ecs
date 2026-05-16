@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -17,6 +18,9 @@ namespace BattleSystemECS.Systems
         private int mapWidth = 10;
         private int mapHeight = 20;  // 修改为 20
 
+        // SpatialGrid 查询结果复用 — 避免每帧分配
+        private readonly List<int> _enemyBuffer = new List<int>(64);
+
         public MapSystem(IRenderer renderer, Core.ComponentStore store)
         {
             this.renderer = renderer;
@@ -33,9 +37,6 @@ namespace BattleSystemECS.Systems
             renderer.Log($"[MAP] {mapWidth}x{mapHeight} map");
             renderer.Log("[MAP] P = Player, E = Enemy, . = Empty");
 
-            // Cache active enemies once — was called 200x per frame (10 cols × 20 rows) before
-            var activeEnemyIds = store.GetAllActiveEnemyIds();
-
             for (int y = mapHeight - 1; y >= 0; y--)
             {
                 string row = "";
@@ -44,7 +45,7 @@ namespace BattleSystemECS.Systems
                     bool hasPlayer = false;
                     bool hasEnemy = false;
 
-                    // 检查玩家位置 — 直接比较格子坐标，避免逐格遍历
+                    // 检查玩家位置 — 直接比较格子坐标
                     if (store.PlayerEntityId >= 0)
                     {
                         int pid = store.PlayerEntityId;
@@ -57,19 +58,18 @@ namespace BattleSystemECS.Systems
                         }
                     }
 
-                    // 检查敌人位置（复用一个 list 引用）
+                    // 检查敌人位置 — O(1) 哈希查询替代 O(n) 全量遍历
                     if (!hasPlayer)
                     {
-                        foreach (int eid in activeEnemyIds)
+                        _enemyBuffer.Clear();
+                        store.SpatialGrid.GetEnemiesAtPoint(x, y, _enemyBuffer);
+
+                        for (int i = 0; i < _enemyBuffer.Count; i++)
                         {
+                            int eid = _enemyBuffer[i];
                             if (!store.EnemyActive[eid]) continue;
-                            int ex = (int)Math.Round(store.PositionX[eid]);
-                            int ey = (int)Math.Round(store.PositionY[eid]);
-                            if (ex == x && ey == y)
-                            {
-                                hasEnemy = true;
-                                break;
-                            }
+                            hasEnemy = true;
+                            break;
                         }
                     }
 

@@ -248,6 +248,7 @@ namespace BattleSystemECS.Core
                 // 渲染初始地图（SOA）
                 Console.WriteLine();
                 logger.Log("========================================");
+                store.RebuildSpatialGrid();
                 mapSystem.Update();
                 logger.Log("========================================");
 
@@ -326,6 +327,7 @@ namespace BattleSystemECS.Core
                     // skillSystem.AutoCastSkill();  // 暂时注释掉，避免重复执行
 
                     // 渲染地图（SOA）
+                    store.RebuildSpatialGrid(); // O(1) 空间查询，替代 O(n) 全量遍历
                     mapSystem.Update();
 
                     // 显示玩家血量（200）

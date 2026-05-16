@@ -107,8 +107,11 @@ namespace BattleSystemECS.Systems
                 _damageQueue.Add((enemyId, finalDamage));
             });
 
-            // Phase 2 (serial): apply collected damage, then queue deaths
-            foreach (var (enemyId, damage) in _damageQueue)
+            // Phase 2 (serial): capture bag, swap, then iterate — prevents damage
+            // added during apply from being silently dropped (ConcurrentBag swap bug).
+            var captured = _damageQueue;
+            _damageQueue = new ConcurrentBag<(int, float)>();
+            foreach (var (enemyId, damage) in captured)
             {
                 if (!store.EnemyActive[enemyId]) continue;
                 store.EnemyHealth[enemyId] -= damage;
@@ -117,9 +120,6 @@ namespace BattleSystemECS.Systems
                     store.QueueEnemyDeath(enemyId, playerId);
                 }
             }
-
-            // Damage queue reset remains here to keep memory bounded per frame
-            _damageQueue = new ConcurrentBag<(int, float)>();
         }
     }
 }

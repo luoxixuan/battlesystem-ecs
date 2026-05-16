@@ -55,6 +55,18 @@ namespace BattleSystemECS.Core
         }
 
         /// <summary>
+        /// 查询指定格子内的所有敌人 ID — O(1) 哈希。
+        /// </summary>
+        public void GetEnemiesAtPoint(float x, float y, List<int> output)
+        {
+            int gx = (int)Math.Floor(x);
+            int gy = (int)Math.Floor(y);
+            if (!_grid.TryGetValue((gx, gy), out var list)) return;
+            for (int i = 0; i < list.Count; i++)
+                output.Add(list[i]);
+        }
+
+        /// <summary>
         /// 查询范围内所有敌人 ID — O(cells queried)，通常远小于 O(enemies)。
         /// range 是以塔为中心的正方形半径（单位：cell）。
         /// </summary>

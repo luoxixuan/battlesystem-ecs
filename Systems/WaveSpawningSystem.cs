@@ -57,7 +57,7 @@ namespace BattleSystemECS.Systems
                 return;
             }
 
-            if (currentWave > levelConfig.WaveCount)
+            if (currentWave - 1 >= levelConfig.Waves.Count)
             {
                 renderer.Log("[SPAWN] Level " + currentLevel + " complete!");
                 renderer.Log("[SPAWN] Total enemies spawned: " + totalEnemiesSpawned);
