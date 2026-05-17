@@ -30,10 +30,8 @@ namespace BattleSystemECS.Systems
         private List<int> _activeEnemyList;
         private float _playerX, _playerY;
 
-        // BT evaluation cache — version counter increments on player health change.
+        // BT evaluation cache — invalidates when enemy health or player health changes.
         // Turn/frame changes do NOT invalidate (enemy health per-enemy + player health global).
-        private int _cacheVersion = 0;
-        private int _cacheSnapshot = -1;
         private float _cachedPlayerHealth = -1;
         private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
@@ -94,11 +92,10 @@ namespace BattleSystemECS.Systems
                     // O(1) array access — pre-cached at spawn time in WaveSpawningSystem
                     var cachedBt = store.EnemyBehaviorTree[enemyId];
 
-                    // Check BT evaluation cache: skip if enemy health, player health, and turn are unchanged
+                    // Check BT evaluation cache: skip if enemy health and player health are unchanged
                     float enemyHealth = store.EnemyHealth[enemyId];
                     float playerHealth = store.PlayerCurrentHealth[playerId];
-                    if (_cacheSnapshot == _cacheVersion &&
-                        _enemyHealthCache[enemyId] == enemyHealth &&
+                    if (_enemyHealthCache[enemyId] == enemyHealth &&
                         _cachedPlayerHealth == playerHealth)
                     {
                         // Cache hit: reuse last action without re-evaluating BT
@@ -166,7 +163,6 @@ namespace BattleSystemECS.Systems
             }
 
             // Update turn cache after all enemies processed
-            _cacheSnapshot = _cacheVersion;
         }
 
         /// <summary>
