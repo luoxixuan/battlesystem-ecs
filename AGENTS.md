@@ -57,7 +57,7 @@ mode 2 和 mode 4 是不同的语义，**不要再用一个 FPS 代表全部性�
 - `AGENTS.md` — 本文件（若规则有变化）
 - `README.md` — 项目说明（性能数字、功能列表更新）
 - `docs/architecture.md` — 架构文档（系统结构、关键设计变更）
-- `docs/bug-fix.md` — Bug 追踪（若有 Bug 修复）
+- `docs/desgin-and-bugs.md` — Bug和设计变更追踪（若有 Bug 修复或者设计变更）
 
 顺序：**代码完成 → 验证通过 → 更新文档 → git commit → git push**
 
