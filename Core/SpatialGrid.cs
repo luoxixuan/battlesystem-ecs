@@ -55,6 +55,57 @@ namespace BattleSystemECS.Core
             Allocate(10, 20);
         }
 
+        /// <summary>
+        /// Incremental update — clears dirty cells and re-inserts only the given enemy IDs.
+        /// Used by RebuildSpatialGrid() to achieve O(enemies) dirty-cell clearing.
+        /// </summary>
+        public void UpdateEnemies(ComponentStore store, IReadOnlyList<int> enemyIds)
+        {
+            // Phase 1: clear all cells that had enemies last frame (dirty cells)
+            for (int i = 0; i < _prevActiveCellCount; i++)
+            {
+                int idx = _prevActiveCells[i];
+                int baseOff = idx * CellCapacity;
+                for (int j = 0; j < _cellCounts[idx]; j++)
+                    _gridData[baseOff + j] = 0;
+                _cellCounts[idx] = 0;
+            }
+            _currActiveCellCount = 0;
+
+            // Phase 2: re-insert the given enemies into their current cells
+            for (int i = 0; i < enemyIds.Count; i++)
+            {
+                int eid = enemyIds[i];
+                if (!store.EnemyActive[eid]) continue;
+
+                float x = store.PositionX[eid];
+                float y = store.PositionY[eid];
+                int gx = (int)x;
+                int gy = (int)y;
+
+                if (gx >= 0 && gx < _mapWidth && gy >= 0 && gy < _mapHeight)
+                {
+                    int cellIndex = gy * _mapWidth + gx;
+                    int count = _cellCounts[cellIndex];
+                    if (count < CellCapacity)
+                    {
+                        _gridData[cellIndex * CellCapacity + count] = eid;
+                        _cellCounts[cellIndex] = count + 1;
+                        if (count == 0)
+                        {
+                            _currActiveCells[_currActiveCellCount++] = cellIndex;
+                        }
+                    }
+                }
+            }
+
+            // Swap: current becomes previous for next frame
+            int[] tmp = _prevActiveCells;
+            _prevActiveCells = _currActiveCells;
+            _currActiveCells = tmp;
+            _prevActiveCellCount = _currActiveCellCount;
+        }
+
         private void Allocate(int width, int height)
         {
             _mapWidth = width;

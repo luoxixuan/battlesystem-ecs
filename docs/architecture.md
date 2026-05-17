@@ -1,7 +1,7 @@
 # BattleSystem-ECS 架构文档
 
 > 每次修改架构或业务逻辑后，必须同步更新此文档。
-> 最后更新：2026-05-13（commit `69bb49b`）
+> 最后更新：2026-05-17（commit `c36747b`）
 
 ---
 
@@ -143,10 +143,11 @@ List<int> ActiveTowerIds             // 仅活跃塔 ID（并行遍历用）
 | TowerAttackSystem | Systems/ | 塔攻击 | **两阶段**：遍历 `ActiveTowerIds`，并行收集 damage，串行 apply + queue 死亡 |
 | UpgradeSystem | Systems/ | 玩家升级 | 等级阈值触发；`_sharedRandom` 类级单例 |
 | SkillSystem | Systems/ | 技能施放 | GAS 架构；AreaShape 驱动；**只 queue 死亡，帧末统一 resolve** |
-| TechTreeSystem | Systems/ | 科技树 | 前置依赖检查；效果缓存在 `TechTreeSystem` 字段 |
+| TechTreeSystem | Systems/ | 科技树 | 前置依赖检查；效果缓存在 `TechTreeSystem` 字段；**O(1) Dictionary 查找（`c36747b`）** |
 | GoldSystem | Systems/ | 金币结算 | 击杀产金；`Interlocked.Add` 并行安全 |
+| MapSystem | Systems/ | 地图渲染 | Debug 渲染 |
+| SpatialGridSystem | Systems/ | 空间网格 | 范围查询（塔攻击范围、Buff 范围）；O(1) cell 访问 |
 | BenchmarkSystem | Systems/ | 性能压测 | **dual mode**：mode 2 合并热路径 / mode 4 真实系统链路，各独立计时 |
-
 ---
 
 ## 6. GAS 模块（Core/GAS/）
@@ -210,16 +211,29 @@ branches:
 
 ## 9. 配置系统
 
+### 运行时配置（Configs/）
+
 | 文件 | 内容 |
 |------|------|
-| `Configs/game_config.json` | 怪物类型、等级、波次 |
-| `Configs/behavior_trees.json` | 行为树定义 |
-| `Configs/skills.json` | 技能定义（未使用，已迁移到 GAS） |
-| `Configs/tech_tree.json` | 科技树节点 |
-| `Configs/phase_behavior.json` | 阶段行为 |
-| `Configs/tower_placement.json` | 塔位配置 |
+| `game_config.json` | 怪物类型、等级、波次 |
+| `behavior_trees.json` | 行为树定义 |
+| `skills.json` | 技能定义（已迁移到 GAS） |
+| `tech_tree.json` | 科技树节点 |
+| `phase_behavior.json` | 阶段行为 |
+| `tower_placement.json` | 塔位配置 |
+| `wave_spawn.json` | 波次生成配置 |
 
-Loader：`Configs/GameConfigLoader.cs`
+Loader：`Core/GameConfigLoader.cs`
+配置类：`Core/GameConfig.cs`、`Core/TechTreeDef.cs`
+
+### 静态数据（Data/，auto-gen，勿手动编辑）
+
+| 目录 | 内容 |
+|------|------|
+| `Data/Monsters/` | 200 种怪物定义 |
+| `Data/Skills/` | 150 种技能定义 |
+| `Data/Towers/` | 150 种塔定义（all_towers.json） |
+| `Data/Levels/` | 5 个关卡配置 |
 
 ---
 
@@ -253,7 +267,7 @@ GameManager.Run() → while(gameRunning) → 每回合:
 
 ## 12. 已删除（2026-05-13）
 
-| 路径 | 原状态 | 说明 |
+|| 路径 | 原状态 | 说明 |
 |------|--------|------|
 | `System/` (大写) | 未编译 | 全目录已删除，原 5 个死文件 |
 | `GridSpatialHash.cs` | 空桩 | 已删除，Spatial Hash 在 range=3 场景是反模式 |
@@ -261,12 +275,25 @@ GameManager.Run() → while(gameRunning) → 每回合:
 | `Components/BuffDebuffComponents.cs` | 老架构 | 已删除 |
 | `Components/GameStateComponent.cs` 等 9 个 | 老架构 | 已删除（仅保留 BuffData/EnemyActionType/EnemyComponent/SkillComponent）|
 
+## 12b. 目录结构重组（2026-05-17，`c36747b`）
+
+|| 原路径 | 现路径 | 说明 |
+|------|--------|--------|------|
+| `Configs/GameConfig.cs` | `Core/GameConfig.cs` | 配置类归入 Core/ |
+| `Configs/GameConfigLoader.cs` | `Core/GameConfigLoader.cs` | Loader 归入 Core/ |
+| `Configs/TechTreeDef.cs` | `Core/TechTreeDef.cs` | 配置类归入 Core/ |
+| `Configs/all_towers.json` | `Data/Towers/all_towers.json` | 静态数据归入 Data/ |
+| `Configs/game_config.json` | 根目录 + bin/ | 运行时配置保留在 Configs/ 或根目录 |
+| `Research/bench2.log` 等 | `Research/logs/` | 日志归入子目录 |
+| `Research/*.ps1` | `Research/scripts/` | 构建脚本归入子目录 |
+
 ---
 
 ## 13. 更新记录
 
-| 日期 | commit | 变更 |
-|------|--------|------|
+|| 日期 | commit | 变更 |
+|------|--------|------|------|
+| 2026-05-17 | `c36747b` | TechTreeSystem O(N)→O(1) Dictionary 查找；配置类迁移 Core/；目录结构重组（Data/, Research/） |
 | 2026-05-13 | `c4c360b` | 清理死代码（System/、GridSpatialHash、9个旧组件、EntityManager精简） |
 | 2026-05-13 | `2ce3352` | README 更新（添加 TechTree） |
 | 2026-05-13 | `5e01a26` | 新增科技树系统（3分支 × 5节点） |

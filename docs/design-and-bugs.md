@@ -1,7 +1,7 @@
 # BattleSystem-ECS 设计治理与 Bug 追踪
 
 > 项目路径：F:\AI\BattleSystem-ECS
-> 最后更新：2026-05-17（commit `2acf9a1`）
+> 最后更新：2026-05-17（commit `c36747b`）
 
 ---
 
@@ -116,7 +116,7 @@
 **说明**: health-driven version counter 解决了缓存命中率问题。
 
 #### 13. GameConfig MonsterTypes 用 List.Find 导致 O(n) 查询
-**文件**: Configs/GameConfig.cs
+**文件**: Core/GameConfig.cs
 **状态**: ℹ️ 可接受
 **说明**: MonsterTypes 数量少（4个），性能影响可忽略；_monsterCache 提供 O(1) 缓存保护。
 
@@ -245,7 +245,7 @@
 **修复内容**: `indexMap` 字典初始化从 `new Dictionary<string, int>()` 改为 `new Dictionary<string, int>(nodeIds.Count)` 预分配容量，避免动态扩容开销；同时 `cached.Nodes[nodeIdx]` 赋值从 `indexMap[kvp.Key]` 重复查询改为 `nodeIdx` 变量直接使用。
 
 #### 35. GameConfig.GetCachedBehaviorTree 调用 GetBehaviorTree 造成双重字典查找 ✅ FIXED
-**文件**: Configs/GameConfig.cs
+**文件**: Core/GameConfig.cs
 **状态**: ✅ 已修复
 **修复内容**: `GetCachedBehaviorTree()` 原先通过 `GetBehaviorTree()` 查询，再在里面查 `_btCache` 和 `BehaviorTrees`，造成双层查找。现改为直接查询 `BehaviorTrees.TryGetValue()`，避免中间层。
 
@@ -254,7 +254,7 @@
 ### 【INFO】信息级
 
 #### 36. GameConfig.MonsterTypes.Find 使用线性搜索
-**文件**: Configs/GameConfig.cs
+**文件**: Core/GameConfig.cs
 **状态**: ℹ️ 可接受
 **说明**: MonsterTypes 数量少（4个），`_monsterCache` 提供 O(1) 保护，影响可忽略。
 
@@ -382,11 +382,30 @@ _记录时间：2026-05-13 22:20 GMT+8_
 | 2026-05-17 03:00 | — | 无方向文件，跳过 | [SILENT] |
 | 2026-05-17 04:00 | 方向：SkillSystem Cast 方法 GC 消除（ConcurrentBag 预分配） | 执行中…（方向文件已生成待执行） | ⏳ |
 
-### 本次 commit
+### 本次 commit（上午）
 
 - `2acf9a1` — 修复 EnemyMovementSystem Dodge case 冗余写入 + SkillSystem ResolveSkillDamage 死代码
 - Mode2: 6053 FPS（baseline ~6200, -2.4%），Mode4: 3458 FPS（baseline ~3507, -1.4%）
-- Bug review: 3 HIGH（BenchmarkSystem/SkillSystem 存于 BenchmarkSystem，不在约束范围），3 MEDIUM
+- Bug review: 3 HIGH，3 MEDIUM
+
+### 本次 commit（下午）
+
+- `c36747b` — TechTreeSystem O(N)→O(1) Dictionary 查找（`GetTechNode`/`CanUnlock`/`TryUnlock` 全部改为 Dictionary）
+- 目录结构重组：配置类 `GameConfig.cs`/`GameConfigLoader.cs`/`TechTreeDef.cs` 迁移 `Core/`；`all_towers.json` 迁移 `Data/Towers/`；日志/脚本归入 `Research/logs/` / `Research/scripts/`
+- Mode2: ~6200 FPS，Mode4: ~3500 FPS
+
+### 目录结构重组（2026-05-17 下午）
+
+|| 原路径 | 现路径 |
+|------|--------|--------|
+| `Configs/GameConfig.cs` | `Core/GameConfig.cs` |
+| `Configs/GameConfigLoader.cs` | `Core/GameConfigLoader.cs` |
+| `Configs/TechTreeDef.cs` | `Core/TechTreeDef.cs` |
+| `Configs/all_towers.json` | `Data/Towers/all_towers.json` |
+| `Research/bench2.log` 等 | `Research/logs/` |
+| `Research/*.ps1` | `Research/scripts/` |
+
+Configs/ 现在只含运行时 .json 配置（7 个文件），不再含 .cs 文件。
 
 ### 当前性能基准（2026-05-17）
 
