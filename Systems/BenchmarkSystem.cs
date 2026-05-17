@@ -99,6 +99,7 @@ namespace BattleSystemECS.Systems
             long tWaveSpawn = 0, tEnemyAI = 0, tMoveAttack = 0;
             long tTowerAttack = 0, tGold = 0;
             long tUpgrade = 0, tSkill = 0, tMap = 0;
+            long tGridRebuild = 0;
 
             var totalSw = Stopwatch.StartNew();
 
@@ -114,6 +115,7 @@ namespace BattleSystemECS.Systems
 
                 sw.Start(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedTicks;
                 sw.Restart(); enemyAI.SetTurn(turn); enemyAI.Update(); tEnemyAI += sw.ElapsedTicks;
+                sw.Restart(); store.RebuildSpatialGrid(); tGridRebuild += sw.ElapsedTicks;
                 sw.Restart();
 
                 // Merged Movement + PlayerAttack in one Parallel.For
@@ -200,6 +202,7 @@ namespace BattleSystemECS.Systems
             Console.WriteLine($"\n[BENCHMARK] Per-system timing ({frames} frames, {scenario} enemies):");
             Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn/ticksPerMs,7:F2} ms  ({tWaveSpawn/ticksPerMs/msTotal*100,5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms  ({tEnemyAI/ticksPerMs/msTotal*100,5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   GridRebuild:   {tGridRebuild/ticksPerMs,7:F2} ms  ({tGridRebuild/ticksPerMs/msTotal*100,5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   MoveAttack:     {tMoveAttack/ticksPerMs,7:F2} ms  ({tMoveAttack/ticksPerMs/msTotal*100,5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   TowerAttack:    {tTowerAttack/ticksPerMs,7:F2} ms  ({tTowerAttack/ticksPerMs/msTotal*100,5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   Gold:           {tGold/ticksPerMs,7:F2} ms  ({tGold/ticksPerMs/msTotal*100,5:F1}%)");
@@ -356,6 +359,7 @@ namespace BattleSystemECS.Systems
 
             long tWaveSpawn = 0, tEnemyAI = 0, tMoveAttack = 0;
             long tPlayerAttack = 0, tTowerAttack = 0, tGold = 0, tUpgrade = 0, tSkill = 0;
+            long tGridRebuildMode4 = 0;
 
             ConsoleLogger.EnableLog = false;
             var totalSw = Stopwatch.StartNew();
@@ -366,7 +370,8 @@ namespace BattleSystemECS.Systems
                 store.BeginFrame();
                 var sw = new Stopwatch();
 
-                sw.Start(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedTicks;
+                sw.Start(); store.RebuildSpatialGrid(); tGridRebuildMode4 += sw.ElapsedTicks;
+                sw.Restart(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedTicks;
                 sw.Restart(); enemyAI.SetTurn(turn); enemyAI.Update(); tEnemyAI += sw.ElapsedTicks;
                 sw.Restart(); enemyMovement.SetTurn(turn); enemyMovement.Update(); tMoveAttack += sw.ElapsedTicks;
                 sw.Restart(); playerAttack.SetTurn(turn); playerAttack.Update(); tPlayerAttack += sw.ElapsedTicks;
@@ -385,6 +390,7 @@ namespace BattleSystemECS.Systems
             double fps = 1000.0 / (msTotal / frames);
 
             Console.WriteLine($"\n[BENCHMARK] Real-system-chain timing ({frames} frames, {scenario} enemies):");
+            Console.WriteLine($"[BENCHMARK]   GridRebuild:    {tGridRebuildMode4/ticksPerMs,7:F2} ms");
             Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn/ticksPerMs,7:F2} ms");
             Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms");
             Console.WriteLine($"[BENCHMARK]   EnemyMovement: {tMoveAttack/ticksPerMs,7:F2} ms");

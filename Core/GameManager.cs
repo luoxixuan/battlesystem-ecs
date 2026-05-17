@@ -327,6 +327,8 @@ namespace BattleSystemECS.Core
                     // skillSystem.AutoCastSkill();  // 暂时注释掉，避免重复执行
 
                     // 渲染地图（SOA）
+                    // Spatial grid — O(enemies), called once here before all system updates.
+                    // All systems (TowerAttack, PlayerTowerAttack, EnemyAI) reuse this grid.
                     store.RebuildSpatialGrid(); // O(1) 空间查询，替代 O(n) 全量遍历
                     mapSystem.Update();
 

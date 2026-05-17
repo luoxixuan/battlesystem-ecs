@@ -64,8 +64,8 @@ namespace BattleSystemECS.Systems
                 _towerCandidates = newArr;
             }
 
-            // Phase 0: rebuild spatial grid once per frame — O(enemies), called once outside Parallel.For
-            store.RebuildSpatialGrid();
+            // Phase 0: Spatial grid already rebuilt by GameManager before system chain.
+            // Reuse instead of rebuilding — avoids O(enemies) waste per frame.
 
             // Phase 1 (parallel): collect damage events only — no structural mutations.
             // Capture current bag into local so threads keep writing to the same bag reference
