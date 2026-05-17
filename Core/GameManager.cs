@@ -297,6 +297,11 @@ namespace BattleSystemECS.Core
                     // 技能系统缓存（与玩家攻击/敌人AI保持一致的 SetTurn 模式）
                     skillSystem.SetTurn(turn);
 
+                    // Spatial Grid 必须在 TowerAttackSystem 之前重建——
+                    // 因为所有系统都会改变敌人位置，塔需要最新网格数据进行目标查询。
+                    // 这是帧内第二次 rebuild（第一次在游戏主循环开始前，约第 251 行）。
+                    store.RebuildSpatialGrid();
+
                     // [测试] 塔攻击逻辑
                     towerAttackSystem.Update(1.0f);
 
