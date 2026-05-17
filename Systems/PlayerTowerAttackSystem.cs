@@ -35,6 +35,10 @@ namespace BattleSystemECS.Systems
         private float _critRateBonus;
         private float _critDamageBonus;  // additive bonus to ×2, e.g. 0.25 → ×2.25
 
+        // Cached buff stats (precomputed in SetTurn — eliminates per-frame method calls + boundary checks)
+        private float _attackBuffMult = 1f;
+        private float _critRateThreshold;  // merged: (_hasCritRateBuff ? 0.05f : 0f) + _critRateBonus
+
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         private ConcurrentBag<(int enemyId, float damage)>[] _damageQueue = new ConcurrentBag<(int, float)>[2];
         private int _damageQueueIdx = 0;
@@ -67,6 +71,11 @@ namespace BattleSystemECS.Systems
             // Cache crit bonuses from tech tree (avoid per-enemy calls in hot path)
             _critRateBonus = techTreeSystem != null ? techTreeSystem.GetCritRateBonus() : 0f;
             _critDamageBonus = techTreeSystem != null ? techTreeSystem.GetCritDamageMult() : 1f;
+
+            // Precompute buff-related values — eliminates 2 method calls + 2 boundary checks per frame
+            _attackBuffMult = store.GetAttackBuffMultiplier(playerId);
+            bool hasCritRateBuff = store.HasCritRateBuff(playerId);
+            _critRateThreshold = (hasCritRateBuff ? 0.05f : 0f) + _critRateBonus;
         }
 
         public int GetCachedEnemyCount() => _activeEnemyList != null ? _activeEnemyList.Count : 0;
@@ -78,9 +87,8 @@ namespace BattleSystemECS.Systems
                 SetTurn(0);
             }
 
-            // O(1) bit-flag check — no GC, no string comparison
-            float baseDamage = _attackDamage * store.GetAttackBuffMultiplier(playerId);
-            bool hasCritBuff = store.HasCritRateBuff(playerId);
+            // O(1) field access — no method calls, no boundary checks
+            float baseDamage = _attackDamage * _attackBuffMult;
 
             var activeEnemyIds = _activeEnemyList;
 
@@ -101,8 +109,9 @@ namespace BattleSystemECS.Systems
                 if (enemyHealth <= 0f) return;
 
                 // H-3 fix: crit rolled per-enemy inside parallel loop, not once per frame globally.
+                // Optimized: merged crit rate threshold (precomputed _critRateThreshold) eliminates branch
                 float finalDamage = baseDamage;
-                if (hasCritBuff && critRandom.NextDouble() < (0.05f + _critRateBonus))
+                if (critRandom.NextDouble() < _critRateThreshold)
                 {
                     finalDamage *= (1f + _critDamageBonus);
                 }
