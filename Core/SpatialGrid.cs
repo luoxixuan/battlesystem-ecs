@@ -92,8 +92,8 @@ namespace BattleSystemECS.Core
                 int eid = enemyIds[i];
                 if (!store.EnemyActive[eid]) continue;
 
-                int gx = (int)Math.Floor(store.PositionX[eid]);
-                int gy = (int)Math.Floor(store.PositionY[eid]);
+                int gx = (int)store.PositionX[eid];
+                int gy = (int)store.PositionY[eid];
 
                 if (gx < 0 || gx >= _mapWidth || gy < 0 || gy >= _mapHeight) continue;
 
