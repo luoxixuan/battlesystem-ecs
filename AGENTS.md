@@ -82,21 +82,19 @@ BattleSystem-ECS/
 ├── Core/                     # ECS 核心（ComponentStore, GameManager, EntityManager, EventBus, GAS）
 ├── Components/               # 组件定义（EnemyComponent, SkillComponent, BuffData, EnemyActionType）
 ├── Systems/                  # 游戏系统（14 个，参见上方列表）
-├── Configs/                  # 运行时 .json 配置（勿改扩展名）
-│   ├── all_towers.json
-│   ├── behavior_trees.json
-│   ├── game_config.json
-│   ├── player.json
-│   ├── skills.json
-│   ├── tech_tree.json
-│   ├── tower_placement.json
-│   ├── wave_spawn.json
-│   └── phase_behavior.json
 ├── Data/                     # 静态数据（auto-gen，勿手动编辑）
-│   ├── Monsters/            # 200 种怪物定义
-│   ├── Skills/               # 150 种技能定义
-│   ├── Towers/               # 150 种塔定义
-│   └── Levels/               # 5 个关卡
+│   ├── Configs/              # 运行时 .json 配置
+│   │   ├── behavior_trees.json
+│   │   ├── phase_behavior.json
+│   │   ├── player.json
+│   │   ├── skills.json
+│   │   ├── tech_tree.json
+│   │   ├── tower_placement.json
+│   │   └── wave_spawn.json
+│   ├── Monsters/             # 200 种怪物定义
+│   ├── Skills/              # 150 种技能定义
+│   ├── Towers/              # 150 种塔定义
+│   └── Levels/              # 5 个关卡
 ├── docs/
 │   ├── architecture.md
 │   ├── bug-fix.md

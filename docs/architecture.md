@@ -211,19 +211,18 @@ branches:
 
 ## 9. 配置系统
 
-### 运行时配置（Configs/）
+### 运行时配置（Data/Configs/）
 
 | 文件 | 内容 |
 |------|------|
-| `game_config.json` | 怪物类型、等级、波次 |
 | `behavior_trees.json` | 行为树定义 |
+| `phase_behavior.json` | 相位行为 |
+| `player.json` | 玩家属性 |
 | `skills.json` | 技能定义（已迁移到 GAS） |
 | `tech_tree.json` | 科技树节点 |
-| `phase_behavior.json` | 阶段行为 |
-| `tower_placement.json` | 塔位配置 |
-| `wave_spawn.json` | 波次生成配置 |
+| `tower_placement.json` | 塔位规则 |
+| `wave_spawn.json` | 波次生成 |
 
-Loader：`Core/GameConfigLoader.cs`
 配置类：`Core/GameConfig.cs`、`Core/TechTreeDef.cs`
 
 ### 静态数据（Data/，auto-gen，勿手动编辑）

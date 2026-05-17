@@ -58,7 +58,7 @@ namespace BattleSystemECS.Config
 
         private static void LoadBehaviorTrees(GameConfig gameConfig, IRenderer renderer)
         {
-            const string btFile = "Configs/behavior_trees.json";
+            const string btFile = "Data/Configs/behavior_trees.json";
             try
             {
                 if (!File.Exists(btFile))
