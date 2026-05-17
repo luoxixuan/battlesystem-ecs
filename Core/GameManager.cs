@@ -108,13 +108,6 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]      Player Entity created successfully!");
 
             logger.Log("[BOOTSTRAP] 3. Initializing Player Skills (from config)...");
-
-            // 初始化其他系统
-            logger.Log("[BOOTSTRAP]    - Creating GoldSystem...");
-            goldSystem = new GoldSystem(store, logger);
-            logger.Log("[BOOTSTRAP]      GoldSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating WaveSpawningSystem...");
             waveSpawningSystem = new WaveSpawningSystem(store, logger, gameConfig);
             logger.Log("[BOOTSTRAP]      WaveSpawningSystem created successfully!");
 
@@ -138,6 +131,10 @@ namespace BattleSystemECS.Core
             var techConfig = TechTreeSystem.LoadConfig(logger);
             techTreeSystem = new TechTreeSystem(store, logger, playerId, techConfig);
             logger.Log("[BOOTSTRAP]      TechTreeSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating GoldSystem...");
+            goldSystem = new GoldSystem(store, logger, techTreeSystem);
+            logger.Log("[BOOTSTRAP]      GoldSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating PlayerTowerAttackSystem...");
             playerTowerAttackSystem = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig, techTreeSystem);

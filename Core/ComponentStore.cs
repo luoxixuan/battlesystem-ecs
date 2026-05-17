@@ -37,6 +37,8 @@ namespace BattleSystemECS.Core
         public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float[] PlayerGold = new float[MAX_PLAYERS];
         public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
+        private float _goldKillMultiplier = 1.0f;
+        public float GoldKillMultiplier { get => _goldKillMultiplier; set => _goldKillMultiplier = value; }
         public List<string>[] PlayerBuffs = new List<string>[MAX_PLAYERS];
 
         // Perf: bit-flag buff storage — O(1) lookup, no GC allocation per frame
@@ -184,7 +186,7 @@ namespace BattleSystemECS.Core
             {
                 if (!EnemyActive[enemyId]) continue; // already destroyed this frame
                 TotalKills++;
-                PlayerGold[playerId] += EnemyGoldReward[enemyId];
+                PlayerGold[playerId] += EnemyGoldReward[enemyId] * _goldKillMultiplier;
                 DestroyEntity(enemyId);
             }
             _deathQueue[writeIdx].Clear();

@@ -7,16 +7,35 @@ namespace BattleSystemECS.Systems
     /// <summary>
     /// 金币系统 - 负责管理金币获取和花费
     /// 金币奖励逻辑已迁移到 PlayerTowerAttackSystem 和 TowerAttackSystem
+    /// 科技树击杀金币倍率通过 GoldKillMultiplier 同步到 ComponentStore
     /// </summary>
     public class GoldSystem
     {
         private ComponentStore store;
         private IRenderer renderer;
+        private TechTreeSystem techTreeSystem;
+        private readonly bool hasTechTreeSystem;
 
+        /// <summary>
+        /// Full constructor with TechTreeSystem — enables gold-on-kill multiplier sync.
+        /// </summary>
+        public GoldSystem(ComponentStore store, IRenderer renderer, TechTreeSystem techTreeSystem)
+        {
+            this.store = store;
+            this.renderer = renderer;
+            this.techTreeSystem = techTreeSystem;
+            this.hasTechTreeSystem = true;
+        }
+
+        /// <summary>
+        /// Backwards-compatible constructor without TechTreeSystem.
+        /// Defaults multiplier to 1.0 (no bonus).
+        /// </summary>
         public GoldSystem(ComponentStore store, IRenderer renderer)
         {
             this.store = store;
             this.renderer = renderer;
+            this.hasTechTreeSystem = false;
         }
 
         public void SetTurn(int turn)
@@ -26,7 +45,15 @@ namespace BattleSystemECS.Systems
 
         public void Update()
         {
-            // Gold reward logic moved to PlayerTowerAttackSystem and TowerAttackSystem
+            // Sync tech tree gold-on-kill multiplier to ComponentStore every frame
+            if (hasTechTreeSystem)
+            {
+                store.GoldKillMultiplier = techTreeSystem.GetGoldOnKillMult();
+            }
+            else
+            {
+                store.GoldKillMultiplier = 1.0f;
+            }
         }
 
         public bool SpendGold(float amount)
