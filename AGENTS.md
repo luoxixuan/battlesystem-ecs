@@ -8,14 +8,16 @@
 
 ---
 
-## 性能基准（2026-05-13, commit `3bd1c9c`）
+## 性能基准（2026-05-17, commit `f6e086c`）
 
-| benchmark | FPS | 说明 |
+|| benchmark | FPS | 说明 |
 |-----------|-----|------|
-| mode 2（合并热路径） | ~9500 | 手写合并热路径，参考用 |
-| mode 4（真实系统链路） | ~5100 | **主指标**，直接调用各系统 `.Update()` |
+| mode 2（合并热路径） | ~6353 | 手写合并热路径，参考用 |
+| mode 4（真实系统链路） | ~3810 | **主指标**，直接调用各系统 `.Update()` |
 
 mode 2 和 mode 4 是不同的语义，**不要再用一个 FPS 代表全部性能**。
+
+**门禁**：mode 2 >5000 FPS，mode 4 >3500 FPS。
 
 ---
 
@@ -43,7 +45,7 @@ mode 2 和 mode 4 是不同的语义，**不要再用一个 FPS 代表全部性�
 > 严格按顺序执行，才能提交 git。
 
 1. **`dotnet build`** — 确认 0 warnings 0 errors
-2. **`dotnet test BattleSystemECS.Tests`** — 确认 48/48 测试全部通过
+2. **`dotnet test BattleSystemECS.Tests`** — 确认 63/63 测试全部通过
 3. **`echo 2 | dotnet run`** — 运行合并热路径压测（mode 2），确认 FPS 没有下降（允许 ±5% 误差）
 4. **`echo 4 | dotnet run`** — 运行真实系统链路压测（mode 4），确认主指标没有下降
 5. **验证通过后** → `git add -A && git commit -m "描述"`
@@ -77,52 +79,37 @@ mode 2 和 mode 4 是不同的语义，**不要再用一个 FPS 代表全部性�
 
 ```
 BattleSystem-ECS/
-├── Core/
-│   ├── ComponentStore.cs     # SOA 数据存储（所有组件的 SOA 数组）
-│   ├── GameManager.cs        # 游戏主循环与系统调度
-│   ├── EntityManager.cs
-│   ├── EventBus.cs
-│   ├── IRenderer.cs / ConsoleLogger.cs / FileLogger.cs
-│   └── GAS/                  # Gameplay Ability System
-│       ├── Attributes.cs
-│       ├── GameplayEffect.cs
-│       └── GameplayAbility.cs
-├── Components/
-│   ├── BuffData.cs
-│   ├── EnemyActionType.cs
-│   ├── EnemyComponent.cs
-│   └── SkillComponent.cs
-├── Systems/
-│   ├── EnemyAISystem.cs       # 行为树评估 + 攻击执行（BT cache）
-│   ├── EnemyMovementSystem.cs
-│   ├── PlayerTowerAttackSystem.cs
-│   ├── TowerAttackSystem.cs
-│   ├── TowerPlacementSystem.cs
-│   ├── TowerUpgradeSystem.cs
-│   ├── WaveSpawningSystem.cs   # 波次生成（含 OnWaveComplete 事件）
-│   ├── UpgradeSystem.cs        # 玩家升级
-│   ├── SkillSystem.cs          # GAS 技能系统
-│   ├── TechTreeSystem.cs       # 科技树（3分支 × 5节点）
-│   ├── GoldSystem.cs
-│   ├── MapSystem.cs
-│   ├── BenchmarkSystem.cs      # 全链路压测
-│   ├── BehaviorTreeEvaluator.cs
-│   └── BehaviorTreeNodes.cs
-├── Configs/
-│   ├── game_config.json        # 怪物类型、等级、波次
-│   ├── behavior_trees.json     # 行为树定义
-│   ├── tech_tree.json          # 科技树节点
+├── Core/                     # ECS 核心（ComponentStore, GameManager, EntityManager, EventBus, GAS）
+├── Components/               # 组件定义（EnemyComponent, SkillComponent, BuffData, EnemyActionType）
+├── Systems/                  # 游戏系统（14 个，参见上方列表）
+├── Configs/                  # 运行时 .json 配置（勿改扩展名）
+│   ├── all_towers.json
+│   ├── behavior_trees.json
+│   ├── game_config.json
+│   ├── player.json
 │   ├── skills.json
+│   ├── tech_tree.json
 │   ├── tower_placement.json
-│   └── TechTreeDef.cs          # 科技树配置结构
+│   ├── wave_spawn.json
+│   └── phase_behavior.json
+├── Data/                     # 静态数据（auto-gen，勿手动编辑）
+│   ├── Monsters/            # 200 种怪物定义
+│   ├── Skills/               # 150 种技能定义
+│   ├── Towers/               # 150 种塔定义
+│   └── Levels/               # 5 个关卡
 ├── docs/
-│   ├── bug-fix.md              # Bug 追踪（46 项，45 已修复，1 未修复）
-├── Research/
-│   ├── tower_defense_knowledge.md  # 自动更新的塔防知识库
-│   └── findings/               # 爬取原始数据
-├── BattleSystemECS.Tests/
-│   └── ...                     # 27 单元测试
-└── Program.cs                  # 入口（游戏/压测/微基准）
+│   ├── architecture.md
+│   ├── bug-fix.md
+│   ├── design-and-bugs.md
+│   └── philosophy.md
+├── Research/                 # 研究与工具
+│   ├── tower_defense_knowledge.md  # 塔防知识库（自动更新）
+│   ├── findings/             # 爬取原始数据
+│   ├── logs/                 # 构建/测试/压测日志
+│   ├── scripts/              # 旧脚本（batch_gen, gen_towers, runbench*）
+│   └── bug-report-*.md / crawler*.py 等
+└── BattleSystemECS.Tests/   # 63 单元测试
+└── Program.cs                # 入口（游戏/压测/微基准）
 ```
 
 ---

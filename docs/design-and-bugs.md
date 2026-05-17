@@ -325,12 +325,12 @@ GameManager.Run() / BenchmarkSystem
 
 | benchmark | FPS | 说明 |
 |-----------|-----|------|
-| mode 2（合并热路径） | ~9500 | 手写合并热路径，参考用 |
-| mode 4（真实系统链路） | ~5100 | **主指标**，直接调用各系统 `.Update()` |
+| mode 2（合并热路径） | ~6353 | 手写合并热路径，参考用 |
+| mode 4（真实系统链路） | ~3810 | **主指标**，直接调用各系统 `.Update()` |
 
 mode 2 和 mode 4 是不同的语义，**不要再用一个 FPS 代表全部性能**。
 
-测试覆盖：48 单元测试。
+测试覆盖：63 单元测试。
 
 ---
 
@@ -380,7 +380,10 @@ _记录时间：2026-05-13 22:20 GMT+8_
 | 2026-05-17 02:00 | 方向：SpatialGrid.Rebuild GC 压力 | 修复 2 个 HIGH bug（EnemyMovementSystem L77 冗余写入、SkillSystem L354 死代码），Mode2 6053 FPS，Mode4 3458 FPS | ✅ 修复 |
 | 2026-05-17 02:47 | — | GitHub 爬取（tower_defense_explorer） | ✅ |
 | 2026-05-17 03:00 | — | 无方向文件，跳过 | [SILENT] |
-| 2026-05-17 04:00 | 方向：SkillSystem Cast 方法 GC 消除（ConcurrentBag 预分配） | 执行中…（方向文件已生成待执行） | ⏳ |
+| 2026-05-17 04:00 | 方向：SkillSystem Cast 方法 GC 消除（ConcurrentBag 预分配） | 方向已产出，执行失败（见晚上记录） | ❌ |
+| 2026-05-17 05:00 | — | 无方向文件，跳过 | [SILENT] |
+| 2026-05-17 06:00-19:00 | — | 无方向文件，跳过 | [SILENT] |
+| 2026-05-17 20:46 | 方向：SpatialGrid.Rebuild（增量更新探索） | SpatialGrid 增量更新（ConcurrentBag 追踪 → 决策保留全量），Mode2 6353，Mode4 3810 | ✅ |
 
 ### 本次 commit（上午）
 
@@ -394,9 +397,17 @@ _记录时间：2026-05-13 22:20 GMT+8_
 - 目录结构重组：配置类 `GameConfig.cs`/`GameConfigLoader.cs`/`TechTreeDef.cs` 迁移 `Core/`；`all_towers.json` 迁移 `Data/Towers/`；日志/脚本归入 `Research/logs/` / `Research/scripts/`
 - Mode2: ~6200 FPS，Mode4: ~3500 FPS
 
+### 本次 commit（晚上，20:46）
+
+- `f6e086c` — SpatialGrid 增量更新（incremental rebuild）
+- 探索结论：ConcurrentBag 追踪方案存在正确性边界问题，最终决策保留全量 O(enemies) 重建（~0.03ms，占比极小）
+- 代码改动（5 files, +120/-24）：`Core/SpatialGrid.cs` 新增 `UpdateEnemies()`，`Core/ComponentStore.cs` 改为调用 `UpdateEnemies()`，`Systems/EnemyMovementSystem.cs` 清理未使用追踪字段，`Core/GameManager.cs` 注释更新，`docs/` 架构文档同步
+- Mode2: 6353 FPS，Mode4: 3810 FPS
+- Git push 超时，commit 保留本地
+
 ### 目录结构重组（2026-05-17 下午）
 
-|| 原路径 | 现路径 |
+| 原路径 | 现路径 |
 |------|--------|--------|
 | `Configs/GameConfig.cs` | `Core/GameConfig.cs` |
 | `Configs/GameConfigLoader.cs` | `Core/GameConfigLoader.cs` |
@@ -407,12 +418,12 @@ _记录时间：2026-05-13 22:20 GMT+8_
 
 Configs/ 现在只含运行时 .json 配置（7 个文件），不再含 .cs 文件。
 
-### 当前性能基准（2026-05-17）
+### 当前性能基准（2026-05-17 晚）
 
-| benchmark | FPS | 门禁 |
+| benchmark | FPS | 说明 |
 |-----------|-----|------|
-| mode 2（合并热路径） | ~6053 | >5000 |
-| mode 4（真实系统链路） | ~3458 | >3500（当前低于门禁 42 FPS） |
+| mode 2（合并热路径） | ~6353 | >5000 |
+| mode 4（真实系统链路） | ~3810 | >3500 |
 
 ### 待处理方向
 
