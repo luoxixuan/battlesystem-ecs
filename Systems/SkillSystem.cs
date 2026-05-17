@@ -194,8 +194,9 @@ namespace BattleSystemECS.Systems
 
         private int CastSingleTarget(float finalDamage, float playerX, float playerY, int range, string name)
         {
-            var activeEnemyIds = _activeEnemyList ?? store.GetCachedActiveEnemyIds();
-            if (activeEnemyIds == null) return 0;
+            // _activeEnemyList is guaranteed non-null after SetTurn(); no fallback needed
+            if (_activeEnemyList == null) return 0;
+            var activeEnemyIds = _activeEnemyList;
 
             int rangeSq = range * range;
 
@@ -245,8 +246,9 @@ namespace BattleSystemECS.Systems
 
         private int CastCrossArea(float finalDamage, float playerX, float playerY, int radius, string name)
         {
-            var activeEnemyIds = _activeEnemyList ?? store.GetCachedActiveEnemyIds();
-            if (activeEnemyIds == null) return 0;
+            // _activeEnemyList is guaranteed non-null after SetTurn(); no fallback needed
+            if (_activeEnemyList == null) return 0;
+            var activeEnemyIds = _activeEnemyList;
 
             // Parallel phase: collect all enemies in cross area
             _crossAreaHits.Clear();
@@ -288,8 +290,9 @@ namespace BattleSystemECS.Systems
 
         private int CastBoxArea(float finalDamage, float playerX, float playerY, int range, string name)
         {
-            var activeEnemyIds = _activeEnemyList ?? store.GetCachedActiveEnemyIds();
-            if (activeEnemyIds == null) return 0;
+            // _activeEnemyList is guaranteed non-null after SetTurn(); no fallback needed
+            if (_activeEnemyList == null) return 0;
+            var activeEnemyIds = _activeEnemyList;
 
             float xMin = playerX - (float)range;
             float xMax = playerX + (float)range;

@@ -394,6 +394,7 @@ namespace BattleSystemECS.Tests
             MakeEnemy(store, eid, 5f, 1f);
             var sys = new SkillSystem(store, r, pid, config);
             sys.InitializePlayerSkills();
+            sys.SetTurn(0); // required: populates _activeEnemyList before any Cast call
             sys.CastSkill("Cross Slash");
             sys.ResolveSkillDamage(); // serial-phase damage application
             store.ResolveEnemiesKilledThisFrame(); // frame-end death resolution
