@@ -23,8 +23,9 @@ namespace BattleSystemECS.Systems
         private float deltaTime = 1f;
         private GameConfig gameConfig;
         private List<int> _activeEnemyList;
-        // Two-phase pattern: collect damage in parallel phase, resolve in serial phase
-        private ConcurrentBag<(int enemyId, float damage)> _skillDamageQueue = new();
+        // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
+        private ConcurrentBag<(int enemyId, float damage)>[] _skillDamageQueue = new ConcurrentBag<(int, float)>[2];
+        private int _skillDamageQueueIdx = 0;
         // GC elimination: field-level bags pre-allocated, cleared before each use
         private ConcurrentBag<(int enemyId, float distSq)> _singleTargetCandidates = new();
         private ConcurrentBag<int> _crossAreaHits = new();
@@ -36,6 +37,8 @@ namespace BattleSystemECS.Systems
             this.renderer = renderer;
             this.playerId = playerId;
             this.gameConfig = gameConfig;
+            _skillDamageQueue[0] = new ConcurrentBag<(int, float)>();
+            _skillDamageQueue[1] = new ConcurrentBag<(int, float)>();
         }
 
         /// <summary>
@@ -232,7 +235,7 @@ namespace BattleSystemECS.Systems
                 float enemyX = store.PositionX[closestEnemyId];
                 float enemyY = store.PositionY[closestEnemyId];
 
-                _skillDamageQueue.Add((closestEnemyId, finalDamage));
+                _skillDamageQueue[_skillDamageQueueIdx].Add((closestEnemyId, finalDamage));
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {closestEnemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
                 return 1;
@@ -275,7 +278,7 @@ namespace BattleSystemECS.Systems
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                _skillDamageQueue.Add((enemyId, finalDamage));
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
                 hitCount++;
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
@@ -319,7 +322,7 @@ namespace BattleSystemECS.Systems
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                _skillDamageQueue.Add((enemyId, finalDamage));
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
                 hitCount++;
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
@@ -341,11 +344,12 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void ResolveSkillDamage()
         {
-            // Capture bag, swap, then iterate — prevents damage added during apply
-            // from being silently dropped (ConcurrentBag swap bug).
-            var captured = _skillDamageQueue;
-            _skillDamageQueue = new ConcurrentBag<(int, float)>();
-            foreach (var (enemyId, damage) in captured)
+            // Phase 2 (serial): ping-pong swap — read from current bag, clear alternate for next frame
+            int readIdx = _skillDamageQueueIdx;
+            int writeIdx = 1 - _skillDamageQueueIdx;
+            _skillDamageQueueIdx = writeIdx;
+            _skillDamageQueue[writeIdx].Clear();
+            foreach (var (enemyId, damage) in _skillDamageQueue[readIdx])
             {
                 if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) continue;
                 float currentHealth = store.EnemyHealth[enemyId];

@@ -20,13 +20,16 @@ namespace BattleSystemECS.Systems
         // GC elimination: per-tower reusable candidate lists, pre-allocated in SetTurn
         private List<int>[] _towerCandidates = Array.Empty<List<int>>();
 
-        // Two-phase: damage collected in parallel (enemyId, damage, playerId), applied serially with -= to accumulate
-        private ConcurrentBag<(int enemyId, float damage, int playerId)> _damageQueue = new ConcurrentBag<(int, float, int)>();
+        // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
+        private ConcurrentBag<(int enemyId, float damage, int playerId)>[] _damageQueue = new ConcurrentBag<(int, float, int)>[2];
+        private int _damageQueueIdx = 0;
 
         public TowerAttackSystem(ComponentStore store, IRenderer logger)
         {
             this.store = store;
             this.logger = logger;
+            _damageQueue[0] = new ConcurrentBag<(int, float, int)>();
+            _damageQueue[1] = new ConcurrentBag<(int, float, int)>();
         }
 
         public void SetTurn(int turn)
@@ -67,7 +70,7 @@ namespace BattleSystemECS.Systems
             // Phase 1 (parallel): collect damage events only — no structural mutations.
             // Capture current bag into local so threads keep writing to the same bag reference
             // even after we swap _damageQueue below. This prevents orphaned-bag damage drops.
-            var bag = _damageQueue;
+            var bag = _damageQueue[_damageQueueIdx];
 
             // Phase 1 (parallel): collect damage events only — no structural mutations
             Parallel.For(0, activeTowerIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, ti =>
@@ -117,8 +120,12 @@ namespace BattleSystemECS.Systems
                 }
             });
 
-            // Phase 2 (serial): apply damage, queue deaths. Resolve happens at frame end in GameManager/Benchmark.
-            foreach (var (enemyId, damage, playerId) in bag)
+            // Phase 2 (serial): ping-pong swap — read from current bag, clear alternate for next frame
+            int readIdx = _damageQueueIdx;
+            int writeIdx = 1 - _damageQueueIdx;
+            _damageQueueIdx = writeIdx;
+            _damageQueue[writeIdx].Clear();
+            foreach (var (enemyId, damage, playerId) in _damageQueue[readIdx])
             {
                 if (!store.EnemyActive[enemyId]) continue;
                 store.EnemyHealth[enemyId] -= damage;
@@ -127,10 +134,7 @@ namespace BattleSystemECS.Systems
                     store.QueueEnemyDeath(enemyId, playerId);
                 }
             }
-            // Atomic swap: next frame's threads will capture the new bag via _damageQueue,
-            // while this frame's threads (which captured 'bag' above) keep draining to 'bag'.
-            System.Threading.Thread.MemoryBarrier(); // ensure bag drain completes before swap
-            _damageQueue = new ConcurrentBag<(int, float, int)>();
+            System.Threading.Thread.MemoryBarrier(); // ensure drain completes
         }
     }
 }

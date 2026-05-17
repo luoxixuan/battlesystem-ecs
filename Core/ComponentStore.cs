@@ -136,25 +136,25 @@ namespace BattleSystemECS.Core
         public void AddActiveEnemyId(int id) => _activeEnemyIds.Add(id);
         public void AddActiveTowerId(int id) => _activeTowerIds.Add(id);
 
-        // ── Two-phase death resolution (Thread-safe) ──────────────────────────
-        private ConcurrentBag<(int enemyId, int playerId)> _deathQueue = new ConcurrentBag<(int, int)>();
+        // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
+        private ConcurrentBag<(int enemyId, int playerId)>[] _deathQueue = new ConcurrentBag<(int, int)>[2];
+        private int _deathQueueIdx = 0;
 
         private bool _deathQueueResolved = false;
 
         public void BeginFrame()
         {
             // M-1 fix: detect programming error — BeginFrame called without Resolve
-            if (_deathQueue != null && !_deathQueue.IsEmpty && !_deathQueueResolved)
+            if (!_deathQueue[_deathQueueIdx].IsEmpty && !_deathQueueResolved)
             {
                 throw new InvalidOperationException(
                     "BeginFrame() called but ResolveEnemiesKilledThisFrame() was not called " +
                     "for the previous frame. Deaths may have been discarded.");
             }
-            // Reset for a new frame — called at the start of each game turn
-            _deathQueue = new ConcurrentBag<(int, int)>();
+            // Ping-pong: switch to alternate bag, clear it for new frame
+            _deathQueueIdx = 1 - _deathQueueIdx;
+            _deathQueue[_deathQueueIdx].Clear();
             _deathQueueResolved = false;
-            // _activeEnemyIds mutation is blocked during game loop (adds only in WaveSpawning between frames).
-            // GetCachedActiveEnemyIds returns _activeEnemyIds directly — zero allocation, safe read-only.
             CurrentFrame++;
         }
 
@@ -167,7 +167,7 @@ namespace BattleSystemECS.Core
             // H-11 fix: validate IDs are within valid range before queueing
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
             if (playerId < 0 || playerId >= MAX_PLAYERS) return;
-            _deathQueue.Add((enemyId, playerId));
+            _deathQueue[_deathQueueIdx].Add((enemyId, playerId));
         }
 
 
@@ -177,20 +177,25 @@ namespace BattleSystemECS.Core
         /// </summary>
         public void ResolveEnemiesKilledThisFrame()
         {
-            foreach (var (enemyId, playerId) in _deathQueue)
+            int readIdx = _deathQueueIdx;
+            int writeIdx = 1 - _deathQueueIdx;
+            _deathQueueIdx = writeIdx;
+            foreach (var (enemyId, playerId) in _deathQueue[readIdx])
             {
                 if (!EnemyActive[enemyId]) continue; // already destroyed this frame
                 TotalKills++;
                 PlayerGold[playerId] += EnemyGoldReward[enemyId];
                 DestroyEntity(enemyId);
             }
-            // EndFrame: clear after processing so BeginFrame is optional
-            _deathQueue = new ConcurrentBag<(int, int)>();
+            _deathQueue[writeIdx].Clear();
             _deathQueueResolved = true;
         }
 
         public ComponentStore()
         {
+            // Initialize ping-pong death queue buffers
+            _deathQueue[0] = new ConcurrentBag<(int, int)>();
+            _deathQueue[1] = new ConcurrentBag<(int, int)>();
             // 初始化玩家 buffs
             for (int i = 0; i < MAX_PLAYERS; i++)
             {

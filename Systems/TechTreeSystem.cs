@@ -239,7 +239,7 @@ namespace BattleSystemECS.Systems
             if (_lowHpRegenValue <= 0f) return 0f;
             float hp = store.GetPlayerCurrentHealth(playerId);
             float maxHp = store.GetPlayerMaxHealth(playerId);
-            if (hp > 0 && hp / maxHp < _lowHpRegenThreshold)
+            if (hp > 0 && maxHp > 0 && hp / maxHp < _lowHpRegenThreshold)
             {
                 float heal = maxHp * _lowHpRegenValue;
                 float newHp = Math.Min(maxHp, hp + heal);

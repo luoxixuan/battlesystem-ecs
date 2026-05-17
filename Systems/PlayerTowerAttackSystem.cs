@@ -35,8 +35,9 @@ namespace BattleSystemECS.Systems
         private float _critRateBonus;
         private float _critDamageBonus;  // additive bonus to ×2, e.g. 0.25 → ×2.25
 
-        // Two-phase: damage collected in parallel (enemyId, damage), applied serially with -= to accumulate correctly
-        private ConcurrentBag<(int enemyId, float damage)> _damageQueue = new ConcurrentBag<(int, float)>();
+        // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
+        private ConcurrentBag<(int enemyId, float damage)>[] _damageQueue = new ConcurrentBag<(int, float)>[2];
+        private int _damageQueueIdx = 0;
 
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
             : this(store, renderer, playerId, gameConfig, null)
@@ -49,6 +50,8 @@ namespace BattleSystemECS.Systems
             this.renderer = renderer;
             this.playerId = playerId;
             this.techTreeSystem = techTreeSystem;
+            _damageQueue[0] = new ConcurrentBag<(int, float)>();
+            _damageQueue[1] = new ConcurrentBag<(int, float)>();
         }
 
         public void SetTurn(int turn)
@@ -104,14 +107,15 @@ namespace BattleSystemECS.Systems
                     finalDamage *= (1f + _critDamageBonus);
                 }
 
-                _damageQueue.Add((enemyId, finalDamage));
+                _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage));
             });
 
-            // Phase 2 (serial): capture bag, swap, then iterate — prevents damage
-            // added during apply from being silently dropped (ConcurrentBag swap bug).
-            var captured = _damageQueue;
-            _damageQueue = new ConcurrentBag<(int, float)>();
-            foreach (var (enemyId, damage) in captured)
+            // Phase 2 (serial): ping-pong swap — read from current bag, clear alternate for next frame
+            int readIdx = _damageQueueIdx;
+            int writeIdx = 1 - _damageQueueIdx;
+            _damageQueueIdx = writeIdx;
+            _damageQueue[writeIdx].Clear(); // clear the bag threads will write to next frame
+            foreach (var (enemyId, damage) in _damageQueue[readIdx])
             {
                 if (!store.EnemyActive[enemyId]) continue;
                 store.EnemyHealth[enemyId] -= damage;
