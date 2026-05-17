@@ -30,9 +30,10 @@ namespace BattleSystemECS.Systems
         private List<int> _activeEnemyList;
         private float _playerX, _playerY;
 
-        // Attack event batch — collected in parallel phase, executed in serial phase.
-        // Replaced each frame to avoid expensive Clear() on ConcurrentBag.
-        private ConcurrentBag<AttackEvent> _attackEvents = new();
+        // Attack event batch — ping-pong double-buffer to eliminate per-frame GC allocation.
+        // Collected in parallel phase, executed in serial phase.
+        private ConcurrentBag<AttackEvent>[] _attackEvents = new ConcurrentBag<AttackEvent>[2];
+        private int _attackEventsIdx = 0;
 
         // BT evaluation cache — invalidates when enemy health or player health changes.
         // Turn/frame changes do NOT invalidate (enemy health per-enemy + player health global).
@@ -48,6 +49,8 @@ namespace BattleSystemECS.Systems
             this.logger = logger;
             this.playerId = playerId;
             this.gameConfig = gameConfig;
+            _attackEvents[0] = new ConcurrentBag<AttackEvent>();
+            _attackEvents[1] = new ConcurrentBag<AttackEvent>();
         }
 
         /// <summary>
@@ -146,7 +149,7 @@ namespace BattleSystemECS.Systems
                     {
                         float param = (actionEnum == EnemyActionType.ChargeAttack)
                             ? store.EnemyChargeParam[enemyId] : 0f;
-                        _attackEvents.Add(new AttackEvent
+                        _attackEvents[_attackEventsIdx].Add(new AttackEvent
                         {
                             EnemyId = enemyId,
                             ActionType = actionEnum,
@@ -161,13 +164,16 @@ namespace BattleSystemECS.Systems
             //
             // Batch-optimized: attack events collected in parallel phase (_attackEvents bag),
             // executed here by iterating only attacking enemies (skips MoveToTarget/None).
-            foreach (var evt in _attackEvents)
+            int readIdx = _attackEventsIdx;
+            foreach (var evt in _attackEvents[readIdx])
             {
                 InvokeExecuteActionEnum(evt.EnemyId, evt.ActionType);
             }
 
-            // Clear bag by replacing (avoids ConcurrentBag.Clear() allocation)
-            _attackEvents = new ConcurrentBag<AttackEvent>();
+            // Ping-pong swap: clear the write buffer, flip idx for next frame
+            int writeIdx = 1 - _attackEventsIdx;
+            _attackEvents[writeIdx].Clear();
+            _attackEventsIdx = writeIdx;
 
             // Dodge and other non-attack actions still processed per-enemy (lightweight)
             foreach (var enemyId in activeEnemyIds)
