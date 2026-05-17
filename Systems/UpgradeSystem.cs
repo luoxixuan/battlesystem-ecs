@@ -36,10 +36,6 @@ namespace BattleSystemECS.Systems
             {
                 ProcessUpgrade();
             }
-            else
-            {
-                renderer.Log($"[UPGRADE] Current gold: {gold:F1} / {threshold:F1} (next upgrade)");
-            }
         }
 
         private void ProcessUpgrade()
