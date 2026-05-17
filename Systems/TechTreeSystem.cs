@@ -17,6 +17,8 @@ namespace BattleSystemECS.Systems
         private readonly IRenderer renderer;
         private readonly int playerId;
         private TechTreeConfig config;
+        // O(1) node lookup — built once from config, rebuilt on ReloadConfig
+        private Dictionary<string, TechNodeDef> _nodeLookup;
 
         // Per-player computed tech multipliers (applied to base stats on unlock)
         // Avoids recomputing on every attack
@@ -43,6 +45,22 @@ namespace BattleSystemECS.Systems
             this.renderer = renderer;
             this.playerId = playerId;
             this.config = config;
+            BuildNodeLookup();
+        }
+
+        /// <summary>
+        /// Build O(1) node lookup dictionary from config branches.
+        /// </summary>
+        private void BuildNodeLookup()
+        {
+            _nodeLookup = new Dictionary<string, TechNodeDef>();
+            if (config?.branches == null) return;
+            foreach (var branch in config.branches)
+            {
+                if (branch.nodes == null) continue;
+                foreach (var node in branch.nodes)
+                    _nodeLookup[node.id] = node;
+            }
         }
 
         /// <summary>
@@ -51,6 +69,7 @@ namespace BattleSystemECS.Systems
         public void ReloadConfig(TechTreeConfig newConfig)
         {
             this.config = newConfig;
+            BuildNodeLookup();
         }
 
         /// <summary>
@@ -264,14 +283,7 @@ namespace BattleSystemECS.Systems
 
         private TechNodeDef FindNode(string nodeId)
         {
-            foreach (var branch in config.branches)
-            {
-                foreach (var node in branch.nodes)
-                {
-                    if (node.id == nodeId) return node;
-                }
-            }
-            return null;
+            return _nodeLookup.TryGetValue(nodeId, out var node) ? node : null;
         }
 
         // ==================== Config Loader ====================
