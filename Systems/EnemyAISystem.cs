@@ -57,8 +57,8 @@ namespace BattleSystemECS.Systems
             // Cache player position once per turn
             _playerX = store.PositionX[playerId];
             _playerY = store.PositionY[playerId];
-            // Cache active enemy list once per turn
-            _activeEnemyList = store.GetAllActiveEnemyIds();
+            // Cache active enemy list once per turn (zero allocation — uses frame cache)
+            _activeEnemyList = store.GetCachedActiveEnemyIds();
             // Cache current player health for BT evaluation
             _cachedPlayerHealth = store.PlayerCurrentHealth[playerId];
             // BT eval cache auto-invalidates when enemy/player health changes —

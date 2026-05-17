@@ -354,7 +354,8 @@ namespace BattleSystemECS.Core
         /// </summary>
         private bool CheckEnemiesAtBottom()
         {
-            var activeEnemyIds = store.GetAllActiveEnemyIds();
+            // Uses frame-cached enemy list — zero allocation (no new List<int> per call)
+            var activeEnemyIds = store.GetCachedActiveEnemyIds();
 
             foreach (var enemyId in activeEnemyIds)
             {

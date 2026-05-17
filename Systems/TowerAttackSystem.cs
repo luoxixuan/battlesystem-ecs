@@ -31,7 +31,7 @@ namespace BattleSystemECS.Systems
 
         public void SetTurn(int turn)
         {
-            _activeEnemyList = store.GetAllActiveEnemyIds();
+            _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
 
             // Ensure _towerCandidates is large enough; each slot is a reusable List<int>
             var towerIds = store.ActiveTowerIds;

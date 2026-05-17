@@ -153,6 +153,8 @@ namespace BattleSystemECS.Core
             // Reset for a new frame — called at the start of each game turn
             _deathQueue = new ConcurrentBag<(int, int)>();
             _deathQueueResolved = false;
+            // _activeEnemyIds mutation is blocked during game loop (adds only in WaveSpawning between frames).
+            // GetCachedActiveEnemyIds returns _activeEnemyIds directly — zero allocation, safe read-only.
             CurrentFrame++;
         }
 
@@ -701,6 +703,21 @@ namespace BattleSystemECS.Core
         public List<int> GetAllActiveEnemyIds()
         {
             // Returns a single defensive copy — avoids double allocation from ActiveEnemyIds.ToList() + new List<int>(...)
+            return new List<int>(_activeEnemyIds);
+        }
+
+        /// <summary>
+        /// Returns the internal active enemy list directly — zero allocation, read-only use.
+        /// Safe for concurrent read access across all systems within a frame.
+        /// Falls back to a fresh allocation if the list is empty (test/standalone scenarios).
+        /// </summary>
+        public List<int> GetCachedActiveEnemyIds()
+        {
+            // _activeEnemyIds is mutated only by AddEnemy/RemoveEntity — never during the
+            // parallel system chain within a frame. Safe to share as read-only reference.
+            if (_activeEnemyIds.Count > 0)
+                return _activeEnemyIds;
+            // Fallback: empty store (test / standalone usage). Return fresh copy.
             return new List<int>(_activeEnemyIds);
         }
 

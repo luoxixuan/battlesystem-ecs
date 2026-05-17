@@ -32,7 +32,7 @@ namespace BattleSystemECS.Systems
 
         public void SetTurn(int turn)
         {
-            _activeEnemyList = store.GetAllActiveEnemyIds();
+            _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
             _playerX = store.PositionX[playerId];
         }
 
@@ -41,7 +41,7 @@ namespace BattleSystemECS.Systems
             if (_activeEnemyList == null)
             {
                 // Fallback for code that calls Update() without SetTurn()
-                _activeEnemyList = store.GetAllActiveEnemyIds();
+                _activeEnemyList = store.GetCachedActiveEnemyIds();
                 _playerX = store.PositionX[playerId];
             }
 

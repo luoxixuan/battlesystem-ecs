@@ -39,12 +39,11 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Cache active enemy list at turn start — eliminates 3× GetAllActiveEnemyIds() allocations per skill cast.
-        /// Consistent with PlayerTowerAttackSystem, EnemyAISystem, and EnemyMovementSystem SetTurn patterns.
+        /// Cache active enemy list at turn start — uses frame-cached list (zero allocation).
         /// </summary>
         public void SetTurn(int turn)
         {
-            this._activeEnemyList = store.GetAllActiveEnemyIds();
+            this._activeEnemyList = store.GetCachedActiveEnemyIds();
         }
 
         /// <summary>
@@ -192,7 +191,7 @@ namespace BattleSystemECS.Systems
 
         private int CastSingleTarget(float finalDamage, float playerX, float playerY, int range, string name)
         {
-            var activeEnemyIds = _activeEnemyList ?? store.GetAllActiveEnemyIds();
+            var activeEnemyIds = _activeEnemyList ?? store.GetCachedActiveEnemyIds();
             if (activeEnemyIds == null) return 0;
 
             int rangeSq = range * range;
@@ -243,7 +242,7 @@ namespace BattleSystemECS.Systems
 
         private int CastCrossArea(float finalDamage, float playerX, float playerY, int radius, string name)
         {
-            var activeEnemyIds = _activeEnemyList ?? store.GetAllActiveEnemyIds();
+            var activeEnemyIds = _activeEnemyList ?? store.GetCachedActiveEnemyIds();
             if (activeEnemyIds == null) return 0;
 
             // Parallel phase: collect all enemies in cross area
@@ -286,7 +285,7 @@ namespace BattleSystemECS.Systems
 
         private int CastBoxArea(float finalDamage, float playerX, float playerY, int range, string name)
         {
-            var activeEnemyIds = _activeEnemyList ?? store.GetAllActiveEnemyIds();
+            var activeEnemyIds = _activeEnemyList ?? store.GetCachedActiveEnemyIds();
             if (activeEnemyIds == null) return 0;
 
             float xMin = playerX - (float)range;

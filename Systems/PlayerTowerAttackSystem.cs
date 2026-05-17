@@ -57,7 +57,7 @@ namespace BattleSystemECS.Systems
             _playerY = store.PositionY[playerId];
             _attackDamage = store.GetPlayerAttackDamage(playerId);
             _attackRange = store.GetPlayerAttackRange(playerId);
-            _activeEnemyList = store.GetAllActiveEnemyIds();
+            _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
             _turnCached = true;
             _rangeSq = (int)(_attackRange * _attackRange);
 
