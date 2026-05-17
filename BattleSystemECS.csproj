@@ -11,18 +11,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Config files -->
-    <Compile Include="Configs\*.cs" />
-
-    <!-- Core files -->
+    <!-- Core files (includes EnemyActionType, BuffType, GameConfig, GAS, etc.) -->
     <Compile Include="Core\*.cs" />
     <Compile Include="Core\GAS\*.cs" />
-
-    <!-- Components (only actively referenced files) -->
-    <Compile Include="Components\BuffData.cs" />
-    <Compile Include="Components\EnemyActionType.cs" />
-    <Compile Include="Components\EnemyComponent.cs" />
-    <Compile Include="Components\SkillComponent.cs" />
 
     <!-- Systems -->
     <Compile Include="Systems\*.cs" />
@@ -32,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="game_config.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Data\Configs\game_config.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
