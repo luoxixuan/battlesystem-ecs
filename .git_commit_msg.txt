@@ -1,8 +1,1 @@
-[auto] Fix SpatialGrid rebuild before TowerAttackSystem
-
-- Insert store.RebuildSpatialGrid() before towerAttackSystem.Update() in GameManager.Run()
-- Fixes stale grid data bug: TowerAttackSystem now queries fresh enemy positions
-- BenchmarkSystem order unchanged
-
-Mode2: 6338 FPS, Mode4: 3852 FPS
-Bug review: 0 HIGH, 0 MEDIUM
+chore: remove commit msg temp file
