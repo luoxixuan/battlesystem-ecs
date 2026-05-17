@@ -30,6 +30,10 @@ namespace BattleSystemECS.Systems
         private List<int> _activeEnemyList;
         private float _playerX, _playerY;
 
+        // Attack event batch — collected in parallel phase, executed in serial phase.
+        // Replaced each frame to avoid expensive Clear() on ConcurrentBag.
+        private ConcurrentBag<AttackEvent> _attackEvents = new();
+
         // BT evaluation cache — invalidates when enemy health or player health changes.
         // Turn/frame changes do NOT invalidate (enemy health per-enemy + player health global).
         private float _cachedPlayerHealth = -1;
@@ -134,29 +138,47 @@ namespace BattleSystemECS.Systems
                     _enemyHealthCache[enemyId] = enemyHealth;
                     _lastActionCache[enemyId] = actionEnum;
                     _lastActionStringCache[enemyId] = action;
+
+                    // Collect attack events for batch serial execution
+                    if (actionEnum == EnemyActionType.AttackMelee ||
+                        actionEnum == EnemyActionType.RangedAttack ||
+                        actionEnum == EnemyActionType.ChargeAttack)
+                    {
+                        float param = (actionEnum == EnemyActionType.ChargeAttack)
+                            ? store.EnemyChargeParam[enemyId] : 0f;
+                        _attackEvents.Add(new AttackEvent
+                        {
+                            EnemyId = enemyId,
+                            ActionType = actionEnum,
+                            Param = param
+                        });
+                    }
                 }
             });
 
             // Serial action execution — damage/event must be applied serially to avoid race conditions.
             // Two-phase: BT eval is parallel (safe), action execution is serial (correct).
+            //
+            // Batch-optimized: attack events collected in parallel phase (_attackEvents bag),
+            // executed here by iterating only attacking enemies (skips MoveToTarget/None).
+            foreach (var evt in _attackEvents)
+            {
+                InvokeExecuteActionEnum(evt.EnemyId, evt.ActionType);
+            }
+
+            // Clear bag by replacing (avoids ConcurrentBag.Clear() allocation)
+            _attackEvents = new ConcurrentBag<AttackEvent>();
+
+            // Dodge and other non-attack actions still processed per-enemy (lightweight)
             foreach (var enemyId in activeEnemyIds)
             {
                 if (!store.EnemyActive[enemyId]) continue;
                 var actionEnum = store.GetEnemyActionEnum(enemyId);
-                if (actionEnum == EnemyActionType.AttackMelee ||
-                    actionEnum == EnemyActionType.RangedAttack ||
-                    actionEnum == EnemyActionType.ChargeAttack)
+                if (actionEnum == EnemyActionType.Dodge)
                 {
-                    InvokeExecuteActionEnum(enemyId, actionEnum);
-                }
-                else if (actionEnum == EnemyActionType.Dodge)
-                {
-                    // Retrieve cached action string and parse dodge direction
                     string cachedAction = _lastActionStringCache[enemyId] ?? "dodge";
                     int dodgeDir = ParseDodgeDirection(cachedAction);
-                    // Store direction in EnemyChargeParam for EnemyMovementSystem to read
                     store.EnemyChargeParam[enemyId] = dodgeDir;
-                    // Inline lateral X movement here to avoid extra array read in EnemyMovementSystem parallel loop
                     float enemyX = store.PositionX[enemyId];
                     store.PositionX[enemyId] = enemyX + dodgeDir * store.EnemyMoveSpeed[enemyId];
                 }
@@ -417,6 +439,14 @@ namespace BattleSystemECS.Systems
                     return dir;
             }
             return 1; // default dodge right
+        }
+
+        // Lightweight struct for batch-collected attack events (avoids delegate allocation).
+        private struct AttackEvent
+        {
+            public int EnemyId;
+            public EnemyActionType ActionType;
+            public float Param;
         }
     }
 }
