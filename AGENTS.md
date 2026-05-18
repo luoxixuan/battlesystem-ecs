@@ -8,12 +8,12 @@
 
 ---
 
-## 性能基准（2026-05-18, commit `d34e5fd`）
+## 性能基准（2026-05-18, commit `2b9e5e7`）
 
 | benchmark | FPS | 说明 |
 |-----------|------|------|
-| mode 2（合并热路径 + 完整 skill+buff） | ~10954 | 含 skill 施放 + DoT 链路，>5000 门禁 ✅ |
-| mode 4（真实系统链路 + 完整 skill+buff） | ~11473 | 含 BuffSystem + AutoCast，>3500 门禁 ✅ |
+| mode 2（合并热路径 + 完整 skill+buff） | ~6214 | ≥5000 门禁 ✅ |
+| mode 4（真实系统链路 + 完整 skill+buff） | ~3740 | ≥3500 门禁 ✅ |
 
 mode 2 和 mode 4 是不同的语义，**不要再用一个 FPS 代表全部性能**。
 

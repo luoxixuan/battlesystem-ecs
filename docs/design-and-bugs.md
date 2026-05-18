@@ -323,34 +323,43 @@ GameManager.Run() / BenchmarkSystem
 
 ## 五、性能基准
 
-> ⚠️ 2026-05-18 重要修正：之前的 Mode2/4 对比存在根本性测量错误——Mode4 里 AutoCastBestSkill + Poison Nova 每帧杀敌 → WaveSpawning 每帧补怪 → ResolveEnemiesKilledThisFrame 每帧 O(10K)。修复：BENCH_ENEMY_HEALTH=1e9，敌人永生，敌人数量稳定 10K。但 Mode2 EnemyAI ~350ms vs Mode4 ~42ms 差异仍来自 benchmark 框架本身，不代表系统真实性能。
+> 2026-05-18 修正：BENCH_ENEMY_HEALTH 已恢复 100（原 1e9 导致敌人永生，Workload 从 ~100/帧变为 10K/帧，FPS 下降 10x 但非系统退化）。HP=100 下敌人持续死亡重生，benchmark 场景与 c9f79c0 可比。
 
 测试覆盖：63 单元测试。
 
 | benchmark | FPS | EnemyAI | 说明 |
 |-----------|------|---------|------|
-| mode 2（合并热路径，1e9 HP） | ~510 | ~350ms | EnemyAI 累加计时，非 totalSw |
-| mode 4（真实系统链路，1e9 HP） | ~2070 | ~42ms | EnemyAI totalSw 计时 |
-
-> Mode2/4 FPS 不可比：EnemyAI 测量差异来自 benchmark 框架，不反映系统真实性能退化。
+| mode 2（合并热路径，HP=100） | **~6214** | ~7.5ms | ≥5000 门禁 ✅ |
+| mode 4（真实系统链路，HP=100） | **~3740** | ~23ms | ≥3500 门禁 ✅ |
 
 ---
 
 ## 六、今日完成（2026-05-18 下午）
 
-### Benchmark 对比测量修复
+### Benchmark 对比测量修复（2026-05-18 下午）
 
 | # | 内容 |
 |---|------|
 | 1 | 发现：AutoCast + Poison Nova 每帧杀敌 → WaveSpawning 每帧补怪 → ResolveEnemiesKilledThisFrame 每帧 O(10K) |
-| 2 | 修复：BENCH_ENEMY_HEALTH=1e9，敌人永生，敌人数量在 200 帧内稳定 10K |
+| 2 | 修复（第一次）：BENCH_ENEMY_HEALTH=1e9，敌人永生，但导致 Workload 变为 10K/帧，FPS 下降 10x |
+| 3 | 修复（第二次）：BENCH_ENEMY_HEALTH=100 恢复，benchmark 场景与 c9f79c0 可比 |
 
 | benchmark | FPS | 说明 |
 |-----------|------|------|
-| Mode2 | **~510** | 含完整 skill+buff 链路，EnemyAI ~350ms（累加计时） |
-| Mode4 | **~2070** | 含 BuffSystem + AutoCast，EnemyAI ~42ms（totalSw） |
+| Mode2 | **~6214** | 含完整 skill+buff 链路，EnemyAI ~7.5ms |
+| Mode4 | **~3740** | 含 BuffSystem + AutoCast，EnemyAI ~23ms |
 
-> Mode2/4 EnemyAI 差异来自 benchmark 框架，不代表系统真实性能。
+> 注：HP=1e9 的 ~510/~2070 数据已废弃，保留于 git history。根因：HP=1e9 后敌人永生，每帧 EnemyAI 处理 10K 敌人（vs HP=100 时 ~100 活跃敌人），Workload 差 100x。 |
+
+---
+
+### Benchmark HP=100 恢复（2026-05-18 晚）
+
+| # | 内容 |
+|---|------|
+| 1 | 发现 BENCH_ENEMY_HEALTH=1e9 后 Mode2 FPS 从 ~6442 降到 ~510（EnemyAI 从 7.88ms 到 351ms）|
+| 2 | 根因：HP=1e9 → 敌人永生 → 每帧活跃敌人从 ~100 变为 10K → EnemyAI Workload 差 100x |
+| 3 | 确认：c9f79c0 的 BenchmarkSystem.cs（HP=100）在 HEAD 上跑 = 6561 FPS，证明 Core/ECS 无退化 |
 
 ---
 
