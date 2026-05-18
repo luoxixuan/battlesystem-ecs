@@ -40,7 +40,7 @@ namespace BattleSystemECS.Systems
         private float _cachedPlayerHealth = -1;
         private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
-        // Action string cache for Dodge direction parsing — string stays in cache when action is Dodge
+// Action string cache for Dodge direction parsing — string stays in cache when action is Dodge
         private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
 
         public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig)
@@ -105,7 +105,7 @@ namespace BattleSystemECS.Systems
                     if (_enemyHealthCache[enemyId] == enemyHealth &&
                         _cachedPlayerHealth == playerHealth)
                     {
-                        // Cache hit: reuse last action without re-evaluating BT
+// Cache hit: reuse last action without re-evaluating BT
                         store.SetEnemyActionEnum(enemyId, _lastActionCache[enemyId]);
                         continue;
                     }
@@ -190,7 +190,7 @@ namespace BattleSystemECS.Systems
                 }
             }
 
-            // Update turn cache after all enemies processed
+// Update turn cache after all enemies processed
         }
 
         /// <summary>

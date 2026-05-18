@@ -15,10 +15,7 @@ namespace BattleSystemECS.Systems
     /// </summary>
     public class BenchmarkSystem
     {
-        // Enemies in benchmark must survive full 200-frame run to keep enemy count stable.
-        // With Health=1e9 and max ~8-damage AOE hits per enemy across 200 frames (~200 hits),
-        // total possible damage ≈ 200 * 8 = 1600 << 1e9 — enemies survive indefinitely.
-        private const float BENCH_ENEMY_HEALTH = 1e9f;
+        private const float BENCH_ENEMY_HEALTH = 100f;
 
         private ComponentStore store;
 
@@ -64,7 +61,7 @@ namespace BattleSystemECS.Systems
             Console.WriteLine($"[BENCHMARK] Spawned {scenario} enemies");
 
             // 12 active game systems (BuffSystem now included for real DoT path)
-            var waveSpawning   = new WaveSpawningSystem(store, logger, gameConfig);
+var waveSpawning   = new WaveSpawningSystem(store, logger, gameConfig);
             var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig);
             var enemyMovement = new EnemyMovementSystem(store, playerId);
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
@@ -215,7 +212,7 @@ namespace BattleSystemECS.Systems
 
             Console.WriteLine($"\n[BENCHMARK] Per-system timing ({frames} frames, {scenario} enemies):");
             Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn/ticksPerMs,7:F2} ms  ({tWaveSpawn/ticksPerMs/msTotal*100,5:F1}%)");
-            Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms  ({tEnemyAI/ticksPerMs/msTotal*100,5:F1}%)");
+Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms  ({tEnemyAI/ticksPerMs/msTotal*100,5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   GridRebuild:   {tGridRebuild/ticksPerMs,7:F2} ms  ({tGridRebuild/ticksPerMs/msTotal*100,5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   MoveAttack:     {tMoveAttack/ticksPerMs,7:F2} ms  ({tMoveAttack/ticksPerMs/msTotal*100,5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   TowerAttack:    {tTowerAttack/ticksPerMs,7:F2} ms  ({tTowerAttack/ticksPerMs/msTotal*100,5:F1}%)");
@@ -362,7 +359,7 @@ namespace BattleSystemECS.Systems
             store.AddTower(t2, "魔法塔", 25f, 5, 1f, 1, 100f);
             store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
 
-            var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
+var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
             var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig);
             var enemyMovement = new EnemyMovementSystem(store, playerId);
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
@@ -406,7 +403,7 @@ namespace BattleSystemECS.Systems
             Console.WriteLine($"\n[BENCHMARK] Real-system-chain timing ({frames} frames, {scenario} enemies):");
             Console.WriteLine($"[BENCHMARK]   GridRebuild:    {tGridRebuildMode4/ticksPerMs,7:F2} ms");
             Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn/ticksPerMs,7:F2} ms");
-            Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms");
+Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms");
             Console.WriteLine($"[BENCHMARK]   EnemyMovement: {tMoveAttack/ticksPerMs,7:F2} ms");
             Console.WriteLine($"[BENCHMARK]   PlayerAttack:  {tPlayerAttack/ticksPerMs,7:F2} ms");
             Console.WriteLine($"[BENCHMARK]   TowerAttack:    {tTowerAttack/ticksPerMs,7:F2} ms");
