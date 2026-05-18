@@ -178,8 +178,11 @@ namespace BattleSystemECS.Systems
                 case 1: // Cross (+) shape
                     enemiesHit = CastCrossArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
                     break;
-                case 2: // Box (3×3)
+                case 2: // Box (N×N)
                     enemiesHit = CastBoxArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
+                    break;
+                case 3: // Circle (radius-based AOE, for Poison Nova DoT)
+                    enemiesHit = CastCircleArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -315,6 +318,51 @@ namespace BattleSystemECS.Systems
 
                 if (enemyX >= xMin && enemyX <= xMax &&
                     enemyY >= yMin && enemyY <= yMax)
+                {
+                    _boxAreaHits.Add(enemyId);
+                }
+            });
+
+            // Serial phase: apply damage
+            int hitCount = 0;
+            foreach (int enemyId in _boxAreaHits)
+            {
+                float enemyX = store.PositionX[enemyId];
+                float enemyY = store.PositionY[enemyId];
+
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                hitCount++;
+
+                renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
+            }
+            return hitCount;
+        }
+
+
+        private int CastCircleArea(float finalDamage, float playerX, float playerY, int radius, string name)
+        {
+            // _activeEnemyList is guaranteed non-null after SetTurn(); no fallback needed
+            if (_activeEnemyList == null) return 0;
+            var activeEnemyIds = _activeEnemyList;
+
+            int radiusSq = radius * radius;
+
+            _boxAreaHits.Clear();
+
+            Parallel.ForEach(activeEnemyIds, enemyId =>
+            {
+                if (enemyId == playerId) return;
+                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyHealth <= 0f) return;
+
+                float enemyX = store.PositionX[enemyId];
+                float enemyY = store.PositionY[enemyId];
+
+                float dx = enemyX - playerX;
+                float dy = enemyY - playerY;
+                float distSq = dx * dx + dy * dy;
+
+                if (distSq <= radiusSq)
                 {
                     _boxAreaHits.Add(enemyId);
                 }

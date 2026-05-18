@@ -71,7 +71,7 @@
   {
     "Name": "Poison Nova",
     "Description": "圆形范围毒雾 - 持续 5 秒，每秒造成 DoT 伤害",
-    "AreaShape": "box",
+    "AreaShape": "circle",
     "AreaWidth": 5,
     "AreaHeight": 5,
     "AttackRange": 4,
@@ -83,7 +83,7 @@
       {
         "Name": "PoisonNovaDot",
         "Type": "Debuff",
-        "Duration": 5000,
+        "Duration": 5,
         "StackingType": "Duration",
         "StackLimitCount": 3,
         "Value": 8,
