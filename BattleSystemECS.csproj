@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Data\Configs\game_config.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="game_config.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

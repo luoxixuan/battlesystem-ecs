@@ -116,7 +116,7 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]      UpgradeSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating SkillSystem (config-driven)...");
-            skillSystem = new SkillSystem(store, logger, playerId, gameConfig);  // 初始化技能系统（从配置加载）
+            skillSystem = new SkillSystem(store, logger, playerId, gameConfig, techTreeSystem);  // 初始化技能系统（从配置加载）
             logger.Log("[BOOTSTRAP]      SkillSystem created successfully!");
 
             // 初始化玩家技能（从配置加载）

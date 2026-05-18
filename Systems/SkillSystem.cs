@@ -22,6 +22,7 @@ namespace BattleSystemECS.Systems
         private int playerId;
         private float deltaTime = 1f;
         private GameConfig gameConfig;
+        private TechTreeSystem techTreeSystem;
         private List<int> _activeEnemyList;
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         private ConcurrentBag<(int enemyId, float damage)>[] _skillDamageQueue = new ConcurrentBag<(int, float)>[2];
@@ -31,12 +32,13 @@ namespace BattleSystemECS.Systems
         private ConcurrentBag<int> _crossAreaHits = new();
         private ConcurrentBag<int> _boxAreaHits = new();
 
-        public SkillSystem(ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
+        public SkillSystem(ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem = null)
         {
             this.store = store;
             this.renderer = renderer;
             this.playerId = playerId;
             this.gameConfig = gameConfig;
+            this.techTreeSystem = techTreeSystem;
             _skillDamageQueue[0] = new ConcurrentBag<(int, float)>();
             _skillDamageQueue[1] = new ConcurrentBag<(int, float)>();
         }
@@ -157,7 +159,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         private void ExecuteAbility(GameplayAbilityDef def, int slot)
         {
-            float baseDamage = store.GetPlayerAttackDamage(playerId);
+            float baseDamage = techTreeSystem != null ? techTreeSystem.GetFinalAttackDamage() : store.GetPlayerAttackDamage(playerId);
             // Use FixedBaseDamage multiplier when DamageMultiplierAttr == -1
             float finalDamage = (def.DamageMultiplierAttr < 0)
                 ? baseDamage * def.FixedBaseDamage

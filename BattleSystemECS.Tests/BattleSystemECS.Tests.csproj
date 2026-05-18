@@ -22,4 +22,8 @@
     <ProjectReference Include="..\BattleSystemECS.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\game_config.json" Link="game_config.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
