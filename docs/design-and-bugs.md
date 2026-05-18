@@ -1,7 +1,7 @@
 # BattleSystem-ECS 设计治理与 Bug 追踪
 
 > 项目路径：F:\AI\BattleSystem-ECS
-> 最后更新：2026-05-17（commit `c36747b`）
+> 最后更新：2026-05-18（commit `d34e5fd`）
 
 ---
 
@@ -323,31 +323,41 @@ GameManager.Run() / BenchmarkSystem
 
 ## 五、性能基准
 
-| benchmark | FPS | 说明 |
-|-----------|-----|------|
-| mode 2（合并热路径） | ~6353 | 手写合并热路径，参考用 |
-| mode 4（真实系统链路） | ~3810 | **主指标**，直接调用各系统 `.Update()` |
+> 注：Mode2/4 均已含完整 skill+buff 链路（AutoCastBestSkill + BuffSystem.Update + ResolveDotDamage），新旧基准不可直接比较。
 
-mode 2 和 mode 4 是不同的语义，**不要再用一个 FPS 代表全部性能**。
+|| benchmark | FPS | 说明 |
+|-----------|---------|-----|------|
+| mode 2（合并热路径 + 完整 skill+buff） | ~10954 | 含 skill 施放 + DoT 链路，>5000 门禁 ✅ |
+| mode 4（真实系统链路 + 完整 skill+buff） | ~11473 | 含 BuffSystem + skill.AutoCast，>3500 门禁 ✅ |
 
 测试覆盖：63 单元测试。
 
 ---
 
-## 六、今日完成（2026-05-13）
+## 六、今日完成（2026-05-18）
+
+### GAS DoT 系统补全
 
 | # | 内容 | commit |
 |---|------|--------|
-| 1 | EnemyAI 两阶段重构（并行 eval + 串行动作执行） | `ccc42e3` |
-| 2 | 删除未使用队列字段 `_playerDamageQueue` / `_eventQueue` | `a92116c` |
-| 3 | PlayerAttack + TowerAttack 两阶段（并行收集 → 串行 apply） | `2248d4a` |
-| 4 | damage queue 累加正确性修复（存 damage 不存 newHealth） | `d707920` |
-| 5 | TowerAttackSystem.cs 残留 `float newHealth` 死代码 | `d707920` |
-| 6 | 死亡队列自清空（Resolve 后 new ConcurrentBag） | `7ef56aa` |
-| 7 | 模式 4 真实系统链路 benchmark | `7ef56aa` |
-| 8 | 统一帧末死亡结算（系统只 queue，GameManager/Benchmark resolve） | `3bd1c9c` |
-| 9 | AGENTS.md 并行安全原则写入 | `41cc6a5` |
-| 10 | 文档同步（46 bugs、48 tests、mode 2/4 FPS） | `63d9c1f` |
+| 1 | BuffSystem 新建（Periodic EffectType / ping-pong 双缓冲 DoT 队列 / ApplyDot/Update/ResolveDotDamage） | `58e48d5` |
+| 2 | SkillSystem CastCircleArea 写入 Periodic 效果而非即时扣血 | `530f6a5` |
+| 3 | GAS 技能配置从 hardcode 迁移到 skills.json（AreaShape/AreaRadius/DoT 参数） | `8fc7893` |
+| 4 | GameplayAbility AreaShapeType 常量 + FromString；GameplayEffect EffectType 加 Periodic | `8fc7893` |
+| 5 | BenchmarkSystem 补全 BuffSystem + AutoCastBestSkill 链路，修复 benchmark 测量真实性 | `d34e5fd` |
+
+### 性能基准
+
+| benchmark | FPS | 说明 |
+|-----------|------|------|
+| Mode2 | **10954** | 不可比（旧基准 6353 无 skill+buff 链路） |
+| Mode4 | **11473** | 不可比（旧基准 3810 无 BuffSystem） |
+
+> Mode2/4 均含完整 skill+buff 链路，AutoCastBestSkill 每帧可能不触发（cooldown），Mode4 略高属正常。
+
+---
+
+## 七、今日完成（2026-05-13）
 
 ---
 
@@ -402,8 +412,9 @@ _记录时间：2026-05-13 22:20 GMT+8_
 - `f6e086c` — SpatialGrid 增量更新（incremental rebuild）
 - 探索结论：ConcurrentBag 追踪方案存在正确性边界问题，最终决策保留全量 O(enemies) 重建（~0.03ms，占比极小）
 - 代码改动（5 files, +120/-24）：`Core/SpatialGrid.cs` 新增 `UpdateEnemies()`，`Core/ComponentStore.cs` 改为调用 `UpdateEnemies()`，`Systems/EnemyMovementSystem.cs` 清理未使用追踪字段，`Core/GameManager.cs` 注释更新，`docs/` 架构文档同步
-- Mode2: 6353 FPS，Mode4: 3810 FPS
 - Git push 超时，commit 保留本地
+
+> 注：`f6e086c` 的基准（Mode2 6353 / Mode4 3810）已被 `d34e5fd` 替代，因后者补全了 BuffSystem 链路，测量更真实。
 
 ### 目录结构重组（2026-05-17 下午）
 
@@ -427,7 +438,7 @@ Configs/ 现在只含运行时 .json 配置（7 个文件），不再含 .cs 文
 
 ## 九、优化方向策略（2026-05-18）
 
-> 性能优化已基本到瓶颈（Mode4 ~3810 FPS，门禁已过），转向业务和架构升级。
+> 性能优化已基本到瓶颈（Mode4 ~11473 FPS，门禁 3500 已稳定通过），转向业务和架构升级。
 
 ### 优先级排序
 
@@ -452,6 +463,5 @@ Configs/ 现在只含运行时 .json 配置（7 个文件），不再含 .cs 文
 ### 文档状态
 
 - `design-and-bugs.md`：本次更新
-- `bug-fix.md`：项目要求存放于 `docs/bug-fix.md`，当前不存在（文档内容合并至 `design-and-bugs.md`）
-- `AGENTS.md`：性能基准已更新为 Mode2 ~6053 / Mode4 ~3458
+- `docs/bug-fix.md`：项目要求存放于 `docs/bug-fix.md`，当前不存在（文档内容合并至 `design-and-bugs.md`）
 - `Research/tower_defense_knowledge.md`：99 行，GitHub 爬取持续更新

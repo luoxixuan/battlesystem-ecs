@@ -1,7 +1,7 @@
 # BattleSystem-ECS 架构文档
 
 > 每次修改架构或业务逻辑后，必须同步更新此文档。
-> 最后更新：2026-05-17（commit `c36747b`）
+> 最后更新：2026-05-18（commit `d34e5fd`）
 
 ---
 
@@ -11,7 +11,8 @@
 - **架构**: SOA (Struct of Arrays) ECS
 - **定位**: 塔防战斗系统性能基准，逻辑与渲染完全分离
 - **性能目标**: 10K 敌 × 200 帧 ≥ 5,000 FPS（mode 4 真实系统链路）
-- **性能基准**: mode 2 ~6353 FPS / mode 4 ~3810 FPS（`f6e086c`，2026-05-17）
+- **性能基准**: mode 2 ~10954 FPS / mode 4 ~11473 FPS（`d34e5fd`，2026-05-18）
+  > 注：Mode2/4 均已含完整 skill+buff 链路（AutoCastBestSkill + BuffSystem.Update + ResolveDotDamage），与旧基准不可直接比较
 - **测试覆盖**: 63 单元测试
 
 ---
@@ -147,6 +148,7 @@ List<int> ActiveTowerIds             // 仅活跃塔 ID（并行遍历用）
 | GoldSystem | Systems/ | 金币结算 | 击杀产金；`Interlocked.Add` 并行安全 |
 | MapSystem | Systems/ | 地图渲染 | Debug 渲染 |
 | SpatialGridSystem | Systems/ | 空间网格 | 范围查询（塔攻击范围、Buff 范围）；O(1) cell 访问 |
+| BuffSystem | Systems/ | 持续伤害（DoT）追踪 | Periodic EffectType；ping-pong 双缓冲 DoT 伤害队列；`ApplyDot`/`Update`/`ResolveDotDamage` |
 | BenchmarkSystem | Systems/ | 性能压测 | **dual mode**：mode 2 合并热路径 / mode 4 真实系统链路，各独立计时 |
 ---
 
@@ -161,9 +163,12 @@ Core/GAS/
 
 关键类型：
 - `AttributeSetDefinitions` — 静态常量定义
-- `GameplayAbilityDef` — 技能元数据（Name, Cooldown, AreaShape, FixedBaseDamage）
+- `GameplayEffectDef` — 效果元数据（Type/Duration/TickInterval/TotalTicks/Modifiers）
+- `EffectType` — 效果类型（`Instant`/`Duration`/`Periodic`）
+- `GameplayAbilityDef` — 技能元数据（Name/Cooldown/AreaShape/AreaRadius/FixedBaseDamage/HasDot/DotDuration/TickInterval/DamagePerTick）
+- `AreaShapeType` — 范围形状（`Single`=0/`Cross`=1/`Box`=2/`Circle`=3）
 - `AbilityInstance` — 技能实例（含 CurrentCooldown）
-- `AppliedEffect` — 已应用的效果实例
+- `AppliedEffect` — 已应用的效果实例（含 TimeSinceLastTick）
 
 ---
 
@@ -218,7 +223,7 @@ branches:
 | `behavior_trees.json` | 行为树定义 |
 | `phase_behavior.json` | 相位行为 |
 | `player.json` | 玩家属性 |
-| `skills.json` | 技能定义（已迁移到 GAS） |
+| `skills.json` | 技能定义（AreaShape/AreaRadius/DoT 参数） |
 | `tech_tree.json` | 科技树节点 |
 | `tower_placement.json` | 塔位规则 |
 | `wave_spawn.json` | 波次生成 |
