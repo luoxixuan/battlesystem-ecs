@@ -23,6 +23,7 @@ namespace BattleSystemECS.Systems
         private float deltaTime = 1f;
         private GameConfig gameConfig;
         private TechTreeSystem techTreeSystem;
+        private BuffSystem dotSystem;
         private List<int> _activeEnemyList;
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         private ConcurrentBag<(int enemyId, float damage)>[] _skillDamageQueue = new ConcurrentBag<(int, float)>[2];
@@ -32,6 +33,11 @@ namespace BattleSystemECS.Systems
         private ConcurrentBag<int> _crossAreaHits = new();
         private ConcurrentBag<int> _boxAreaHits = new();
 
+        // Poison Nova DoT constants
+        private const float POISON_NOVA_DURATION = 5f;
+        private const float POISON_NOVA_TICK_INTERVAL = 1f;
+        private const float POISON_NOVA_DAMAGE_PER_TICK = 8f;
+
         public SkillSystem(ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem = null)
         {
             this.store = store;
@@ -39,8 +45,18 @@ namespace BattleSystemECS.Systems
             this.playerId = playerId;
             this.gameConfig = gameConfig;
             this.techTreeSystem = techTreeSystem;
+            this.dotSystem = null; // wired up via InjectDotSystem after construction
             _skillDamageQueue[0] = new ConcurrentBag<(int, float)>();
             _skillDamageQueue[1] = new ConcurrentBag<(int, float)>();
+        }
+
+        /// <summary>
+        /// Inject BuffSystem reference for DoT effect application.
+        /// Called by GameManager after both systems are constructed.
+        /// </summary>
+        public void InjectDotSystem(BuffSystem dotSystem)
+        {
+            this.dotSystem = dotSystem;
         }
 
         /// <summary>
@@ -368,17 +384,27 @@ namespace BattleSystemECS.Systems
                 }
             });
 
-            // Serial phase: apply damage
+            // Serial phase: apply DoT effect to each enemy
             int hitCount = 0;
             foreach (int enemyId in _boxAreaHits)
             {
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                if (dotSystem != null)
+                {
+                    var dotDef = GameplayEffectDef.Periodic(
+                        "Poison Nova",
+                        AttributeSetDefinitions.ENEMY_HEALTH,
+                        POISON_NOVA_DAMAGE_PER_TICK,
+                        POISON_NOVA_DURATION,
+                        POISON_NOVA_TICK_INTERVAL
+                    );
+                    dotSystem.ApplyDot(enemyId, dotDef);
+                }
+                else
+                {
+                    // Fallback: immediate damage if no dotSystem wired
+                    _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                }
                 hitCount++;
-
-                renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
             }
             return hitCount;
         }

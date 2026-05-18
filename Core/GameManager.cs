@@ -141,6 +141,9 @@ namespace BattleSystemECS.Core
             buffSystem = new BuffSystem(store, playerId);
             logger.Log("[BOOTSTRAP]      BuffSystem created successfully!");
 
+            // Wire BuffSystem into SkillSystem for Poison Nova DoT application
+            skillSystem.InjectDotSystem(buffSystem);
+
             logger.Log("[BOOTSTRAP]    - Creating PlayerTowerAttackSystem...");
             playerTowerAttackSystem = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig, techTreeSystem);
             logger.Log("[BOOTSTRAP]      PlayerTowerAttackSystem created successfully!");
