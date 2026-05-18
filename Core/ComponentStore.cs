@@ -821,6 +821,13 @@ namespace BattleSystemECS.Core
             if (slot < MAX_ACTIVE_EFFECTS_PER_ENTITY) { SetEffect(entityId, slot, eff); ActiveEffectCount[entityId]++; }
         }
 
+        public void SetEffectCount(int entityId, int count) {
+            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (count < 0) count = 0;
+            if (count > MAX_ACTIVE_EFFECTS_PER_ENTITY) count = MAX_ACTIVE_EFFECTS_PER_ENTITY;
+            ActiveEffectCount[entityId] = count;
+        }
+
         // ==================== 科技树组件访问方法 ====================
 
         public int GetResearchPoints(int playerId)

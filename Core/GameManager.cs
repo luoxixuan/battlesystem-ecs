@@ -30,6 +30,7 @@ namespace BattleSystemECS.Core
         private TowerAttackSystem towerAttackSystem;       // 塔攻击系统
         private TowerUpgradeSystem towerUpgradeSystem;     // 塔升级系统
         private TechTreeSystem techTreeSystem;            // 科技树系统
+        private BuffSystem buffSystem;                    // Buff/DoT 追踪系统
 
         // 渲染器
         private IRenderer logger;
@@ -135,6 +136,10 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]    - Creating GoldSystem...");
             goldSystem = new GoldSystem(store, logger, techTreeSystem);
             logger.Log("[BOOTSTRAP]      GoldSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating BuffSystem (DoT tracking)...");
+            buffSystem = new BuffSystem(store, playerId);
+            logger.Log("[BOOTSTRAP]      BuffSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating PlayerTowerAttackSystem...");
             playerTowerAttackSystem = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig, techTreeSystem);
@@ -299,11 +304,14 @@ namespace BattleSystemECS.Core
                     // path has correctness complexity; full rebuild is fast enough (~0.03ms).
                     store.RebuildSpatialGrid();
 
-                    // [测试] 塔攻击逻辑
+// [测试] 塔攻击逻辑
                     towerAttackSystem.Update(1.0f);
 
                     // 技能系统串行段伤害结算（两阶段：并行收集 → 串行 apply）
                     skillSystem.ResolveSkillDamage();
+
+                    // DoT/Buff 系统伤害结算（两阶段：收集 → 串行 apply）
+                    buffSystem.ResolveDotDamage();
 
                     // 统一帧末死亡结算（所有攻击系统已完成伤害/死亡入队）
                     store.ResolveEnemiesKilledThisFrame();
@@ -324,6 +332,9 @@ namespace BattleSystemECS.Core
 
                     // 更新技能系统冷却
                     skillSystem.Update(1f);  // 每回合 1 秒
+
+                    // 更新 Buff/DoT 系统（减少持续时间，触发周期性伤害）
+                    buffSystem.Update(1f);  // 每回合 1 秒
 
                     // 自动释放技能（根据冷却时间）
                     // skillSystem.AutoCastSkill();  // 暂时注释掉，避免重复执行
