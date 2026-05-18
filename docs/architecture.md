@@ -11,8 +11,8 @@
 - **架构**: SOA (Struct of Arrays) ECS
 - **定位**: 塔防战斗系统性能基准，逻辑与渲染完全分离
 - **性能目标**: 10K 敌 × 200 帧 ≥ 5,000 FPS（mode 4 真实系统链路）
-- **性能基准**: mode 2 ~10954 FPS / mode 4 ~11473 FPS（`d34e5fd`，2026-05-18）
-  > 注：Mode2/4 均已含完整 skill+buff 链路（AutoCastBestSkill + BuffSystem.Update + ResolveDotDamage），与旧基准不可直接比较
+- **性能基准**: Mode2 ~510 FPS / Mode4 ~2070 FPS（`HEAD`，2026-05-18，含 BuffSystem）
+  > ⚠️ 注：Mode2/4 EnemyAI 在两模式下测量差异巨大（~350ms vs ~42ms），来自 benchmark 框架本身，不代表系统真实性能退化。新旧基准不可直接比较。
 - **测试覆盖**: 63 单元测试
 
 ---

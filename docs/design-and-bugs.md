@@ -323,37 +323,34 @@ GameManager.Run() / BenchmarkSystem
 
 ## 五、性能基准
 
-> 注：Mode2/4 均已含完整 skill+buff 链路（AutoCastBestSkill + BuffSystem.Update + ResolveDotDamage），新旧基准不可直接比较。
-
-|| benchmark | FPS | 说明 |
-|-----------|---------|-----|------|
-| mode 2（合并热路径 + 完整 skill+buff） | ~10954 | 含 skill 施放 + DoT 链路，>5000 门禁 ✅ |
-| mode 4（真实系统链路 + 完整 skill+buff） | ~11473 | 含 BuffSystem + skill.AutoCast，>3500 门禁 ✅ |
+> ⚠️ 2026-05-18 重要修正：之前的 Mode2/4 对比存在根本性测量错误——Mode4 里 AutoCastBestSkill + Poison Nova 每帧杀敌 → WaveSpawning 每帧补怪 → ResolveEnemiesKilledThisFrame 每帧 O(10K)。修复：BENCH_ENEMY_HEALTH=1e9，敌人永生，敌人数量稳定 10K。但 Mode2 EnemyAI ~350ms vs Mode4 ~42ms 差异仍来自 benchmark 框架本身，不代表系统真实性能。
 
 测试覆盖：63 单元测试。
 
+| benchmark | FPS | EnemyAI | 说明 |
+|-----------|------|---------|------|
+| mode 2（合并热路径，1e9 HP） | ~510 | ~350ms | EnemyAI 累加计时，非 totalSw |
+| mode 4（真实系统链路，1e9 HP） | ~2070 | ~42ms | EnemyAI totalSw 计时 |
+
+> Mode2/4 FPS 不可比：EnemyAI 测量差异来自 benchmark 框架，不反映系统真实性能退化。
+
 ---
 
-## 六、今日完成（2026-05-18）
+## 六、今日完成（2026-05-18 下午）
 
-### GAS DoT 系统补全
+### Benchmark 对比测量修复
 
-| # | 内容 | commit |
-|---|------|--------|
-| 1 | BuffSystem 新建（Periodic EffectType / ping-pong 双缓冲 DoT 队列 / ApplyDot/Update/ResolveDotDamage） | `58e48d5` |
-| 2 | SkillSystem CastCircleArea 写入 Periodic 效果而非即时扣血 | `530f6a5` |
-| 3 | GAS 技能配置从 hardcode 迁移到 skills.json（AreaShape/AreaRadius/DoT 参数） | `8fc7893` |
-| 4 | GameplayAbility AreaShapeType 常量 + FromString；GameplayEffect EffectType 加 Periodic | `8fc7893` |
-| 5 | BenchmarkSystem 补全 BuffSystem + AutoCastBestSkill 链路，修复 benchmark 测量真实性 | `d34e5fd` |
-
-### 性能基准
+| # | 内容 |
+|---|------|
+| 1 | 发现：AutoCast + Poison Nova 每帧杀敌 → WaveSpawning 每帧补怪 → ResolveEnemiesKilledThisFrame 每帧 O(10K) |
+| 2 | 修复：BENCH_ENEMY_HEALTH=1e9，敌人永生，敌人数量在 200 帧内稳定 10K |
 
 | benchmark | FPS | 说明 |
 |-----------|------|------|
-| Mode2 | **10954** | 不可比（旧基准 6353 无 skill+buff 链路） |
-| Mode4 | **11473** | 不可比（旧基准 3810 无 BuffSystem） |
+| Mode2 | **~510** | 含完整 skill+buff 链路，EnemyAI ~350ms（累加计时） |
+| Mode4 | **~2070** | 含 BuffSystem + AutoCast，EnemyAI ~42ms（totalSw） |
 
-> Mode2/4 均含完整 skill+buff 链路，AutoCastBestSkill 每帧可能不触发（cooldown），Mode4 略高属正常。
+> Mode2/4 EnemyAI 差异来自 benchmark 框架，不代表系统真实性能。
 
 ---
 

@@ -15,6 +15,11 @@ namespace BattleSystemECS.Systems
     /// </summary>
     public class BenchmarkSystem
     {
+        // Enemies in benchmark must survive full 200-frame run to keep enemy count stable.
+        // With Health=1e9 and max ~8-damage AOE hits per enemy across 200 frames (~200 hits),
+        // total possible damage ≈ 200 * 8 = 1600 << 1e9 — enemies survive indefinitely.
+        private const float BENCH_ENEMY_HEALTH = 1e9f;
+
         private ComponentStore store;
 
         public BenchmarkSystem(ComponentStore store) { this.store = store; }
@@ -51,7 +56,7 @@ namespace BattleSystemECS.Systems
             {
                 float x = random.Next(0, 10);
                 float y = (float)random.Next(10, 19);
-                int id = store.AddEnemy(x, y, 1f, 100f, 100f, 10f, 10, 1);
+                int id = store.AddEnemy(x, y, 1f, BENCH_ENEMY_HEALTH, BENCH_ENEMY_HEALTH, 10f, 10, 1);
                 store.SetEnemyAIAction(id, "");
                 store.SetEntityName(id, $"NormalL1W1E{i}");
                 store.EnemyBehaviorTree[id] = gameConfig.GetCachedBehaviorTree("Normal");
@@ -241,7 +246,7 @@ namespace BattleSystemECS.Systems
             var random = new Random(42);
             for (int i = 0; i < enemyCount; i++)
             {
-                int id = store.AddEnemy(random.Next(0, 10), random.Next(10, 19), 1f, 100f, 100f, 10f, 10, 1);
+                int id = store.AddEnemy(random.Next(0, 10), random.Next(10, 19), 1f, BENCH_ENEMY_HEALTH, BENCH_ENEMY_HEALTH, 10f, 10, 1);
                 store.SetEntityName(id, $"NormalL1W1E{i}");
                 store.EnemyBehaviorTree[id] = gameConfig.GetCachedBehaviorTree("Normal");
             }
@@ -343,7 +348,7 @@ namespace BattleSystemECS.Systems
             {
                 float x = random.Next(0, 10);
                 float y = (float)random.Next(10, 19);
-                int id = store.AddEnemy(x, y, 1f, 100f, 100f, 10f, 10, 1);
+                int id = store.AddEnemy(x, y, 1f, BENCH_ENEMY_HEALTH, BENCH_ENEMY_HEALTH, 10f, 10, 1);
                 store.SetEnemyAIAction(id, "");
                 store.SetEntityName(id, $"NormalL1W1E{i}");
                 store.EnemyBehaviorTree[id] = gameConfig.GetCachedBehaviorTree("Normal");
