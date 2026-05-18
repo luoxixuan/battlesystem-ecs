@@ -66,6 +66,14 @@ namespace BattleSystemECS.Config
         public float Cooldown { get; set; }
         public bool AutoCast { get; set; }
         public string Hotkey { get; set; }
+        // Area shape string maps to AreaShapeType via FromString()
+        public string AreaShape { get; set; }
+        // Effect radius (tiles). Box uses this as half-size → 3×3 box → AreaRadius=1
+        public int AreaRadius { get; set; }
+        // DoT fields (0 = no DoT)
+        public float DotDuration { get; set; }
+        public float DotTickInterval { get; set; }
+        public float DotDamagePerTick { get; set; }
     }
 
     public class BehaviorTreeDef

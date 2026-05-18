@@ -3,6 +3,31 @@ namespace BattleSystemECS.Core.GAS
     public enum AbilityActivation { Instant, InputPressed, Passive }
 
     /// <summary>
+    /// Area shape types. Maps to string values in skills.json:
+    /// single / cross / box / circle
+    /// </summary>
+    public static class AreaShapeType
+    {
+        public const int Single = 0;
+        public const int Cross = 1;
+        public const int Box = 2;
+        public const int Circle = 3;
+
+        /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
+        public static int FromString(string s)
+        {
+            return s?.ToLowerInvariant() switch
+            {
+                "single" => Single,
+                "cross" => Cross,
+                "box" => Box,
+                "circle" => Circle,
+                _ => Single
+            };
+        }
+    }
+
+    /// <summary>
     /// Ability definition — data only, no runtime state.
     /// </summary>
     public struct GameplayAbilityDef
@@ -16,18 +41,29 @@ namespace BattleSystemECS.Core.GAS
         public AbilityActivation Activation;
         public int[] RequiredBuffs; // entity must have these buffs active to use
 
-        // Area shape: 0=single target, 1=line cross, 2=box
-        public int AreaShape; // 0=single, 1=cross, 2=box
+        // Area shape: 0=single, 1=cross, 2=box, 3=circle
+        public int AreaShape;
         public int AreaRadius; // tiles for area effects
+
+        // DoT fields (0 / 0f = no DoT)
+        public float DotDuration;       // seconds; 0 = no DoT
+        public float DotTickInterval;    // seconds between ticks
+        public float DotDamagePerTick;   // damage per tick
 
         public GameplayAbilityDef(string name, string desc, float cooldown, float cost,
             int dmgAttr, float fixedDmg, AbilityActivation act, int areaShape, int areaRadius,
+            float dotDuration = 0f, float dotTickInterval = 0f, float dotDamagePerTick = 0f,
             params int[] requiredBuffs)
         {
             Name = name; Description = desc; Cooldown = cooldown; Cost = cost;
             DamageMultiplierAttr = dmgAttr; FixedBaseDamage = fixedDmg; Activation = act;
-            AreaShape = areaShape; AreaRadius = areaRadius; RequiredBuffs = requiredBuffs;
+            AreaShape = areaShape; AreaRadius = areaRadius;
+            DotDuration = dotDuration; DotTickInterval = dotTickInterval; DotDamagePerTick = dotDamagePerTick;
+            RequiredBuffs = requiredBuffs;
         }
+
+        /// <summary>True if this ability applies a periodic DoT effect.</summary>
+        public bool HasDot => DotDuration > 0f && DotTickInterval > 0f && DotDamagePerTick > 0f;
     }
 
     /// <summary>

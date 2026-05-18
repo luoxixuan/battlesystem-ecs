@@ -7,9 +7,13 @@
     "AreaHeight": 3,
     "AttackRange": 3,
     "Cooldown": 5,
-    "DamageMultiplier": 1,
+    "DamageMultiplier": 4,
     "AutoCast": false,
     "Hotkey": "1",
+    "AreaRadius": 3,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
     "Modifiers": [
       {
         "Name": "CrossSlashDamage",
@@ -29,10 +33,14 @@
     "AreaWidth": 3,
     "AreaHeight": 3,
     "AttackRange": 5,
-    "Cooldown": 10,
-    "DamageMultiplier": 1,
+    "Cooldown": 7,
+    "DamageMultiplier": 3,
     "AutoCast": false,
     "Hotkey": "2",
+    "AreaRadius": 1,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
     "Modifiers": [
       {
         "Name": "MegaExplosionDamage",
@@ -53,9 +61,13 @@
     "AreaHeight": 1,
     "AttackRange": 9,
     "Cooldown": 8,
-    "DamageMultiplier": 1,
+    "DamageMultiplier": 6,
     "AutoCast": false,
     "Hotkey": "3",
+    "AreaRadius": 9,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
     "Modifiers": [
       {
         "Name": "SniperShotDamage",
@@ -70,15 +82,19 @@
   },
   {
     "Name": "Poison Nova",
-    "Description": "圆形范围毒雾 - 持续 5 秒，每秒造成 DoT 伤害",
+    "Description": "圆形范围毒雾 - 持续 5 秒，每秒造成 8 点 DoT 伤害",
     "AreaShape": "circle",
     "AreaWidth": 5,
     "AreaHeight": 5,
     "AttackRange": 4,
     "Cooldown": 15,
-    "DamageMultiplier": 1,
+    "DamageMultiplier": 0,
     "AutoCast": false,
     "Hotkey": "4",
+    "AreaRadius": 4,
+    "DotDuration": 5,
+    "DotTickInterval": 1,
+    "DotDamagePerTick": 8,
     "Modifiers": [
       {
         "Name": "PoisonNovaDot",

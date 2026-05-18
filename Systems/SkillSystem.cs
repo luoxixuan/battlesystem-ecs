@@ -49,11 +49,6 @@ namespace BattleSystemECS.Systems
             _skillDamageQueue[0] = new ConcurrentBag<(int, float)>();
             _skillDamageQueue[1] = new ConcurrentBag<(int, float)>();
         }
-
-        /// <summary>
-        /// Inject BuffSystem reference for DoT effect application.
-        /// Called by GameManager after both systems are constructed.
-        /// </summary>
         public void InjectDotSystem(BuffSystem dotSystem)
         {
             this.dotSystem = dotSystem;
@@ -75,42 +70,33 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void InitializePlayerSkills()
         {
-            // Bug#9: Reset abilities before re-init (game restart scenario)
             store.ResetPlayerAbilities(playerId);
 
-            // Define 3 abilities using GAS structure
-            var crossSlashDef = new GameplayAbilityDef(
-                "Cross Slash", "400% damage in cross shape",
-                5f, 0f,           // cooldown, cost
-                -1, 4f,           // no attribute multiplier, fixed 4× base damage
-                AbilityActivation.Instant,
-                1, 3,             // area shape 1=cross, radius 3
-                Array.Empty<int>()
-            );
-            store.AddAbility(playerId, crossSlashDef);
-            renderer.Log("[SKILL] Cross Slash ability registered (cooldown: 5s, cross area radius 3)");
+            var skills = gameConfig?.Skills;
+            if (skills == null || skills.Count == 0)
+            {
+                // Fallback: register no abilities (empty skill bar)
+                renderer.Log("[SKILL] No skills in game config — skill bar empty");
+                return;
+            }
 
-            var megaExplosionDef = new GameplayAbilityDef(
-                "Mega Explosion", "3×3 area explosion",
-                7f, 0f,
-                -1, 3f,
-                AbilityActivation.Instant,
-                2, 1,             // area shape 2=box (3×3), radius 1
-                Array.Empty<int>()
-            );
-            store.AddAbility(playerId, megaExplosionDef);
-            renderer.Log("[SKILL] Mega Explosion ability registered (cooldown: 7s, 3×3 box area)");
-
-            var sniperShotDef = new GameplayAbilityDef(
-                "Sniper Shot", "Single target, 9-tile range",
-                8f, 0f,
-                -1, 6f,
-                AbilityActivation.Instant,
-                0, 9,             // area shape 0=single target, range 9
-                Array.Empty<int>()
-            );
-            store.AddAbility(playerId, sniperShotDef);
-            renderer.Log("[SKILL] Sniper Shot ability registered (cooldown: 8s, single target, range 9)");
+            foreach (var sc in skills)
+            {
+                var def = new GameplayAbilityDef(
+                    sc.Name,
+                    sc.Description,
+                    sc.Cooldown, 0f,   // cooldown, cost
+                    -1, sc.DamageMultiplier > 0 ? sc.DamageMultiplier : 1f,  // fixed base damage multiplier
+                    AbilityActivation.Instant,
+                    AreaShapeType.FromString(sc.AreaShape),
+                    sc.AreaRadius,
+                    sc.DotDuration,
+                    sc.DotTickInterval,
+                    sc.DotDamagePerTick
+                );
+                store.AddAbility(playerId, def);
+                renderer.Log($"[SKILL] {sc.Name} registered (shape: {sc.AreaShape}, radius: {sc.AreaRadius}, DoT: {sc.DotDuration}s/{sc.DotTickInterval}s×{sc.DotDamagePerTick})");
+            }
 
             // Apply "Attack+10%" and "Crit Rate+5%" buffs via GameplayEffect
             var attackBoost = new GameplayEffectDef("Attack+10%", EffectType.Instant,
@@ -197,8 +183,8 @@ namespace BattleSystemECS.Systems
                 case 2: // Box (N×N)
                     enemiesHit = CastBoxArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
                     break;
-                case 3: // Circle (radius-based AOE, for Poison Nova DoT)
-                    enemiesHit = CastCircleArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
+                case 3: // Circle (radius-based AOE, for DoT abilities)
+                    enemiesHit = CastCircleArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def);
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -355,7 +341,7 @@ namespace BattleSystemECS.Systems
         }
 
 
-        private int CastCircleArea(float finalDamage, float playerX, float playerY, int radius, string name)
+        private int CastCircleArea(float finalDamage, float playerX, float playerY, int radius, string name, GameplayAbilityDef def)
         {
             // _activeEnemyList is guaranteed non-null after SetTurn(); no fallback needed
             if (_activeEnemyList == null) return 0;
@@ -388,14 +374,14 @@ namespace BattleSystemECS.Systems
             int hitCount = 0;
             foreach (int enemyId in _boxAreaHits)
             {
-                if (dotSystem != null)
+                if (dotSystem != null && def.HasDot)
                 {
                     var dotDef = GameplayEffectDef.Periodic(
-                        "Poison Nova",
+                        $"DoT:{def.Name}",
                         AttributeSetDefinitions.ENEMY_HEALTH,
-                        POISON_NOVA_DAMAGE_PER_TICK,
-                        POISON_NOVA_DURATION,
-                        POISON_NOVA_TICK_INTERVAL
+                        def.DotDamagePerTick,
+                        def.DotDuration,
+                        def.DotTickInterval
                     );
                     dotSystem.ApplyDot(enemyId, dotDef);
                 }
