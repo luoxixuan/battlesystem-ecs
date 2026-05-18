@@ -367,6 +367,8 @@ var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
             var gold          = new GoldSystem(store, logger);
             var upgrade       = new UpgradeSystem(store, logger, playerId, gameConfig);
             var skill         = new SkillSystem(store, logger, playerId, gameConfig);
+            var buffSystem    = new BuffSystem(store, playerId);
+            skill.InjectDotSystem(buffSystem);
 
             long tWaveSpawn = 0, tEnemyAI = 0, tMoveAttack = 0;
             long tPlayerAttack = 0, tTowerAttack = 0, tGold = 0, tUpgrade = 0, tSkill = 0;
@@ -389,7 +391,14 @@ var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
                 sw.Restart(); towerAttack.SetTurn(turn); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
                 sw.Restart(); gold.SetTurn(turn); gold.Update(); tGold += sw.ElapsedTicks;
                 sw.Restart(); upgrade.Update(); tUpgrade += sw.ElapsedTicks;
-                sw.Restart(); skill.Update(1f); tSkill += sw.ElapsedTicks;
+                sw.Restart(); skill.Update(1f);
+                skill.AutoCastBestSkill();
+                skill.ResolveSkillDamage();
+                buffSystem.Update(1f);
+                buffSystem.ResolveDotDamage();
+                store.ResolveEnemiesKilledThisFrame();
+                long tSkillAndBuff = sw.ElapsedTicks;
+                sw.Restart(); tSkill += tSkillAndBuff;
                 store.ResolveEnemiesKilledThisFrame();
             }
 
