@@ -58,7 +58,7 @@ namespace BattleSystemECS.Systems
             }
             Console.WriteLine($"[BENCHMARK] Spawned {scenario} enemies");
 
-            // 11 active game systems (no BuffSystem/BreachSystem in this project)
+            // 12 active game systems (BuffSystem now included for real DoT path)
             var waveSpawning   = new WaveSpawningSystem(store, logger, gameConfig);
             var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig);
             var enemyMovement = new EnemyMovementSystem(store, playerId);
@@ -67,6 +67,8 @@ namespace BattleSystemECS.Systems
             var gold         = new GoldSystem(store, logger);
             var upgrade      = new UpgradeSystem(store, logger, playerId, gameConfig);
             var skill        = new SkillSystem(store, logger, playerId, gameConfig);
+            var buffSystem   = new BuffSystem(store, playerId);
+            skill.InjectDotSystem(buffSystem);
             var map          = new MapSystem(logger, store);
             map.SetMapSize(10, 20);
 
@@ -188,7 +190,14 @@ namespace BattleSystemECS.Systems
                 sw.Restart(); towerAttack.SetTurn(turn); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
                 sw.Restart(); gold.SetTurn(turn); gold.Update(); tGold += sw.ElapsedTicks;
                 sw.Restart(); upgrade.Update(); tUpgrade += sw.ElapsedTicks;
-                sw.Restart(); skill.Update(1f); tSkill += sw.ElapsedTicks;
+                sw.Restart(); skill.Update(1f);
+                skill.AutoCastBestSkill();
+                skill.ResolveSkillDamage();
+                buffSystem.Update(1f);
+                buffSystem.ResolveDotDamage();
+                store.ResolveEnemiesKilledThisFrame();  // after DoT deaths
+                long tSkillAndBuff = sw.ElapsedTicks;
+                sw.Restart(); tSkill += tSkillAndBuff;
                 /* map.Update() = skip */
             }
 
