@@ -12,6 +12,7 @@ namespace BattleSystemECS.Core.GAS
         public const int Cross = 1;
         public const int Box = 2;
         public const int Circle = 3;
+        public const int Chain = 4;
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -22,6 +23,7 @@ namespace BattleSystemECS.Core.GAS
                 "cross" => Cross,
                 "box" => Box,
                 "circle" => Circle,
+                "chain" => Chain,
                 _ => Single
             };
         }

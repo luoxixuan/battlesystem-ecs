@@ -38,6 +38,13 @@ namespace BattleSystemECS.Systems
         private const float POISON_NOVA_TICK_INTERVAL = 1f;
         private const float POISON_NOVA_DAMAGE_PER_TICK = 8f;
 
+        // Chain Lightning constants
+        private const int CHAIN_LIGHTNING_MAX_TARGETS = 4;  // primary + 3 chain targets
+        private const float CHAIN_LIGHTNING_DAMAGE_DECAY = 0.70f;  // each hop deals 70% of previous
+        // Pre-allocated bool[] reused across CastChainLightning calls (avoids per-call allocation)
+        private bool[] _chainHitBuffer = new bool[0];
+        private int _chainHitBufferSize = 0;
+
         public SkillSystem(ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem = null)
         {
             this.store = store;
@@ -185,6 +192,9 @@ namespace BattleSystemECS.Systems
                     break;
                 case 3: // Circle (radius-based AOE, for DoT abilities)
                     enemiesHit = CastCircleArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def);
+                    break;
+                case 4: // Chain Lightning — O(N) nearest-neighbor chaining
+                    enemiesHit = CastChainLightning(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -393,6 +403,80 @@ namespace BattleSystemECS.Systems
                 hitCount++;
             }
             return hitCount;
+        }
+
+        /// <summary>
+        /// Chain Lightning: O(N) nearest-neighbor chaining.
+        /// Hits primary target, then up to 3 additional targets, each at 70% of previous damage.
+        /// Serial implementation — no parallel needed (chain order is inherently sequential).
+        /// </summary>
+        private int CastChainLightning(float baseDamage, float playerX, float playerY, int range, string name)
+        {
+            if (_activeEnemyList == null) return 0;
+            var activeEnemyIds = _activeEnemyList;
+            int count = activeEnemyIds.Count;
+
+            int rangeSq = range * range;
+            // Ensure pooled buffer is large enough
+            if (_chainHitBufferSize < count)
+            {
+                _chainHitBuffer = new bool[count];
+                _chainHitBufferSize = count;
+            }
+            else
+            {
+                Array.Clear(_chainHitBuffer, 0, _chainHitBufferSize);
+                _chainHitBufferSize = count;
+            }
+
+            float currentDamage = baseDamage;
+            int totalHit = 0;
+            float originX = playerX;
+            float originY = playerY;
+
+            for (int hop = 0; hop < CHAIN_LIGHTNING_MAX_TARGETS; hop++)
+            {
+                int bestIdx = -1;
+                float bestDistSq = float.MaxValue;
+
+                for (int i = 0; i < count; i++)
+                {
+                    int enemyId = activeEnemyIds[i];
+                    if (enemyId == playerId) continue;
+                    if (_chainHitBuffer[i]) continue;
+                    float health = store.EnemyHealth[enemyId];
+                    if (health <= 0f) continue;
+
+                    float ex = store.PositionX[enemyId];
+                    float ey = store.PositionY[enemyId];
+                    float dx = ex - originX;
+                    float dy = ey - originY;
+                    float distSq = dx * dx + dy * dy;
+
+                    if (distSq <= rangeSq && distSq < bestDistSq)
+                    {
+                        bestDistSq = distSq;
+                        bestIdx = i;
+                    }
+                }
+
+                if (bestIdx == -1) break;
+
+                _chainHitBuffer[bestIdx] = true;
+                int bestId = activeEnemyIds[bestIdx];
+                _skillDamageQueue[_skillDamageQueueIdx].Add((bestId, currentDamage));
+                totalHit++;
+
+                float bestX = store.PositionX[bestId];
+                float bestY = store.PositionY[bestId];
+                renderer.Log($"[SKILL] {name} chain #{hop + 1} → enemy {bestId} at ({bestX:F0},{bestY:F0}), dmg: {currentDamage:F1}");
+
+                originX = bestX;
+                originY = bestY;
+                currentDamage *= CHAIN_LIGHTNING_DAMAGE_DECAY;
+            }
+
+            return totalHit;
         }
 
         private void HandleKill(int enemyId)

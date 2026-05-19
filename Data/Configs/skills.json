@@ -106,5 +106,32 @@
         "EffectTag": "Poison"
       }
     ]
+  },
+  {
+    "Name": "Chain Lightning",
+    "Description": "弹射连锁伤害 - 打击最近敌人后跳跃至多 3 个目标，伤害递减",
+    "AreaShape": "chain",
+    "AreaWidth": 1,
+    "AreaHeight": 1,
+    "AttackRange": 6,
+    "Cooldown": 10,
+    "DamageMultiplier": 5,
+    "AutoCast": false,
+    "Hotkey": "5",
+    "AreaRadius": 6,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
+    "Modifiers": [
+      {
+        "Name": "ChainLightningDamage",
+        "Type": "Damage",
+        "Duration": 0,
+        "StackingType": "None",
+        "StackLimitCount": 0,
+        "Value": 40,
+        "EffectTag": "Lightning"
+      }
+    ]
   }
 ]
