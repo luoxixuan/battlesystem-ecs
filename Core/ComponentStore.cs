@@ -59,6 +59,8 @@ namespace BattleSystemECS.Core
         public float[] EnemyChargeParam = new float[MAX_ENTITIES]; // SOA: replaces ConcurrentDictionary in EnemyAISystem
         // EnemyBuffDamageBonus: tracks buff damage bonus applied by buff_allies ability — separate from EnemyChargeParam
         public float[] EnemyBuffDamageBonus = new float[MAX_ENTITIES];
+        // EnemyBuffDurationLeft: tracks remaining duration for buff_allies ability (in turns). 0 = no active buff.
+        public float[] EnemyBuffDurationLeft = new float[MAX_ENTITIES];
         public int[] EnemySpawnFrame = new int[MAX_ENTITIES];
         // Armor: reduces incoming damage. Affected by attacker's armor penetration.
         public float[] EnemyArmor = new float[MAX_ENTITIES];
@@ -267,6 +269,7 @@ namespace BattleSystemECS.Core
                 EnemyWaveNumber[entityId] = 0;
                 EnemyChargeParam[entityId] = 0f;
                 EnemyBuffDamageBonus[entityId] = 0f;
+                EnemyBuffDurationLeft[entityId] = 0f;
                 EnemyBehaviorTree[entityId] = null;
                 EnemyTypeName[entityId] = null;
                 EnemyAIAction[entityId] = null;

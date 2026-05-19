@@ -198,7 +198,7 @@ namespace BattleSystemECS.Systems
                     if (currentBuff >= 0)
                     {
                         store.EnemyBuffDamageBonus[allyId] = buffDamageBonus;
-                        store.EnemySpawnFrame[allyId] = ability.BuffDuration;
+                        store.EnemyBuffDurationLeft[allyId] = ability.BuffDuration;
                         buffedCount++;
                     }
                 }
@@ -207,6 +207,27 @@ namespace BattleSystemECS.Systems
             if (buffedCount > 0)
             {
                 logger.Log($"[ABILITY] Enemy {enemyId} buffs {buffedCount} allies with {ability.BuffStat} for {ability.BuffDuration} turns");
+            }
+        }
+
+        /// <summary>
+        /// Called once per turn from GameManager.Run(). Decrements buff durations and clears expired buffs.
+        /// </summary>
+        public void Update()
+        {
+            var activeEnemyIds = store.GetCachedActiveEnemyIds();
+            foreach (var enemyId in activeEnemyIds)
+            {
+                if (!store.EnemyActive[enemyId]) continue;
+                float remaining = store.EnemyBuffDurationLeft[enemyId];
+                if (remaining <= 0f) continue;
+
+                store.EnemyBuffDurationLeft[enemyId] = remaining - 1f;
+                if (store.EnemyBuffDurationLeft[enemyId] <= 0f)
+                {
+                    store.EnemyBuffDamageBonus[enemyId] = 0f;
+                    store.EnemyBuffDurationLeft[enemyId] = 0f;
+                }
             }
         }
 

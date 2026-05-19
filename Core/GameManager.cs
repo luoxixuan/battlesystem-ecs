@@ -300,6 +300,7 @@ namespace BattleSystemECS.Core
                     enemyAbilitySystem.SetTurn(turn);
                     enemyAbilitySystem.UpdateCooldowns(1f);
                     enemyAbilitySystem.ExecuteAbilities();
+                    enemyAbilitySystem.Update(); // 回合末：减少 buff 持续时间，清除过期 buff
 
                     // 移动敌人（SOA）
                     enemyMovementSystem.SetTurn(turn);
