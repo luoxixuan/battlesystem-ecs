@@ -95,8 +95,13 @@ namespace BattleSystemECS.Core
             towerPlacementSystem = new TowerPlacementSystem(store, logger);
             logger.Log("[BOOTSTRAP]      TowerPlacementSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating TechTreeSystem...");
+            var techConfig = TechTreeSystem.LoadConfig(logger);
+            techTreeSystem = new TechTreeSystem(store, logger, playerId, techConfig);
+            logger.Log("[BOOTSTRAP]      TechTreeSystem created successfully!");
+
             logger.Log("[BOOTSTRAP]    - Creating TowerAttackSystem...");
-            towerAttackSystem = new TowerAttackSystem(store, logger);
+            towerAttackSystem = new TowerAttackSystem(store, logger, techTreeSystem);
             logger.Log("[BOOTSTRAP]      TowerAttackSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating TowerUpgradeSystem...");
@@ -127,11 +132,6 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]    - Creating EnemyAISystem...");
             enemyAISystem = new EnemyAISystem(store, logger, playerId, gameConfig);  // 初始化敌人 AI 系统（行为树驱动）
             logger.Log("[BOOTSTRAP]      EnemyAISystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating TechTreeSystem...");
-            var techConfig = TechTreeSystem.LoadConfig(logger);
-            techTreeSystem = new TechTreeSystem(store, logger, playerId, techConfig);
-            logger.Log("[BOOTSTRAP]      TechTreeSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating GoldSystem...");
             goldSystem = new GoldSystem(store, logger, techTreeSystem);
@@ -297,6 +297,7 @@ namespace BattleSystemECS.Core
 
                     // 玩家攻击（SOA）
                     playerTowerAttackSystem.SetTurn(turn);
+                    towerAttackSystem.SetTurn(turn);
                     playerTowerAttackSystem.Update();
 
                     // 技能系统缓存（与玩家攻击/敌人AI保持一致的 SetTurn 模式）

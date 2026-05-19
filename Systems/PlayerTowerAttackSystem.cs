@@ -39,6 +39,10 @@ namespace BattleSystemECS.Systems
         private float _attackBuffMult = 1f;
         private float _critRateThreshold;  // merged: (_hasCritRateBuff ? 0.05f : 0f) + _critRateBonus
 
+        // Cached armor stats (updated on SetTurn — used in damage calculation)
+        private float _armorPenetration = 0f;  // fraction of enemy armor ignored, e.g. 0.3 = 30% pen
+        private float _damageTakenMult = 1f;    // tech tree: <1.0 = take less damage
+
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         private ConcurrentBag<(int enemyId, float damage)>[] _damageQueue = new ConcurrentBag<(int, float)>[2];
         private int _damageQueueIdx = 0;
@@ -71,6 +75,10 @@ namespace BattleSystemECS.Systems
             // Cache crit bonuses from tech tree (avoid per-enemy calls in hot path)
             _critRateBonus = techTreeSystem != null ? techTreeSystem.GetCritRateBonus() : 0f;
             _critDamageBonus = techTreeSystem != null ? techTreeSystem.GetCritDamageMult() : 1f;
+
+            // Cache armor stats from tech tree
+            _armorPenetration = techTreeSystem != null ? techTreeSystem.GetArmorPenetration() : 0f;
+            _damageTakenMult = techTreeSystem != null ? techTreeSystem.GetDamageTakenMult() : 1f;
 
             // Precompute buff-related values — eliminates 2 method calls + 2 boundary checks per frame
             _attackBuffMult = store.GetAttackBuffMultiplier(playerId);
@@ -115,6 +123,15 @@ namespace BattleSystemECS.Systems
                 {
                     finalDamage *= (1f + _critDamageBonus);
                 }
+
+                // Apply enemy armor reduction (armor = flat reduction; armor pen ignores a fraction)
+                // Fast path: skip computation when enemy has no armor (common in benchmarks)
+                float enemyArmor = store.EnemyArmor[enemyId];
+                if (enemyArmor > 0f)
+                    finalDamage *= Math.Max(0.01f, 1f - enemyArmor * (1f - _armorPenetration));
+
+                // Apply tech tree damage taken multiplier (e.g. "Iron Wall II" reduces incoming damage)
+                finalDamage *= _damageTakenMult;
 
                 _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage));
             });

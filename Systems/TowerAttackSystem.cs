@@ -15,6 +15,7 @@ namespace BattleSystemECS.Systems
     {
         private ComponentStore store;
         private IRenderer logger;
+        private TechTreeSystem techTreeSystem;
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate lists, pre-allocated in SetTurn
@@ -24,10 +25,15 @@ namespace BattleSystemECS.Systems
         private ConcurrentBag<(int enemyId, float damage, int playerId)>[] _damageQueue = new ConcurrentBag<(int, float, int)>[2];
         private int _damageQueueIdx = 0;
 
-        public TowerAttackSystem(ComponentStore store, IRenderer logger)
+        // Cached player armor stats (updated each SetTurn)
+        private float _armorPenetration = 0f;  // from TechTreeSystem
+        private float _damageTakenMult = 1f;   // from TechTreeSystem
+
+        public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem = null)
         {
             this.store = store;
             this.logger = logger;
+            this.techTreeSystem = techTreeSystem;
             _damageQueue[0] = new ConcurrentBag<(int, float, int)>();
             _damageQueue[1] = new ConcurrentBag<(int, float, int)>();
         }
@@ -35,6 +41,10 @@ namespace BattleSystemECS.Systems
         public void SetTurn(int turn)
         {
             _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
+
+            // Cache armor stats from tech tree
+            _armorPenetration = techTreeSystem != null ? techTreeSystem.GetArmorPenetration() : 0f;
+            _damageTakenMult = techTreeSystem != null ? techTreeSystem.GetDamageTakenMult() : 1f;
 
             // Ensure _towerCandidates is large enough; each slot is a reusable List<int>
             var towerIds = store.ActiveTowerIds;
@@ -116,7 +126,11 @@ namespace BattleSystemECS.Systems
                 if (bestTarget != -1)
                 {
                     store.TowerLastAttackTime[towerId] = 0f;
-                    bag.Add((bestTarget, store.TowerAttackDamage[towerId], store.PlayerEntityId));
+                    float baseDmg = store.TowerAttackDamage[towerId];
+                    // Apply enemy armor reduction + tech tree damage taken multiplier
+                    // Inlined: avoids branch + Math.Max call in hot path
+                    baseDmg *= Math.Max(0.01f, 1f - store.EnemyArmor[bestTarget] * (1f - _armorPenetration)) * _damageTakenMult;
+                    bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
                 }
             });
 

@@ -58,6 +58,8 @@ namespace BattleSystemECS.Core
         public bool[] EnemyActive = new bool[MAX_ENTITIES];
         public float[] EnemyChargeParam = new float[MAX_ENTITIES]; // SOA: replaces ConcurrentDictionary in EnemyAISystem
         public int[] EnemySpawnFrame = new int[MAX_ENTITIES];
+        // Armor: reduces incoming damage. Affected by attacker's armor penetration.
+        public float[] EnemyArmor = new float[MAX_ENTITIES];
 
         // ==================== 敌人 AI 组件的 SOA 存储 ====================
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
@@ -257,6 +259,7 @@ namespace BattleSystemECS.Core
                 EnemyActionEnum[entityId] = EnemyActionType.None;
                 EnemyAIChargeCounter[entityId] = 0;
                 EnemyAILastAttackTurn[entityId] = 0;
+                EnemyArmor[entityId] = 0f;
             }
 
             if (wasTower)
@@ -454,7 +457,7 @@ namespace BattleSystemECS.Core
 
         // ==================== 敌人组件访问 ====================
 
-        public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber, string fullName = null)
+        public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber, string fullName = null, float armor = 0f)
         {
             int entityId = CreateEntity();
 
@@ -475,6 +478,7 @@ namespace BattleSystemECS.Core
             EnemyWaveNumber[entityId] = waveNumber;
             EnemyActive[entityId] = true;
             EnemySpawnFrame[entityId] = CurrentFrame;
+            EnemyArmor[entityId] = armor;
 
             // 缓存怪物类型名（如 "NormalL1W1E0" -> "Normal"），避免每帧解析
             if (fullName != null)
@@ -526,6 +530,18 @@ namespace BattleSystemECS.Core
         {
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0f;
             return EnemyMaxHealth[enemyId];
+        }
+
+        public float GetEnemyArmor(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0f;
+            return EnemyArmor[enemyId];
+        }
+
+        public void SetEnemyArmor(int enemyId, float armor)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            EnemyArmor[enemyId] = armor;
         }
 
         public float GetEnemyMoveSpeed(int enemyId)

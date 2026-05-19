@@ -221,6 +221,11 @@ namespace BattleSystemECS.Systems
         public float GetArmor() => _armorAdd;
 
         /// <summary>
+        /// Get damage taken multiplier (tech tree reduces incoming damage).
+        /// </summary>
+        public float GetDamageTakenMult() => _damageTakenMult;
+
+        /// <summary>
         /// Get crit rate bonus.
         /// </summary>
         public float GetCritRateBonus() => _critRateAdd;
