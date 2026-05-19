@@ -76,6 +76,21 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// Decrement cooldown timers for active enemies with abilities. Called once per turn from GameManager.
+        /// Each enemy uses slot 0 of _abilityCooldownTimers.
+        /// </summary>
+        public void UpdateCooldowns(float deltaTime)
+        {
+            var activeEnemyIds = store.GetCachedActiveEnemyIds();
+            foreach (var enemyId in activeEnemyIds)
+            {
+                int idx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY; // slot 0
+                if (_abilityCooldownTimers[idx] > 0f)
+                    _abilityCooldownTimers[idx] -= deltaTime;
+            }
+        }
+
+        /// <summary>
         /// Serial phase: execute all queued ability events in order.
         /// </summary>
         public void ExecuteAbilities()
@@ -177,12 +192,12 @@ namespace BattleSystemECS.Systems
 
                 if (dist <= ability.AoeRadius)
                 {
-                    float currentBuff = store.EnemyChargeParam[allyId];
+                    float currentBuff = store.EnemyBuffDamageBonus[allyId];
                     float buffDamageBonus = store.EnemyDamage[allyId] * 0.3f;
 
                     if (currentBuff >= 0)
                     {
-                        store.EnemyChargeParam[allyId] = buffDamageBonus;
+                        store.EnemyBuffDamageBonus[allyId] = buffDamageBonus;
                         store.EnemySpawnFrame[allyId] = ability.BuffDuration;
                         buffedCount++;
                     }

@@ -34,10 +34,10 @@ namespace BattleSystemECS.Systems
         private ConcurrentBag<AttackEvent>[] _attackEvents = new ConcurrentBag<AttackEvent>[2];
         private int _attackEventsIdx = 0;
 
-        // BT evaluation cache — invalidates when enemy health or player health changes.
-        // Turn/frame changes do NOT invalidate (enemy health per-enemy + player health global).
+        // BT evaluation cache — invalidates when enemy health or charge counter changes.
         private float _cachedPlayerHealth = -1;
         private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
+        private readonly int[] _enemyChargeCounterCache = new int[ComponentStore.MAX_ENTITIES];
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
         private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
 
@@ -93,8 +93,10 @@ namespace BattleSystemECS.Systems
                     // Check BT evaluation cache
                     float enemyHealth = store.EnemyHealth[enemyId];
                     float playerHealth = store.PlayerCurrentHealth[playerId];
+                    int chargeCounter = store.GetEnemyAIChargeCounter(enemyId);
                     if (_enemyHealthCache[enemyId] == enemyHealth &&
-                        _cachedPlayerHealth == playerHealth)
+                        _cachedPlayerHealth == playerHealth &&
+                        _enemyChargeCounterCache[enemyId] == chargeCounter)
                     {
                         store.SetEnemyActionEnum(enemyId, _lastActionCache[enemyId]);
                         continue;
@@ -132,6 +134,7 @@ namespace BattleSystemECS.Systems
                     store.EnemyCastAbilityId[enemyId] = abilityId;
 
                     _enemyHealthCache[enemyId] = enemyHealth;
+                    _enemyChargeCounterCache[enemyId] = chargeCounter;
                     _lastActionCache[enemyId] = actionEnum;
                     _lastActionStringCache[enemyId] = action;
 

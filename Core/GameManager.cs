@@ -298,6 +298,7 @@ namespace BattleSystemECS.Core
                     enemyAISystem.Update();
                     // 敌人技能执行（串行，与 attack event 合并）
                     enemyAbilitySystem.SetTurn(turn);
+                    enemyAbilitySystem.UpdateCooldowns(1f);
                     enemyAbilitySystem.ExecuteAbilities();
 
                     // 移动敌人（SOA）
