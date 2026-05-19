@@ -391,7 +391,7 @@ namespace BattleSystemECS.Tests
             var (store, config, pid) = CreateEnv();
             var r = new MockRenderer();
             int eid = store.CreateEntity();
-            MakeEnemy(store, eid, 5f, 1f);
+            MakeEnemy(store, eid, 5f, 0f, gold: 1);
             var sys = new SkillSystem(store, r, pid, config);
             sys.InitializePlayerSkills();
             sys.SetTurn(0); // required: populates _activeEnemyList before any Cast call
