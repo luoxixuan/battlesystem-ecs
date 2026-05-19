@@ -133,6 +133,15 @@ namespace BattleSystemECS.Core
         /// </summary>
         public SpatialGrid SpatialGrid => _spatialGrid;
 
+        /// <summary>
+        /// Synchronize spatial grid dimensions with MapSystem. Call once during game initialization,
+        /// before any enemies are added. Must match gameConfig.MapWidth/MapHeight.
+        /// </summary>
+        public void SetMapSize(int width, int height)
+        {
+            _spatialGrid.SetMapSize(width, height);
+        }
+
         private readonly ConcurrentStack<int> freeEntityIds = new ConcurrentStack<int>();
         private readonly Dictionary<int, string> entityNames = new Dictionary<int, string>();
         private readonly object entityNamesLock = new object(); // H-1: thread-safe access to entityNames
@@ -734,8 +743,16 @@ namespace BattleSystemECS.Core
 
         /// <summary>
         /// Returns the internal active enemy list directly — zero allocation, read-only use.
-        /// Safe for concurrent read access across all systems within a frame.
-        /// Falls back to a fresh allocation if the list is empty (test/standalone scenarios).
+        ///
+        /// FRAME-ORDER INVARIANT (enforced, not optional):
+        /// - Call SetTurn() or equivalent to obtain this reference ONCE per frame.
+        /// - Do NOT hold the reference across frames — the next SetTurn() may invalidate it.
+        /// - Do NOT mutate the returned list — DestroyEntity removes entries during
+        ///   ResolveEnemiesKilledThisFrame(), which runs AFTER all systems in the main loop.
+        /// - Concurrent read access from Parallel.For within the same frame is safe.
+        ///
+        /// Violating these rules causes: stale enumeration, IndexOutOfRange, or enemies
+        /// vanishing mid-frame from a system that still holds a cached reference.
         /// </summary>
         public List<int> GetCachedActiveEnemyIds()
         {

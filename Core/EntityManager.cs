@@ -19,6 +19,8 @@ namespace BattleSystemECS
         public Entity CreateEntity()
         {
             int entityId = store.CreateEntity();
+            if (entityId < 0)
+                throw new InvalidOperationException($"EntityManager.CreateEntity: pool exhausted (MAX_ENTITIES={ComponentStore.MAX_ENTITIES}).");
             store.SetEntityName(entityId, $"Entity_{entityId}");
             return new Entity(entityId);
         }

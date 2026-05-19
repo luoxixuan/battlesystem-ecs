@@ -84,6 +84,7 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]    - Creating MapSystem (10x20 map)...");
             mapSystem = new MapSystem(logger, store);
             mapSystem.SetMapSize(gameConfig.MapWidth, gameConfig.MapHeight);  // Bug#30: use config values instead of magic numbers
+            store.SetMapSize(gameConfig.MapWidth, gameConfig.MapHeight);     // Bug#2: sync SpatialGrid with MapSystem
             logger.Log("[BOOTSTRAP]      MapSystem created successfully!");
 
             // 初始化其他系统

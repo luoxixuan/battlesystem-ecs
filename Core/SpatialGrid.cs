@@ -56,6 +56,16 @@ namespace BattleSystemECS.Core
         }
 
         /// <summary>
+        /// Resize the spatial grid. Must be called before any enemies are added —
+        /// re-allocate discards all cell data. Call via ComponentStore.SetMapSize()
+        /// during game initialization, synchronized with MapSystem.
+        /// </summary>
+        public void SetMapSize(int width, int height)
+        {
+            Allocate(width, height);
+        }
+
+        /// <summary>
         /// Incremental update — clears dirty cells and re-inserts only the given enemy IDs.
         /// Used by RebuildSpatialGrid() to achieve O(enemies) dirty-cell clearing.
         /// </summary>
