@@ -11,6 +11,7 @@ namespace BattleSystemECS.Systems
     /// 直接访问 ComponentStore 的数组，无字典查询，无 struct 复制
     /// 性能提升：10-100 倍
     /// 支持每波 100 只怪生成
+    /// 支持多怪物类型（EnemyTypes[]）
     /// </summary>
     public class WaveSpawningSystem
     {
@@ -23,6 +24,13 @@ namespace BattleSystemECS.Systems
         private int enemiesSpawnedInWave = 0;
         private int totalEnemiesSpawned = 0;
         private Random _spawnRandom;
+        private readonly object _spawnRandomLock = new object();
+
+        // Multi-type support
+        private string[] _multiTypes = Array.Empty<string>();
+        private int[] _multiCounts = Array.Empty<int>();
+        private int _multiTypeIndex = 0;
+        private int _multiSpawnedForType = 0;
 
         /// <summary>
         /// Fired when a wave completes (not level complete).
@@ -46,6 +54,25 @@ namespace BattleSystemECS.Systems
             currentWave = 1;
             enemiesSpawnedInWave = 0;
             totalEnemiesSpawned = 0;
+            ClearMultiTypeState();
+        }
+
+        private void ClearMultiTypeState()
+        {
+            _multiTypes = Array.Empty<string>();
+            _multiCounts = Array.Empty<int>();
+            _multiTypeIndex = 0;
+            _multiSpawnedForType = 0;
+        }
+
+        private Random GetSpawnRandom()
+        {
+            if (_spawnRandom != null) return _spawnRandom;
+            lock (_spawnRandomLock)
+            {
+                _spawnRandom ??= new Random();
+                return _spawnRandom;
+            }
         }
 
         public void Update()
@@ -71,28 +98,50 @@ namespace BattleSystemECS.Systems
                 return;
             }
 
+            // Lazy-init multi-type state at wave start
+            if (_multiTypes.Length == 0)
+            {
+                InitMultiTypeState(waveConfig);
+                enemiesSpawnedInWave = 0;
+            }
+
             if (enemiesSpawnedInWave < waveConfig.EnemyCount)
             {
-                // 批量生成敌人：每波 100 只怪
-                var monsterConfig = gameConfig.GetMonsterConfig(waveConfig.MonsterType);
-                if (monsterConfig == null)
-                {
-                    renderer.Log("[SPAWN] Monster type '" + waveConfig.MonsterType + "' not found!");
-                    return;
-                }
+                Random random = GetSpawnRandom();
 
-                _spawnRandom ??= new Random();
-                Random random = _spawnRandom;
-
-                // 批量生成 5 个敌人
+                // Batch spawn 5 enemies
                 for (int i = 0; i < 5; i++)
                 {
-                    // 计算随机位置（X：0-9，Y：19）
-                    float startX = (float)random.Next(0, 10);
-                    float startY = 19f;  // 放在地图中间位置
+                    // Advance to next type if current is exhausted
+                    while (_multiTypeIndex < _multiTypes.Length)
+                    {
+                        if (_multiSpawnedForType >= _multiCounts[_multiTypeIndex])
+                        {
+                            _multiTypeIndex++;
+                            _multiSpawnedForType = 0;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    if (_multiTypeIndex >= _multiTypes.Length)
+                        break;
 
-                    string enemyName = $"{waveConfig.MonsterType}L{currentLevel}W{currentWave}E{enemiesSpawnedInWave + i}";
-                    // SOA: 直接数组访问，无字典查询，无 struct 复制
+                    string monsterType = _multiTypes[_multiTypeIndex];
+                    var monsterConfig = gameConfig.GetMonsterConfig(monsterType);
+                    if (monsterConfig == null)
+                    {
+                        renderer.Log("[SPAWN] Monster type '" + monsterType + "' not found!");
+                        _multiTypeIndex++;
+                        _multiSpawnedForType = 0;
+                        continue;
+                    }
+
+                    float startX = (float)random.Next(0, 10);
+                    float startY = 19f;
+
+                    string enemyName = $"{monsterType}L{currentLevel}W{currentWave}T{_multiTypeIndex}E{_multiSpawnedForType}";
                     int enemyId = store.AddEnemy(
                         startX, startY,
                         monsterConfig.MoveSpeed,
@@ -109,19 +158,18 @@ namespace BattleSystemECS.Systems
                         continue;
                     }
                     store.SetEntityName(enemyId, enemyName);
-                    // Cache the behavior tree on the enemy — O(1) array access per frame instead of Dictionary+string lookup
-                    store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(waveConfig.MonsterType);
+                    store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(monsterType);
+                    _multiSpawnedForType++;
                     enemiesSpawnedInWave++;
+                    totalEnemiesSpawned++;
                 }
-
-                totalEnemiesSpawned += 5;
 
                 renderer.Log($"[SPAWN] Spawned {enemiesSpawnedInWave} enemies (batch 5) for Wave {currentWave}");
             }
             else
             {
-                // Wave complete
                 renderer.Log($"[SPAWN] Wave {currentWave} complete! Spawned {enemiesSpawnedInWave} enemies (batch 100 per wave)");
+                ClearMultiTypeState();
                 enemiesSpawnedInWave = 0;
                 currentWave++;
                 OnWaveComplete?.Invoke();
@@ -133,6 +181,31 @@ namespace BattleSystemECS.Systems
                     currentWave = 1;
                 }
             }
+        }
+
+        private void InitMultiTypeState(WaveConfig waveConfig)
+        {
+            // Check if EnemyTypes[] is configured
+            if (waveConfig.EnemyTypes != null && waveConfig.EnemyTypes.Count > 0)
+            {
+                int count = waveConfig.EnemyTypes.Count;
+                _multiTypes = new string[count];
+                _multiCounts = new int[count];
+                for (int i = 0; i < count; i++)
+                {
+                    var entry = waveConfig.EnemyTypes[i];
+                    _multiTypes[i] = entry.MonsterType ?? "";
+                    _multiCounts[i] = entry.Count;
+                }
+            }
+            else
+            {
+                // Fallback: single type from MonsterType field
+                _multiTypes = new string[] { waveConfig.MonsterType ?? "Normal" };
+                _multiCounts = new int[] { waveConfig.EnemyCount };
+            }
+            _multiTypeIndex = 0;
+            _multiSpawnedForType = 0;
         }
     }
 }

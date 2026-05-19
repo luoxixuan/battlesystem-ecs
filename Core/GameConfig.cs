@@ -41,11 +41,70 @@ namespace BattleSystemECS.Config
         public float UpgradeCost { get; set; }
     }
 
+    public class EnemyTypeEntry
+    {
+        public string MonsterType { get; set; }
+        public int Count { get; set; } = 0;
+    }
+
     public class WaveConfig
     {
         public int WaveNumber { get; set; }
         public string MonsterType { get; set; }
         public int EnemyCount { get; set; }
+        // Multi-type support: if EnemyTypes is non-empty, use it instead of MonsterType
+        public List<EnemyTypeEntry> EnemyTypes { get; set; } = new List<EnemyTypeEntry>();
+
+        /// <summary>
+        /// Returns how many enemies of a given monster type should spawn this wave.
+        /// Uses EnemyTypes[] if populated, otherwise falls back to MonsterType + EnemyCount.
+        /// </summary>
+        public int GetEnemyCountForType(string monsterType)
+        {
+            if (EnemyTypes != null && EnemyTypes.Count > 0)
+            {
+                foreach (var entry in EnemyTypes)
+                {
+                    if (!string.IsNullOrEmpty(entry.MonsterType) && entry.MonsterType == monsterType)
+                        return entry.Count;
+                }
+                return 0;
+            }
+            return !string.IsNullOrEmpty(MonsterType) ? EnemyCount : 0;
+        }
+
+        /// <summary>
+        /// Returns all monster types configured for this wave, in order.
+        /// </summary>
+        public List<string> GetAllMonsterTypes()
+        {
+            if (EnemyTypes != null && EnemyTypes.Count > 0)
+            {
+                var result = new List<string>();
+                foreach (var entry in EnemyTypes)
+                {
+                    if (!string.IsNullOrEmpty(entry.MonsterType) && entry.Count > 0)
+                        result.Add(entry.MonsterType);
+                }
+                return result;
+            }
+            return !string.IsNullOrEmpty(MonsterType) ? new List<string> { MonsterType } : new List<string>();
+        }
+
+        /// <summary>
+        /// Returns total enemy count for this wave.
+        /// </summary>
+        public int GetTotalEnemyCount()
+        {
+            if (EnemyTypes != null && EnemyTypes.Count > 0)
+            {
+                int total = 0;
+                foreach (var entry in EnemyTypes)
+                    total += entry.Count;
+                return total;
+            }
+            return EnemyCount;
+        }
     }
 
     public class LevelConfig

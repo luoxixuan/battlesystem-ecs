@@ -50,5 +50,57 @@
     "DamageMultiplier": 1,
     "HealAmount": 0.5,
     "BuffDuration": 0
+  },
+  {
+    "Id": "tank_self_heal",
+    "Name": "Fortify",
+    "Description": "Tank heals 50% of max HP when low",
+    "AbilityType": "self_heal",
+    "BuffStat": "",
+    "Cooldown": 6,
+    "CooldownRemaining": 0,
+    "AoeRadius": 0,
+    "DamageMultiplier": 1,
+    "HealAmount": 0.5,
+    "BuffDuration": 0
+  },
+  {
+    "Id": "tank_aoe_slam",
+    "Name": "AOE Slam",
+    "Description": "Deals 80% of attack damage to player in 3-cell radius",
+    "AbilityType": "aoe_damage",
+    "BuffStat": "",
+    "Cooldown": 8,
+    "CooldownRemaining": 0,
+    "AoeRadius": 3,
+    "DamageMultiplier": 0.8,
+    "HealAmount": 0,
+    "BuffDuration": 0
+  },
+  {
+    "Id": "boss_rage_buff",
+    "Name": "Rage",
+    "Description": "30% damage boost to allies within 6 cells for 4 turns",
+    "AbilityType": "buff_allies",
+    "BuffStat": "damage_boost",
+    "Cooldown": 12,
+    "CooldownRemaining": 0,
+    "AoeRadius": 6,
+    "DamageMultiplier": 0,
+    "HealAmount": 0,
+    "BuffDuration": 4
+  },
+  {
+    "Id": "boss_screen_aoe",
+    "Name": "Shockwave",
+    "Description": "Deals 60% of attack damage to player in 6-cell radius",
+    "AbilityType": "aoe_damage",
+    "BuffStat": "",
+    "Cooldown": 10,
+    "CooldownRemaining": 0,
+    "AoeRadius": 6,
+    "DamageMultiplier": 0.6,
+    "HealAmount": 0,
+    "BuffDuration": 0
   }
 ]

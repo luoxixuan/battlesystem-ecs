@@ -610,7 +610,56 @@ namespace BattleSystemECS.Config
             wave.MonsterType = ExtractString(json, "MonsterType");
             wave.EnemyCount = ExtractInt(json, "EnemyCount");
 
+            // Parse EnemyTypes[] for multi-type wave support
+            wave.EnemyTypes = ParseEnemyTypeEntries(json, "EnemyTypes");
+
             return wave;
+        }
+
+        private static List<EnemyTypeEntry> ParseEnemyTypeEntries(string json, string key)
+        {
+            var entries = new List<EnemyTypeEntry>();
+
+            string keyPattern = "\"" + key + "\":";
+            int keyIndex = json.IndexOf(keyPattern);
+            if (keyIndex == -1) return entries;
+
+            int arrayStart = json.IndexOf("[", keyIndex);
+            if (arrayStart == -1) return entries;
+
+            int arrayEnd = FindMatchingBrace(json, arrayStart);
+            if (arrayEnd == -1) return entries;
+
+            string arrayContent = json.Substring(arrayStart + 1, arrayEnd - arrayStart - 1);
+
+            int pos = 0;
+            while (pos < arrayContent.Length)
+            {
+                while (pos < arrayContent.Length && (char.IsWhiteSpace(arrayContent[pos]) || arrayContent[pos] == ',')) pos++;
+                if (pos >= arrayContent.Length) break;
+
+                if (arrayContent[pos] == '{')
+                {
+                    int objEnd = FindMatchingBrace(arrayContent, pos);
+                    if (objEnd == -1) break;
+
+                    string entryJson = arrayContent.Substring(pos, objEnd - pos);
+                    var entry = new EnemyTypeEntry
+                    {
+                        MonsterType = ExtractString(entryJson, "MonsterType"),
+                        Count = ExtractInt(entryJson, "Count")
+                    };
+                    if (!string.IsNullOrEmpty(entry.MonsterType))
+                        entries.Add(entry);
+                    pos = objEnd + 1;
+                }
+                else
+                {
+                    pos++;
+                }
+            }
+
+            return entries;
         }
 
         private static List<string> ParseStringArray(string json, string key)
