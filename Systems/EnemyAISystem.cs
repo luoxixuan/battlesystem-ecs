@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
@@ -22,10 +22,9 @@ namespace BattleSystemECS.Systems
         private readonly int playerId;
 
         private readonly GameConfig gameConfig;
+        private readonly EnemyAbilitySystem enemyAbilitySystem;
 
         private int currentTurn;
-        // SOA charge param — stored in store.EnemyChargeParam[] for zero-allocation array access
-
         // Per-turn cached fields for cache locality
         private List<int> _activeEnemyList;
         private float _playerX, _playerY;
@@ -40,15 +39,15 @@ namespace BattleSystemECS.Systems
         private float _cachedPlayerHealth = -1;
         private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
-// Action string cache for Dodge direction parsing — string stays in cache when action is Dodge
         private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
 
-        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig)
+        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem)
         {
             this.store = store;
             this.logger = logger;
             this.playerId = playerId;
             this.gameConfig = gameConfig;
+            this.enemyAbilitySystem = enemyAbilitySystem;
             _attackEvents[0] = new ConcurrentBag<AttackEvent>();
             _attackEvents[1] = new ConcurrentBag<AttackEvent>();
         }
@@ -59,15 +58,10 @@ namespace BattleSystemECS.Systems
         public void SetTurn(int turn)
         {
             currentTurn = turn;
-            // Cache player position once per turn
             _playerX = store.PositionX[playerId];
             _playerY = store.PositionY[playerId];
-            // Cache active enemy list once per turn (zero allocation — uses frame cache)
             _activeEnemyList = store.GetCachedActiveEnemyIds();
-            // Cache current player health for BT evaluation
             _cachedPlayerHealth = store.PlayerCurrentHealth[playerId];
-            // BT eval cache auto-invalidates when enemy/player health changes —
-            // turn change alone does NOT invalidate (benchmark-friendly)
         }
 
         /// <summary>
@@ -79,11 +73,9 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = _activeEnemyList;
             int count = activeEnemyIds.Count;
 
-            // Parallel batch processing: 256 enemies per batch for instruction cache locality
             const int batchSize = 256;
             int numBatches = (count + batchSize - 1) / batchSize;
 
-            // Each thread processes its own batch — no shared mutable state during BT evaluation
             Parallel.For(0, numBatches, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
                 batchIdx =>
             {
@@ -96,38 +88,39 @@ namespace BattleSystemECS.Systems
                     if (!store.EnemyActive[enemyId])
                         continue;
 
-                    // O(1) array access — pre-cached at spawn time in WaveSpawningSystem
                     var cachedBt = store.EnemyBehaviorTree[enemyId];
 
-                    // Check BT evaluation cache: skip if enemy health and player health are unchanged
+                    // Check BT evaluation cache
                     float enemyHealth = store.EnemyHealth[enemyId];
                     float playerHealth = store.PlayerCurrentHealth[playerId];
                     if (_enemyHealthCache[enemyId] == enemyHealth &&
                         _cachedPlayerHealth == playerHealth)
                     {
-// Cache hit: reuse last action without re-evaluating BT
                         store.SetEnemyActionEnum(enemyId, _lastActionCache[enemyId]);
                         continue;
                     }
 
                     // Cache miss: evaluate behavior tree
-                    // Precomputed enum eliminates StringToActionEnum() in hot path (saves ~17ms/frame at 10K enemies)
                     string action;
                     EnemyActionType actionEnum;
+                    string abilityId = null;
                     if (cachedBt != null)
                     {
-                        action = BTCachedTreeEvaluator.EvaluateWithEnum(cachedBt, enemyId, store, playerId, currentTurn, out actionEnum);
+                        action = BTCachedTreeEvaluator.EvaluateWithEnumAndAbility(
+                            cachedBt, enemyId, store, playerId, currentTurn,
+                            out actionEnum, out abilityId);
                     }
                     else
                     {
-                        // Fallback when no BT is configured — derive monsterType from stored name
                         string monsterType = store.GetEnemyTypeName(enemyId);
                         if (string.IsNullOrEmpty(monsterType))
                             monsterType = store.GetName(enemyId);
                         cachedBt = gameConfig.GetCachedBehaviorTree(monsterType);
                         if (cachedBt != null)
                         {
-                            action = BTCachedTreeEvaluator.EvaluateWithEnum(cachedBt, enemyId, store, playerId, currentTurn, out actionEnum);
+                            action = BTCachedTreeEvaluator.EvaluateWithEnumAndAbility(
+                                cachedBt, enemyId, store, playerId, currentTurn,
+                                out actionEnum, out abilityId);
                         }
                         else
                         {
@@ -136,13 +129,13 @@ namespace BattleSystemECS.Systems
                         }
                     }
                     store.SetEnemyActionEnum(enemyId, actionEnum);
+                    store.EnemyCastAbilityId[enemyId] = abilityId;
 
-                    // Update cache
                     _enemyHealthCache[enemyId] = enemyHealth;
                     _lastActionCache[enemyId] = actionEnum;
                     _lastActionStringCache[enemyId] = action;
 
-                    // Collect attack events for batch serial execution
+                    // Collect attack events
                     if (actionEnum == EnemyActionType.AttackMelee ||
                         actionEnum == EnemyActionType.RangedAttack ||
                         actionEnum == EnemyActionType.ChargeAttack)
@@ -159,23 +152,19 @@ namespace BattleSystemECS.Systems
                 }
             });
 
-            // Serial action execution — damage/event must be applied serially to avoid race conditions.
-            // Two-phase: BT eval is parallel (safe), action execution is serial (correct).
-            //
-            // Batch-optimized: attack events collected in parallel phase (_attackEvents bag),
-            // executed here by iterating only attacking enemies (skips MoveToTarget/None).
+            // Serial action execution
             int readIdx = _attackEventsIdx;
             foreach (var evt in _attackEvents[readIdx])
             {
                 InvokeExecuteActionEnum(evt.EnemyId, evt.ActionType);
             }
 
-            // Ping-pong swap: clear the write buffer, flip idx for next frame
+            // Ping-pong swap
             int writeIdx = 1 - _attackEventsIdx;
             _attackEvents[writeIdx].Clear();
             _attackEventsIdx = writeIdx;
 
-            // Dodge and other non-attack actions still processed per-enemy (lightweight)
+            // Dodge execution
             foreach (var enemyId in activeEnemyIds)
             {
                 if (!store.EnemyActive[enemyId]) continue;
@@ -189,30 +178,18 @@ namespace BattleSystemECS.Systems
                     store.PositionX[enemyId] = enemyX + dodgeDir * store.EnemyMoveSpeed[enemyId];
                 }
             }
-
-// Update turn cache after all enemies processed
         }
 
-        /// <summary>
-        /// Fallback action when no BT is configured.
-        /// </summary>
         private string GetFallbackAction(int enemyId)
         {
             float enemyX = store.PositionX[enemyId];
             float enemyY = store.PositionY[enemyId];
-            float playerX = _playerX;
-            float playerY = _playerY;
-            float distance = Math.Abs(enemyX - playerX) + Math.Abs(enemyY - playerY);
-
+            float distance = Math.Abs(enemyX - _playerX) + Math.Abs(enemyY - _playerY);
             if (distance <= 1.5f)
                 return "attack_melee";
             return "move_to_target";
         }
 
-        /// <summary>
-        /// Convert action string to EnemyActionType enum using a static cache.
-        /// Base action is extracted the same way as in InvokeExecuteAction.
-        /// </summary>
         public static EnemyActionType StringToActionEnum(string action)
         {
             if (string.IsNullOrEmpty(action))
@@ -227,9 +204,7 @@ namespace BattleSystemECS.Systems
             {
                 string suffix = action.Substring(underscoreIdx + 1);
                 if (float.TryParse(suffix, out _))
-                {
                     baseAction = action.Substring(0, underscoreIdx);
-                }
             }
 
             EnemyActionType result = baseAction switch
@@ -247,49 +222,41 @@ namespace BattleSystemECS.Systems
             return result;
         }
 
-        // Static cache for StringToActionEnum — eliminates repeated switch per call
         private static readonly ConcurrentDictionary<string, EnemyActionType> actionCache = new ConcurrentDictionary<string, EnemyActionType>();
 
-        /// <summary>
-        /// Execute the given action for the specified enemy using enum dispatch.
-        /// </summary>
         public void InvokeExecuteActionEnum(int enemyId, EnemyActionType actionEnum)
         {
             switch (actionEnum)
             {
                 case EnemyActionType.MoveToTarget:
                     break;
-
                 case EnemyActionType.AttackMelee:
                     ExecuteMeleeAttack(enemyId);
                     break;
-
                 case EnemyActionType.RangedAttack:
                     ExecuteRangedAttack(enemyId);
                     break;
-
                 case EnemyActionType.ChargeAttack:
-                    {
-                        float param = store.EnemyChargeParam[enemyId];
-                        ExecuteChargeAttack(enemyId, param);
-                    }
+                    ExecuteChargeAttack(enemyId, store.EnemyChargeParam[enemyId]);
                     break;
-
                 case EnemyActionType.Dodge:
                     break;
-
                 case EnemyActionType.Retreat:
                     break;
-
+                case EnemyActionType.SelfHeal:
+                case EnemyActionType.AoeDamage:
+                case EnemyActionType.BuffAllies:
+                    // Ability actions are dispatched to EnemyAbilitySystem
+                    string abilityId = store.EnemyCastAbilityId[enemyId];
+                    if (!string.IsNullOrEmpty(abilityId))
+                        enemyAbilitySystem.EnqueueAbility(enemyId, abilityId);
+                    break;
                 case EnemyActionType.None:
                 default:
                     break;
             }
         }
 
-        /// <summary>
-        /// Legacy string-based execute — kept for backward compatibility.
-        /// </summary>
         public void InvokeExecuteAction(int enemyId, string action)
         {
             if (string.IsNullOrEmpty(action))
@@ -313,25 +280,19 @@ namespace BattleSystemECS.Systems
             {
                 case "move_to_target":
                     break;
-
                 case "attack_melee":
                     ExecuteMeleeAttack(enemyId);
                     break;
-
                 case "ranged_attack":
                     ExecuteRangedAttack(enemyId);
                     break;
-
                 case "charge_attack":
                     ExecuteChargeAttack(enemyId, param);
                     break;
-
                 case "dodge":
                     break;
-
                 case "retreat":
                     break;
-
                 default:
                     break;
             }
@@ -340,17 +301,14 @@ namespace BattleSystemECS.Systems
         private void ExecuteMeleeAttack(int enemyId)
         {
             float damage = store.EnemyDamage[enemyId];
-
             store.DecreasePlayerHealth(playerId, damage);
             float remaining = store.GetPlayerCurrentHealth(playerId);
-
             EventBus.Instance.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
             {
                 Damage = damage,
                 RemainingHealth = remaining,
                 AttackerId = enemyId
             });
-
             store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
             logger.Log($"[AI] Enemy {enemyId} attacks player for {damage} damage (HP: {remaining})");
         }
@@ -358,24 +316,20 @@ namespace BattleSystemECS.Systems
         private void ExecuteRangedAttack(int enemyId)
         {
             float damage = store.EnemyDamage[enemyId];
-
             store.DecreasePlayerHealth(playerId, damage);
             float remaining = store.GetPlayerCurrentHealth(playerId);
-
             EventBus.Instance.Publish(GameEvents.EnemyCharging, new EnemyChargingEvent
             {
                 EnemyId = enemyId,
                 Turn = currentTurn,
                 Damage = damage
             });
-
             EventBus.Instance.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
             {
                 Damage = damage,
                 RemainingHealth = remaining,
                 AttackerId = enemyId
             });
-
             store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
             logger.Log($"[AI] Enemy {enemyId} ranged attacks player for {damage} damage (HP: {remaining})");
         }
@@ -389,54 +343,43 @@ namespace BattleSystemECS.Systems
             {
                 store.SetEnemyAIChargeCounter(enemyId, counter + 1);
                 store.EnemyChargeParam[enemyId] = param;
-
                 EventBus.Instance.Publish(GameEvents.EnemyCharging, new EnemyChargingEvent
                 {
                     EnemyId = enemyId,
                     Turn = currentTurn,
                     Damage = store.EnemyDamage[enemyId]
                 });
-
                 logger.Log($"[AI] Enemy {enemyId} charging ({counter + 1}/{requiredTurns})");
             }
             else
             {
                 float baseDamage = store.EnemyDamage[enemyId];
                 float chargedDamage = baseDamage * 3f;
-
                 store.DecreasePlayerHealth(playerId, chargedDamage);
                 float remaining = store.GetPlayerCurrentHealth(playerId);
-
                 EventBus.Instance.Publish(GameEvents.EnemyChargeReleased, new EnemyChargeReleasedEvent
                 {
                     EnemyId = enemyId,
                     Turn = currentTurn,
                     Damage = chargedDamage
                 });
-
                 EventBus.Instance.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
                 {
                     Damage = chargedDamage,
                     RemainingHealth = remaining,
                     AttackerId = enemyId
                 });
-
                 store.SetEnemyAIChargeCounter(enemyId, 0);
                 store.EnemyChargeParam[enemyId] = 0f;
                 store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
-
                 logger.Log($"[AI] Enemy {enemyId} releases CHARGE for {chargedDamage} damage (3x)! HP: {remaining}");
             }
         }
-        /// <summary>
-        /// Parse dodge direction from action string suffix (e.g. "dodge_1" → +1, "dodge_-1" → -1, "dodge" → +1).
-        /// Kept for backward compatibility with the dodge parameter only.
-        /// </summary>
+
         private static int ParseDodgeDirection(string action)
         {
             if (string.IsNullOrEmpty(action))
                 return 1;
-
             int underscoreIdx = action.LastIndexOf('_');
             if (underscoreIdx > 0 && underscoreIdx < action.Length - 1)
             {
@@ -444,10 +387,9 @@ namespace BattleSystemECS.Systems
                 if (int.TryParse(suffix, out int dir))
                     return dir;
             }
-            return 1; // default dodge right
+            return 1;
         }
 
-        // Lightweight struct for batch-collected attack events (avoids delegate allocation).
         private struct AttackEvent
         {
             public int EnemyId;

@@ -12,6 +12,10 @@ namespace BattleSystemECS.Components
         RangedAttack = 3,
         ChargeAttack = 4,
         Dodge = 5,
-        Retreat = 6
+        Retreat = 6,
+        // Enemy ability actions (enemy_cast_* BT action nodes)
+        SelfHeal = 7,
+        AoeDamage = 8,
+        BuffAllies = 9
     }
 }

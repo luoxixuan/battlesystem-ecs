@@ -70,6 +70,8 @@ namespace BattleSystemECS.Core
         public BTCachedTree[] EnemyBehaviorTree = new BTCachedTree[MAX_ENTITIES];
         // Optimized action type as enum — avoids string comparison per frame
         public EnemyActionType[] EnemyActionEnum = new EnemyActionType[MAX_ENTITIES];
+        // Ability ID for enemy_cast_* actions — stores the ability id to invoke
+        public string[] EnemyCastAbilityId = new string[MAX_ENTITIES];
 
         // ==================== 塔组件的 SOA 存储 ====================
         public string[] TowerType = new string[MAX_ENTITIES];
@@ -256,6 +258,7 @@ namespace BattleSystemECS.Core
                 EnemyBehaviorTree[entityId] = null;
                 EnemyTypeName[entityId] = null;
                 EnemyAIAction[entityId] = null;
+                EnemyCastAbilityId[entityId] = null;
                 EnemyActionEnum[entityId] = EnemyActionType.None;
                 EnemyAIChargeCounter[entityId] = 0;
                 EnemyAILastAttackTurn[entityId] = 0;

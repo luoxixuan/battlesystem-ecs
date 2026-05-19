@@ -55,6 +55,24 @@ namespace BattleSystemECS.Config
         public List<WaveConfig> Waves { get; set; } = new List<WaveConfig>();
     }
 
+    /// <summary>
+    /// Enemy ability definition — loaded from enemy_abilities.json.
+    /// </summary>
+    public class EnemyAbilityDef
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string AbilityType { get; set; } // "self_heal", "aoe_damage", "buff_allies"
+        public float Cooldown { get; set; }
+        public float CooldownRemaining { get; set; }
+        public int AoeRadius { get; set; }
+        public float DamageMultiplier { get; set; }
+        public float HealAmount { get; set; }
+        public string BuffStat { get; set; }
+        public int BuffDuration { get; set; }
+    }
+
     public class SkillConfig
     {
         public string Name { get; set; }
@@ -93,6 +111,8 @@ namespace BattleSystemECS.Config
         public float Value;
         public float Param;
         public string[] Children;
+        // Ability ID for enemy_cast_* action nodes
+        public string AbilityId;
     }
 
     public class GameConfig
@@ -109,6 +129,9 @@ namespace BattleSystemECS.Config
         private Dictionary<string, BehaviorTreeDef> _btCache = new Dictionary<string, BehaviorTreeDef>();
         private Dictionary<string, BattleSystemECS.Systems.BTCachedTree> _cachedBtCache = new Dictionary<string, BattleSystemECS.Systems.BTCachedTree>();
         private Dictionary<string, MonsterConfig> _monsterCache = new Dictionary<string, MonsterConfig>();
+
+        // Enemy abilities keyed by ability id
+        public List<EnemyAbilityDef> EnemyAbilities { get; set; } = new List<EnemyAbilityDef>();
 
         // Buff definitions for UpgradeSystem (Bug#31 fix: was hardcoded strings)
         public List<string> UpgradeBuffs { get; set; } = new List<string> { "Attack+10%", "Crit Rate+5%", "Defense+10%" };

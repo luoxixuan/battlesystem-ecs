@@ -35,6 +35,9 @@ namespace BattleSystemECS.Config
                 // Load behavior trees
                 LoadBehaviorTrees(gameConfig, renderer);
 
+                // Load enemy abilities
+                LoadEnemyAbilities(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -80,6 +83,105 @@ namespace BattleSystemECS.Config
                 renderer.Log("[BT] Failed to load behavior trees: " + ex.Message);
             }
         }
+
+        private static void LoadEnemyAbilities(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string abFile = "Data/Configs/enemy_abilities.json";
+            try
+            {
+                if (!File.Exists(abFile))
+                {
+                    renderer.Log("[ABILITY] Enemy abilities file not found: " + abFile + ", using empty list");
+                    return;
+                }
+                string json = File.ReadAllText(abFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[ABILITY] Enemy abilities file is empty: " + abFile);
+                    return;
+                }
+                ParseEnemyAbilities(gameConfig, json);
+                renderer.Log("[ABILITY] Loaded " + gameConfig.EnemyAbilities.Count + " enemy abilities from " + abFile);
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[ABILITY] Failed to load enemy abilities: " + ex.Message);
+            }
+        }
+
+        private static void ParseEnemyAbilities(GameConfig gameConfig, string jsonArray)
+        {
+            // Simple JSON array parsing for enemy abilities
+            int pos = 0;
+            while (pos < jsonArray.Length)
+            {
+                // Find next '{'
+                int objStart = jsonArray.IndexOf('{', pos);
+                if (objStart < 0) break;
+                int objEnd = jsonArray.IndexOf('}', objStart);
+                if (objEnd < 0) break;
+
+                string objJson = jsonArray.Substring(objStart, objEnd - objStart + 1);
+                var ability = ParseEnemyAbility(objJson);
+                if (ability != null)
+                    gameConfig.EnemyAbilities.Add(ability);
+
+                pos = objEnd + 1;
+            }
+        }
+
+        private static EnemyAbilityDef ParseEnemyAbility(string json)
+        {
+            var ability = new EnemyAbilityDef();
+            ability.Id = ExtractString(json, "Id");
+            ability.Name = ExtractString(json, "Name");
+            ability.Description = ExtractString(json, "Description");
+            ability.AbilityType = ExtractString(json, "AbilityType");
+            ability.BuffStat = ExtractString(json, "BuffStat");
+            ability.Cooldown = ExtractFloat(json, "Cooldown");
+            ability.CooldownRemaining = ExtractFloat(json, "CooldownRemaining");
+            ability.AoeRadius = ExtractInt(json, "AoeRadius");
+            ability.DamageMultiplier = ExtractFloat(json, "DamageMultiplier");
+            ability.HealAmount = ExtractFloat(json, "HealAmount");
+            ability.BuffDuration = ExtractInt(json, "BuffDuration");
+            return ability;
+        }
+
+        private static string ExtractString(string json, string key)
+        {
+            string pattern = "\"" + key + "\"";
+            int idx = json.IndexOf(pattern);
+            if (idx < 0) return null;
+            int colon = json.IndexOf(':', idx);
+            if (colon < 0) return null;
+            int start = json.IndexOf('"', colon);
+            if (start < 0) return null;
+            int end = json.IndexOf('"', start + 1);
+            if (end < 0) return null;
+            return json.Substring(start + 1, end - start - 1);
+        }
+
+        private static float ExtractFloat(string json, string key)
+        {
+            string pattern = "\"" + key + "\"";
+            int idx = json.IndexOf(pattern);
+            if (idx < 0) return 0f;
+            int colon = json.IndexOf(':', idx);
+            if (colon < 0) return 0f;
+            int start = colon + 1;
+            while (start < json.Length && (json[start] == ' ' || json[start] == '\t')) start++;
+            int end = start;
+            while (end < json.Length && (char.IsDigit(json[end]) || json[end] == '.' || json[end] == '-')) end++;
+            if (end == start) return 0f;
+            if (float.TryParse(json.Substring(start, end - start), out float val)) return val;
+            return 0f;
+        }
+
+        private static int ExtractInt(string json, string key)
+        {
+            return (int)ExtractFloat(json, key);
+        }
+
 
         private static void ParseBehaviorTrees(GameConfig gameConfig, string jsonArray)
         {
@@ -159,7 +261,8 @@ namespace BattleSystemECS.Config
                         Operator = ExtractString(nodeObjJson, "Operator"),
                         Value = ExtractFloat(nodeObjJson, "Value"),
                         Param = ExtractFloat(nodeObjJson, "Param"),
-                        Children = ParseStringArray(nodeObjJson, "Children")?.ToArray()
+                        Children = ParseStringArray(nodeObjJson, "Children")?.ToArray(),
+                        AbilityId = ExtractString(nodeObjJson, "AbilityId")
                     };
                     bt.Nodes[nodeId] = nodeDef;
                     nodePos = nodeObjEnd + 1;
@@ -366,7 +469,7 @@ namespace BattleSystemECS.Config
             player.CurrentLevel = ExtractInt(json, "CurrentLevel");
             player.UpgradeThreshold = ExtractFloat(json, "UpgradeThreshold");
             player.MaxHealth = ExtractFloat(json, "MaxHealth");
-            player.StartingSkills = ExtractStringList(json, "StartingSkills");
+            player.StartingSkills = ParseStringArray(json, "StartingSkills");
 
             return player;
         }
@@ -549,92 +652,6 @@ namespace BattleSystemECS.Config
             }
 
             return items;
-        }
-
-        private static string ExtractString(string json, string key)
-        {
-            string keyPattern = "\"" + key + "\":";
-            int keyIndex = json.IndexOf(keyPattern);
-            if (keyIndex == -1) return null;
-
-            int pos = keyIndex + keyPattern.Length;
-            while (pos < json.Length && char.IsWhiteSpace(json[pos])) pos++;
-
-            if (pos >= json.Length) return null;
-
-            // Check if value is a number (not quoted)
-            if (char.IsDigit(json[pos]) || json[pos] == '-' || json[pos] == '+')
-            {
-                // Extract number
-                int valueEnd = pos;
-                while (valueEnd < json.Length && (char.IsDigit(json[valueEnd]) || json[valueEnd] == '.'))
-                {
-                    valueEnd++;
-                }
-                return json.Substring(pos, valueEnd - pos);
-            }
-
-            // Check if value is quoted string
-            if (json[pos] == '"')
-            {
-                pos++;
-                int endQuote = json.IndexOf("\"", pos);
-                if (endQuote == -1) return null;
-                return json.Substring(pos, endQuote - pos);
-            }
-            else if (json[pos] == '{' || json[pos] == '[')
-            {
-                int braceEnd = FindMatchingBrace(json, pos);
-                if (braceEnd == -1) return null;
-                return json.Substring(pos, braceEnd - pos);
-            }
-
-            return null;
-        }
-
-        private static List<string> ExtractStringList(string json, string key)
-        {
-            var list = new List<string>();
-            int keyIndex = json.IndexOf(key);
-            if (keyIndex == -1) return list;
-
-            int arrayStart = json.IndexOf("[", keyIndex);
-            if (arrayStart == -1) return list;
-
-            int depth = 0;
-            int start = arrayStart + 1;
-            for (int i = arrayStart; i < json.Length; i++)
-            {
-                if (json[i] == '[') depth++;
-                else if (json[i] == ']') { depth--; if (depth == 0) { string arr = json.Substring(start, i - start); var matches = System.Text.RegularExpressions.Regex.Matches(arr, "\"[^\"]*\""); foreach (System.Text.RegularExpressions.Match m in matches) list.Add(m.Value.Trim('\"')); break; } }
-            }
-            return list;
-        }
-
-        private static float ExtractFloat(string json, string key)
-        {
-            string value = ExtractString(json, key);
-            if (string.IsNullOrEmpty(value)) return 0f;
-
-            float result;
-            if (float.TryParse(value, out result))
-            {
-                return result;
-            }
-            return 0f;
-        }
-
-        private static int ExtractInt(string json, string key)
-        {
-            string value = ExtractString(json, key);
-            if (string.IsNullOrEmpty(value)) return 0;
-
-            int result;
-            if (int.TryParse(value, out result))
-            {
-                return result;
-            }
-            return 0;
         }
 
         private static int FindMatchingBrace(string str, int startPos)

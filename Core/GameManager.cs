@@ -26,6 +26,7 @@ namespace BattleSystemECS.Core
         private UpgradeSystem upgradeSystem;
         private SkillSystem skillSystem;
         private EnemyAISystem enemyAISystem;
+        private EnemyAbilitySystem enemyAbilitySystem;
         private TowerPlacementSystem towerPlacementSystem;  // 塔建造系统
         private TowerAttackSystem towerAttackSystem;       // 塔攻击系统
         private TowerUpgradeSystem towerUpgradeSystem;     // 塔升级系统
@@ -129,8 +130,12 @@ namespace BattleSystemECS.Core
             skillSystem.InitializePlayerSkills();  // 初始化技能系统
             logger.Log("[BOOTSTRAP]      Player Skills initialized successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating EnemyAbilitySystem...");
+            enemyAbilitySystem = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
+            logger.Log("[BOOTSTRAP]      EnemyAbilitySystem created successfully!");
+
             logger.Log("[BOOTSTRAP]    - Creating EnemyAISystem...");
-            enemyAISystem = new EnemyAISystem(store, logger, playerId, gameConfig);  // 初始化敌人 AI 系统（行为树驱动）
+            enemyAISystem = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbilitySystem);  // 初始化敌人 AI 系统（行为树驱动）
             logger.Log("[BOOTSTRAP]      EnemyAISystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating GoldSystem...");
@@ -290,6 +295,9 @@ namespace BattleSystemECS.Core
                     // 敌人 AI 评估（行为树）- 在移动之前执行
                     enemyAISystem.SetTurn(turn);
                     enemyAISystem.Update();
+                    // 敌人技能执行（串行，与 attack event 合并）
+                    enemyAbilitySystem.SetTurn(turn);
+                    enemyAbilitySystem.ExecuteAbilities();
 
                     // 移动敌人（SOA）
                     enemyMovementSystem.SetTurn(turn);

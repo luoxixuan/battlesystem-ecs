@@ -30,6 +30,8 @@ namespace BattleSystemECS.Systems
         public float Value;
         public int[] Children;      // indices into BTCachedTree.Nodes
         public EnemyActionType PrecomputedActionEnum; // precomputed at build time; None if not Action
+        // Ability ID for enemy_cast_* action nodes
+        public string AbilityId;
     }
 
     // ============================================================
@@ -120,24 +122,43 @@ namespace BattleSystemECS.Systems
             int turn,
             out EnemyActionType precomputedEnum)
         {
+            return EvaluateWithEnumAndAbility(bt, enemyId, store, playerId, turn, out precomputedEnum, out _);
+        }
+
+        /// <summary>
+        /// Evaluate behavior tree and return action string, enum, and ability ID.
+        /// Used by EnemyAISystem for enemy_cast_* action nodes.
+        /// </summary>
+        public static string EvaluateWithEnumAndAbility(
+            BTCachedTree bt,
+            int enemyId,
+            ComponentStore store,
+            int playerId,
+            int turn,
+            out EnemyActionType precomputedEnum,
+            out string abilityId)
+        {
+            abilityId = null;
             var root = bt?.Root;
             if (root == null)
             {
                 precomputedEnum = EnemyActionType.None;
                 return "";
             }
-            return EvaluateNodeWithEnum(root, bt, enemyId, store, playerId, turn, out precomputedEnum);
+            return EvaluateNodeWithEnumAndAbility(root, bt, enemyId, store, playerId, turn, out precomputedEnum, out abilityId);
         }
 
-        private static string EvaluateNodeWithEnum(
+        private static string EvaluateNodeWithEnumAndAbility(
             BTCachedNode node,
             BTCachedTree bt,
             int enemyId,
             ComponentStore store,
             int playerId,
             int turn,
-            out EnemyActionType precomputedEnum)
+            out EnemyActionType precomputedEnum,
+            out string abilityId)
         {
+            abilityId = null;
             switch (node.Type)
             {
                 case BTNodeType.Sequence:
@@ -156,6 +177,7 @@ namespace BattleSystemECS.Systems
                             if (!string.IsNullOrEmpty(a))
                             {
                                 precomputedEnum = child.PrecomputedActionEnum;
+                                abilityId = child.AbilityId;
                                 return a;
                             }
                         }
@@ -178,12 +200,13 @@ namespace BattleSystemECS.Systems
                             if (!string.IsNullOrEmpty(a))
                             {
                                 precomputedEnum = child.PrecomputedActionEnum;
+                                abilityId = child.AbilityId;
                                 return a;
                             }
                         }
                         else if (child.Type == BTNodeType.Sequence)
                         {
-                            var result = EvaluateNodeWithEnum(child, bt, enemyId, store, playerId, turn, out precomputedEnum);
+                            var result = EvaluateNodeWithEnumAndAbility(child, bt, enemyId, store, playerId, turn, out precomputedEnum, out abilityId);
                             if (!string.IsNullOrEmpty(result)) return result;
                         }
                     }
@@ -192,6 +215,7 @@ namespace BattleSystemECS.Systems
 
                 case BTNodeType.Action:
                     precomputedEnum = node.PrecomputedActionEnum;
+                    abilityId = node.AbilityId;
                     return node.Action ?? "";
 
                 default:
@@ -266,11 +290,16 @@ namespace BattleSystemECS.Systems
             if (string.IsNullOrEmpty(action))
                 return EnemyActionType.None;
 
-            // Extract base action (strip parameter suffix like "(2)")
-            int idx = action.IndexOf('(');
-            string baseAction = idx >= 0 ? action.Substring(0, idx) : action;
+            // Extract base action (strip parameter suffix like "_1")
+            int idx = action.LastIndexOf('_');
+            if (idx > 0 && idx < action.Length - 1)
+            {
+                string suffix = action.Substring(idx + 1);
+                if (float.TryParse(suffix, out _))
+                    action = action.Substring(0, idx);
+            }
 
-            return baseAction switch
+            return action switch
             {
                 "move_to_target" => EnemyActionType.MoveToTarget,
                 "attack_melee"   => EnemyActionType.AttackMelee,
@@ -278,6 +307,9 @@ namespace BattleSystemECS.Systems
                 "charge_attack"  => EnemyActionType.ChargeAttack,
                 "dodge"          => EnemyActionType.Dodge,
                 "retreat"        => EnemyActionType.Retreat,
+                "enemy_cast_self_heal"  => EnemyActionType.SelfHeal,
+                "enemy_cast_aoe"        => EnemyActionType.AoeDamage,
+                "enemy_cast_buff"      => EnemyActionType.BuffAllies,
                 _                => EnemyActionType.None,
             };
         }
@@ -301,17 +333,13 @@ namespace BattleSystemECS.Systems
             {
                 int nodeIdx = indexMap[kvp.Key];
                 var n = kvp.Value;
-            int[] childIndices = (n.Children == null || n.Children.Length == 0)
-                ? Array.Empty<int>()
-                : n.Children
-                    .Select(c => indexMap.TryGetValue(c, out var idx) ? idx : -1)
-                    .ToArray();
-            for (int ci = 0; ci < childIndices.Length; ci++)
-            {
-                if (childIndices[ci] < 0)
-                    Console.WriteLine($"[BT-WARN] Node '{n.Id}' references unknown child ID '{n.Children[ci]}' — dropped from cached tree");
-            }
-            childIndices = childIndices.Where(idx => idx >= 0).ToArray();
+
+                int[] childIndices = (n.Children == null || n.Children.Length == 0)
+                    ? Array.Empty<int>()
+                    : n.Children
+                        .Select(c => indexMap.TryGetValue(c, out var idx) ? idx : -1)
+                        .Where(idx => idx >= 0)
+                        .ToArray();
 
                 cached.Nodes[nodeIdx] = new BTCachedNode
                 {
@@ -322,7 +350,8 @@ namespace BattleSystemECS.Systems
                     Operator = n.Operator ?? "<=",
                     Value = n.Value,
                     Children = childIndices,
-                    PrecomputedActionEnum = n.Type == "Action" ? MapActionToEnum(n.Action) : EnemyActionType.None
+                    PrecomputedActionEnum = n.Type == "Action" ? MapActionToEnum(n.Action ?? "") : EnemyActionType.None,
+                    AbilityId = n.AbilityId
                 };
             }
 

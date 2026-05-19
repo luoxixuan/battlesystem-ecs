@@ -203,5 +203,163 @@
         "Action": "move_to_target"
       }
     }
+  },
+  {
+    "MonsterType": "Tank",
+    "Description": "Slow approach, self-heal at low HP, AOE slam when adjacent",
+    "RootId": "root",
+    "Nodes": {
+      "root": {
+        "Id": "root",
+        "Type": "Selector",
+        "Children": ["seq_self_heal", "seq_aoe", "seq_attack", "act_move"]
+      },
+      "seq_self_heal": {
+        "Id": "seq_self_heal",
+        "Type": "Sequence",
+        "Children": ["cond_lowhp_heal", "act_self_heal"]
+      },
+      "cond_lowhp_heal": {
+        "Id": "cond_lowhp_heal",
+        "Type": "Condition",
+        "Condition": "health_below",
+        "Operator": "<=",
+        "Value": 0.5
+      },
+      "act_self_heal": {
+        "Id": "act_self_heal",
+        "Type": "Action",
+        "Action": "enemy_cast_self_heal",
+        "AbilityId": "tank_self_heal"
+      },
+      "seq_aoe": {
+        "Id": "seq_aoe",
+        "Type": "Sequence",
+        "Children": ["cond_range_aoe", "act_aoe"]
+      },
+      "cond_range_aoe": {
+        "Id": "cond_range_aoe",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 3.0
+      },
+      "act_aoe": {
+        "Id": "act_aoe",
+        "Type": "Action",
+        "Action": "enemy_cast_aoe",
+        "AbilityId": "tank_aoe_slam"
+      },
+      "seq_attack": {
+        "Id": "seq_attack",
+        "Type": "Sequence",
+        "Children": ["cond_range_attack", "act_melee"]
+      },
+      "cond_range_attack": {
+        "Id": "cond_range_attack",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 1.5
+      },
+      "act_melee": {
+        "Id": "act_melee",
+        "Type": "Action",
+        "Action": "attack_melee"
+      },
+      "act_move": {
+        "Id": "act_move",
+        "Type": "Action",
+        "Action": "move_to_target"
+      }
+    }
+  },
+  {
+    "MonsterType": "Boss",
+    "Description": "Charge -> AOE shockwave -> rage buff at low HP",
+    "RootId": "root",
+    "Nodes": {
+      "root": {
+        "Id": "root",
+        "Type": "Selector",
+        "Children": ["seq_rage", "seq_charge", "seq_aoe", "seq_attack", "act_move"]
+      },
+      "seq_rage": {
+        "Id": "seq_rage",
+        "Type": "Sequence",
+        "Children": ["cond_lowhp_rage", "act_rage"]
+      },
+      "cond_lowhp_rage": {
+        "Id": "cond_lowhp_rage",
+        "Type": "Condition",
+        "Condition": "health_below",
+        "Operator": "<=",
+        "Value": 0.3
+      },
+      "act_rage": {
+        "Id": "act_rage",
+        "Type": "Action",
+        "Action": "enemy_cast_buff",
+        "AbilityId": "boss_rage_buff"
+      },
+      "seq_charge": {
+        "Id": "seq_charge",
+        "Type": "Sequence",
+        "Children": ["cond_range_charge", "act_charge"]
+      },
+      "cond_range_charge": {
+        "Id": "cond_range_charge",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 4.0
+      },
+      "act_charge": {
+        "Id": "act_charge",
+        "Type": "Action",
+        "Action": "charge_attack",
+        "Param": 2.0
+      },
+      "seq_aoe": {
+        "Id": "seq_aoe",
+        "Type": "Sequence",
+        "Children": ["cond_in_range", "act_screen_aoe"]
+      },
+      "cond_in_range": {
+        "Id": "cond_in_range",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 6.0
+      },
+      "act_screen_aoe": {
+        "Id": "act_screen_aoe",
+        "Type": "Action",
+        "Action": "enemy_cast_aoe",
+        "AbilityId": "boss_screen_aoe"
+      },
+      "seq_attack": {
+        "Id": "seq_attack",
+        "Type": "Sequence",
+        "Children": ["cond_range_attack", "act_melee"]
+      },
+      "cond_range_attack": {
+        "Id": "cond_range_attack",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 1.5
+      },
+      "act_melee": {
+        "Id": "act_melee",
+        "Type": "Action",
+        "Action": "attack_melee"
+      },
+      "act_move": {
+        "Id": "act_move",
+        "Type": "Action",
+        "Action": "move_to_target"
+      }
+    }
   }
 ]

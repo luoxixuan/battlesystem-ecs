@@ -237,7 +237,8 @@ namespace BattleSystemECS.Tests
             }
 
             // Simulate 10 frames - this exercises EnemyAISystem, EnemyMovementSystem, etc.
-            var enemyAISystem = new EnemyAISystem(store, _renderer, playerId, config);
+            var enemyAbilitySystem = new EnemyAbilitySystem(store, _renderer, playerId, config);
+            var enemyAISystem = new EnemyAISystem(store, _renderer, playerId, config, enemyAbilitySystem);
             var enemyMovement = new EnemyMovementSystem(store, playerId);
             var waveSpawning = new WaveSpawningSystem(store, _renderer, config);
             var goldSystem = new GoldSystem(store, _renderer);
@@ -453,7 +454,8 @@ namespace BattleSystemECS.Tests
             }
 
             // Initialize all systems
-            var enemyAI       = new EnemyAISystem(store, _renderer, playerId, config);
+            var enemyAbility = new EnemyAbilitySystem(store, _renderer, playerId, config);
+            var enemyAI       = new EnemyAISystem(store, _renderer, playerId, config, enemyAbility);
             var enemyMovement = new EnemyMovementSystem(store, playerId);
             var playerAttack  = new PlayerTowerAttackSystem(store, _renderer, playerId, config);
             var towerAttack   = new TowerAttackSystem(store, _renderer);

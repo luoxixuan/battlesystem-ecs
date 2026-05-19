@@ -60,9 +60,10 @@ namespace BattleSystemECS.Systems
             }
             Console.WriteLine($"[BENCHMARK] Spawned {scenario} enemies");
 
-            // 12 active game systems (BuffSystem now included for real DoT path)
-var waveSpawning   = new WaveSpawningSystem(store, logger, gameConfig);
-            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig);
+            // 13 active game systems (EnemyAbilitySystem included)
+            var waveSpawning   = new WaveSpawningSystem(store, logger, gameConfig);
+            var enemyAbility   = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
+            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbility);
             var enemyMovement = new EnemyMovementSystem(store, playerId);
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
             var towerAttack  = new TowerAttackSystem(store, logger, null);
@@ -359,8 +360,8 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             store.AddTower(t2, "魔法塔", 25f, 5, 1f, 1, 100f);
             store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
 
-var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
-            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig);
+            var enemyAbility = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
+            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbility);
             var enemyMovement = new EnemyMovementSystem(store, playerId);
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
             var towerAttack   = new TowerAttackSystem(store, logger, null);
@@ -369,6 +370,9 @@ var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
             var skill         = new SkillSystem(store, logger, playerId, gameConfig);
             var buffSystem    = new BuffSystem(store, playerId);
             skill.InjectDotSystem(buffSystem);
+            var map           = new MapSystem(logger, store);
+            map.SetMapSize(10, 20);
+            var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
 
             long tWaveSpawn = 0, tEnemyAI = 0, tMoveAttack = 0;
             long tPlayerAttack = 0, tTowerAttack = 0, tGold = 0, tUpgrade = 0, tSkill = 0;

@@ -1,0 +1,54 @@
+[
+  {
+    "Id": "self_heal_1",
+    "Name": "Self Heal",
+    "Description": "Enemy heals 30% of max HP",
+    "AbilityType": "self_heal",
+    "BuffStat": "",
+    "Cooldown": 5,
+    "CooldownRemaining": 0,
+    "AoeRadius": 0,
+    "DamageMultiplier": 1,
+    "HealAmount": 0.3,
+    "BuffDuration": 0
+  },
+  {
+    "Id": "aoe_damage_1",
+    "Name": "AOE Burst",
+    "Description": "Deals 50% of attack damage to player in 3-cell radius",
+    "AbilityType": "aoe_damage",
+    "BuffStat": "",
+    "Cooldown": 8,
+    "CooldownRemaining": 0,
+    "AoeRadius": 3,
+    "DamageMultiplier": 0.5,
+    "HealAmount": 0,
+    "BuffDuration": 0
+  },
+  {
+    "Id": "buff_allies_1",
+    "Name": "War Cry",
+    "Description": "30% damage boost to allies within 5 cells for 3 turns",
+    "AbilityType": "buff_allies",
+    "BuffStat": "damage_boost",
+    "Cooldown": 10,
+    "CooldownRemaining": 0,
+    "AoeRadius": 5,
+    "DamageMultiplier": 0,
+    "HealAmount": 0,
+    "BuffDuration": 3
+  },
+  {
+    "Id": "self_heal_2",
+    "Name": "Regeneration",
+    "Description": "Enemy heals 50% of max HP",
+    "AbilityType": "self_heal",
+    "BuffStat": "",
+    "Cooldown": 3,
+    "CooldownRemaining": 0,
+    "AoeRadius": 0,
+    "DamageMultiplier": 1,
+    "HealAmount": 0.5,
+    "BuffDuration": 0
+  }
+]
