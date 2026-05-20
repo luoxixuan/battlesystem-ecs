@@ -79,6 +79,7 @@ namespace BattleSystemECS.Systems
                 store.AddTower(towerId, type, damage, range, speed, 1, cost);
             }
 
+            logger.Log($"[TOWER] {type} placed at ({x},{y})");
             logger.Log($"[TOWER] Tower placed: {type} at ({x},{y}), damage: {damage}, range: {range}, ID: {towerId}");
             return towerId;
         }

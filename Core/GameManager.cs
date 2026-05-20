@@ -194,6 +194,7 @@ namespace BattleSystemECS.Core
             store.SetPlayerMaxHealth(id, maxHealth);
             store.SetPlayerCurrentHealth(id, maxHealth);
             store.SetPlayerUpgradeThreshold(id, upgradeThreshold);
+            store.SetPlayerGold(id, 200f); // 初始金币，允许第一波前建造 1-2 个初始塔
 
             playerId = id;
 
