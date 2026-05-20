@@ -23,11 +23,13 @@ namespace BattleSystemECS.Systems
 
         private readonly GameConfig gameConfig;
         private readonly EnemyAbilitySystem enemyAbilitySystem;
+        private readonly TechTreeSystem techTreeSystem;
 
         private int currentTurn;
         // Per-turn cached fields for cache locality
         private List<int> _activeEnemyList;
         private float _playerX, _playerY;
+        private bool _playerHasKnockbackImmunity;
 
         // Attack event batch — ping-pong double-buffer to eliminate per-frame GC allocation.
         // Collected in parallel phase, executed in serial phase.
@@ -42,13 +44,14 @@ namespace BattleSystemECS.Systems
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
         private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
 
-        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem)
+        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem, TechTreeSystem techTreeSystem)
         {
             this.store = store;
             this.logger = logger;
             this.playerId = playerId;
             this.gameConfig = gameConfig;
             this.enemyAbilitySystem = enemyAbilitySystem;
+            this.techTreeSystem = techTreeSystem;
             _attackEvents[0] = new ConcurrentBag<AttackEvent>();
             _attackEvents[1] = new ConcurrentBag<AttackEvent>();
         }
@@ -63,6 +66,7 @@ namespace BattleSystemECS.Systems
             _playerY = store.PositionY[playerId];
             _activeEnemyList = store.GetCachedActiveEnemyIds();
             _cachedPlayerHealth = store.PlayerCurrentHealth[playerId];
+            _playerHasKnockbackImmunity = techTreeSystem.GetKnockbackImmunity();
         }
 
         /// <summary>
@@ -189,6 +193,8 @@ namespace BattleSystemECS.Systems
                 var actionEnum = store.GetEnemyActionEnum(enemyId);
                 if (actionEnum == EnemyActionType.Dodge)
                 {
+                    // Skip lateral dodge movement if player has knockback immunity
+                    if (_playerHasKnockbackImmunity) continue;
                     string cachedAction = _lastActionStringCache[enemyId] ?? "dodge";
                     int dodgeDir = ParseDodgeDirection(cachedAction);
                     store.EnemyChargeParam[enemyId] = dodgeDir;

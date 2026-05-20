@@ -41,6 +41,7 @@ namespace BattleSystemECS.Systems
         private const float LOW_HP_REGEN_THRESHOLD = 0.30f;
         private bool _hasRespawn = false;
         private float _respawnHpPct = 0f;
+        private bool _hasKnockbackImmunity = false;
 
         public TechTreeSystem(ComponentStore store, IRenderer renderer, int playerId, TechTreeConfig config, GameConfig gameConfig = null)
         {
@@ -198,7 +199,7 @@ namespace BattleSystemECS.Systems
                         _lowHpRegenValue = eff.value;
                         break;
                     case "immunity_knockback":
-                        // future: track immunity state
+                        _hasKnockbackImmunity = true;
                         break;
                     case "respawn_once":
                         _hasRespawn = true;
@@ -288,6 +289,11 @@ namespace BattleSystemECS.Systems
             }
             return 0f;
         }
+
+        /// <summary>
+        /// Returns true if the player has immunity to knockback (enemy dodge lateral movement).
+        /// </summary>
+        public bool GetKnockbackImmunity() => _hasKnockbackImmunity;
 
         /// <summary>
         /// Check if player has respawn and consume it. Returns true if respawn was used.

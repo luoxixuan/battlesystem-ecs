@@ -63,7 +63,8 @@ namespace BattleSystemECS.Systems
             // 13 active game systems (EnemyAbilitySystem included)
             var waveSpawning   = new WaveSpawningSystem(store, logger, gameConfig);
             var enemyAbility   = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
-            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbility);
+            var benchTechTree  = new TechTreeSystem(store, logger, playerId, null, gameConfig);
+            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbility, benchTechTree);
             var enemyMovement = new EnemyMovementSystem(store, playerId);
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
             var towerAttack  = new TowerAttackSystem(store, logger, null);
@@ -361,7 +362,8 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
 
             var enemyAbility = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
-            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbility);
+            var benchTechTree = new TechTreeSystem(store, logger, playerId, null, gameConfig);
+            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbility, benchTechTree);
             var enemyMovement = new EnemyMovementSystem(store, playerId);
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
             var towerAttack   = new TowerAttackSystem(store, logger, null);

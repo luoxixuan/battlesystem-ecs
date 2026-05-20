@@ -136,7 +136,7 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]      EnemyAbilitySystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating EnemyAISystem...");
-            enemyAISystem = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbilitySystem);  // 初始化敌人 AI 系统（行为树驱动）
+            enemyAISystem = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbilitySystem, techTreeSystem);  // 初始化敌人 AI 系统（行为树驱动）
             logger.Log("[BOOTSTRAP]      EnemyAISystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating GoldSystem...");
@@ -343,9 +343,18 @@ namespace BattleSystemECS.Core
                     // 检查玩家是否存活
                     if (!store.IsPlayerAlive(playerId))
                     {
-                        logger.Log("[INFO] Player died! Game Over.");
-                        gameRunning = false;
-                        break;
+                        // Try不朽科技复活（消耗一次复活机会）
+                        if (techTreeSystem.TryRespawn())
+                        {
+                            logger.Log("[INFO] 不朽科技触发！玩家复活，继续游戏...");
+                            logger.Log("[HEALTH] Player Health: " + store.GetPlayerCurrentHealth(playerId) + " / " + store.GetPlayerMaxHealth(playerId));
+                        }
+                        else
+                        {
+                            logger.Log("[INFO] Player died! Game Over.");
+                            gameRunning = false;
+                            break;
+                        }
                     }
 
                     // 检查升级（SOA）
@@ -359,6 +368,11 @@ namespace BattleSystemECS.Core
 
                     // 更新 Buff/DoT 系统（减少持续时间，触发周期性伤害）
                     buffSystem.Update(1f);  // 每回合 1 秒
+
+                    // 低血量回血科技（喘息）生效
+                    float healed = techTreeSystem.TickLowHpRegen();
+                    if (healed > 0f)
+                        logger.Log("[TECH] 喘息触发，回复 " + healed.ToString("F1") + " 生命");
 
                     // 自动释放技能（根据冷却时间）
                     // skillSystem.AutoCastSkill();  // 暂时注释掉，避免重复执行
