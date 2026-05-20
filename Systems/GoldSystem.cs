@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 
@@ -53,6 +54,27 @@ namespace BattleSystemECS.Systems
             else
             {
                 store.GoldKillMultiplier = 1.0f;
+            }
+        }
+
+        /// <summary>
+        /// Award gold bonus when a wave completes, applying tech tree wave bonus multiplier.
+        /// </summary>
+        public void AwardGoldForWave(float baseGold, int playerId)
+        {
+            if (playerId < 0 || playerId >= 10) return;
+            float bonus = 0f;
+            if (hasTechTreeSystem)
+            {
+                bonus = Math.Max(0f, techTreeSystem.GetGoldOnWaveBonus());
+            }
+            float totalGold = baseGold + bonus;
+            if (totalGold > 0f)
+            {
+                float currentGold = store.GetPlayerGold(playerId);
+                store.SetPlayerGold(playerId, currentGold + totalGold);
+                store.PlayerWaveCompleteGold[playerId] = totalGold;
+                renderer.Log($"[GOLD] Wave complete: +{totalGold} gold (base {baseGold}, bonus {bonus})");
             }
         }
 

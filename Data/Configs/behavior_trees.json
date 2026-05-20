@@ -275,6 +275,58 @@
     }
   },
   {
+    "MonsterType": "Elite",
+    "Description": "Mid armor + high damage + War Cry buff allies, triggers gold_on_elite_kill",
+    "RootId": "root",
+    "Nodes": {
+      "root": {
+        "Id": "root",
+        "Type": "Selector",
+        "Children": ["seq_warcry", "seq_attack", "act_move"]
+      },
+      "seq_warcry": {
+        "Id": "seq_warcry",
+        "Type": "Sequence",
+        "Children": ["cond_warcry_range", "act_warcry"]
+      },
+      "cond_warcry_range": {
+        "Id": "cond_warcry_range",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 5.0
+      },
+      "act_warcry": {
+        "Id": "act_warcry",
+        "Type": "Action",
+        "Action": "enemy_cast_buff",
+        "AbilityId": "buff_allies_1"
+      },
+      "seq_attack": {
+        "Id": "seq_attack",
+        "Type": "Sequence",
+        "Children": ["cond_range", "act_melee"]
+      },
+      "cond_range": {
+        "Id": "cond_range",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 2.0
+      },
+      "act_melee": {
+        "Id": "act_melee",
+        "Type": "Action",
+        "Action": "attack_melee"
+      },
+      "act_move": {
+        "Id": "act_move",
+        "Type": "Action",
+        "Action": "move_to_target"
+      }
+    }
+  },
+  {
     "MonsterType": "Boss",
     "Description": "Charge -> AOE shockwave -> rage buff at low HP",
     "RootId": "root",

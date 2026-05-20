@@ -53,6 +53,18 @@ namespace BattleSystemECS.Core
         public int[] PlayerResearchPoints = new int[MAX_PLAYERS];
         public HashSet<string>[] PlayerUnlockedTechs = new HashSet<string>[MAX_PLAYERS];
 
+        // ==================== 波次状态组件 ====================
+        // WaveIndex: current wave number (0-indexed), -1 = no wave started
+        public int[] PlayerWaveIndex = new int[MAX_PLAYERS];
+        // EnemiesRemaining: alive enemies in the current wave (updated when enemies die)
+        public int[] PlayerEnemiesRemaining = new int[MAX_PLAYERS];
+        // IsWaveActive: true when a wave is in progress (enemies spawned, not yet cleared)
+        public bool[] PlayerIsWaveActive = new bool[MAX_PLAYERS];
+        // WaveTimer: frames remaining before next wave auto-starts (-1 = waiting for manual start)
+        public float[] PlayerWaveTimer = new float[MAX_PLAYERS];
+        // WaveCompleteGold: gold awarded when wave was completed (for tech tree bonus calculation)
+        public float[] PlayerWaveCompleteGold = new float[MAX_PLAYERS];
+
         // ==================== 敌人组件的 SOA 存储 ====================
         public float[] EnemyHealth = new float[MAX_ENTITIES];
         public float[] EnemyMaxHealth = new float[MAX_ENTITIES];
@@ -228,7 +240,7 @@ namespace BattleSystemECS.Core
             // Initialize ping-pong death queue buffers
             _deathQueue[0] = new ConcurrentBag<(int, int)>();
             _deathQueue[1] = new ConcurrentBag<(int, int)>();
-            // 初始化玩家 buffs
+            // Initialize player buffs
             for (int i = 0; i < MAX_PLAYERS; i++)
             {
                 PlayerBuffs[i] = new List<string>();
@@ -237,6 +249,11 @@ namespace BattleSystemECS.Core
                 PlayerStunDuration[i] = 0;
                 PlayerSlowFactor[i] = 0f;
                 PlayerSlowDuration[i] = 0;
+                PlayerWaveIndex[i] = -1;
+                PlayerEnemiesRemaining[i] = 0;
+                PlayerIsWaveActive[i] = false;
+                PlayerWaveTimer[i] = -1f;
+                PlayerWaveCompleteGold[i] = 0f;
             }
         }
 
