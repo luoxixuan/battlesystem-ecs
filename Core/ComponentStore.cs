@@ -691,7 +691,7 @@ namespace BattleSystemECS.Core
                 PlayerStunDuration[playerId] = turns;
         }
 
-        /// <summary>Applies a slow to the enemy. factor is a multiplier (e.g. 0.5 = 50% speed). Duration in turns tracked by EnemyBuffDurationLeft.</summary>
+        /// <summary>Applies a slow to the enemy. factor is a multiplier (e.g. 0.5 = 50% speed). Duration in turns tracked by EnemySlowDurationLeft.</summary>
         public void ApplySlow(int enemyId, float factor, int duration)
         {
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
@@ -702,7 +702,7 @@ namespace BattleSystemECS.Core
 
             EnemySlowFactor[enemyId] = factor;
             EnemyMoveSpeed[enemyId] = baseSpeed * factor;
-            EnemyBuffDurationLeft[enemyId] = duration;
+            EnemySlowDurationLeft[enemyId] = duration;
         }
 
         /// <summary>Applies slow to the player. factor is a speed multiplier (0.5 = 50% speed).</summary>
@@ -761,7 +761,7 @@ namespace BattleSystemECS.Core
             EnemyStunFlag[enemyId] = true;
         }
 
-        /// <summary>Applies slow to the enemy. factor is a speed multiplier (e.g. 0.5 = 50% speed). Duration in turns.</summary>
+        /// <summary>Applies slow to the enemy. factor is a speed multiplier (e.g. 0.5 = 50% speed). Duration in turns tracked by EnemySlowDurationLeft.</summary>
         public void ApplyEnemySlow(int enemyId, float factor, int duration)
         {
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
@@ -773,7 +773,7 @@ namespace BattleSystemECS.Core
                 float baseSpeed = EnemyMoveSpeedBase[enemyId];
                 if (baseSpeed <= 0f) baseSpeed = EnemyMoveSpeed[enemyId];
                 EnemyMoveSpeed[enemyId] = baseSpeed * factor;
-                EnemyBuffDurationLeft[enemyId] = duration;
+                EnemySlowDurationLeft[enemyId] = duration;
             }
             else if (EnemySlowFactor[enemyId] <= 0f)
             {
@@ -781,7 +781,7 @@ namespace BattleSystemECS.Core
                 float baseSpeed = EnemyMoveSpeedBase[enemyId];
                 if (baseSpeed <= 0f) baseSpeed = EnemyMoveSpeed[enemyId];
                 EnemyMoveSpeed[enemyId] = baseSpeed * factor;
-                EnemyBuffDurationLeft[enemyId] = duration;
+                EnemySlowDurationLeft[enemyId] = duration;
             }
         }
 
