@@ -93,8 +93,11 @@ namespace BattleSystemECS.Core
         public float[] EnemyArmor = new float[MAX_ENTITIES];
         // ==================== 敌人 CC (Crowd Control) 字段 ====================
         // Grouped together after all enemy hot-path fields to preserve cache locality
-        // EnemyStunFlag: true = stunned, skip movement this frame
+        // EnemyStunFlag: legacy bool, kept for backward compat; use EnemyStunDurationLeft for correctness
         public bool[] EnemyStunFlag = new bool[MAX_ENTITIES];
+        // EnemyStunDurationLeft: stun duration in turns. Decremented by EnemyMovementSystem.Update().
+        // When > 0, IsEnemyStunned() returns true regardless of EnemyStunFlag.
+        public float[] EnemyStunDurationLeft = new float[MAX_ENTITIES];
         // EnemySlowFactor: speed multiplier (0.5 = 50% speed), 0 = no slow
         public float[] EnemySlowFactor = new float[MAX_ENTITIES];
         // EnemyMoveSpeedBase: stores original speed for slow recovery
@@ -335,6 +338,7 @@ namespace BattleSystemECS.Core
                 EnemyAILastAttackTurn[entityId] = 0;
                 EnemyArmor[entityId] = 0f;
                 EnemyStunFlag[entityId] = false;
+                EnemyStunDurationLeft[entityId] = 0f;
                 EnemySlowFactor[entityId] = 0f;
                 EnemyMoveSpeedBase[entityId] = 0f;
                 EnemySlowDurationLeft[entityId] = 0f;
@@ -658,6 +662,9 @@ namespace BattleSystemECS.Core
         public bool IsEnemyStunned(int enemyId)
         {
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return false;
+            // Primary check: duration-based stun (set by ApplyEnemyStun, decremented by EnemyMovementSystem.Update)
+            if (EnemyStunDurationLeft[enemyId] > 0f) return true;
+            // Fallback: legacy flag (set by external systems, cleared by EnemyMovementSystem.SetTurn)
             return EnemyStunFlag[enemyId];
         }
 
@@ -753,11 +760,14 @@ namespace BattleSystemECS.Core
             EnemySlowFactor[enemyId] = 0f;
         }
 
-        /// <summary>Applies stun to the enemy for 1 frame. Stun clears automatically at start of each frame.</summary>
+        /// <summary>Applies stun to the enemy for `duration` turns. Stored in EnemyStunDurationLeft (not EnemyStunFlag) so it persists across frames.</summary>
         public void ApplyEnemyStun(int enemyId, int duration)
         {
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
-            // Stun duration is tracked in frames; 1 frame stun means skip this movement frame
+            // Use duration-based stun so it survives the EnemyMovementSystem.SetTurn() clear
+            if (duration > EnemyStunDurationLeft[enemyId])
+                EnemyStunDurationLeft[enemyId] = duration;
+            // Also set legacy flag for backward compat with IsEnemyStunned fallback
             EnemyStunFlag[enemyId] = true;
         }
 

@@ -331,10 +331,13 @@ namespace BattleSystemECS.Core
 // [测试] 塔攻击逻辑
                     towerAttackSystem.Update(1.0f);
 
+                    // Buff/DoT 系统更新（减少持续时间，触发周期性伤害）— 在帧末结算前执行，使 DoT 伤害本帧生效
+                    buffSystem.Update(1f);
+
                     // 技能系统串行段伤害结算（两阶段：并行收集 → 串行 apply）
                     skillSystem.ResolveSkillDamage();
 
-                    // DoT/Buff 系统伤害结算（两阶段：收集 → 串行 apply）
+                    // DoT/Buff 系统伤害结算（两阶段：收集 → 串行 apply）— 在帧末死亡结算前执行，确保 DoT 伤害与攻击伤害同一帧结算
                     buffSystem.ResolveDotDamage();
 
                     // 统一帧末死亡结算（所有攻击系统已完成伤害/死亡入队）
@@ -365,9 +368,6 @@ namespace BattleSystemECS.Core
 
                     // 更新技能系统冷却
                     skillSystem.Update(1f);  // 每回合 1 秒
-
-                    // 更新 Buff/DoT 系统（减少持续时间，触发周期性伤害）
-                    buffSystem.Update(1f);  // 每回合 1 秒
 
                     // 低血量回血科技（喘息）生效
                     float healed = techTreeSystem.TickLowHpRegen();

@@ -34,9 +34,11 @@ namespace BattleSystemECS.Systems
         {
             _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
             _playerX = store.PositionX[playerId];
-            // Clear stun flags for all active enemies at the start of each turn
-            for (int i = 0; i < _activeEnemyList.Count; i++)
-                store.EnemyStunFlag[_activeEnemyList[i]] = false;
+            // NOTE: Do NOT clear EnemyStunFlag here.
+            // Stun is now managed by EnemyStunDurationLeft (duration-based),
+            // decremented in Update(). Clearing flags here broke tower stun
+            // because TowerAttackSystem.ApplyEnemyStun() runs after SetTurn()
+            // in the same frame.
         }
 
         public void Update()
@@ -55,6 +57,18 @@ namespace BattleSystemECS.Systems
                 int enemyId = activeEnemyIds[i];
                 if (!store.EnemyActive[enemyId])
                     return;
+
+                // Decrement stun duration (duration-based stun, survives SetTurn clear)
+                float stunDur = store.EnemyStunDurationLeft[enemyId];
+                if (stunDur > 0f)
+                {
+                    store.EnemyStunDurationLeft[enemyId] = stunDur - 1f;
+                    if (store.EnemyStunDurationLeft[enemyId] <= 0f)
+                    {
+                        store.EnemyStunDurationLeft[enemyId] = 0f;
+                        store.EnemyStunFlag[enemyId] = false;
+                    }
+                }
 
                 // Decrement slow duration and restore base speed when expired (tower-slow tracking)
                 float dur = store.EnemySlowDurationLeft[enemyId];
