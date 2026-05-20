@@ -157,7 +157,8 @@ namespace BattleSystemECS.Systems
                         monsterConfig.Damage,
                         monsterConfig.GoldReward,
                         currentWave,
-                        enemyName
+                        enemyName,
+                        monsterConfig.Armor
                     );
                     if (enemyId < 0)
                     {

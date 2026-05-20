@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":0.5,"AttackInterval":1.7,"Type":"Normal","AttackRange":3,"MaxHealth":60,"Damage":2,"Name":"Chrome Normal #51","Health":60,"GoldReward":55,"Skills":["Normal Attack"]}
+{"MoveSpeed":0.5,"AttackInterval":1.7,"Type":"Normal","AttackRange":3,"MaxHealth":60,"Damage":2,"Name":"Chrome Normal #51","Health":60,"GoldReward":55,"Skills":["Normal Attack"],"Armor":0}

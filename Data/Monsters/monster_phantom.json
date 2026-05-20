@@ -1,12 +1,1 @@
-{
-  "Name": "Phantom Slicer",
-  "Type": "Assassin",
-  "Health": 28,
-  "MaxHealth": 28,
-  "Damage": 15,
-  "MoveSpeed": 2,
-  "AttackRange": 1,
-  "AttackInterval": 1,
-  "GoldReward": 28,
-  "Skills": ["Normal Attack", "Vital Strike"]
-}
+{"Name":"Phantom Slicer","Type":"Assassin","Health":28,"MaxHealth":28,"Damage":15,"MoveSpeed":2,"AttackRange":1,"AttackInterval":1,"GoldReward":28,"Skills":["Normal Attack","Vital Strike"],"Armor":2}

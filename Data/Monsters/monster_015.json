@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":1.7,"AttackInterval":0.5,"Type":"Summoner","AttackRange":3,"MaxHealth":24,"Damage":15,"Name":"Flux Summoner #15","Health":24,"GoldReward":19,"Skills":["Normal Attack"]}
+{"MoveSpeed":1.7,"AttackInterval":0.5,"Type":"Summoner","AttackRange":3,"MaxHealth":24,"Damage":15,"Name":"Flux Summoner #15","Health":24,"GoldReward":19,"Skills":["Normal Attack"],"Armor":3}

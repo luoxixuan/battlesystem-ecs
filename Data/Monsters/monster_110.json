@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":1.6,"AttackInterval":1.5,"Type":"Assassin","AttackRange":2,"MaxHealth":119,"Damage":12,"Name":"Fire Assassin #110","Health":119,"GoldReward":114,"Skills":["Normal Attack"]}
+{"MoveSpeed":1.6,"AttackInterval":1.5,"Type":"Assassin","AttackRange":2,"MaxHealth":119,"Damage":12,"Name":"Fire Assassin #110","Health":119,"GoldReward":114,"Skills":["Normal Attack"],"Armor":2}

@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":2.1,"AttackInterval":1.3,"Type":"Boss","AttackRange":3,"MaxHealth":28,"Damage":19,"Name":"Alpha Boss #19","Health":28,"GoldReward":23,"Skills":["Normal Attack"]}
+{"MoveSpeed":2.1,"AttackInterval":1.3,"Type":"Boss","AttackRange":3,"MaxHealth":28,"Damage":19,"Name":"Alpha Boss #19","Health":28,"GoldReward":23,"Skills":["Normal Attack"],"Armor":15}

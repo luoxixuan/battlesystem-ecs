@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":0.3,"AttackInterval":2.5,"Type":"Rogue","AttackRange":1,"MaxHealth":154,"Damage":47,"Name":"Beta Rogue #145","Health":154,"GoldReward":149,"Skills":["Normal Attack"]}
+{"MoveSpeed":0.3,"AttackInterval":2.5,"Type":"Rogue","AttackRange":1,"MaxHealth":154,"Damage":47,"Name":"Beta Rogue #145","Health":154,"GoldReward":149,"Skills":["Normal Attack"],"Armor":3}

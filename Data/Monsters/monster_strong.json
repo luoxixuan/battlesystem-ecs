@@ -1,12 +1,1 @@
-{
-  "Name": "Strong Slime",
-  "Type": "Strong",
-  "Health": 30,
-  "MaxHealth": 30,
-  "Damage": 8,
-  "MoveSpeed": 0.5,
-  "AttackRange": 2,
-  "AttackInterval": 2,
-  "GoldReward": 20,
-  "Skills": ["Normal Attack", "Heavy Strike"]
-}
+{"Name":"Strong Slime","Type":"Strong","Health":30,"MaxHealth":30,"Damage":8,"MoveSpeed":0.5,"AttackRange":2,"AttackInterval":2,"GoldReward":20,"Skills":["Normal Attack","Heavy Strike"],"Armor":5}

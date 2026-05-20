@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":2,"AttackInterval":1.1,"Type":"Debuff","AttackRange":2,"MaxHealth":27,"Damage":18,"Name":"Omega Debuff #18","Health":27,"GoldReward":22,"Skills":["Normal Attack"]}
+{"MoveSpeed":2,"AttackInterval":1.1,"Type":"Debuff","AttackRange":2,"MaxHealth":27,"Damage":18,"Name":"Omega Debuff #18","Health":27,"GoldReward":22,"Skills":["Normal Attack"],"Armor":2}

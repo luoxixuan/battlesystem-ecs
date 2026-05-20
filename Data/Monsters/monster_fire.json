@@ -1,12 +1,1 @@
-{
-  "Name": "Fire Elemental",
-  "Type": "Fire",
-  "Health": 55,
-  "MaxHealth": 55,
-  "Damage": 14,
-  "MoveSpeed": 1,
-  "AttackRange": 2,
-  "AttackInterval": 1.5,
-  "GoldReward": 32,
-  "Skills": ["Normal Attack", "Flame Burst"]
-}
+{"Name":"Fire Elemental","Type":"Fire","Health":55,"MaxHealth":55,"Damage":14,"MoveSpeed":1,"AttackRange":2,"AttackInterval":1.5,"GoldReward":32,"Skills":["Normal Attack","Flame Burst"],"Armor":2}

@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":1.5,"AttackInterval":3.1,"Type":"Virus","AttackRange":1,"MaxHealth":22,"Damage":13,"Name":"Quantum Virus #13","Health":22,"GoldReward":17,"Skills":["Normal Attack"]}
+{"MoveSpeed":1.5,"AttackInterval":3.1,"Type":"Virus","AttackRange":1,"MaxHealth":22,"Damage":13,"Name":"Quantum Virus #13","Health":22,"GoldReward":17,"Skills":["Normal Attack"],"Armor":3}

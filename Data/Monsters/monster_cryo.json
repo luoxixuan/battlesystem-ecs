@@ -1,12 +1,1 @@
-{
-  "Name": "Cryo Warden",
-  "Type": "Cryo",
-  "Health": 70,
-  "MaxHealth": 70,
-  "Damage": 9,
-  "MoveSpeed": 0.9,
-  "AttackRange": 1,
-  "AttackInterval": 1.8,
-  "GoldReward": 28,
-  "Skills": ["Normal Attack", "Freeze Aura"]
-}
+{"Name":"Cryo Warden","Type":"Cryo","Health":70,"MaxHealth":70,"Damage":9,"MoveSpeed":0.9,"AttackRange":1,"AttackInterval":1.8,"GoldReward":28,"Skills":["Normal Attack","Freeze Aura"],"Armor":2}

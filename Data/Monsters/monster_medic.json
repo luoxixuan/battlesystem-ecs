@@ -1,12 +1,1 @@
-{
-  "Name": "Medic Drone",
-  "Type": "Healer",
-  "Health": 40,
-  "MaxHealth": 40,
-  "Damage": 3,
-  "MoveSpeed": 0.8,
-  "AttackRange": 4,
-  "AttackInterval": 3,
-  "GoldReward": 20,
-  "Skills": ["Normal Attack", "Repair Wave"]
-}
+{"Name":"Medic Drone","Type":"Healer","Health":40,"MaxHealth":40,"Damage":3,"MoveSpeed":0.8,"AttackRange":4,"AttackInterval":3,"GoldReward":20,"Skills":["Normal Attack","Repair Wave"],"Armor":2}

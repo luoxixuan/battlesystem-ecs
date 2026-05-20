@@ -1,12 +1,1 @@
-{
-  "Name": "Shock Drone",
-  "Type": "Electric",
-  "Health": 25,
-  "MaxHealth": 25,
-  "Damage": 8,
-  "MoveSpeed": 1.8,
-  "AttackRange": 1,
-  "AttackInterval": 1.2,
-  "GoldReward": 18,
-  "Skills": ["Normal Attack", "Chain Lightning"]
-}
+{"Name":"Shock Drone","Type":"Electric","Health":25,"MaxHealth":25,"Damage":8,"MoveSpeed":1.8,"AttackRange":1,"AttackInterval":1.2,"GoldReward":18,"Skills":["Normal Attack","Chain Lightning"],"Armor":1}

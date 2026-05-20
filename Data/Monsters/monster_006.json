@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":0.8,"AttackInterval":1.7,"Type":"Stealth","AttackRange":2,"MaxHealth":15,"Damage":6,"Name":"Plasma Stealth #6","Health":15,"GoldReward":10,"Skills":["Normal Attack"]}
+{"MoveSpeed":0.8,"AttackInterval":1.7,"Type":"Stealth","AttackRange":2,"MaxHealth":15,"Damage":6,"Name":"Plasma Stealth #6","Health":15,"GoldReward":10,"Skills":["Normal Attack"],"Armor":1}

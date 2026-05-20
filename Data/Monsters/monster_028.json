@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":3,"AttackInterval":3.1,"Type":"Strong","AttackRange":4,"MaxHealth":37,"Damage":28,"Name":"Cyber Strong #28","Health":37,"GoldReward":32,"Skills":["Normal Attack"]}
+{"MoveSpeed":3,"AttackInterval":3.1,"Type":"Strong","AttackRange":4,"MaxHealth":37,"Damage":28,"Name":"Cyber Strong #28","Health":37,"GoldReward":32,"Skills":["Normal Attack"],"Armor":5}

@@ -29,6 +29,9 @@ namespace BattleSystemECS.Config
         public float AttackInterval { get; set; }
         public int GoldReward { get; set; }
         public List<string> Skills { get; set; } = new List<string>();
+        // Armor: reduces incoming damage. Tank/Elite/Boss types get high armor (5-15),
+        // Normal/Fast types get low armor (0-2). Affected by attacker's armor penetration.
+        public float Armor { get; set; } = 0f;
     }
 
     public class TowerConfig

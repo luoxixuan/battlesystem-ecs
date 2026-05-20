@@ -1,12 +1,1 @@
-{
-  "Name": "Heavy Exo",
-  "Type": "Exo",
-  "Health": 150,
-  "MaxHealth": 150,
-  "Damage": 15,
-  "MoveSpeed": 0.5,
-  "AttackRange": 1,
-  "AttackInterval": 2,
-  "GoldReward": 45,
-  "Skills": ["Normal Attack", "Seismic Slam"]
-}
+{"Name":"Heavy Exo","Type":"Exo","Health":150,"MaxHealth":150,"Damage":15,"MoveSpeed":0.5,"AttackRange":1,"AttackInterval":2,"GoldReward":45,"Skills":["Normal Attack","Seismic Slam"],"Armor":6}

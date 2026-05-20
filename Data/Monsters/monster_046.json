@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":4.8,"AttackInterval":0.7,"Type":"Phantom","AttackRange":2,"MaxHealth":55,"Damage":46,"Name":"Delta Phantom #46","Health":55,"GoldReward":50,"Skills":["Normal Attack"]}
+{"MoveSpeed":4.8,"AttackInterval":0.7,"Type":"Phantom","AttackRange":2,"MaxHealth":55,"Damage":46,"Name":"Delta Phantom #46","Health":55,"GoldReward":50,"Skills":["Normal Attack"],"Armor":4}

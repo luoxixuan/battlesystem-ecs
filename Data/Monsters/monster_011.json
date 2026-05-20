@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":1.3,"AttackInterval":2.7,"Type":"Heavy","AttackRange":3,"MaxHealth":20,"Damage":11,"Name":"Cryo Heavy #11","Health":20,"GoldReward":15,"Skills":["Normal Attack"]}
+{"MoveSpeed":1.3,"AttackInterval":2.7,"Type":"Heavy","AttackRange":3,"MaxHealth":20,"Damage":11,"Name":"Cryo Heavy #11","Health":20,"GoldReward":15,"Skills":["Normal Attack"],"Armor":8}

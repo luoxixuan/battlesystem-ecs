@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":3.4,"AttackInterval":0.9,"Type":"Healer","AttackRange":4,"MaxHealth":41,"Damage":32,"Name":"Shock Healer #32","Health":41,"GoldReward":36,"Skills":["Normal Attack"]}
+{"MoveSpeed":3.4,"AttackInterval":0.9,"Type":"Healer","AttackRange":4,"MaxHealth":41,"Damage":32,"Name":"Shock Healer #32","Health":41,"GoldReward":36,"Skills":["Normal Attack"],"Armor":2}

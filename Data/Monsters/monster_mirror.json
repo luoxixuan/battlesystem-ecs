@@ -1,12 +1,1 @@
-{
-  "Name": "Mirror Bot",
-  "Type": "Clone",
-  "Health": 30,
-  "MaxHealth": 30,
-  "Damage": 7,
-  "MoveSpeed": 1.2,
-  "AttackRange": 1,
-  "AttackInterval": 1.3,
-  "GoldReward": 22,
-  "Skills": ["Normal Attack", "Clone Image"]
-}
+{"Name":"Mirror Bot","Type":"Clone","Health":30,"MaxHealth":30,"Damage":7,"MoveSpeed":1.2,"AttackRange":1,"AttackInterval":1.3,"GoldReward":22,"Skills":["Normal Attack","Clone Image"],"Armor":2}

@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":1.3,"AttackInterval":0.9,"Type":"Healer","AttackRange":3,"MaxHealth":116,"Damage":9,"Name":"Shock Healer #107","Health":116,"GoldReward":111,"Skills":["Normal Attack"]}
+{"MoveSpeed":1.3,"AttackInterval":0.9,"Type":"Healer","AttackRange":3,"MaxHealth":116,"Damage":9,"Name":"Shock Healer #107","Health":116,"GoldReward":111,"Skills":["Normal Attack"],"Armor":2}

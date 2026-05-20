@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":2.8,"AttackInterval":3.3,"Type":"Drone","AttackRange":2,"MaxHealth":83,"Damage":25,"Name":"Doom Drone #74","Health":83,"GoldReward":78,"Skills":["Normal Attack"]}
+{"MoveSpeed":2.8,"AttackInterval":3.3,"Type":"Drone","AttackRange":2,"MaxHealth":83,"Damage":25,"Name":"Doom Drone #74","Health":83,"GoldReward":78,"Skills":["Normal Attack"],"Armor":4}

@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":3.9,"AttackInterval":1.9,"Type":"Support","AttackRange":1,"MaxHealth":46,"Damage":37,"Name":"Dark Support #37","Health":46,"GoldReward":41,"Skills":["Normal Attack"]}
+{"MoveSpeed":3.9,"AttackInterval":1.9,"Type":"Support","AttackRange":1,"MaxHealth":46,"Damage":37,"Name":"Dark Support #37","Health":46,"GoldReward":41,"Skills":["Normal Attack"],"Armor":4}

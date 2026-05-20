@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":1.1,"AttackInterval":0.5,"Type":"Electric","AttackRange":1,"MaxHealth":114,"Damage":7,"Name":"Nano Electric #105","Health":114,"GoldReward":109,"Skills":["Normal Attack"]}
+{"MoveSpeed":1.1,"AttackInterval":0.5,"Type":"Electric","AttackRange":1,"MaxHealth":114,"Damage":7,"Name":"Nano Electric #105","Health":114,"GoldReward":109,"Skills":["Normal Attack"],"Armor":1}

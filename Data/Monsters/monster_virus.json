@@ -1,12 +1,1 @@
-{
-  "Name": "Speed Virus",
-  "Type": "Virus",
-  "Health": 18,
-  "MaxHealth": 18,
-  "Damage": 6,
-  "MoveSpeed": 3,
-  "AttackRange": 1,
-  "AttackInterval": 0.8,
-  "GoldReward": 16,
-  "Skills": ["Normal Attack", "Haste"]
-}
+{"Name":"Speed Virus","Type":"Virus","Health":18,"MaxHealth":18,"Damage":6,"MoveSpeed":3,"AttackRange":1,"AttackInterval":0.8,"GoldReward":16,"Skills":["Normal Attack","Haste"],"Armor":3}

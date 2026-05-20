@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":2.7,"AttackInterval":3.1,"Type":"Mech","AttackRange":1,"MaxHealth":82,"Damage":24,"Name":"Titan Mech #73","Health":82,"GoldReward":77,"Skills":["Normal Attack"]}
+{"MoveSpeed":2.7,"AttackInterval":3.1,"Type":"Mech","AttackRange":1,"MaxHealth":82,"Damage":24,"Name":"Titan Mech #73","Health":82,"GoldReward":77,"Skills":["Normal Attack"],"Armor":6}

@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":1.1,"AttackInterval":2.3,"Type":"Clone","AttackRange":1,"MaxHealth":18,"Damage":9,"Name":"Mirror Clone #9","Health":18,"GoldReward":13,"Skills":["Normal Attack"]}
+{"MoveSpeed":1.1,"AttackInterval":2.3,"Type":"Clone","AttackRange":1,"MaxHealth":18,"Damage":9,"Name":"Mirror Clone #9","Health":18,"GoldReward":13,"Skills":["Normal Attack"],"Armor":2}

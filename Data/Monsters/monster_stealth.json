@@ -1,12 +1,1 @@
-{
-  "Name": "Stealth Infiltrator",
-  "Type": "Stealth",
-  "Health": 35,
-  "MaxHealth": 35,
-  "Damage": 10,
-  "MoveSpeed": 1.5,
-  "AttackRange": 1,
-  "AttackInterval": 1.5,
-  "GoldReward": 25,
-  "Skills": ["Normal Attack", "Backstab"]
-}
+{"Name":"Stealth Infiltrator","Type":"Stealth","Health":35,"MaxHealth":35,"Damage":10,"MoveSpeed":1.5,"AttackRange":1,"AttackInterval":1.5,"GoldReward":25,"Skills":["Normal Attack","Backstab"],"Armor":1}

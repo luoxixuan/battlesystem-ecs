@@ -1,12 +1,1 @@
-{
-  "Name": "Plasma Wraith",
-  "Type": "Strong",
-  "Health": 80,
-  "MaxHealth": 80,
-  "Damage": 12,
-  "MoveSpeed": 0.6,
-  "AttackRange": 2,
-  "AttackInterval": 2,
-  "GoldReward": 30,
-  "Skills": ["Normal Attack", "Heavy Strike"]
-}
+{"Name":"Plasma Wraith","Type":"Strong","Health":80,"MaxHealth":80,"Damage":12,"MoveSpeed":0.6,"AttackRange":2,"AttackInterval":2,"GoldReward":30,"Skills":["Normal Attack","Heavy Strike"],"Armor":5}

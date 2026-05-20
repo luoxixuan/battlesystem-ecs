@@ -1,12 +1,1 @@
-{
-  "Name": "Healer Bot",
-  "Type": "Support",
-  "Health": 45,
-  "MaxHealth": 45,
-  "Damage": 5,
-  "MoveSpeed": 0.9,
-  "AttackRange": 5,
-  "AttackInterval": 2.5,
-  "GoldReward": 30,
-  "Skills": ["Normal Attack", "Healing Pulse"]
-}
+{"Name":"Healer Bot","Type":"Support","Health":45,"MaxHealth":45,"Damage":5,"MoveSpeed":0.9,"AttackRange":5,"AttackInterval":2.5,"GoldReward":30,"Skills":["Normal Attack","Healing Pulse"],"Armor":4}

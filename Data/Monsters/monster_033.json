@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":3.5,"AttackInterval":1.1,"Type":"Tank","AttackRange":1,"MaxHealth":42,"Damage":33,"Name":"Stealth Tank #33","Health":42,"GoldReward":37,"Skills":["Normal Attack"]}
+{"MoveSpeed":3.5,"AttackInterval":1.1,"Type":"Tank","AttackRange":1,"MaxHealth":42,"Damage":33,"Name":"Stealth Tank #33","Health":42,"GoldReward":37,"Skills":["Normal Attack"],"Armor":10}

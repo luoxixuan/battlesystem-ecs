@@ -1,1 +1,1 @@
-﻿{"MoveSpeed":0.4,"AttackInterval":1.5,"Type":"Titan","AttackRange":2,"MaxHealth":59,"Damage":1,"Name":"Mega Titan #50","Health":59,"GoldReward":54,"Skills":["Normal Attack"]}
+{"MoveSpeed":0.4,"AttackInterval":1.5,"Type":"Titan","AttackRange":2,"MaxHealth":59,"Damage":1,"Name":"Mega Titan #50","Health":59,"GoldReward":54,"Skills":["Normal Attack"],"Armor":8}
