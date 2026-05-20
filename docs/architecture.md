@@ -164,10 +164,16 @@ Core/GAS/
 - `AttributeSetDefinitions` — 静态常量定义
 - `GameplayEffectDef` — 效果元数据（Type/Duration/TickInterval/TotalTicks/Modifiers）
 - `EffectType` — 效果类型（`Instant`/`Duration`/`Periodic`）
-- `GameplayAbilityDef` — 技能元数据（Name/Cooldown/AreaShape/AreaRadius/FixedBaseDamage/HasDot/DotDuration/TickInterval/DamagePerTick）
+- `GameplayAbilityDef` — 技能元数据（Name/Cooldown/AreaShape/AreaRadius/FixedBaseDamage/HasDot/DotDuration/TickInterval/DamagePerTick/IsShield/ShieldAmount/ShieldDuration）
 - `AreaShapeType` — 范围形状（`Single`=0/`Cross`=1/`Box`=2/`Circle`=3）
 - `AbilityInstance` — 技能实例（含 CurrentCooldown）
 - `AppliedEffect` — 已应用的效果实例（含 TimeSinceLastTick）
+
+护盾（Shield）施放链路：
+1. `SkillSystem.CastShield()` 调用 `store.ApplyPlayerShield(playerId, shieldAmount, duration)`
+2. `ComponentStore.ApplyPlayerShield()` 叠加护盾值和持续时间
+3. 伤害结算：`ComponentStore.DecreasePlayerHealth()` 优先扣除护盾，剩余穿透到生命值
+4. 护盾消散：`ComponentStore.SetTurnCCFlags()` 每回合递减 duration，为 0 时清零 shield + 打印 `[SHIELD] 护盾消散！`
 
 ---
 

@@ -795,6 +795,8 @@ namespace BattleSystemECS.Core
         /// <summary>
         /// Called at the start of each turn: clears enemy stun flags and decrements player CC durations.
         /// Enemy stun flags are cleared by EnemyMovementSystem.SetTurn; this method handles player CC only.
+        /// Thread-safety note: called in the serial phase (GameManager.Run frame-end), so no additional
+        /// synchronization is needed for MAX_PLAYERS=10 CC field access.
         /// </summary>
         public void SetTurnCCFlags()
         {
@@ -815,6 +817,8 @@ namespace BattleSystemECS.Core
                     {
                         PlayerShieldDuration[i] = 0f;
                         PlayerShield[i] = 0f;
+                        // Log shield dissipation — use static no-op to avoid Console.WriteLine/IO overhead in hot path
+                        FileLogger.LogHotPath($"[SHIELD] 护盾消散！ playerId={i}");
                     }
                 }
             }

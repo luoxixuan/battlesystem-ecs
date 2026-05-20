@@ -270,6 +270,15 @@
 **状态**: ✅ 已修复（commit `a4650bc`）
 **修复内容**: 移除 `private const int MAX_BUFFS = 10;` 死代码常量，该常量在整个代码库中无任何引用。
 
+#### 31. 护盾吸收逻辑缺失 ✅ FIXED
+**文件**: Core/ComponentStore.cs
+**状态**: ✅ 已修复（commit `d34e5fd` + 本次）
+**修复内容**:
+- `DecreasePlayerHealth()` 已实现护盾吸收：shield > 0 时优先扣除 shield，剩余穿透到 health
+- `SetTurnCCFlags()` 已实现护盾持续时间递减，到 0 时清零 shield 值 + 打印 `[SHIELD] 护盾消散！`
+- `ApplyPlayerShield()` 已实现护盾叠加和持续时间
+- `SkillSystem.CastShield()` 调用 `ApplyPlayerShield()`，护盾施放链路完整
+
 #### 41. ComponentStore 中 MAX_MONSTERS=20000 常量定义但未使用 ✅ FIXED
 **文件**: Core/ComponentStore.cs
 **状态**: ✅ 已修复（commit `a4650bc` 同类清理）

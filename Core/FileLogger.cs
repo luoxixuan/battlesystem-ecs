@@ -8,6 +8,9 @@ namespace BattleSystemECS.Core
     /// </summary>
     public class FileLogger : IRenderer
     {
+        // Static no-op logger for hot-path use (e.g., ComponentStore shield dissipation).
+        // Avoids I/O overhead of Console.WriteLine or File.AppendAllText during benchmarks.
+        public static void LogHotPath(string message) { /* no-op in hot path */ }
         private string logFilePath;
 
         public FileLogger(string logFilePath = "battle_log.txt")
