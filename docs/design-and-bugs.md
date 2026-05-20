@@ -329,8 +329,8 @@ GameManager.Run() / BenchmarkSystem
 
 | benchmark | FPS | EnemyAI | 说明 |
 |-----------|------|---------|------|
-| mode 2（合并热路径，HP=100） | **~6214** | ~7.5ms | ≥5000 门禁 ✅ |
-| mode 4（真实系统链路，HP=100） | **~3740** | ~23ms | ≥3500 门禁 ✅ |
+| mode 2（合并热路径，HP=100） | **~13663** | ~0.07ms | ≥5000 门禁 ✅ |
+| mode 4（真实系统链路，HP=100） | **~7096** | ~0.14ms | ≥3500 门禁 ✅ |
 
 ---
 
@@ -346,8 +346,8 @@ GameManager.Run() / BenchmarkSystem
 
 | benchmark | FPS | 说明 |
 |-----------|------|------|
-| Mode2 | **~6214** | 含完整 skill+buff 链路，EnemyAI ~7.5ms |
-| Mode4 | **~3740** | 含 BuffSystem + AutoCast，EnemyAI ~23ms |
+| Mode2 | **~13663** | 含完整 skill+buff 链路 |
+| Mode4 | **~7096** | 含 BuffSystem + AutoCast |
 
 > 注：HP=1e9 的 ~510/~2070 数据已废弃，保留于 git history。根因：HP=1e9 后敌人永生，每帧 EnemyAI 处理 10K 敌人（vs HP=100 时 ~100 活跃敌人），Workload 差 100x。 |
 
