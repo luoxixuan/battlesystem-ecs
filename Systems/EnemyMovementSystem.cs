@@ -56,6 +56,17 @@ namespace BattleSystemECS.Systems
                 if (!store.EnemyActive[enemyId])
                     return;
 
+                // Decrement slow duration and restore base speed when expired
+                float dur = store.EnemyBuffDurationLeft[enemyId];
+                if (dur > 0f)
+                {
+                    store.EnemyBuffDurationLeft[enemyId] = dur - 1f;
+                    if (store.EnemyBuffDurationLeft[enemyId] <= 0f)
+                    {
+                        store.ClearEnemySlow(enemyId);
+                    }
+                }
+
                 float moveSpeed = store.EnemyMoveSpeed[enemyId];
 
                 // Enum-based action dispatch — O(1) per enemy, no string comparison

@@ -5,5 +5,8 @@
   "Range": 3,
   "AttackSpeed": 1,
   "Cost": 55,
-  "UpgradeCost": 35
+  "UpgradeCost": 35,
+  "StunChance": 0,
+  "SlowAmount": 0.5,
+  "SlowDuration": 2
 }

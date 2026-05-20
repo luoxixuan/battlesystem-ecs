@@ -8,8 +8,8 @@ using BattleSystemECS.Components;
 namespace BattleSystemECS.Systems
 {
     /// <summary>
-    /// 塔攻击系统 - 负责处理塔寻找目标并攻击敌人的逻辑
-    /// Two-phase: parallel collect, serial resolve (Bug#2 thread-safety fix)
+    /// Tower attack system - handles tower target acquisition and enemy damage + debuffs.
+    /// Two-phase: parallel collect, serial resolve (Bug#2 thread-safety fix).
     /// </summary>
     public class TowerAttackSystem
     {
@@ -25,12 +25,19 @@ namespace BattleSystemECS.Systems
         private ConcurrentBag<(int enemyId, float damage, int playerId)>[] _damageQueue = new ConcurrentBag<(int, float, int)>[2];
         private int _damageQueueIdx = 0;
 
+        // Ping-pong double-buffer for tower debuff events (collected parallel, applied serial)
+        private ConcurrentBag<(int enemyId, int towerId)>[] _debuffQueue = new ConcurrentBag<(int, int)>[2];
+        private int _debuffQueueIdx = 0;
+
         // Cached player armor stats (updated each SetTurn)
         private float _armorPenetration = 0f;  // from TechTreeSystem
         private float _damageTakenMult = 1f;   // from TechTreeSystem
 
         // Cached wave-based difficulty multiplier (updated each SetTurn)
         private float _waveDifficultyMult = 1f;
+
+        // Shared random for debuff chance rolls — not thread-safe but debuffs are applied serially
+        private static readonly Random _rand = new Random();
 
         public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem = null)
         {
@@ -39,6 +46,8 @@ namespace BattleSystemECS.Systems
             this.techTreeSystem = techTreeSystem;
             _damageQueue[0] = new ConcurrentBag<(int, float, int)>();
             _damageQueue[1] = new ConcurrentBag<(int, float, int)>();
+            _debuffQueue[0] = new ConcurrentBag<(int, int)>();
+            _debuffQueue[1] = new ConcurrentBag<(int, int)>();
         }
 
         public void SetTurn(int turn)
@@ -92,12 +101,10 @@ namespace BattleSystemECS.Systems
             // Phase 0: Spatial grid already rebuilt by GameManager before system chain.
             // Reuse instead of rebuilding — avoids O(enemies) waste per frame.
 
-            // Phase 1 (parallel): collect damage events only — no structural mutations.
-            // Capture current bag into local so threads keep writing to the same bag reference
-            // even after we swap _damageQueue below. This prevents orphaned-bag damage drops.
+            // Phase 1 (parallel): collect damage events and debuff events — no structural mutations.
             var bag = _damageQueue[_damageQueueIdx];
+            var debuffBag = _debuffQueue[_debuffQueueIdx];
 
-            // Phase 1 (parallel): collect damage events only — no structural mutations
             Parallel.For(0, activeTowerIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, ti =>
             {
                 int towerId = activeTowerIds[ti];
@@ -143,14 +150,21 @@ namespace BattleSystemECS.Systems
                     store.TowerLastAttackTime[towerId] = 0f;
                     float baseDmg = store.TowerAttackDamage[towerId];
                     // Apply enemy armor reduction + tech tree damage taken multiplier + wave scaling
-                    // Inlined: avoids branch + Math.Max call in hot path
                     baseDmg *= Math.Max(0.01f, 1f - store.EnemyArmor[bestTarget] * (1f - _armorPenetration)) * _damageTakenMult;
                     if (_waveDifficultyMult != 1.0f) baseDmg *= _waveDifficultyMult;
                     bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
+
+                    // Collect debuff event (if tower has stun or slow)
+                    float stunChance = store.TowerStunChance[towerId];
+                    float slowAmount = store.TowerSlowAmount[towerId];
+                    if (stunChance > 0f || slowAmount > 0f)
+                    {
+                        debuffBag.Add((bestTarget, towerId));
+                    }
                 }
             });
 
-            // Phase 2 (serial): ping-pong swap — read from current bag, clear alternate for next frame
+            // Phase 2 (serial): apply damage
             int readIdx = _damageQueueIdx;
             int writeIdx = 1 - _damageQueueIdx;
             _damageQueueIdx = writeIdx;
@@ -165,6 +179,32 @@ namespace BattleSystemECS.Systems
                 }
             }
             System.Threading.Thread.MemoryBarrier(); // ensure drain completes
+
+            // Phase 3 (serial): apply tower debuffs
+            int debuffReadIdx = _debuffQueueIdx;
+            int debuffWriteIdx = 1 - _debuffQueueIdx;
+            _debuffQueueIdx = debuffWriteIdx;
+            _debuffQueue[debuffWriteIdx].Clear();
+            foreach (var (enemyId, towerId) in _debuffQueue[debuffReadIdx])
+            {
+                if (!store.EnemyActive[enemyId]) continue;
+
+                // Stun: roll chance
+                float stunChance = store.TowerStunChance[towerId];
+                if (stunChance > 0f && _rand.NextDouble() < stunChance)
+                {
+                    store.ApplyEnemyStun(enemyId, 1);
+                }
+
+                // Slow: apply if tower has slow amount
+                float slowAmount = store.TowerSlowAmount[towerId];
+                float slowDuration = store.TowerSlowDuration[towerId];
+                if (slowAmount > 0f && slowDuration > 0f)
+                {
+                    store.ApplyEnemySlow(enemyId, slowAmount, (int)slowDuration);
+                }
+            }
+            System.Threading.Thread.MemoryBarrier();
         }
     }
 }

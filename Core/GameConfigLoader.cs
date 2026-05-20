@@ -454,6 +454,9 @@ namespace BattleSystemECS.Config
             tower.AttackSpeed = ExtractFloat(json, "AttackSpeed");
             tower.Cost = ExtractFloat(json, "Cost");
             tower.UpgradeCost = ExtractFloat(json, "UpgradeCost");
+            tower.StunChance = ExtractFloat(json, "StunChance");
+            tower.SlowAmount = ExtractFloat(json, "SlowAmount");
+            tower.SlowDuration = ExtractFloat(json, "SlowDuration");
             return tower;
         }
 

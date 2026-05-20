@@ -40,6 +40,10 @@ namespace BattleSystemECS.Config
         public float AttackSpeed { get; set; }
         public float Cost { get; set; }
         public float UpgradeCost { get; set; }
+        // Tower debuff fields (0 = no debuff)
+        public float StunChance { get; set; } = 0f;   // probability per hit (0-1)
+        public float SlowAmount { get; set; } = 0f;   // speed multiplier (e.g. 0.5 = 50% speed)
+        public float SlowDuration { get; set; } = 0f; // duration in turns
     }
 
     public class EnemyTypeEntry

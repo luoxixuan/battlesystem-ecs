@@ -119,6 +119,10 @@ namespace BattleSystemECS.Core
         public string[] TowerUpgradePathId = new string[MAX_ENTITIES];
         public bool[] TowerActive = new bool[MAX_ENTITIES];
         public float[] TowerLastAttackTime = new float[MAX_ENTITIES];
+        // Tower debuff parameters (read from TowerConfig per tower type)
+        public float[] TowerStunChance = new float[MAX_ENTITIES];
+        public float[] TowerSlowAmount = new float[MAX_ENTITIES];
+        public float[] TowerSlowDuration = new float[MAX_ENTITIES];
 
         // ==================== 技能组件的 SOA 存储 ====================
         public string[] SkillName = new string[MAX_PLAYERS];
@@ -338,6 +342,9 @@ namespace BattleSystemECS.Core
                 TowerUpgradeCost[entityId] = 0f;
                 TowerUpgradePathId[entityId] = null;
                 TowerLastAttackTime[entityId] = 0f;
+                TowerStunChance[entityId] = 0f;
+                TowerSlowAmount[entityId] = 0f;
+                TowerSlowDuration[entityId] = 0f;
             }
 
             // ── Phase 4: recycle ID ───────────────────────────────────────────────
@@ -562,12 +569,18 @@ namespace BattleSystemECS.Core
         /// Add a tower with default "standard" upgrade path.
         /// </summary>
         public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost)
-            => AddTower(entityId, type, damage, range, speed, level, cost, "standard");
+            => AddTower(entityId, type, damage, range, speed, level, cost, "standard", 0f, 0f, 0f);
 
         /// <summary>
         /// Add a tower with a specific upgrade path.
         /// </summary>
         public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost, string upgradePathId)
+            => AddTower(entityId, type, damage, range, speed, level, cost, upgradePathId, 0f, 0f, 0f);
+
+        /// <summary>
+        /// Add a tower with debuff parameters.
+        /// </summary>
+        public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost, string upgradePathId, float stunChance, float slowAmount, float slowDuration)
         {
             if (entityId < 0 || entityId >= MAX_ENTITIES) return;
             TowerType[entityId] = type;
@@ -579,6 +592,9 @@ namespace BattleSystemECS.Core
             TowerUpgradePathId[entityId] = upgradePathId ?? "standard";
             TowerActive[entityId] = true;
             TowerLastAttackTime[entityId] = 0f;
+            TowerStunChance[entityId] = stunChance;
+            TowerSlowAmount[entityId] = slowAmount;
+            TowerSlowDuration[entityId] = slowDuration;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); }
         }
@@ -703,6 +719,49 @@ namespace BattleSystemECS.Core
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
             if (EnemySlowFactor[enemyId] <= 0f) return; // no slow active
 
+            float baseSpeed = EnemyMoveSpeedBase[enemyId];
+            if (baseSpeed > 0f)
+                EnemyMoveSpeed[enemyId] = baseSpeed;
+            EnemySlowFactor[enemyId] = 0f;
+        }
+
+        /// <summary>Applies stun to the enemy for 1 frame. Stun clears automatically at start of each frame.</summary>
+        public void ApplyEnemyStun(int enemyId, int duration)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            // Stun duration is tracked in frames; 1 frame stun means skip this movement frame
+            EnemyStunFlag[enemyId] = true;
+        }
+
+        /// <summary>Applies slow to the enemy. factor is a speed multiplier (e.g. 0.5 = 50% speed). Duration in turns.</summary>
+        public void ApplyEnemySlow(int enemyId, float factor, int duration)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (factor <= 0f || factor >= 1f) return;
+            // Take the stronger slow if stacking
+            if (factor < EnemySlowFactor[enemyId])
+            {
+                EnemySlowFactor[enemyId] = factor;
+                float baseSpeed = EnemyMoveSpeedBase[enemyId];
+                if (baseSpeed <= 0f) baseSpeed = EnemyMoveSpeed[enemyId];
+                EnemyMoveSpeed[enemyId] = baseSpeed * factor;
+                EnemyBuffDurationLeft[enemyId] = duration;
+            }
+            else if (EnemySlowFactor[enemyId] <= 0f)
+            {
+                EnemySlowFactor[enemyId] = factor;
+                float baseSpeed = EnemyMoveSpeedBase[enemyId];
+                if (baseSpeed <= 0f) baseSpeed = EnemyMoveSpeed[enemyId];
+                EnemyMoveSpeed[enemyId] = baseSpeed * factor;
+                EnemyBuffDurationLeft[enemyId] = duration;
+            }
+        }
+
+        /// <summary>Clears slow effect on enemy and restores original speed.</summary>
+        public void ClearEnemySlow(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (EnemySlowFactor[enemyId] <= 0f) return;
             float baseSpeed = EnemyMoveSpeedBase[enemyId];
             if (baseSpeed > 0f)
                 EnemyMoveSpeed[enemyId] = baseSpeed;

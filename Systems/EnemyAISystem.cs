@@ -106,6 +106,17 @@ namespace BattleSystemECS.Systems
                     string action;
                     EnemyActionType actionEnum;
                     string abilityId = null;
+
+                    // If enemy is stunned, skip BT and force no action
+                    if (store.EnemyStunFlag[enemyId])
+                    {
+                        action = "none";
+                        actionEnum = EnemyActionType.None;
+                        store.SetEnemyActionEnum(enemyId, actionEnum);
+                        _lastActionCache[enemyId] = actionEnum;
+                        continue;
+                    }
+
                     if (cachedBt != null)
                     {
                         action = BTCachedTreeEvaluator.EvaluateWithEnumAndAbility(

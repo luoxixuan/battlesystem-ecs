@@ -1,15 +1,17 @@
 using System;
 using BattleSystemECS.Core;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
     /// <summary>
-    /// 塔建造系统 - 负责在地图上放置防御塔
+    /// Tower placement system - handles tower construction on the map.
     /// </summary>
     public class TowerPlacementSystem
     {
         private ComponentStore store;
         private IRenderer logger;
+        private GameConfig gameConfig;
 
         public TowerPlacementSystem(ComponentStore store, IRenderer logger)
         {
@@ -18,39 +20,66 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// 在指定位置建造塔
+        /// Overload accepting GameConfig so debuff fields can be looked up from TowerConfig.
+        /// </summary>
+        public TowerPlacementSystem(ComponentStore store, IRenderer logger, GameConfig gameConfig)
+        {
+            this.store = store;
+            this.logger = logger;
+            this.gameConfig = gameConfig;
+        }
+
+        /// <summary>
+        /// Place a tower at the specified location (legacy overload, no debuff support).
         /// </summary>
         public int PlaceTower(int x, int y, string type, float damage, int range, float speed, float cost)
         {
-            // 1. 检查位置是否有效 (简单范围检查)
+            // 1. Check if position is valid
             if (x < 0 || x >= 10 || y < 0 || y >= 20)
             {
-                logger.Log("[TOWER] 建造失败: 坐标超出地图范围");
+                logger.Log("[TOWER] PlaceTower failed: position out of map range");
                 return -1;
             }
 
-            // 2. 检查该位置是否已经有塔（Bug#19: O(n)→O(1)，用 ActiveTowerIds 而非 NextEntityId 遍历）
+            // 2. Check if position already has a tower
             foreach (int tid in store.ActiveTowerIds)
             {
                 if (store.PositionX[tid] == x && store.PositionY[tid] == y)
                 {
-                    logger.Log($"[TOWER] 建造失败: 坐标 ({x},{y}) 已有塔存在");
+                    logger.Log($"[TOWER] PlaceTower failed: position ({x},{y}) already has a tower");
                     return -1;
                 }
             }
 
-            // 3. 创建塔实体（使用 CreateEntity 而不是 NextEntityId — Bug #4）
+            // 3. Create tower entity
             int towerId = store.CreateEntity();
             if (towerId == -1)
             {
-                logger.Log("[TOWER] 建造失败: 实体创建失败（实体池已满或ID冲突）");
+                logger.Log("[TOWER] PlaceTower failed: entity creation failed (entity pool exhausted)");
                 return -1;
             }
 
             store.AddPosition(towerId, x, y);
-            store.AddTower(towerId, type, damage, range, speed, 1, cost);
+            // Try to look up debuff params from gameConfig if available
+            if (gameConfig != null)
+            {
+                var tc = gameConfig.GetTowerConfig(type);
+                if (tc != null)
+                {
+                    store.AddTower(towerId, type, damage, range, speed, 1, cost, "standard",
+                        tc.StunChance, tc.SlowAmount, tc.SlowDuration);
+                }
+                else
+                {
+                    store.AddTower(towerId, type, damage, range, speed, 1, cost);
+                }
+            }
+            else
+            {
+                store.AddTower(towerId, type, damage, range, speed, 1, cost);
+            }
 
-            logger.Log($"[TOWER] 建造成功: {type} 塔于 ({x},{y}), 攻击力: {damage}, 射程: {range}, ID: {towerId}");
+            logger.Log($"[TOWER] Tower placed: {type} at ({x},{y}), damage: {damage}, range: {range}, ID: {towerId}");
             return towerId;
         }
     }
