@@ -34,7 +34,7 @@
     "Cooldown": 10,
     "CooldownRemaining": 0,
     "AoeRadius": 5,
-    "DamageMultiplier": 0,
+    "DamageMultiplier": 0.3,
     "HealAmount": 0,
     "BuffDuration": 3
   },
@@ -86,7 +86,7 @@
     "Cooldown": 12,
     "CooldownRemaining": 0,
     "AoeRadius": 6,
-    "DamageMultiplier": 0,
+    "DamageMultiplier": 0.3,
     "HealAmount": 0,
     "BuffDuration": 4
   },

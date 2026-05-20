@@ -34,6 +34,7 @@ namespace BattleSystemECS.Core
         public float[] PlayerAttackDamage = new float[MAX_PLAYERS];
         public float[] PlayerMaxHealth = new float[MAX_PLAYERS];  // 玩家最大生命值
         public float[] PlayerCurrentHealth = new float[MAX_PLAYERS];  // 玩家当前生命值
+        public float[] PlayerArmor = new float[MAX_PLAYERS];  // 玩家护甲：减少受到伤害
         public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float[] PlayerGold = new float[MAX_PLAYERS];
         public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
@@ -1022,7 +1023,9 @@ namespace BattleSystemECS.Core
         public void DecreasePlayerHealth(int playerId, float damage)
         {
             if (playerId < 0 || playerId >= MAX_PLAYERS) return;
-            PlayerCurrentHealth[playerId] = System.Math.Max(0f, PlayerCurrentHealth[playerId] - damage);
+            float armor = PlayerArmor[playerId];
+            float mitigatedDamage = damage * (1f - armor);
+            PlayerCurrentHealth[playerId] = System.Math.Max(0f, PlayerCurrentHealth[playerId] - mitigatedDamage);
         }
 
         public bool IsPlayerAlive(int playerId)

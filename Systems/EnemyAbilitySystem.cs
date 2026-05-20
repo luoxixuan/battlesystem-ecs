@@ -199,7 +199,7 @@ namespace BattleSystemECS.Systems
                 if (dist <= ability.AoeRadius)
                 {
                     float currentBuff = store.EnemyBuffDamageBonus[allyId];
-                    float buffDamageBonus = store.EnemyDamage[allyId] * 0.3f;
+                    float buffDamageBonus = store.EnemyDamage[allyId] * ability.DamageMultiplier;
 
                     if (currentBuff >= 0)
                     {

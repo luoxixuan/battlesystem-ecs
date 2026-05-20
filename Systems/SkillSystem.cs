@@ -105,7 +105,7 @@ namespace BattleSystemECS.Systems
                     sc.Description,
                     sc.Cooldown, 0f,   // cooldown, cost
                     -1, sc.DamageMultiplier > 0 ? sc.DamageMultiplier : 1f,  // fixed base damage multiplier
-                    AbilityActivation.Instant,
+                    sc.AutoCast ? AbilityActivation.Passive : AbilityActivation.Instant,
                     AreaShapeType.FromString(sc.AreaShape),
                     sc.AreaRadius,
                     sc.DotDuration,
@@ -130,10 +130,17 @@ namespace BattleSystemECS.Systems
             // Sync to bit flags for O(1) hot-path queries
             store.AddBuff(playerId, BuffType.CritRateBoost);
             renderer.Log("[SKILL] Applied Effect: Crit Rate+5% (instant, +0.05)");
+
+            // Defense+10%: apply armor reduction to incoming damage
+            float armorValue = 0.10f;  // 10% damage reduction
+            store.PlayerArmor[playerId] = armorValue;
+            store.AddBuff(playerId, BuffType.DefenseBoost);
+            renderer.Log($"[SKILL] Applied Effect: Defense+10% (armor={armorValue})");
         }
 
         /// <summary>
         /// Update cooldown timers for all abilities.
+        /// Auto-cast any Passive ability that is off cooldown.
         /// </summary>
         public void Update(float deltaTime)
         {
@@ -146,6 +153,12 @@ namespace BattleSystemECS.Systems
                 {
                     inst.CurrentCooldown = Math.Max(0f, inst.CurrentCooldown - deltaTime);
                     store.SetAbility(playerId, slot, inst);
+                }
+
+                // Auto-cast Passive abilities that are ready
+                if (inst.Definition.Activation == AbilityActivation.Passive && inst.CanActivate())
+                {
+                    ExecuteAbility(inst.Definition, slot);
                 }
             }
         }
