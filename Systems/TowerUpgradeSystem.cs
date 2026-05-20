@@ -1,20 +1,24 @@
 using System;
 using BattleSystemECS.Core;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
     /// <summary>
-    /// 塔升级系统 - 负责处理防御塔的升级逻辑与金币消耗
+    /// 塔升级系统 - 负责处理防御塔的升级逻辑与金币消耗。
+    /// 升级曲线由 GameConfig.TowerUpgradePaths 配置驱动，支持不同塔种差异化升级路径。
     /// </summary>
     public class TowerUpgradeSystem
     {
-        private ComponentStore store;
-        private IRenderer logger;
+        private readonly ComponentStore store;
+        private readonly IRenderer logger;
+        private readonly GameConfig config;
 
-        public TowerUpgradeSystem(ComponentStore store, IRenderer logger)
+        public TowerUpgradeSystem(ComponentStore store, IRenderer logger, GameConfig config)
         {
             this.store = store;
             this.logger = logger;
+            this.config = config;
         }
 
         /// <summary>
@@ -42,16 +46,37 @@ namespace BattleSystemECS.Systems
             // 2. 扣除金币
             store.SetPlayerGold(playerId, currentGold - upgradeCost);
 
-            // 3. 提升属性 (升级逻辑)
+            // 3. 提升属性 — 使用配置驱动的升级曲线
             int oldLevel = store.TowerLevel[towerId];
-            store.TowerLevel[towerId]++;
-            
-            // 属性提升：攻击力+20%，射程+1，成本增加50%
-            store.TowerAttackDamage[towerId] *= 1.2f;
-            store.TowerRange[towerId] += 1;
-            store.TowerUpgradeCost[towerId] *= 1.5f;
+            int newLevel = oldLevel + 1;
+            store.TowerLevel[towerId] = newLevel;
 
-            logger.Log($"[UPGRADE] 塔 {towerId} 升级成功! Lv.{oldLevel} -> Lv.{store.TowerLevel[towerId]}");
+            // 获取该塔的升级路径（默认 "standard"）
+            string upgradePathId = store.TowerUpgradePathId[towerId];
+            if (string.IsNullOrEmpty(upgradePathId))
+                upgradePathId = "standard";
+
+            var levelCfg = config.GetUpgradeLevelConfig(upgradePathId, newLevel);
+
+            if (levelCfg != null)
+            {
+                // 应用配置乘数
+                store.TowerAttackDamage[towerId] *= levelCfg.DamageMultiplier;
+                store.TowerRange[towerId] += (int)levelCfg.RangeAdd;
+                if (levelCfg.AttackSpeedMultiplier != 1.0f)
+                    store.TowerAttackSpeed[towerId] *= levelCfg.AttackSpeedMultiplier;
+                store.TowerUpgradeCost[towerId] *= levelCfg.CostMultiplier;
+            }
+            else
+            {
+                // Fallback: 原始硬编码逻辑（兼容无配置路径）
+                store.TowerAttackDamage[towerId] *= 1.2f;
+                store.TowerRange[towerId] += 1;
+                store.TowerAttackSpeed[towerId] *= 1.0f;
+                store.TowerUpgradeCost[towerId] *= 1.5f;
+            }
+
+            logger.Log($"[UPGRADE] 塔 {towerId} 升级成功! Lv.{oldLevel} -> Lv.{store.TowerLevel[towerId]} (path: {upgradePathId})");
             logger.Log($"[UPGRADE] 新属性 -> 攻击力: {store.TowerAttackDamage[towerId]:F1}, 射程: {store.TowerRange[towerId]}, 下次升级成本: {store.TowerUpgradeCost[towerId]:F1}");
             logger.Log($"[UPGRADE] 剩余金币: {store.GetPlayerGold(playerId):F1}");
 

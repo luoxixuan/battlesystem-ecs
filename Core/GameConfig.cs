@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace BattleSystemECS.Config
 {
@@ -177,6 +178,30 @@ namespace BattleSystemECS.Config
         public string AbilityId;
     }
 
+    /// <summary>
+    /// Per-level upgrade multipliers for a tower upgrade path.
+    /// Keys are upgrade levels (1-based). Level 1 = first upgrade from base.
+    /// </summary>
+    public class TowerUpgradeLevelConfig
+    {
+        public float DamageMultiplier { get; set; } = 1.2f;
+        public float RangeAdd { get; set; } = 1f;
+        public float AttackSpeedMultiplier { get; set; } = 1.0f;
+        public float CostMultiplier { get; set; } = 1.5f;
+    }
+
+    /// <summary>
+    /// A named tower upgrade path (e.g., "standard", "fast", "tank").
+    /// Maps upgrade levels to per-level multipliers.
+    /// </summary>
+    public class TowerUpgradePathConfig
+    {
+        public string Id { get; set; }
+        public string Description { get; set; }
+        /// <summary>Keys are level numbers (1, 2, 3, ...). If a level is missing, fall back to the highest defined level.</summary>
+        public Dictionary<int, TowerUpgradeLevelConfig> Levels { get; set; } = new Dictionary<int, TowerUpgradeLevelConfig>();
+    }
+
     public class GameConfig
     {
         public PlayerConfig Player { get; set; } = new PlayerConfig();
@@ -185,6 +210,9 @@ namespace BattleSystemECS.Config
         public List<TowerConfig> TowerTypes { get; set; } = new List<TowerConfig>();
         public List<LevelConfig> Levels { get; set; } = new List<LevelConfig>();
         public LevelConfig CurrentLevel { get; set; }
+
+        // Tower upgrade paths (config-driven upgrade curves)
+        public Dictionary<string, TowerUpgradePathConfig> TowerUpgradePaths { get; set; } = new Dictionary<string, TowerUpgradePathConfig>();
 
         // Behavior tree definitions keyed by monster type
         public Dictionary<string, BehaviorTreeDef> BehaviorTrees { get; set; } = new Dictionary<string, BehaviorTreeDef>();
@@ -348,6 +376,41 @@ namespace BattleSystemECS.Config
             }
             Levels.Add(level1);
 
+            // Default tower upgrade paths (replaces hardcoded +20%/+1/+1.5x in TowerUpgradeSystem)
+            // "standard" — matches the original hardcoded curve
+            // Note: undefined levels fall back to the highest defined level
+            TowerUpgradePaths["standard"] = new TowerUpgradePathConfig
+            {
+                Id = "standard",
+                Description = "Standard upgrade path: +20% damage, +1 range, +1.5x cost per level",
+                Levels = new Dictionary<int, TowerUpgradeLevelConfig>
+                {
+                    { 1, new TowerUpgradeLevelConfig { DamageMultiplier = 1.2f, RangeAdd = 1f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.5f } },
+                }
+            };
+
+            // "fast" — prioritizes attack speed, minimal range growth (suitable for Weapon/Fast towers)
+            TowerUpgradePaths["fast"] = new TowerUpgradePathConfig
+            {
+                Id = "fast",
+                Description = "Fast upgrade path: +15% damage, +0.5 range, +25% attack speed, +1.6x cost",
+                Levels = new Dictionary<int, TowerUpgradeLevelConfig>
+                {
+                    { 1, new TowerUpgradeLevelConfig { DamageMultiplier = 1.15f, RangeAdd = 0.5f, AttackSpeedMultiplier = 1.25f, CostMultiplier = 1.6f } },
+                }
+            };
+
+            // "tank" — prioritizes damage and range (suitable for Defense/Special towers)
+            TowerUpgradePaths["tank"] = new TowerUpgradePathConfig
+            {
+                Id = "tank",
+                Description = "Tank upgrade path: +30% damage, +2 range, +1.4x cost",
+                Levels = new Dictionary<int, TowerUpgradeLevelConfig>
+                {
+                    { 1, new TowerUpgradeLevelConfig { DamageMultiplier = 1.3f, RangeAdd = 2f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.4f } },
+                }
+            };
+
             // Default player
             Player = new PlayerConfig
             {
@@ -432,5 +495,33 @@ namespace BattleSystemECS.Config
         /// Returns upgrade buff options (Bug#31 fix: was hardcoded in UpgradeSystem).
         /// </summary>
         public IReadOnlyList<string> GetUpgradeBuffs() => UpgradeBuffs;
+
+        /// <summary>
+        /// Returns the upgrade path config for the given pathId, or null if not found.
+        /// </summary>
+        public TowerUpgradePathConfig GetUpgradePath(string pathId)
+        {
+            if (string.IsNullOrEmpty(pathId)) return null;
+            TowerUpgradePaths.TryGetValue(pathId, out var path);
+            return path;
+        }
+
+        /// <summary>
+        /// Returns the per-level upgrade config for the given path and level.
+        /// Falls back to the highest defined level if the exact level is not defined.
+        /// Returns null if the path is not found.
+        /// </summary>
+        public TowerUpgradeLevelConfig GetUpgradeLevelConfig(string pathId, int level)
+        {
+            var path = GetUpgradePath(pathId);
+            if (path == null || path.Levels == null || path.Levels.Count == 0) return null;
+
+            if (path.Levels.TryGetValue(level, out var levelCfg))
+                return levelCfg;
+
+            // Fall back to the highest defined level
+            int highestLevel = path.Levels.Keys.Max();
+            return path.Levels[highestLevel];
+        }
     }
 }

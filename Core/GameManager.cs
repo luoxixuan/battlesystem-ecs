@@ -107,7 +107,7 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]      TowerAttackSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating TowerUpgradeSystem...");
-            towerUpgradeSystem = new TowerUpgradeSystem(store, logger);
+            towerUpgradeSystem = new TowerUpgradeSystem(store, logger, gameConfig);
             logger.Log("[BOOTSTRAP]      TowerUpgradeSystem created successfully!");
 
             // 初始化玩家（血量 200）

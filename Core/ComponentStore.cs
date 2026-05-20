@@ -109,6 +109,8 @@ namespace BattleSystemECS.Core
         public float[] TowerAttackSpeed = new float[MAX_ENTITIES];
         public int[] TowerLevel = new int[MAX_ENTITIES];
         public float[] TowerUpgradeCost = new float[MAX_ENTITIES];
+        // Upgrade path ID per tower (e.g., "standard", "fast", "tank") — drives config-driven upgrade curves
+        public string[] TowerUpgradePathId = new string[MAX_ENTITIES];
         public bool[] TowerActive = new bool[MAX_ENTITIES];
         public float[] TowerLastAttackTime = new float[MAX_ENTITIES];
 
@@ -326,6 +328,7 @@ namespace BattleSystemECS.Core
                 TowerAttackSpeed[entityId] = 0f;
                 TowerLevel[entityId] = 0;
                 TowerUpgradeCost[entityId] = 0f;
+                TowerUpgradePathId[entityId] = null;
                 TowerLastAttackTime[entityId] = 0f;
             }
 
@@ -547,7 +550,16 @@ namespace BattleSystemECS.Core
             return entityId;
         }
 
+        /// <summary>
+        /// Add a tower with default "standard" upgrade path.
+        /// </summary>
         public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost)
+            => AddTower(entityId, type, damage, range, speed, level, cost, "standard");
+
+        /// <summary>
+        /// Add a tower with a specific upgrade path.
+        /// </summary>
+        public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost, string upgradePathId)
         {
             if (entityId < 0 || entityId >= MAX_ENTITIES) return;
             TowerType[entityId] = type;
@@ -556,6 +568,7 @@ namespace BattleSystemECS.Core
             TowerAttackSpeed[entityId] = speed;
             TowerLevel[entityId] = level;
             TowerUpgradeCost[entityId] = cost;
+            TowerUpgradePathId[entityId] = upgradePathId ?? "standard";
             TowerActive[entityId] = true;
             TowerLastAttackTime[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
@@ -566,6 +579,7 @@ namespace BattleSystemECS.Core
         {
             if (entityId < 0 || entityId >= MAX_ENTITIES) return;
             TowerActive[entityId] = false;
+            TowerUpgradePathId[entityId] = null;
             lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
         }
 
