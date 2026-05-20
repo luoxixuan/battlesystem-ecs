@@ -2,7 +2,7 @@ using System;
 
 namespace BattleSystemECS.Core.GAS
 {
-    public enum EffectType { Instant, Duration, Periodic }
+    public enum EffectType { Instant, Duration, Periodic, Heal }
 
     public enum AttributeModifierOp { Add, Multiply, Override }
 

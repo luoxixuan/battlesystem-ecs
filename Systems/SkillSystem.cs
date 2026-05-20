@@ -110,7 +110,10 @@ namespace BattleSystemECS.Systems
                     sc.AreaRadius,
                     sc.DotDuration,
                     sc.DotTickInterval,
-                    sc.DotDamagePerTick
+                    sc.DotDamagePerTick,
+                    sc.HealPercent,
+                    sc.ShieldAmount,
+                    sc.ShieldDuration
                 );
                 store.AddAbility(playerId, def);
                 renderer.Log($"[SKILL] {sc.Name} registered (shape: {sc.AreaShape}, radius: {sc.AreaRadius}, DoT: {sc.DotDuration}s/{sc.DotTickInterval}s×{sc.DotDamagePerTick})");
@@ -221,6 +224,14 @@ namespace BattleSystemECS.Systems
                     break;
                 case 4: // Chain Lightning — O(N) nearest-neighbor chaining
                     enemiesHit = CastChainLightning(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
+                    break;
+                case 5: // Heal — restore player HP
+                    CastHeal(def);
+                    enemiesHit = 0;
+                    break;
+                case 6: // Shield — apply shield to player
+                    CastShield(def);
+                    enemiesHit = 0;
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -510,6 +521,23 @@ namespace BattleSystemECS.Systems
             // Queue death for serial resolution — ResolveEnemiesKilledThisFrame() called at frame end
             store.QueueEnemyDeath(enemyId, playerId);
             renderer.Log($"[SKILL] Killed enemy {enemyId}");
+        }
+
+        private void CastHeal(GameplayAbilityDef def)
+        {
+            if (dotSystem == null)
+            {
+                renderer.Log($"[SKILL] {def.Name}: dotSystem not wired, cannot heal");
+                return;
+            }
+            dotSystem.HealPlayer(def.HealPercent);
+            renderer.Log($"[SKILL] {def.Name} cast — HealPercent={def.HealPercent:F2} ({def.HealPercent * 100:F0}% max HP)");
+        }
+
+        private void CastShield(GameplayAbilityDef def)
+        {
+            store.ApplyPlayerShield(playerId, def.ShieldAmount, def.ShieldDuration);
+            renderer.Log($"[SKILL] {def.Name} cast — Shield={def.ShieldAmount:F0}, Duration={def.ShieldDuration:F0}s");
         }
 
         /// <summary>

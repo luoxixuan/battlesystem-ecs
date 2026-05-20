@@ -159,6 +159,10 @@ namespace BattleSystemECS.Config
         public float DotDuration { get; set; }
         public float DotTickInterval { get; set; }
         public float DotDamagePerTick { get; set; }
+        // Heal/Shield fields (0 = no heal/shield)
+        public float HealPercent { get; set; }
+        public float ShieldAmount { get; set; }
+        public float ShieldDuration { get; set; }
     }
 
     public class BehaviorTreeDef

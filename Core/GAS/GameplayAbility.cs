@@ -13,6 +13,8 @@ namespace BattleSystemECS.Core.GAS
         public const int Box = 2;
         public const int Circle = 3;
         public const int Chain = 4;
+        public const int Heal = 5;
+        public const int Shield = 6;
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -24,6 +26,8 @@ namespace BattleSystemECS.Core.GAS
                 "box" => Box,
                 "circle" => Circle,
                 "chain" => Chain,
+                "heal" => Heal,
+                "shield" => Shield,
                 _ => Single
             };
         }
@@ -52,20 +56,33 @@ namespace BattleSystemECS.Core.GAS
         public float DotTickInterval;    // seconds between ticks
         public float DotDamagePerTick;   // damage per tick
 
+        // Heal/Shield fields (0 / 0f = no heal/shield)
+        public float HealPercent;        // heal percent of max health (e.g. 0.3 = 30%)
+        public float ShieldAmount;        // flat shield value absorbed
+        public float ShieldDuration;      // shield duration in seconds
+
         public GameplayAbilityDef(string name, string desc, float cooldown, float cost,
             int dmgAttr, float fixedDmg, AbilityActivation act, int areaShape, int areaRadius,
             float dotDuration = 0f, float dotTickInterval = 0f, float dotDamagePerTick = 0f,
+            float healPercent = 0f, float shieldAmount = 0f, float shieldDuration = 0f,
             params int[] requiredBuffs)
         {
             Name = name; Description = desc; Cooldown = cooldown; Cost = cost;
             DamageMultiplierAttr = dmgAttr; FixedBaseDamage = fixedDmg; Activation = act;
             AreaShape = areaShape; AreaRadius = areaRadius;
             DotDuration = dotDuration; DotTickInterval = dotTickInterval; DotDamagePerTick = dotDamagePerTick;
+            HealPercent = healPercent; ShieldAmount = shieldAmount; ShieldDuration = shieldDuration;
             RequiredBuffs = requiredBuffs;
         }
 
         /// <summary>True if this ability applies a periodic DoT effect.</summary>
         public bool HasDot => DotDuration > 0f && DotTickInterval > 0f && DotDamagePerTick > 0f;
+
+        /// <summary>True if this ability applies a heal effect.</summary>
+        public bool IsHeal => HealPercent > 0f;
+
+        /// <summary>True if this ability applies a shield effect.</summary>
+        public bool IsShield => ShieldAmount > 0f;
     }
 
     /// <summary>

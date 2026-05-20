@@ -122,6 +122,9 @@
     "DotDuration": 0,
     "DotTickInterval": 0,
     "DotDamagePerTick": 0,
+    "HealPercent": 0,
+    "ShieldAmount": 0,
+    "ShieldDuration": 0,
     "Modifiers": [
       {
         "Name": "ChainLightningDamage",
@@ -133,5 +136,45 @@
         "EffectTag": "Lightning"
       }
     ]
+  },
+  {
+    "Name": "Guardian Heal",
+    "Description": "范围治疗 - 恢复 30% 最大生命值，冷却 20 秒",
+    "AreaShape": "heal",
+    "AreaWidth": 1,
+    "AreaHeight": 1,
+    "AttackRange": 0,
+    "Cooldown": 20,
+    "DamageMultiplier": 0,
+    "AutoCast": false,
+    "Hotkey": "6",
+    "AreaRadius": 0,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
+    "HealPercent": 0.3,
+    "ShieldAmount": 0,
+    "ShieldDuration": 0,
+    "Modifiers": []
+  },
+  {
+    "Name": "Energy Shield",
+    "Description": "护盾技能 - 吸收 50 点伤害，持续 5 秒，冷却 25 秒",
+    "AreaShape": "shield",
+    "AreaWidth": 1,
+    "AreaHeight": 1,
+    "AttackRange": 0,
+    "Cooldown": 25,
+    "DamageMultiplier": 0,
+    "AutoCast": false,
+    "Hotkey": "7",
+    "AreaRadius": 0,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
+    "HealPercent": 0,
+    "ShieldAmount": 50,
+    "ShieldDuration": 5,
+    "Modifiers": []
   }
 ]

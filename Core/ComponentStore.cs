@@ -20,7 +20,7 @@ namespace BattleSystemECS.Core
     {
         // 常量定义
         public const int MAX_ENTITIES = 100000;
-        private const int MAX_PLAYERS = 10;
+        internal const int MAX_PLAYERS = 10;
         public int TotalKills = 0;
 
         // ==================== 位置组件的 SOA 存储 ====================
@@ -35,6 +35,9 @@ namespace BattleSystemECS.Core
         public float[] PlayerMaxHealth = new float[MAX_PLAYERS];  // 玩家最大生命值
         public float[] PlayerCurrentHealth = new float[MAX_PLAYERS];  // 玩家当前生命值
         public float[] PlayerArmor = new float[MAX_PLAYERS];  // 玩家护甲：减少受到伤害
+        // Player shield: absorbs damage before health, independent of armor
+        public float[] PlayerShield = new float[MAX_PLAYERS];
+        public float[] PlayerShieldDuration = new float[MAX_PLAYERS]; // seconds remaining
         public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float[] PlayerGold = new float[MAX_PLAYERS];
         public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
@@ -269,6 +272,8 @@ namespace BattleSystemECS.Core
                 PlayerIsWaveActive[i] = false;
                 PlayerWaveTimer[i] = -1f;
                 PlayerWaveCompleteGold[i] = 0f;
+                PlayerShield[i] = 0f;
+                PlayerShieldDuration[i] = 0f;
             }
         }
 
@@ -714,6 +719,24 @@ namespace BattleSystemECS.Core
             }
         }
 
+        /// <summary>Applies a shield to the player. Shield absorbs damage before health.</summary>
+        public void ApplyPlayerShield(int playerId, float amount, float duration)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (amount <= 0f) return;
+            // Stack shields (keep the larger one + add the new amount)
+            PlayerShield[playerId] += amount;
+            if (duration > PlayerShieldDuration[playerId])
+                PlayerShieldDuration[playerId] = duration;
+        }
+
+        /// <summary>Returns the current shield value for a player.</summary>
+        public float GetPlayerShield(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            return PlayerShield[playerId];
+        }
+
         /// <summary>Clears slow effect and restores original speed.</summary>
         public void ClearSlow(int enemyId)
         {
@@ -783,6 +806,16 @@ namespace BattleSystemECS.Core
                 {
                     PlayerSlowDuration[i]--;
                     if (PlayerSlowDuration[i] <= 0) PlayerSlowFactor[i] = 0f;
+                }
+                // Shield duration decrements per turn (1 second per turn in this engine)
+                if (PlayerShieldDuration[i] > 0f)
+                {
+                    PlayerShieldDuration[i] -= 1f;
+                    if (PlayerShieldDuration[i] <= 0f)
+                    {
+                        PlayerShieldDuration[i] = 0f;
+                        PlayerShield[i] = 0f;
+                    }
                 }
             }
         }
@@ -1023,6 +1056,15 @@ namespace BattleSystemECS.Core
         public void DecreasePlayerHealth(int playerId, float damage)
         {
             if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            // Shield absorbs damage before health (independent of armor)
+            float shield = PlayerShield[playerId];
+            if (shield > 0f)
+            {
+                float absorbed = System.Math.Min(shield, damage);
+                PlayerShield[playerId] = shield - absorbed;
+                damage -= absorbed;
+                if (damage <= 0f) return;
+            }
             float armor = PlayerArmor[playerId];
             float mitigatedDamage = damage * (1f - armor);
             PlayerCurrentHealth[playerId] = System.Math.Max(0f, PlayerCurrentHealth[playerId] - mitigatedDamage);

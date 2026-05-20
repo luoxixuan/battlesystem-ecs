@@ -17,15 +17,17 @@ namespace BattleSystemECS.Systems
     {
         private ComponentStore store;
         private int playerId;
+        private IRenderer renderer;
 
         // Ping-pong double-buffer for enemy DoT damage queue
         private ConcurrentBag<(int enemyId, float damage)>[] _dotDamageQueue = new ConcurrentBag<(int, float)>[2];
         private int _dotQueueIdx = 0;
 
-        public BuffSystem(ComponentStore store, int playerId)
+        public BuffSystem(ComponentStore store, int playerId, IRenderer renderer = null)
         {
             this.store = store;
             this.playerId = playerId;
+            this.renderer = renderer;
             _dotDamageQueue[0] = new ConcurrentBag<(int, float)>();
             _dotDamageQueue[1] = new ConcurrentBag<(int, float)>();
         }
@@ -47,7 +49,11 @@ namespace BattleSystemECS.Systems
             for (int slot = 0; slot < count; slot++)
             {
                 var eff = store.GetEffect(playerId, slot);
-                if (eff.Definition.Type == EffectType.Instant) continue;
+                if (eff.Definition.Type == EffectType.Instant || eff.Definition.Type == EffectType.Heal)
+                {
+                    // Instant and Heal effects are handled separately (Heal via SkillSystem casting, Instant already applied)
+                    continue;
+                }
 
                 if (eff.Definition.Type == EffectType.Periodic)
                 {
@@ -173,6 +179,20 @@ namespace BattleSystemECS.Systems
         public void ApplyDot(int targetId, GameplayEffectDef dotDef)
         {
             store.AddEffect(targetId, new AppliedEffect(dotDef, playerId));
+        }
+
+        /// <summary>
+        /// Heal the player by a percent of max health. Caps at max health.
+        /// </summary>
+        public void HealPlayer(float healPercent)
+        {
+            if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) return;
+            float maxHealth = store.GetPlayerMaxHealth(playerId);
+            float currentHealth = store.GetPlayerCurrentHealth(playerId);
+            float healAmount = maxHealth * healPercent;
+            float newHealth = System.Math.Min(currentHealth + healAmount, maxHealth);
+            store.SetPlayerCurrentHealth(playerId, newHealth);
+            renderer?.Log($"[BUFF] HealPlayer: +{healAmount:F1} HP ({currentHealth:F1} -> {newHealth:F1})");
         }
     }
 }
