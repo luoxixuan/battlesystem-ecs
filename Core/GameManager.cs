@@ -150,6 +150,9 @@ namespace BattleSystemECS.Core
             // Wire BuffSystem into SkillSystem for Poison Nova DoT application
             skillSystem.InjectDotSystem(buffSystem);
 
+            // Wire BuffSystem into TowerAttackSystem for Firewall DoT and Leech lifesteal
+            towerAttackSystem.SetBuffSystem(buffSystem);
+
             logger.Log("[BOOTSTRAP]    - Creating PlayerTowerAttackSystem...");
             playerTowerAttackSystem = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig, techTreeSystem);
             logger.Log("[BOOTSTRAP]      PlayerTowerAttackSystem created successfully!");

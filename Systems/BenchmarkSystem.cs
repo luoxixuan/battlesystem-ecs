@@ -375,6 +375,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             var skill         = new SkillSystem(store, logger, playerId, gameConfig);
             var buffSystem    = new BuffSystem(store, playerId);
             skill.InjectDotSystem(buffSystem);
+            towerAttack.SetBuffSystem(buffSystem);
             var map           = new MapSystem(logger, store);
             map.SetMapSize(10, 20);
             var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);

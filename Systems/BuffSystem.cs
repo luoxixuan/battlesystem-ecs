@@ -175,6 +175,29 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// Convenience overload: apply a Firewall burn DoT with raw damage/duration params.
+        /// Creates a StackingBehavior.None GameplayEffectDef internally.
+        /// </summary>
+        public void ApplyDot(int targetId, float damagePerTick, int duration)
+        {
+            if (targetId < 0 || targetId >= ComponentStore.MAX_ENTITIES) return;
+            if (damagePerTick <= 0f || duration <= 0) return;
+            // Firewall DoT: 1 tick per second, name encodes tower type
+            var dotDef = new GameplayEffectDef(
+                name: "Firewall_Burn",
+                type: EffectType.Periodic,
+                attrIdx: -1,
+                op: AttributeModifierOp.Add,
+                magnitude: damagePerTick,
+                duration: duration
+            );
+            dotDef.TotalTicks = duration;
+            dotDef.TickInterval = 1f;
+            dotDef.StackingBehavior = StackingBehavior.None;
+            ApplyDot(targetId, dotDef);
+        }
+
+        /// <summary>
         /// Add a Periodic DoT effect to an entity with stacking support.
         /// Implements stacking behaviors:
         /// - None: replaces any existing effect of the same name

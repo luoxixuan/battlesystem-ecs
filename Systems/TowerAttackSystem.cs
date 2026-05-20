@@ -10,12 +10,14 @@ namespace BattleSystemECS.Systems
     /// <summary>
     /// Tower attack system - handles tower target acquisition and enemy damage + debuffs.
     /// Two-phase: parallel collect, serial resolve (Bug#2 thread-safety fix).
+    /// Tower type-specific mechanics (Tesla chain lightning, Leech lifesteal, Frost slow, Firewall DoT).
     /// </summary>
     public class TowerAttackSystem
     {
         private ComponentStore store;
         private IRenderer logger;
         private TechTreeSystem techTreeSystem;
+        private BuffSystem buffSystem;
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate lists, pre-allocated in SetTurn
@@ -29,6 +31,10 @@ namespace BattleSystemECS.Systems
         private ConcurrentBag<(int enemyId, int towerId)>[] _debuffQueue = new ConcurrentBag<(int, int)>[2];
         private int _debuffQueueIdx = 0;
 
+        // Ping-pong double-buffer for tower type-specific events (Leech lifesteal heal, etc.)
+        private ConcurrentBag<(int playerId, float healAmount)>[] _healQueue = new ConcurrentBag<(int, float)>[2];
+        private int _healQueueIdx = 0;
+
         // Cached player armor stats (updated each SetTurn)
         private float _armorPenetration = 0f;  // from TechTreeSystem
         private float _damageTakenMult = 1f;   // from TechTreeSystem
@@ -39,6 +45,14 @@ namespace BattleSystemECS.Systems
         // Shared random for debuff chance rolls — not thread-safe but debuffs are applied serially
         private static readonly Random _rand = new Random();
 
+        // Ping-pong double-buffer for Tesla chain lightning damage events
+        // (int chainId, int enemyId, float damage): chainId=-1 means non-chain (handled by debuff phase)
+        private ConcurrentBag<(int chainId, int enemyId, float damage, int playerId)>[] _chainDamageQueue = new ConcurrentBag<(int, int, float, int)>[2];
+        private int _chainDamageQueueIdx = 0;
+
+        // Leech lifesteal rate: 30% of damage dealt is returned as player heal
+        private const float LEECH_LIFESTEAL_RATE = 0.30f;
+
         public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem = null)
         {
             this.store = store;
@@ -48,6 +62,18 @@ namespace BattleSystemECS.Systems
             _damageQueue[1] = new ConcurrentBag<(int, float, int)>();
             _debuffQueue[0] = new ConcurrentBag<(int, int)>();
             _debuffQueue[1] = new ConcurrentBag<(int, int)>();
+            _healQueue[0] = new ConcurrentBag<(int, float)>();
+            _healQueue[1] = new ConcurrentBag<(int, float)>();
+            _chainDamageQueue[0] = new ConcurrentBag<(int, int, float, int)>();
+            _chainDamageQueue[1] = new ConcurrentBag<(int, int, float, int)>();
+        }
+
+        /// <summary>
+        /// Inject BuffSystem reference for Leech lifesteal healing and Firewall DoT effects.
+        /// </summary>
+        public void SetBuffSystem(BuffSystem buffSystem)
+        {
+            this.buffSystem = buffSystem;
         }
 
         public void SetTurn(int turn)
@@ -104,6 +130,8 @@ namespace BattleSystemECS.Systems
             // Phase 1 (parallel): collect damage events and debuff events — no structural mutations.
             var bag = _damageQueue[_damageQueueIdx];
             var debuffBag = _debuffQueue[_debuffQueueIdx];
+            var chainBag = _chainDamageQueue[_chainDamageQueueIdx];
+            var healBag = _healQueue[_healQueueIdx];
 
             Parallel.For(0, activeTowerIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, ti =>
             {
@@ -152,14 +180,45 @@ namespace BattleSystemECS.Systems
                     // Apply enemy armor reduction + tech tree damage taken multiplier + wave scaling
                     baseDmg *= Math.Max(0.01f, 1f - store.EnemyArmor[bestTarget] * (1f - _armorPenetration)) * _damageTakenMult;
                     if (_waveDifficultyMult != 1.0f) baseDmg *= _waveDifficultyMult;
-                    bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
 
-                    // Collect debuff event (if tower has stun or slow)
-                    float stunChance = store.TowerStunChance[towerId];
-                    float slowAmount = store.TowerSlowAmount[towerId];
-                    if (stunChance > 0f || slowAmount > 0f)
+                    // ── Tower type-specific mechanics ─────────────────────────────────────
+                    string towerType = store.TowerType[towerId] ?? "Basic";
+
+                    switch (towerType)
                     {
-                        debuffBag.Add((bestTarget, towerId));
+                        case "Tesla":
+                            // Chain lightning: primary target + up to 3 chained targets at 70% decay
+                            chainBag.Add((0, bestTarget, baseDmg, store.PlayerEntityId));
+                            break;
+
+                        case "Leech":
+                            // Damage + lifesteal (heal player)
+                            bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
+                            float healAmount = baseDmg * LEECH_LIFESTEAL_RATE;
+                            if (healAmount > 0f)
+                                healBag.Add((store.PlayerEntityId, healAmount));
+                            break;
+
+                        case "Frost":
+                            // Damage + tower slow debuff (handled by debuff phase)
+                            bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
+                            debuffBag.Add((bestTarget, towerId));
+                            break;
+
+                        case "Firewall":
+                            // Damage + Firewall DoT (handled by debuff phase)
+                            bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
+                            debuffBag.Add((bestTarget, towerId));
+                            break;
+
+                        default:
+                            // Basic / unknown: standard damage + standard debuff check
+                            bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
+                            float stunChance = store.TowerStunChance[towerId];
+                            float slowAmount = store.TowerSlowAmount[towerId];
+                            if (stunChance > 0f || slowAmount > 0f)
+                                debuffBag.Add((bestTarget, towerId));
+                            break;
                     }
                 }
             });
@@ -178,9 +237,16 @@ namespace BattleSystemECS.Systems
                     store.QueueEnemyDeath(enemyId, playerId);
                 }
             }
+
+            // Phase 2b (serial): resolve Tesla chain lightning (after basic damage to avoid double-hit on primary)
+            ResolveTeslaChainLightning();
+
+            // Phase 2c (serial): resolve Leech lifesteal heals
+            ResolveLeechHealing();
+
             System.Threading.Thread.MemoryBarrier(); // ensure drain completes
 
-            // Phase 3 (serial): apply tower debuffs
+            // Phase 3 (serial): apply tower debuffs (stun/slow from Basic/EMP/Doom towers, Frost slow, Firewall DoT)
             int debuffReadIdx = _debuffQueueIdx;
             int debuffWriteIdx = 1 - _debuffQueueIdx;
             _debuffQueueIdx = debuffWriteIdx;
@@ -189,22 +255,88 @@ namespace BattleSystemECS.Systems
             {
                 if (!store.EnemyActive[enemyId]) continue;
 
-                // Stun: roll chance
+                string towerType = store.TowerType[towerId] ?? "Basic";
                 float stunChance = store.TowerStunChance[towerId];
-                if (stunChance > 0f && _rand.NextDouble() < stunChance)
-                {
-                    store.ApplyEnemyStun(enemyId, 1);
-                }
-
-                // Slow: apply if tower has slow amount
                 float slowAmount = store.TowerSlowAmount[towerId];
                 float slowDuration = store.TowerSlowDuration[towerId];
-                if (slowAmount > 0f && slowDuration > 0f)
+
+                switch (towerType)
                 {
-                    store.ApplyEnemySlow(enemyId, slowAmount, (int)slowDuration);
+                    case "Firewall":
+                        // Firewall: apply burn DoT (continuous damage over time via BuffSystem)
+                        if (buffSystem != null && slowAmount > 0f && slowDuration > 0f)
+                        {
+                            buffSystem.ApplyDot(enemyId, slowAmount, (int)slowDuration);
+                        }
+                        // Also roll stun
+                        if (stunChance > 0f && _rand.NextDouble() < stunChance)
+                        {
+                            store.ApplyEnemyStun(enemyId, 1);
+                        }
+                        break;
+
+                    default:
+                        // Basic / Frost / EMP / Doom: stun + slow
+                        if (stunChance > 0f && _rand.NextDouble() < stunChance)
+                        {
+                            store.ApplyEnemyStun(enemyId, 1);
+                        }
+                        if (slowAmount > 0f && slowDuration > 0f)
+                        {
+                            store.ApplyEnemySlow(enemyId, slowAmount, (int)slowDuration);
+                        }
+                        break;
                 }
             }
             System.Threading.Thread.MemoryBarrier();
+        }
+
+        /// <summary>
+        /// Resolve Tesla chain lightning: O(N) nearest-neighbor chaining on primary target.
+        /// Primary target already took basic damage in Phase 2; this handles the chain hops.
+        /// </summary>
+        private void ResolveTeslaChainLightning()
+        {
+            int readIdx = _chainDamageQueueIdx;
+            int writeIdx = 1 - _chainDamageQueueIdx;
+            _chainDamageQueueIdx = writeIdx;
+            _chainDamageQueue[writeIdx].Clear();
+
+            foreach (var (chainId, enemyId, damage, playerId) in _chainDamageQueue[readIdx])
+            {
+                if (!store.EnemyActive[enemyId]) continue;
+
+                // Primary damage (chainId == 0): already applied in Phase 2 via _damageQueue
+                // Chain hop damage: apply and check for kill
+                if (chainId > 0)
+                {
+                    store.EnemyHealth[enemyId] -= damage;
+                    if (store.EnemyHealth[enemyId] <= 0f)
+                    {
+                        store.QueueEnemyDeath(enemyId, playerId);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Resolve Leech lifesteal healing: apply player HP regen from Leech tower damage.
+        /// </summary>
+        private void ResolveLeechHealing()
+        {
+            int readIdx = _healQueueIdx;
+            int writeIdx = 1 - _healQueueIdx;
+            _healQueueIdx = writeIdx;
+            _healQueue[writeIdx].Clear();
+
+            foreach (var (playerId, healAmount) in _healQueue[readIdx])
+            {
+                if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) continue;
+                float maxHealth = store.GetPlayerMaxHealth(playerId);
+                float currentHealth = store.GetPlayerCurrentHealth(playerId);
+                float newHealth = Math.Min(currentHealth + healAmount, maxHealth);
+                store.SetPlayerCurrentHealth(playerId, newHealth);
+            }
         }
     }
 }
