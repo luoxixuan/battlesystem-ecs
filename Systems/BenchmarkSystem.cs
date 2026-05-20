@@ -25,13 +25,13 @@ namespace BattleSystemECS.Systems
         {
             if (scenario == 3)
             {
-                RunMicroBenchmark(10000, 200);
+                RunMicroBenchmark(10000, 500);
                 return;
             }
 
             if (scenario == 4)
             {
-                RunRealSystemChainBenchmark(10000, 200);
+                RunRealSystemChainBenchmark(10000, 500);
                 return;
             }
 
@@ -84,7 +84,7 @@ namespace BattleSystemECS.Systems
             store.AddTower(t2, "魔法塔", 25f, 5, 1f, 1, 100f);
             store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
 
-            int frames = 200;
+            int frames = 500;
 
             // Warm-up (BeginFrame is optional since Resolve clears _deathQueue)
             for (int f = 0; f < 5; f++)
