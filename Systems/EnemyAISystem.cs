@@ -44,7 +44,7 @@ namespace BattleSystemECS.Systems
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
         private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
 
-        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem, TechTreeSystem techTreeSystem)
+        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem, TechTreeSystem techTreeSystem = null)
         {
             this.store = store;
             this.logger = logger;
@@ -66,7 +66,7 @@ namespace BattleSystemECS.Systems
             _playerY = store.PositionY[playerId];
             _activeEnemyList = store.GetCachedActiveEnemyIds();
             _cachedPlayerHealth = store.PlayerCurrentHealth[playerId];
-            _playerHasKnockbackImmunity = techTreeSystem.GetKnockbackImmunity();
+            _playerHasKnockbackImmunity = techTreeSystem?.GetKnockbackImmunity() ?? false;
         }
 
         /// <summary>

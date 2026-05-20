@@ -110,7 +110,8 @@ namespace BattleSystemECS.Systems
             var totalSw = Stopwatch.StartNew();
 
             // Pre-compute move direction lookup to eliminate switch in hot path
-            var moveDir = new sbyte[] { -1, 0, 0, 0, 0, 1, -1 };
+            // 12 values: Forward(0), Retreat(1), FastRetreat(2), StrafeLeft(3), StrafeRight(4), Charge(5), Dodge(6), Knockback(7), Die(8), StunAoe(9), SlowAoe(10), Unknown(11)
+            var moveDir = new sbyte[] { -1, 1, 1, -1, 1, -1, 0, 0, 0, 0, 0, 0 };
             // index: (int)EnemyActionType → direction (-1=forward, 0=stand, 1=retreat)
 
             for (int f = 0; f < frames; f++)
@@ -166,7 +167,9 @@ namespace BattleSystemECS.Systems
 
                         if (ae != EnemyActionType.Dodge)
                         {
-                            store.PositionY[enemyId] = y + moveDir[(int)ae] * moveSpeed;
+                            int actionIdx = (int)ae;
+                            sbyte dir = actionIdx < moveDir.Length ? moveDir[actionIdx] : (sbyte)0;
+                            store.PositionY[enemyId] = y + dir * moveSpeed;
                         }
                         else
                         {
