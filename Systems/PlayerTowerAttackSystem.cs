@@ -43,6 +43,9 @@ namespace BattleSystemECS.Systems
         private float _armorPenetration = 0f;  // fraction of enemy armor ignored, e.g. 0.3 = 30% pen
         private float _damageTakenMult = 1f;    // tech tree: <1.0 = take less damage
 
+        // Cached wave-based difficulty multiplier (updated on SetTurn)
+        private float _waveDifficultyMult = 1f;
+
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         private ConcurrentBag<(int enemyId, float damage)>[] _damageQueue = new ConcurrentBag<(int, float)>[2];
         private int _damageQueueIdx = 0;
@@ -86,6 +89,15 @@ namespace BattleSystemECS.Systems
             _critRateThreshold = (hasCritRateBuff ? 0.05f : 0f) + _critRateBonus;
         }
 
+        /// <summary>
+        /// Update the cached wave difficulty multiplier when wave number changes.
+        /// Call this when a new wave starts. Also called internally by SetTurn for initial setup.
+        /// </summary>
+        public void SetWaveNumber(int waveNumber)
+        {
+            _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(waveNumber) : 1f;
+        }
+
         public int GetCachedEnemyCount() => _activeEnemyList != null ? _activeEnemyList.Count : 0;
 
         public void Update()
@@ -97,6 +109,7 @@ namespace BattleSystemECS.Systems
 
             // O(1) field access — no method calls, no boundary checks
             float baseDamage = _attackDamage * _attackBuffMult;
+            baseDamage *= _waveDifficultyMult;  // wave scaling, always applied (1.0f when wave=1)
 
             var activeEnemyIds = _activeEnemyList;
 

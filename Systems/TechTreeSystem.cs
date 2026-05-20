@@ -16,6 +16,7 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore store;
         private readonly IRenderer renderer;
         private readonly int playerId;
+        private readonly GameConfig gameConfig;
         private TechTreeConfig config;
         // O(1) node lookup — built once from config, rebuilt on ReloadConfig
         private Dictionary<string, TechNodeDef> _nodeLookup;
@@ -39,12 +40,13 @@ namespace BattleSystemECS.Systems
         private bool _hasRespawn = false;
         private float _respawnHpPct = 0f;
 
-        public TechTreeSystem(ComponentStore store, IRenderer renderer, int playerId, TechTreeConfig config)
+        public TechTreeSystem(ComponentStore store, IRenderer renderer, int playerId, TechTreeConfig config, GameConfig gameConfig = null)
         {
             this.store = store;
             this.renderer = renderer;
             this.playerId = playerId;
             this.config = config;
+            this.gameConfig = gameConfig;
             BuildNodeLookup();
         }
 
@@ -284,6 +286,17 @@ namespace BattleSystemECS.Systems
             store.SetPlayerCurrentHealth(playerId, maxHp * _respawnHpPct);
             renderer.Log($"[TECH] 不朽触发！玩家复活至 {(_respawnHpPct * 100):F0}% 生命");
             return true;
+        }
+
+        /// <summary>
+        /// Get wave-based damage scaling multiplier for a given wave number.
+        /// Formula: 1.0 + (waveNumber - 1) * PlayerDamageScalingPerWave
+        /// </summary>
+        public float GetWaveDifficultyMultiplier(int waveNumber)
+        {
+            if (waveNumber <= 0) return 1.0f;
+            float growthPerWave = gameConfig?.PlayerDamageScalingPerWave ?? 0.05f;
+            return 1.0f + (waveNumber - 1) * growthPerWave;
         }
 
         private TechNodeDef FindNode(string nodeId)

@@ -214,6 +214,10 @@ namespace BattleSystemECS.Config
         // Tower upgrade paths (config-driven upgrade curves)
         public Dictionary<string, TowerUpgradePathConfig> TowerUpgradePaths { get; set; } = new Dictionary<string, TowerUpgradePathConfig>();
 
+        // Wave-based difficulty scaling
+        public float DifficultyGrowthPerWave { get; set; } = 0.05f;
+        public float PlayerDamageScalingPerWave { get; set; } = 0.05f;
+
         // Behavior tree definitions keyed by monster type
         public Dictionary<string, BehaviorTreeDef> BehaviorTrees { get; set; } = new Dictionary<string, BehaviorTreeDef>();
         private Dictionary<string, BehaviorTreeDef> _btCache = new Dictionary<string, BehaviorTreeDef>();

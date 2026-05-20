@@ -29,6 +29,9 @@ namespace BattleSystemECS.Systems
         private float _armorPenetration = 0f;  // from TechTreeSystem
         private float _damageTakenMult = 1f;   // from TechTreeSystem
 
+        // Cached wave-based difficulty multiplier (updated each SetTurn)
+        private float _waveDifficultyMult = 1f;
+
         public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem = null)
         {
             this.store = store;
@@ -46,6 +49,9 @@ namespace BattleSystemECS.Systems
             _armorPenetration = techTreeSystem != null ? techTreeSystem.GetArmorPenetration() : 0f;
             _damageTakenMult = techTreeSystem != null ? techTreeSystem.GetDamageTakenMult() : 1f;
 
+            // Cache wave-based difficulty multiplier (default wave 1)
+            _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(1) : 1f;
+
             // Ensure _towerCandidates is large enough; each slot is a reusable List<int>
             var towerIds = store.ActiveTowerIds;
             if (_towerCandidates.Length < towerIds.Count)
@@ -56,6 +62,15 @@ namespace BattleSystemECS.Systems
                     newArr[i] = new List<int>(128);
                 _towerCandidates = newArr;
             }
+        }
+
+        /// <summary>
+        /// Update the cached wave difficulty multiplier when wave number changes.
+        /// Call this when a new wave starts.
+        /// </summary>
+        public void SetWaveNumber(int waveNumber)
+        {
+            _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(waveNumber) : 1f;
         }
 
         public void Update(float deltaTime)
@@ -127,9 +142,10 @@ namespace BattleSystemECS.Systems
                 {
                     store.TowerLastAttackTime[towerId] = 0f;
                     float baseDmg = store.TowerAttackDamage[towerId];
-                    // Apply enemy armor reduction + tech tree damage taken multiplier
+                    // Apply enemy armor reduction + tech tree damage taken multiplier + wave scaling
                     // Inlined: avoids branch + Math.Max call in hot path
                     baseDmg *= Math.Max(0.01f, 1f - store.EnemyArmor[bestTarget] * (1f - _armorPenetration)) * _damageTakenMult;
+                    if (_waveDifficultyMult != 1.0f) baseDmg *= _waveDifficultyMult;
                     bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
                 }
             });

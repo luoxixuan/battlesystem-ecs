@@ -99,7 +99,7 @@ namespace BattleSystemECS.Core
 
             logger.Log("[BOOTSTRAP]    - Creating TechTreeSystem...");
             var techConfig = TechTreeSystem.LoadConfig(logger);
-            techTreeSystem = new TechTreeSystem(store, logger, playerId, techConfig);
+            techTreeSystem = new TechTreeSystem(store, logger, playerId, techConfig, gameConfig);
             logger.Log("[BOOTSTRAP]      TechTreeSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating TowerAttackSystem...");
@@ -156,6 +156,14 @@ namespace BattleSystemECS.Core
 
             // 订阅波次完成事件 → 产出研究点数
             waveSpawningSystem.OnWaveComplete += () => techTreeSystem.OnWaveComplete();
+            // 订阅波次开始事件 → 同步波次伤害缩放到所有攻击系统
+            waveSpawningSystem.OnWaveStart += () =>
+            {
+                int wave = waveSpawningSystem.GetCurrentWave();
+                playerTowerAttackSystem.SetWaveNumber(wave);
+                towerAttackSystem.SetWaveNumber(wave);
+                skillSystem.SetWaveNumber(wave);
+            };
 
             logger.Log("[BOOTSTRAP] ========== Game Initialization Complete ==========");
             Console.WriteLine();

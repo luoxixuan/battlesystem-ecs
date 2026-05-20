@@ -37,6 +37,11 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public event System.Action OnWaveComplete;
 
+        /// <summary>
+        /// Fired when a new wave starts (before enemies spawn that wave).
+        /// </summary>
+        public event System.Action OnWaveStart;
+
         public WaveSpawningSystem(Core.ComponentStore store, IRenderer renderer, GameConfig gameConfig)
         {
             this.store = store;
@@ -55,6 +60,7 @@ namespace BattleSystemECS.Systems
             enemiesSpawnedInWave = 0;
             totalEnemiesSpawned = 0;
             ClearMultiTypeState();
+            OnWaveStart?.Invoke();
         }
 
         private void ClearMultiTypeState()
@@ -103,6 +109,7 @@ namespace BattleSystemECS.Systems
             {
                 InitMultiTypeState(waveConfig);
                 enemiesSpawnedInWave = 0;
+                OnWaveStart?.Invoke();
             }
 
             if (enemiesSpawnedInWave < waveConfig.EnemyCount)

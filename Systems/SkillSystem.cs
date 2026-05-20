@@ -25,6 +25,8 @@ namespace BattleSystemECS.Systems
         private TechTreeSystem techTreeSystem;
         private BuffSystem dotSystem;
         private List<int> _activeEnemyList;
+        // Cached wave-based difficulty multiplier (updated via SetWaveNumber)
+        private float _waveDifficultyMult = 1f;
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         private ConcurrentBag<(int enemyId, float damage)>[] _skillDamageQueue = new ConcurrentBag<(int, float)>[2];
         private int _skillDamageQueueIdx = 0;
@@ -67,6 +69,15 @@ namespace BattleSystemECS.Systems
         public void SetTurn(int turn)
         {
             this._activeEnemyList = store.GetCachedActiveEnemyIds();
+        }
+
+        /// <summary>
+        /// Update the cached wave difficulty multiplier when wave number changes.
+        /// Call this when a new wave starts.
+        /// </summary>
+        public void SetWaveNumber(int waveNumber)
+        {
+            _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(waveNumber) : 1f;
         }
 
         /// <summary>
@@ -173,6 +184,8 @@ namespace BattleSystemECS.Systems
             float finalDamage = (def.DamageMultiplierAttr < 0)
                 ? baseDamage * def.FixedBaseDamage
                 : baseDamage; // attribute-based not wired up yet
+            // Apply wave-based difficulty scaling
+            finalDamage *= _waveDifficultyMult;
 
             float playerX = store.PositionX[playerId];
             float playerY = store.PositionY[playerId];
