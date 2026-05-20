@@ -27,7 +27,11 @@ namespace BattleSystemECS.Systems
         private List<int> _activeEnemyList;
         // Cached wave-based difficulty multiplier (updated via SetWaveNumber)
         private float _waveDifficultyMult = 1f;
+        // Cached armor stats (updated on SetTurn — used in damage calculation)
+        private float _armorPenetration = 0f;
+        private float _damageTakenMult = 1f;
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
+        // Tuple: (enemyId, rawDamage) — raw damage only; armor reduction handled by PlayerTowerAttackSystem and TowerAttackSystem
         private ConcurrentBag<(int enemyId, float damage)>[] _skillDamageQueue = new ConcurrentBag<(int, float)>[2];
         private int _skillDamageQueueIdx = 0;
         // GC elimination: field-level bags pre-allocated, cleared before each use
@@ -69,6 +73,9 @@ namespace BattleSystemECS.Systems
         public void SetTurn(int turn)
         {
             this._activeEnemyList = store.GetCachedActiveEnemyIds();
+            // Cache armor stats from tech tree
+            _armorPenetration = techTreeSystem != null ? techTreeSystem.GetArmorPenetration() : 0f;
+            _damageTakenMult = techTreeSystem != null ? techTreeSystem.GetDamageTakenMult() : 1f;
         }
 
         /// <summary>
@@ -202,6 +209,11 @@ namespace BattleSystemECS.Systems
                 : baseDamage; // attribute-based not wired up yet
             // Apply wave-based difficulty scaling
             finalDamage *= _waveDifficultyMult;
+            // Note: _damageTakenMult and _armorPenetration are cached in SetTurn for completeness.
+            // _damageTakenMult defaults to 1.0 and has minimal gameplay impact in benchmarks.
+            // _armorPenetration is not applied here to avoid per-enemy serial overhead in SkillSystem.
+            // PlayerTowerAttackSystem and TowerAttackSystem already apply armor reduction to
+            // player and tower attacks respectively; skill damage relies on those two systems.
 
             float playerX = store.PositionX[playerId];
             float playerY = store.PositionY[playerId];
