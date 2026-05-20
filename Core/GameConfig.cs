@@ -130,6 +130,9 @@ namespace BattleSystemECS.Config
         public float HealAmount { get; set; }
         public string BuffStat { get; set; }
         public int BuffDuration { get; set; }
+        public int StunDuration { get; set; }   // turns to stun (for stun_aoe abilities)
+        public float SlowFactor { get; set; }   // speed multiplier for slow (0.5 = 50%)
+        public int SlowDuration { get; set; }  // turns for slow
     }
 
     public class SkillConfig

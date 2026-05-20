@@ -285,6 +285,7 @@ namespace BattleSystemECS.Core
                 {
                     turn++;
                     store.BeginFrame(); // Reset two-phase queues each turn
+                    store.SetTurnCCFlags(); // Decrement player CC durations (enemy stun flags cleared in EnemyMovementSystem.SetTurn)
 
                     System.Threading.Thread.Sleep(1000);
 

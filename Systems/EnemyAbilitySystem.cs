@@ -120,6 +120,12 @@ namespace BattleSystemECS.Systems
                 case "buff_allies":
                     ExecuteBuffAllies(enemyId, ability);
                     break;
+                case "stun_aoe":
+                    ExecuteStunAoe(enemyId, ability);
+                    break;
+                case "slow_aoe":
+                    ExecuteSlowAoe(enemyId, ability);
+                    break;
             }
 
             int timerIdx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY;
@@ -210,8 +216,41 @@ namespace BattleSystemECS.Systems
             }
         }
 
+        private void ExecuteStunAoe(int enemyId, EnemyAbilityDef ability)
+        {
+            if (ability.AoeRadius <= 0 || ability.StunDuration <= 0) return;
+
+            float enemyX = store.PositionX[enemyId];
+            float enemyY = store.PositionY[enemyId];
+            float playerX = store.PositionX[playerId];
+            float playerY = store.PositionY[playerId];
+
+            float dist = Math.Abs(enemyX - playerX) + Math.Abs(enemyY - playerY);
+            if (dist > ability.AoeRadius) return;
+
+            store.ApplyPlayerStun(playerId, ability.StunDuration);
+            logger.Log($"[ABILITY] Enemy {enemyId} stuns player for {ability.StunDuration} turn(s) ({ability.Name})");
+        }
+
+        private void ExecuteSlowAoe(int enemyId, EnemyAbilityDef ability)
+        {
+            if (ability.AoeRadius <= 0 || ability.SlowFactor <= 0f || ability.SlowDuration <= 0) return;
+
+            float enemyX = store.PositionX[enemyId];
+            float enemyY = store.PositionY[enemyId];
+            float playerX = store.PositionX[playerId];
+            float playerY = store.PositionY[playerId];
+
+            float dist = Math.Abs(enemyX - playerX) + Math.Abs(enemyY - playerY);
+            if (dist > ability.AoeRadius) return;
+
+            store.ApplyPlayerSlow(playerId, ability.SlowFactor, ability.SlowDuration);
+            logger.Log($"[ABILITY] Enemy {enemyId} slows player by {((1f - ability.SlowFactor) * 100):F0}% for {ability.SlowDuration} turn(s) ({ability.Name})");
+        }
+
         /// <summary>
         /// Called once per turn from GameManager.Run(). Decrements buff durations and clears expired buffs.
+        /// Also clears expired slow effects and restores speed.
         /// </summary>
         public void Update()
         {
@@ -227,6 +266,8 @@ namespace BattleSystemECS.Systems
                 {
                     store.EnemyBuffDamageBonus[enemyId] = 0f;
                     store.EnemyBuffDurationLeft[enemyId] = 0f;
+                    // Clear slow if it was the expiring CC effect
+                    store.ClearSlow(enemyId);
                 }
             }
         }

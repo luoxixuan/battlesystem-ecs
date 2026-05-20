@@ -101,6 +101,41 @@
     "AoeRadius": 6,
     "DamageMultiplier": 0.6,
     "HealAmount": 0,
-    "BuffDuration": 0
+    "BuffDuration": 0,
+    "StunDuration": 0,
+    "SlowFactor": 0,
+    "SlowDuration": 0
+  },
+  {
+    "Id": "boss_stun_shockwave",
+    "Name": "Stun Wave",
+    "Description": "Stuns the player for 1 turn in 4-cell radius",
+    "AbilityType": "stun_aoe",
+    "BuffStat": "",
+    "Cooldown": 8,
+    "CooldownRemaining": 0,
+    "AoeRadius": 4,
+    "DamageMultiplier": 0,
+    "HealAmount": 0,
+    "BuffDuration": 0,
+    "StunDuration": 1,
+    "SlowFactor": 0,
+    "SlowDuration": 0
+  },
+  {
+    "Id": "boss_slow_field",
+    "Name": "Cursed Ground",
+    "Description": "Slows player by 50% for 3 turns in 5-cell radius",
+    "AbilityType": "slow_aoe",
+    "BuffStat": "",
+    "Cooldown": 10,
+    "CooldownRemaining": 0,
+    "AoeRadius": 5,
+    "DamageMultiplier": 0,
+    "HealAmount": 0,
+    "BuffDuration": 0,
+    "StunDuration": 0,
+    "SlowFactor": 0.5,
+    "SlowDuration": 3
   }
 ]

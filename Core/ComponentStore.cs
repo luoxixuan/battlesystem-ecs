@@ -43,6 +43,11 @@ namespace BattleSystemECS.Core
 
         // Perf: bit-flag buff storage — O(1) lookup, no GC allocation per frame
         public BuffType[] PlayerBuffFlags = new BuffType[MAX_PLAYERS];
+        // Player stun duration counter (turns remaining). 0 = not stunned.
+        public int[] PlayerStunDuration = new int[MAX_PLAYERS];
+        // Player slow: tracks remaining slow turns and factor
+        public float[] PlayerSlowFactor = new float[MAX_PLAYERS];
+        public int[] PlayerSlowDuration = new int[MAX_PLAYERS];
 
         // ==================== 科技树组件的 SOA 存储 ====================
         public int[] PlayerResearchPoints = new int[MAX_PLAYERS];
@@ -64,6 +69,14 @@ namespace BattleSystemECS.Core
         public int[] EnemySpawnFrame = new int[MAX_ENTITIES];
         // Armor: reduces incoming damage. Affected by attacker's armor penetration.
         public float[] EnemyArmor = new float[MAX_ENTITIES];
+        // ==================== 敌人 CC (Crowd Control) 字段 ====================
+        // Grouped together after all enemy hot-path fields to preserve cache locality
+        // EnemyStunFlag: true = stunned, skip movement this frame
+        public bool[] EnemyStunFlag = new bool[MAX_ENTITIES];
+        // EnemySlowFactor: speed multiplier (0.5 = 50% speed), 0 = no slow
+        public float[] EnemySlowFactor = new float[MAX_ENTITIES];
+        // EnemyMoveSpeedBase: stores original speed for slow recovery
+        public float[] EnemyMoveSpeedBase = new float[MAX_ENTITIES];
 
         // ==================== 敌人 AI 组件的 SOA 存储 ====================
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
@@ -221,6 +234,9 @@ namespace BattleSystemECS.Core
                 PlayerBuffs[i] = new List<string>();
                 PlayerUnlockedTechs[i] = new HashSet<string>();
                 PlayerBuffFlags[i] = BuffType.None;
+                PlayerStunDuration[i] = 0;
+                PlayerSlowFactor[i] = 0f;
+                PlayerSlowDuration[i] = 0;
             }
         }
 
@@ -278,6 +294,9 @@ namespace BattleSystemECS.Core
                 EnemyAIChargeCounter[entityId] = 0;
                 EnemyAILastAttackTurn[entityId] = 0;
                 EnemyArmor[entityId] = 0f;
+                EnemyStunFlag[entityId] = false;
+                EnemySlowFactor[entityId] = 0f;
+                EnemyMoveSpeedBase[entityId] = 0f;
             }
 
             if (wasTower)
@@ -491,6 +510,7 @@ namespace BattleSystemECS.Core
             EnemyHealth[entityId] = health;
             EnemyMaxHealth[entityId] = maxHealth;
             EnemyMoveSpeed[entityId] = moveSpeed;
+            EnemyMoveSpeedBase[entityId] = moveSpeed;
             EnemyDamage[entityId] = damage;
             EnemyGoldReward[entityId] = goldReward;
             EnemyWaveNumber[entityId] = waveNumber;
@@ -566,6 +586,106 @@ namespace BattleSystemECS.Core
         {
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0f;
             return EnemyMoveSpeed[enemyId];
+        }
+
+        // ==================== CC (Crowd Control) helpers ====================
+        /// <summary>Returns true if the enemy is currently stunned.</summary>
+        public bool IsEnemyStunned(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return false;
+            return EnemyStunFlag[enemyId];
+        }
+
+        /// <summary>Returns true if the player is currently stunned.</summary>
+        public bool IsPlayerStunned(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
+            return PlayerStunDuration[playerId] > 0;
+        }
+
+        /// <summary>Returns true if the player is currently slowed.</summary>
+        public bool IsPlayerSlowed(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
+            return PlayerSlowFactor[playerId] > 0f;
+        }
+
+        /// <summary>Applies a stun to the enemy for the current frame. Stun clears automatically at start of each frame via SetTurnCCFlags.</summary>
+        public void ApplyStun(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            EnemyStunFlag[enemyId] = true;
+        }
+
+        /// <summary>Applies a stun to the player for N turns.</summary>
+        public void ApplyPlayerStun(int playerId, int turns)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (turns <= 0) return;
+            if (PlayerStunDuration[playerId] < turns)
+                PlayerStunDuration[playerId] = turns;
+        }
+
+        /// <summary>Applies a slow to the enemy. factor is a multiplier (e.g. 0.5 = 50% speed). Duration in turns tracked by EnemyBuffDurationLeft.</summary>
+        public void ApplySlow(int enemyId, float factor, int duration)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (factor <= 0f || factor >= 1f) return; // only valid slow factors
+
+            float baseSpeed = EnemyMoveSpeedBase[enemyId];
+            if (baseSpeed <= 0f) baseSpeed = EnemyMoveSpeed[enemyId];
+
+            EnemySlowFactor[enemyId] = factor;
+            EnemyMoveSpeed[enemyId] = baseSpeed * factor;
+            EnemyBuffDurationLeft[enemyId] = duration;
+        }
+
+        /// <summary>Applies slow to the player. factor is a speed multiplier (0.5 = 50% speed).</summary>
+        public void ApplyPlayerSlow(int playerId, float factor, int duration)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (factor <= 0f || factor >= 1f) return;
+            // Take the stronger slow if stacking
+            if (factor < PlayerSlowFactor[playerId])
+            {
+                PlayerSlowFactor[playerId] = factor;
+                PlayerSlowDuration[playerId] = duration;
+            }
+            else if (PlayerSlowFactor[playerId] <= 0f)
+            {
+                PlayerSlowFactor[playerId] = factor;
+                PlayerSlowDuration[playerId] = duration;
+            }
+        }
+
+        /// <summary>Clears slow effect and restores original speed.</summary>
+        public void ClearSlow(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (EnemySlowFactor[enemyId] <= 0f) return; // no slow active
+
+            float baseSpeed = EnemyMoveSpeedBase[enemyId];
+            if (baseSpeed > 0f)
+                EnemyMoveSpeed[enemyId] = baseSpeed;
+            EnemySlowFactor[enemyId] = 0f;
+        }
+
+        /// <summary>
+        /// Called at the start of each turn: clears enemy stun flags and decrements player CC durations.
+        /// Enemy stun flags are cleared by EnemyMovementSystem.SetTurn; this method handles player CC only.
+        /// </summary>
+        public void SetTurnCCFlags()
+        {
+            // Decrement player CC durations (MAX_PLAYERS = 10, so simple loop is fast)
+            for (int i = 0; i < MAX_PLAYERS; i++)
+            {
+                if (PlayerStunDuration[i] > 0) PlayerStunDuration[i]--;
+                if (PlayerSlowDuration[i] > 0)
+                {
+                    PlayerSlowDuration[i]--;
+                    if (PlayerSlowDuration[i] <= 0) PlayerSlowFactor[i] = 0f;
+                }
+            }
         }
 
         public float GetEnemyDamage(int enemyId)

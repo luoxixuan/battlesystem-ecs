@@ -34,6 +34,9 @@ namespace BattleSystemECS.Systems
         {
             _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
             _playerX = store.PositionX[playerId];
+            // Clear stun flags for all active enemies at the start of each turn
+            for (int i = 0; i < _activeEnemyList.Count; i++)
+                store.EnemyStunFlag[_activeEnemyList[i]] = false;
         }
 
         public void Update()
@@ -57,6 +60,10 @@ namespace BattleSystemECS.Systems
 
                 // Enum-based action dispatch — O(1) per enemy, no string comparison
                 EnemyActionType actionEnum = store.GetEnemyActionEnum(enemyId);
+
+                // Stun check: stunned enemies skip all movement this frame
+                if (store.IsEnemyStunned(enemyId))
+                    return;
 
                 // Default: move toward player (direction = -1, toward y=0)
                 int direction = -1;
