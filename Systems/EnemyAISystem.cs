@@ -38,6 +38,7 @@ namespace BattleSystemECS.Systems
         private float _cachedPlayerHealth = -1;
         private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
         private readonly int[] _enemyChargeCounterCache = new int[ComponentStore.MAX_ENTITIES];
+        private readonly bool[] _stunFlagCache = new bool[ComponentStore.MAX_ENTITIES];
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
         private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
 
@@ -94,9 +95,11 @@ namespace BattleSystemECS.Systems
                     float enemyHealth = store.EnemyHealth[enemyId];
                     float playerHealth = store.PlayerCurrentHealth[playerId];
                     int chargeCounter = store.GetEnemyAIChargeCounter(enemyId);
+                    bool stunFlag = store.EnemyStunFlag[enemyId];
                     if (_enemyHealthCache[enemyId] == enemyHealth &&
                         _cachedPlayerHealth == playerHealth &&
-                        _enemyChargeCounterCache[enemyId] == chargeCounter)
+                        _enemyChargeCounterCache[enemyId] == chargeCounter &&
+                        _stunFlagCache[enemyId] == stunFlag)
                     {
                         store.SetEnemyActionEnum(enemyId, _lastActionCache[enemyId]);
                         continue;
@@ -146,6 +149,7 @@ namespace BattleSystemECS.Systems
 
                     _enemyHealthCache[enemyId] = enemyHealth;
                     _enemyChargeCounterCache[enemyId] = chargeCounter;
+                    _stunFlagCache[enemyId] = stunFlag;
                     _lastActionCache[enemyId] = actionEnum;
                     _lastActionStringCache[enemyId] = action;
 
