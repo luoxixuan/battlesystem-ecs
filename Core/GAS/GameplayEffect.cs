@@ -7,6 +7,17 @@ namespace BattleSystemECS.Core.GAS
     public enum AttributeModifierOp { Add, Multiply, Override }
 
     /// <summary>
+    /// Defines how multiple instances of the same effect stack on a target.
+    /// </summary>
+    public enum StackingBehavior
+    {
+        None = 0,           // No stacking: replaces any existing effect of same name
+        DurationRefresh = 1, // Refresh duration only, no stacking
+        MaxStacks = 2,       // Stack up to MaxStacks, no duration refresh
+        MaxStacksRefresh = 3 // Stack up to MaxStacks, refresh duration on each application
+    }
+
+    /// <summary>
     /// A gameplay effect that modifies attributes.
     /// </summary>
     public struct GameplayEffectDef
@@ -24,11 +35,19 @@ namespace BattleSystemECS.Core.GAS
         public int TotalTicks;      // total number of ticks (e.g., 5 for 5s DoT at 1s interval)
         public int TicksRemaining;  // runtime: ticks left
 
+        // Stacking fields
+        public StackingBehavior StackingBehavior;
+        public int MaxStacks;       // max stack count (1 = single, >1 = stacking)
+        public bool RefreshDuration; // runtime: whether to reset RemainingTime on stack refresh
+
         public GameplayEffectDef(string name, EffectType type, int attrIdx, AttributeModifierOp op, float magnitude, float duration = 0f)
         {
             Name = name; Type = type; AttributeIndex = attrIdx; ModifierOp = op; Magnitude = magnitude;
             Duration = duration; RemainingTime = duration;
             TickInterval = 0f; TotalTicks = 0; TicksRemaining = 0;
+            StackingBehavior = StackingBehavior.None;
+            MaxStacks = 1;
+            RefreshDuration = false;
         }
 
         /// <summary>
@@ -41,6 +60,25 @@ namespace BattleSystemECS.Core.GAS
             def.TickInterval = tickInterval;
             def.TotalTicks = ticks;
             def.TicksRemaining = ticks;
+            def.StackingBehavior = StackingBehavior.None;
+            def.MaxStacks = 1;
+            def.RefreshDuration = false;
+            return def;
+        }
+
+        /// <summary>
+        /// Full constructor for Periodic (DoT) effects with stacking behavior.
+        /// </summary>
+        public static GameplayEffectDef Periodic(string name, int attrIdx, float damagePerTick, float totalDuration, float tickInterval, StackingBehavior stacking, int maxStacks)
+        {
+            int ticks = totalDuration <= 0 ? 0 : Math.Max(1, (int)Math.Floor(totalDuration / tickInterval));
+            var def = new GameplayEffectDef(name, EffectType.Periodic, attrIdx, AttributeModifierOp.Add, damagePerTick, totalDuration);
+            def.TickInterval = tickInterval;
+            def.TotalTicks = ticks;
+            def.TicksRemaining = ticks;
+            def.StackingBehavior = stacking;
+            def.MaxStacks = Math.Max(1, maxStacks);
+            def.RefreshDuration = stacking == StackingBehavior.DurationRefresh || stacking == StackingBehavior.MaxStacksRefresh;
             return def;
         }
     }
@@ -56,11 +94,15 @@ namespace BattleSystemECS.Core.GAS
         // Periodic-specific: time accumulator since last tick
         public float TimeSinceLastTick;
 
+        // Stacking: current stack count for this applied effect
+        public int StackCount;
+
         public AppliedEffect(GameplayEffectDef def, int sourceId)
         {
             Definition = def;
             SourceEntityId = sourceId;
             TimeSinceLastTick = 0f;
+            StackCount = 1;
         }
     }
 }

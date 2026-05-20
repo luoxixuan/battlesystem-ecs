@@ -56,6 +56,10 @@ namespace BattleSystemECS.Core.GAS
         public float DotTickInterval;    // seconds between ticks
         public float DotDamagePerTick;   // damage per tick
 
+        // Stacking fields for DoT effects
+        public StackingBehavior DotStackingBehavior;  // how DoT stacks
+        public int DotMaxStacks;         // max stack count for DoT (1 = single application)
+
         // Heal/Shield fields (0 / 0f = no heal/shield)
         public float HealPercent;        // heal percent of max health (e.g. 0.3 = 30%)
         public float ShieldAmount;        // flat shield value absorbed
@@ -65,12 +69,14 @@ namespace BattleSystemECS.Core.GAS
             int dmgAttr, float fixedDmg, AbilityActivation act, int areaShape, int areaRadius,
             float dotDuration = 0f, float dotTickInterval = 0f, float dotDamagePerTick = 0f,
             float healPercent = 0f, float shieldAmount = 0f, float shieldDuration = 0f,
+            StackingBehavior dotStacking = StackingBehavior.None, int dotMaxStacks = 1,
             params int[] requiredBuffs)
         {
             Name = name; Description = desc; Cooldown = cooldown; Cost = cost;
             DamageMultiplierAttr = dmgAttr; FixedBaseDamage = fixedDmg; Activation = act;
             AreaShape = areaShape; AreaRadius = areaRadius;
             DotDuration = dotDuration; DotTickInterval = dotTickInterval; DotDamagePerTick = dotDamagePerTick;
+            DotStackingBehavior = dotStacking; DotMaxStacks = dotMaxStacks;
             HealPercent = healPercent; ShieldAmount = shieldAmount; ShieldDuration = shieldDuration;
             RequiredBuffs = requiredBuffs;
         }

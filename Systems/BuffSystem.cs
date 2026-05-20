@@ -106,8 +106,9 @@ namespace BattleSystemECS.Systems
                         {
                             eff.TimeSinceLastTick -= eff.Definition.TickInterval;
                             eff.Definition.TicksRemaining--;
-                            // Queue DoT damage
-                            _dotDamageQueue[_dotQueueIdx].Add((enemyId, eff.Definition.Magnitude));
+                            // Queue DoT damage (multiplied by current stack count)
+                            float stackedDamage = eff.Definition.Magnitude * eff.StackCount;
+                            _dotDamageQueue[_dotQueueIdx].Add((enemyId, stackedDamage));
                         }
                         eff.Definition.RemainingTime = Math.Max(0f, eff.Definition.RemainingTime - deltaTime);
                     }
@@ -174,10 +175,63 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Add a Periodic DoT effect to an entity.
+        /// Add a Periodic DoT effect to an entity with stacking support.
+        /// Implements stacking behaviors:
+        /// - None: replaces any existing effect of the same name
+        /// - DurationRefresh: refreshes duration only (no stacking)
+        /// - MaxStacks: stacks up to MaxStacks, no duration refresh
+        /// - MaxStacksRefresh: stacks up to MaxStacks, refreshes duration on each application
         /// </summary>
         public void ApplyDot(int targetId, GameplayEffectDef dotDef)
         {
+            // Fast path: StackingBehavior.None skips the search — same as old O(1) behavior
+            if (dotDef.StackingBehavior == StackingBehavior.None)
+            {
+                store.AddEffect(targetId, new AppliedEffect(dotDef, playerId));
+                return;
+            }
+
+            int count = store.GetEffectCount(targetId);
+            for (int slot = 0; slot < count; slot++)
+            {
+                var existing = store.GetEffect(targetId, slot);
+                if (existing.Definition.Name != dotDef.Name) continue;
+                if (existing.Definition.Type != EffectType.Periodic) continue;
+
+                switch (dotDef.StackingBehavior)
+                {
+                    case StackingBehavior.DurationRefresh:
+                        // Refresh duration only, keep existing stacks
+                        existing.Definition.RemainingTime = dotDef.Duration;
+                        existing.Definition.TicksRemaining = dotDef.TotalTicks;
+                        existing.TimeSinceLastTick = 0f;
+                        store.SetEffect(targetId, slot, existing);
+                        return;
+
+                    case StackingBehavior.MaxStacks:
+                        // Stack up to MaxStacks, no duration refresh
+                        if (existing.StackCount < dotDef.MaxStacks)
+                        {
+                            existing.StackCount++;
+                            store.SetEffect(targetId, slot, existing);
+                        }
+                        return;
+
+                    case StackingBehavior.MaxStacksRefresh:
+                        // Stack up to MaxStacks, refresh duration on each application
+                        if (existing.StackCount < dotDef.MaxStacks)
+                        {
+                            existing.StackCount++;
+                        }
+                        existing.Definition.RemainingTime = dotDef.Duration;
+                        existing.Definition.TicksRemaining = dotDef.TotalTicks;
+                        existing.TimeSinceLastTick = 0f;
+                        store.SetEffect(targetId, slot, existing);
+                        return;
+                }
+                return;
+            }
+            // No existing effect found — add new one
             store.AddEffect(targetId, new AppliedEffect(dotDef, playerId));
         }
 

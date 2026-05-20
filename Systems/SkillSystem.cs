@@ -120,7 +120,8 @@ namespace BattleSystemECS.Systems
                     sc.DotDamagePerTick,
                     sc.HealPercent,
                     sc.ShieldAmount,
-                    sc.ShieldDuration
+                    sc.ShieldDuration,
+                    StackingBehavior.None, 1  // dotStacking, dotMaxStacks
                 );
                 store.AddAbility(playerId, def);
                 renderer.Log($"[SKILL] {sc.Name} registered (shape: {sc.AreaShape}, radius: {sc.AreaRadius}, DoT: {sc.DotDuration}s/{sc.DotTickInterval}s×{sc.DotDamagePerTick})");
@@ -435,13 +436,21 @@ namespace BattleSystemECS.Systems
             {
                 if (dotSystem != null && def.HasDot)
                 {
-                    var dotDef = GameplayEffectDef.Periodic(
-                        $"DoT:{def.Name}",
-                        AttributeSetDefinitions.ENEMY_HEALTH,
-                        def.DotDamagePerTick,
-                        def.DotDuration,
-                        def.DotTickInterval
-                    );
+                    var dotDef = def.DotStackingBehavior != StackingBehavior.None
+                        ? GameplayEffectDef.Periodic(
+                            $"DoT:{def.Name}",
+                            AttributeSetDefinitions.ENEMY_HEALTH,
+                            def.DotDamagePerTick,
+                            def.DotDuration,
+                            def.DotTickInterval,
+                            def.DotStackingBehavior,
+                            def.DotMaxStacks)
+                        : GameplayEffectDef.Periodic(
+                            $"DoT:{def.Name}",
+                            AttributeSetDefinitions.ENEMY_HEALTH,
+                            def.DotDamagePerTick,
+                            def.DotDuration,
+                            def.DotTickInterval);
                     dotSystem.ApplyDot(enemyId, dotDef);
                 }
                 else
