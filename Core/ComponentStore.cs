@@ -39,6 +39,12 @@ namespace BattleSystemECS.Core
         public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         private float _goldKillMultiplier = 1.0f;
         public float GoldKillMultiplier { get => _goldKillMultiplier; set => _goldKillMultiplier = value; }
+        // all_income_mult: extra multiplier layered on top of gold kill multiplier
+        private float _allIncomeMultKill = 1.0f;
+        public float AllIncomeMultKill { get => _allIncomeMultKill; set => _allIncomeMultKill = value; }
+        // flat bonus awarded once per elite kill
+        private float _goldOnEliteKill = 0f;
+        public float GoldOnEliteKill { get => _goldOnEliteKill; set => _goldOnEliteKill = value; }
         public List<string>[] PlayerBuffs = new List<string>[MAX_PLAYERS];
 
         // Perf: bit-flag buff storage — O(1) lookup, no GC allocation per frame
@@ -230,7 +236,9 @@ namespace BattleSystemECS.Core
             {
                 if (!EnemyActive[enemyId]) continue; // already destroyed this frame
                 TotalKills++;
-                PlayerGold[playerId] += EnemyGoldReward[enemyId] * _goldKillMultiplier;
+                PlayerGold[playerId] += EnemyGoldReward[enemyId] * _goldKillMultiplier * _allIncomeMultKill;
+                if (_goldOnEliteKill > 0f && EnemyTypeName[enemyId] == "Elite")
+                    PlayerGold[playerId] += _goldOnEliteKill;
                 DestroyEntity(enemyId);
             }
             _deathQueue[writeIdx].Clear();

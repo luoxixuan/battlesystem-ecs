@@ -29,6 +29,8 @@ namespace BattleSystemECS.Systems
         private float _damageTakenMult = 1.0f;  // < 1.0 = less damage taken
         private float _goldOnKillMult = 1.0f;
         private float _allIncomeMult = 1.0f;
+        private float _experiencePerKill = 0f;
+        private float _goldOnEliteKill = 0f;
         private float _armorAdd = 0f;
         private float _critRateAdd = 0f;
         private float _critDamageMult = 1.0f;
@@ -184,6 +186,8 @@ namespace BattleSystemECS.Systems
                     case "damage_taken_mult":       _damageTakenMult += eff.value; break;
                     case "gold_on_kill_mult":       _goldOnKillMult += eff.value; break;
                     case "all_income_mult":         _allIncomeMult += eff.value; break;
+                    case "experience_on_kill_add":  _experiencePerKill += eff.value; break;
+                    case "gold_on_elite_kill":      _goldOnEliteKill += eff.value; break;
                     case "armor_add":               _armorAdd += eff.value; break;
                     case "crit_rate_add":           _critRateAdd += eff.value; break;
                     case "crit_damage_mult":        _critDamageMult += eff.value; break;
@@ -246,6 +250,16 @@ namespace BattleSystemECS.Systems
         /// Get all income multiplier.
         /// </summary>
         public float GetAllIncomeMult() => _allIncomeMult;
+
+        /// <summary>
+        /// Get bonus experience per kill.
+        /// </summary>
+        public float GetExperiencePerKill() => _experiencePerKill;
+
+        /// <summary>
+        /// Get bonus gold awarded when an elite enemy is killed.
+        /// </summary>
+        public float GetGoldOnEliteKill() => _goldOnEliteKill;
 
         /// <summary>
         /// Get armor penetration ratio.

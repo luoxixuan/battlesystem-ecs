@@ -46,19 +46,23 @@ namespace BattleSystemECS.Systems
 
         public void Update()
         {
-            // Sync tech tree gold-on-kill multiplier to ComponentStore every frame
+            // Sync tech tree gold multipliers to ComponentStore every frame
             if (hasTechTreeSystem)
             {
                 store.GoldKillMultiplier = techTreeSystem.GetGoldOnKillMult();
+                store.AllIncomeMultKill = techTreeSystem.GetAllIncomeMult();
+                store.GoldOnEliteKill = techTreeSystem.GetGoldOnEliteKill();
             }
             else
             {
                 store.GoldKillMultiplier = 1.0f;
+                store.AllIncomeMultKill = 1.0f;
+                store.GoldOnEliteKill = 0f;
             }
         }
 
         /// <summary>
-        /// Award gold bonus when a wave completes, applying tech tree wave bonus multiplier.
+        /// Award gold bonus when a wave completes, applying tech tree wave bonus and all_income_mult.
         /// </summary>
         public void AwardGoldForWave(float baseGold, int playerId)
         {
@@ -68,13 +72,16 @@ namespace BattleSystemECS.Systems
             {
                 bonus = Math.Max(0f, techTreeSystem.GetGoldOnWaveBonus());
             }
-            float totalGold = baseGold + bonus;
+            float subtotal = baseGold + bonus;
+            // Apply all_income_mult multiplier (layered on top of gold_on_wave_bonus)
+            float mult = hasTechTreeSystem ? techTreeSystem.GetAllIncomeMult() : 1.0f;
+            float totalGold = subtotal * mult;
             if (totalGold > 0f)
             {
                 float currentGold = store.GetPlayerGold(playerId);
                 store.SetPlayerGold(playerId, currentGold + totalGold);
                 store.PlayerWaveCompleteGold[playerId] = totalGold;
-                renderer.Log($"[GOLD] Wave complete: +{totalGold} gold (base {baseGold}, bonus {bonus})");
+                renderer.Log($"[GOLD] Wave complete: +{totalGold} gold (base {baseGold}, bonus {bonus}, mult {mult:F2})");
             }
         }
 
