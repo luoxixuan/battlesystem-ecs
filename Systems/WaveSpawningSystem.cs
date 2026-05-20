@@ -148,13 +148,19 @@ namespace BattleSystemECS.Systems
                     float startX = (float)random.Next(0, 10);
                     float startY = 19f;
 
+                    // Apply wave difficulty scaling to enemy stats for progressive challenge
+                    float waveScaling = 1.0f + (currentWave - 1) * (gameConfig?.PlayerDamageScalingPerWave ?? 0.05f);
+                    float scaledHealth = monsterConfig.Health * waveScaling;
+                    float scaledMaxHealth = monsterConfig.MaxHealth * waveScaling;
+                    float scaledDamage = monsterConfig.Damage * waveScaling;
+
                     string enemyName = $"{monsterType}L{currentLevel}W{currentWave}T{_multiTypeIndex}E{_multiSpawnedForType}";
                     int enemyId = store.AddEnemy(
                         startX, startY,
                         monsterConfig.MoveSpeed,
-                        monsterConfig.Health,
-                        monsterConfig.MaxHealth,
-                        monsterConfig.Damage,
+                        scaledHealth,
+                        scaledMaxHealth,
+                        scaledDamage,
                         monsterConfig.GoldReward,
                         currentWave,
                         enemyName,
