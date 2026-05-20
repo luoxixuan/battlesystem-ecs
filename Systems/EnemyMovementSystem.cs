@@ -56,13 +56,14 @@ namespace BattleSystemECS.Systems
                 if (!store.EnemyActive[enemyId])
                     return;
 
-                // Decrement slow duration and restore base speed when expired
-                float dur = store.EnemyBuffDurationLeft[enemyId];
+                // Decrement slow duration and restore base speed when expired (tower-slow tracking)
+                float dur = store.EnemySlowDurationLeft[enemyId];
                 if (dur > 0f)
                 {
-                    store.EnemyBuffDurationLeft[enemyId] = dur - 1f;
-                    if (store.EnemyBuffDurationLeft[enemyId] <= 0f)
+                    store.EnemySlowDurationLeft[enemyId] = dur - 1f;
+                    if (store.EnemySlowDurationLeft[enemyId] <= 0f)
                     {
+                        store.EnemySlowDurationLeft[enemyId] = 0f;
                         store.ClearEnemySlow(enemyId);
                     }
                 }

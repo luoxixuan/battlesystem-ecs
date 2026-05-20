@@ -249,8 +249,8 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Called once per turn from GameManager.Run(). Decrements buff durations and clears expired buffs.
-        /// Also clears expired slow effects and restores speed.
+        /// Called once per turn from GameManager.Run(). Decrements buff_allies durations and clears expired buffs.
+        /// Does NOT touch EnemySlowDurationLeft — that is managed by ComponentStore.DecrementEnemySlowDurations().
         /// </summary>
         public void Update()
         {
@@ -266,8 +266,7 @@ namespace BattleSystemECS.Systems
                 {
                     store.EnemyBuffDamageBonus[enemyId] = 0f;
                     store.EnemyBuffDurationLeft[enemyId] = 0f;
-                    // Clear slow if it was the expiring CC effect
-                    store.ClearSlow(enemyId);
+                    // NOTE: do NOT clear slow here — EnemySlowDurationLeft is tracked separately
                 }
             }
         }

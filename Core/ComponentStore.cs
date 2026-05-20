@@ -99,6 +99,9 @@ namespace BattleSystemECS.Core
         public float[] EnemySlowFactor = new float[MAX_ENTITIES];
         // EnemyMoveSpeedBase: stores original speed for slow recovery
         public float[] EnemyMoveSpeedBase = new float[MAX_ENTITIES];
+        // EnemySlowDurationLeft: tower-slow duration in turns. Separate from EnemyBuffDurationLeft
+        // which is used by buff_allies ability. This prevents double-decrement and cross-clearing.
+        public float[] EnemySlowDurationLeft = new float[MAX_ENTITIES];
 
         // ==================== 敌人 AI 组件的 SOA 存储 ====================
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
@@ -334,6 +337,7 @@ namespace BattleSystemECS.Core
                 EnemyStunFlag[entityId] = false;
                 EnemySlowFactor[entityId] = 0f;
                 EnemyMoveSpeedBase[entityId] = 0f;
+                EnemySlowDurationLeft[entityId] = 0f;
             }
 
             if (wasTower)
@@ -819,6 +823,29 @@ namespace BattleSystemECS.Core
                         PlayerShield[i] = 0f;
                         // Log shield dissipation — use static no-op to avoid Console.WriteLine/IO overhead in hot path
                         FileLogger.LogHotPath($"[SHIELD] 护盾消散！ playerId={i}");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Decrement EnemySlowDurationLeft for all active enemies and clear expired slow effects.
+        /// Called once per turn from EnemyMovementSystem.SetTurn() to expire tower-slow durations.
+        /// Uses _activeEnemyIds which is safe for read during the serial phase.
+        /// </summary>
+        public void DecrementEnemySlowDurations()
+        {
+            for (int i = 0; i < _activeEnemyIds.Count; i++)
+            {
+                int enemyId = _activeEnemyIds[i];
+                float dur = EnemySlowDurationLeft[enemyId];
+                if (dur > 0f)
+                {
+                    EnemySlowDurationLeft[enemyId] = dur - 1f;
+                    if (EnemySlowDurationLeft[enemyId] <= 0f)
+                    {
+                        EnemySlowDurationLeft[enemyId] = 0f;
+                        ClearEnemySlow(enemyId);
                     }
                 }
             }
