@@ -58,16 +58,19 @@ namespace BattleSystemECS.Systems
                 if (!store.EnemyActive[enemyId])
                     return;
 
-                // Decrement stun duration (duration-based stun, survives SetTurn clear)
-                float stunDur = store.EnemyStunDurationLeft[enemyId];
-                if (stunDur > 0f)
+                // Check stun BEFORE decrement so duration=1 blocks exactly 1 frame (current frame),
+                // then decrements to 0 for next frame.
+                if (store.EnemyStunDurationLeft[enemyId] > 0f)
                 {
-                    store.EnemyStunDurationLeft[enemyId] = stunDur - 1f;
+                    // Stunned: skip movement this frame, then decrement.
+                    // After decrement, clear flag if expired.
+                    store.EnemyStunDurationLeft[enemyId] -= 1f;
                     if (store.EnemyStunDurationLeft[enemyId] <= 0f)
                     {
                         store.EnemyStunDurationLeft[enemyId] = 0f;
                         store.EnemyStunFlag[enemyId] = false;
                     }
+                    return;  // stunned enemies skip movement
                 }
 
                 // Decrement slow duration and restore base speed when expired (tower-slow tracking)
@@ -86,10 +89,6 @@ namespace BattleSystemECS.Systems
 
                 // Enum-based action dispatch — O(1) per enemy, no string comparison
                 EnemyActionType actionEnum = store.GetEnemyActionEnum(enemyId);
-
-                // Stun check: stunned enemies skip all movement this frame
-                if (store.IsEnemyStunned(enemyId))
-                    return;
 
                 // Default: move toward player (direction = -1, toward y=0)
                 int direction = -1;
