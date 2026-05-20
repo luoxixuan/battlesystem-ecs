@@ -310,6 +310,8 @@ namespace BattleSystemECS.Systems
                 "enemy_cast_self_heal"  => EnemyActionType.SelfHeal,
                 "enemy_cast_aoe"        => EnemyActionType.AoeDamage,
                 "enemy_cast_buff"      => EnemyActionType.BuffAllies,
+                "enemy_cast_stun"      => EnemyActionType.StunAoe,
+                "enemy_cast_slow"      => EnemyActionType.SlowAoe,
                 _                => EnemyActionType.None,
             };
         }

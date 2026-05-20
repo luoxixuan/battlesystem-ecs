@@ -218,6 +218,8 @@ namespace BattleSystemECS.Systems
                 "charge_attack" => EnemyActionType.ChargeAttack,
                 "dodge" => EnemyActionType.Dodge,
                 "retreat" => EnemyActionType.Retreat,
+                "enemy_cast_stun" => EnemyActionType.StunAoe,
+                "enemy_cast_slow" => EnemyActionType.SlowAoe,
                 _ => EnemyActionType.None,
             };
 
@@ -249,6 +251,8 @@ namespace BattleSystemECS.Systems
                 case EnemyActionType.SelfHeal:
                 case EnemyActionType.AoeDamage:
                 case EnemyActionType.BuffAllies:
+                case EnemyActionType.StunAoe:
+                case EnemyActionType.SlowAoe:
                     // Ability actions are dispatched to EnemyAbilitySystem
                     string abilityId = store.EnemyCastAbilityId[enemyId];
                     if (!string.IsNullOrEmpty(abilityId))

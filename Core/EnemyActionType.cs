@@ -16,6 +16,8 @@ namespace BattleSystemECS.Components
         // Enemy ability actions (enemy_cast_* BT action nodes)
         SelfHeal = 7,
         AoeDamage = 8,
-        BuffAllies = 9
+        BuffAllies = 9,
+        StunAoe = 10,
+        SlowAoe = 11
     }
 }
