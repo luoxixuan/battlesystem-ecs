@@ -136,7 +136,7 @@ List<int> ActiveTowerIds             // 仅活跃塔 ID（并行遍历用）
 
 | 系统 | 文件 | 职责 | 关键设计 |
 |------|------|------|---------|
-| WaveSpawningSystem | Systems/ | 波次生成 | `OnWaveComplete` 事件触发科技树点数产出 |
+| WaveSpawningSystem | Systems/ | 波次生成 + 难度曲线 | `OnWaveComplete` 事件触发科技树点数产出；**波次动态难度曲线**（基础缩放 + 精英 + Boss）|
 | EnemyAISystem | Systems/ | 行为树评估 | **两阶段**：并行 BT 评估写 EnemyActionEnum，串行动作执行（含 EventBus.Publish） |
 | EnemyMovementSystem | Systems/ | 敌人移动 | `EnemyActionEnum` 驱动方向；Dodge 分支有副作用 |
 | PlayerTowerAttackSystem | Systems/ | 玩家攻击 | **两阶段**：并行收集 `(enemyId, damage)`，串行 `enemyHealth -= damage` + queue 死亡 |
@@ -148,6 +148,7 @@ List<int> ActiveTowerIds             // 仅活跃塔 ID（并行遍历用）
 | MapSystem | Systems/ | 地图渲染 | Debug 渲染 |
 | SpatialGridSystem | Systems/ | 空间网格 | 范围查询（塔攻击范围、Buff 范围）；O(1) cell 访问 |
 | BuffSystem | Systems/ | 持续伤害（DoT）追踪 | Periodic EffectType；ping-pong 双缓冲 DoT 伤害队列；`ApplyDot`/`Update`/`ResolveDotDamage` |
+| EnemyAbilitySystem | Systems/ | 敌人技能系统 | `UpdateCooldowns`/`ExecuteAbilities`/`Update`；FrameScheduler 已集成；冷却/Buff/自疗/AoE |
 | BenchmarkSystem | Systems/ | 性能压测 | **dual mode**：mode 2 合并热路径 / mode 4 真实系统链路，各独立计时 |
 ---
 

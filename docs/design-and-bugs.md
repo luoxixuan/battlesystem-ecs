@@ -403,7 +403,35 @@ GameManager.Run() / BenchmarkSystem
 
 ---
 
-_记录时间：2026-05-13 22:20 GMT+8_
+## 十、今日完成（2026-05-22）
+
+### 波次动态难度曲线（2026-05-22）
+
+|| # | 内容 |
+|---|------|
+| 1 | 新增 `Data/Configs/wave_spawn.json` 的 `difficultyConfig` 配置段 |
+| 2 | WaveSpawningSystem 新增 `DifficultyConfig` / `WaveSpawnConfig` 类和 `LoadWaveSpawnConfig()` |
+| 3 | Update() 实现三层难度缩放：基础波次增长 + 精英（wave≥5） + Boss（wave≥10） |
+| 4 | EnemyName 标记 [ELITE] / [BOSS] 前缀 |
+
+**配置项**：
+- `baseHealthMultPerWave: 0.05`（每波+5%血量）
+- `baseDamageMultPerWave: 0.05`（每波+5%伤害）
+- `eliteStartWave: 5` / `bossStartWave: 10`
+- `eliteHealthMult: 2.0` / `bossHealthMult: 5.0`
+
+**性能**：Mode2 14423 FPS ✅ / Mode4 7095 FPS ✅（门禁 12000/7000）
+
+**commit**：`f2a2bf7` — 波次动态难度曲线：敌人属性随波次增长（含精英/Boss缩放）
+
+### Bug Scan 报告（本次，WaveSpawningSystem.cs）
+
+| 严重度 | 行 | 问题 | 状态 |
+|--------|----|------|------|
+| HIGH | 162-167 | GetSpawnRandom() Random 双初始化竞态（预存） | 预存 |
+| HIGH | 179 | 边界检查被参数求值顺序绕过（预存） | 预存 |
+| MEDIUM | 285 | GetCachedBehaviorTree null 返回未处理（预存） | 预存 |
+| MEDIUM | 301 | WaveCount/Waves.Count 不一致（预存） | 预存 |
 
 ---
 
