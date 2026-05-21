@@ -1818,5 +1818,41 @@
         "StunChance": 0.0,
         "SlowAmount": 0.0,
         "SlowDuration": 0.0
+    },
+    {
+        "UpgradeCost": 40,
+        "Name": "Cryo Shard",
+        "Damage": 6,
+        "Type": "Frost",
+        "Cost": 45,
+        "AttackSpeed": 0.6,
+        "Range": 2,
+        "StunChance": 0.0,
+        "SlowAmount": 0.3,
+        "SlowDuration": 2
+    },
+    {
+        "UpgradeCost": 65,
+        "Name": "Cryo Beam",
+        "Damage": 10,
+        "Type": "Frost",
+        "Cost": 80,
+        "AttackSpeed": 0.75,
+        "Range": 3,
+        "StunChance": 0.05,
+        "SlowAmount": 0.4,
+        "SlowDuration": 2
+    },
+    {
+        "UpgradeCost": 90,
+        "Name": "Cryo Storm",
+        "Damage": 14,
+        "Type": "Frost",
+        "Cost": 115,
+        "AttackSpeed": 0.9,
+        "Range": 4,
+        "StunChance": 0.1,
+        "SlowAmount": 0.5,
+        "SlowDuration": 3
     }
 ]
