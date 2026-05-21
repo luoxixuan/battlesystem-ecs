@@ -385,6 +385,51 @@ namespace BattleSystemECS.Config
                 SlowDuration = 1f
             });
 
+            // Frost Tower — dedicated cryo tower, applies heavy slow
+            TowerTypes.Add(new TowerConfig
+            {
+                Name = "Frost Tower",
+                Type = "Frost",
+                Damage = 6f,
+                Range = 3,
+                AttackSpeed = 1.2f,
+                Cost = 80f,
+                UpgradeCost = 48f,
+                StunChance = 0f,
+                SlowAmount = 0.50f,   // 50% slow on hit
+                SlowDuration = 2f
+            });
+
+            // Stun Tower — dedicated stun tower, high stun chance
+            TowerTypes.Add(new TowerConfig
+            {
+                Name = "Stun Tower",
+                Type = "Stun",
+                Damage = 8f,
+                Range = 3,
+                AttackSpeed = 0.8f,
+                Cost = 90f,
+                UpgradeCost = 54f,
+                StunChance = 0.35f,   // 35% stun on hit
+                SlowAmount = 0f,
+                SlowDuration = 0f
+            });
+
+            // EMP Tower — silence/disable tower (future: enemy ability suppression)
+            TowerTypes.Add(new TowerConfig
+            {
+                Name = "EMP Tower",
+                Type = "EMP",
+                Damage = 10f,
+                Range = 4,
+                AttackSpeed = 0.6f,
+                Cost = 100f,
+                UpgradeCost = 60f,
+                StunChance = 0.15f,   // 15% stun on hit
+                SlowAmount = 0.20f,   // 20% slow
+                SlowDuration = 1f
+            });
+
             // Default monsters
             MonsterTypes.Add(new MonsterConfig
             {

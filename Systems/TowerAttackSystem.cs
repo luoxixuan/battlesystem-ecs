@@ -242,6 +242,18 @@ namespace BattleSystemECS.Systems
                             lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             break;
 
+                        case "Stun":
+                            // High-stun tower: damage + stun roll in debuff phase
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
+                            break;
+
+                        case "EMP":
+                            // EMP tower: damage + stun + slow (debuff phase)
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
+                            break;
+
                         case "Firewall":
                             // Damage + Firewall DoT (handled by debuff phase)
                             lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
