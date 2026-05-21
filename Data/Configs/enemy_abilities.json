@@ -137,5 +137,37 @@
     "StunDuration": 0,
     "SlowFactor": 0.5,
     "SlowDuration": 3
+  },
+  {
+    "Id": "healer_aoe_heal",
+    "Name": "Group Heal",
+    "Description": "Heals all allies within 4 cells for 40% of max HP",
+    "AbilityType": "heal_allies",
+    "BuffStat": "",
+    "Cooldown": 8,
+    "CooldownRemaining": 0,
+    "AoeRadius": 4,
+    "DamageMultiplier": 0,
+    "HealAmount": 0.4,
+    "BuffDuration": 0,
+    "StunDuration": 0,
+    "SlowFactor": 0,
+    "SlowDuration": 0
+  },
+  {
+    "Id": "stealth_strike_1",
+    "Name": "Ambush",
+    "Description": "Prepares a stealth attack dealing 2x damage",
+    "AbilityType": "stealth_attack",
+    "BuffStat": "",
+    "Cooldown": 6,
+    "CooldownRemaining": 0,
+    "AoeRadius": 0,
+    "DamageMultiplier": 2.0,
+    "HealAmount": 0,
+    "BuffDuration": 1,
+    "StunDuration": 0,
+    "SlowFactor": 0,
+    "SlowDuration": 0
   }
 ]

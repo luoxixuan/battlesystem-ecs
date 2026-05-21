@@ -126,6 +126,16 @@ namespace BattleSystemECS.Systems
                 case "slow_aoe":
                     ExecuteSlowAoe(enemyId, ability);
                     break;
+                case "heal_allies":
+                    ExecuteHealAllies(enemyId, ability);
+                    break;
+                case "stealth_attack":
+                    ExecuteStealthAttack(enemyId, ability);
+                    break;
+                default:
+                    // Unknown ability type — log and set cooldown to prevent infinite retry
+                    logger.Log($"[ABILITY] Unknown ability type '{ability.AbilityType}' on enemy {enemyId}, ignoring");
+                    break;
             }
 
             int timerIdx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY;
@@ -246,6 +256,59 @@ namespace BattleSystemECS.Systems
 
             store.ApplyPlayerSlow(playerId, ability.SlowFactor, ability.SlowDuration);
             logger.Log($"[ABILITY] Enemy {enemyId} slows player by {((1f - ability.SlowFactor) * 100):F0}% for {ability.SlowDuration} turn(s) ({ability.Name})");
+        }
+
+        private void ExecuteHealAllies(int enemyId, EnemyAbilityDef ability)
+        {
+            if (ability.AoeRadius <= 0) return;
+
+            float enemyX = store.PositionX[enemyId];
+            float enemyY = store.PositionY[enemyId];
+
+            var activeEnemyIds = store.GetCachedActiveEnemyIds();
+            int healedCount = 0;
+
+            foreach (var allyId in activeEnemyIds)
+            {
+                if (!store.EnemyActive[allyId]) continue;
+                if (allyId == enemyId) continue;
+
+                float allyX = store.PositionX[allyId];
+                float allyY = store.PositionY[allyId];
+                float dist = Math.Abs(enemyX - allyX) + Math.Abs(enemyY - allyY);
+
+                if (dist <= ability.AoeRadius)
+                {
+                    float maxHealth = store.EnemyMaxHealth[allyId];
+                    float healAmount = maxHealth * ability.HealAmount;
+                    float newHealth = store.EnemyHealth[allyId] + healAmount;
+                    store.EnemyHealth[allyId] = Math.Min(newHealth, maxHealth);
+                    healedCount++;
+                }
+            }
+
+            if (healedCount > 0)
+            {
+                logger.Log($"[ABILITY] Enemy {enemyId} heals {healedCount} allies for {ability.HealAmount * 100:F0}% max HP each ({ability.Name})");
+            }
+        }
+
+        private void ExecuteStealthAttack(int enemyId, EnemyAbilityDef ability)
+        {
+            // Stealth attack: enhanced damage when attacking from stealth
+            // The actual damage application is handled by TowerAttackSystem targeting logic.
+            // Here we just apply a damage multiplier bonus for the next attack.
+            if (ability.DamageMultiplier <= 0f) return;
+
+            float baseDamage = store.EnemyDamage[enemyId];
+            float bonusDamage = baseDamage * (ability.DamageMultiplier - 1f);
+            if (bonusDamage > 0)
+            {
+                store.EnemyBuffDamageBonus[enemyId] += bonusDamage;
+                store.EnemyBuffDurationLeft[enemyId] = 1f;
+            }
+
+            logger.Log($"[ABILITY] Enemy {enemyId} prepares stealth attack with {ability.DamageMultiplier:F1}x damage multiplier ({ability.Name})");
         }
 
         /// <summary>
