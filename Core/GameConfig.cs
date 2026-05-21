@@ -263,6 +263,27 @@ namespace BattleSystemECS.Config
         public Dictionary<int, TowerUpgradeLevelConfig> Levels { get; set; } = new Dictionary<int, TowerUpgradeLevelConfig>();
     }
 
+    // ── Phase Behavior Config ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Per-phase behavior settings loaded from phase_behavior.json.
+    /// </summary>
+    public class PhaseBehaviorDef
+    {
+        public string Description { get; set; }
+        public string EnterMessage { get; set; }
+        public bool AutoAdvance { get; set; }
+        public List<string> UnlockTowers { get; set; } = new List<string>();
+        public List<string> UnlockAbilities { get; set; } = new List<string>();
+        public int IntermissionDelayMs { get; set; }
+        public string WaveStartMessage { get; set; }
+        public int TurnIntervalMs { get; set; }
+        public string NextWaveMessage { get; set; }
+        public bool AutoAdvanceToBuild { get; set; }
+        public int AdvanceDelayMs { get; set; }
+        public bool ShowStats { get; set; }
+    }
+
     public class GameConfig
     {
         public PlayerConfig Player { get; set; } = new PlayerConfig();
@@ -271,6 +292,9 @@ namespace BattleSystemECS.Config
         public List<TowerConfig> TowerTypes { get; set; } = new List<TowerConfig>();
         public List<LevelConfig> Levels { get; set; } = new List<LevelConfig>();
         public LevelConfig CurrentLevel { get; set; }
+
+        // Phase behavior keyed by GameState name
+        public Dictionary<string, PhaseBehaviorDef> PhaseBehaviors { get; set; } = new Dictionary<string, PhaseBehaviorDef>();
 
         // Tower upgrade paths (config-driven upgrade curves)
         public Dictionary<string, TowerUpgradePathConfig> TowerUpgradePaths { get; set; } = new Dictionary<string, TowerUpgradePathConfig>();
@@ -650,6 +674,17 @@ namespace BattleSystemECS.Config
             // Fall back to the highest defined level
             int highestLevel = path.Levels.Keys.Max();
             return path.Levels[highestLevel];
+        }
+
+        /// <summary>
+        /// Returns phase behavior settings for the given GameState name.
+        /// Returns null if not configured.
+        /// </summary>
+        public PhaseBehaviorDef GetPhaseBehavior(string stateName)
+        {
+            if (string.IsNullOrEmpty(stateName)) return null;
+            PhaseBehaviors.TryGetValue(stateName, out var def);
+            return def;
         }
     }
 }

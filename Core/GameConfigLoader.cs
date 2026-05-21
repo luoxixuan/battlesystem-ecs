@@ -38,6 +38,9 @@ namespace BattleSystemECS.Config
                 // Load enemy abilities
                 LoadEnemyAbilities(gameConfig, renderer);
 
+                // Load phase behaviors
+                LoadPhaseBehaviors(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -107,6 +110,123 @@ namespace BattleSystemECS.Config
             {
                 renderer.Log("[ABILITY] Failed to load enemy abilities: " + ex.Message);
             }
+        }
+
+        private static void LoadPhaseBehaviors(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string phaseFile = "Data/Configs/phase_behavior.json";
+            try
+            {
+                if (!File.Exists(phaseFile))
+                {
+                    renderer.Log("[PHASE] Phase behavior file not found: " + phaseFile + ", using defaults");
+                    return;
+                }
+                string json = File.ReadAllText(phaseFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[PHASE] Phase behavior file is empty: " + phaseFile);
+                    return;
+                }
+                ParsePhaseBehaviors(gameConfig, json);
+                renderer.Log("[PHASE] Loaded " + gameConfig.PhaseBehaviors.Count + " phase behaviors from " + phaseFile);
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[PHASE] Failed to load phase behaviors: " + ex.Message);
+            }
+        }
+
+        private static void ParsePhaseBehaviors(GameConfig gameConfig, string json)
+        {
+            // Parse top-level keys (phase names)
+            int pos = 0;
+            while (pos < json.Length)
+            {
+                // Find key: "PhaseName": {
+                while (pos < json.Length && (char.IsWhiteSpace(json[pos]) || json[pos] == ',')) pos++;
+                if (pos >= json.Length) break;
+                if (json[pos] != '"') { pos++; continue; }
+
+                int keyStart = pos + 1;
+                int keyEnd = json.IndexOf('"', keyStart);
+                if (keyEnd < 0) break;
+                string phaseName = json.Substring(keyStart, keyEnd - keyStart);
+                pos = keyEnd + 1;
+
+                // Skip to {
+                while (pos < json.Length && json[pos] != ':') pos++;
+                if (pos >= json.Length) break;
+                pos++;
+                while (pos < json.Length && char.IsWhiteSpace(json[pos])) pos++;
+                if (pos >= json.Length || json[pos] != '{') { pos++; continue; }
+
+                int objEnd = FindMatchingBrace(json, pos);
+                if (objEnd < 0) { pos++; continue; }
+                string objJson = json.Substring(pos + 1, objEnd - pos - 1);
+
+                var def = new PhaseBehaviorDef();
+                def.Description = ExtractString(objJson, "Description");
+                def.EnterMessage = ExtractString(objJson, "enterMessage");
+                def.AutoAdvance = ExtractBool(objJson, "autoAdvance");
+                def.UnlockTowers = ParseStringList(objJson, "unlockTowers");
+                def.UnlockAbilities = ParseStringList(objJson, "unlockAbilities");
+                def.IntermissionDelayMs = ExtractInt(objJson, "intermissionDelayMs");
+                def.WaveStartMessage = ExtractString(objJson, "waveStartMessage");
+                def.TurnIntervalMs = ExtractInt(objJson, "turnIntervalMs");
+                def.NextWaveMessage = ExtractString(objJson, "nextWaveMessage");
+                def.AutoAdvanceToBuild = ExtractBool(objJson, "autoAdvanceToBuild");
+                def.AdvanceDelayMs = ExtractInt(objJson, "advanceDelayMs");
+                def.ShowStats = ExtractBool(objJson, "showStats");
+
+                gameConfig.PhaseBehaviors[phaseName] = def;
+                pos = objEnd + 1;
+            }
+        }
+
+        private static List<string> ParseStringList(string json, string key)
+        {
+            var result = new List<string>();
+            string pattern = "\"" + key + "\"";
+            int idx = json.IndexOf(pattern);
+            if (idx < 0) return result;
+            int bracket = json.IndexOf('[', idx);
+            if (bracket < 0) return result;
+            int endBracket = FindMatchingBrace(json, bracket);
+            if (endBracket < 0) return result;
+            string arrJson = json.Substring(bracket + 1, endBracket - bracket - 1);
+
+            int p = 0;
+            while (p < arrJson.Length)
+            {
+                while (p < arrJson.Length && (char.IsWhiteSpace(arrJson[p]) || arrJson[p] == ',')) p++;
+                if (p >= arrJson.Length) break;
+                if (arrJson[p] == '"')
+                {
+                    int s = p + 1;
+                    int e = arrJson.IndexOf('"', s);
+                    if (e < 0) break;
+                    result.Add(arrJson.Substring(s, e - s));
+                    p = e + 1;
+                }
+                else p++;
+            }
+            return result;
+        }
+
+        private static bool ExtractBool(string json, string key)
+        {
+            string pattern = "\"" + key + "\"";
+            int idx = json.IndexOf(pattern);
+            if (idx < 0) return false;
+            int colon = json.IndexOf(':', idx);
+            if (colon < 0) return false;
+            int start = colon + 1;
+            while (start < json.Length && char.IsWhiteSpace(json[start])) start++;
+            int end = start;
+            while (end < json.Length && char.IsLetter(json[end])) end++;
+            string val = json.Substring(start, end - start).Trim();
+            return val.Equals("true", StringComparison.OrdinalIgnoreCase);
         }
 
         private static void ParseEnemyAbilities(GameConfig gameConfig, string jsonArray)

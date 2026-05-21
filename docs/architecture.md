@@ -309,3 +309,36 @@ GameManager.Run() → while(gameRunning) → 每回合:
 | 2026-05-12 | `79fea25` | BT Cache fix + Merged pipeline，FPS 8334 |
 | 2026-05-12 | `01c05a7` | chargeParams SOA 化 |
 | 2026-05-12 | `04c50a6` | P0 Bug 修复（GetAllActiveEnemyIds 副本） |
+
+## 14. Phase 阶段循环系统（2026-05-22）
+
+`phase_behavior.json` → `GameConfig.PhaseBehaviors` → `StateMachine` → `FrameScheduler.Phase`
+
+### 设计
+
+- `PhaseBehaviorDef`：每个阶段的配置（EnterMessage、AutoAdvance、UnlockTowers 等）
+- `StateMachine`：管理 `BuildPhase / WavePhase / Intermission / LevelComplete / GameOver / Victory` 状态转换
+- `FrameScheduler.Phase`：当前 phase，Tick() 按此门控系统调度
+  - `BuildPhase`：只运行 Gold/Upgrade/Skill(cd)，**不运行** WaveSpawning/EnemyAI/Combat
+  - `WavePhase`：完整战斗管道
+  - `Intermission`：同 WavePhase（仍运行战斗引擎显示信息）
+
+### 文件
+
+| 文件 | 改动 |
+|------|------|
+| `Core/GameConfig.cs` | 新增 `PhaseBehaviorDef` 类 + `GetPhaseBehavior()` + `PhaseBehaviors` 字段 |
+| `Core/GameConfigLoader.cs` | 新增 `LoadPhaseBehaviors()` / `ParsePhaseBehaviors()` / `ParseStringList()` / `ExtractBool()` |
+| `Core/FrameScheduler.cs` | 新增 `Phase` 字段，`Tick()` 按 phase 门控系统 |
+| `Core/GameManager.cs` | 初始化 `StateMachine`，`scheduler.Phase` 与状态机同步，`Run()` 中触发 BuildPhase→WavePhase 转换并显示消息 |
+| `Data/Configs/phase_behavior.json` | 已存在，配置各阶段行为参数 |
+
+### 状态转换图
+
+```
+Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → LevelComplete → BuildPhase
+                                                    ↓
+                                              GameOver / Victory
+```
+
+---

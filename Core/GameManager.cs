@@ -36,6 +36,9 @@ namespace BattleSystemECS.Core
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
 
+        // 游戏状态机（管理 BuildPhase / WavePhase / Intermission 切换）
+        private StateMachine stateMachine;
+
         // 渲染器
         private IRenderer logger;
 
@@ -184,6 +187,15 @@ namespace BattleSystemECS.Core
             scheduler.Gold = goldSystem;
             scheduler.Upgrade = upgradeSystem;
 
+            // 初始化状态机
+            stateMachine = new StateMachine();
+            scheduler.Phase = GameState.BuildPhase;
+
+            // 注册 phase 切换回调：scheduler.Phase 跟随状态机同步
+            stateMachine.OnEnter(GameState.BuildPhase, () => { scheduler.Phase = GameState.BuildPhase; });
+            stateMachine.OnEnter(GameState.WavePhase, () => { scheduler.Phase = GameState.WavePhase; });
+            stateMachine.OnEnter(GameState.Intermission, () => { scheduler.Phase = GameState.WavePhase; }); // intermission 仍运行战斗引擎（显示信息）
+
             logger.Log("[BOOTSTRAP] ========== Game Initialization Complete ==========");
             Console.WriteLine();
         }
@@ -284,6 +296,19 @@ namespace BattleSystemECS.Core
                 // 设置波次关卡
                 waveSpawningSystem.SetLevel(currentLevel);
 
+                // ── Phase: BuildPhase ──────────────────────────────────────────
+                // Transition from Init → BuildPhase and show enter message
+                if (stateMachine.TransitionTo(GameState.BuildPhase))
+                {
+                    var pb = gameConfig.GetPhaseBehavior("BuildPhase");
+                    string msg = pb?.EnterMessage ?? "[PHASE] Build Phase — place your towers!";
+                    Console.WriteLine();
+                    Console.WriteLine("═══════════════════════════════════════════");
+                    Console.WriteLine("  " + msg);
+                    Console.WriteLine("═══════════════════════════════════════════");
+                    Console.WriteLine();
+                }
+
                 // 渲染初始地图（SOA）
                 Console.WriteLine();
                 logger.Log("========================================");
@@ -304,6 +329,18 @@ namespace BattleSystemECS.Core
 
                 Console.WriteLine();
                 logger.Log("Game Start!");
+
+                // ── Phase transition: BuildPhase → WavePhase ────────────────────
+                if (stateMachine.TransitionTo(GameState.WavePhase))
+                {
+                    var pb = gameConfig.GetPhaseBehavior("WavePhase");
+                    string msg = pb?.WaveStartMessage ?? "[PHASE] Wave Phase — FIGHT!";
+                    Console.WriteLine();
+                    Console.WriteLine("═══════════════════════════════════════════");
+                    Console.WriteLine("  " + msg);
+                    Console.WriteLine("═══════════════════════════════════════════");
+                    Console.WriteLine();
+                }
 
                 // 游戏主循环
                 gameRunning = true;

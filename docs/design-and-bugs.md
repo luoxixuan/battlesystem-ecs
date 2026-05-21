@@ -1,24 +1,25 @@
 # BattleSystem-ECS 设计治理与 Bug 追踪
 
 > 项目路径：F:\AI\BattleSystem-ECS
-> 最后更新：2026-05-18（commit `d34e5fd`）
+> 最后更新：2026-05-22
 
 ---
 
-## 一、设计治理（10 项，全部完成）
+## 一、设计治理（11 项，全部完成）
 
-| # | 优先级 | 任务 | 状态 | 备注 |
-|---|--------|------|------|------|
-| 1 | 最高 | 主循环刷新缓存 | ✅ 已完成 | GameManager 每回合对所有系统调用 SetTurn()（`commit 743664c`）|
-| 2 | 最高 | 并行系统两阶段死亡解析 | ✅ 已完成 | PlayerAttack/TowerAttack 两阶段（`2248d4a`），统一帧末 resolve（`3bd1c9c`）|
-| 3 | 最高 | 禁止并行段直接改 active list / EventBus | ✅ 已完成 | EnemyAI 两阶段（`ccc42e3`），EventBus 加锁（`afb988d`），两阶段模式保证调用路径安全 |
-| 4 | 最高 | SkillSystem 击杀统一 DestroyEntity | ✅ 已完成 | HandleKill 只 queue 死亡（`3bd1c9c`），帧末统一 resolve |
-| 5 | 高 | ComponentStore 生命周期字段收口 | ✅ 已完成 | ActiveEnemyIds/TowerIds 暴露为 IReadOnlyList（`840bc3e`），freeEntityIds Stack 并发安全由两阶段模式保证 |
-| 6 | 高 | DestroyEntity 完整清理 | ✅ 已完成 | 清所有 archetype 字段（`c0d85cf`）|
-| 7 | 高 | GameConfigLoader 完整解析 | ✅ 已完成 | 解析 MaxHealth / StartingSkills（`736746c`）|
-| 8 | 高 | EventBus 并行安全改造 | ✅ 已完成 | lock + snapshot iteration + Reset()（`afb988d`）|
-| 9 | 中 | 击杀奖励集中化 | ✅ 已完成 | 帧末统一 resolve 内处理（`3bd1c9c`）|
-| 10 | 中 | Benchmark 真实系统链路 | ✅ 已完成 | mode 4 真实系统链路 benchmark（`7ef56aa`），AGENTS.md 写入 dual benchmark 规则（`41cc6a5`）|
+|| # | 优先级 | 任务 | 状态 | 备注 |
+|---|--------|------|------|------|------|
+|| 1 | 最高 | 主循环刷新缓存 | ✅ 已完成 | GameManager 每回合对所有系统调用 SetTurn()（`commit 743664c`）|
+|| 2 | 最高 | 并行系统两阶段死亡解析 | ✅ 已完成 | PlayerAttack/TowerAttack 两阶段（`2248d4a`），统一帧末 resolve（`3bd1c9c`）|
+|| 3 | 最高 | 禁止并行段直接改 active list / EventBus | ✅ 已完成 | EnemyAI 两阶段（`ccc42e3`），EventBus 加锁（`afb988d`），两阶段模式保证调用路径安全 |
+|| 4 | 最高 | SkillSystem 击杀统一 DestroyEntity | ✅ 已完成 | HandleKill 只 queue 死亡（`3bd1c9c`），帧末统一 resolve |
+|| 5 | 高 | ComponentStore 生命周期字段收口 | ✅ 已完成 | ActiveEnemyIds/TowerIds 暴露为 IReadOnlyList（`840bc3e`），freeEntityIds Stack 并发安全由两阶段模式保证 |
+|| 6 | 高 | DestroyEntity 完整清理 | ✅ 已完成 | 清所有 archetype 字段（`c0d85cf`）|
+|| 7 | 高 | GameConfigLoader 完整解析 | ✅ 已完成 | 解析 MaxHealth / StartingSkills（`736746c`）|
+|| 8 | 高 | EventBus 并行安全改造 | ✅ 已完成 | lock + snapshot iteration + Reset()（`afb988d`）|
+|| 9 | 中 | 击杀奖励集中化 | ✅ 已完成 | 帧末统一 resolve 内处理（`3bd1c9c`）|
+|| 10 | 中 | Benchmark 真实系统链路 | ✅ 已完成 | mode 4 真实系统链路 benchmark（`7ef56aa`），AGENTS.md 写入 dual benchmark 规则（`41cc6a5`）|
+|| 11 | 高 | Phase 阶段循环打通 | ✅ 已完成 | `phase_behavior.json` → `StateMachine` → `FrameScheduler.Phase`（2026-05-22）|
 
 ---
 

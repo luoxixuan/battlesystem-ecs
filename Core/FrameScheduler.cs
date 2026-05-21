@@ -18,6 +18,13 @@ namespace BattleSystemECS.Core
         private readonly ComponentStore store;
         private readonly GameConfig gameConfig;
 
+        /// <summary>
+        /// Current game phase — controls which systems run per frame.
+        /// BuildPhase: only tower placement/upgrade UI, no combat.
+        /// WavePhase: full combat systems.
+        /// </summary>
+        public GameState Phase { get; set; } = GameState.WavePhase;
+
         // Systems — nullable，调用方按需注入
         public WaveSpawningSystem? WaveSpawning { get; set; }
         public EnemyAISystem? EnemyAI { get; set; }
@@ -39,6 +46,9 @@ namespace BattleSystemECS.Core
 
         /// <summary>
         /// 执行一帧完整调度。
+        /// Systems are gated by current Phase:
+        ///   BuildPhase — tower placement/upgrade only (no WaveSpawning/EnemyAI/Combat)
+        ///   WavePhase  — full combat pipeline
         /// </summary>
         /// <param name="deltaTime">时间步长（通常 1f）</param>
         /// <param name="turn">当前回合编号（从 1 开始）</param>
@@ -47,6 +57,17 @@ namespace BattleSystemECS.Core
             // ── Phase 0: 帧初始化 ──────────────────────────────────────────
             store.BeginFrame();
             store.SetTurnCCFlags();
+
+            if (Phase == GameState.BuildPhase)
+            {
+                // ── BuildPhase: tower placement/upgrade UI only ────────────
+                Gold?.Update();
+                Upgrade?.Update();
+                Skill?.Update(deltaTime); // skill cooldown ticking
+                return;
+            }
+
+            // ── WavePhase / Intermission: full combat pipeline ──────────────
 
             // ── Phase 1: 生成 ─────────────────────────────────────────────
             WaveSpawning?.Update();
@@ -80,6 +101,7 @@ namespace BattleSystemECS.Core
             Buff?.Update(deltaTime);
             Skill?.ResolveSkillDamage();
             Buff?.ResolveDotDamage();
+            Skill?.Update(deltaTime); // skill cooldown ticking (WavePhase only path)
 
             // ── Phase 8: Death Resolve ─────────────────────────────────────
             store.ResolveEnemiesKilledThisFrame();
@@ -94,9 +116,9 @@ namespace BattleSystemECS.Core
             Tick(deltaTime, turn);
 
             // ── Post-tick 游戏逻辑（GameManager 中每帧执行的非战斗逻辑）──
-            Gold?.Update();
-            Upgrade?.Update();
-            Skill?.Update(deltaTime); // 冷却更新
+            // Gold/Upgrade/Skill cooldown already handled inside Tick based on phase.
+            // Additional game-level systems that run regardless of phase:
+            // (TechTree is read-only here, Gold/Upgrade already called above)
         }
     }
 }
