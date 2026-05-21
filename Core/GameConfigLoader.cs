@@ -457,7 +457,35 @@ namespace BattleSystemECS.Config
             tower.StunChance = ExtractFloat(json, "StunChance");
             tower.SlowAmount = ExtractFloat(json, "SlowAmount");
             tower.SlowDuration = ExtractFloat(json, "SlowDuration");
+            tower.SpecialAbility = ParseTowerSpecialAbility(json);
             return tower;
+        }
+
+        private static TowerSpecialAbility ParseTowerSpecialAbility(string json)
+        {
+            string key = "\"SpecialAbility\"";
+            int idx = json.IndexOf(key);
+            if (idx < 0) return null;
+
+            int braceStart = json.IndexOf('{', idx);
+            if (braceStart < 0) return null;
+            int braceEnd = FindMatchingBrace(json, braceStart);
+            if (braceEnd < 0) return null;
+
+            string subJson = json.Substring(braceStart, braceEnd - braceStart + 1);
+            var ability = new TowerSpecialAbility();
+            ability.AbilityType = ExtractString(subJson, "AbilityType");
+            ability.Cooldown = ExtractFloat(subJson, "Cooldown");
+            ability.AreaShape = ExtractString(subJson, "AreaShape");
+            ability.Radius = ExtractInt(subJson, "Radius");
+            ability.DamageMultiplier = ExtractFloat(subJson, "DamageMultiplier");
+            ability.Duration = ExtractFloat(subJson, "Duration");
+            ability.DotDamagePerTick = ExtractFloat(subJson, "DotDamagePerTick");
+            ability.DotTickInterval = ExtractFloat(subJson, "DotTickInterval");
+            ability.StunDuration = ExtractInt(subJson, "StunDuration");
+            ability.SlowFactor = ExtractFloat(subJson, "SlowFactor");
+            ability.SlowDuration = ExtractInt(subJson, "SlowDuration");
+            return ability;
         }
 
         private static PlayerConfig ParsePlayerConfig(string json)

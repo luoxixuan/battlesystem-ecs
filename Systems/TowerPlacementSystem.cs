@@ -68,6 +68,12 @@ namespace BattleSystemECS.Systems
                 {
                     store.AddTower(towerId, type, damage, range, speed, 1, cost, "standard",
                         tc.StunChance, tc.SlowAmount, tc.SlowDuration);
+                    // Apply tower's innate special ability (e.g., chain_lightning for Tesla)
+                    if (tc.SpecialAbility != null)
+                    {
+                        ApplyTowerSpecialAbility(store, towerId, tc.SpecialAbility);
+                        logger.Log($"[TOWER] {tc.Name} 固有能力: {tc.SpecialAbility.AbilityType}");
+                    }
                 }
                 else
                 {
@@ -82,6 +88,25 @@ namespace BattleSystemECS.Systems
             logger.Log($"[TOWER] {type} placed at ({x},{y})");
             logger.Log($"[TOWER] Tower placed: {type} at ({x},{y}), damage: {damage}, range: {range}, ID: {towerId}");
             return towerId;
+        }
+
+        private void ApplyTowerSpecialAbility(ComponentStore store, int towerId, TowerSpecialAbility ability)
+        {
+            if (ability == null || string.IsNullOrEmpty(ability.AbilityType)) return;
+
+            switch (ability.AbilityType.ToLowerInvariant())
+            {
+                case "chain_lightning":
+                    store.TowerHasChainLightning[towerId] = true;
+                    break;
+                case "freeze_aoe":
+                    store.TowerHasFreezeAoe[towerId] = true;
+                    break;
+                case "splash":
+                case "splash_damage":
+                    store.TowerSplashRadius[towerId] = ability.Radius;
+                    break;
+            }
         }
     }
 }

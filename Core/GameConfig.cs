@@ -452,6 +452,8 @@ namespace BattleSystemECS.Config
                 {
                     { 1, new TowerUpgradeLevelConfig { DamageMultiplier = 1.2f, RangeAdd = 1f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.5f } },
                     { 2, new TowerUpgradeLevelConfig { DamageMultiplier = 1.2f, RangeAdd = 0f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.5f, SpecialAbility = TowerUpgradeAbility.SplashDamage, SpecialAbilityParam = 1f } },
+                    { 3, new TowerUpgradeLevelConfig { DamageMultiplier = 1.2f, RangeAdd = 0f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.5f, SpecialAbility = TowerUpgradeAbility.ChainLightning, SpecialAbilityParam = 0f } },
+                    { 4, new TowerUpgradeLevelConfig { DamageMultiplier = 1.2f, RangeAdd = 0f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.5f, SpecialAbility = TowerUpgradeAbility.FreezeAoe, SpecialAbilityParam = 0f } },
                 }
             };
 
@@ -464,6 +466,8 @@ namespace BattleSystemECS.Config
                 {
                     { 1, new TowerUpgradeLevelConfig { DamageMultiplier = 1.15f, RangeAdd = 0.5f, AttackSpeedMultiplier = 1.25f, CostMultiplier = 1.6f } },
                     { 2, new TowerUpgradeLevelConfig { DamageMultiplier = 1.15f, RangeAdd = 0f, AttackSpeedMultiplier = 1.10f, CostMultiplier = 1.6f, SpecialAbility = TowerUpgradeAbility.CriticalStrike, SpecialAbilityParam = 0.25f } },
+                    { 3, new TowerUpgradeLevelConfig { DamageMultiplier = 1.15f, RangeAdd = 0f, AttackSpeedMultiplier = 1.05f, CostMultiplier = 1.6f, SpecialAbility = TowerUpgradeAbility.SplashDamage, SpecialAbilityParam = 1f } },
+                    { 4, new TowerUpgradeLevelConfig { DamageMultiplier = 1.15f, RangeAdd = 0f, AttackSpeedMultiplier = 1.05f, CostMultiplier = 1.6f, SpecialAbility = TowerUpgradeAbility.ChainLightning, SpecialAbilityParam = 0f } },
                 }
             };
 
@@ -476,6 +480,8 @@ namespace BattleSystemECS.Config
                 {
                     { 1, new TowerUpgradeLevelConfig { DamageMultiplier = 1.3f, RangeAdd = 2f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.4f } },
                     { 2, new TowerUpgradeLevelConfig { DamageMultiplier = 1.3f, RangeAdd = 0f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.4f, SpecialAbility = TowerUpgradeAbility.ArmorPierce, SpecialAbilityParam = 0.5f } },
+                    { 3, new TowerUpgradeLevelConfig { DamageMultiplier = 1.3f, RangeAdd = 0f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.4f, SpecialAbility = TowerUpgradeAbility.CriticalStrike, SpecialAbilityParam = 0.35f } },
+                    { 4, new TowerUpgradeLevelConfig { DamageMultiplier = 1.3f, RangeAdd = 0f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.4f, SpecialAbility = TowerUpgradeAbility.FreezeAoe, SpecialAbilityParam = 0f } },
                 }
             };
 

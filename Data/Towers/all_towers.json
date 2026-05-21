@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "UpgradeCost": 18,
         "Name": "Energy Pulse",
@@ -21,7 +21,11 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "SpecialAbility": {
+            "AbilityType": "chain_lightning",
+            "Radius": 3
+        }
     },
     {
         "UpgradeCost": 72,
@@ -33,7 +37,11 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "SpecialAbility": {
+            "AbilityType": "splash",
+            "Radius": 2
+        }
     },
     {
         "UpgradeCost": 99,
@@ -585,7 +593,11 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "SpecialAbility": {
+            "AbilityType": "splash",
+            "Radius": 2
+        }
     },
     {
         "UpgradeCost": 283,
@@ -1461,7 +1473,11 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "SpecialAbility": {
+            "AbilityType": "splash",
+            "Radius": 1
+        }
     },
     {
         "UpgradeCost": 240,
@@ -1737,7 +1753,11 @@
         "Range": 7,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "SpecialAbility": {
+            "AbilityType": "freeze_aoe",
+            "Radius": 2
+        }
     },
     {
         "UpgradeCost": 930,
