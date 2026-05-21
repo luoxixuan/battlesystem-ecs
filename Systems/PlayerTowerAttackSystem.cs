@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -21,8 +20,17 @@ namespace BattleSystemECS.Systems
         private int playerId;
         private TechTreeSystem techTreeSystem;
 
-        // BUG-1 fix: use System.Random.Shared (thread-safe in .NET 6+, eliminates Random corruption in Parallel.For)
-        private static readonly Random critRandom = System.Random.Shared;
+        // BUG-1 fix: deterministic hash-based RNG — no shared state, fully reproducible per (frame, enemyId, attackerId)
+        // Replaces Random.Shared which caused non-determinism across runs.
+        private static int GetDeterministicRandom(int frame, int enemyId, int attackerId)
+        {
+            // Combine frame + enemyId + attackerId into a single int seed, then xorshift
+            int seed = frame ^ (enemyId * 71523) ^ (attackerId * 149357);
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            return seed & 0x7FFFFFFF;
+        }
 
         // Cached per-turn to avoid per-frame store lookups
         private float _playerX, _playerY;
@@ -46,8 +54,11 @@ namespace BattleSystemECS.Systems
         // Cached wave-based difficulty multiplier (updated on SetTurn)
         private float _waveDifficultyMult = 1f;
 
+        private int _currentTurn;
+
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
-        private ConcurrentBag<(int enemyId, float damage)>[] _damageQueue = new ConcurrentBag<(int, float)>[2];
+        private List<(int enemyId, float damage)>[] _damageQueue = new List<(int, float)>[2];
+        private readonly object _damageQueueLock = new object();
         private int _damageQueueIdx = 0;
 
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
@@ -61,12 +72,13 @@ namespace BattleSystemECS.Systems
             this.renderer = renderer;
             this.playerId = playerId;
             this.techTreeSystem = techTreeSystem;
-            _damageQueue[0] = new ConcurrentBag<(int, float)>();
-            _damageQueue[1] = new ConcurrentBag<(int, float)>();
+            _damageQueue[0] = new List<(int, float)>(256);
+            _damageQueue[1] = new List<(int, float)>(256);
         }
 
         public void SetTurn(int turn)
         {
+            _currentTurn = turn;
             _playerX = store.PositionX[playerId];
             _playerY = store.PositionY[playerId];
             _attackDamage = store.GetPlayerAttackDamage(playerId);
@@ -132,7 +144,7 @@ namespace BattleSystemECS.Systems
                 // H-3 fix: crit rolled per-enemy inside parallel loop, not once per frame globally.
                 // Optimized: merged crit rate threshold (precomputed _critRateThreshold) eliminates branch
                 float finalDamage = baseDamage;
-                if (critRandom.NextDouble() < _critRateThreshold)
+                if (GetDeterministicRandom(_currentTurn, enemyId, playerId) < (int)(_critRateThreshold * 0x7FFFFFFF))
                 {
                     finalDamage *= (1f + _critDamageBonus);
                 }
@@ -149,7 +161,7 @@ namespace BattleSystemECS.Systems
                 // Apply ally buff damage bonus (buff_allies ability from enemy BT)
                 finalDamage += store.EnemyBuffDamageBonus[enemyId];
 
-                _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage));
+                lock (_damageQueueLock) { _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage)); }
             });
 
             // Phase 2 (serial): ping-pong swap — read from current bag, clear alternate for next frame

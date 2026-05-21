@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using BattleSystemECS.Components;
@@ -32,13 +31,18 @@ namespace BattleSystemECS.Systems
         private float _damageTakenMult = 1f;
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         // Tuple: (enemyId, rawDamage) — raw damage only; armor reduction handled by PlayerTowerAttackSystem and TowerAttackSystem
-        private ConcurrentBag<(int enemyId, float damage)>[] _skillDamageQueue = new ConcurrentBag<(int, float)>[2];
+        private List<(int enemyId, float damage)>[] _skillDamageQueue = new List<(int, float)>[2];
+        private readonly object _skillDamageQueueLock = new object();
         private int _skillDamageQueueIdx = 0;
-        // GC elimination: field-level bags pre-allocated, cleared before each use
-        private ConcurrentBag<(int enemyId, float distSq)> _singleTargetCandidates = new();
-        private ConcurrentBag<int> _crossAreaHits = new();
-        private ConcurrentBag<int> _boxAreaHits = new();
-        private ConcurrentBag<int> _lineAreaHits = new();
+        // GC elimination: field-level lists pre-allocated, cleared before each use
+        private List<(int enemyId, float distSq)> _singleTargetCandidates = new List<(int, float)>(64);
+        private List<int> _crossAreaHits = new List<int>(64);
+        private List<int> _boxAreaHits = new List<int>(64);
+        private List<int> _lineAreaHits = new List<int>(64);
+        private readonly object _singleTargetCandidatesLock = new object();
+        private readonly object _crossAreaHitsLock = new object();
+        private readonly object _boxAreaHitsLock = new object();
+        private readonly object _lineAreaHitsLock = new object();
 
         // Poison Nova DoT constants
         private const float POISON_NOVA_DURATION = 5f;
@@ -60,8 +64,8 @@ namespace BattleSystemECS.Systems
             this.gameConfig = gameConfig;
             this.techTreeSystem = techTreeSystem;
             this.dotSystem = null; // wired up via InjectDotSystem after construction
-            _skillDamageQueue[0] = new ConcurrentBag<(int, float)>();
-            _skillDamageQueue[1] = new ConcurrentBag<(int, float)>();
+            _skillDamageQueue[0] = new List<(int, float)>(256);
+            _skillDamageQueue[1] = new List<(int, float)>(256);
         }
         public void InjectDotSystem(BuffSystem dotSystem)
         {
@@ -286,7 +290,7 @@ namespace BattleSystemECS.Systems
                 float distSq = dx * dx + dy * dy;
                 if (distSq <= rangeSq)
                 {
-                    _singleTargetCandidates.Add((enemyId, distSq));
+                    lock (_singleTargetCandidatesLock) { _singleTargetCandidates.Add((enemyId, distSq)); }
                 }
             });
 
@@ -307,7 +311,7 @@ namespace BattleSystemECS.Systems
                 float enemyX = store.PositionX[closestEnemyId];
                 float enemyY = store.PositionY[closestEnemyId];
 
-                _skillDamageQueue[_skillDamageQueueIdx].Add((closestEnemyId, finalDamage));
+                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((closestEnemyId, finalDamage)); }
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {closestEnemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
                 return 1;
@@ -340,7 +344,7 @@ namespace BattleSystemECS.Systems
 
                 if (inHorizontalArm || inVerticalArm)
                 {
-                    _crossAreaHits.Add(enemyId);
+                    lock (_crossAreaHitsLock) { _crossAreaHits.Add(enemyId); }
                 }
             });
 
@@ -351,7 +355,7 @@ namespace BattleSystemECS.Systems
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
                 hitCount++;
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
@@ -385,7 +389,7 @@ namespace BattleSystemECS.Systems
                 if (enemyX >= xMin && enemyX <= xMax &&
                     enemyY >= yMin && enemyY <= yMax)
                 {
-                    _boxAreaHits.Add(enemyId);
+                    lock (_boxAreaHitsLock) { _boxAreaHits.Add(enemyId); }
                 }
             });
 
@@ -396,7 +400,7 @@ namespace BattleSystemECS.Systems
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
                 hitCount++;
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
@@ -430,7 +434,7 @@ namespace BattleSystemECS.Systems
 
                 if (distSq <= radiusSq)
                 {
-                    _boxAreaHits.Add(enemyId);
+                    lock (_boxAreaHitsLock) { _boxAreaHits.Add(enemyId); }
                 }
             });
 
@@ -460,7 +464,7 @@ namespace BattleSystemECS.Systems
                 else
                 {
                     // Fallback: immediate damage if no dotSystem wired
-                    _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                    lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
                 }
                 hitCount++;
             }
@@ -568,7 +572,7 @@ namespace BattleSystemECS.Systems
 
                 if (onSameRow && withinRange)
                 {
-                    _lineAreaHits.Add(enemyId);
+                    lock (_lineAreaHitsLock) { _lineAreaHits.Add(enemyId); }
                 }
             });
 
@@ -579,7 +583,7 @@ namespace BattleSystemECS.Systems
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
                 hitCount++;
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");

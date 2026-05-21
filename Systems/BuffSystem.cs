@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using BattleSystemECS.Core;
 using BattleSystemECS.Core.GAS;
 
@@ -20,7 +20,8 @@ namespace BattleSystemECS.Systems
         private IRenderer renderer;
 
         // Ping-pong double-buffer for enemy DoT damage queue
-        private ConcurrentBag<(int enemyId, float damage)>[] _dotDamageQueue = new ConcurrentBag<(int, float)>[2];
+        private List<(int enemyId, float damage)>[] _dotDamageQueue = new List<(int, float)>[2];
+        private readonly object _dotDamageQueueLock = new object();
         private int _dotQueueIdx = 0;
 
         public BuffSystem(ComponentStore store, int playerId, IRenderer renderer = null)
@@ -28,8 +29,8 @@ namespace BattleSystemECS.Systems
             this.store = store;
             this.playerId = playerId;
             this.renderer = renderer;
-            _dotDamageQueue[0] = new ConcurrentBag<(int, float)>();
-            _dotDamageQueue[1] = new ConcurrentBag<(int, float)>();
+            _dotDamageQueue[0] = new List<(int, float)>(128);
+            _dotDamageQueue[1] = new List<(int, float)>(128);
         }
 
         /// <summary>

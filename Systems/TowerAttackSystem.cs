@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
@@ -24,15 +23,18 @@ namespace BattleSystemECS.Systems
         private List<int>[] _towerCandidates = Array.Empty<List<int>>();
 
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
-        private ConcurrentBag<(int enemyId, float damage, int playerId)>[] _damageQueue = new ConcurrentBag<(int, float, int)>[2];
+        private List<(int enemyId, float damage, int playerId)>[] _damageQueue = new List<(int, float, int)>[2];
+        private readonly object _damageQueueLock = new object();
         private int _damageQueueIdx = 0;
 
         // Ping-pong double-buffer for tower debuff events (collected parallel, applied serial)
-        private ConcurrentBag<(int enemyId, int towerId)>[] _debuffQueue = new ConcurrentBag<(int, int)>[2];
+        private List<(int enemyId, int towerId)>[] _debuffQueue = new List<(int, int)>[2];
+        private readonly object _debuffQueueLock = new object();
         private int _debuffQueueIdx = 0;
 
         // Ping-pong double-buffer for tower type-specific events (Leech lifesteal heal, etc.)
-        private ConcurrentBag<(int playerId, float healAmount)>[] _healQueue = new ConcurrentBag<(int, float)>[2];
+        private List<(int playerId, float healAmount)>[] _healQueue = new List<(int, float)>[2];
+        private readonly object _healQueueLock = new object();
         private int _healQueueIdx = 0;
 
         // Cached player armor stats (updated each SetTurn)
@@ -47,11 +49,13 @@ namespace BattleSystemECS.Systems
 
         // Ping-pong double-buffer for Tesla chain lightning damage events
         // (int chainId, int enemyId, float damage): chainId=-1 means non-chain (handled by debuff phase)
-        private ConcurrentBag<(int chainId, int enemyId, float damage, int playerId)>[] _chainDamageQueue = new ConcurrentBag<(int, int, float, int)>[2];
+        private List<(int chainId, int enemyId, float damage, int playerId)>[] _chainDamageQueue = new List<(int, int, float, int)>[2];
+        private readonly object _chainDamageQueueLock = new object();
         private int _chainDamageQueueIdx = 0;
 
         // Ping-pong double-buffer for splash damage events (from upgrade special abilities)
-        private ConcurrentBag<(int primaryEnemyId, float splashDamage, int playerId, int towerId)>[] _splashDamageQueue = new ConcurrentBag<(int, float, int, int)>[2];
+        private List<(int primaryEnemyId, float splashDamage, int playerId, int towerId)>[] _splashDamageQueue = new List<(int, float, int, int)>[2];
+        private readonly object _splashDamageQueueLock = new object();
         private int _splashDamageQueueIdx = 0;
 
         // Leech lifesteal rate: 30% of damage dealt is returned as player heal
@@ -62,16 +66,16 @@ namespace BattleSystemECS.Systems
             this.store = store;
             this.logger = logger;
             this.techTreeSystem = techTreeSystem;
-            _damageQueue[0] = new ConcurrentBag<(int, float, int)>();
-            _damageQueue[1] = new ConcurrentBag<(int, float, int)>();
-            _debuffQueue[0] = new ConcurrentBag<(int, int)>();
-            _debuffQueue[1] = new ConcurrentBag<(int, int)>();
-            _healQueue[0] = new ConcurrentBag<(int, float)>();
-            _healQueue[1] = new ConcurrentBag<(int, float)>();
-            _chainDamageQueue[0] = new ConcurrentBag<(int, int, float, int)>();
-            _chainDamageQueue[1] = new ConcurrentBag<(int, int, float, int)>();
-            _splashDamageQueue[0] = new ConcurrentBag<(int, float, int, int)>();
-            _splashDamageQueue[1] = new ConcurrentBag<(int, float, int, int)>();
+            _damageQueue[0] = new List<(int, float, int)>(256);
+            _damageQueue[1] = new List<(int, float, int)>(256);
+            _debuffQueue[0] = new List<(int, int)>(256);
+            _debuffQueue[1] = new List<(int, int)>(256);
+            _healQueue[0] = new List<(int, float)>(64);
+            _healQueue[1] = new List<(int, float)>(64);
+            _chainDamageQueue[0] = new List<(int, int, float, int)>(64);
+            _chainDamageQueue[1] = new List<(int, int, float, int)>(64);
+            _splashDamageQueue[0] = new List<(int, float, int, int)>(64);
+            _splashDamageQueue[1] = new List<(int, float, int, int)>(64);
         }
 
         /// <summary>
@@ -139,6 +143,11 @@ namespace BattleSystemECS.Systems
             var chainBag = _chainDamageQueue[_chainDamageQueueIdx];
             var healBag = _healQueue[_healQueueIdx];
             var splashBag = _splashDamageQueue[_splashDamageQueueIdx];
+            var damageLock = _damageQueueLock;
+            var debuffLock = _debuffQueueLock;
+            var chainLock = _chainDamageQueueLock;
+            var healLock = _healQueueLock;
+            var splashLock = _splashDamageQueueLock;
 
             Parallel.For(0, activeTowerIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, ti =>
             {
@@ -198,68 +207,68 @@ namespace BattleSystemECS.Systems
                     {
                         case "Tesla":
                             // Chain lightning: primary target + up to 3 chained targets at 70% decay
-                            chainBag.Add((0, bestTarget, baseDmg, store.PlayerEntityId));
+                            lock (chainLock) { chainBag.Add((0, bestTarget, baseDmg, store.PlayerEntityId)); }
                             break;
 
                         case "Leech":
                             // Damage + lifesteal (heal player)
-                            bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
                             float healAmount = baseDmg * LEECH_LIFESTEAL_RATE;
                             if (healAmount > 0f)
-                                healBag.Add((store.PlayerEntityId, healAmount));
+                                lock (healLock) { healBag.Add((store.PlayerEntityId, healAmount)); }
                             break;
 
                         case "Frost":
                             // Damage + tower slow debuff (handled by debuff phase)
-                            bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
-                            debuffBag.Add((bestTarget, towerId));
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             break;
 
                         case "Firewall":
                             // Damage + Firewall DoT (handled by debuff phase)
-                            bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
-                            debuffBag.Add((bestTarget, towerId));
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             break;
 
                         default:
                             // Basic / unknown: standard damage + standard debuff check
-                            bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
                             // Special ability: armor pierce (reduces enemy armor effectiveness)
                             if (store.TowerArmorPierceRatio[towerId] > 0f)
                             {
                                 float effectiveArmor = store.EnemyArmor[bestTarget] * (1f - store.TowerArmorPierceRatio[towerId]);
                                 float pierceBonus = baseDmg * (1f - Math.Max(0.01f, 1f - effectiveArmor));
                                 if (pierceBonus > 0f)
-                                    bag.Add((bestTarget, pierceBonus, store.PlayerEntityId));
+                                    lock (damageLock) { bag.Add((bestTarget, pierceBonus, store.PlayerEntityId)); }
                             }
                             // Special ability: splash damage (AOE)
                             if (store.TowerSplashRadius[towerId] > 0f)
                             {
                                 // Collect splash targets for later processing
-                                splashBag.Add((bestTarget, baseDmg * 0.5f, store.PlayerEntityId, towerId));
+                                lock (splashLock) { splashBag.Add((bestTarget, baseDmg * 0.5f, store.PlayerEntityId, towerId)); }
                             }
                             // Special ability: critical strike
                             if (store.TowerCritChance[towerId] > 0f && _rand.NextDouble() < store.TowerCritChance[towerId])
                             {
                                 float critBonus = baseDmg * (store.TowerCritMultiplier[towerId] - 1f);
                                 if (critBonus > 0f)
-                                    bag.Add((bestTarget, critBonus, store.PlayerEntityId));
+                                    lock (damageLock) { bag.Add((bestTarget, critBonus, store.PlayerEntityId)); }
                             }
                             // Special ability: chain lightning (from upgrade, not Tesla tower type)
                             if (store.TowerHasChainLightning[towerId])
                             {
-                                chainBag.Add((0, bestTarget, baseDmg, store.PlayerEntityId));
+                                lock (chainLock) { chainBag.Add((0, bestTarget, baseDmg, store.PlayerEntityId)); }
                             }
                             // Special ability: freeze AOE (from upgrade)
                             if (store.TowerHasFreezeAoe[towerId])
                             {
-                                debuffBag.Add((bestTarget, towerId));
+                                lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             }
                             // Standard stun/slow from tower debuff config
                             float stunChance = store.TowerStunChance[towerId];
                             float slowAmount = store.TowerSlowAmount[towerId];
                             if (stunChance > 0f || slowAmount > 0f)
-                                debuffBag.Add((bestTarget, towerId));
+                                lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             break;
                     }
                 }
