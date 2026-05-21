@@ -140,6 +140,11 @@ namespace BattleSystemECS.Core
         public float[] TowerCritMultiplier = new float[MAX_ENTITIES];
         public bool[] TowerHasChainLightning = new bool[MAX_ENTITIES];
         public bool[] TowerHasFreezeAoe = new bool[MAX_ENTITIES];
+        // Tower special ability parameters from TowerSpecialAbility config
+        public float[] TowerSpecialAbilityRadius = new float[MAX_ENTITIES];
+        public float[] TowerSpecialAbilityDamageMult = new float[MAX_ENTITIES];
+        public float[] TowerSpecialAbilityDotDamage = new float[MAX_ENTITIES];
+        public float[] TowerSpecialAbilityDotInterval = new float[MAX_ENTITIES];
 
         // ==================== 技能组件的 SOA 存储 ====================
         public string[] SkillName = new string[MAX_PLAYERS];

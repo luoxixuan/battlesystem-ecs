@@ -454,6 +454,26 @@ namespace BattleSystemECS.Config
                 SlowDuration = 1f
             });
 
+            // Tesla Tower — chain lightning tower with built-in SpecialAbility
+            TowerTypes.Add(new TowerConfig
+            {
+                Name = "Tesla Coil",
+                Type = "Tesla",
+                Damage = 8f,
+                Range = 4,
+                AttackSpeed = 1.5f,
+                Cost = 70f,
+                UpgradeCost = 40f,
+                StunChance = 0f,
+                SlowAmount = 0f,
+                SlowDuration = 0f,
+                SpecialAbility = new TowerSpecialAbility
+                {
+                    AbilityType = "chain_lightning",
+                    Radius = 3
+                }
+            });
+
             // Default monsters
             MonsterTypes.Add(new MonsterConfig
             {

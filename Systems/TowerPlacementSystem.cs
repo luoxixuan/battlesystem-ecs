@@ -94,6 +94,12 @@ namespace BattleSystemECS.Systems
         {
             if (ability == null || string.IsNullOrEmpty(ability.AbilityType)) return;
 
+            // Store all ability parameters for TowerAttackSystem to read
+            store.TowerSpecialAbilityRadius[towerId] = ability.Radius;
+            store.TowerSpecialAbilityDamageMult[towerId] = ability.DamageMultiplier;
+            store.TowerSpecialAbilityDotDamage[towerId] = ability.DotDamagePerTick;
+            store.TowerSpecialAbilityDotInterval[towerId] = ability.DotTickInterval > 0f ? ability.DotTickInterval : 1f;
+
             switch (ability.AbilityType.ToLowerInvariant())
             {
                 case "chain_lightning":
