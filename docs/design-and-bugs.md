@@ -29,12 +29,18 @@
 | 严重度 | 总数 | 已修复 | 未修复 |
 |--------|------|--------|--------|
 | HIGH   | 13   | 13     | 0      |
-| MEDIUM | 15   | 15     | 0      |
+| MEDIUM | 16   | 16     | 0      |
 | LOW    | 9    | 9      | 0      |
 | INFO   | 6    | 6      | 0      |
-| **合计** | **46** | **46** | **0** |
+| **合计** | **47** | **47** | **0** |
 
 > 2026-05-15：#39（GridSpatialHash 空文件）和 #40（csproj 编译项）均已确认已修复/非问题，46/46 全部解决。
+
+#### 47. TowerPlacementSystem 无参构造导致 debuff 塔效果失效 [MEDIUM] ✅ FIXED
+**文件**: Core/GameManager.cs, Systems/TowerPlacementSystem.cs
+**状态**: ✅ 已修复
+**说明**: GameManager 初始化 TowerPlacementSystem 时使用无参构造函数，导致 `gameConfig == null`。PlaceTower 中的 debuff 查询逻辑 `if (gameConfig != null)` 永远走 else 分支，Cryo/Firewall/Leech/Tesla 等功能性塔的 StunChance/SlowAmount/SlowDuration 保持默认值 0，debuff 效果不生效。
+**修复内容**: `GameManager.cs:97` 改为传入 `gameConfig` 参数：`new TowerPlacementSystem(store, logger, gameConfig)`。TowerPlacementSystem 已有两个构造函数，无参版本保留兼容。
 
 ### 2.2 未修复项
 

@@ -94,7 +94,7 @@ namespace BattleSystemECS.Core
 
             // 初始化塔防系统
             logger.Log("[BOOTSTRAP]    - Creating TowerPlacementSystem...");
-            towerPlacementSystem = new TowerPlacementSystem(store, logger);
+            towerPlacementSystem = new TowerPlacementSystem(store, logger, gameConfig);
             logger.Log("[BOOTSTRAP]      TowerPlacementSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating TechTreeSystem...");
