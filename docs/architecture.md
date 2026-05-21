@@ -165,7 +165,7 @@ Core/GAS/
 - `GameplayEffectDef` — 效果元数据（Type/Duration/TickInterval/TotalTicks/Modifiers）
 - `EffectType` — 效果类型（`Instant`/`Duration`/`Periodic`）
 - `GameplayAbilityDef` — 技能元数据（Name/Cooldown/AreaShape/AreaRadius/FixedBaseDamage/HasDot/DotDuration/TickInterval/DamagePerTick/IsShield/ShieldAmount/ShieldDuration）
-- `AreaShapeType` — 范围形状（`Single`=0/`Cross`=1/`Box`=2/`Circle`=3）
+- `AreaShapeType` — 范围形状（`Single`=0/`Cross`=1/`Box`=2/`Circle`=3/`Chain`=4/`Heal`=5/`Shield`=6/`Line`=7）
 - `AbilityInstance` — 技能实例（含 CurrentCooldown）
 - `AppliedEffect` — 已应用的效果实例（含 TimeSinceLastTick）
 

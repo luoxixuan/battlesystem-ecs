@@ -38,6 +38,7 @@ namespace BattleSystemECS.Systems
         private ConcurrentBag<(int enemyId, float distSq)> _singleTargetCandidates = new();
         private ConcurrentBag<int> _crossAreaHits = new();
         private ConcurrentBag<int> _boxAreaHits = new();
+        private ConcurrentBag<int> _lineAreaHits = new();
 
         // Poison Nova DoT constants
         private const float POISON_NOVA_DURATION = 5f;
@@ -245,6 +246,9 @@ namespace BattleSystemECS.Systems
                 case 6: // Shield — apply shield to player
                     CastShield(def);
                     enemiesHit = 0;
+                    break;
+                case 7: // Line/Ray — horizontal laser beam along player's Y axis
+                    enemiesHit = CastLineArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -535,6 +539,52 @@ namespace BattleSystemECS.Systems
             }
 
             return totalHit;
+        }
+
+        /// <summary>
+        /// Line/Ray AreaShape: hits all enemies sharing the player's Y coordinate
+        /// within range (horizontal laser beam). Extensible to vertical via parameter.
+        /// </summary>
+        private int CastLineArea(float finalDamage, float playerX, float playerY, int range, string name)
+        {
+            if (_activeEnemyList == null) return 0;
+            var activeEnemyIds = _activeEnemyList;
+
+            // Parallel phase: collect all enemies on same Y row within range
+            _lineAreaHits.Clear();
+
+            Parallel.ForEach(activeEnemyIds, enemyId =>
+            {
+                if (enemyId == playerId) return;
+                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyHealth <= 0f) return;
+
+                float enemyX = store.PositionX[enemyId];
+                float enemyY = store.PositionY[enemyId];
+
+                // Horizontal line: same Y (dy ≈ 0), within range on X axis
+                bool onSameRow = Math.Abs(enemyY - playerY) < 0.5f;
+                bool withinRange = Math.Abs(enemyX - playerX) <= range;
+
+                if (onSameRow && withinRange)
+                {
+                    _lineAreaHits.Add(enemyId);
+                }
+            });
+
+            // Serial phase: apply damage
+            int hitCount = 0;
+            foreach (int enemyId in _lineAreaHits)
+            {
+                float enemyX = store.PositionX[enemyId];
+                float enemyY = store.PositionY[enemyId];
+
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                hitCount++;
+
+                renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
+            }
+            return hitCount;
         }
 
         private void HandleKill(int enemyId)

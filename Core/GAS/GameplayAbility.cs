@@ -15,6 +15,7 @@ namespace BattleSystemECS.Core.GAS
         public const int Chain = 4;
         public const int Heal = 5;
         public const int Shield = 6;
+        public const int Line = 7;
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -28,6 +29,7 @@ namespace BattleSystemECS.Core.GAS
                 "chain" => Chain,
                 "heal" => Heal,
                 "shield" => Shield,
+                "line" => Line,
                 _ => Single
             };
         }
