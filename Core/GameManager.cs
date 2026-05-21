@@ -33,6 +33,9 @@ namespace BattleSystemECS.Core
         private TechTreeSystem techTreeSystem;            // 科技树系统
         private BuffSystem buffSystem;                    // Buff/DoT 追踪系统
 
+        // 统一帧调度器（所有帧路径统一入口）
+        private FrameScheduler scheduler;
+
         // 渲染器
         private IRenderer logger;
 
@@ -168,6 +171,19 @@ namespace BattleSystemECS.Core
                 skillSystem.SetWaveNumber(wave);
             };
 
+            // 初始化统一帧调度器
+            scheduler = new FrameScheduler(store, gameConfig);
+            scheduler.WaveSpawning = waveSpawningSystem;
+            scheduler.EnemyAI = enemyAISystem;
+            scheduler.EnemyAbility = enemyAbilitySystem;
+            scheduler.EnemyMovement = enemyMovementSystem;
+            scheduler.PlayerTowerAttack = playerTowerAttackSystem;
+            scheduler.TowerAttack = towerAttackSystem;
+            scheduler.Skill = skillSystem;
+            scheduler.Buff = buffSystem;
+            scheduler.Gold = goldSystem;
+            scheduler.Upgrade = upgradeSystem;
+
             logger.Log("[BOOTSTRAP] ========== Game Initialization Complete ==========");
             Console.WriteLine();
         }
@@ -296,58 +312,16 @@ namespace BattleSystemECS.Core
                 while (gameRunning && turn < maxTurns)
                 {
                     turn++;
-                    store.BeginFrame(); // Reset two-phase queues each turn
-                    store.SetTurnCCFlags(); // Decrement player CC durations (enemy stun flags cleared in EnemyMovementSystem.SetTurn)
 
                     System.Threading.Thread.Sleep(1000);
 
                     logger.Log("[INFO] --- Turn " + turn + " ---");
 
-                    // 生成敌人（SOA）- 每波 100 只怪
-                    waveSpawningSystem.Update();
+                    // ── 帧调度（统一入口）──
+                    scheduler.TickGameTurn(1f, turn);
 
-                    // 敌人 AI 评估（行为树）- 在移动之前执行
-                    enemyAISystem.SetTurn(turn);
-                    enemyAISystem.Update();
-                    // 敌人技能执行（串行，与 attack event 合并）
-                    enemyAbilitySystem.SetTurn(turn);
-                    enemyAbilitySystem.UpdateCooldowns(1f);
-                    enemyAbilitySystem.ExecuteAbilities();
-                    enemyAbilitySystem.Update(); // 回合末：减少 buff 持续时间，清除过期 buff
-
-                    // 移动敌人（SOA）
-                    enemyMovementSystem.SetTurn(turn);
-                    enemyMovementSystem.Update();
-
-                    // 玩家攻击（SOA）
-                    playerTowerAttackSystem.SetTurn(turn);
-                    towerAttackSystem.SetTurn(turn);
-                    playerTowerAttackSystem.Update();
-
-                    // 技能系统缓存（与玩家攻击/敌人AI保持一致的 SetTurn 模式）
-                    skillSystem.SetTurn(turn);
-
-                    // Spatial Grid — rebuild all active enemies for this frame.
-                    // EnemyMovementSystem tracks MovedEnemyIds but the incremental update
-                    // path has correctness complexity; full rebuild is fast enough (~0.03ms).
-                    store.RebuildSpatialGrid();
-
-// [测试] 塔攻击逻辑
-                    towerAttackSystem.Update(1.0f);
-
-                    // Buff/DoT 系统更新（减少持续时间，触发周期性伤害）— 在帧末结算前执行，使 DoT 伤害本帧生效
-                    buffSystem.Update(1f);
-
-                    // 技能系统串行段伤害结算（两阶段：并行收集 → 串行 apply）
-                    skillSystem.ResolveSkillDamage();
-
-                    // DoT/Buff 系统伤害结算（两阶段：收集 → 串行 apply）— 在帧末死亡结算前执行，确保 DoT 伤害与攻击伤害同一帧结算
-                    buffSystem.ResolveDotDamage();
-
-                    // 统一帧末死亡结算（所有攻击系统已完成伤害/死亡入队）
-                    store.ResolveEnemiesKilledThisFrame();
-
-                    // 检查玩家是否存活
+                    // ── 游戏级逻辑 ───────────────────────────────
+                    // 注意：Gold/Upgrade/Skill cooldown 已由 TickGameTurn 处理
                     if (!store.IsPlayerAlive(playerId))
                     {
                         // Try不朽科技复活（消耗一次复活机会）
@@ -363,15 +337,6 @@ namespace BattleSystemECS.Core
                             break;
                         }
                     }
-
-                    // 检查升级（SOA）
-                    goldSystem.Update();
-
-                    // 应用升级（SOA）
-                    upgradeSystem.Update();
-
-                    // 更新技能系统冷却
-                    skillSystem.Update(1f);  // 每回合 1 秒
 
                     // 低血量回血科技（喘息）生效
                     float healed = techTreeSystem.TickLowHpRegen();
