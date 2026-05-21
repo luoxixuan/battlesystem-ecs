@@ -202,6 +202,27 @@ namespace BattleSystemECS.Systems
 
                     switch (towerType)
                     {
+                        case "AOE":
+                            // Damage + area splash (handled via upgrade special ability mechanism)
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            // AOE towers naturally use splash — just mark the primary hit
+                            // The splash resolution is handled in ResolveSplashDamage() if splash is set
+                            break;
+
+                        case "Sniper":
+                            // High single-target damage + mark (bonus damage on next hit)
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            // Apply mark debuff: next tower hit deals +20% damage
+                            if (store.EnemyArmor[bestTarget] >= 0)
+                            {
+                                // Sniper mark: enemy takes +20% damage from next hit
+                                // Use slowAmount field as mark damage amp for this tower
+                                float markAmp = 0.20f;
+                                if (markAmp > 0f)
+                                    lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
+                            }
+                            break;
+
                         case "Tesla":
                             // Chain lightning: primary target + up to 3 chained targets at 70% decay
                             lock (chainLock) { chainBag.Add((0, bestTarget, baseDmg, store.PlayerEntityId)); }

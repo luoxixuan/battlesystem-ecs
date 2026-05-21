@@ -342,7 +342,7 @@ namespace BattleSystemECS.Config
                 Hotkey = "3"
             });
 
-            // Default towers
+            // Default towers — now with debuff fields so TowerPlacementSystem.GetTowerConfig() finds them
             TowerTypes.Add(new TowerConfig
             {
                 Name = "Basic Tower",
@@ -351,7 +351,10 @@ namespace BattleSystemECS.Config
                 Range = 3,
                 AttackSpeed = 1f,
                 Cost = 50f,
-                UpgradeCost = 30f
+                UpgradeCost = 30f,
+                StunChance = 0.10f,   // 10% stun on hit
+                SlowAmount = 0f,
+                SlowDuration = 0f
             });
 
             TowerTypes.Add(new TowerConfig
@@ -362,7 +365,10 @@ namespace BattleSystemECS.Config
                 Range = 8,
                 AttackSpeed = 0.5f,
                 Cost = 100f,
-                UpgradeCost = 60f
+                UpgradeCost = 60f,
+                StunChance = 0.05f,   // 5% stun — precision shot can stun briefly
+                SlowAmount = 0f,
+                SlowDuration = 0f
             });
 
             TowerTypes.Add(new TowerConfig
@@ -373,7 +379,10 @@ namespace BattleSystemECS.Config
                 Range = 2,
                 AttackSpeed = 1.5f,
                 Cost = 75f,
-                UpgradeCost = 45f
+                UpgradeCost = 45f,
+                StunChance = 0f,
+                SlowAmount = 0.30f,   // 30% slow on hit (area of effect)
+                SlowDuration = 1f
             });
 
             // Default monsters
