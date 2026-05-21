@@ -42,13 +42,17 @@ namespace BattleSystemECS.Systems
         // Cached wave-based difficulty multiplier (updated each SetTurn)
         private float _waveDifficultyMult = 1f;
 
-        // Shared random for debuff chance rolls — not thread-safe but debuffs are applied serially
-        private static readonly Random _rand = new Random();
+        // Shared random for debuff chance rolls — uses Random.Shared (.NET 6+ thread-safe)
+        private static readonly Random _rand = Random.Shared;
 
         // Ping-pong double-buffer for Tesla chain lightning damage events
         // (int chainId, int enemyId, float damage): chainId=-1 means non-chain (handled by debuff phase)
         private ConcurrentBag<(int chainId, int enemyId, float damage, int playerId)>[] _chainDamageQueue = new ConcurrentBag<(int, int, float, int)>[2];
         private int _chainDamageQueueIdx = 0;
+
+        // Ping-pong double-buffer for splash damage events (from upgrade special abilities)
+        private ConcurrentBag<(int enemyId, float damage, int playerId)>[] _splashDamageQueue = new ConcurrentBag<(int, float, int)>[2];
+        private int _splashDamageQueueIdx = 0;
 
         // Leech lifesteal rate: 30% of damage dealt is returned as player heal
         private const float LEECH_LIFESTEAL_RATE = 0.30f;
@@ -66,6 +70,8 @@ namespace BattleSystemECS.Systems
             _healQueue[1] = new ConcurrentBag<(int, float)>();
             _chainDamageQueue[0] = new ConcurrentBag<(int, int, float, int)>();
             _chainDamageQueue[1] = new ConcurrentBag<(int, int, float, int)>();
+            _splashDamageQueue[0] = new ConcurrentBag<(int, float, int)>();
+            _splashDamageQueue[1] = new ConcurrentBag<(int, float, int)>();
         }
 
         /// <summary>
@@ -132,6 +138,7 @@ namespace BattleSystemECS.Systems
             var debuffBag = _debuffQueue[_debuffQueueIdx];
             var chainBag = _chainDamageQueue[_chainDamageQueueIdx];
             var healBag = _healQueue[_healQueueIdx];
+            var splashBag = _splashDamageQueue[_splashDamageQueueIdx];
 
             Parallel.For(0, activeTowerIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, ti =>
             {
@@ -217,6 +224,38 @@ namespace BattleSystemECS.Systems
                         default:
                             // Basic / unknown: standard damage + standard debuff check
                             bag.Add((bestTarget, baseDmg, store.PlayerEntityId));
+                            // Special ability: armor pierce (reduces enemy armor effectiveness)
+                            if (store.TowerArmorPierceRatio[towerId] > 0f)
+                            {
+                                float effectiveArmor = store.EnemyArmor[bestTarget] * (1f - store.TowerArmorPierceRatio[towerId]);
+                                float pierceBonus = baseDmg * (1f - Math.Max(0.01f, 1f - effectiveArmor));
+                                if (pierceBonus > 0f)
+                                    bag.Add((bestTarget, pierceBonus, store.PlayerEntityId));
+                            }
+                            // Special ability: splash damage (AOE)
+                            if (store.TowerSplashRadius[towerId] > 0f)
+                            {
+                                // Collect splash targets for later processing
+                                splashBag.Add((bestTarget, baseDmg * 0.5f, store.PlayerEntityId));
+                            }
+                            // Special ability: critical strike
+                            if (store.TowerCritChance[towerId] > 0f && _rand.NextDouble() < store.TowerCritChance[towerId])
+                            {
+                                float critBonus = baseDmg * (store.TowerCritMultiplier[towerId] - 1f);
+                                if (critBonus > 0f)
+                                    bag.Add((bestTarget, critBonus, store.PlayerEntityId));
+                            }
+                            // Special ability: chain lightning (from upgrade, not Tesla tower type)
+                            if (store.TowerHasChainLightning[towerId])
+                            {
+                                chainBag.Add((0, bestTarget, baseDmg, store.PlayerEntityId));
+                            }
+                            // Special ability: freeze AOE (from upgrade)
+                            if (store.TowerHasFreezeAoe[towerId])
+                            {
+                                debuffBag.Add((bestTarget, towerId));
+                            }
+                            // Standard stun/slow from tower debuff config
                             float stunChance = store.TowerStunChance[towerId];
                             float slowAmount = store.TowerSlowAmount[towerId];
                             if (stunChance > 0f || slowAmount > 0f)
@@ -244,7 +283,10 @@ namespace BattleSystemECS.Systems
             // Phase 2b (serial): resolve Tesla chain lightning (after basic damage to avoid double-hit on primary)
             ResolveTeslaChainLightning();
 
-            // Phase 2c (serial): resolve Leech lifesteal heals
+            // Phase 2c (serial): resolve splash damage from upgrade special ability
+            ResolveSplashDamage();
+
+            // Phase 2d (serial): resolve Leech lifesteal heals
             ResolveLeechHealing();
 
             System.Threading.Thread.MemoryBarrier(); // ensure drain completes
@@ -317,6 +359,61 @@ namespace BattleSystemECS.Systems
                     if (store.EnemyHealth[enemyId] <= 0f)
                     {
                         store.QueueEnemyDeath(enemyId, playerId);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Resolve splash damage from tower upgrade special abilities.
+        /// Deals reduced damage to enemies near the primary target.
+        /// </summary>
+        private void ResolveSplashDamage()
+        {
+            int readIdx = _splashDamageQueueIdx;
+            int writeIdx = 1 - _splashDamageQueueIdx;
+            _splashDamageQueueIdx = writeIdx;
+            _splashDamageQueue[writeIdx].Clear();
+
+            foreach (var (primaryEnemyId, splashDamage, playerId) in _splashDamageQueue[readIdx])
+            {
+                if (!store.EnemyActive[primaryEnemyId]) continue;
+
+                float px = store.PositionX[primaryEnemyId];
+                float py = store.PositionY[primaryEnemyId];
+
+                // Find towers that have splash and hit this primary target
+                var activeTowerIds = store.ActiveTowerIds;
+                for (int ti = 0; ti < activeTowerIds.Count; ti++)
+                {
+                    int towerId = activeTowerIds[ti];
+                    if (store.TowerSplashRadius[towerId] <= 0f) continue;
+
+                    // Check if this tower hit the primary target this frame
+                    float tx = store.PositionX[towerId];
+                    float ty = store.PositionY[towerId];
+                    float dx = px - tx;
+                    float dy = py - ty;
+                    float distSq = dx * dx + dy * dy;
+                    int range = store.TowerRange[towerId];
+                    if (distSq > range * range) continue;
+
+                    // Apply splash to nearby enemies (within splash radius)
+                    int splashRadius = (int)store.TowerSplashRadius[towerId];
+                    var candidates = _towerCandidates[ti];
+                    candidates.Clear();
+                    store.SpatialGrid.GetEnemiesInRange(store, px, py, splashRadius, candidates);
+
+                    for (int ci = 0; ci < candidates.Count; ci++)
+                    {
+                        int enemyId = candidates[ci];
+                        if (!store.EnemyActive[enemyId] || enemyId == primaryEnemyId) continue;
+
+                        store.EnemyHealth[enemyId] -= splashDamage;
+                        if (store.EnemyHealth[enemyId] <= 0f)
+                        {
+                            store.QueueEnemyDeath(enemyId, playerId);
+                        }
                     }
                 }
             }

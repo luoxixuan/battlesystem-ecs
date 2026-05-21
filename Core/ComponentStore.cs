@@ -133,6 +133,13 @@ namespace BattleSystemECS.Core
         public float[] TowerStunChance = new float[MAX_ENTITIES];
         public float[] TowerSlowAmount = new float[MAX_ENTITIES];
         public float[] TowerSlowDuration = new float[MAX_ENTITIES];
+        // Tower special abilities from upgrade path (e.g., armor pierce, splash, critical strike)
+        public float[] TowerArmorPierceRatio = new float[MAX_ENTITIES];
+        public float[] TowerSplashRadius = new float[MAX_ENTITIES];
+        public float[] TowerCritChance = new float[MAX_ENTITIES];
+        public float[] TowerCritMultiplier = new float[MAX_ENTITIES];
+        public bool[] TowerHasChainLightning = new bool[MAX_ENTITIES];
+        public bool[] TowerHasFreezeAoe = new bool[MAX_ENTITIES];
 
         // ==================== 技能组件的 SOA 存储 ====================
         public string[] SkillName = new string[MAX_PLAYERS];

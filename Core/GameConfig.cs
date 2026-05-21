@@ -190,6 +190,19 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Special ability granted by a tower upgrade level.
+    /// </summary>
+    public enum TowerSpecialAbility
+    {
+        None = 0,
+        ArmorPierce,     // Ignore part of enemy armor
+        SplashDamage,    // Deal damage to nearby enemies
+        CriticalStrike,  // Chance to deal bonus damage
+        ChainLightning,  // Chain to nearby enemies (uses existing Tesla logic)
+        FreezeAoe        // Slow nearby enemies on hit
+    }
+
+    /// <summary>
     /// Per-level upgrade multipliers for a tower upgrade path.
     /// Keys are upgrade levels (1-based). Level 1 = first upgrade from base.
     /// </summary>
@@ -199,6 +212,10 @@ namespace BattleSystemECS.Config
         public float RangeAdd { get; set; } = 1f;
         public float AttackSpeedMultiplier { get; set; } = 1.0f;
         public float CostMultiplier { get; set; } = 1.5f;
+        /// <summary>Special ability granted by this upgrade level (e.g., "armor_pierce", "splash_damage").</summary>
+        public TowerSpecialAbility SpecialAbility { get; set; } = TowerSpecialAbility.None;
+        /// <summary>Parameter for special ability (e.g., armor pierce ratio, splash radius, crit chance).</summary>
+        public float SpecialAbilityParam { get; set; } = 0f;
     }
 
     /// <summary>
@@ -401,6 +418,7 @@ namespace BattleSystemECS.Config
                 Levels = new Dictionary<int, TowerUpgradeLevelConfig>
                 {
                     { 1, new TowerUpgradeLevelConfig { DamageMultiplier = 1.2f, RangeAdd = 1f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.5f } },
+                    { 2, new TowerUpgradeLevelConfig { DamageMultiplier = 1.2f, RangeAdd = 0f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.5f, SpecialAbility = TowerSpecialAbility.SplashDamage, SpecialAbilityParam = 1f } },
                 }
             };
 
@@ -412,6 +430,7 @@ namespace BattleSystemECS.Config
                 Levels = new Dictionary<int, TowerUpgradeLevelConfig>
                 {
                     { 1, new TowerUpgradeLevelConfig { DamageMultiplier = 1.15f, RangeAdd = 0.5f, AttackSpeedMultiplier = 1.25f, CostMultiplier = 1.6f } },
+                    { 2, new TowerUpgradeLevelConfig { DamageMultiplier = 1.15f, RangeAdd = 0f, AttackSpeedMultiplier = 1.10f, CostMultiplier = 1.6f, SpecialAbility = TowerSpecialAbility.CriticalStrike, SpecialAbilityParam = 0.25f } },
                 }
             };
 
@@ -423,6 +442,7 @@ namespace BattleSystemECS.Config
                 Levels = new Dictionary<int, TowerUpgradeLevelConfig>
                 {
                     { 1, new TowerUpgradeLevelConfig { DamageMultiplier = 1.3f, RangeAdd = 2f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.4f } },
+                    { 2, new TowerUpgradeLevelConfig { DamageMultiplier = 1.3f, RangeAdd = 0f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.4f, SpecialAbility = TowerSpecialAbility.ArmorPierce, SpecialAbilityParam = 0.5f } },
                 }
             };
 
