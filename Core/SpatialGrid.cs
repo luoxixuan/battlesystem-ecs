@@ -50,6 +50,9 @@ namespace BattleSystemECS.Core
         /// <summary>本帧活跃格子数量</summary>
         private int _currActiveCellCount;
 
+        /// <summary>累计 overflow 次数（每帧超过 CellCapacity 的插入次数）。</summary>
+        public int OverflowCount { get; private set; }
+
         public SpatialGrid()
         {
             Allocate(10, 20);
@@ -71,6 +74,8 @@ namespace BattleSystemECS.Core
         /// </summary>
         public void UpdateEnemies(ComponentStore store, IReadOnlyList<int> enemyIds)
         {
+            OverflowCount = 0;
+
             // Phase 1: clear all cells that had enemies last frame (dirty cells)
             for (int i = 0; i < _prevActiveCellCount; i++)
             {
@@ -170,6 +175,12 @@ namespace BattleSystemECS.Core
                     {
                         _currActiveCells[_currActiveCellCount++] = cellIndex;
                     }
+                }
+                else
+                {
+                    // Overflow: 同一格堆叠超过 CellCapacity（静默丢敌 = 战斗语义改变）
+                    // 记录之；调试/压测时可断言此值为 0
+                    OverflowCount++;
                 }
             }
 
