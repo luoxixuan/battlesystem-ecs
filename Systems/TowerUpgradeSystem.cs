@@ -90,23 +90,23 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Apply a special ability to the tower based on upgrade level config.
         /// </summary>
-        private void ApplySpecialAbility(int towerId, TowerSpecialAbility ability, float param)
+        private void ApplySpecialAbility(int towerId, TowerUpgradeAbility ability, float param)
         {
             switch (ability)
             {
-                case TowerSpecialAbility.ArmorPierce:
+                case TowerUpgradeAbility.ArmorPierce:
                     // param = armor pierce ratio (0-1), e.g. 0.5 = ignore 50% armor
                     store.TowerArmorPierceRatio[towerId] = Math.Max(0f, Math.Min(1f, param > 0f ? param : 0.5f));
                     logger.Log($"[UPGRADE] 获得护甲穿透: {store.TowerArmorPierceRatio[towerId]:P0}");
                     break;
 
-                case TowerSpecialAbility.SplashDamage:
+                case TowerUpgradeAbility.SplashDamage:
                     // param = splash radius in tiles, default 1 (adjacent 3x3)
                     store.TowerSplashRadius[towerId] = param > 0f ? param : 1f;
                     logger.Log($"[UPGRADE] 获得范围伤害: 半径 {store.TowerSplashRadius[towerId]:F0} 格");
                     break;
 
-                case TowerSpecialAbility.CriticalStrike:
+                case TowerUpgradeAbility.CriticalStrike:
                     // param = crit chance (0-1) or crit multiplier if > 1
                     if (param > 1f)
                     {
@@ -122,12 +122,12 @@ namespace BattleSystemECS.Systems
                     logger.Log($"[UPGRADE] 获得暴击: {store.TowerCritChance[towerId]:P0} 几率, {store.TowerCritMultiplier[towerId]:F1}x 倍率");
                     break;
 
-                case TowerSpecialAbility.ChainLightning:
+                case TowerUpgradeAbility.ChainLightning:
                     store.TowerHasChainLightning[towerId] = true;
                     logger.Log($"[UPGRADE] 获得链式闪电!");
                     break;
 
-                case TowerSpecialAbility.FreezeAoe:
+                case TowerUpgradeAbility.FreezeAoe:
                     store.TowerHasFreezeAoe[towerId] = true;
                     logger.Log($"[UPGRADE] 获得冰冻范围效果!");
                     break;

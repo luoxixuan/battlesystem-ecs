@@ -51,7 +51,7 @@ namespace BattleSystemECS.Systems
         private int _chainDamageQueueIdx = 0;
 
         // Ping-pong double-buffer for splash damage events (from upgrade special abilities)
-        private ConcurrentBag<(int enemyId, float damage, int playerId)>[] _splashDamageQueue = new ConcurrentBag<(int, float, int)>[2];
+        private ConcurrentBag<(int primaryEnemyId, float splashDamage, int playerId, int towerId)>[] _splashDamageQueue = new ConcurrentBag<(int, float, int, int)>[2];
         private int _splashDamageQueueIdx = 0;
 
         // Leech lifesteal rate: 30% of damage dealt is returned as player heal
@@ -70,8 +70,8 @@ namespace BattleSystemECS.Systems
             _healQueue[1] = new ConcurrentBag<(int, float)>();
             _chainDamageQueue[0] = new ConcurrentBag<(int, int, float, int)>();
             _chainDamageQueue[1] = new ConcurrentBag<(int, int, float, int)>();
-            _splashDamageQueue[0] = new ConcurrentBag<(int, float, int)>();
-            _splashDamageQueue[1] = new ConcurrentBag<(int, float, int)>();
+            _splashDamageQueue[0] = new ConcurrentBag<(int, float, int, int)>();
+            _splashDamageQueue[1] = new ConcurrentBag<(int, float, int, int)>();
         }
 
         /// <summary>
@@ -236,7 +236,7 @@ namespace BattleSystemECS.Systems
                             if (store.TowerSplashRadius[towerId] > 0f)
                             {
                                 // Collect splash targets for later processing
-                                splashBag.Add((bestTarget, baseDmg * 0.5f, store.PlayerEntityId));
+                                splashBag.Add((bestTarget, baseDmg * 0.5f, store.PlayerEntityId, towerId));
                             }
                             // Special ability: critical strike
                             if (store.TowerCritChance[towerId] > 0f && _rand.NextDouble() < store.TowerCritChance[towerId])
@@ -375,32 +375,19 @@ namespace BattleSystemECS.Systems
             _splashDamageQueueIdx = writeIdx;
             _splashDamageQueue[writeIdx].Clear();
 
-            foreach (var (primaryEnemyId, splashDamage, playerId) in _splashDamageQueue[readIdx])
+            foreach (var (primaryEnemyId, splashDamage, playerId, towerId) in _splashDamageQueue[readIdx])
             {
                 if (!store.EnemyActive[primaryEnemyId]) continue;
+                if (store.TowerSplashRadius[towerId] <= 0f) continue;
 
                 float px = store.PositionX[primaryEnemyId];
                 float py = store.PositionY[primaryEnemyId];
+                int splashRadius = (int)store.TowerSplashRadius[towerId];
 
-                // Find towers that have splash and hit this primary target
-                var activeTowerIds = store.ActiveTowerIds;
-                for (int ti = 0; ti < activeTowerIds.Count; ti++)
+                // Collect nearby enemies via spatial grid
+                if (splashRadius > 0 && splashRadius <= 100)
                 {
-                    int towerId = activeTowerIds[ti];
-                    if (store.TowerSplashRadius[towerId] <= 0f) continue;
-
-                    // Check if this tower hit the primary target this frame
-                    float tx = store.PositionX[towerId];
-                    float ty = store.PositionY[towerId];
-                    float dx = px - tx;
-                    float dy = py - ty;
-                    float distSq = dx * dx + dy * dy;
-                    int range = store.TowerRange[towerId];
-                    if (distSq > range * range) continue;
-
-                    // Apply splash to nearby enemies (within splash radius)
-                    int splashRadius = (int)store.TowerSplashRadius[towerId];
-                    var candidates = _towerCandidates[ti];
+                    var candidates = _towerCandidates[0]; // reuse first slot
                     candidates.Clear();
                     store.SpatialGrid.GetEnemiesInRange(store, px, py, splashRadius, candidates);
 

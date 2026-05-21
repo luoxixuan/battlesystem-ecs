@@ -47,6 +47,39 @@ namespace BattleSystemECS.Config
         public float StunChance { get; set; } = 0f;   // probability per hit (0-1)
         public float SlowAmount { get; set; } = 0f;   // speed multiplier (e.g. 0.5 = 50% speed)
         public float SlowDuration { get; set; } = 0f; // duration in turns
+        // Tower special ability fields (null = no special ability)
+        public TowerSpecialAbility SpecialAbility { get; set; }
+    }
+
+    /// <summary>
+    /// Tower special ability definition — allows towers to have active skills
+    /// that are triggered manually (or auto) with area-of-effect effects.
+    /// Mirrors the AreaShape pattern from SkillSystem for consistency.
+    /// </summary>
+    public class TowerSpecialAbility
+    {
+        /// <summary>Ability identifier, e.g. "aoe_burn", "freeze_stun", "chain_lightning"</summary>
+        public string AbilityType { get; set; }
+        /// <summary>Cooldown in seconds between activations</summary>
+        public float Cooldown { get; set; } = 0f;
+        /// <summary>Area shape: circle, box, cross, line, chain. Maps to AreaShapeType enum.</summary>
+        public string AreaShape { get; set; }
+        /// <summary>Radius in tiles for circle/chain shapes, or half-size for box shapes</summary>
+        public int Radius { get; set; } = 0;
+        /// <summary>Damage dealt by the ability (multiplied by tower damage)</summary>
+        public float DamageMultiplier { get; set; } = 1f;
+        /// <summary>Duration in seconds for effects like burn DoT</summary>
+        public float Duration { get; set; } = 0f;
+        /// <summary>DoT damage per tick (0 = no DoT)</summary>
+        public float DotDamagePerTick { get; set; } = 0f;
+        /// <summary>DoT tick interval in seconds</summary>
+        public float DotTickInterval { get; set; } = 1f;
+        /// <summary>Stun duration in turns (0 = no stun)</summary>
+        public int StunDuration { get; set; } = 0;
+        /// <summary>Slow factor (0.5 = 50% speed, 0 = no slow)</summary>
+        public float SlowFactor { get; set; } = 0f;
+        /// <summary>Slow duration in turns</summary>
+        public int SlowDuration { get; set; } = 0;
     }
 
     public class EnemyTypeEntry
@@ -192,7 +225,7 @@ namespace BattleSystemECS.Config
     /// <summary>
     /// Special ability granted by a tower upgrade level.
     /// </summary>
-    public enum TowerSpecialAbility
+    public enum TowerUpgradeAbility
     {
         None = 0,
         ArmorPierce,     // Ignore part of enemy armor
@@ -213,7 +246,7 @@ namespace BattleSystemECS.Config
         public float AttackSpeedMultiplier { get; set; } = 1.0f;
         public float CostMultiplier { get; set; } = 1.5f;
         /// <summary>Special ability granted by this upgrade level (e.g., "armor_pierce", "splash_damage").</summary>
-        public TowerSpecialAbility SpecialAbility { get; set; } = TowerSpecialAbility.None;
+        public TowerUpgradeAbility SpecialAbility { get; set; } = TowerUpgradeAbility.None;
         /// <summary>Parameter for special ability (e.g., armor pierce ratio, splash radius, crit chance).</summary>
         public float SpecialAbilityParam { get; set; } = 0f;
     }
@@ -418,7 +451,7 @@ namespace BattleSystemECS.Config
                 Levels = new Dictionary<int, TowerUpgradeLevelConfig>
                 {
                     { 1, new TowerUpgradeLevelConfig { DamageMultiplier = 1.2f, RangeAdd = 1f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.5f } },
-                    { 2, new TowerUpgradeLevelConfig { DamageMultiplier = 1.2f, RangeAdd = 0f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.5f, SpecialAbility = TowerSpecialAbility.SplashDamage, SpecialAbilityParam = 1f } },
+                    { 2, new TowerUpgradeLevelConfig { DamageMultiplier = 1.2f, RangeAdd = 0f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.5f, SpecialAbility = TowerUpgradeAbility.SplashDamage, SpecialAbilityParam = 1f } },
                 }
             };
 
@@ -430,7 +463,7 @@ namespace BattleSystemECS.Config
                 Levels = new Dictionary<int, TowerUpgradeLevelConfig>
                 {
                     { 1, new TowerUpgradeLevelConfig { DamageMultiplier = 1.15f, RangeAdd = 0.5f, AttackSpeedMultiplier = 1.25f, CostMultiplier = 1.6f } },
-                    { 2, new TowerUpgradeLevelConfig { DamageMultiplier = 1.15f, RangeAdd = 0f, AttackSpeedMultiplier = 1.10f, CostMultiplier = 1.6f, SpecialAbility = TowerSpecialAbility.CriticalStrike, SpecialAbilityParam = 0.25f } },
+                    { 2, new TowerUpgradeLevelConfig { DamageMultiplier = 1.15f, RangeAdd = 0f, AttackSpeedMultiplier = 1.10f, CostMultiplier = 1.6f, SpecialAbility = TowerUpgradeAbility.CriticalStrike, SpecialAbilityParam = 0.25f } },
                 }
             };
 
@@ -442,7 +475,7 @@ namespace BattleSystemECS.Config
                 Levels = new Dictionary<int, TowerUpgradeLevelConfig>
                 {
                     { 1, new TowerUpgradeLevelConfig { DamageMultiplier = 1.3f, RangeAdd = 2f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.4f } },
-                    { 2, new TowerUpgradeLevelConfig { DamageMultiplier = 1.3f, RangeAdd = 0f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.4f, SpecialAbility = TowerSpecialAbility.ArmorPierce, SpecialAbilityParam = 0.5f } },
+                    { 2, new TowerUpgradeLevelConfig { DamageMultiplier = 1.3f, RangeAdd = 0f, AttackSpeedMultiplier = 1.0f, CostMultiplier = 1.4f, SpecialAbility = TowerUpgradeAbility.ArmorPierce, SpecialAbilityParam = 0.5f } },
                 }
             };
 
