@@ -286,6 +286,11 @@
 - `ApplyPlayerShield()` 已实现护盾叠加和持续时间
 - `SkillSystem.CastShield()` 调用 `ApplyPlayerShield()`，护盾施放链路完整
 
+#### second_wind 喘息科技缺失触发逻辑 ✅ 已实现
+**文件**: Systems/TechTreeSystem.cs, Core/GameManager.cs
+**状态**: ✅ 已确认存在
+**说明**: `TechTreeSystem` 已有完整字段：`_lowHpRegenThreshold = 0.30f`（30% 触发线）、`_lowHpRegenValue`（回复值）、`TickLowHpRegen()` 方法（278-291行）。GameManager.Run() 已调用 `techTreeSystem.TickLowHpRegen()`（379-381行）。科技树配置 `tech_tree.json` 中 `second_wind` 节点链接正确（前置 iron_skin，消耗 2 点，效果 low_hp_regen=0.15）。触发链路完整，无需新增代码。
+
 #### 41. ComponentStore 中 MAX_MONSTERS=20000 常量定义但未使用 ✅ FIXED
 **文件**: Core/ComponentStore.cs
 **状态**: ✅ 已修复（commit `a4650bc` 同类清理）
