@@ -329,6 +329,7 @@ namespace BattleSystemECS.Systems
         private void ExecuteMeleeAttack(int enemyId)
         {
             float damage = store.EnemyDamage[enemyId];
+            damage += store.EnemyBuffDamageBonus[enemyId];
             store.DecreasePlayerHealth(playerId, damage);
             float remaining = store.GetPlayerCurrentHealth(playerId);
             EventBus.Instance.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
@@ -344,6 +345,7 @@ namespace BattleSystemECS.Systems
         private void ExecuteRangedAttack(int enemyId)
         {
             float damage = store.EnemyDamage[enemyId];
+            damage += store.EnemyBuffDamageBonus[enemyId];
             store.DecreasePlayerHealth(playerId, damage);
             float remaining = store.GetPlayerCurrentHealth(playerId);
             EventBus.Instance.Publish(GameEvents.EnemyCharging, new EnemyChargingEvent
@@ -382,6 +384,7 @@ namespace BattleSystemECS.Systems
             else
             {
                 float baseDamage = store.EnemyDamage[enemyId];
+                baseDamage += store.EnemyBuffDamageBonus[enemyId];
                 float chargedDamage = baseDamage * 3f;
                 store.DecreasePlayerHealth(playerId, chargedDamage);
                 float remaining = store.GetPlayerCurrentHealth(playerId);
