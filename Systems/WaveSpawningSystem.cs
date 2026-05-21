@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -7,17 +9,47 @@ using BattleSystemECS.Config;
 namespace BattleSystemECS.Systems
 {
     /// <summary>
+    /// Difficulty configuration for wave scaling — loaded from wave_spawn.json.
+    /// </summary>
+    public class DifficultyConfig
+    {
+        public float BaseHealthMultPerWave { get; set; } = 0.05f;
+        public float BaseDamageMultPerWave { get; set; } = 0.05f;
+        public int EliteStartWave { get; set; } = 5;
+        public int BossStartWave { get; set; } = 10;
+        public float EliteHealthMult { get; set; } = 2.0f;
+        public float EliteDamageMult { get; set; } = 1.5f;
+        public float BossHealthMult { get; set; } = 5.0f;
+        public float BossDamageMult { get; set; } = 3.0f;
+    }
+
+    /// <summary>
+    /// Wave spawn configuration loaded from wave_spawn.json.
+    /// </summary>
+    public class WaveSpawnConfig
+    {
+        public int SpawnBatchSize { get; set; } = 5;
+        public int WaveDelayTurns { get; set; } = 3;
+        public float SpawnY { get; set; } = 49.0f;
+        public float SpawnXMin { get; set; } = 0.0f;
+        public float SpawnXMax { get; set; } = 9.0f;
+        public DifficultyConfig DifficultyConfig { get; set; } = new DifficultyConfig();
+    }
+
+    /// <summary>
     /// SOA (Struct of Arrays) 波次生成系统
     /// 直接访问 ComponentStore 的数组，无字典查询，无 struct 复制
     /// 性能提升：10-100 倍
     /// 支持每波 100 只怪生成
     /// 支持多怪物类型（EnemyTypes[]）
+    /// 支持精英/Boss 难度缩放（波次动态难度曲线）
     /// </summary>
     public class WaveSpawningSystem
     {
         private Core.ComponentStore store;
         private IRenderer renderer;
         private GameConfig gameConfig;
+        private WaveSpawnConfig spawnConfig;
 
         private int currentWave = 1;
         private int currentLevel = 1;
@@ -47,6 +79,60 @@ namespace BattleSystemECS.Systems
             this.store = store;
             this.renderer = renderer;
             this.gameConfig = gameConfig;
+            this.spawnConfig = LoadWaveSpawnConfig();
+        }
+
+        private WaveSpawnConfig LoadWaveSpawnConfig()
+        {
+            const string configPath = "Data/Configs/wave_spawn.json";
+            try
+            {
+                if (File.Exists(configPath))
+                {
+                    string json = File.ReadAllText(configPath);
+                    var doc = JsonDocument.Parse(json);
+                    var cfg = new WaveSpawnConfig();
+
+                    if (doc.RootElement.TryGetProperty("spawnBatchSize", out var bs))
+                        cfg.SpawnBatchSize = bs.GetInt32();
+                    if (doc.RootElement.TryGetProperty("waveDelayTurns", out var wdt))
+                        cfg.WaveDelayTurns = wdt.GetInt32();
+                    if (doc.RootElement.TryGetProperty("spawnY", out var sy))
+                        cfg.SpawnY = sy.GetSingle();
+                    if (doc.RootElement.TryGetProperty("spawnXMin", out var sxmin))
+                        cfg.SpawnXMin = sxmin.GetSingle();
+                    if (doc.RootElement.TryGetProperty("spawnXMax", out var sxmax))
+                        cfg.SpawnXMax = sxmax.GetSingle();
+
+                    if (doc.RootElement.TryGetProperty("difficultyConfig", out var dc))
+                    {
+                        cfg.DifficultyConfig = new DifficultyConfig();
+                        if (dc.TryGetProperty("baseHealthMultPerWave", out var bhm))
+                            cfg.DifficultyConfig.BaseHealthMultPerWave = bhm.GetSingle();
+                        if (dc.TryGetProperty("baseDamageMultPerWave", out var bdm))
+                            cfg.DifficultyConfig.BaseDamageMultPerWave = bdm.GetSingle();
+                        if (dc.TryGetProperty("eliteStartWave", out var esw))
+                            cfg.DifficultyConfig.EliteStartWave = esw.GetInt32();
+                        if (dc.TryGetProperty("bossStartWave", out var bsw))
+                            cfg.DifficultyConfig.BossStartWave = bsw.GetInt32();
+                        if (dc.TryGetProperty("eliteHealthMult", out var ehm))
+                            cfg.DifficultyConfig.EliteHealthMult = ehm.GetSingle();
+                        if (dc.TryGetProperty("eliteDamageMult", out var edm))
+                            cfg.DifficultyConfig.EliteDamageMult = edm.GetSingle();
+                        if (dc.TryGetProperty("bossHealthMult", out var bohm))
+                            cfg.DifficultyConfig.BossHealthMult = bohm.GetSingle();
+                        if (dc.TryGetProperty("bossDamageMult", out var bodm))
+                            cfg.DifficultyConfig.BossDamageMult = bodm.GetSingle();
+                    }
+                    renderer.Log($"[SPAWN] Loaded difficulty config: health/wave={cfg.DifficultyConfig.BaseHealthMultPerWave:P0}, elite@wave{cfg.DifficultyConfig.EliteStartWave}, boss@wave{cfg.DifficultyConfig.BossStartWave}");
+                    return cfg;
+                }
+            }
+            catch (Exception ex)
+            {
+                renderer.Log($"[SPAWN] Failed to load wave_spawn.json: {ex.Message}, using defaults");
+            }
+            return new WaveSpawnConfig();
         }
 
         public int GetCurrentWave() => currentWave;
@@ -148,13 +234,37 @@ namespace BattleSystemECS.Systems
                     float startX = (float)random.Next(0, 10);
                     float startY = 19f;
 
-                    // Apply wave difficulty scaling to enemy stats for progressive challenge
-                    float waveScaling = 1.0f + (currentWave - 1) * (gameConfig?.PlayerDamageScalingPerWave ?? 0.05f);
-                    float scaledHealth = monsterConfig.Health * waveScaling;
-                    float scaledMaxHealth = monsterConfig.MaxHealth * waveScaling;
-                    float scaledDamage = monsterConfig.Damage * waveScaling;
+                    // ── 波次动态难度曲线 ───────────────────────────────────────
+                    // 1. Base wave scaling: each wave increases stats by base mult
+                    float waveGrowth = spawnConfig.DifficultyConfig.BaseHealthMultPerWave;
+                    float dmgGrowth = spawnConfig.DifficultyConfig.BaseDamageMultPerWave;
+                    float waveScaling = 1.0f + (currentWave - 1) * waveGrowth;
+
+                    // 2. Elite scaling: wave >= EliteStartWave gets ×eliteMult
+                    bool isEliteWave = currentWave >= spawnConfig.DifficultyConfig.EliteStartWave;
+                    bool isBossWave = currentWave >= spawnConfig.DifficultyConfig.BossStartWave;
+
+                    float healthMult = waveScaling;
+                    float damageMult = 1.0f + (currentWave - 1) * dmgGrowth;
+
+                    if (isBossWave)
+                    {
+                        healthMult *= spawnConfig.DifficultyConfig.BossHealthMult;
+                        damageMult *= spawnConfig.DifficultyConfig.BossDamageMult;
+                    }
+                    else if (isEliteWave)
+                    {
+                        healthMult *= spawnConfig.DifficultyConfig.EliteHealthMult;
+                        damageMult *= spawnConfig.DifficultyConfig.EliteDamageMult;
+                    }
+
+                    float scaledHealth = monsterConfig.Health * healthMult;
+                    float scaledMaxHealth = monsterConfig.MaxHealth * healthMult;
+                    float scaledDamage = monsterConfig.Damage * damageMult;
 
                     string enemyName = $"{monsterType}L{currentLevel}W{currentWave}T{_multiTypeIndex}E{_multiSpawnedForType}";
+                    if (isBossWave) enemyName = "[BOSS] " + enemyName;
+                    else if (isEliteWave) enemyName = "[ELITE] " + enemyName;
                     int enemyId = store.AddEnemy(
                         startX, startY,
                         monsterConfig.MoveSpeed,

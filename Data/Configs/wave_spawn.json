@@ -3,5 +3,15 @@
   "waveDelayTurns": 3,
   "spawnY": 49.0,
   "spawnXMin": 0.0,
-  "spawnXMax": 9.0
+  "spawnXMax": 9.0,
+  "difficultyConfig": {
+    "baseHealthMultPerWave": 0.05,
+    "baseDamageMultPerWave": 0.05,
+    "eliteStartWave": 5,
+    "bossStartWave": 10,
+    "eliteHealthMult": 2.0,
+    "eliteDamageMult": 1.5,
+    "bossHealthMult": 5.0,
+    "bossDamageMult": 3.0
+  }
 }
