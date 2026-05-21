@@ -158,9 +158,6 @@ namespace BattleSystemECS.Systems
                 // Apply tech tree damage taken multiplier (e.g. "Iron Wall II" reduces incoming damage)
                 finalDamage *= _damageTakenMult;
 
-                // Apply ally buff damage bonus (buff_allies ability from enemy BT)
-                finalDamage += store.EnemyBuffDamageBonus[enemyId];
-
                 lock (_damageQueueLock) { _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage)); }
             });
 

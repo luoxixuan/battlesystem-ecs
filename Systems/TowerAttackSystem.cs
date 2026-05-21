@@ -197,9 +197,6 @@ namespace BattleSystemECS.Systems
                     baseDmg *= Math.Max(0.01f, 1f - store.EnemyArmor[bestTarget] * (1f - _armorPenetration)) * _damageTakenMult;
                     if (_waveDifficultyMult != 1.0f) baseDmg *= _waveDifficultyMult;
 
-                    // Apply ally buff damage bonus (buff_allies ability from enemy BT)
-                    baseDmg += store.EnemyBuffDamageBonus[bestTarget];
-
                     // ── Tower type-specific mechanics ─────────────────────────────────────
                     string towerType = store.TowerType[towerId] ?? "Basic";
 
