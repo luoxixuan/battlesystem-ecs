@@ -409,9 +409,19 @@ GameManager.Run() / BenchmarkSystem
 
 ---
 
-## 十、今日完成（2026-05-22）
+## 十、今日完成（2026-05-23）
 
-### 波次动态难度曲线（2026-05-22）
+### ComboConfig JSON 配置化（2026-05-23）
+
+将连击系统的 4 个可调参数从 C# 默认值迁移到 `game_config.json`，完成数据驱动最后一公里。
+
+| 改动文件 | 内容 |
+|----------|------|
+| `Core/GameConfigLoader.cs` | 新增 `ParseComboConfig()` 方法 |
+| `game_config.json` | 新增 `"Combo": {...}` 配置节 |
+| `docs/architecture.md` | 新增第 7.1 节 ComboConfig 格式记录 |
+
+**性能验证**：Mode2 13244 FPS / Mode4 7138 FPS（门禁 ≥12000/≥7000 ✅）
 
 || # | 内容 |
 |---|------|

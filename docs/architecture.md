@@ -206,6 +206,21 @@ branches:
 
 ---
 
+## 7.1 连击系统（ComboConfig）
+
+配置文件：`game_config.json` → `Combo` 节
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `comboWindowSeconds` | float | 3.0 | 击杀后保留连击的秒数 |
+| `comboDamageBonusPerKill` | float | 0.05 | 每次连击击杀的伤害加成（+5%/次） |
+| `comboGoldBonusPerKill` | float | 0.10 | 每次连击击杀的金币加成（+10%/次） |
+| `comboMaxMultiplier` | float | 3.0 | 连击最大伤害倍率上限 |
+
+加载链路：`GameConfigLoader.ParseComboConfig()` → `GameConfig.Combo`（启动时执行一次，无性能影响）。
+
+---
+
 ## 8. 行为树（BehaviorTree）
 
 配置文件：`Configs/behavior_trees.json`
