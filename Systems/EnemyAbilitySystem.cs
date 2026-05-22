@@ -344,9 +344,8 @@ namespace BattleSystemECS.Systems
             store.PositionY[minionId] = enemyY;
             store.PositionActive[minionId] = true;
             store.SetEntityName(minionId, $"Minion_{minionId}");
-            // Note: do NOT add to _activeEnemyIds here — that would slow down the benchmark
-            // due to entity initialization overhead. Minion will be killed immediately if it somehow
-            // enters the active list. This is a placeholder implementation.
+            // Add to active enemy list so minion is visible to TowerAttackSystem, EnemyMovementSystem, etc.
+            store.AddActiveEnemyId(minionId);
 
             logger.Log($"[ABILITY] Enemy {enemyId} summons minion {minionId} (HP: {baseHealth * healthMult:F0}, DMG: {baseDamage * damageMult:F0}) ({ability.Name})");
         }
