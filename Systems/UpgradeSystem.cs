@@ -18,6 +18,7 @@ namespace BattleSystemECS.Systems
         private IRenderer renderer;
         private int playerId;
         private GameConfig gameConfig;
+        private TowerUpgradeSystem towerUpgradeSystem;
 
         public UpgradeSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
         {
@@ -25,6 +26,7 @@ namespace BattleSystemECS.Systems
             this.renderer = renderer;
             this.playerId = playerId;
             this.gameConfig = gameConfig;
+            this.towerUpgradeSystem = new TowerUpgradeSystem(store, renderer, gameConfig);
         }
 
         public void Update()
@@ -84,6 +86,15 @@ namespace BattleSystemECS.Systems
                     store.AddBuff(playerId, BuffType.DefenseBoost);
                 Console.WriteLine($"[BUFF] Gained new buff: {newBuff}!");
             }
+        }
+
+        /// <summary>
+        /// Upgrade the specified tower using TowerUpgradeSystem.
+        /// Returns true if upgrade succeeded.
+        /// </summary>
+        public bool UpgradeTower(int towerId)
+        {
+            return towerUpgradeSystem.UpgradeTower(towerId);
         }
     }
 }

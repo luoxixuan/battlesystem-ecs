@@ -123,6 +123,8 @@ namespace BattleSystemECS.Core
         public string[] EnemyCastAbilityId = new string[MAX_ENTITIES];
 
         // ==================== 塔组件的 SOA 存储 ====================
+        // Tower selection state — O(1) read/write, no GC
+        public bool[] TowerSelected = new bool[MAX_ENTITIES];
         public string[] TowerType = new string[MAX_ENTITIES];
         public float[] TowerAttackDamage = new float[MAX_ENTITIES];
         public int[] TowerRange = new int[MAX_ENTITIES];
@@ -645,7 +647,53 @@ namespace BattleSystemECS.Core
             if (entityId < 0 || entityId >= MAX_ENTITIES) return;
             TowerActive[entityId] = false;
             TowerUpgradePathId[entityId] = null;
+            TowerSelected[entityId] = false;
             lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
+        }
+
+        // ==================== 塔选中状态管理 ====================
+        /// <summary>Select a tower for build-phase operations.</summary>
+        public void SelectTower(int towerId)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            if (!TowerActive[towerId]) return;
+            TowerSelected[towerId] = true;
+        }
+
+        /// <summary>Deselect a specific tower.</summary>
+        public void DeselectTower(int towerId)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            TowerSelected[towerId] = false;
+        }
+
+        /// <summary>Deselect all currently selected towers.</summary>
+        public void DeselectAllTowers()
+        {
+            lock (activeIdsLock)
+            {
+                foreach (int tid in _activeTowerIds)
+                    TowerSelected[tid] = false;
+            }
+        }
+
+        /// <summary>Returns all selected tower IDs. O(n) over active towers, zero GC.</summary>
+        public int[] GetSelectedTowerIds()
+        {
+            int count = 0;
+            lock (activeIdsLock)
+            {
+                foreach (int tid in _activeTowerIds)
+                    if (TowerSelected[tid]) count++;
+            }
+            int[] result = new int[count];
+            int idx = 0;
+            lock (activeIdsLock)
+            {
+                foreach (int tid in _activeTowerIds)
+                    if (TowerSelected[tid]) result[idx++] = tid;
+            }
+            return result;
         }
 
         public float GetEnemyHealth(int enemyId)

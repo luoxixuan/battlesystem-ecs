@@ -1,5 +1,8 @@
 {
   "mapWidth": 10,
   "mapHeight": 50,
-  "maxTowers": 20
+  "maxTowers": 20,
+  "sellRatio": 0.5,
+  "minSellRatio": 0.3,
+  "sellRatioDecreasePerLevel": 0.05
 }

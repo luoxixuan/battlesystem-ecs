@@ -1,11 +1,12 @@
 using System;
+using System.IO;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
     /// <summary>
-    /// Tower placement system - handles tower construction on the map.
+    /// Tower placement system - handles tower construction, selling, and selection on the map.
     /// </summary>
     public class TowerPlacementSystem
     {
@@ -13,10 +14,16 @@ namespace BattleSystemECS.Systems
         private IRenderer logger;
         private GameConfig gameConfig;
 
+        // Sell ratio: fraction of upgrade cost refunded (0.5 = 50%)
+        private float sellRatio = 0.5f;
+        private float minSellRatio = 0.3f;
+        private float sellRatioDecreasePerLevel = 0.05f;
+
         public TowerPlacementSystem(ComponentStore store, IRenderer logger)
         {
             this.store = store;
             this.logger = logger;
+            LoadSellConfig();
         }
 
         /// <summary>
@@ -27,6 +34,36 @@ namespace BattleSystemECS.Systems
             this.store = store;
             this.logger = logger;
             this.gameConfig = gameConfig;
+            LoadSellConfig();
+        }
+
+        private void LoadSellConfig()
+        {
+            string basePath = AppDomain.CurrentDomain.BaseDirectory;
+            string configPath = Path.Combine(basePath, "Data", "Configs", "tower_placement.json");
+            if (File.Exists(configPath))
+            {
+                try
+                {
+                    string json = File.ReadAllText(configPath);
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("sellRatio", out var sr)) sellRatio = sr.GetSingle();
+                    if (root.TryGetProperty("minSellRatio", out var msr)) minSellRatio = msr.GetSingle();
+                    if (root.TryGetProperty("sellRatioDecreasePerLevel", out var srdpl)) sellRatioDecreasePerLevel = srdpl.GetSingle();
+                }
+                catch { /* use defaults */ }
+            }
+        }
+
+        /// <summary>
+        /// Calculate the effective sell ratio for a given tower level.
+        /// Ratio decreases per level but never drops below minSellRatio.
+        /// </summary>
+        private float GetEffectiveSellRatio(int towerLevel)
+        {
+            float ratio = sellRatio - (towerLevel - 1) * sellRatioDecreasePerLevel;
+            return Math.Max(ratio, minSellRatio);
         }
 
         /// <summary>
@@ -113,6 +150,59 @@ namespace BattleSystemECS.Systems
                     store.TowerSplashRadius[towerId] = ability.Radius;
                     break;
             }
+        }
+
+        /// <summary>
+        /// Sell a single tower and refund a portion of its upgrade cost.
+        /// The tower must be selected first.
+        /// </summary>
+        /// <returns>Gold refunded, or 0 if sell failed.</returns>
+        public float SellTower(int towerId, int playerId = 1)
+        {
+            if (towerId < 0 || towerId >= ComponentStore.MAX_ENTITIES || !store.TowerActive[towerId])
+            {
+                logger.Log($"[TOWER] 出售失败: 实体 {towerId} 不是激活的防御塔");
+                return 0f;
+            }
+
+            int level = store.TowerLevel[towerId];
+            float sellGold = store.TowerUpgradeCost[towerId] * GetEffectiveSellRatio(level);
+            int goldInt = (int)sellGold;
+
+            // Refund gold to player
+            float currentGold = store.GetPlayerGold(playerId);
+            store.SetPlayerGold(playerId, currentGold + sellGold);
+
+            // Destroy tower entity (handles ActiveTowerIds removal and state cleanup)
+            store.DestroyEntity(towerId);
+
+            logger.Log($"[TOWER] 出售塔 #{towerId} (Lv.{level})，返还 {goldInt} 金币");
+            return sellGold;
+        }
+
+        /// <summary>
+        /// Sell all currently selected towers in a batch.
+        /// </summary>
+        /// <returns>Total gold refunded.</returns>
+        public float SellSelectedTowers(int playerId = 1)
+        {
+            int[] selected = store.GetSelectedTowerIds();
+            if (selected.Length == 0)
+            {
+                logger.Log("[TOWER] 批量出售: 没有选中的塔");
+                return 0f;
+            }
+
+            // Lock around ActiveTowerIds modifications for batch safety
+            float totalRefunded = 0f;
+            foreach (int tid in selected)
+            {
+                // SellTower internally calls DestroyEntity which locks activeIdsLock
+                totalRefunded += SellTower(tid, playerId);
+            }
+
+            logger.Log($"[TOWER] 批量出售完成: {selected.Length} 塔，共返还 {(int)totalRefunded} 金币");
+            return totalRefunded;
         }
     }
 }
