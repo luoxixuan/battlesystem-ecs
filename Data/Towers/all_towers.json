@@ -9,7 +9,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 45,
@@ -25,7 +26,8 @@
         "SpecialAbility": {
             "AbilityType": "chain_lightning",
             "Radius": 3
-        }
+        },
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 72,
@@ -41,7 +43,8 @@
         "SpecialAbility": {
             "AbilityType": "splash",
             "Radius": 2
-        }
+        },
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 99,
@@ -53,7 +56,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 126,
@@ -65,7 +69,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 153,
@@ -77,7 +82,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 180,
@@ -89,7 +95,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 207,
@@ -101,7 +108,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 234,
@@ -113,7 +121,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 261,
@@ -125,7 +134,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 288,
@@ -137,7 +147,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 315,
@@ -149,7 +160,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 342,
@@ -161,7 +173,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 369,
@@ -173,7 +186,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 396,
@@ -185,7 +199,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 423,
@@ -197,7 +212,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 450,
@@ -209,7 +225,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 477,
@@ -221,7 +238,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 504,
@@ -233,7 +251,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 531,
@@ -245,7 +264,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 558,
@@ -257,7 +277,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 585,
@@ -269,7 +290,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 612,
@@ -281,7 +303,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 639,
@@ -293,7 +316,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 666,
@@ -305,7 +329,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 693,
@@ -317,7 +342,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 720,
@@ -329,7 +355,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 747,
@@ -341,7 +368,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 774,
@@ -353,7 +381,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 801,
@@ -365,7 +394,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 828,
@@ -377,7 +407,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 855,
@@ -389,7 +420,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 882,
@@ -401,7 +433,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 909,
@@ -413,7 +446,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 936,
@@ -425,7 +459,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 963,
@@ -437,7 +472,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 990,
@@ -449,7 +485,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 1017,
@@ -461,7 +498,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 1044,
@@ -473,7 +511,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 1071,
@@ -485,7 +524,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 24,
@@ -497,7 +537,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 53,
@@ -509,7 +550,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 82,
@@ -521,7 +563,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 110,
@@ -533,7 +576,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 139,
@@ -545,7 +589,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 168,
@@ -557,7 +602,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 197,
@@ -569,7 +615,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 226,
@@ -581,7 +628,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 254,
@@ -597,7 +645,8 @@
         "SpecialAbility": {
             "AbilityType": "splash",
             "Radius": 2
-        }
+        },
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 283,
@@ -609,7 +658,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 312,
@@ -621,7 +671,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 341,
@@ -633,7 +684,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 370,
@@ -645,7 +697,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 398,
@@ -657,7 +710,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 427,
@@ -669,7 +723,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 456,
@@ -681,7 +736,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 485,
@@ -693,7 +749,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 514,
@@ -705,7 +762,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 542,
@@ -717,7 +775,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 571,
@@ -729,7 +788,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 600,
@@ -741,7 +801,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 629,
@@ -753,7 +814,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 658,
@@ -765,7 +827,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 686,
@@ -777,7 +840,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 715,
@@ -789,7 +853,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 744,
@@ -801,7 +866,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 773,
@@ -813,7 +879,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 802,
@@ -825,7 +892,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 830,
@@ -837,7 +905,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 859,
@@ -849,7 +918,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 888,
@@ -861,7 +931,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 917,
@@ -873,7 +944,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 946,
@@ -885,7 +957,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 974,
@@ -897,7 +970,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 1003,
@@ -909,7 +983,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 1032,
@@ -921,7 +996,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 1061,
@@ -933,7 +1009,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 1090,
@@ -945,7 +1022,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 1118,
@@ -957,7 +1035,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 1147,
@@ -969,7 +1048,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 21,
@@ -981,7 +1061,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 45,
@@ -993,7 +1074,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 69,
@@ -1005,7 +1087,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 93,
@@ -1017,7 +1100,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 117,
@@ -1029,7 +1113,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 141,
@@ -1041,7 +1126,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 165,
@@ -1053,7 +1139,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 189,
@@ -1065,7 +1152,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 213,
@@ -1077,7 +1165,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 237,
@@ -1089,7 +1178,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 261,
@@ -1101,7 +1191,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 285,
@@ -1113,7 +1204,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 309,
@@ -1125,7 +1217,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 333,
@@ -1137,7 +1230,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 357,
@@ -1149,7 +1243,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 381,
@@ -1161,7 +1256,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 405,
@@ -1173,7 +1269,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 429,
@@ -1185,7 +1282,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 453,
@@ -1197,7 +1295,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 477,
@@ -1209,7 +1308,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 501,
@@ -1221,7 +1321,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 525,
@@ -1233,7 +1334,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 549,
@@ -1245,7 +1347,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 573,
@@ -1257,7 +1360,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 597,
@@ -1269,7 +1373,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 621,
@@ -1281,7 +1386,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 645,
@@ -1293,7 +1399,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 669,
@@ -1305,7 +1412,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 693,
@@ -1317,7 +1425,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 717,
@@ -1329,7 +1438,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 741,
@@ -1341,7 +1451,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 765,
@@ -1353,7 +1464,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 789,
@@ -1365,7 +1477,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 813,
@@ -1377,7 +1490,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 837,
@@ -1389,7 +1503,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 30,
@@ -1401,7 +1516,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 60,
@@ -1413,7 +1529,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 90,
@@ -1425,7 +1542,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 120,
@@ -1437,7 +1555,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 150,
@@ -1449,7 +1568,8 @@
         "Range": 7,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 180,
@@ -1461,7 +1581,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 210,
@@ -1477,7 +1598,8 @@
         "SpecialAbility": {
             "AbilityType": "splash",
             "Radius": 1
-        }
+        },
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 240,
@@ -1489,7 +1611,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 270,
@@ -1501,7 +1624,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 300,
@@ -1513,7 +1637,8 @@
         "Range": 7,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 330,
@@ -1525,7 +1650,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 360,
@@ -1537,7 +1663,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 390,
@@ -1549,7 +1676,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 420,
@@ -1561,7 +1689,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 450,
@@ -1573,7 +1702,8 @@
         "Range": 7,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 480,
@@ -1585,7 +1715,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 510,
@@ -1597,7 +1728,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 540,
@@ -1609,7 +1741,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 570,
@@ -1621,7 +1754,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 600,
@@ -1633,7 +1767,8 @@
         "Range": 7,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 630,
@@ -1645,7 +1780,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 660,
@@ -1657,7 +1793,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 690,
@@ -1669,7 +1806,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 720,
@@ -1681,7 +1819,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 750,
@@ -1693,7 +1832,8 @@
         "Range": 7,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 780,
@@ -1705,7 +1845,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 810,
@@ -1717,7 +1858,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 840,
@@ -1729,7 +1871,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 870,
@@ -1741,7 +1884,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 900,
@@ -1757,7 +1901,8 @@
         "SpecialAbility": {
             "AbilityType": "freeze_aoe",
             "Radius": 2
-        }
+        },
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 930,
@@ -1769,7 +1914,8 @@
         "Range": 3,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 960,
@@ -1781,7 +1927,8 @@
         "Range": 4,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 990,
@@ -1793,7 +1940,8 @@
         "Range": 5,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 1020,
@@ -1805,7 +1953,8 @@
         "Range": 6,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 1050,
@@ -1817,7 +1966,8 @@
         "Range": 7,
         "StunChance": 0.0,
         "SlowAmount": 0.0,
-        "SlowDuration": 0.0
+        "SlowDuration": 0.0,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 40,
@@ -1829,7 +1979,8 @@
         "Range": 2,
         "StunChance": 0.0,
         "SlowAmount": 0.3,
-        "SlowDuration": 2
+        "SlowDuration": 2,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 65,
@@ -1841,7 +1992,8 @@
         "Range": 3,
         "StunChance": 0.05,
         "SlowAmount": 0.4,
-        "SlowDuration": 2
+        "SlowDuration": 2,
+        "TargetingMode": 0
     },
     {
         "UpgradeCost": 90,
@@ -1853,6 +2005,7 @@
         "Range": 4,
         "StunChance": 0.1,
         "SlowAmount": 0.5,
-        "SlowDuration": 3
+        "SlowDuration": 3,
+        "TargetingMode": 0
     }
 ]

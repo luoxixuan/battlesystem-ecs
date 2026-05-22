@@ -124,6 +124,7 @@ BTCachedTree[] EnemyBehaviorTree     // 预缓存 BT（O(1) 访问）
 
 ### 塔组件
 ```csharp
+int[]    TowerTargetingMode            // 索敌模式：0=最近,1=最远,2=血量最低,3=血量最高,4=最先生成,5=最后生成
 string[] TowerType, float[] TowerAttackDamage
 int[]    TowerRange, float[] TowerAttackSpeed, TowerLevel
 bool[]   TowerActive, float[] TowerLastAttackTime
@@ -140,7 +141,7 @@ List<int> ActiveTowerIds             // 仅活跃塔 ID（并行遍历用）
 | EnemyAISystem | Systems/ | 行为树评估 | **两阶段**：并行 BT 评估写 EnemyActionEnum，串行动作执行（含 EventBus.Publish） |
 | EnemyMovementSystem | Systems/ | 敌人移动 | `EnemyActionEnum` 驱动方向；Dodge 分支有副作用 |
 | PlayerTowerAttackSystem | Systems/ | 玩家攻击 | **两阶段**：并行收集 `(enemyId, damage)`，串行 `enemyHealth -= damage` + queue 死亡 |
-| TowerAttackSystem | Systems/ | 塔攻击 | **两阶段**：遍历 `ActiveTowerIds`，并行收集 damage，串行 apply + queue 死亡 |
+| TowerAttackSystem | Systems/ | 塔攻击 | **两阶段**：遍历 `ActiveTowerIds`，并行收集 damage，串行 apply + queue 死亡；**索敌模式**（最近/最远/血量最低/血量最高/最先生成/最后生成）可配置 |
 | UpgradeSystem | Systems/ | 玩家升级 | 等级阈值触发；`_sharedRandom` 类级单例 |
 | SkillSystem | Systems/ | 技能施放 | GAS 架构；AreaShape 驱动；**只 queue 死亡，帧末统一 resolve** |
 | TechTreeSystem | Systems/ | 科技树 | 前置依赖检查；效果缓存在 `TechTreeSystem` 字段；**O(1) Dictionary 查找（`c36747b`）** |

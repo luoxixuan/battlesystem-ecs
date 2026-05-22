@@ -577,6 +577,7 @@ namespace BattleSystemECS.Config
             tower.StunChance = ExtractFloat(json, "StunChance");
             tower.SlowAmount = ExtractFloat(json, "SlowAmount");
             tower.SlowDuration = ExtractFloat(json, "SlowDuration");
+            tower.TargetingMode = ExtractInt(json, "TargetingMode");
             tower.SpecialAbility = ParseTowerSpecialAbility(json);
             return tower;
         }

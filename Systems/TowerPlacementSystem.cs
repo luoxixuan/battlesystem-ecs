@@ -105,6 +105,8 @@ namespace BattleSystemECS.Systems
                 {
                     store.AddTower(towerId, type, damage, range, speed, 1, cost, "standard",
                         tc.StunChance, tc.SlowAmount, tc.SlowDuration);
+                    // Apply tower targeting mode from config
+                    store.SetTowerTargetingMode(towerId, tc.TargetingMode);
                     // Apply tower's innate special ability (e.g., chain_lightning for Tesla)
                     if (tc.SpecialAbility != null)
                     {

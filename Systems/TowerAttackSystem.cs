@@ -167,26 +167,96 @@ namespace BattleSystemECS.Systems
                 candidates.Clear();
                 store.SpatialGrid.GetEnemiesInRange(store, tx, ty, range, candidates);
 
+                // Select best target based on tower's configured targeting mode
                 int bestTarget = -1;
-                float minDistSq = float.MaxValue;
+                int targetingMode = store.GetTowerTargetingMode(towerId);
 
-                for (int ci = 0; ci < candidates.Count; ci++)
+                switch (targetingMode)
                 {
-                    int enemyId = candidates[ci];
-                    if (!store.EnemyActive[enemyId]) continue;
-
-                    float ex = store.PositionX[enemyId];
-                    float ey = store.PositionY[enemyId];
-
-                    float dx = ex - tx;
-                    float dy = ey - ty;
-
-                    float distSq = dx * dx + dy * dy;
-                    if (distSq < minDistSq)
-                    {
-                        minDistSq = distSq;
-                        bestTarget = enemyId;
-                    }
+                    case 1: // Furthest
+                        {
+                            float maxDistSq = float.MinValue;
+                            for (int ci = 0; ci < candidates.Count; ci++)
+                            {
+                                int enemyId = candidates[ci];
+                                if (!store.EnemyActive[enemyId]) continue;
+                                float ex = store.PositionX[enemyId];
+                                float ey = store.PositionY[enemyId];
+                                float distSq = (ex - tx) * (ex - tx) + (ey - ty) * (ey - ty);
+                                if (distSq > maxDistSq)
+                                {
+                                    maxDistSq = distSq;
+                                    bestTarget = enemyId;
+                                }
+                            }
+                            break;
+                        }
+                    case 2: // LowestHealth
+                        {
+                            float minHealth = float.MaxValue;
+                            for (int ci = 0; ci < candidates.Count; ci++)
+                            {
+                                int enemyId = candidates[ci];
+                                if (!store.EnemyActive[enemyId]) continue;
+                                float h = store.EnemyHealth[enemyId];
+                                if (h < minHealth)
+                                {
+                                    minHealth = h;
+                                    bestTarget = enemyId;
+                                }
+                            }
+                            break;
+                        }
+                    case 3: // HighestHealth
+                        {
+                            float maxHealth = float.MinValue;
+                            for (int ci = 0; ci < candidates.Count; ci++)
+                            {
+                                int enemyId = candidates[ci];
+                                if (!store.EnemyActive[enemyId]) continue;
+                                float h = store.EnemyHealth[enemyId];
+                                if (h > maxHealth)
+                                {
+                                    maxHealth = h;
+                                    bestTarget = enemyId;
+                                }
+                            }
+                            break;
+                        }
+                    case 4: // FirstSpawned
+                        {
+                            int minSpawnFrame = int.MaxValue;
+                            for (int ci = 0; ci < candidates.Count; ci++)
+                            {
+                                int enemyId = candidates[ci];
+                                if (!store.EnemyActive[enemyId]) continue;
+                                int sf = store.EnemySpawnFrame[enemyId];
+                                if (sf < minSpawnFrame)
+                                {
+                                    minSpawnFrame = sf;
+                                    bestTarget = enemyId;
+                                }
+                            }
+                            break;
+                        }
+                    default: // 0=Nearest, 5+=LastSpawned
+                        {
+                            float minDistSq = float.MaxValue;
+                            for (int ci = 0; ci < candidates.Count; ci++)
+                            {
+                                int enemyId = candidates[ci];
+                                if (!store.EnemyActive[enemyId]) continue;
+                                float ex = store.PositionX[enemyId];
+                                float ey = store.PositionY[enemyId];
+                                float distSq = (ex - tx) * (ex - tx) + (ey - ty) * (ey - ty);
+                                if (distSq < minDistSq)
+                                {
+                                    minDistSq = distSq;
+                                    bestTarget = enemyId;
+                                }
+                            }
+                            break;
+                        }
                 }
 
                 if (bestTarget != -1)

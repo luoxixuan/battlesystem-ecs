@@ -47,6 +47,9 @@ namespace BattleSystemECS.Config
         public float StunChance { get; set; } = 0f;   // probability per hit (0-1)
         public float SlowAmount { get; set; } = 0f;   // speed multiplier (e.g. 0.5 = 50% speed)
         public float SlowDuration { get; set; } = 0f; // duration in turns
+        // Targeting mode: which enemy the tower prefers to attack
+        // 0=Nearest, 1=Furthest, 2=LowestHealth, 3=HighestHealth, 4=FirstSpawned, 5=LastSpawned
+        public int TargetingMode { get; set; } = 0;
         // Tower special ability fields (null = no special ability)
         public TowerSpecialAbility SpecialAbility { get; set; }
     }

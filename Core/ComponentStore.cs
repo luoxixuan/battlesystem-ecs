@@ -123,6 +123,9 @@ namespace BattleSystemECS.Core
         public string[] EnemyCastAbilityId = new string[MAX_ENTITIES];
 
         // ==================== 塔组件的 SOA 存储 ====================
+        // Tower targeting mode: controls which enemy the tower selects as its target.
+        // Maps to TowerTargetingMode enum: Nearest=0, Furthest=1, LowestHealth=2, HighestHealth=3, FirstSpawned=4, LastSpawned=5
+        public int[] TowerTargetingMode = new int[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
         public string[] TowerType = new string[MAX_ENTITIES];
@@ -367,6 +370,7 @@ namespace BattleSystemECS.Core
             {
                 lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
                 TowerActive[entityId] = false;
+                TowerTargetingMode[entityId] = 0;
                 TowerType[entityId] = null;
                 TowerAttackDamage[entityId] = 0f;
                 TowerRange[entityId] = 0;
@@ -694,6 +698,21 @@ namespace BattleSystemECS.Core
                     if (TowerSelected[tid]) result[idx++] = tid;
             }
             return result;
+        }
+
+        // ==================== 塔索敌模式管理 ====================
+        /// <summary>Gets the targeting mode for a tower (0=Nearest, 1=Furthest, 2=LowestHealth, 3=HighestHealth, 4=FirstSpawned, 5=LastSpawned).</summary>
+        public int GetTowerTargetingMode(int towerId)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return 0;
+            return TowerTargetingMode[towerId];
+        }
+
+        /// <summary>Sets the targeting mode for a tower.</summary>
+        public void SetTowerTargetingMode(int towerId, int mode)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            TowerTargetingMode[towerId] = mode;
         }
 
         public float GetEnemyHealth(int enemyId)
