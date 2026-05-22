@@ -105,6 +105,10 @@ namespace BattleSystemECS.Core
         // EnemySlowDurationLeft: tower-slow duration in turns. Separate from EnemyBuffDurationLeft
         // which is used by buff_allies ability. This prevents double-decrement and cross-clearing.
         public float[] EnemySlowDurationLeft = new float[MAX_ENTITIES];
+        // EnemyIsElite: true if this enemy was spawned as an elite ([ELITE] prefix in fullName).
+        // Used by ResolveEnemiesKilledThisFrame to correctly award GoldOnEliteKill instead of
+        // the broken EnemyTypeName == "Elite" check (EnemyTypeName stores base type names).
+        public bool[] EnemyIsElite = new bool[MAX_ENTITIES];
 
         // ==================== 敌人 AI 组件的 SOA 存储 ====================
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
@@ -263,7 +267,7 @@ namespace BattleSystemECS.Core
                 if (!EnemyActive[enemyId]) continue; // already destroyed this frame
                 TotalKills++;
                 PlayerGold[playerId] += EnemyGoldReward[enemyId] * _goldKillMultiplier * _allIncomeMultKill;
-                if (_goldOnEliteKill > 0f && EnemyTypeName[enemyId] == "Elite")
+                if (_goldOnEliteKill > 0f && EnemyIsElite[enemyId])
                     PlayerGold[playerId] += _goldOnEliteKill;
                 DestroyEntity(enemyId);
             }
@@ -354,6 +358,7 @@ namespace BattleSystemECS.Core
                 EnemySlowFactor[entityId] = 0f;
                 EnemyMoveSpeedBase[entityId] = 0f;
                 EnemySlowDurationLeft[entityId] = 0f;
+                EnemyIsElite[entityId] = false;
             }
 
             if (wasTower)
@@ -580,10 +585,20 @@ namespace BattleSystemECS.Core
             EnemyArmor[entityId] = armor;
 
             // 缓存怪物类型名（如 "NormalL1W1E0" -> "Normal"），避免每帧解析
+            // 同时检测 [ELITE]/[BOSS] 前缀来正确标记精英/首领
             if (fullName != null)
             {
-                int sepIdx = fullName.IndexOf('L');
-                EnemyTypeName[entityId] = (sepIdx > 0) ? fullName.Substring(0, sepIdx) : fullName;
+                bool isElite = fullName.StartsWith("[ELITE]");
+                EnemyIsElite[entityId] = isElite;
+                // 剥除 [BOSS]/[ELITE] 前缀，保留基础类型名
+                string nameToStore = fullName;
+                if (isElite || fullName.StartsWith("[BOSS]"))
+                {
+                    int spaceIdx = fullName.IndexOf(' ');
+                    nameToStore = (spaceIdx > 0) ? fullName.Substring(spaceIdx + 1) : fullName;
+                }
+                int sepIdx = nameToStore.IndexOf('L');
+                EnemyTypeName[entityId] = (sepIdx > 0) ? nameToStore.Substring(0, sepIdx) : nameToStore;
             }
 
             // H-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
