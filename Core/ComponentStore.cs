@@ -75,6 +75,18 @@ namespace BattleSystemECS.Core
         // WaveCompleteGold: gold awarded when wave was completed (for tech tree bonus calculation)
         public float[] PlayerWaveCompleteGold = new float[MAX_PLAYERS];
 
+        // ==================== Combo Kill 连击组件（SOA） ====================
+        // ComboCount: current consecutive kill streak within combo window
+        public float[] PlayerComboCount = new float[MAX_PLAYERS];
+        // ComboTimer: seconds since last kill (resets combo when > ComboWindowSeconds)
+        public float[] PlayerComboTimer = new float[MAX_PLAYERS];
+        // ComboDamageMult: current damage multiplier = min(1 + ComboCount * ComboDamageBonusPerKill, ComboMaxMultiplier)
+        public float[] PlayerComboDamageMult = new float[MAX_PLAYERS];
+        // ComboKillStreak: max combo achieved this wave (for UI/achievement tracking)
+        public float[] PlayerComboKillStreak = new float[MAX_PLAYERS];
+        // ComboGoldMult: current gold bonus multiplier = min(1 + ComboCount * ComboGoldBonusPerKill, ComboMaxMultiplier)
+        public float[] PlayerComboGoldMult = new float[MAX_PLAYERS];
+
         // ==================== 敌人组件的 SOA 存储 ====================
         public float[] EnemyHealth = new float[MAX_ENTITIES];
         public float[] EnemyMaxHealth = new float[MAX_ENTITIES];
@@ -229,6 +241,10 @@ namespace BattleSystemECS.Core
 
         private bool _deathQueueResolved = false;
 
+        // Combo kill callback — fired once per killed enemy during ResolveEnemiesKilledThisFrame.
+        // Safe for serial use only (called from the resolve loop inside a foreach).
+        public event Action<int, int> OnEnemyKilled;
+
         public void BeginFrame()
         {
             // M-1 fix: detect programming error — BeginFrame called without Resolve
@@ -271,9 +287,12 @@ namespace BattleSystemECS.Core
             {
                 if (!EnemyActive[enemyId]) continue; // already destroyed this frame
                 TotalKills++;
-                PlayerGold[playerId] += EnemyGoldReward[enemyId] * _goldKillMultiplier * _allIncomeMultKill;
+                float goldReward = EnemyGoldReward[enemyId] * _goldKillMultiplier * _allIncomeMultKill;
+                goldReward *= PlayerComboGoldMult[playerId];
+                PlayerGold[playerId] += goldReward;
                 if (_goldOnEliteKill > 0f && EnemyIsElite[enemyId])
                     PlayerGold[playerId] += _goldOnEliteKill;
+                OnEnemyKilled?.Invoke(enemyId, playerId);
                 DestroyEntity(enemyId);
             }
             _deathQueue[writeIdx].Clear();

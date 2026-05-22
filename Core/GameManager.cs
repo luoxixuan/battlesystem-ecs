@@ -32,6 +32,7 @@ namespace BattleSystemECS.Core
         private TowerUpgradeSystem towerUpgradeSystem;     // 塔升级系统
         private TechTreeSystem techTreeSystem;            // 科技树系统
         private BuffSystem buffSystem;                    // Buff/DoT 追踪系统
+        private ComboSystem comboSystem;                   // Combo Kill 连击系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -153,6 +154,10 @@ namespace BattleSystemECS.Core
             buffSystem = new BuffSystem(store, playerId);
             logger.Log("[BOOTSTRAP]      BuffSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating ComboSystem (Combo Kill tracking)...");
+            comboSystem = new ComboSystem(store, gameConfig.Combo);
+            logger.Log("[BOOTSTRAP]      ComboSystem created successfully!");
+
             // Wire BuffSystem into SkillSystem for Poison Nova DoT application
             skillSystem.InjectDotSystem(buffSystem);
 
@@ -172,6 +177,7 @@ namespace BattleSystemECS.Core
                 playerTowerAttackSystem.SetWaveNumber(wave);
                 towerAttackSystem.SetWaveNumber(wave);
                 skillSystem.SetWaveNumber(wave);
+                comboSystem.ResetCombo(playerId);
             };
 
             // 初始化统一帧调度器
@@ -184,6 +190,7 @@ namespace BattleSystemECS.Core
             scheduler.TowerAttack = towerAttackSystem;
             scheduler.Skill = skillSystem;
             scheduler.Buff = buffSystem;
+            scheduler.Combo = comboSystem;
             scheduler.Gold = goldSystem;
             scheduler.Upgrade = upgradeSystem;
 

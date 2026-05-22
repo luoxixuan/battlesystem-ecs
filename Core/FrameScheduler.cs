@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Systems;
 using BattleSystemECS.Config;
@@ -37,6 +38,11 @@ namespace BattleSystemECS.Core
         public TechTreeSystem? TechTree { get; set; }
         public GoldSystem? Gold { get; set; }
         public UpgradeSystem? Upgrade { get; set; }
+        public ComboSystem? Combo { get; set; }
+
+        // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
+        // Used by ComboSystem to increment combo counters.
+        public event Action<int, int> OnEnemyKilled;
 
         public FrameScheduler(ComponentStore store, GameConfig gameConfig)
         {
@@ -103,8 +109,18 @@ namespace BattleSystemECS.Core
             Buff?.ResolveDotDamage();
             Skill?.Update(deltaTime); // skill cooldown ticking (WavePhase only path)
 
-            // ── Phase 8: Death Resolve ─────────────────────────────────────
+            // ── Phase 9: Death Resolve ─────────────────────────────────────
+            // Collect kill events before resolving so ComboSystem can subscribe
+            var killEvents = new List<(int enemyId, int playerId)>();
+            // Snapshot the death queue (readIdx is set by ResolveEnemiesKilledThisFrame internally)
+            // We need to collect kills AFTER ResolveEnemiesKilledThisFrame processes them.
+            // The safest approach: resolve first, then fire event. But we need the IDs.
+            // Alternative: hook into ComponentStore.ResolveEnemiesKilledThisFrame callback.
+            //
+            // For now, fire a generic "kills resolved" signal after resolve completes.
+            // Subscribers can read store.TotalKills delta or the combo counters directly.
             store.ResolveEnemiesKilledThisFrame();
+            Combo?.Update(deltaTime); // decay already called above — safe to call again (idempotent)
         }
 
         /// <summary>

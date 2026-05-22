@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -73,6 +73,7 @@ namespace BattleSystemECS.Systems
             var skill        = new SkillSystem(store, logger, playerId, gameConfig);
             var buffSystem   = new BuffSystem(store, playerId);
             skill.InjectDotSystem(buffSystem);
+            var comboSystem  = new ComboSystem(store, gameConfig.Combo);
             var map          = new MapSystem(logger, store);
             map.SetMapSize(10, 20);
 
@@ -201,6 +202,7 @@ namespace BattleSystemECS.Systems
                 skill.AutoCastBestSkill();
                 skill.ResolveSkillDamage();
                 buffSystem.Update(1f);
+                comboSystem.Update(1f);
                 buffSystem.ResolveDotDamage();
                 store.ResolveEnemiesKilledThisFrame();  // after DoT deaths
                 long tSkillAndBuff = sw.ElapsedTicks;
@@ -374,6 +376,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             var upgrade       = new UpgradeSystem(store, logger, playerId, gameConfig);
             var skill         = new SkillSystem(store, logger, playerId, gameConfig);
             var buffSystem    = new BuffSystem(store, playerId);
+            var comboSystem   = new ComboSystem(store, gameConfig.Combo);
             skill.InjectDotSystem(buffSystem);
             towerAttack.SetBuffSystem(buffSystem);
             var map           = new MapSystem(logger, store);
@@ -405,6 +408,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
                 skill.AutoCastBestSkill();
                 skill.ResolveSkillDamage();
                 buffSystem.Update(1f);
+                comboSystem.Update(1f);
                 buffSystem.ResolveDotDamage();
                 store.ResolveEnemiesKilledThisFrame();
                 long tSkillAndBuff = sw.ElapsedTicks;

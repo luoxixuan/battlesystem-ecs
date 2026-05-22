@@ -293,6 +293,21 @@ namespace BattleSystemECS.Config
         public bool ShowStats { get; set; }
     }
 
+    /// <summary>
+    /// Combo Kill system configuration — controls combo window, damage/gold scaling, and cap.
+    /// </summary>
+    public class ComboConfig
+    {
+        /// <summary>Seconds since last kill before combo resets to 0. Default: 3.0f</summary>
+        public float ComboWindowSeconds { get; set; } = 3.0f;
+        /// <summary>Damage bonus per combo kill. 0.05f = +5% per kill. Default: 0.05f</summary>
+        public float ComboDamageBonusPerKill { get; set; } = 0.05f;
+        /// <summary>Gold bonus per combo kill. 0.10f = +10% per kill. Default: 0.10f</summary>
+        public float ComboGoldBonusPerKill { get; set; } = 0.10f;
+        /// <summary>Maximum combo damage multiplier. Default: 3.0f (reached at 40 kills)</summary>
+        public float ComboMaxMultiplier { get; set; } = 3.0f;
+    }
+
     public class GameConfig
     {
         public PlayerConfig Player { get; set; } = new PlayerConfig();
@@ -323,6 +338,9 @@ namespace BattleSystemECS.Config
 
         // Buff definitions for UpgradeSystem (Bug#31 fix: was hardcoded strings)
         public List<string> UpgradeBuffs { get; set; } = new List<string> { "Attack+10%", "Crit Rate+5%", "Defense+10%" };
+
+        // Combo Kill configuration
+        public ComboConfig Combo { get; set; } = new ComboConfig();
 
         // Map dimensions (Bug#30 fix: magic numbers 10 and 20 in GameManager/EnemyMovementSystem)
         public int MapWidth { get; set; } = 10;

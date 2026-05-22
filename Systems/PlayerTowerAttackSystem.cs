@@ -123,6 +123,9 @@ namespace BattleSystemECS.Systems
             float baseDamage = _attackDamage * _attackBuffMult;
             baseDamage *= _waveDifficultyMult;  // wave scaling, always applied (1.0f when wave=1)
 
+            // Apply combo kill damage multiplier (min(1 + ComboCount * bonus, maxMult))
+            baseDamage *= store.PlayerComboDamageMult[playerId];
+
             var activeEnemyIds = _activeEnemyList;
 
             // Phase 1 (parallel): collect damage events only — no structural mutations
