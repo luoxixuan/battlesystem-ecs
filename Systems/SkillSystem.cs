@@ -612,9 +612,6 @@ namespace BattleSystemECS.Systems
         /// Freeze AreaShape: circle AoE that damages and can freeze enemies.
         /// Reuses CastCircleArea range query logic, then applies freeze via ApplyEnemyStun
         /// with probability-based roll (FreezeChance). Follows two-phase pattern.
-        /// </summary>
-        private static readonly Random _freezeRng = new Random();
-
         private int CastFreezeArea(float finalDamage, float playerX, float playerY,
             int radius, string name, GameplayAbilityDef def)
         {
@@ -643,7 +640,7 @@ namespace BattleSystemECS.Systems
 
                     if (def.FreezeDuration > 0f && def.FreezeChance > 0f)
                     {
-                        float roll = (float)_freezeRng.NextDouble();
+                        float roll = (float)Random.Shared.NextDouble();
                         if (roll < def.FreezeChance)
                         {
                             int freezeTurns = Math.Max(1, (int)Math.Ceiling(def.FreezeDuration));
