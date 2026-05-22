@@ -44,6 +44,7 @@ namespace BattleSystemECS.Systems
         private readonly object _crossAreaHitsLock = new object();
         private readonly object _boxAreaHitsLock = new object();
         private readonly object _lineAreaHitsLock = new object();
+        private readonly object _coneAreaHitsLock = new object();
 
         // Poison Nova DoT constants
         private const float POISON_NOVA_DURATION = 5f;
@@ -724,7 +725,7 @@ namespace BattleSystemECS.Systems
 
                 if (dot >= cosThreshold)
                 {
-                    lock (_boxAreaHitsLock) { _coneAreaHits.Add(enemyId); }
+                    lock (_coneAreaHitsLock) { _coneAreaHits.Add(enemyId); }
                 }
             });
 
