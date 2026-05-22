@@ -298,7 +298,7 @@ namespace BattleSystemECS.Systems
                 currentWave++;
                 OnWaveComplete?.Invoke();
 
-                if (currentWave > levelConfig.WaveCount)
+                if (currentWave > levelConfig.Waves.Count)
                 {
                     renderer.Log($"[SPAWN] Level {currentLevel} complete! Total enemies spawned: {totalEnemiesSpawned}");
                     currentLevel++;
