@@ -158,6 +158,9 @@ namespace BattleSystemECS.Core
             comboSystem = new ComboSystem(store, gameConfig.Combo);
             logger.Log("[BOOTSTRAP]      ComboSystem created successfully!");
 
+            // Wire OnEnemyKilled → ComboSystem (连击计数链路)
+            store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
+
             // Wire BuffSystem into SkillSystem for Poison Nova DoT application
             skillSystem.InjectDotSystem(buffSystem);
 
