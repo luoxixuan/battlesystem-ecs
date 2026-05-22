@@ -6124,4 +6124,11 @@
                        "LevelNumber":  5
                    }
                ]
+           },
+           "Combo": {
+               "comboWindowSeconds": 3.0,
+               "comboDamageBonusPerKill": 0.05,
+               "comboGoldBonusPerKill": 0.10,
+               "comboMaxMultiplier": 3.0
+           }
 }

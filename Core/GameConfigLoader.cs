@@ -540,7 +540,31 @@ namespace BattleSystemECS.Config
                 gameConfig.CurrentLevel = gameConfig.Levels[0];
             }
 
+            // Parse Combo config from JSON (fills GameConfig.Combo)
+            ParseComboConfig(gameConfig, jsonContent);
+
             return gameConfig;
+        }
+
+        private static void ParseComboConfig(GameConfig gameConfig, string jsonContent)
+        {
+            int comboStart = jsonContent.IndexOf("\"Combo\"");
+            if (comboStart == -1) return;
+
+            int braceStart = jsonContent.IndexOf('{', comboStart);
+            if (braceStart == -1) return;
+            int braceEnd = FindMatchingBrace(jsonContent, braceStart);
+            if (braceEnd == -1) return;
+
+            string comboJson = jsonContent.Substring(braceStart + 1, braceEnd - braceStart - 1);
+
+            gameConfig.Combo = new ComboConfig
+            {
+                ComboWindowSeconds = ExtractFloat(comboJson, "comboWindowSeconds"),
+                ComboDamageBonusPerKill = ExtractFloat(comboJson, "comboDamageBonusPerKill"),
+                ComboGoldBonusPerKill = ExtractFloat(comboJson, "comboGoldBonusPerKill"),
+                ComboMaxMultiplier = ExtractFloat(comboJson, "comboMaxMultiplier")
+            };
         }
 
         private static List<TowerConfig> ParseTowerConfigs(string jsonArray)
