@@ -238,5 +238,69 @@
         "EffectTag": "Freeze"
       }
     ]
+  },
+  {
+    "Name": "Dragon Breath",
+    "Description": "锥形火焰喷射 — 扇形 AoE，持续灼烧伤害",
+    "AreaShape": "cone",
+    "AreaWidth": 60,
+    "AreaHeight": 5,
+    "AttackRange": 5,
+    "Cooldown": 14,
+    "DamageMultiplier": 3,
+    "AutoCast": false,
+    "Hotkey": "0",
+    "AreaRadius": 4,
+    "DotDuration": 3,
+    "DotTickInterval": 1,
+    "DotDamagePerTick": 5,
+    "HealPercent": 0,
+    "ShieldAmount": 0,
+    "ShieldDuration": 0,
+    "FreezeDuration": 0,
+    "FreezeChance": 0,
+    "Modifiers": [
+      {
+        "Name": "DragonBreathDot",
+        "Type": "Debuff",
+        "Duration": 3,
+        "StackingType": "Duration",
+        "StackLimitCount": 3,
+        "Value": 5,
+        "EffectTag": "Fire"
+      }
+    ]
+  },
+  {
+    "Name": "Plasma Cannon",
+    "Description": "等离子炮 — 锥形高能射线，大范围扇形冲击",
+    "AreaShape": "cone",
+    "AreaWidth": 45,
+    "AreaHeight": 6,
+    "AttackRange": 6,
+    "Cooldown": 16,
+    "DamageMultiplier": 5,
+    "AutoCast": false,
+    "Hotkey": "-",
+    "AreaRadius": 5,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
+    "HealPercent": 0,
+    "ShieldAmount": 0,
+    "ShieldDuration": 0,
+    "FreezeDuration": 0,
+    "FreezeChance": 0,
+    "Modifiers": [
+      {
+        "Name": "PlasmaCannonDamage",
+        "Type": "Damage",
+        "Duration": 0,
+        "StackingType": "None",
+        "StackLimitCount": 0,
+        "Value": 60,
+        "EffectTag": "Plasma"
+      }
+    ]
   }
 ]
