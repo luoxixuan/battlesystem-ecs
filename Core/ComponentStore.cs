@@ -320,6 +320,9 @@ namespace BattleSystemECS.Core
                 PlayerWaveCompleteGold[i] = 0f;
                 PlayerShield[i] = 0f;
                 PlayerShieldDuration[i] = 0f;
+                PlayerComboGoldMult[i] = 1f;
+                PlayerComboDamageMult[i] = 1f;
+                PlayerComboKillStreak[i] = 0f;
             }
         }
 
