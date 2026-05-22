@@ -239,7 +239,23 @@ namespace BattleSystemECS.Systems
                             }
                             break;
                         }
-                    default: // 0=Nearest, 5+=LastSpawned
+                    case 5: // LastSpawned
+                        {
+                            int maxSpawnFrame = int.MinValue;
+                            for (int ci = 0; ci < candidates.Count; ci++)
+                            {
+                                int enemyId = candidates[ci];
+                                if (!store.EnemyActive[enemyId]) continue;
+                                int sf = store.EnemySpawnFrame[enemyId];
+                                if (sf > maxSpawnFrame)
+                                {
+                                    maxSpawnFrame = sf;
+                                    bestTarget = enemyId;
+                                }
+                            }
+                            break;
+                        }
+                    default: // 0=Nearest
                         {
                             float minDistSq = float.MaxValue;
                             for (int ci = 0; ci < candidates.Count; ci++)
