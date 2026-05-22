@@ -169,5 +169,23 @@
     "StunDuration": 0,
     "SlowFactor": 0,
     "SlowDuration": 0
+  },
+  {
+    "Id": "summon_minion",
+    "Name": "Summon Minion",
+    "Description": "Summons a weak minion to fight alongside the summoner",
+    "AbilityType": "summon_minion",
+    "BuffStat": "",
+    "Cooldown": 12,
+    "CooldownRemaining": 0,
+    "AoeRadius": 0,
+    "DamageMultiplier": 1.0,
+    "HealAmount": 0,
+    "BuffDuration": 0,
+    "StunDuration": 0,
+    "SlowFactor": 0,
+    "SlowDuration": 0,
+    "MinionHealthMult": 0.3,
+    "MinionDamageMult": 0.3
   }
 ]

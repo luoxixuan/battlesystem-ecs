@@ -174,6 +174,9 @@ namespace BattleSystemECS.Config
         public int StunDuration { get; set; }   // turns to stun (for stun_aoe abilities)
         public float SlowFactor { get; set; }   // speed multiplier for slow (0.5 = 50%)
         public int SlowDuration { get; set; }  // turns for slow
+        // summon_minion ability fields
+        public float MinionHealthMult { get; set; } // health multiplier for summoned minion
+        public float MinionDamageMult { get; set; } // damage multiplier for summoned minion
     }
 
     public class SkillConfig

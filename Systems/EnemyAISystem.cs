@@ -241,6 +241,8 @@ namespace BattleSystemECS.Systems
                 "retreat" => EnemyActionType.Retreat,
                 "enemy_cast_stun" => EnemyActionType.StunAoe,
                 "enemy_cast_slow" => EnemyActionType.SlowAoe,
+                "enemy_cast_heal" => EnemyActionType.HealAllies,
+                "enemy_cast_stealth" => EnemyActionType.StealthAttack,
                 _ => EnemyActionType.None,
             };
 
@@ -274,6 +276,8 @@ namespace BattleSystemECS.Systems
                 case EnemyActionType.BuffAllies:
                 case EnemyActionType.StunAoe:
                 case EnemyActionType.SlowAoe:
+                case EnemyActionType.HealAllies:
+                case EnemyActionType.StealthAttack:
                     // Ability actions are dispatched to EnemyAbilitySystem
                     string abilityId = store.EnemyCastAbilityId[enemyId];
                     if (!string.IsNullOrEmpty(abilityId))

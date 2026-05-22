@@ -18,6 +18,8 @@ namespace BattleSystemECS.Components
         AoeDamage = 8,
         BuffAllies = 9,
         StunAoe = 10,
-        SlowAoe = 11
+        SlowAoe = 11,
+        HealAllies = 12,
+        StealthAttack = 13
     }
 }

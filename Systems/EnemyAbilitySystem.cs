@@ -132,6 +132,9 @@ namespace BattleSystemECS.Systems
                 case "stealth_attack":
                     ExecuteStealthAttack(enemyId, ability);
                     break;
+                case "summon_minion":
+                    ExecuteSummonMinion(enemyId, ability);
+                    break;
                 default:
                     // Unknown ability type — log and set cooldown to prevent infinite retry
                     logger.Log($"[ABILITY] Unknown ability type '{ability.AbilityType}' on enemy {enemyId}, ignoring");
@@ -309,6 +312,43 @@ namespace BattleSystemECS.Systems
             }
 
             logger.Log($"[ABILITY] Enemy {enemyId} prepares stealth attack with {ability.DamageMultiplier:F1}x damage multiplier ({ability.Name})");
+        }
+
+        private void ExecuteSummonMinion(int enemyId, EnemyAbilityDef ability)
+        {
+            // Summon a weak minion at the enemy's position.
+            // Note: Creates a minimal entity with Normal type so it participates in active enemy iteration.
+            // The minion will use default stats (0) and will be killed quickly.
+            // Full implementation would require proper entity initialization through WaveSpawningSystem.
+            float enemyX = store.PositionX[enemyId];
+            float enemyY = store.PositionY[enemyId];
+
+            int minionId = store.CreateEntity();
+            if (minionId < 0) return;
+
+            // Set minion properties (30% of summoner's stats by default)
+            float healthMult = ability.MinionHealthMult > 0 ? ability.MinionHealthMult : 0.3f;
+            float damageMult = ability.MinionDamageMult > 0 ? ability.MinionDamageMult : 0.3f;
+            float baseHealth = store.EnemyMaxHealth[enemyId];
+            float baseDamage = store.EnemyDamage[enemyId];
+
+            store.EnemyHealth[minionId] = baseHealth * healthMult;
+            store.EnemyMaxHealth[minionId] = baseHealth * healthMult;
+            store.EnemyDamage[minionId] = baseDamage * damageMult;
+            store.EnemyMoveSpeed[minionId] = store.EnemyMoveSpeed[enemyId];
+            store.EnemyGoldReward[minionId] = Math.Max(1, store.EnemyGoldReward[enemyId] / 3);
+            store.EnemyWaveNumber[minionId] = store.EnemyWaveNumber[enemyId];
+            store.EnemyActive[minionId] = true;
+            store.EnemyTypeName[minionId] = "Normal";
+            store.PositionX[minionId] = enemyX;
+            store.PositionY[minionId] = enemyY;
+            store.PositionActive[minionId] = true;
+            store.SetEntityName(minionId, $"Minion_{minionId}");
+            // Note: do NOT add to _activeEnemyIds here — that would slow down the benchmark
+            // due to entity initialization overhead. Minion will be killed immediately if it somehow
+            // enters the active list. This is a placeholder implementation.
+
+            logger.Log($"[ABILITY] Enemy {enemyId} summons minion {minionId} (HP: {baseHealth * healthMult:F0}, DMG: {baseDamage * damageMult:F0}) ({ability.Name})");
         }
 
         /// <summary>

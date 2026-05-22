@@ -413,5 +413,197 @@
         "Action": "move_to_target"
       }
     }
+  },
+  {
+    "MonsterType": "Healer",
+    "Description": "Heals allies when in range, attacks melee, otherwise moves",
+    "RootId": "root",
+    "Nodes": {
+      "root": {
+        "Id": "root",
+        "Type": "Selector",
+        "Children": ["seq_self_heal", "seq_heal_allies", "seq_attack", "act_move"]
+      },
+      "seq_self_heal": {
+        "Id": "seq_self_heal",
+        "Type": "Sequence",
+        "Children": ["cond_lowhp", "act_self_heal"]
+      },
+      "cond_lowhp": {
+        "Id": "cond_lowhp",
+        "Type": "Condition",
+        "Condition": "health_below",
+        "Operator": "<=",
+        "Value": 0.4
+      },
+      "act_self_heal": {
+        "Id": "act_self_heal",
+        "Type": "Action",
+        "Action": "enemy_cast_self_heal",
+        "AbilityId": "self_heal_2"
+      },
+      "seq_heal_allies": {
+        "Id": "seq_heal_allies",
+        "Type": "Sequence",
+        "Children": ["cond_heal_range", "act_heal"]
+      },
+      "cond_heal_range": {
+        "Id": "cond_heal_range",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 5.0
+      },
+      "act_heal": {
+        "Id": "act_heal",
+        "Type": "Action",
+        "Action": "enemy_cast_heal",
+        "AbilityId": "healer_aoe_heal"
+      },
+      "seq_attack": {
+        "Id": "seq_attack",
+        "Type": "Sequence",
+        "Children": ["cond_melee_range", "act_melee"]
+      },
+      "cond_melee_range": {
+        "Id": "cond_melee_range",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 1.5
+      },
+      "act_melee": {
+        "Id": "act_melee",
+        "Type": "Action",
+        "Action": "attack_melee"
+      },
+      "act_move": {
+        "Id": "act_move",
+        "Type": "Action",
+        "Action": "move_to_target"
+      }
+    }
+  },
+  {
+    "MonsterType": "Summoner",
+    "Description": "Summons minions when in range, attacks melee, otherwise moves",
+    "RootId": "root",
+    "Nodes": {
+      "root": {
+        "Id": "root",
+        "Type": "Selector",
+        "Children": ["seq_self_heal", "seq_summon", "seq_attack", "act_move"]
+      },
+      "seq_self_heal": {
+        "Id": "seq_self_heal",
+        "Type": "Sequence",
+        "Children": ["cond_lowhp", "act_self_heal"]
+      },
+      "cond_lowhp": {
+        "Id": "cond_lowhp",
+        "Type": "Condition",
+        "Condition": "health_below",
+        "Operator": "<=",
+        "Value": 0.4
+      },
+      "act_self_heal": {
+        "Id": "act_self_heal",
+        "Type": "Action",
+        "Action": "enemy_cast_self_heal",
+        "AbilityId": "self_heal_2"
+      },
+      "seq_summon": {
+        "Id": "seq_summon",
+        "Type": "Sequence",
+        "Children": ["cond_summon_range", "act_summon"]
+      },
+      "cond_summon_range": {
+        "Id": "cond_summon_range",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 6.0
+      },
+      "act_summon": {
+        "Id": "act_summon",
+        "Type": "Action",
+        "Action": "enemy_cast_summon",
+        "AbilityId": "summon_minion"
+      },
+      "seq_attack": {
+        "Id": "seq_attack",
+        "Type": "Sequence",
+        "Children": ["cond_melee_range", "act_melee"]
+      },
+      "cond_melee_range": {
+        "Id": "cond_melee_range",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 1.5
+      },
+      "act_melee": {
+        "Id": "act_melee",
+        "Type": "Action",
+        "Action": "attack_melee"
+      },
+      "act_move": {
+        "Id": "act_move",
+        "Type": "Action",
+        "Action": "move_to_target"
+      }
+    }
+  },
+  {
+    "MonsterType": "Stealth",
+    "Description": "Prepares stealth attack for bonus damage when in range, otherwise moves",
+    "RootId": "root",
+    "Nodes": {
+      "root": {
+        "Id": "root",
+        "Type": "Selector",
+        "Children": ["seq_stealth", "seq_attack", "act_move"]
+      },
+      "seq_stealth": {
+        "Id": "seq_stealth",
+        "Type": "Sequence",
+        "Children": ["cond_stealth_range", "act_stealth"]
+      },
+      "cond_stealth_range": {
+        "Id": "cond_stealth_range",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 4.0
+      },
+      "act_stealth": {
+        "Id": "act_stealth",
+        "Type": "Action",
+        "Action": "enemy_cast_stealth",
+        "AbilityId": "stealth_strike_1"
+      },
+      "seq_attack": {
+        "Id": "seq_attack",
+        "Type": "Sequence",
+        "Children": ["cond_melee_range", "act_melee"]
+      },
+      "cond_melee_range": {
+        "Id": "cond_melee_range",
+        "Type": "Condition",
+        "Condition": "target_in_range",
+        "Operator": "<=",
+        "Value": 1.5
+      },
+      "act_melee": {
+        "Id": "act_melee",
+        "Type": "Action",
+        "Action": "attack_melee"
+      },
+      "act_move": {
+        "Id": "act_move",
+        "Type": "Action",
+        "Action": "move_to_target"
+      }
+    }
   }
 ]
