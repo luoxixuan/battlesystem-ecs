@@ -449,6 +449,7 @@ GameManager.Run() / BenchmarkSystem
 | 2026-05-17 05:00 | — | 无方向文件，跳过 | [SILENT] |
 | 2026-05-17 06:00-19:00 | — | 无方向文件，跳过 | [SILENT] |
 | 2026-05-17 20:46 | 方向：SpatialGrid.Rebuild（增量更新探索） | SpatialGrid 增量更新（ConcurrentBag 追踪 → 决策保留全量），Mode2 6353，Mode4 3810 | ✅ |
+| 2026-05-22 16:54 | 方向：新增冰霜新星（Freeze）技能 | `AreaShape=8` + `GameplayAbilityDef.FreezeDuration/FreezeChance` + `CastFreezeArea` + `skills.json` 配置，Mode2 13583 FPS，Mode4 6505 FPS | ✅ |
 
 ### 本次 commit（上午）
 

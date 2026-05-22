@@ -126,7 +126,9 @@ namespace BattleSystemECS.Systems
                     sc.HealPercent,
                     sc.ShieldAmount,
                     sc.ShieldDuration,
-                    StackingBehavior.None, 1  // dotStacking, dotMaxStacks
+                    StackingBehavior.None, 1,  // dotStacking, dotMaxStacks
+                    sc.FreezeDuration,
+                    sc.FreezeChance  // Cold Nova freeze fields
                 );
                 store.AddAbility(playerId, def);
                 renderer.Log($"[SKILL] {sc.Name} registered (shape: {sc.AreaShape}, radius: {sc.AreaRadius}, DoT: {sc.DotDuration}s/{sc.DotTickInterval}s×{sc.DotDamagePerTick})");
@@ -253,6 +255,9 @@ namespace BattleSystemECS.Systems
                     break;
                 case 7: // Line/Ray — horizontal laser beam along player's Y axis
                     enemiesHit = CastLineArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
+                    break;
+                case 8: // Freeze — circle AoE + chance to freeze enemies
+                    enemiesHit = CastFreezeArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def);
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -591,11 +596,65 @@ namespace BattleSystemECS.Systems
             return hitCount;
         }
 
+        /// <summary>
+        /// Freeze AreaShape: circle AoE that damages and can freeze enemies.
+        /// Reuses CastCircleArea range query logic, then applies freeze via ApplyEnemyStun
+        /// with probability-based roll (FreezeChance). Follows two-phase pattern.
+        /// </summary>
         private void HandleKill(int enemyId)
         {
             // Queue death for serial resolution — ResolveEnemiesKilledThisFrame() called at frame end
             store.QueueEnemyDeath(enemyId, playerId);
             renderer.Log($"[SKILL] Killed enemy {enemyId}");
+        }
+
+        /// <summary>
+        /// Freeze AreaShape: circle AoE that damages and can freeze enemies.
+        /// Reuses CastCircleArea range query logic, then applies freeze via ApplyEnemyStun
+        /// with probability-based roll (FreezeChance). Follows two-phase pattern.
+        /// </summary>
+        private static readonly Random _freezeRng = new Random();
+
+        private int CastFreezeArea(float finalDamage, float playerX, float playerY,
+            int radius, string name, GameplayAbilityDef def)
+        {
+            if (_activeEnemyList == null) return 0;
+            var activeEnemyIds = _activeEnemyList;
+
+            int radiusSq = radius * radius;
+            int hitCount = 0;
+
+            foreach (int enemyId in activeEnemyIds)
+            {
+                if (enemyId == playerId) continue;
+                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyHealth <= 0f) continue;
+
+                float enemyX = store.PositionX[enemyId];
+                float enemyY = store.PositionY[enemyId];
+
+                float dx = enemyX - playerX;
+                float dy = enemyY - playerY;
+                float distSq = dx * dx + dy * dy;
+
+                if (distSq <= radiusSq)
+                {
+                    lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+
+                    if (def.FreezeDuration > 0f && def.FreezeChance > 0f)
+                    {
+                        float roll = (float)_freezeRng.NextDouble();
+                        if (roll < def.FreezeChance)
+                        {
+                            int freezeTurns = Math.Max(1, (int)Math.Ceiling(def.FreezeDuration));
+                            store.ApplyEnemyStun(enemyId, freezeTurns);
+                            renderer.Log($"[SKILL] {name} froze enemy {enemyId} for {freezeTurns} turns");
+                        }
+                    }
+                    hitCount++;
+                }
+            }
+            return hitCount;
         }
 
         private void CastHeal(GameplayAbilityDef def)

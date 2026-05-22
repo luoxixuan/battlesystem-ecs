@@ -202,6 +202,9 @@ namespace BattleSystemECS.Config
         public float HealPercent { get; set; }
         public float ShieldAmount { get; set; }
         public float ShieldDuration { get; set; }
+        // Freeze fields (Cold Nova)
+        public float FreezeDuration { get; set; }
+        public float FreezeChance { get; set; }
     }
 
     public class BehaviorTreeDef

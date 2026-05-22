@@ -16,6 +16,7 @@ namespace BattleSystemECS.Core.GAS
         public const int Heal = 5;
         public const int Shield = 6;
         public const int Line = 7;
+        public const int Freeze = 8;  // Cold Nova: circle AoE + freeze on hit
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -30,6 +31,7 @@ namespace BattleSystemECS.Core.GAS
                 "heal" => Heal,
                 "shield" => Shield,
                 "line" => Line,
+                "freeze" => Freeze,
                 _ => Single
             };
         }
@@ -67,11 +69,16 @@ namespace BattleSystemECS.Core.GAS
         public float ShieldAmount;        // flat shield value absorbed
         public float ShieldDuration;      // shield duration in seconds
 
+        // Freeze fields (Cold Nova)
+        public float FreezeDuration;     // turns to freeze enemy; 0 = no freeze
+        public float FreezeChance;       // probability [0,1] of freeze applying per enemy
+
         public GameplayAbilityDef(string name, string desc, float cooldown, float cost,
             int dmgAttr, float fixedDmg, AbilityActivation act, int areaShape, int areaRadius,
             float dotDuration = 0f, float dotTickInterval = 0f, float dotDamagePerTick = 0f,
             float healPercent = 0f, float shieldAmount = 0f, float shieldDuration = 0f,
             StackingBehavior dotStacking = StackingBehavior.None, int dotMaxStacks = 1,
+            float freezeDuration = 0f, float freezeChance = 0f,
             params int[] requiredBuffs)
         {
             Name = name; Description = desc; Cooldown = cooldown; Cost = cost;
@@ -80,6 +87,7 @@ namespace BattleSystemECS.Core.GAS
             DotDuration = dotDuration; DotTickInterval = dotTickInterval; DotDamagePerTick = dotDamagePerTick;
             DotStackingBehavior = dotStacking; DotMaxStacks = dotMaxStacks;
             HealPercent = healPercent; ShieldAmount = shieldAmount; ShieldDuration = shieldDuration;
+            FreezeDuration = freezeDuration; FreezeChance = freezeChance;
             RequiredBuffs = requiredBuffs;
         }
 

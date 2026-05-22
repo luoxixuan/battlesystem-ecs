@@ -177,33 +177,65 @@
     "ShieldDuration": 5,
     "Modifiers": []
   },
+        {
+        "Name": "Laser Beam",
+        "Description": "横向激光 — 打击同一 Y 轴上所有敌人",
+        "AreaShape": "line",
+        "AreaWidth": 1,
+        "AreaHeight": 1,
+        "AttackRange": 8,
+        "Cooldown": 12,
+        "DamageMultiplier": 3,
+        "AutoCast": false,
+        "Hotkey": "8",
+        "AreaRadius": 8,
+        "DotDuration": 0,
+        "DotTickInterval": 0,
+        "DotDamagePerTick": 0,
+        "HealPercent": 0,
+        "ShieldAmount": 0,
+        "ShieldDuration": 0,
+        "Modifiers": [
+          {
+            "Name": "LaserBeamDamage",
+            "Type": "Damage",
+            "Duration": 0,
+            "StackingType": "None",
+            "StackLimitCount": 0,
+            "Value": 40,
+            "EffectTag": "Normal"
+          }
+        ]
+      },
   {
-    "Name": "Laser Beam",
-    "Description": "横向激光 — 打击同一 Y 轴上所有敌人",
-    "AreaShape": "line",
-    "AreaWidth": 1,
-    "AreaHeight": 1,
-    "AttackRange": 8,
-    "Cooldown": 12,
-    "DamageMultiplier": 3,
+    "Name": "Cold Nova",
+    "Description": "环形 AoE 冻结 — 范围内敌人受到伤害，有概率被冻结 2 回合",
+    "AreaShape": "freeze",
+    "AreaWidth": 5,
+    "AreaHeight": 5,
+    "AttackRange": 4,
+    "Cooldown": 18,
+    "DamageMultiplier": 2,
     "AutoCast": false,
-    "Hotkey": "8",
-    "AreaRadius": 8,
+    "Hotkey": "9",
+    "AreaRadius": 3,
     "DotDuration": 0,
     "DotTickInterval": 0,
     "DotDamagePerTick": 0,
     "HealPercent": 0,
     "ShieldAmount": 0,
     "ShieldDuration": 0,
+    "FreezeDuration": 2,
+    "FreezeChance": 0.3,
     "Modifiers": [
       {
-        "Name": "LaserBeamDamage",
-        "Type": "Damage",
-        "Duration": 0,
-        "StackingType": "None",
-        "StackLimitCount": 0,
-        "Value": 40,
-        "EffectTag": "Normal"
+        "Name": "ColdNovaFreeze",
+        "Type": "CrowdControl",
+        "Duration": 2,
+        "StackingType": "Duration",
+        "StackLimitCount": 3,
+        "Value": 0,
+        "EffectTag": "Freeze"
       }
     ]
   }
