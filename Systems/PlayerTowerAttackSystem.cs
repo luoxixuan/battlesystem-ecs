@@ -39,6 +39,9 @@ namespace BattleSystemECS.Systems
         private bool _turnCached;
         private int _rangeSq;
 
+        // Cached tech tree attack damage multiplier (updated on SetTurn)
+        private float _attackDamageMult = 1f;
+
         // Cached crit stats (updated on SetTurn to avoid per-enemy tech tree calls)
         private float _critRateBonus;
         private float _critDamageBonus;  // additive bonus to ×2, e.g. 0.25 → ×2.25
@@ -91,6 +94,9 @@ namespace BattleSystemECS.Systems
             _critRateBonus = techTreeSystem != null ? techTreeSystem.GetCritRateBonus() : 0f;
             _critDamageBonus = techTreeSystem != null ? techTreeSystem.GetCritDamageMult() : 1f;
 
+            // Cache tech tree attack damage multiplier
+            _attackDamageMult = techTreeSystem != null ? techTreeSystem.GetAttackDamageMult() : 1f;
+
             // Cache armor stats from tech tree
             _armorPenetration = techTreeSystem != null ? techTreeSystem.GetArmorPenetration() : 0f;
             _damageTakenMult = techTreeSystem != null ? techTreeSystem.GetDamageTakenMult() : 1f;
@@ -120,7 +126,7 @@ namespace BattleSystemECS.Systems
             }
 
             // O(1) field access — no method calls, no boundary checks
-            float baseDamage = _attackDamage * _attackBuffMult;
+            float baseDamage = _attackDamage * _attackBuffMult * _attackDamageMult;
             baseDamage *= _waveDifficultyMult;  // wave scaling, always applied (1.0f when wave=1)
 
             // Apply combo kill damage multiplier (min(1 + ComboCount * bonus, maxMult))

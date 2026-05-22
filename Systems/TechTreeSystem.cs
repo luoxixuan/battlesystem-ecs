@@ -218,6 +218,11 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// Get attack damage multiplier from tech tree.
+        /// </summary>
+        public float GetAttackDamageMult() => _attackDamageMult;
+
+        /// <summary>
         /// Get attack speed multiplier.
         /// </summary>
         public float GetAttackSpeedMult() => _attackSpeedMult;
