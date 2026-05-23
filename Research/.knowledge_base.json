@@ -1,0 +1,1142 @@
+{
+  "tower_patterns": {
+    "技能系统/GAS": {
+      "desc": "Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.",
+      "sources": [
+        "tinh2/skills-hub-registry",
+        "KABBOUCHI/starred",
+        "ogtamimi/OLLAGENT-AI",
+        "amjad2161/agency-agents",
+        "devanshutak25/3d-resources",
+        "mm-anishn/Agent-Dashboard",
+        "datagrowth/datagrowth-ai-audit",
+        "crazyshader/GameDev",
+        "killop/anything_about_game",
+        "insthync/awesome-unity3d",
+        "StefanoCecere/awesome-opensource-unity",
+        "msitarzewski/agency-agents"
+      ]
+    },
+    "状态机 AI": {
+      "desc": "Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.",
+      "sources": [
+        "tinh2/skills-hub-registry",
+        "KABBOUCHI/starred",
+        "devanshutak25/3d-resources",
+        "crazyshader/GameDev",
+        "0xmzn/awesome-go-awelist",
+        "v1nvn/enhansome-go",
+        "v1nvn/enhansome-dotnet",
+        "gaahrdner/starred",
+        "mpsuesser/starred",
+        "michidk/Unity-Script-Collection",
+        "killop/anything_about_game",
+        "insthync/awesome-unity3d",
+        "Caerind/AwesomeCppGameDev",
+        "StefanoCecere/awesome-opensource-unity",
+        "oskardudycz/ArchitectureWeekly",
+        "justxor/MachineLearningRoadmap",
+        "avelino/awesome-go",
+        "punkpeye/awesome-mcp-servers",
+        "rust-unofficial/awesome-rust",
+        "quozd/awesome-dotnet",
+        "ellisonleao/magictools",
+        "godotengine/awesome-godot",
+        "Kavex/GameDev-Resources",
+        "SanderMertens/ecs-faq",
+        "aloisdeniel/awesome-monogame"
+      ]
+    },
+    "Unity 桥接": {
+      "desc": "Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.",
+      "sources": [
+        "tinh2/skills-hub-registry",
+        "KABBOUCHI/starred",
+        "devanshutak25/3d-resources",
+        "crazyshader/GameDev",
+        "0xmzn/awesome-go-awelist",
+        "phrohdoh/stars",
+        "v1nvn/enhansome-go",
+        "gaahrdner/starred",
+        "tattwamasi/starry-eye",
+        "mpsuesser/starred",
+        "sschmid/Entitas",
+        "michidk/Unity-Script-Collection",
+        "killop/anything_about_game",
+        "mhxion/awesome-discord-communities",
+        "insthync/awesome-unity3d",
+        "vmayoral/ros-robotics-companies",
+        "oskardudycz/ArchitectureWeekly",
+        "gopala-kr/summary",
+        "avelino/awesome-go",
+        "punkpeye/awesome-mcp-servers",
+        "rust-unofficial/awesome-rust",
+        "dexteryy/spellbook-of-modern-webdev",
+        "SanderMertens/ecs-faq"
+      ]
+    },
+    "攻击间隔/冷却": {
+      "desc": "Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.",
+      "sources": [
+        "tinh2/skills-hub-registry",
+        "KABBOUCHI/starred",
+        "ogtamimi/OLLAGENT-AI",
+        "amjad2161/agency-agents",
+        "devanshutak25/3d-resources",
+        "mm-anishn/Agent-Dashboard",
+        "datagrowth/datagrowth-ai-audit",
+        "crazyshader/GameDev",
+        "0xmzn/awesome-go-awelist",
+        "phrohdoh/stars",
+        "v1nvn/enhansome-go",
+        "v1nvn/enhansome-dotnet",
+        "gaahrdner/starred",
+        "tattwamasi/starry-eye",
+        "mpsuesser/starred",
+        "michidk/Unity-Script-Collection",
+        "killop/anything_about_game",
+        "mhxion/awesome-discord-communities",
+        "insthync/awesome-unity3d",
+        "Caerind/AwesomeCppGameDev",
+        "StefanoCecere/awesome-opensource-unity",
+        "oskardudycz/ArchitectureWeekly",
+        "justxor/MachineLearningRoadmap",
+        "avelino/awesome-go",
+        "msitarzewski/agency-agents",
+        "punkpeye/awesome-mcp-servers",
+        "rust-unofficial/awesome-rust",
+        "quozd/awesome-dotnet",
+        "dexteryy/spellbook-of-modern-webdev",
+        "ellisonleao/magictools",
+        "godotengine/awesome-godot",
+        "Kavex/GameDev-Resources",
+        "Calinou/awesome-gamedev",
+        "SanderMertens/ecs-faq",
+        "aloisdeniel/awesome-monogame"
+      ]
+    },
+    "寻路系统": {
+      "desc": "Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.",
+      "sources": [
+        "tinh2/skills-hub-registry",
+        "KABBOUCHI/starred",
+        "amjad2161/agency-agents",
+        "devanshutak25/3d-resources",
+        "mm-anishn/Agent-Dashboard",
+        "datagrowth/datagrowth-ai-audit",
+        "crazyshader/GameDev",
+        "0xmzn/awesome-go-awelist",
+        "phrohdoh/stars",
+        "v1nvn/enhansome-go",
+        "v1nvn/enhansome-dotnet",
+        "gaahrdner/starred",
+        "tattwamasi/starry-eye",
+        "mpsuesser/starred",
+        "michidk/Unity-Script-Collection",
+        "killop/anything_about_game",
+        "insthync/awesome-unity3d",
+        "Caerind/AwesomeCppGameDev",
+        "StefanoCecere/awesome-opensource-unity",
+        "vmayoral/ros-robotics-companies",
+        "oskardudycz/ArchitectureWeekly",
+        "gopala-kr/summary",
+        "avelino/awesome-go",
+        "msitarzewski/agency-agents",
+        "punkpeye/awesome-mcp-servers",
+        "quozd/awesome-dotnet",
+        "godotengine/awesome-godot",
+        "Calinou/awesome-gamedev",
+        "aloisdeniel/awesome-monogame"
+      ]
+    },
+    "行为树": {
+      "desc": "Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.",
+      "sources": [
+        "tinh2/skills-hub-registry",
+        "KABBOUCHI/starred",
+        "ogtamimi/OLLAGENT-AI",
+        "amjad2161/agency-agents",
+        "devanshutak25/3d-resources",
+        "mm-anishn/Agent-Dashboard",
+        "datagrowth/datagrowth-ai-audit",
+        "crazyshader/GameDev",
+        "0xmzn/awesome-go-awelist",
+        "phrohdoh/stars",
+        "v1nvn/enhansome-go",
+        "v1nvn/enhansome-dotnet",
+        "gaahrdner/starred",
+        "tattwamasi/starry-eye",
+        "mpsuesser/starred",
+        "michidk/Unity-Script-Collection",
+        "killop/anything_about_game",
+        "insthync/awesome-unity3d",
+        "Caerind/AwesomeCppGameDev",
+        "StefanoCecere/awesome-opensource-unity",
+        "vmayoral/ros-robotics-companies",
+        "oskardudycz/ArchitectureWeekly",
+        "gopala-kr/summary",
+        "justxor/MachineLearningRoadmap",
+        "avelino/awesome-go",
+        "msitarzewski/agency-agents",
+        "punkpeye/awesome-mcp-servers",
+        "rust-unofficial/awesome-rust",
+        "quozd/awesome-dotnet",
+        "dexteryy/spellbook-of-modern-webdev",
+        "ellisonleao/magictools",
+        "godotengine/awesome-godot",
+        "Kavex/GameDev-Resources",
+        "SanderMertens/ecs-faq",
+        "aloisdeniel/awesome-monogame"
+      ]
+    },
+    "性能优化/Burst": {
+      "desc": "Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.",
+      "sources": [
+        "tinh2/skills-hub-registry",
+        "KABBOUCHI/starred",
+        "amjad2161/agency-agents",
+        "devanshutak25/3d-resources",
+        "mm-anishn/Agent-Dashboard",
+        "datagrowth/datagrowth-ai-audit",
+        "crazyshader/GameDev",
+        "0xmzn/awesome-go-awelist",
+        "phrohdoh/stars",
+        "v1nvn/enhansome-go",
+        "v1nvn/enhansome-dotnet",
+        "gaahrdner/starred",
+        "tattwamasi/starry-eye",
+        "mpsuesser/starred",
+        "killop/anything_about_game",
+        "insthync/awesome-unity3d",
+        "Caerind/AwesomeCppGameDev",
+        "StefanoCecere/awesome-opensource-unity",
+        "oskardudycz/ArchitectureWeekly",
+        "gopala-kr/summary",
+        "avelino/awesome-go",
+        "msitarzewski/agency-agents",
+        "punkpeye/awesome-mcp-servers",
+        "rust-unofficial/awesome-rust",
+        "quozd/awesome-dotnet",
+        "dexteryy/spellbook-of-modern-webdev",
+        "godotengine/awesome-godot"
+      ]
+    },
+    "伤害计算": {
+      "desc": "Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.",
+      "sources": [
+        "tinh2/skills-hub-registry",
+        "KABBOUCHI/starred",
+        "amjad2161/agency-agents",
+        "mm-anishn/Agent-Dashboard",
+        "datagrowth/datagrowth-ai-audit",
+        "phrohdoh/stars",
+        "gaahrdner/starred",
+        "tattwamasi/starry-eye",
+        "mpsuesser/starred",
+        "killop/anything_about_game",
+        "vmayoral/ros-robotics-companies",
+        "oskardudycz/ArchitectureWeekly",
+        "gopala-kr/summary",
+        "msitarzewski/agency-agents",
+        "punkpeye/awesome-mcp-servers",
+        "rust-unofficial/awesome-rust",
+        "dexteryy/spellbook-of-modern-webdev"
+      ]
+    },
+    "塔升级系统": {
+      "desc": "",
+      "sources": [
+        "KABBOUCHI/starred",
+        "phrohdoh/stars",
+        "gaahrdner/starred",
+        "tattwamasi/starry-eye",
+        "mpsuesser/starred",
+        "Brackeys/Tower-Defense-Tutorial",
+        "Calinou/awesome-gamedev"
+      ]
+    },
+    "塔放置": {
+      "desc": "",
+      "sources": [
+        "KABBOUCHI/starred",
+        "0xmzn/awesome-go-awelist",
+        "v1nvn/enhansome-go",
+        "gaahrdner/starred",
+        "tattwamasi/starry-eye",
+        "mpsuesser/starred",
+        "killop/anything_about_game",
+        "mhxion/awesome-discord-communities",
+        "Caerind/AwesomeCppGameDev",
+        "oskardudycz/ArchitectureWeekly",
+        "avelino/awesome-go",
+        "punkpeye/awesome-mcp-servers",
+        "rust-unofficial/awesome-rust"
+      ]
+    },
+    "ECS 实体管理": {
+      "desc": "A collection of resources for 3D.",
+      "sources": [
+        "devanshutak25/3d-resources",
+        "v1nvn/enhansome-dotnet",
+        "sschmid/Entitas",
+        "michidk/Unity-Script-Collection",
+        "killop/anything_about_game",
+        "mhxion/awesome-discord-communities",
+        "insthync/awesome-unity3d",
+        "Caerind/AwesomeCppGameDev",
+        "StefanoCecere/awesome-opensource-unity",
+        "quozd/awesome-dotnet",
+        "godotengine/awesome-godot",
+        "Kavex/GameDev-Resources",
+        "Calinou/awesome-gamedev",
+        "SanderMertens/ecs-faq",
+        "aloisdeniel/awesome-monogame"
+      ]
+    },
+    "DOTS Archetype": {
+      "desc": "# Unity游戏开发资源",
+      "sources": [
+        "crazyshader/GameDev",
+        "0xmzn/awesome-go-awelist",
+        "v1nvn/enhansome-go",
+        "gaahrdner/starred",
+        "killop/anything_about_game",
+        "insthync/awesome-unity3d",
+        "StefanoCecere/awesome-opensource-unity",
+        "avelino/awesome-go",
+        "punkpeye/awesome-mcp-servers",
+        "SanderMertens/ecs-faq"
+      ]
+    },
+    "效果系统": {
+      "desc": "# Unity游戏开发资源",
+      "sources": [
+        "crazyshader/GameDev",
+        "killop/anything_about_game"
+      ]
+    },
+    "敌怪 AI": {
+      "desc": "A wonderful list of Game Development resources.",
+      "sources": [
+        "killop/anything_about_game"
+      ]
+    },
+    "空间分区": {
+      "desc": "A wonderful list of Game Development resources.",
+      "sources": [
+        "killop/anything_about_game",
+        "insthync/awesome-unity3d"
+      ]
+    }
+  },
+  "generic_patterns": {
+    "状态机模式": {
+      "sources": [
+        "tinh2/skills-hub-registry",
+        "KABBOUCHI/starred",
+        "devanshutak25/3d-resources",
+        "crazyshader/GameDev",
+        "0xmzn/awesome-go-awelist",
+        "v1nvn/enhansome-go",
+        "v1nvn/enhansome-dotnet",
+        "gaahrdner/starred",
+        "mpsuesser/starred",
+        "michidk/Unity-Script-Collection",
+        "killop/anything_about_game",
+        "insthync/awesome-unity3d",
+        "Caerind/AwesomeCppGameDev",
+        "StefanoCecere/awesome-opensource-unity",
+        "oskardudycz/ArchitectureWeekly",
+        "justxor/MachineLearningRoadmap",
+        "avelino/awesome-go",
+        "punkpeye/awesome-mcp-servers",
+        "rust-unofficial/awesome-rust",
+        "quozd/awesome-dotnet",
+        "godotengine/awesome-godot",
+        "SanderMertens/ecs-faq",
+        "aloisdeniel/awesome-monogame"
+      ]
+    },
+    "ScriptableObject": {
+      "sources": [
+        "tinh2/skills-hub-registry",
+        "KABBOUCHI/starred",
+        "ogtamimi/OLLAGENT-AI",
+        "amjad2161/agency-agents",
+        "devanshutak25/3d-resources",
+        "mm-anishn/Agent-Dashboard",
+        "datagrowth/datagrowth-ai-audit",
+        "crazyshader/GameDev",
+        "michidk/Unity-Script-Collection",
+        "killop/anything_about_game",
+        "insthync/awesome-unity3d",
+        "StefanoCecere/awesome-opensource-unity",
+        "msitarzewski/agency-agents"
+      ]
+    },
+    "对象池模式": {
+      "sources": [
+        "tinh2/skills-hub-registry",
+        "devanshutak25/3d-resources",
+        "crazyshader/GameDev",
+        "0xmzn/awesome-go-awelist",
+        "v1nvn/enhansome-go",
+        "mpsuesser/starred",
+        "michidk/Unity-Script-Collection",
+        "killop/anything_about_game",
+        "insthync/awesome-unity3d",
+        "Caerind/AwesomeCppGameDev",
+        "StefanoCecere/awesome-opensource-unity",
+        "oskardudycz/ArchitectureWeekly",
+        "gopala-kr/summary",
+        "justxor/MachineLearningRoadmap",
+        "avelino/awesome-go",
+        "rust-unofficial/awesome-rust"
+      ]
+    },
+    "依赖注入": {
+      "sources": [
+        "tinh2/skills-hub-registry",
+        "KABBOUCHI/starred",
+        "devanshutak25/3d-resources",
+        "0xmzn/awesome-go-awelist",
+        "phrohdoh/stars",
+        "v1nvn/enhansome-go",
+        "v1nvn/enhansome-dotnet",
+        "gaahrdner/starred",
+        "tattwamasi/starry-eye",
+        "mpsuesser/starred",
+        "killop/anything_about_game",
+        "mhxion/awesome-discord-communities",
+        "insthync/awesome-unity3d",
+        "Caerind/AwesomeCppGameDev",
+        "StefanoCecere/awesome-opensource-unity",
+        "oskardudycz/ArchitectureWeekly",
+        "avelino/awesome-go",
+        "quozd/awesome-dotnet"
+      ]
+    },
+    "事件总线": {
+      "sources": [
+        "KABBOUCHI/starred",
+        "crazyshader/GameDev",
+        "0xmzn/awesome-go-awelist",
+        "v1nvn/enhansome-go",
+        "v1nvn/enhansome-dotnet",
+        "gaahrdner/starred",
+        "tattwamasi/starry-eye",
+        "killop/anything_about_game",
+        "Caerind/AwesomeCppGameDev",
+        "oskardudycz/ArchitectureWeekly",
+        "avelino/awesome-go",
+        "quozd/awesome-dotnet",
+        "dexteryy/spellbook-of-modern-webdev"
+      ]
+    },
+    "缓存友好": {
+      "sources": [
+        "0xmzn/awesome-go-awelist",
+        "v1nvn/enhansome-go",
+        "Caerind/AwesomeCppGameDev",
+        "avelino/awesome-go",
+        "punkpeye/awesome-mcp-servers",
+        "SanderMertens/ecs-faq"
+      ]
+    },
+    "命令模式": {
+      "sources": [
+        "v1nvn/enhansome-go",
+        "v1nvn/enhansome-dotnet",
+        "avelino/awesome-go",
+        "quozd/awesome-dotnet"
+      ]
+    }
+  },
+  "dir_patterns": {},
+  "insights": [
+    {
+      "text": "| [api-review](review/api-review/)                             | 2.0.0   | Review API design against REST best practices and internal consistency. Audits naming conventions, HTTP method semantics, status code correctness, pagination and filtering...         |",
+      "repo": "tinh2/skills-hub-registry",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "| [content-performance](analysis/content-performance/)               | 2.0.0   | Analyze content engagement metrics, audience retention, attribution models, A/B test results, and recommendation engine effectiveness. Use when: 'audit content metrics', 'evaluate... |",
+      "repo": "tinh2/skills-hub-registry",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "| [disaster-prediction](analysis/disaster-prediction/)               | 2.0.0   | Analyze disaster prediction and early warning systems — model accuracy for flood, earthquake, wildfire, hurricane, and tsunami hazards, data pipeline reliability from sensor...       |",
+      "repo": "tinh2/skills-hub-registry",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [TheAlgorithms/JavaScript](https://github.com/TheAlgorithms/JavaScript) - Algorithms and Data Structures implemented in JavaScript for beginners, following best practices.",
+      "repo": "KABBOUCHI/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [sdrdis/hotfix](https://github.com/sdrdis/hotfix) - Help Hotfix collect stargazers and avoid enemies. Collect commits to upgrade hotfix and add new features.",
+      "repo": "KABBOUCHI/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [Akryum/vue-safe-teleport](https://github.com/Akryum/vue-safe-teleport) - Recommended for teleporting inside the app",
+      "repo": "KABBOUCHI/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [redis/redis](https://github.com/redis/redis) - For developers, who are building real-time data-driven applications, Redis is the preferred, fastest, and most feature-rich cache, data structure server, and document and vector query engine.",
+      "repo": "KABBOUCHI/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [postgres/postgres](https://github.com/postgres/postgres) - Mirror of the official PostgreSQL GIT repository. Note that this is just a *mirror* - we don't work with pull requests on github. To contribute, please see https://wiki.postgresql.org/wiki/Submitting_",
+      "repo": "KABBOUCHI/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [needim/noty](https://github.com/needim/noty) - ⛔️ DEPRECATED - Dependency-free notification library that makes it easy to create alert - success - error - warning - information - confirmation messages as an alternative the standard alert dialog.",
+      "repo": "KABBOUCHI/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [carbon-language/carbon-lang](https://github.com/carbon-language/carbon-lang) - Carbon Language's main repository: documents, design, implementation, and related tools. (NOTE: Carbon Language is experimental; see README)",
+      "repo": "KABBOUCHI/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "| 🔮 [AI Citation Strategist](AgentsRoster/marketing/marketing-ai-citation-strategist.md) | AEO/GEO, AI recommendation visibility, citation auditing | Improving brand visibility across ChatGPT, Claude, Gemini, Perplexity |",
+      "repo": "ogtamimi/OLLAGENT-AI",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "Breaking things so users don't have to.",
+      "repo": "ogtamimi/OLLAGENT-AI",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "### Option 1: Use with Claude Code (Recommended)",
+      "repo": "amjad2161/agency-agents",
+      "date": "2026-05-22"
+    },
+    {
+      "text": "- [Unity Good Practices](https://github.com/futurice/unity-good-practices). Github repository with Unity best practices.",
+      "repo": "devanshutak25/3d-resources",
+      "date": "2026-05-22"
+    },
+    {
+      "text": "- [Pyro Shader for Redshit, ARnold, Renderman](https://sadjad.gumroad.com/l/PvjRz?recommended_by=search). Pyro Shader for Redshit, ARnold, Renderman.",
+      "repo": "devanshutak25/3d-resources",
+      "date": "2026-05-22"
+    },
+    {
+      "text": "- [Bangingcuts](https://github.com/OllyFunkster/bangingcuts). Cut up audio and video clips based on peaks in the audio track removing silences. Last Blender versions: don't install the zip, install.py file instead.",
+      "repo": "devanshutak25/3d-resources",
+      "date": "2026-05-22"
+    },
+    {
+      "text": "- [NodeToy](https://app.nodetoy.co/). The shader tool for the web. NodeToy provides creators a editor to create incredible new shaders and visual effects. If you are a react-three-fiber user, consider checking",
+      "repo": "devanshutak25/3d-resources",
+      "date": "2026-05-22"
+    },
+    {
+      "text": "- [Unity NavMesh代理之间避障功能-NavMeshAvoidance](https://github.com/OlegDzhuraev/NavMeshAvoidance)",
+      "repo": "crazyshader/GameDev",
+      "date": "2026-05-21"
+    },
+    {
+      "text": "* [Dragonfly](https://github.com/dragonflyoss/Dragonfly2) / ⭐ 3176 - Provide efficient, stable and secure file distribution and image acceleration based on p2p technology to be the best practice and standard solution in cloud native architectures.",
+      "repo": "0xmzn/awesome-go-awelist",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [zerocfg](https://github.com/chaindead/zerocfg) / ⭐ 200 - Zero-effort, concise configuration management that avoids boilerplate and repetitive code, supports multiple sources with priority overrides.",
+      "repo": "0xmzn/awesome-go-awelist",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [goRecommend](https://github.com/timkaye11/goRecommend) / ⭐ 205 - Recommendation Algorithms library written in Go.",
+      "repo": "0xmzn/awesome-go-awelist",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [portproxy](https://github.com/aybabtme/portproxy) / ⭐ 58 - Simple TCP proxy which adds CORS support to API's which don't support it.",
+      "repo": "0xmzn/awesome-go-awelist",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [Go in Practice, Second Edition](https://www.manning.com/books/go-in-practice-second-edition) - Your practical guide on the ins-and-outs of Go development, covering the standard library and the most important tools from Go’s powerful ecosystem.",
+      "repo": "0xmzn/awesome-go-awelist",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [golang-standards/project-layout](https://github.com/golang-standards/project-layout) / ⭐ 56005 - Set of common historical and emerging project layout patterns in the Go ecosystem. Note: despite the org-name they do not represent official golang standards, see this issue for more information. Nonetheless, some may find the layout useful.",
+      "repo": "0xmzn/awesome-go-awelist",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [Sairyss/domain-driven-hexagon](https://github.com/Sairyss/domain-driven-hexagon) - Learn Domain-Driven Design, software architecture, design patterns, best practices. Code examples included \\[*MIT License*\\] (⭐️14662)",
+      "repo": "phrohdoh/stars",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [clibs/entr](https://github.com/clibs/entr) - A utility for running arbitrary commands when files change. Uses kqueue(2) or inotify(7) to avoid polling. entr responds to file system events by executing command line arguments or by writing to a FIFO. entr was written to provide to make rapid feedback and automated testing natural and completely ordinary. (⭐️618)",
+      "repo": "phrohdoh/stars",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [TaoK/PoorMansTSqlFormatter](https://github.com/TaoK/PoorMansTSqlFormatter) - A small free .Net and JS library (with demo UI, command-line bulk formatter, SSMS/VS add-in, notepad++ plugin, winmerge plugin, and demo webpage) for reformatting and coloring T-SQL code to the user's preferences. \\[*GNU AGPLv3*\\] (⭐️1023)",
+      "repo": "phrohdoh/stars",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [slimtoolkit/slim](https://github.com/slimtoolkit/slim) - Slim(toolkit): Don't change anything in your container image and minify it by up to 30x (and for compiled languages even more) making it secure too! (free and open source) \\[*Apache License 2.0*\\] (⭐️23267)",
+      "repo": "phrohdoh/stars",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [yarrow/zet](https://github.com/yarrow/zet) - CLI utility to find the union, intersection, set difference, etc of files considered as sets of lines \\[*Apache License 2.0*\\] (⭐️210)",
+      "repo": "phrohdoh/stars",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [solemnwarning/rehex](https://github.com/solemnwarning/rehex) - Reverse Engineers' Hex Editor \\[*GNU GPLv2*\\] (⭐️2458)",
+      "repo": "phrohdoh/stars",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [Dragonfly](https://github.com/dragonflyoss/Dragonfly2) ⭐ 3,177 | 🐛 32 | 🌐 Go | 📅 2026-05-22 - Provide efficient, stable and secure file distribution and image acceleration based on p2p technology to be the best practice and standard solution in cloud native architectures.",
+      "repo": "v1nvn/enhansome-go",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [zerocfg](https://github.com/chaindead/zerocfg) ⭐ 200 | 🐛 3 | 🌐 Go | 📅 2025-07-08 - Zero-effort, concise configuration management that avoids boilerplate and repetitive code, supports multiple sources with priority overrides.",
+      "repo": "v1nvn/enhansome-go",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [regommend](https://github.com/muesli/regommend) ⭐ 312 | 🐛 0 | 🌐 Go | 📅 2019-08-07 - Recommendation & collaborative filtering engine.",
+      "repo": "v1nvn/enhansome-go",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [portproxy](https://github.com/aybabtme/portproxy) ⭐ 58 | 🐛 0 | 🌐 Go | 📅 2014-12-13 - Simple TCP proxy which adds CORS support to API's which don't support it.",
+      "repo": "v1nvn/enhansome-go",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [golang-standards/project-layout](https://github.com/golang-standards/project-layout) ⭐ 56,005 | 🐛 94 | 🌐 Makefile | 📅 2026-04-28 - Set of common historical and emerging project layout patterns in the Go ecosystem. Note: despite the org-name they do not represent official golang standards, see [this issue](https://github.com/golang-standards/project-layout/issues/117) ⭐ 56,005 | 🐛 94 | 🌐 Makefile | 📅 2026-04-28 for more information. Nonetheless, some may find the layout useful.",
+      "repo": "v1nvn/enhansome-go",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [ASP.NET Boilerplate](https://github.com/aspnetboilerplate/aspnetboilerplate) ⭐ 11,978 | 🐛 60 | 🌐 C# | 📅 2026-04-28 - A starting point for new modern ASP.NET MVC web applications with best practices and most popular tools.",
+      "repo": "v1nvn/enhansome-dotnet",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [Population.NET](https://github.com/Authentic199/Population.NET) ⭐ 38 | 🐛 0 | 🌐 C# | 📅 2024-12-25 - A .NET library allows clients to specify the exact fields they need, reducing unnecessary data transfer by avoiding the retrieval of all fields by default.",
+      "repo": "v1nvn/enhansome-dotnet",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [ProjectScaffold](https://github.com/fsprojects/ProjectScaffold) ⭐ 522 | 🐛 62 | 🌐 F# | 📅 2023-07-18 - A prototypical .NET solution recommended by the F# Foundation---includes file system setup, Paket for dependencies and FAKE for build/test automation. By default, build process also compiles documentation and generates NuGet packages.",
+      "repo": "v1nvn/enhansome-dotnet",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [Orleankka](https://github.com/OrleansContrib/Orleankka) ⭐ 507 | 🐛 3 | 🌐 C# | 📅 2025-12-15 - Orleankka is a functional API for Microsoft Orleans framework. It is highly suitable for scenarios where having composable, uniform communication interface is preferable, such as: CQRS, event-sourcing, re-routing, FSM, etc. Additional API available for F# called Orleankka.FSharp.",
+      "repo": "v1nvn/enhansome-dotnet",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [DotVVM](https://github.com/riganti/dotvvm) ⭐ 803 | 🐛 182 | 🌐 C# | 📅 2026-05-22 - MVVM framework for people who don't like to write JavaScript, with OWIN and ASP.NET Core support and a free extension for Visual Studio 2015 and 2017.",
+      "repo": "v1nvn/enhansome-dotnet",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [AngouriMath](https://github.com/asc-community/AngouriMath) ⭐ 822 | 🐛 127 | 🌐 C# | 📅 2026-02-27 - An open-source symbolic/computer algebra library, made primarily for C# and F#. It covers a range of features and might be considered as an alternative to SymPy in .NET.",
+      "repo": "v1nvn/enhansome-dotnet",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [goldbergyoni/nodebestpractices](https://github.com/goldbergyoni/nodebestpractices) - :white_check_mark:  The Node.js best practices list (July 2024)",
+      "repo": "gaahrdner/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [teivah/100-go-mistakes](https://github.com/teivah/100-go-mistakes) - 📖 100 Go Mistakes and How to Avoid Them",
+      "repo": "gaahrdner/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [gorse-io/gorse](https://github.com/gorse-io/gorse) - AI powered open source recommender system engine supports classical/LLM rankers and multimodal content via embedding",
+      "repo": "gaahrdner/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [dagger/container-use](https://github.com/dagger/container-use) - Development environments for coding agents. Enable multiple agents to work safely and independently with your preferred stack.",
+      "repo": "gaahrdner/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [jesseduffield/horcrux](https://github.com/jesseduffield/horcrux) - Split your file into encrypted fragments so that you don't need to remember a passcode",
+      "repo": "gaahrdner/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [norvig/pytudes](https://github.com/norvig/pytudes) - Python programs, usually short, of considerable difficulty, to perfect particular skills.",
+      "repo": "gaahrdner/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [cycloidio/inframap](https://github.com/cycloidio/inframap) - Read your tfstate or HCL to generate a graph specific for each provider, showing only the resources that are most important/relevant.",
+      "repo": "gaahrdner/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [vietanhdev/open-adas](https://github.com/vietanhdev/open-adas) - An open source advanced driver assistance system (ADAS) that uses Jetson Nano as the hardware. Features: Traffic sign detection, Forward collision warning, Lane departure warning.",
+      "repo": "gaahrdner/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [EngineOwningSoftware/pcileech-webradar](https://github.com/EngineOwningSoftware/pcileech-webradar) - CS:GO DMA Cheat (caution, seems to be detected by ESEA and FaceIt)",
+      "repo": "gaahrdner/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [cpp-best-practices/cmake_template](https://github.com/cpp-best-practices/cmake_template) - CMake for C++ Best Practices",
+      "repo": "tattwamasi/starry-eye",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [kholia/OSX-KVM](https://github.com/kholia/OSX-KVM) - Run macOS on QEMU/KVM. With OpenCore + Monterey + Ventura + Sonoma support now! Only commercial (paid) support is available now to avoid spammy issues. No Mac system is required.",
+      "repo": "tattwamasi/starry-eye",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [facebookresearch/dlrm](https://github.com/facebookresearch/dlrm) - An implementation of a deep learning recommendation model (DLRM)",
+      "repo": "tattwamasi/starry-eye",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [webui-dev/webui](https://github.com/webui-dev/webui) - Use any web browser or WebView as GUI, with your preferred language in the backend and modern web technologies in the frontend, all in a lightweight portable library.",
+      "repo": "tattwamasi/starry-eye",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [stormwarning/tailwindcss-opentype](https://github.com/stormwarning/tailwindcss-opentype) - 🔡 Tailwind CSS utility classes for advanced typographic features.",
+      "repo": "tattwamasi/starry-eye",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [livereload/LiveReload](https://github.com/livereload/LiveReload) - LiveReload.app for Mac and Windows. See “develop” branch for the latest Windows release and LiveReload 3 progress. (NOTE: renamed from LiveReload2.)",
+      "repo": "tattwamasi/starry-eye",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [elsewhencode/project-guidelines](https://github.com/elsewhencode/project-guidelines) - A set of best practices for JavaScript projects",
+      "repo": "mpsuesser/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [conorbronsdon/avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing) - Skill that audits and rewrites content to remove AI writing patterns. Use it with your favorite agents including Claude Code, OpenClaw, and Hermes.",
+      "repo": "mpsuesser/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [t3dotgg/stripe-recommendations](https://github.com/t3dotgg/stripe-recommendations) - How to implement Stripe without going mad",
+      "repo": "mpsuesser/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [unclecode/crawl4ai](https://github.com/unclecode/crawl4ai) - 🚀🤖 Crawl4AI: Open-source LLM Friendly Web Crawler & Scraper. Don't be shy, join here: https://discord.gg/jP8KfhDhyN",
+      "repo": "mpsuesser/starred",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "### GitHub releases (recommended)",
+      "repo": "sschmid/Entitas",
+      "date": "2023-12-30"
+    },
+    {
+      "text": "* [UnitySteer](https://github.com/ricardojmendez/UnitySteer) - steering, obstacle avoidance and path following behaviors.",
+      "repo": "michidk/Unity-Script-Collection",
+      "date": "2025-08-20"
+    },
+    {
+      "text": "- [《CMake Best Practices》的非专业个人翻译](https://github.com/xiaoweiChen/CMake-Best-Practices)",
+      "repo": "killop/anything_about_game",
+      "date": "2026-05-19"
+    },
+    {
+      "text": "- [unity-texture-apply-async](https://github.com/gilzoide/unity-texture-apply-async) Alternative to Texture2D.Apply() that doesn't require synchronizing with the render thread, avoiding stalls in the main thread",
+      "repo": "killop/anything_about_game",
+      "date": "2026-05-19"
+    },
+    {
+      "text": "- [PowerVR](http://cdn.imgtec.com/sdk-documentation/PowerVR.Performance+Recommendations.pdf)",
+      "repo": "killop/anything_about_game",
+      "date": "2026-05-19"
+    },
+    {
+      "text": "* [50 Tips and Best Practices for Unity (2016 Edition)](https://www.gamasutra.com/blogs/HermanTulleken/20160812/279100/50_Tips_and_Best_Practices_for_Unity_2016_Edition.php)",
+      "repo": "insthync/awesome-unity3d",
+      "date": "2026-04-18"
+    },
+    {
+      "text": "* [UnitySteer](https://github.com/ricardojmendez/UnitySteer) - Steering, obstacle avoidance and path following behaviors for the Unity Game Engine",
+      "repo": "insthync/awesome-unity3d",
+      "date": "2026-04-18"
+    },
+    {
+      "text": "* [Dynamic Multi Target Camera for Unity](https://github.com/lopespm/unity-camera-multi-target) - Concise Unity library which dynamically keeps a set of objects (e.g. players and important objects) in view.",
+      "repo": "insthync/awesome-unity3d",
+      "date": "2026-04-18"
+    },
+    {
+      "text": "- [CppCoreGuidelines](https://github.com/isocpp/CppCoreGuidelines) : The C++ Core Guidelines are a set of tried-and-true guidelines, rules, and best practices about coding in C++",
+      "repo": "Caerind/AwesomeCppGameDev",
+      "date": "2024-12-20"
+    },
+    {
+      "text": "- [bitsquid-foundation](https://github.com/niklas-ourmachinery/bitsquid-foundation) : A minimalistic foundation library with functions for memory allocation, basic collections, etc. The library has been written with a data-oriented philosophy: POD structures are preferred over class…",
+      "repo": "Caerind/AwesomeCppGameDev",
+      "date": "2024-12-20"
+    },
+    {
+      "text": "- [EAMain](https://github.com/electronicarts/EAMain) : EAMain provides a multi-platform entry point used for platforms that don't support console output, return codes and command-line arguments.",
+      "repo": "Caerind/AwesomeCppGameDev",
+      "date": "2024-12-20"
+    },
+    {
+      "text": "- [compiler-warnings](https://github.com/Barro/compiler-warnings) : A list of compiler warning flags for different GCC and clang versions",
+      "repo": "Caerind/AwesomeCppGameDev",
+      "date": "2024-12-20"
+    },
+    {
+      "text": "- [llvm-project](https://github.com/llvm/llvm-project) : The LLVM Project is a collection of modular and reusable compiler and toolchain technologies. Note: the repository does not accept github pull requests at this moment. Please submit your patches at…",
+      "repo": "Caerind/AwesomeCppGameDev",
+      "date": "2024-12-20"
+    },
+    {
+      "text": "- [50 Tips and Best Practices for Unity (2016 Edition)](https://www.gamasutra.com/blogs/HermanTulleken/20160812/279100/50_Tips_and_Best_Practices_for_Unity_2016_Edition.php)",
+      "repo": "StefanoCecere/awesome-opensource-unity",
+      "date": "2026-02-18"
+    },
+    {
+      "text": "- [UnitySteer](https://github.com/ricardojmendez/UnitySteer) ⭐1.2k 🕒5y ago- Steering, obstacle avoidance and path following behaviors for the Unity Game Engine.",
+      "repo": "StefanoCecere/awesome-opensource-unity",
+      "date": "2026-02-18"
+    },
+    {
+      "text": "- [unity-camera-multi-target](https://github.com/lopespm/unity-camera-multi-target) ⭐228 🕒5mo ago- Concise Unity library which dynamically keeps a set of objects (e.g. players and important objects) in view.",
+      "repo": "StefanoCecere/awesome-opensource-unity",
+      "date": "2026-02-18"
+    },
+    {
+      "text": "| [Evitado Technologies](https://evitado.io/) | Develop temporarily installable collision avoidance systems using the industries latest sensor technologies. Hiring ROS engineers ([Software Engineer](https://evitado.io/careers/)). | 2019 |",
+      "repo": "vmayoral/ros-robotics-companies",
+      "date": "2026-04-19"
+    },
+    {
+      "text": "| [eProsima](https://www.eprosima.com/) | Provides insight to develop distributed systems recommending the right DDS middleware products and supporting in all the stages of the development. ROS drivers for eProsima middleware (see [`eProsima`](https://github.com/eProsima))[^105]. | 2005 |",
+      "repo": "vmayoral/ros-robotics-companies",
+      "date": "2026-04-19"
+    },
+    {
+      "text": "| [Clobot](https://www.clobot.co.kr/) | Is an autonomous robot service provider. They implement specialized robot services in consideration of the robot hardware and  operating environment. ROS drivers (see [`CLOBOT-Co-Ltd`](https://github.com/CLOBOT-Co-Ltd)). | 2017 |",
+      "repo": "vmayoral/ros-robotics-companies",
+      "date": "2026-04-19"
+    },
+    {
+      "text": "- [Yoni Goldberg - The Node.js best practices list](https://github.com/goldbergyoni/nodebestpractices)",
+      "repo": "oskardudycz/ArchitectureWeekly",
+      "date": "2024-07-08"
+    },
+    {
+      "text": "- [📺 Adam Savage - Avoid These Words (And Not Just at Work)](https://www.youtube.com/watch?v=OP4CKn86qGY)",
+      "repo": "oskardudycz/ArchitectureWeekly",
+      "date": "2024-07-08"
+    },
+    {
+      "text": "- [The Verge - Microsoft starts testing ads in the Windows 11 Start menu](https://www.theverge.com/2024/4/12/24128640/microsoft-windows-11-start-menu-ads-app-recommendations)",
+      "repo": "oskardudycz/ArchitectureWeekly",
+      "date": "2024-07-08"
+    },
+    {
+      "text": "- [Steve Dunn - Prefer test-doubles over mocking frameworks](https://dunnhq.com/posts/2024/prefer-test-doubles-over-mocking/)",
+      "repo": "oskardudycz/ArchitectureWeekly",
+      "date": "2024-07-08"
+    },
+    {
+      "text": "- [Nat Bennett - Don't be results-oriented](https://www.simplermachines.com/dont-be-results-oriented/)",
+      "repo": "oskardudycz/ArchitectureWeekly",
+      "date": "2024-07-08"
+    },
+    {
+      "text": "- [📺 Michael Staib - Why you should consider using persisted queries with GraphQL](https://www.youtube.com/watch?v=ZZ5PF3_P_r4)",
+      "repo": "oskardudycz/ArchitectureWeekly",
+      "date": "2024-07-08"
+    },
+    {
+      "text": "## [8th July 2024](per-week/2024-07-08.md) [![Subscribe](https://img.shields.io/badge/%F0%9F%9A%80-subscribe!-important)](https://www.architecture-weekly.com/?utm_source=github_architecture_weekly)",
+      "repo": "oskardudycz/ArchitectureWeekly",
+      "date": "2024-07-08"
+    },
+    {
+      "text": "- [The Register - Apple stops warning of 'state-sponsored' attacks, now alerts about 'mercenary spyware'](https://www.theregister.com/2024/04/12/apple_mercenary_spyware/)",
+      "repo": "oskardudycz/ArchitectureWeekly",
+      "date": "2024-07-08"
+    },
+    {
+      "text": "- [Steve Sanderson - Keynote: Where Web Tech is Going Now](https://www.youtube.com/watch?v=fIYYC_p_uU8)",
+      "repo": "oskardudycz/ArchitectureWeekly",
+      "date": "2024-07-08"
+    },
+    {
+      "text": "* [[Week-6](https://github.com/gopala-kr/summary/tree/master/summaries/Week-6)] 19-Nov-2017 - recommender systems",
+      "repo": "gopala-kr/summary",
+      "date": "2026-05-22"
+    },
+    {
+      "text": "- [Reward learning from human preferences and demonstrations in Atari](https://arxiv.org/abs/1811.06521v1)  :star:",
+      "repo": "gopala-kr/summary",
+      "date": "2026-05-22"
+    },
+    {
+      "text": "- [Informative Object Annotations: Tell Me Something I Don't Know](https://arxiv.org/abs/1812.10358v1)",
+      "repo": "gopala-kr/summary",
+      "date": "2026-05-22"
+    },
+    {
+      "text": "- [Energy and Policy Considerations for Deep Learning in NLP](https://arxiv.org/abs/1906.02243v1)",
+      "repo": "gopala-kr/summary",
+      "date": "2026-05-22"
+    },
+    {
+      "text": "- **[Aider — Tips & Best Practices](https://aider.chat/docs/usage/tips.html)** — концентрат опыта по работе с CLI-агентом.",
+      "repo": "justxor/MachineLearningRoadmap",
+      "date": "2026-05-18"
+    },
+    {
+      "text": "- **Recommender Systems** — collaborative filtering, two‑tower, ранкеры, RecSys в проде.",
+      "repo": "justxor/MachineLearningRoadmap",
+      "date": "2026-05-18"
+    },
+    {
+      "text": "- **Direct Preference Optimization** (Rafailov et al., 2023) — DPO без reward model.",
+      "repo": "justxor/MachineLearningRoadmap",
+      "date": "2026-05-18"
+    },
+    {
+      "text": "6. **Show, don't tell.** Дайте ссылку на файл, скриншот ошибки, лог стектрейса. Не пересказывайте — копируйте.",
+      "repo": "justxor/MachineLearningRoadmap",
+      "date": "2026-05-18"
+    },
+    {
+      "text": "**Pro tip:** если первая гипотеза не подтвердилась — не уходите в новый чат, скажите модели «гипотеза 1 отпала, вот данные эксперимента, обновляй приоритеты».",
+      "repo": "justxor/MachineLearningRoadmap",
+      "date": "2026-05-18"
+    },
+    {
+      "text": "- [Dragonfly](https://github.com/dragonflyoss/Dragonfly2) - Provide efficient, stable and secure file distribution and image acceleration based on p2p technology to be the best practice and standard solution in cloud native architectures.",
+      "repo": "avelino/awesome-go",
+      "date": "2026-05-21"
+    },
+    {
+      "text": "- [zerocfg](https://github.com/chaindead/zerocfg) - Zero-effort, concise configuration management that avoids boilerplate and repetitive code, supports multiple sources with priority overrides.",
+      "repo": "avelino/awesome-go",
+      "date": "2026-05-21"
+    },
+    {
+      "text": "- [goRecommend](https://github.com/timkaye11/goRecommend) - Recommendation Algorithms library written in Go.",
+      "repo": "avelino/awesome-go",
+      "date": "2026-05-21"
+    },
+    {
+      "text": "- [portproxy](https://github.com/aybabtme/portproxy) - Simple TCP proxy which adds CORS support to API's which don't support it.",
+      "repo": "avelino/awesome-go",
+      "date": "2026-05-21"
+    },
+    {
+      "text": "- [Go in Practice, Second Edition](https://www.manning.com/books/go-in-practice-second-edition) - Your practical guide on the ins-and-outs of Go development, covering the standard library and the most important tools from Go’s powerful ecosystem.",
+      "repo": "avelino/awesome-go",
+      "date": "2026-05-21"
+    },
+    {
+      "text": "- [efremidze/swift-patterns-mcp](https://github.com/efremidze/swift-patterns-mcp) 📇 🏠 🍎 🪟 🐧 - An MCP server providing curated Swift and SwiftUI best practices from leading iOS developers, including patterns and real-world code examples from Swift by Sundell, SwiftLee, and other trusted sources.",
+      "repo": "punkpeye/awesome-mcp-servers",
+      "date": "2026-05-02"
+    },
+    {
+      "text": "- [oxgeneral/agentnet](https://github.com/oxgeneral/agentnet) 🐍 ☁️ 🍎 🪟 🐧 - Agent-to-agent referral network where AI agents discover, recommend, and refer users to each other. Features bilateral trust model, credit economy, and 7 MCP tools for agent registration, discovery, and referral tracking.",
+      "repo": "punkpeye/awesome-mcp-servers",
+      "date": "2026-05-02"
+    },
+    {
+      "text": "- [OctoMind-dev/octomind-mcp](https://github.com/OctoMind-dev/octomind-mcp) 📇 ☁️ - lets your preferred AI agent create & run fully managed [Octomind](https://www.octomind.dev/) end-to-end tests from your codebase or other data sources like Jira, Slack or TestRail.",
+      "repo": "punkpeye/awesome-mcp-servers",
+      "date": "2026-05-02"
+    },
+    {
+      "text": "- [admica/FileScopeMCP](https://github.com/admica/FileScopeMCP) 🐍 📇 🦀 - Analyzes your codebase identifying important files based on dependency relationships. Generates diagrams and importance scores, helping AI assistants understand the codebase.",
+      "repo": "punkpeye/awesome-mcp-servers",
+      "date": "2026-05-02"
+    },
+    {
+      "text": "* [Cherrybomb](https://github.com/blst-security/cherrybomb) - Stop half-done API specifications with a CLI tool that helps you avoid undefined user behaviour by validating your API specifications.",
+      "repo": "rust-unofficial/awesome-rust",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [Programming Community Curated Resources for Learning Rust](https://hackr.io/tutorials/learn-rust) - A list of recommended resources voted by the programming community.",
+      "repo": "rust-unofficial/awesome-rust",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "* [cargo-limit](https://crates.io/crates/cargo-limit) - Cargo with less noise: warnings are skipped until errors are fixed, Neovim integration, etc. [![build badge](https://github.com/cargo-limit/cargo-limit/actions/workflows/ci.yml/badge.svg)](https://github.com/cargo-limit/cargo-limit/actions)",
+      "repo": "rust-unofficial/awesome-rust",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "- [Discover Threejs](https://discoverthreejs.com), especially the [Tips and Tricks](https://discoverthreejs.com/tips-and-tricks) chapter for best practices",
+      "repo": "pmndrs/react-three-fiber",
+      "date": "2026-05-07"
+    },
+    {
+      "text": "If you like this project, please consider helping out. All contributions are welcome as well as donations to [Opencollective](https://opencollective.com/react-three-fiber), or in crypto `BTC: 36fuguTPxGCNnYZSRdgdh6Ea94brCAjMbH`, `ETH: 0x6E3f79Ea1d0dcedeb33D3fC6c34d2B1f156F2682`.",
+      "repo": "pmndrs/react-three-fiber",
+      "date": "2026-05-07"
+    },
+    {
+      "text": "* [ASP.NET Boilerplate](https://github.com/aspnetboilerplate/aspnetboilerplate) - A starting point for new modern ASP.NET MVC web applications with best practices and most popular tools.",
+      "repo": "quozd/awesome-dotnet",
+      "date": "2026-03-26"
+    },
+    {
+      "text": "* [Population.NET](https://github.com/Authentic199/Population.NET) - A .NET library allows clients to specify the exact fields they need, reducing unnecessary data transfer by avoiding the retrieval of all fields by default.",
+      "repo": "quozd/awesome-dotnet",
+      "date": "2026-03-26"
+    },
+    {
+      "text": "* [DotVVM](https://github.com/riganti/dotvvm) - MVVM framework for people who don't like to write JavaScript, with OWIN and ASP.NET Core support and a free extension for Visual Studio 2015 and 2017.",
+      "repo": "quozd/awesome-dotnet",
+      "date": "2026-03-26"
+    },
+    {
+      "text": "* [AngouriMath](https://github.com/asc-community/AngouriMath) - An open-source symbolic/computer algebra library, made primarily for C# and F#. It covers a range of features and might be considered as an alternative to SymPy in .NET.",
+      "repo": "quozd/awesome-dotnet",
+      "date": "2026-03-26"
+    },
+    {
+      "text": "- Best Practices (Skeleton, Methodology, Code Style...)",
+      "repo": "dexteryy/spellbook-of-modern-webdev",
+      "date": "2023-12-18"
+    },
+    {
+      "text": "* [Starter Kits Recommended by the React Team](https://reactjs.org/community/starter-kits.html)",
+      "repo": "dexteryy/spellbook-of-modern-webdev",
+      "date": "2023-12-18"
+    },
+    {
+      "text": "* Prefer __fine-grained classifications and deep hierarchies__ over __featureless descriptions and distractive comments__.",
+      "repo": "dexteryy/spellbook-of-modern-webdev",
+      "date": "2023-12-18"
+    },
+    {
+      "text": "[You Don't Need jQuery](https://github.com/oneuijs/You-Dont-Need-jQuery), \\",
+      "repo": "dexteryy/spellbook-of-modern-webdev",
+      "date": "2023-12-18"
+    },
+    {
+      "text": "* [Offline UX Considerations](https://developers.google.com/web/fundamentals/instant-and-offline/offline-ux)",
+      "repo": "dexteryy/spellbook-of-modern-webdev",
+      "date": "2023-12-18"
+    },
+    {
+      "text": "- ES6+ Features, Intro to ES6+, Re-intro to JS, Important Proposals, Functional Programming, FRP, Static Typing, Code Style...",
+      "repo": "dexteryy/spellbook-of-modern-webdev",
+      "date": "2023-12-18"
+    },
+    {
+      "text": "- :tada: [Tilesplit](https://github.com/AlexPoulsen/tilesplit) - CLI text-based tilesheet splitter and namer. Turn a spritesheet into many separate files with names you pick, or not if you don't care. Support templates and textures that are not all the same size.",
+      "repo": "ellisonleao/magictools",
+      "date": "2026-04-09"
+    },
+    {
+      "text": "* :heavy_dollar_sign: [Pixen](https://github.com/Pixen/Pixen) - Pixel Art Editor for OSX (Warning: Pixen previously did not support custom gif palettes before becoming paid, and may still have this limiation.)",
+      "repo": "Kavex/GameDev-Resources",
+      "date": "2026-04-10"
+    },
+    {
+      "text": "This is a catch-all category for things that don't fit anywhere else.",
+      "repo": "Calinou/awesome-gamedev",
+      "date": "2026-03-21"
+    },
+    {
+      "text": "False sharing is avoided by ensuring that data accessed by different threads is not in close enough proximity for it to be loaded in a single cache line.",
+      "repo": "SanderMertens/ecs-faq",
+      "date": "2025-12-17"
+    },
+    {
+      "text": "I highly recommend reading existing resources on ECS and experimenting with the approaches they describe. Reading the code of example ECS projects can also be a good way to fast-track your understanding of how ECS applications are written.",
+      "repo": "SanderMertens/ecs-faq",
+      "date": "2025-12-17"
+    },
+    {
+      "text": "In practice ECS is used a bit more liberally. Some ECS frameworks do not have systems, and only provide methods for querying entities. Other frameworks may allow for adding things to entities than are not components. These implementations are still considered ECS by many people.",
+      "repo": "SanderMertens/ecs-faq",
+      "date": "2025-12-17"
+    },
+    {
+      "text": "Designing an ECS application starts with creating the components (data structures) that contain the game data. Important things to take into account are:",
+      "repo": "SanderMertens/ecs-faq",
+      "date": "2025-12-17"
+    }
+  ],
+  "repos": [
+    "tinh2/skills-hub-registry",
+    "KABBOUCHI/starred",
+    "ogtamimi/OLLAGENT-AI",
+    "amjad2161/agency-agents",
+    "devanshutak25/3d-resources",
+    "mm-anishn/Agent-Dashboard",
+    "datagrowth/datagrowth-ai-audit",
+    "crazyshader/GameDev",
+    "0xmzn/awesome-go-awelist",
+    "phrohdoh/stars",
+    "v1nvn/enhansome-go",
+    "v1nvn/enhansome-dotnet",
+    "gaahrdner/starred",
+    "tattwamasi/starry-eye",
+    "mpsuesser/starred",
+    "sschmid/Entitas",
+    "michidk/Unity-Script-Collection",
+    "killop/anything_about_game",
+    "mhxion/awesome-discord-communities",
+    "insthync/awesome-unity3d",
+    "Caerind/AwesomeCppGameDev",
+    "StefanoCecere/awesome-opensource-unity",
+    "vmayoral/ros-robotics-companies",
+    "oskardudycz/ArchitectureWeekly",
+    "Brackeys/Tower-Defense-Tutorial",
+    "gopala-kr/summary",
+    "justxor/MachineLearningRoadmap",
+    "avelino/awesome-go",
+    "msitarzewski/agency-agents",
+    "punkpeye/awesome-mcp-servers",
+    "rust-unofficial/awesome-rust",
+    "pmndrs/react-three-fiber",
+    "quozd/awesome-dotnet",
+    "dexteryy/spellbook-of-modern-webdev",
+    "ellisonleao/magictools",
+    "godotengine/awesome-godot",
+    "Kavex/GameDev-Resources",
+    "Calinou/awesome-gamedev",
+    "SanderMertens/ecs-faq",
+    "aloisdeniel/awesome-monogame"
+  ],
+  "file_trees": {},
+  "version": 2
+}
