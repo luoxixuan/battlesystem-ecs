@@ -338,6 +338,10 @@ namespace BattleSystemECS.Systems
         {
             float damage = store.EnemyDamage[enemyId];
             damage += store.EnemyBuffDamageBonus[enemyId];
+            // Apply stealth multiplier and reset to 1.0f for next attack
+            float stealthMult = store.EnemyStealthMultiplier[enemyId];
+            damage *= stealthMult;
+            store.EnemyStealthMultiplier[enemyId] = 1f;
             store.DecreasePlayerHealth(playerId, damage);
             float remaining = store.GetPlayerCurrentHealth(playerId);
             EventBus.Instance.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
@@ -354,6 +358,10 @@ namespace BattleSystemECS.Systems
         {
             float damage = store.EnemyDamage[enemyId];
             damage += store.EnemyBuffDamageBonus[enemyId];
+            // Apply stealth multiplier and reset to 1.0f for next attack
+            float stealthMult = store.EnemyStealthMultiplier[enemyId];
+            damage *= stealthMult;
+            store.EnemyStealthMultiplier[enemyId] = 1f;
             store.DecreasePlayerHealth(playerId, damage);
             float remaining = store.GetPlayerCurrentHealth(playerId);
             EventBus.Instance.Publish(GameEvents.EnemyCharging, new EnemyChargingEvent
@@ -393,6 +401,10 @@ namespace BattleSystemECS.Systems
             {
                 float baseDamage = store.EnemyDamage[enemyId];
                 baseDamage += store.EnemyBuffDamageBonus[enemyId];
+                // Apply stealth multiplier and reset to 1.0f for next attack
+                float stealthMult = store.EnemyStealthMultiplier[enemyId];
+                baseDamage *= stealthMult;
+                store.EnemyStealthMultiplier[enemyId] = 1f;
                 float chargedDamage = baseDamage * 3f;
                 store.DecreasePlayerHealth(playerId, chargedDamage);
                 float remaining = store.GetPlayerCurrentHealth(playerId);

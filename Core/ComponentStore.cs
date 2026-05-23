@@ -121,6 +121,9 @@ namespace BattleSystemECS.Core
         // Used by ResolveEnemiesKilledThisFrame to correctly award GoldOnEliteKill instead of
         // the broken EnemyTypeName == "Elite" check (EnemyTypeName stores base type names).
         public bool[] EnemyIsElite = new bool[MAX_ENTITIES];
+        // EnemyStealthMultiplier: per-entity stealth attack damage multiplier.
+        // Set by stealth_attack ability, consumed and reset by EnemyAISystem attack methods.
+        public float[] EnemyStealthMultiplier = new float[MAX_ENTITIES];
 
         // ==================== 敌人 AI 组件的 SOA 存储 ====================
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
@@ -386,6 +389,7 @@ namespace BattleSystemECS.Core
                 EnemyMoveSpeedBase[entityId] = 0f;
                 EnemySlowDurationLeft[entityId] = 0f;
                 EnemyIsElite[entityId] = false;
+                EnemyStealthMultiplier[entityId] = 1f;
                 // Freeze fields (shared with stun — no separate fields needed, cleanup via StunDurationLeft/StunFlag above)
             }
 

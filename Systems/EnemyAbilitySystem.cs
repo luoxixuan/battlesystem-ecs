@@ -298,19 +298,12 @@ namespace BattleSystemECS.Systems
 
         private void ExecuteStealthAttack(int enemyId, EnemyAbilityDef ability)
         {
-            // Stealth attack: enhanced damage when attacking from stealth
-            // The actual damage application is handled by TowerAttackSystem targeting logic.
-            // Here we just apply a damage multiplier bonus for the next attack.
+            // Stealth attack: enhanced damage when attacking from stealth.
+            // Set the EnemyStealthMultiplier so the next attack in EnemyAISystem applies extra damage.
+            // EnemyStealthMultiplier is a dedicated field (not shared with EnemyBuffDamageBonus).
             if (ability.DamageMultiplier <= 0f) return;
 
-            float baseDamage = store.EnemyDamage[enemyId];
-            float bonusDamage = baseDamage * (ability.DamageMultiplier - 1f);
-            if (bonusDamage > 0)
-            {
-                store.EnemyBuffDamageBonus[enemyId] += bonusDamage;
-                store.EnemyBuffDurationLeft[enemyId] = 1f;
-            }
-
+            store.EnemyStealthMultiplier[enemyId] = ability.DamageMultiplier;
             logger.Log($"[ABILITY] Enemy {enemyId} prepares stealth attack with {ability.DamageMultiplier:F1}x damage multiplier ({ability.Name})");
         }
 
