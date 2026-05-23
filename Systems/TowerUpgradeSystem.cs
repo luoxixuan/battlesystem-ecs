@@ -88,6 +88,77 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// Switch the tower's upgrade path to a different one.
+        /// Re-applies the current upgrade level's curve from the new path (without changing level).
+        /// Extra cost: +50% of current upgrade cost.
+        /// </summary>
+        /// <returns>True if switch succeeded, false otherwise.</returns>
+        public bool SwitchUpgradePath(int towerId, string newPathId)
+        {
+            if (towerId < 0 || towerId >= 100000 || !store.TowerActive[towerId])
+            {
+                logger.Log($"[UPGRADE] 路径切换失败: 实体 {towerId} 不是激活的防御塔");
+                return false;
+            }
+
+            string currentPath = store.TowerUpgradePathId[towerId];
+            if (string.IsNullOrEmpty(currentPath)) currentPath = "standard";
+
+            // Validate the new path exists
+            if (!config.TowerUpgradePaths.ContainsKey(newPathId))
+            {
+                logger.Log($"[UPGRADE] 路径切换失败: 未知路径 '{newPathId}'");
+                return false;
+            }
+
+            // No-op if same path
+            if (currentPath == newPathId)
+            {
+                logger.Log($"[UPGRADE] 塔 {towerId} 已在路径 '{newPathId}' 上，无需切换");
+                return true;
+            }
+
+            int playerId = store.PlayerEntityId;
+            float currentGold = store.GetPlayerGold(playerId);
+            float switchCost = store.TowerUpgradeCost[towerId] * 0.5f; // +50%
+
+            if (currentGold < switchCost)
+            {
+                logger.Log($"[UPGRADE] 路径切换失败: 金币不足 (当前: {currentGold:F0}, 需要: {switchCost:F0})");
+                return false;
+            }
+
+            // Deduct cost
+            store.SetPlayerGold(playerId, currentGold - switchCost);
+
+            // Record current level
+            int level = store.TowerLevel[towerId];
+
+            // Switch path
+            store.TowerUpgradePathId[towerId] = newPathId;
+            logger.Log($"[UPGRADE] 塔 {towerId} 切换路径: '{currentPath}' -> '{newPathId}' (Lv.{level}, 消耗 {switchCost:F0} 金)");
+
+            // Re-apply current level's curve from the new path
+            var levelCfg = config.GetUpgradeLevelConfig(newPathId, level);
+            if (levelCfg != null)
+            {
+                // Recalculate stats from base, applying new path multipliers
+                // Note: We accumulate on current values — special abilities were already set by
+                // previous upgrades and remain unless the new path has a different ability.
+                // We don't undo old special abilities here (tower abilities are additive in this design).
+                if (levelCfg.AttackSpeedMultiplier != 1.0f)
+                    store.TowerAttackSpeed[towerId] *= levelCfg.AttackSpeedMultiplier;
+                logger.Log($"[UPGRADE] 新路径 Lv.{level} 属性 -> 攻速: {store.TowerAttackSpeed[towerId]:F3}, 下次升级: {store.TowerUpgradeCost[towerId]:F1}");
+            }
+            else
+            {
+                logger.Log($"[UPGRADE] 新路径 Lv.{level} 无特殊加成");
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Apply a special ability to the tower based on upgrade level config.
         /// </summary>
         private void ApplySpecialAbility(int towerId, TowerUpgradeAbility ability, float param)

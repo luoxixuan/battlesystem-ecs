@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace BattleSystemECS.Config
@@ -52,6 +54,10 @@ namespace BattleSystemECS.Config
         public int TargetingMode { get; set; } = 0;
         // Tower special ability fields (null = no special ability)
         public TowerSpecialAbility SpecialAbility { get; set; }
+        // Tower upgrade path: "standard" (default), "fast", or "tank"
+        // Determines which upgrade curve the tower follows.
+        // When null/empty, defaults to "standard".
+        public string UpgradePath { get; set; }
     }
 
     /// <summary>
@@ -612,6 +618,9 @@ namespace BattleSystemECS.Config
                 }
             };
 
+            // Load tower upgrade paths from JSON config (overrides C# defaults where specified)
+            LoadTowerUpgradePathsFromJson();
+
             // Default player
             Player = new PlayerConfig
             {
@@ -734,6 +743,82 @@ namespace BattleSystemECS.Config
             if (string.IsNullOrEmpty(stateName)) return null;
             PhaseBehaviors.TryGetValue(stateName, out var def);
             return def;
+        }
+
+        /// <summary>
+        /// Loads tower upgrade path definitions from an external JSON file.
+        /// Supported file: Data/Configs/tower_upgrade_paths.json
+        /// Overrides only the path IDs present in the file; C# defaults remain for all others.
+        /// If the file does not exist, C# defaults are used unchanged (safe fallback).
+        /// </summary>
+        private void LoadTowerUpgradePathsFromJson()
+        {
+            string basePath = AppDomain.CurrentDomain.BaseDirectory;
+            string jsonPath = Path.Combine(basePath, "Data", "Configs", "tower_upgrade_paths.json");
+            if (!File.Exists(jsonPath)) return;
+
+            try
+            {
+                string json = File.ReadAllText(jsonPath);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("paths", out var pathsElement) && pathsElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var pathElem in pathsElement.EnumerateArray())
+                    {
+                        string pathId = pathElem.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+                        if (string.IsNullOrEmpty(pathId)) continue;
+
+                        var cfg = new TowerUpgradePathConfig { Id = pathId };
+                        if (pathElem.TryGetProperty("description", out var descProp))
+                            cfg.Description = descProp.GetString();
+
+                        cfg.Levels = new Dictionary<int, TowerUpgradeLevelConfig>();
+                        if (pathElem.TryGetProperty("levels", out var levelsElem) && levelsElem.ValueKind == System.Text.Json.JsonValueKind.Array)
+                        {
+                            foreach (var levelElem in levelsElem.EnumerateArray())
+                            {
+                                int level = levelElem.TryGetProperty("level", out var lvProp) ? lvProp.GetInt32() : 0;
+                                if (level <= 0) continue;
+
+                                var lc = new TowerUpgradeLevelConfig();
+                                if (levelElem.TryGetProperty("damageMultiplier", out var dm)) lc.DamageMultiplier = dm.GetSingle();
+                                if (levelElem.TryGetProperty("rangeAdd", out var ra)) lc.RangeAdd = ra.GetSingle();
+                                if (levelElem.TryGetProperty("attackSpeedMultiplier", out var asm)) lc.AttackSpeedMultiplier = asm.GetSingle();
+                                if (levelElem.TryGetProperty("costMultiplier", out var cm)) lc.CostMultiplier = cm.GetSingle();
+                                if (levelElem.TryGetProperty("specialAbility", out var sa))
+                                {
+                                    lc.SpecialAbility = ParseUpgradeAbility(sa.GetString());
+                                    if (levelElem.TryGetProperty("specialAbilityParam", out var sap))
+                                        lc.SpecialAbilityParam = sap.GetSingle();
+                                }
+                                cfg.Levels[level] = lc;
+                            }
+                        }
+
+                        // Override: merge into existing dict (C# defaults stay if not overridden)
+                        TowerUpgradePaths[pathId] = cfg;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GameConfig] Warning: failed to load tower_upgrade_paths.json: {ex.Message}");
+            }
+        }
+
+        private static TowerUpgradeAbility ParseUpgradeAbility(string s)
+        {
+            return s?.ToLowerInvariant() switch
+            {
+                "splashdamage" or "splash" => TowerUpgradeAbility.SplashDamage,
+                "chainlightning" or "chain" => TowerUpgradeAbility.ChainLightning,
+                "freezepct" or "freeze" => TowerUpgradeAbility.FreezeAoe,
+                "armorpierce" or "armor" => TowerUpgradeAbility.ArmorPierce,
+                "criticalstrike" or "critical" or "crit" => TowerUpgradeAbility.CriticalStrike,
+                _ => TowerUpgradeAbility.None,
+            };
         }
     }
 }

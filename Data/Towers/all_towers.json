@@ -10,7 +10,8 @@
         "StunChance": 0.0,
         "SlowAmount": 0.0,
         "SlowDuration": 0.0,
-        "TargetingMode": 0
+        "TargetingMode": 0,
+        "UpgradePath": "standard"
     },
     {
         "UpgradeCost": 45,
@@ -27,7 +28,8 @@
             "AbilityType": "chain_lightning",
             "Radius": 3
         },
-        "TargetingMode": 0
+        "TargetingMode": 0,
+        "UpgradePath": "standard"
     },
     {
         "UpgradeCost": 72,
@@ -44,7 +46,7 @@
             "AbilityType": "splash",
             "Radius": 2
         },
-        "TargetingMode": 0
+        "UpgradePath": "fast"
     },
     {
         "UpgradeCost": 99,
@@ -57,7 +59,8 @@
         "StunChance": 0.0,
         "SlowAmount": 0.0,
         "SlowDuration": 0.0,
-        "TargetingMode": 0
+        "TargetingMode": 0,
+        "UpgradePath": "tank"
     },
     {
         "UpgradeCost": 126,
@@ -70,7 +73,8 @@
         "StunChance": 0.0,
         "SlowAmount": 0.0,
         "SlowDuration": 0.0,
-        "TargetingMode": 0
+        "TargetingMode": 0,
+        "UpgradePath": "standard"
     },
     {
         "UpgradeCost": 153,
@@ -83,7 +87,8 @@
         "StunChance": 0.0,
         "SlowAmount": 0.0,
         "SlowDuration": 0.0,
-        "TargetingMode": 0
+        "TargetingMode": 0,
+        "UpgradePath": "standard"
     },
     {
         "UpgradeCost": 180,
@@ -96,7 +101,8 @@
         "StunChance": 0.0,
         "SlowAmount": 0.0,
         "SlowDuration": 0.0,
-        "TargetingMode": 0
+        "TargetingMode": 0,
+        "UpgradePath": "tank"
     },
     {
         "UpgradeCost": 207,

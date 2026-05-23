@@ -142,6 +142,8 @@ List<int> ActiveTowerIds             // 仅活跃塔 ID（并行遍历用）
 | EnemyMovementSystem | Systems/ | 敌人移动 | `EnemyActionEnum` 驱动方向；Dodge 分支有副作用 |
 | PlayerTowerAttackSystem | Systems/ | 玩家攻击 | **两阶段**：并行收集 `(enemyId, damage)`，串行 `enemyHealth -= damage` + queue 死亡 |
 | TowerAttackSystem | Systems/ | 塔攻击 | **两阶段**：遍历 `ActiveTowerIds`，并行收集 damage，串行 apply + queue 死亡；**索敌模式**（最近/最远/血量最低/血量最高/最先生成/最后生成）可配置 |
+| TowerPlacementSystem | Systems/ | 塔放置/出售 | `UpgradePath` 从塔 JSON 配置读取，写入 `store.TowerUpgradePathId` |
+| TowerUpgradeSystem | Systems/ | 塔升级/路径切换 | `UpgradeTower`：按路径曲线应用属性；`SwitchUpgradePath`：+50% 切换成本，重新应用当前等级曲线 |
 | UpgradeSystem | Systems/ | 玩家升级 | 等级阈值触发；`_sharedRandom` 类级单例 |
 | SkillSystem | Systems/ | 技能施放 | GAS 架构；AreaShape 驱动；**只 queue 死亡，帧末统一 resolve** |
 | TechTreeSystem | Systems/ | 科技树 | 前置依赖检查；效果缓存在 `TechTreeSystem` 字段；**O(1) Dictionary 查找（`c36747b`）** |

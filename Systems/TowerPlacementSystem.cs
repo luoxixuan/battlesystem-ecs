@@ -103,7 +103,10 @@ namespace BattleSystemECS.Systems
                 var tc = gameConfig.GetTowerConfig(type);
                 if (tc != null)
                 {
-                    store.AddTower(towerId, type, damage, range, speed, 1, cost, "standard",
+                    // Read tower's configured upgrade path, default to "standard"
+                    string upgradePath = tc.UpgradePath;
+                    if (string.IsNullOrEmpty(upgradePath)) upgradePath = "standard";
+                    store.AddTower(towerId, type, damage, range, speed, 1, cost, upgradePath,
                         tc.StunChance, tc.SlowAmount, tc.SlowDuration);
                     // Apply tower targeting mode from config
                     store.SetTowerTargetingMode(towerId, tc.TargetingMode);
