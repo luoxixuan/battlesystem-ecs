@@ -337,12 +337,19 @@ namespace BattleSystemECS.Core
                 if (entityId >= 0 && entityId < MAX_ENTITIES)
                 {
                     EnemyActionEnum[entityId] = EnemyActionType.None;
+                    // Ensure recycled entity has clean stealth multiplier (DestroyEntity already reset it,
+                    // but we set it explicitly here to guard against any future code that might
+                    // skip DestroyEntity's stealth reset while still using the free list).
+                    EnemyStealthMultiplier[entityId] = 1f;
                     return entityId;
                 }
             }
             int entityId2 = Interlocked.Increment(ref nextEntityId) - 1;
             if (entityId2 >= MAX_ENTITIES) return -1;
             EnemyActionEnum[entityId2] = EnemyActionType.None;
+            // Newly allocated IDs start with default float[] = 0f; set to 1f so that
+            // EnemyAISystem attack methods multiply correctly (stealth_mult=1f means no bonus).
+            EnemyStealthMultiplier[entityId2] = 1f;
             return entityId2;
         }
 

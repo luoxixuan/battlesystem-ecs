@@ -303,8 +303,11 @@ namespace BattleSystemECS.Systems
             // EnemyStealthMultiplier is a dedicated field (not shared with EnemyBuffDamageBonus).
             if (ability.DamageMultiplier <= 0f) return;
 
-            store.EnemyStealthMultiplier[enemyId] = ability.DamageMultiplier;
-            logger.Log($"[ABILITY] Enemy {enemyId} prepares stealth attack with {ability.DamageMultiplier:F1}x damage multiplier ({ability.Name})");
+            // Use Math.Max to preserve the strongest stealth bonus if multiple stealth_attack
+            // abilities fire in quick succession.
+            float existingMult = store.EnemyStealthMultiplier[enemyId];
+            store.EnemyStealthMultiplier[enemyId] = Math.Max(existingMult, ability.DamageMultiplier);
+            logger.Log($"[ABILITY] Enemy {enemyId} prepares stealth attack with {store.EnemyStealthMultiplier[enemyId]:F1}x damage multiplier ({ability.Name})");
         }
 
         private void ExecuteSummonMinion(int enemyId, EnemyAbilityDef ability)
