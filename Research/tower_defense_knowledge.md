@@ -1,117 +1,102 @@
 # 塔防游戏 ECS + GAS 知识库
-> 自动生成 · 2026-05-20 01:01
+> 自动生成 · 2026-05-23 21:57
 
-已分析 74 个仓库
+已分析 15 个仓库
 
 ## 塔防专项模式
 
-### 技能系统
-GAS 风格 Ability + Modifier 分离
-来源：[imnazake/Unify](https://github.com/imnazake/Unify), [Narxim/Narxim-GAS-Example](https://github.com/Narxim/Narxim-GAS-Example)
+### DOTS Archetype
+# Unity游戏开发资源
+来源：[crazyshader/GameDev](https://github.com/crazyshader/GameDev)、[0xmzn/awesome-go-awelist](https://github.com/0xmzn/awesome-go-awelist)
 
-### 实体管理器
-ECS 风格：实体创建/销毁/查询
-来源：[genaray/Arch](https://github.com/genaray/Arch), [friflo/Friflo.Engine.ECS](https://github.com/friflo/Friflo.Engine.ECS)
-
-### 状态机 AI
-敌怪状态机：移动/攻击/死亡
-来源：[friflo/Friflo.Engine.ECS](https://github.com/friflo/Friflo.Engine.ECS), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter)
-
-### Unity DOTS Archetype
-DOTS 模式：chunk data layout + entity query
-来源：[genaray/Arch](https://github.com/genaray/Arch), [friflo/Friflo.Engine.ECS](https://github.com/friflo/Friflo.Engine.ECS)
+### ECS 实体管理
+A collection of resources for 3D.
+来源：[devanshutak25/3d-resources](https://github.com/devanshutak25/3d-resources)、[v1nvn/enhansome-dotnet](https://github.com/v1nvn/enhansome-dotnet)
 
 ### Unity 桥接
-纯 ECS 逻辑与 GameObject 渲染层桥接方案
-来源：[No78Vino/gameplay-ability-system-for-unity](https://github.com/No78Vino/gameplay-ability-system-for-unity), [SaiTingHu/HTFramework](https://github.com/SaiTingHu/HTFramework)
-
-### 攻击间隔
-攻速属性、独立冷却管理
-来源：[Rangerz132/gas-unity](https://github.com/Rangerz132/gas-unity), [felipeggrod/gasify](https://github.com/felipeggrod/gasify)
-
-### 塔升级系统
-塔等级/星级/进阶，属性成长曲线配置化
-来源：[prabdhal/Tower-Defence-3D](https://github.com/prabdhal/Tower-Defence-3D), [prabdhal/TD3D-UnityGame](https://github.com/prabdhal/TD3D-UnityGame)
-
-### 寻路系统
-A*/BFS/网格寻路，敌人沿路径移动
-来源：[zulfajuniadi/unity-ecs-navmesh](https://github.com/zulfajuniadi/unity-ecs-navmesh), [quiver-dev/tower-defense-tutorial](https://github.com/quiver-dev/tower-defense-tutorial)
-
-### 行为树
-行为树节点：Sequence/Selector/Condition/Action
-来源：[friflo/Friflo.Engine.ECS](https://github.com/friflo/Friflo.Engine.ECS), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter)
-
-### 性能优化
-Burst 编译、NativeArray、JobSystem
-来源：[friflo/Friflo.Engine.ECS](https://github.com/friflo/Friflo.Engine.ECS), [AkanshDivker/Simple-ECS](https://github.com/AkanshDivker/Simple-ECS)
-
-### 敌怪属性
-敌怪血量/攻击/速度随波次成长
-来源：[prabdhal/Tower-Defence-3D](https://github.com/prabdhal/Tower-Defence-3D), [prabdhal/TD3D-UnityGame](https://github.com/prabdhal/TD3D-UnityGame)
-
-### 系统更新
-SystemBase 按组排序更新，数据逻辑分离
-来源：[AkanshDivker/Simple-ECS](https://github.com/AkanshDivker/Simple-ECS), [annulusgames/MagicTween](https://github.com/annulusgames/MagicTween)
-
-### 敌怪 AI
-AI 决策：追踪/逃跑/施法/躲避
-来源：[quiver-dev/tower-defense-tutorial](https://github.com/quiver-dev/tower-defense-tutorial), [quiver-dev/tower-defense-godot4](https://github.com/quiver-dev/tower-defense-godot4)
+Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
+来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
 
 ### 伤害计算
-攻击/防御/暴击/属性缩放公式
-来源：[Narxim/Narxim-GAS-Example](https://github.com/Narxim/Narxim-GAS-Example)
+Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
+来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
 
-### 空间分区
-GridSpatialHash O(1) 邻域查询，避免全量遍历
-来源：[MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter)
+### 塔升级系统
+来源：[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)、[phrohdoh/stars](https://github.com/phrohdoh/stars)
+
+### 塔放置
+来源：[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)、[0xmzn/awesome-go-awelist](https://github.com/0xmzn/awesome-go-awelist)
+
+### 寻路系统
+Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
+来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
+
+### 性能优化/Burst
+Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
+来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
+
+### 技能系统/GAS
+Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
+来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
+
+### 攻击间隔/冷却
+Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
+来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
 
 ### 效果系统
-伤害/治疗/控制效果排队执行
-来源：[h2v9696/UnityGAS](https://github.com/h2v9696/UnityGAS)
+# Unity游戏开发资源
+来源：[crazyshader/GameDev](https://github.com/crazyshader/GameDev)
 
-## 项目架构线索
+### 状态机 AI
+Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
+来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
 
-### 配置数据
-来源：[strayTrain/SimpleGameplayAbilitySystem](https://github.com/strayTrain/SimpleGameplayAbilitySystem), [fpwong/FPGameplayAbilities](https://github.com/fpwong/FPGameplayAbilities)
-
-### 性能优化
-来源：[sschmid/Entitas](https://github.com/sschmid/Entitas)
-
-### 塔系统
-来源：[Brackeys/Tower-Defense-Tutorial](https://github.com/Brackeys/Tower-Defense-Tutorial)
+### 行为树
+Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
+来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
 
 ## 通用工程模式
 
-### 状态机模式
-状态转换清晰，可视化
-来源：[friflo/Friflo.Engine.ECS](https://github.com/friflo/Friflo.Engine.ECS), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter)
-
 ### ScriptableObject
-数据资产化，配置与代码分离
-来源：[MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [Rangerz132/gas-unity](https://github.com/Rangerz132/gas-unity)
-
-### 对象池模式
-复用对象，减少 Instantiate/Destroy
-来源：[MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [SaiTingHu/HTFramework](https://github.com/SaiTingHu/HTFramework)
-
-### SerializeField
-Inspector 调试，保留封装
-来源：[No78Vino/gameplay-ability-system-for-unity](https://github.com/No78Vino/gameplay-ability-system-for-unity), [sjai013/unity-gameplay-ability-system](https://github.com/sjai013/unity-gameplay-ability-system)
-
-### 缓存友好
-数据连续布局，缓存命中优先
-来源：[sebas77/Svelto.ECS](https://github.com/sebas77/Svelto.ECS)
+来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
 
 ### 事件总线
-解耦系统通信，Publish/Subscribe
-来源：[PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity)
+来源：[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)、[crazyshader/GameDev](https://github.com/crazyshader/GameDev)
+
+### 依赖注入
+来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
+
+### 命令模式
+来源：[v1nvn/enhansome-go](https://github.com/v1nvn/enhansome-go)、[v1nvn/enhansome-dotnet](https://github.com/v1nvn/enhansome-dotnet)
+
+### 对象池模式
+来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[devanshutak25/3d-resources](https://github.com/devanshutak25/3d-resources)
+
+### 状态机模式
+来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
+
+### 缓存友好
+来源：[0xmzn/awesome-go-awelist](https://github.com/0xmzn/awesome-go-awelist)、[v1nvn/enhansome-go](https://github.com/v1nvn/enhansome-go)
 
 ## 实践洞察
 
-- "That's a best practice (Based on working experience), that's not only for Attributes Sets, but for any C++ class that might get reference by another object." — [Narxim/Narxim-GAS-Example](https://github.com/Narxim/Narxim-GAS-Example) (2026-05-12)
-- "The reason is simple: a game should avoid rubber-banding death." — [Narxim/Narxim-GAS-Example](https://github.com/Narxim/Narxim-GAS-Example) (2026-05-12)
-- "- Increases a character's ability to avoid incoming attacks." — [Rangerz132/gas-unity](https://github.com/Rangerz132/gas-unity) (2026-05-15)
-- "While other frameworks typically limit user freedom to avoid exposing flaws in the archetype-based concept, Svelto." — [sebas77/Svelto.ECS](https://github.com/sebas77/Svelto.ECS) (2026-05-17)
-- "It's recommended to use extension methods when available." — [annulusgames/MagicTween](https://github.com/annulusgames/MagicTween) (2026-05-17)
-- "In most cases, the impact on performance is minimal, but it's recommended to avoid using callbacks when creating a large number of tweens." — [annulusgames/MagicTween](https://github.com/annulusgames/MagicTween) (2026-05-17)
-- "This is a very powerful concept and I don't recommend to use it until you really understand what are you doing." — [PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity) (2026-05-17)
+- "* [AngouriMath](https://github.com/asc-community/AngouriMath) ⭐ 822 | 🐛 127 | 🌐 C# | 📅 2026-02-27 - An open-source symbolic/computer algebra library, made primarily for C# and F#. It covers a range of features and might be considered as an alternative to SymPy in .NET." — [v1nvn/enhansome-dotnet](https://github.com/v1nvn/enhansome-dotnet) (2026-05-23)
+- "- [goldbergyoni/nodebestpractices](https://github.com/goldbergyoni/nodebestpractices) - :white_check_mark:  The Node.js best practices list (July 2024)" — [gaahrdner/starred](https://github.com/gaahrdner/starred) (2026-05-23)
+- "- [teivah/100-go-mistakes](https://github.com/teivah/100-go-mistakes) - 📖 100 Go Mistakes and How to Avoid Them" — [gaahrdner/starred](https://github.com/gaahrdner/starred) (2026-05-23)
+- "- [gorse-io/gorse](https://github.com/gorse-io/gorse) - AI powered open source recommender system engine supports classical/LLM rankers and multimodal content via embedding" — [gaahrdner/starred](https://github.com/gaahrdner/starred) (2026-05-23)
+- "- [dagger/container-use](https://github.com/dagger/container-use) - Development environments for coding agents. Enable multiple agents to work safely and independently with your preferred stack." — [gaahrdner/starred](https://github.com/gaahrdner/starred) (2026-05-23)
+- "- [jesseduffield/horcrux](https://github.com/jesseduffield/horcrux) - Split your file into encrypted fragments so that you don't need to remember a passcode" — [gaahrdner/starred](https://github.com/gaahrdner/starred) (2026-05-23)
+- "- [norvig/pytudes](https://github.com/norvig/pytudes) - Python programs, usually short, of considerable difficulty, to perfect particular skills." — [gaahrdner/starred](https://github.com/gaahrdner/starred) (2026-05-23)
+- "- [cycloidio/inframap](https://github.com/cycloidio/inframap) - Read your tfstate or HCL to generate a graph specific for each provider, showing only the resources that are most important/relevant." — [gaahrdner/starred](https://github.com/gaahrdner/starred) (2026-05-23)
+- "- [vietanhdev/open-adas](https://github.com/vietanhdev/open-adas) - An open source advanced driver assistance system (ADAS) that uses Jetson Nano as the hardware. Features: Traffic sign detection, Forward collision warning, Lane departure warning." — [gaahrdner/starred](https://github.com/gaahrdner/starred) (2026-05-23)
+- "- [EngineOwningSoftware/pcileech-webradar](https://github.com/EngineOwningSoftware/pcileech-webradar) - CS:GO DMA Cheat (caution, seems to be detected by ESEA and FaceIt)" — [gaahrdner/starred](https://github.com/gaahrdner/starred) (2026-05-23)
+- "- [cpp-best-practices/cmake_template](https://github.com/cpp-best-practices/cmake_template) - CMake for C++ Best Practices" — [tattwamasi/starry-eye](https://github.com/tattwamasi/starry-eye) (2026-05-23)
+- "- [kholia/OSX-KVM](https://github.com/kholia/OSX-KVM) - Run macOS on QEMU/KVM. With OpenCore + Monterey + Ventura + Sonoma support now! Only commercial (paid) support is available now to avoid spammy issues. No Mac system is required." — [tattwamasi/starry-eye](https://github.com/tattwamasi/starry-eye) (2026-05-23)
+- "- [facebookresearch/dlrm](https://github.com/facebookresearch/dlrm) - An implementation of a deep learning recommendation model (DLRM)" — [tattwamasi/starry-eye](https://github.com/tattwamasi/starry-eye) (2026-05-23)
+- "- [webui-dev/webui](https://github.com/webui-dev/webui) - Use any web browser or WebView as GUI, with your preferred language in the backend and modern web technologies in the frontend, all in a lightweight portable library." — [tattwamasi/starry-eye](https://github.com/tattwamasi/starry-eye) (2026-05-23)
+- "- [stormwarning/tailwindcss-opentype](https://github.com/stormwarning/tailwindcss-opentype) - 🔡 Tailwind CSS utility classes for advanced typographic features." — [tattwamasi/starry-eye](https://github.com/tattwamasi/starry-eye) (2026-05-23)
+- "- [livereload/LiveReload](https://github.com/livereload/LiveReload) - LiveReload.app for Mac and Windows. See “develop” branch for the latest Windows release and LiveReload 3 progress. (NOTE: renamed from LiveReload2.)" — [tattwamasi/starry-eye](https://github.com/tattwamasi/starry-eye) (2026-05-23)
+- "- [elsewhencode/project-guidelines](https://github.com/elsewhencode/project-guidelines) - A set of best practices for JavaScript projects" — [mpsuesser/starred](https://github.com/mpsuesser/starred) (2026-05-23)
+- "- [conorbronsdon/avoid-ai-writing](https://github.com/conorbronsdon/avoid-ai-writing) - Skill that audits and rewrites content to remove AI writing patterns. Use it with your favorite agents including Claude Code, OpenClaw, and Hermes." — [mpsuesser/starred](https://github.com/mpsuesser/starred) (2026-05-23)
+- "- [t3dotgg/stripe-recommendations](https://github.com/t3dotgg/stripe-recommendations) - How to implement Stripe without going mad" — [mpsuesser/starred](https://github.com/mpsuesser/starred) (2026-05-23)
+- "- [unclecode/crawl4ai](https://github.com/unclecode/crawl4ai) - 🚀🤖 Crawl4AI: Open-source LLM Friendly Web Crawler & Scraper. Don't be shy, join here: https://discord.gg/jP8KfhDhyN" — [mpsuesser/starred](https://github.com/mpsuesser/starred) (2026-05-23)
