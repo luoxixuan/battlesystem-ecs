@@ -33,6 +33,7 @@ namespace BattleSystemECS.Core
         public EnemyMovementSystem? EnemyMovement { get; set; }
         public PlayerTowerAttackSystem? PlayerTowerAttack { get; set; }
         public TowerAttackSystem? TowerAttack { get; set; }
+        public TowerSynergySystem? TowerSynergy { get; set; }
         public SkillSystem? Skill { get; set; }
         public BuffSystem? Buff { get; set; }
         public TechTreeSystem? TechTree { get; set; }
@@ -96,6 +97,7 @@ namespace BattleSystemECS.Core
             // ── Phase 4: Combat — SetTurn ─────────────────────────────────
             PlayerTowerAttack?.SetTurn(turn);
             TowerAttack?.SetTurn(turn);
+            TowerSynergy?.SetTurn();
             Skill?.SetTurn(turn);
 
             // ── Phase 5: Spatial Rebuild ──────────────────────────────────
@@ -104,6 +106,7 @@ namespace BattleSystemECS.Core
             // ── Phase 6: Combat — Update ──────────────────────────────────
             PlayerTowerAttack?.Update();
             TowerAttack?.Update(deltaTime);
+            TowerSynergy?.Update();
 
             // ── Phase 7: Skill / Buff Damage ──────────────────────────────
             Buff?.Update(deltaTime);

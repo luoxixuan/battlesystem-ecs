@@ -173,6 +173,12 @@ namespace BattleSystemECS.Core
         public float[] TowerSpecialAbilityDotDamage = new float[MAX_ENTITIES];
         public float[] TowerSpecialAbilityDotInterval = new float[MAX_ENTITIES];
 
+        // ==================== 塔协同增益组件 (Tower Synergy) ====================
+        // 每个塔的协同 ID 索引，-1 表示无协同
+        public int[] TowerSynergyId = new int[MAX_ENTITIES];
+        // 协同增益倍率（从 JSON config 读取并应用，如 bonusChainCount, dotDamageBonus）
+        public float[] TowerSynergyMultiplier = new float[MAX_ENTITIES];
+
         // ==================== 技能组件的 SOA 存储 ====================
         public string[] SkillName = new string[MAX_PLAYERS];
         public float[] SkillDamageMultiplier = new float[MAX_PLAYERS];
@@ -737,6 +743,35 @@ namespace BattleSystemECS.Core
                     if (TowerSelected[tid]) result[idx++] = tid;
             }
             return result;
+        }
+
+        // ==================== 塔协同增益 (Tower Synergy) ====================
+        /// <summary>Gets the synergy ID for a tower (-1 = no synergy).</summary>
+        public int GetTowerSynergyId(int towerId)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return -1;
+            return TowerSynergyId[towerId];
+        }
+
+        /// <summary>Sets the synergy ID for a tower.</summary>
+        public void SetTowerSynergyId(int towerId, int synergyId)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            TowerSynergyId[towerId] = synergyId;
+        }
+
+        /// <summary>Gets the synergy multiplier for a tower (1.0 = no bonus).</summary>
+        public float GetTowerSynergyMultiplier(int towerId)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return 1.0f;
+            return TowerSynergyMultiplier[towerId];
+        }
+
+        /// <summary>Sets the synergy multiplier for a tower.</summary>
+        public void SetTowerSynergyMultiplier(int towerId, float multiplier)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            TowerSynergyMultiplier[towerId] = multiplier;
         }
 
         // ==================== 塔索敌模式管理 ====================

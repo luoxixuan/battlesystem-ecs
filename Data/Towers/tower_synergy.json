@@ -1,0 +1,20 @@
+{
+  "synergies": [
+    {
+      "id": "electric_chain",
+      "name": "⚡ 电弧链",
+      "requiredTypes": ["Tesla", "Tesla"],
+      "description": "2座Tesla塔：链式闪电额外弹射1次",
+      "effect": { "bonusChainCount": 1 },
+      "threshold": 2
+    },
+    {
+      "id": "frost_fire_combo",
+      "name": "❄️🔥 冰火交融",
+      "requiredTypes": ["Frost", "Firewall"],
+      "description": "Frost+Firewall：被减速的敌人受火焰DoT伤害+50%",
+      "effect": { "dotDamageBonus": 0.5 },
+      "threshold": 2
+    }
+  ]
+}

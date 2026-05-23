@@ -34,6 +34,7 @@ namespace BattleSystemECS.Core
         private BuffSystem buffSystem;                    // Buff/DoT 追踪系统
         private ComboSystem comboSystem;                   // Combo Kill 连击系统
         private AutoSkillSystem autoSkillSystem;           // 自动技能施放系统（BuildPhase）
+        private TowerSynergySystem towerSynergySystem;    // 塔协同增益系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -113,6 +114,11 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]    - Creating TowerAttackSystem...");
             towerAttackSystem = new TowerAttackSystem(store, logger, techTreeSystem);
             logger.Log("[BOOTSTRAP]      TowerAttackSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating TowerSynergySystem...");
+            towerSynergySystem = new TowerSynergySystem(store, logger);
+            towerSynergySystem.LoadSynergyConfig();
+            logger.Log("[BOOTSTRAP]      TowerSynergySystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating TowerUpgradeSystem...");
             towerUpgradeSystem = new TowerUpgradeSystem(store, logger, gameConfig);
@@ -196,6 +202,7 @@ namespace BattleSystemECS.Core
             scheduler.EnemyMovement = enemyMovementSystem;
             scheduler.PlayerTowerAttack = playerTowerAttackSystem;
             scheduler.TowerAttack = towerAttackSystem;
+            scheduler.TowerSynergy = towerSynergySystem;
             scheduler.Skill = skillSystem;
             scheduler.Buff = buffSystem;
             scheduler.Combo = comboSystem;
