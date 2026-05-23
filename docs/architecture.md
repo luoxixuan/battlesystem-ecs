@@ -152,6 +152,7 @@ List<int> ActiveTowerIds             // 仅活跃塔 ID（并行遍历用）
 | SpatialGridSystem | Systems/ | 空间网格 | 范围查询（塔攻击范围、Buff 范围）；O(1) cell 访问 |
 | BuffSystem | Systems/ | 持续伤害（DoT）追踪 | Periodic EffectType；ping-pong 双缓冲 DoT 伤害队列；`ApplyDot`/`Update`/`ResolveDotDamage` |
 | EnemyAbilitySystem | Systems/ | 敌人技能系统 | `UpdateCooldowns`/`ExecuteAbilities`/`Update`；FrameScheduler 已集成；冷却/Buff/自疗/AoE |
+| AutoSkillSystem | Systems/ | BuildPhase 自动施放技能 | 冷却保护（`MinCooldownToConsider`）+ 选优策略（CoolestFirst/CooldownShortest/DamageHighest/AoeLargest/Random）；调用 `SkillSystem.CastSkill()`；**不影响战斗帧预算** |
 | BenchmarkSystem | Systems/ | 性能压测 | **dual mode**：mode 2 合并热路径 / mode 4 真实系统链路，各独立计时 |
 ---
 
@@ -251,6 +252,7 @@ branches:
 | `tech_tree.json` | 科技树节点 |
 | `tower_placement.json` | 塔位规则 |
 | `wave_spawn.json` | 波次生成 |
+| `auto_skill.json` | 自动技能配置（BuildPhase 策略） |
 
 配置类：`Core/GameConfig.cs`、`Core/TechTreeDef.cs`
 
@@ -319,8 +321,9 @@ GameManager.Run() → while(gameRunning) → 每回合:
 
 ## 13. 更新记录
 
-|| 日期 | commit | 变更 |
+||| 日期 | commit | 变更 |
 |------|--------|------|------|
+| 2026-05-23 | `HEAD` | AutoSkillSystem：BuildPhase 自动施放技能系统（选优策略/冷却保护）；`Data/Configs/auto_skill.json` 新配置 |
 | 2026-05-17 | `c36747b` | TechTreeSystem O(N)→O(1) Dictionary 查找；配置类迁移 Core/；目录结构重组（Data/, Research/） |
 | 2026-05-13 | `c4c360b` | 清理死代码（System/、GridSpatialHash、9个旧组件、EntityManager精简） |
 | 2026-05-13 | `2ce3352` | README 更新（添加 TechTree） |

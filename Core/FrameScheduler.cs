@@ -39,6 +39,7 @@ namespace BattleSystemECS.Core
         public GoldSystem? Gold { get; set; }
         public UpgradeSystem? Upgrade { get; set; }
         public ComboSystem? Combo { get; set; }
+        public AutoSkillSystem? AutoSkill { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -70,6 +71,7 @@ namespace BattleSystemECS.Core
                 Gold?.Update();
                 Upgrade?.Update();
                 Skill?.Update(deltaTime); // skill cooldown ticking
+                AutoSkill?.Update();      // auto-cast ready skills
                 return;
             }
 

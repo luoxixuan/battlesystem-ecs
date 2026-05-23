@@ -1,0 +1,7 @@
+{
+  "Enabled": true,
+  "MaxSkillsPerPhase": 2,
+  "MinCooldownToConsider": 0.0,
+  "SelectionStrategy": "CoolestFirst",
+  "Description": "Auto Skill System configuration for BuildPhase auto-casting"
+}

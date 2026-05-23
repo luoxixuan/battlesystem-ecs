@@ -316,6 +316,39 @@ namespace BattleSystemECS.Config
         public float ComboMaxMultiplier { get; set; } = 3.0f;
     }
 
+    /// <summary>
+    /// Auto Skill System configuration — controls which strategy is used to auto-cast skills
+    /// during BuildPhase, how many skills can fire per phase, and cooldown protection.
+    /// </summary>
+    public class AutoSkillConfig
+    {
+        /// <summary>Enable auto skill casting during BuildPhase. Default: true</summary>
+        public bool Enabled { get; set; } = true;
+        /// <summary>Maximum number of skills to cast per BuildPhase tick. Default: 2</summary>
+        public int MaxSkillsPerPhase { get; set; } = 2;
+        /// <summary>Minimum cooldown (seconds) a skill must have to be considered for auto-cast. Default: 0s</summary>
+        public float MinCooldownToConsider { get; set; } = 0f;
+        /// <summary>Selection strategy for choosing which ready skill to cast. Default: CoolestFirst</summary>
+        public AutoSkillStrategy SelectionStrategy { get; set; } = AutoSkillStrategy.CoolestFirst;
+    }
+
+    /// <summary>
+    /// Auto-skill selection strategy when multiple skills are ready.
+    /// </summary>
+    public enum AutoSkillStrategy
+    {
+        /// <summary>Best score = large AoE radius / short cooldown. Default.</summary>
+        CoolestFirst = 0,
+        /// <summary>Shortest cooldown first (most frequent re-use).</summary>
+        CooldownShortest = 1,
+        /// <summary>Highest damage multiplier first.</summary>
+        DamageHighest = 2,
+        /// <summary>Largest AoE radius first.</summary>
+        AoeLargest = 3,
+        /// <summary>Random selection.</summary>
+        Random = 4
+    }
+
     public class GameConfig
     {
         public PlayerConfig Player { get; set; } = new PlayerConfig();
@@ -349,6 +382,9 @@ namespace BattleSystemECS.Config
 
         // Combo Kill configuration
         public ComboConfig Combo { get; set; } = new ComboConfig();
+
+        // Auto Skill configuration (BuildPhase auto-casting)
+        public AutoSkillConfig AutoSkill { get; set; } = new AutoSkillConfig();
 
         // Map dimensions (Bug#30 fix: magic numbers 10 and 20 in GameManager/EnemyMovementSystem)
         public int MapWidth { get; set; } = 10;

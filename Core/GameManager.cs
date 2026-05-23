@@ -33,6 +33,7 @@ namespace BattleSystemECS.Core
         private TechTreeSystem techTreeSystem;            // 科技树系统
         private BuffSystem buffSystem;                    // Buff/DoT 追踪系统
         private ComboSystem comboSystem;                   // Combo Kill 连击系统
+        private AutoSkillSystem autoSkillSystem;           // 自动技能施放系统（BuildPhase）
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -158,6 +159,10 @@ namespace BattleSystemECS.Core
             comboSystem = new ComboSystem(store, gameConfig.Combo);
             logger.Log("[BOOTSTRAP]      ComboSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating AutoSkillSystem (BuildPhase auto-casting)...");
+            autoSkillSystem = new AutoSkillSystem(store, logger, playerId, skillSystem, gameConfig.AutoSkill);
+            logger.Log("[BOOTSTRAP]      AutoSkillSystem created successfully!");
+
             // Wire OnEnemyKilled → ComboSystem (连击计数链路)
             store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
 
@@ -194,6 +199,7 @@ namespace BattleSystemECS.Core
             scheduler.Skill = skillSystem;
             scheduler.Buff = buffSystem;
             scheduler.Combo = comboSystem;
+            scheduler.AutoSkill = autoSkillSystem;
             scheduler.Gold = goldSystem;
             scheduler.Upgrade = upgradeSystem;
 
