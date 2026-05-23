@@ -398,11 +398,11 @@ namespace BattleSystemECS.Systems
             foreach (var (enemyId, damage, playerId) in _damageQueue[readIdx])
             {
                 if (!store.EnemyActive[enemyId]) continue;
-                store.EnemyHealth[enemyId] -= damage;
-                if (store.EnemyHealth[enemyId] <= 0f)
-                {
+                // ApplyEnemyDamage handles shield absorption + health damage + death queue
+                float prevHealth = store.EnemyHealth[enemyId];
+                store.ApplyEnemyDamage(enemyId, damage);
+                if (store.EnemyHealth[enemyId] <= 0f && prevHealth > 0f)
                     store.QueueEnemyDeath(enemyId, playerId);
-                }
             }
 
             // Phase 2b (serial): resolve Tesla chain lightning (after basic damage to avoid double-hit on primary)
@@ -480,11 +480,10 @@ namespace BattleSystemECS.Systems
                 // Chain hop damage: apply and check for kill
                 if (chainId > 0)
                 {
-                    store.EnemyHealth[enemyId] -= damage;
-                    if (store.EnemyHealth[enemyId] <= 0f)
-                    {
+                    float prevHealth = store.EnemyHealth[enemyId];
+                    store.ApplyEnemyDamage(enemyId, damage);
+                    if (store.EnemyHealth[enemyId] <= 0f && prevHealth > 0f)
                         store.QueueEnemyDeath(enemyId, playerId);
-                    }
                 }
             }
         }
@@ -521,11 +520,10 @@ namespace BattleSystemECS.Systems
                         int enemyId = candidates[ci];
                         if (!store.EnemyActive[enemyId] || enemyId == primaryEnemyId) continue;
 
-                        store.EnemyHealth[enemyId] -= splashDamage;
-                        if (store.EnemyHealth[enemyId] <= 0f)
-                        {
+                        float prevHealth = store.EnemyHealth[enemyId];
+                        store.ApplyEnemyDamage(enemyId, splashDamage);
+                        if (store.EnemyHealth[enemyId] <= 0f && prevHealth > 0f)
                             store.QueueEnemyDeath(enemyId, playerId);
-                        }
                     }
                 }
             }

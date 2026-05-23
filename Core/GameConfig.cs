@@ -34,6 +34,8 @@ namespace BattleSystemECS.Config
         // Armor: reduces incoming damage. Tank/Elite/Boss types get high armor (5-15),
         // Normal/Fast types get low armor (0-2). Affected by attacker's armor penetration.
         public float Armor { get; set; } = 0f;
+        // Shield: absorbs incoming damage before health. Boss/Elite types can have shield.
+        public float Shield { get; set; } = 0f;
     }
 
     public class TowerConfig

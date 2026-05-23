@@ -174,15 +174,14 @@ namespace BattleSystemECS.Systems
             int readIdx = _damageQueueIdx;
             int writeIdx = 1 - _damageQueueIdx;
             _damageQueueIdx = writeIdx;
-            _damageQueue[writeIdx].Clear(); // clear the bag threads will write to next frame
+_damageQueue[writeIdx].Clear(); // clear the bag threads will write to next frame
             foreach (var (enemyId, damage) in _damageQueue[readIdx])
             {
                 if (!store.EnemyActive[enemyId]) continue;
-                store.EnemyHealth[enemyId] -= damage;
-                if (store.EnemyHealth[enemyId] <= 0f)
-                {
+                float prevHealth = store.EnemyHealth[enemyId];
+                store.ApplyEnemyDamage(enemyId, damage);
+                if (store.EnemyHealth[enemyId] <= 0f && prevHealth > 0f)
                     store.QueueEnemyDeath(enemyId, playerId);
-                }
             }
         }
     }

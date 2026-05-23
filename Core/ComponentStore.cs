@@ -103,6 +103,9 @@ namespace BattleSystemECS.Core
         public int[] EnemySpawnFrame = new int[MAX_ENTITIES];
         // Armor: reduces incoming damage. Affected by attacker's armor penetration.
         public float[] EnemyArmor = new float[MAX_ENTITIES];
+        // Enemy shield: absorbs incoming damage before it reaches EnemyHealth.
+        // Shield is consumed first; remaining damage penetrates to health.
+        public float[] EnemyShield = new float[MAX_ENTITIES];
         // ==================== 敌人 CC (Crowd Control) 字段 ====================
         // Grouped together after all enemy hot-path fields to preserve cache locality
         // EnemyStunFlag: legacy bool, kept for backward compat; use EnemyStunDurationLeft for correctness
@@ -397,6 +400,7 @@ namespace BattleSystemECS.Core
                 EnemySlowDurationLeft[entityId] = 0f;
                 EnemyIsElite[entityId] = false;
                 EnemyStealthMultiplier[entityId] = 1f;
+                EnemyShield[entityId] = 0f;
                 // Freeze fields (shared with stun — no separate fields needed, cleanup via StunDurationLeft/StunFlag above)
             }
 
@@ -600,7 +604,7 @@ namespace BattleSystemECS.Core
 
         // ==================== 敌人组件访问 ====================
 
-        public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber, string fullName = null, float armor = 0f)
+        public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber, string fullName = null, float armor = 0f, float shield = 0f)
         {
             int entityId = CreateEntity();
 
@@ -623,6 +627,7 @@ namespace BattleSystemECS.Core
             EnemyActive[entityId] = true;
             EnemySpawnFrame[entityId] = CurrentFrame;
             EnemyArmor[entityId] = armor;
+            EnemyShield[entityId] = shield;  // configurable initial shield
 
             // 缓存怪物类型名（如 "NormalL1W1E0" -> "Normal"），避免每帧解析
             // 同时检测 [ELITE]/[BOSS] 前缀来正确标记精英/首领
@@ -777,6 +782,30 @@ namespace BattleSystemECS.Core
         {
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
             EnemyArmor[enemyId] = armor;
+        }
+
+        /// <summary>
+        /// Applies damage to an enemy, with shield absorbing damage before it reaches health.
+        /// </summary>
+        public void ApplyEnemyDamage(int enemyId, float damage)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (damage <= 0f) return;
+
+            float shield = EnemyShield[enemyId];
+            if (shield <= 0f)
+            {
+                EnemyHealth[enemyId] -= damage;
+                return;
+            }
+            if (shield >= damage)
+            {
+                EnemyShield[enemyId] = shield - damage;
+                return;
+            }
+            float remaining = damage - shield;
+            EnemyShield[enemyId] = 0f;
+            EnemyHealth[enemyId] -= remaining;
         }
 
         public float GetEnemyMoveSpeed(int enemyId)
