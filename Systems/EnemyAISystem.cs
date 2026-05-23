@@ -36,10 +36,11 @@ namespace BattleSystemECS.Systems
         private ConcurrentBag<AttackEvent>[] _attackEvents = new ConcurrentBag<AttackEvent>[2];
         private int _attackEventsIdx = 0;
 
-        // BT evaluation cache — invalidates when enemy health or charge counter changes.
+        // BT evaluation cache — invalidates when enemy health, charge counter, or stun duration changes.
         private float _cachedPlayerHealth = -1;
         private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
         private readonly int[] _enemyChargeCounterCache = new int[ComponentStore.MAX_ENTITIES];
+        private readonly float[] _enemyStunDurationCache = new float[ComponentStore.MAX_ENTITIES];
         private readonly bool[] _stunFlagCache = new bool[ComponentStore.MAX_ENTITIES];
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
         private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
@@ -95,15 +96,17 @@ namespace BattleSystemECS.Systems
 
                     var cachedBt = store.EnemyBehaviorTree[enemyId];
 
-                    // Check BT evaluation cache
+                    // Check BT evaluation cache — also track stun duration changes
                     float enemyHealth = store.EnemyHealth[enemyId];
                     float playerHealth = store.PlayerCurrentHealth[playerId];
                     int chargeCounter = store.GetEnemyAIChargeCounter(enemyId);
                     bool stunFlag = store.EnemyStunFlag[enemyId];
+                    float stunDuration = store.EnemyStunDurationLeft[enemyId];
                     if (_enemyHealthCache[enemyId] == enemyHealth &&
                         _cachedPlayerHealth == playerHealth &&
                         _enemyChargeCounterCache[enemyId] == chargeCounter &&
-                        _stunFlagCache[enemyId] == stunFlag)
+                        _stunFlagCache[enemyId] == stunFlag &&
+                        _enemyStunDurationCache[enemyId] == stunDuration)
                     {
                         store.SetEnemyActionEnum(enemyId, _lastActionCache[enemyId]);
                         continue;
@@ -154,6 +157,7 @@ namespace BattleSystemECS.Systems
                     _enemyHealthCache[enemyId] = enemyHealth;
                     _enemyChargeCounterCache[enemyId] = chargeCounter;
                     _stunFlagCache[enemyId] = stunFlag;
+                    _enemyStunDurationCache[enemyId] = stunDuration;
                     _lastActionCache[enemyId] = actionEnum;
                     _lastActionStringCache[enemyId] = action;
 

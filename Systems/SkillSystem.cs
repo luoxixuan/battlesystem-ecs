@@ -650,7 +650,7 @@ namespace BattleSystemECS.Systems
                         if (roll < def.FreezeChance)
                         {
                             int freezeTurns = Math.Max(1, (int)Math.Ceiling(def.FreezeDuration));
-                            store.ApplyEnemyStun(enemyId, freezeTurns);
+                            store.ApplyEnemyFreeze(enemyId, freezeTurns);
                             renderer.Log($"[SKILL] {name} froze enemy {enemyId} for {freezeTurns} turns");
                         }
                     }

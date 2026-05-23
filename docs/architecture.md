@@ -319,11 +319,34 @@ GameManager.Run() → while(gameRunning) → 每回合:
 
 ---
 
-## 13. 更新记录
+## 13. Freeze（冰冻）机制（2026-05-23）
+
+Freeze 使用与 Stun 相同的底层基础设施，不新增独立字段。
+
+### 设计
+
+- `Freeze` 通过 `ApplyEnemyFreeze()` 应用，内部调用 `ApplyEnemyStun()`，共享 `EnemyStunDurationLeft` / `EnemyStunFlag`
+- 技能系统 `CastFreezeArea()` 根据 `FreezeChance` 概率掷骰，命中时调用 `ApplyEnemyFreeze()`
+- `IsEnemyFrozen()` 是 `IsEnemyStunned()` 的别名
+- `EnemyAISystem.Update()` 冻结敌人直接跳过 BT 评估，输出 `EnemyActionType.None`
+- `EnemyMovementSystem.Update()` 冻结敌人跳过移动
+- `DestroyEntity` 无需单独清理冻结字段（随 `EnemyStunDurationLeft` / `EnemyStunFlag` 一起被清理）
+
+### 缓存一致性
+
+`EnemyAISystem` 的 BT 评估缓存增加了 `_enemyStunDurationCache[]`，与 `_enemyStunFlagCache[]` 一起追踪冻结状态变化，确保敌人被冻结后立即失效缓存。
+
+### 配置
+
+`skills.json` 中技能通过 `FreezeDuration`（秒）和 `FreezeChance`（概率）控制。
+
+---
+
+## 14. 更新记录
 
 ||| 日期 | commit | 变更 |
 |------|--------|------|------|
-| 2026-05-23 | `HEAD` | AutoSkillSystem：BuildPhase 自动施放技能系统（选优策略/冷却保护）；`Data/Configs/auto_skill.json` 新配置 |
+|| 2026-05-23 | `HEAD` | Freeze 机制：共享 Stun 基础设施（ApplyEnemyFreeze/IsEnemyFrozen），EnemyAISystem 缓存加入 stunDuration，CastFreezeArea 调用 ApplyEnemyFreeze；`docs/architecture.md` 新增 Freeze 章节 |
 | 2026-05-17 | `c36747b` | TechTreeSystem O(N)→O(1) Dictionary 查找；配置类迁移 Core/；目录结构重组（Data/, Research/） |
 | 2026-05-13 | `c4c360b` | 清理死代码（System/、GridSpatialHash、9个旧组件、EntityManager精简） |
 | 2026-05-13 | `2ce3352` | README 更新（添加 TechTree） |

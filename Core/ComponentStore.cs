@@ -386,6 +386,7 @@ namespace BattleSystemECS.Core
                 EnemyMoveSpeedBase[entityId] = 0f;
                 EnemySlowDurationLeft[entityId] = 0f;
                 EnemyIsElite[entityId] = false;
+                // Freeze fields (shared with stun — no separate fields needed, cleanup via StunDurationLeft/StunFlag above)
             }
 
             if (wasTower)
@@ -885,6 +886,18 @@ namespace BattleSystemECS.Core
                 EnemyStunDurationLeft[enemyId] = duration;
             // Also set legacy flag for backward compat with IsEnemyStunned fallback
             EnemyStunFlag[enemyId] = true;
+        }
+
+        /// <summary>Applies freeze to the enemy for `duration` turns. Alias for ApplyEnemyStun — freeze uses the same stun infrastructure.</summary>
+        public void ApplyEnemyFreeze(int enemyId, int duration)
+        {
+            ApplyEnemyStun(enemyId, duration);
+        }
+
+        /// <summary>Returns true if the enemy is currently frozen. Alias for IsEnemyStunned — freeze shares the stun mechanism.</summary>
+        public bool IsEnemyFrozen(int enemyId)
+        {
+            return IsEnemyStunned(enemyId);
         }
 
         /// <summary>Applies slow to the enemy. factor is a speed multiplier (e.g. 0.5 = 50% speed). Duration in turns tracked by EnemySlowDurationLeft.</summary>
