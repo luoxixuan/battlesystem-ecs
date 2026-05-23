@@ -797,8 +797,12 @@ namespace BattleSystemECS.Config
                             }
                         }
 
-                        // Override: merge into existing dict (C# defaults stay if not overridden)
-                        TowerUpgradePaths[pathId] = cfg;
+                        // Merge: only override/add levels in the JSON; keep existing levels not in JSON
+                        if (!TowerUpgradePaths.TryGetValue(pathId, out var existing))
+                            TowerUpgradePaths[pathId] = cfg;
+                        else
+                            foreach (var kvp in cfg.Levels)
+                                existing.Levels[kvp.Key] = kvp.Value;
                     }
                 }
             }

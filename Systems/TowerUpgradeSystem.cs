@@ -27,7 +27,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public bool UpgradeTower(int towerId)
         {
-            if (towerId < 0 || towerId >= 100000 || !store.TowerActive[towerId])
+            if (towerId < 0 || towerId >= ComponentStore.MAX_ENTITIES || !store.TowerActive[towerId])
             {
                 logger.Log($"[UPGRADE] 升级失败: 实体 {towerId} 不是激活的防御塔");
                 return false;
@@ -95,7 +95,7 @@ namespace BattleSystemECS.Systems
         /// <returns>True if switch succeeded, false otherwise.</returns>
         public bool SwitchUpgradePath(int towerId, string newPathId)
         {
-            if (towerId < 0 || towerId >= 100000 || !store.TowerActive[towerId])
+            if (towerId < 0 || towerId >= ComponentStore.MAX_ENTITIES || !store.TowerActive[towerId])
             {
                 logger.Log($"[UPGRADE] 路径切换失败: 实体 {towerId} 不是激活的防御塔");
                 return false;
@@ -142,13 +142,14 @@ namespace BattleSystemECS.Systems
             var levelCfg = config.GetUpgradeLevelConfig(newPathId, level);
             if (levelCfg != null)
             {
-                // Recalculate stats from base, applying new path multipliers
-                // Note: We accumulate on current values — special abilities were already set by
-                // previous upgrades and remain unless the new path has a different ability.
-                // We don't undo old special abilities here (tower abilities are additive in this design).
+                // Apply all multipliers from the new path's current level
+                if (levelCfg.DamageMultiplier != 1.0f)
+                    store.TowerAttackDamage[towerId] *= levelCfg.DamageMultiplier;
+                if (levelCfg.RangeAdd != 0f)
+                    store.TowerRange[towerId] += (int)levelCfg.RangeAdd;
                 if (levelCfg.AttackSpeedMultiplier != 1.0f)
                     store.TowerAttackSpeed[towerId] *= levelCfg.AttackSpeedMultiplier;
-                logger.Log($"[UPGRADE] 新路径 Lv.{level} 属性 -> 攻速: {store.TowerAttackSpeed[towerId]:F3}, 下次升级: {store.TowerUpgradeCost[towerId]:F1}");
+                logger.Log($"[UPGRADE] 新路径 Lv.{level} 属性 -> 伤害: {store.TowerAttackDamage[towerId]:F1}, 射程: {store.TowerRange[towerId]}, 攻速: {store.TowerAttackSpeed[towerId]:F3}");
             }
             else
             {
