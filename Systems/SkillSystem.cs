@@ -130,7 +130,8 @@ namespace BattleSystemECS.Systems
                     sc.ShieldDuration,
                     StackingBehavior.None, 1,  // dotStacking, dotMaxStacks
                     sc.FreezeDuration,
-                    sc.FreezeChance  // Cold Nova freeze fields
+                    sc.FreezeChance,  // Cold Nova freeze fields
+                    sc.ConeAngleDegrees  // cone angle in degrees (only meaningful for AreaShape="cone")
                 );
                 store.AddAbility(playerId, def);
                 renderer.Log($"[SKILL] {sc.Name} registered (shape: {sc.AreaShape}, radius: {sc.AreaRadius}, DoT: {sc.DotDuration}s/{sc.DotTickInterval}s×{sc.DotDamagePerTick})");
@@ -262,7 +263,7 @@ namespace BattleSystemECS.Systems
                     enemiesHit = CastFreezeArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def);
                     break;
                 case 9: // Cone — directional fan-shaped AoE
-                    enemiesHit = CastConeArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
+                    enemiesHit = CastConeArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def.ConeAngleDegrees);
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -678,19 +679,19 @@ namespace BattleSystemECS.Systems
 
         /// <summary>
         /// Cone AreaShape: directional fan-shaped AoE (e.g. Dragon Breath, flame thrower).
-        /// Player faces "up" (negative Y direction). Fan angle is 60 degrees (π/3 radians).
-        /// AreaRadius controls max range; AreaWidth in skill config controls cone angle in degrees.
+        /// Player faces "up" (negative Y direction). Fan angle is controlled by coneAngleDegrees.
+        /// AreaRadius controls max range; ConeAngleDegrees in skill config controls cone angle in degrees.
         /// Reuses circular range query + cosine-based angle filtering.
         /// </summary>
-        private int CastConeArea(float finalDamage, float playerX, float playerY, int range, string name)
+        private int CastConeArea(float finalDamage, float playerX, float playerY, int range, string name, float coneAngleDegrees = 60.0f)
         {
             if (_activeEnemyList == null) return 0;
             var activeEnemyIds = _activeEnemyList;
 
             int radiusSq = range * range;
-            // 60-degree cone: half-angle = π/6 ≈ 0.5236 rad, cosine threshold ≈ 0.866
-            const double HALF_CONE_ANGLE = Math.PI / 6.0;
-            double cosThreshold = Math.Cos(HALF_CONE_ANGLE);
+            // coneAngleDegrees: total fan angle; half-angle used for cosine threshold
+            double halfConeAngle = coneAngleDegrees * (Math.PI / 180.0) / 2.0;
+            double cosThreshold = Math.Cos(halfConeAngle);
 
             // Direction: player faces "up" (negative Y in world space)
             const double dirX = 0.0;

@@ -17,7 +17,8 @@ namespace BattleSystemECS.Core.GAS
         public const int Shield = 6;
         public const int Line = 7;
         public const int Freeze = 8;  // Cold Nova: circle AoE + freeze on hit
-        public const int Cone = 9;    // Cone/Triangle: directional fan-shaped AoE (e.g. Dragon Breath)
+        public const int Cone = 9;    // Cone/Triangle: directional fan-shaped AoE (e.g. Dragon Breath).
+                                       // coneAngleDegrees controls fan spread (passed via GameplayAbilityDef)
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -74,6 +75,8 @@ namespace BattleSystemECS.Core.GAS
         // Freeze fields (Cold Nova)
         public float FreezeDuration;     // turns to freeze enemy; 0 = no freeze
         public float FreezeChance;       // probability [0,1] of freeze applying per enemy
+        /// <summary>Cone angle in degrees for AreaShape.Cone. Fan spread. Default: 60.</summary>
+        public float ConeAngleDegrees;   // degrees, used only when AreaShape == Cone
 
         public GameplayAbilityDef(string name, string desc, float cooldown, float cost,
             int dmgAttr, float fixedDmg, AbilityActivation act, int areaShape, int areaRadius,
@@ -81,6 +84,7 @@ namespace BattleSystemECS.Core.GAS
             float healPercent = 0f, float shieldAmount = 0f, float shieldDuration = 0f,
             StackingBehavior dotStacking = StackingBehavior.None, int dotMaxStacks = 1,
             float freezeDuration = 0f, float freezeChance = 0f,
+            float coneAngleDegrees = 60.0f,
             params int[] requiredBuffs)
         {
             Name = name; Description = desc; Cooldown = cooldown; Cost = cost;
@@ -90,6 +94,7 @@ namespace BattleSystemECS.Core.GAS
             DotStackingBehavior = dotStacking; DotMaxStacks = dotMaxStacks;
             HealPercent = healPercent; ShieldAmount = shieldAmount; ShieldDuration = shieldDuration;
             FreezeDuration = freezeDuration; FreezeChance = freezeChance;
+            ConeAngleDegrees = coneAngleDegrees;
             RequiredBuffs = requiredBuffs;
         }
 

@@ -208,6 +208,8 @@ namespace BattleSystemECS.Config
         // Freeze fields (Cold Nova)
         public float FreezeDuration { get; set; }
         public float FreezeChance { get; set; }
+        /// <summary>Cone angle in degrees for AreaShape="cone". Controls fan spread. Default: 60.</summary>
+        public float ConeAngleDegrees { get; set; } = 60.0f;
     }
 
     public class BehaviorTreeDef

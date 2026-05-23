@@ -932,6 +932,7 @@ namespace BattleSystemECS.Config
                 bool.TryParse(autoCastStr, out autoCast);
             skill.AutoCast = autoCast;
             skill.Hotkey = ExtractString(json, "Hotkey");
+            skill.ConeAngleDegrees = ExtractFloat(json, "ConeAngleDegrees");
             return skill;
         }
     }
