@@ -200,6 +200,10 @@ namespace BattleSystemECS.Systems
                     baseDmg *= Math.Max(0.01f, 1f - store.EnemyArmor[bestTarget] * (1f - _armorPenetration)) * _damageTakenMult;
                     if (_waveDifficultyMult != 1.0f) baseDmg *= _waveDifficultyMult;
 
+                    // Apply tower synergy multiplier (e.g. bonus damage when combo towers are placed together)
+                    float synergyMult = store.GetTowerSynergyMultiplier(towerId);
+                    if (synergyMult > 1.0f) baseDmg *= synergyMult;
+
                     // ── Tower type-specific mechanics ─────────────────────────────────────
                     string towerType = store.TowerType[towerId] ?? "Basic";
 
