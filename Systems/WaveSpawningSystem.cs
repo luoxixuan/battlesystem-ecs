@@ -15,6 +15,8 @@ namespace BattleSystemECS.Systems
     {
         public float BaseHealthMultPerWave { get; set; } = 0.05f;
         public float BaseDamageMultPerWave { get; set; } = 0.05f;
+        public float ArmorGrowthPerWave { get; set; } = 0.02f;
+        public float SpeedGrowthPerWave { get; set; } = 0.01f;
         public int EliteStartWave { get; set; } = 5;
         public int BossStartWave { get; set; } = 10;
         public float EliteHealthMult { get; set; } = 2.0f;
@@ -111,6 +113,10 @@ namespace BattleSystemECS.Systems
                             cfg.DifficultyConfig.BaseHealthMultPerWave = bhm.GetSingle();
                         if (dc.TryGetProperty("baseDamageMultPerWave", out var bdm))
                             cfg.DifficultyConfig.BaseDamageMultPerWave = bdm.GetSingle();
+                        if (dc.TryGetProperty("armorGrowthPerWave", out var agp))
+                            cfg.DifficultyConfig.ArmorGrowthPerWave = agp.GetSingle();
+                        if (dc.TryGetProperty("speedGrowthPerWave", out var sgp))
+                            cfg.DifficultyConfig.SpeedGrowthPerWave = sgp.GetSingle();
                         if (dc.TryGetProperty("eliteStartWave", out var esw))
                             cfg.DifficultyConfig.EliteStartWave = esw.GetInt32();
                         if (dc.TryGetProperty("bossStartWave", out var bsw))
@@ -258,23 +264,31 @@ namespace BattleSystemECS.Systems
                         damageMult *= spawnConfig.DifficultyConfig.EliteDamageMult;
                     }
 
+                    // 3. Armor & Speed scaling per wave
+                    float armorGrowth = spawnConfig.DifficultyConfig.ArmorGrowthPerWave;
+                    float speedGrowth = spawnConfig.DifficultyConfig.SpeedGrowthPerWave;
+                    float armorMult = 1.0f + (currentWave - 1) * armorGrowth;
+                    float speedMult = 1.0f + (currentWave - 1) * speedGrowth;
+
                     float scaledHealth = monsterConfig.Health * healthMult;
                     float scaledMaxHealth = monsterConfig.MaxHealth * healthMult;
                     float scaledDamage = monsterConfig.Damage * damageMult;
+                    float scaledArmor = monsterConfig.Armor * armorMult;
+                    float scaledSpeed = monsterConfig.MoveSpeed * speedMult;
 
                     string enemyName = $"{monsterType}L{currentLevel}W{currentWave}T{_multiTypeIndex}E{_multiSpawnedForType}";
                     if (isBossWave) enemyName = "[BOSS] " + enemyName;
                     else if (isEliteWave) enemyName = "[ELITE] " + enemyName;
                     int enemyId = store.AddEnemy(
                         startX, startY,
-                        monsterConfig.MoveSpeed,
+                        scaledSpeed,
                         scaledHealth,
                         scaledMaxHealth,
                         scaledDamage,
                         monsterConfig.GoldReward,
                         currentWave,
                         enemyName,
-                        monsterConfig.Armor,
+                        scaledArmor,
                         monsterConfig.Shield
                     );
                     if (enemyId < 0)

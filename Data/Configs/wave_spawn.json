@@ -7,6 +7,8 @@
   "difficultyConfig": {
     "baseHealthMultPerWave": 0.05,
     "baseDamageMultPerWave": 0.05,
+    "armorGrowthPerWave": 0.02,
+    "speedGrowthPerWave": 0.01,
     "eliteStartWave": 5,
     "bossStartWave": 10,
     "eliteHealthMult": 2.0,
