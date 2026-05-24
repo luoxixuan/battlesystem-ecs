@@ -14,7 +14,14 @@
         "killop/anything_about_game",
         "insthync/awesome-unity3d",
         "StefanoCecere/awesome-opensource-unity",
-        "msitarzewski/agency-agents"
+        "msitarzewski/agency-agents",
+        "m969/EGamePlay",
+        "insthync/awesome-unreal",
+        "sjai013/unity-gameplay-ability-system",
+        "No78Vino/gameplay-ability-system-for-unity",
+        "terrehbyte/awesome-ue4",
+        "MaiKuraki/UnityStarter",
+        "mikeroyal/Unreal-Engine-Guide"
       ]
     },
     "状态机 AI": {
@@ -44,7 +51,11 @@
         "godotengine/awesome-godot",
         "Kavex/GameDev-Resources",
         "SanderMertens/ecs-faq",
-        "aloisdeniel/awesome-monogame"
+        "aloisdeniel/awesome-monogame",
+        "insthync/awesome-unreal",
+        "freeCodeCamp/awesome-quincy-larson-emails",
+        "MaiKuraki/UnityStarter",
+        "MrRobinOfficial/Guide-UnrealEngine"
       ]
     },
     "Unity 桥接": {
@@ -72,7 +83,13 @@
         "punkpeye/awesome-mcp-servers",
         "rust-unofficial/awesome-rust",
         "dexteryy/spellbook-of-modern-webdev",
-        "SanderMertens/ecs-faq"
+        "SanderMertens/ecs-faq",
+        "freeCodeCamp/awesome-quincy-larson-emails",
+        "marekbrze/categorized-raycast-extensions",
+        "MaiKuraki/UnityStarter",
+        "wuyoscar/GPT-Image2-Skill",
+        "mikeroyal/Unreal-Engine-Guide",
+        "Open-Source-O1/Open-O1"
       ]
     },
     "攻击间隔/冷却": {
@@ -112,7 +129,17 @@
         "Kavex/GameDev-Resources",
         "Calinou/awesome-gamedev",
         "SanderMertens/ecs-faq",
-        "aloisdeniel/awesome-monogame"
+        "aloisdeniel/awesome-monogame",
+        "m969/EGamePlay",
+        "sjai013/unity-gameplay-ability-system",
+        "No78Vino/gameplay-ability-system-for-unity",
+        "freeCodeCamp/awesome-quincy-larson-emails",
+        "marekbrze/categorized-raycast-extensions",
+        "MaiKuraki/UnityStarter",
+        "wuyoscar/GPT-Image2-Skill",
+        "mikeroyal/Unreal-Engine-Guide",
+        "MrRobinOfficial/Guide-UnrealEngine",
+        "Open-Source-O1/Open-O1"
       ]
     },
     "寻路系统": {
@@ -146,7 +173,12 @@
         "quozd/awesome-dotnet",
         "godotengine/awesome-godot",
         "Calinou/awesome-gamedev",
-        "aloisdeniel/awesome-monogame"
+        "aloisdeniel/awesome-monogame",
+        "insthync/awesome-unreal",
+        "freeCodeCamp/awesome-quincy-larson-emails",
+        "MaiKuraki/UnityStarter",
+        "wuyoscar/GPT-Image2-Skill",
+        "MrRobinOfficial/Guide-UnrealEngine"
       ]
     },
     "行为树": {
@@ -186,7 +218,14 @@
         "godotengine/awesome-godot",
         "Kavex/GameDev-Resources",
         "SanderMertens/ecs-faq",
-        "aloisdeniel/awesome-monogame"
+        "aloisdeniel/awesome-monogame",
+        "insthync/awesome-unreal",
+        "freeCodeCamp/awesome-quincy-larson-emails",
+        "marekbrze/categorized-raycast-extensions",
+        "MaiKuraki/UnityStarter",
+        "wuyoscar/GPT-Image2-Skill",
+        "MrRobinOfficial/Guide-UnrealEngine",
+        "Open-Source-O1/Open-O1"
       ]
     },
     "性能优化/Burst": {
@@ -218,7 +257,11 @@
         "rust-unofficial/awesome-rust",
         "quozd/awesome-dotnet",
         "dexteryy/spellbook-of-modern-webdev",
-        "godotengine/awesome-godot"
+        "godotengine/awesome-godot",
+        "freeCodeCamp/awesome-quincy-larson-emails",
+        "marekbrze/categorized-raycast-extensions",
+        "mikeroyal/Unreal-Engine-Guide",
+        "MrRobinOfficial/Guide-UnrealEngine"
       ]
     },
     "伤害计算": {
@@ -240,7 +283,12 @@
         "msitarzewski/agency-agents",
         "punkpeye/awesome-mcp-servers",
         "rust-unofficial/awesome-rust",
-        "dexteryy/spellbook-of-modern-webdev"
+        "dexteryy/spellbook-of-modern-webdev",
+        "freeCodeCamp/awesome-quincy-larson-emails",
+        "wuyoscar/GPT-Image2-Skill",
+        "mikeroyal/Unreal-Engine-Guide",
+        "MrRobinOfficial/Guide-UnrealEngine",
+        "Open-Source-O1/Open-O1"
       ]
     },
     "塔升级系统": {
@@ -252,7 +300,8 @@
         "tattwamasi/starry-eye",
         "mpsuesser/starred",
         "Brackeys/Tower-Defense-Tutorial",
-        "Calinou/awesome-gamedev"
+        "Calinou/awesome-gamedev",
+        "freeCodeCamp/awesome-quincy-larson-emails"
       ]
     },
     "塔放置": {
@@ -270,7 +319,9 @@
         "oskardudycz/ArchitectureWeekly",
         "avelino/awesome-go",
         "punkpeye/awesome-mcp-servers",
-        "rust-unofficial/awesome-rust"
+        "rust-unofficial/awesome-rust",
+        "mikeroyal/Unreal-Engine-Guide",
+        "MrRobinOfficial/Guide-UnrealEngine"
       ]
     },
     "ECS 实体管理": {
@@ -305,20 +356,24 @@
         "StefanoCecere/awesome-opensource-unity",
         "avelino/awesome-go",
         "punkpeye/awesome-mcp-servers",
-        "SanderMertens/ecs-faq"
+        "SanderMertens/ecs-faq",
+        "freeCodeCamp/awesome-quincy-larson-emails",
+        "wuyoscar/GPT-Image2-Skill"
       ]
     },
     "效果系统": {
       "desc": "# Unity游戏开发资源",
       "sources": [
         "crazyshader/GameDev",
-        "killop/anything_about_game"
+        "killop/anything_about_game",
+        "wuyoscar/GPT-Image2-Skill"
       ]
     },
     "敌怪 AI": {
       "desc": "A wonderful list of Game Development resources.",
       "sources": [
-        "killop/anything_about_game"
+        "killop/anything_about_game",
+        "freeCodeCamp/awesome-quincy-larson-emails"
       ]
     },
     "空间分区": {
@@ -354,7 +409,9 @@
         "quozd/awesome-dotnet",
         "godotengine/awesome-godot",
         "SanderMertens/ecs-faq",
-        "aloisdeniel/awesome-monogame"
+        "aloisdeniel/awesome-monogame",
+        "MaiKuraki/UnityStarter",
+        "MrRobinOfficial/Guide-UnrealEngine"
       ]
     },
     "ScriptableObject": {
@@ -371,7 +428,11 @@
         "killop/anything_about_game",
         "insthync/awesome-unity3d",
         "StefanoCecere/awesome-opensource-unity",
-        "msitarzewski/agency-agents"
+        "msitarzewski/agency-agents",
+        "m969/EGamePlay",
+        "sjai013/unity-gameplay-ability-system",
+        "No78Vino/gameplay-ability-system-for-unity",
+        "MaiKuraki/UnityStarter"
       ]
     },
     "对象池模式": {
@@ -391,7 +452,10 @@
         "gopala-kr/summary",
         "justxor/MachineLearningRoadmap",
         "avelino/awesome-go",
-        "rust-unofficial/awesome-rust"
+        "rust-unofficial/awesome-rust",
+        "MaiKuraki/UnityStarter",
+        "mikeroyal/Unreal-Engine-Guide",
+        "MrRobinOfficial/Guide-UnrealEngine"
       ]
     },
     "依赖注入": {
@@ -449,6 +513,12 @@
         "v1nvn/enhansome-dotnet",
         "avelino/awesome-go",
         "quozd/awesome-dotnet"
+      ]
+    },
+    "SerializeField": {
+      "sources": [
+        "sjai013/unity-gameplay-ability-system",
+        "No78Vino/gameplay-ability-system-for-unity"
       ]
     }
   },
@@ -1093,6 +1163,201 @@
       "text": "Designing an ECS application starts with creating the components (data structures) that contain the game data. Important things to take into account are:",
       "repo": "SanderMertens/ecs-faq",
       "date": "2025-12-17"
+    },
+    {
+      "text": "An ability is defined by two classes, deriving from `AbstractAbilityScriptableObject` and `AbstractAbilitySpec`, respectively.  It is recommended to define the `AbstractAbilitySpec` class inside the `AbstractAbilityScriptableObject`.",
+      "repo": "sjai013/unity-gameplay-ability-system",
+      "date": "2022-08-12"
+    },
+    {
+      "text": "/// What to do when the ability is cancelled.  We don't care about there for this example.",
+      "repo": "sjai013/unity-gameplay-ability-system",
+      "date": "2022-08-12"
+    },
+    {
+      "text": "Suggestions and recommendations are welcome to be filed via the GitHub issue",
+      "repo": "terrehbyte/awesome-ue4",
+      "date": "2023-09-19"
+    },
+    {
+      "text": "- Note: Your GitHub account must be a part of the [Epic Games organization](https://www.unrealengine.com/ue4-on-github) in order to view this.",
+      "repo": "terrehbyte/awesome-ue4",
+      "date": "2023-09-19"
+    },
+    {
+      "text": "5. I also recommend reading this quick post by a freeCodeCamp community member on the importance of Hackathons. They opened all sorts of doors for him in his job search. (10 minute read): https://www.freecodecamp.org/news/why-every-student-should-join-hackathons/",
+      "repo": "freeCodeCamp/awesome-quincy-larson-emails",
+      "date": "2026-02-16"
+    },
+    {
+      "text": "Joke of the Week: *\"Why do programmers prefer dark mode? Because light attracts bugs.\"* — ShivamLH on Reddit",
+      "repo": "freeCodeCamp/awesome-quincy-larson-emails",
+      "date": "2026-02-16"
+    },
+    {
+      "text": "Quote of the Week: *\"In mathematics you don't understand things. You just get used to them.\"* — John von Neumann, mathematician and creator of von Neumann computer architecture, which is almost certainly used in the device that you're reading this on",
+      "repo": "freeCodeCamp/awesome-quincy-larson-emails",
+      "date": "2026-02-16"
+    },
+    {
+      "text": "**If you find these learning resources to be worth your time, consider supporting the nonprofit with a tax-deductible donation: [https://donate.freecodecamp.org](https://donate.freecodecamp.org) or with a monthly donation via their Patreon account: https://www.patreon.com/m/4797564/**",
+      "repo": "freeCodeCamp/awesome-quincy-larson-emails",
+      "date": "2026-02-16"
+    },
+    {
+      "text": "Quote of the Week: *\"Numbers have an important story to tell. They rely on you to give them a voice.\"* — Stephen Few, Author and Data Analyst",
+      "repo": "freeCodeCamp/awesome-quincy-larson-emails",
+      "date": "2026-02-16"
+    },
+    {
+      "text": "Categorizing extensions can be a tough nut to crack, and I am open to suggestions! If you think there's a better way to group certain extensions or want to recommend new categories, please feel free to open a GitHub issue. Your input is invaluable in making this directory more useful for everyone.",
+      "repo": "marekbrze/categorized-raycast-extensions",
+      "date": "2024-09-27"
+    },
+    {
+      "text": "https://www.raycast.com/elonwoo/toggle-fn) by elonwoo - Toggle the \"Use all F1, F2, etc. keys as standard function keys\" option in macOS System Preferences.",
+      "repo": "marekbrze/categorized-raycast-extensions",
+      "date": "2024-09-27"
+    },
+    {
+      "text": "I hope this repository helps you make the most out of Raycast. Explore, enjoy, and don't hesitate to contribute!",
+      "repo": "marekbrze/categorized-raycast-extensions",
+      "date": "2024-09-27"
+    },
+    {
+      "text": "https://www.raycast.com/ashleyhindle/focus-anchor) by ashleyhindle - Anchor your focus on the most important thing",
+      "repo": "marekbrze/categorized-raycast-extensions",
+      "date": "2024-09-27"
+    },
+    {
+      "text": "https://www.raycast.com/broc-dev/tidal-controller) by broc-dev - Control your local Tidal client with your keyboard. Note: You **must** enable Accessibility permissions for Raycast in order for this extension to work.",
+      "repo": "marekbrze/categorized-raycast-extensions",
+      "date": "2024-09-27"
+    },
+    {
+      "text": "https://www.raycast.com/fe9lix/pinboard) by fe9lix - Post new bookmarks to Pinboard and search through your Pinboard bookmarks. Tip: Assign a global shortcut to the \"Add Bookmark\" command, select a URL, and then run the command ✨",
+      "repo": "marekbrze/categorized-raycast-extensions",
+      "date": "2024-09-27"
+    },
+    {
+      "text": "> If you find this project helpful, please consider giving it a star ⭐. Thank you!",
+      "repo": "MaiKuraki/UnityStarter",
+      "date": "2026-05-19"
+    },
+    {
+      "text": "These examples intentionally avoid `--global`. Add `--global` only when you explicitly want this skill installed into that runtime's global/shared skills directory.",
+      "repo": "wuyoscar/GPT-Image2-Skill",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "> For research figures, treat generated images as references, workflow sketches, or reproducible style targets. We do **not** recommend dropping GPT Image 2 outputs directly into a paper as-is; for academic communication, that can be misleading and is generally bad practice.",
+      "repo": "wuyoscar/GPT-Image2-Skill",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "If you prefer to install it manually, copy the skill folder into Codex's skills directory:",
+      "repo": "wuyoscar/GPT-Image2-Skill",
+      "date": "2026-05-23"
+    },
+    {
+      "text": "[PerfDoc](https://github.com/ARM-software/perfdoc) is a cross-platform Vulkan layer which checks Vulkan applications for [best practices on Arm Mali](https://developer.arm.com/graphics/developer-guides/mali-gpu-best-practices) devices.",
+      "repo": "mikeroyal/Unreal-Engine-Guide",
+      "date": "2025-06-27"
+    },
+    {
+      "text": "[PyCharm](https://www.jetbrains.com/pycharm/) is the best IDE I've ever used. With PyCharm, you can access the command line, connect to a database, create a virtual environment, and manage your version control system all in one place, saving time by avoiding constantly switching between windows.",
+      "repo": "mikeroyal/Unreal-Engine-Guide",
+      "date": "2025-06-27"
+    },
+    {
+      "text": "- [Getting your game ready for Steam Deck](https://partner.steamgames.com/doc/steamdeck/recommendations)",
+      "repo": "mikeroyal/Unreal-Engine-Guide",
+      "date": "2025-06-27"
+    },
+    {
+      "text": "[Open source C++ libraries on cppreference.com](https://en.cppreference.com/w/cpp/links/libs)",
+      "repo": "mikeroyal/Unreal-Engine-Guide",
+      "date": "2025-06-27"
+    },
+    {
+      "text": "[Linear regression](https://en.wikipedia.org/wiki/Linear_regression) is an approach to model the relationship between two variables by fitting a linear equation to observed data. One variable is considered to be an explanatory variable, and the other is considered to be a dependent variable.",
+      "repo": "mikeroyal/Unreal-Engine-Guide",
+      "date": "2025-06-27"
+    },
+    {
+      "text": "The matrix-vector product is an important special case of the matrix product.",
+      "repo": "mikeroyal/Unreal-Engine-Guide",
+      "date": "2025-06-27"
+    },
+    {
+      "text": "**Note: You can easily convert this markdown file to a PDF in [VSCode](https://code.visualstudio.com/) using this handy extension [Markdown PDF](https://marketplace.visualstudio.com/items?itemName=yzane.markdown-pdf).**",
+      "repo": "mikeroyal/Unreal-Engine-Guide",
+      "date": "2025-06-27"
+    },
+    {
+      "text": "- [🐣 Tips and best practices](#-tips-and-best-practices)",
+      "repo": "MrRobinOfficial/Guide-UnrealEngine",
+      "date": "2025-07-26"
+    },
+    {
+      "text": "The greater the scope of the name, the greater the importance of a good, descriptive name. Avoid over-abbreviation.",
+      "repo": "MrRobinOfficial/Guide-UnrealEngine",
+      "date": "2025-07-26"
+    },
+    {
+      "text": "> If you want to use another language for Unreal Engine, like C#, then highly recommend checking out this [repo by Oscar Olsson](https://github.com/UnrealSharp/UnrealSharp).",
+      "repo": "MrRobinOfficial/Guide-UnrealEngine",
+      "date": "2025-07-26"
+    },
+    {
+      "text": "To change any of the shortcuts, you can access the keyboard shortcut settings via **Editor Preferences**, then under **General** select **Keyboard Shortcuts**.",
+      "repo": "MrRobinOfficial/Guide-UnrealEngine",
+      "date": "2025-07-26"
+    },
+    {
+      "text": "<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->",
+      "repo": "MrRobinOfficial/Guide-UnrealEngine",
+      "date": "2025-07-26"
+    },
+    {
+      "text": "A value type creates a copy when initialized from another variable. For instance, let's consider variable A, and when we initialize variable B with the value of A, a separate copy of the value is created in B. Essentially, B is an independent entity that holds its own value.",
+      "repo": "MrRobinOfficial/Guide-UnrealEngine",
+      "date": "2025-07-26"
+    },
+    {
+      "text": "Unreal has too many classes, which would take a very long time to explain each one of them. However, there are a couple of important classes, that I should mention:",
+      "repo": "MrRobinOfficial/Guide-UnrealEngine",
+      "date": "2025-07-26"
+    },
+    {
+      "text": "When calling the interface function inside C++, you are required to call the function with a prefix of `Execute`. If you don't use the prefix, you will get a warning from Unreal Engine.",
+      "repo": "MrRobinOfficial/Guide-UnrealEngine",
+      "date": "2025-07-26"
+    },
+    {
+      "text": "10. **Cleanup**: Properly ending the \\`curses\\` session is essential to avoid leaving the terminal in an inconsistent state.",
+      "repo": "Open-Source-O1/Open-O1",
+      "date": "2024-11-21"
+    },
+    {
+      "text": "- **Consider Patient Preference:** Discuss with the patient to understand their preferences and any additional information that might influence the treatment plan.",
+      "repo": "Open-Source-O1/Open-O1",
+      "date": "2024-11-21"
+    },
+    {
+      "text": "The Year of the Varg is an event in Don't Starve Together, lasting from February 9 until March 16, 2018.",
+      "repo": "Open-Source-O1/Open-O1",
+      "date": "2024-11-21"
+    },
+    {
+      "text": "6. **Edge Cases**: We need to consider scenarios where the initial state is already the target state, or where it's impossible to reach the target state from the initial state due to the puzzle being unsolvable.",
+      "repo": "Open-Source-O1/Open-O1",
+      "date": "2024-11-21"
+    },
+    {
+      "text": "Which important event took place on 1906?",
+      "repo": "Open-Source-O1/Open-O1",
+      "date": "2024-11-21"
     }
   ],
   "repos": [
@@ -1135,7 +1400,19 @@
     "Kavex/GameDev-Resources",
     "Calinou/awesome-gamedev",
     "SanderMertens/ecs-faq",
-    "aloisdeniel/awesome-monogame"
+    "aloisdeniel/awesome-monogame",
+    "m969/EGamePlay",
+    "insthync/awesome-unreal",
+    "sjai013/unity-gameplay-ability-system",
+    "No78Vino/gameplay-ability-system-for-unity",
+    "terrehbyte/awesome-ue4",
+    "freeCodeCamp/awesome-quincy-larson-emails",
+    "marekbrze/categorized-raycast-extensions",
+    "MaiKuraki/UnityStarter",
+    "wuyoscar/GPT-Image2-Skill",
+    "mikeroyal/Unreal-Engine-Guide",
+    "MrRobinOfficial/Guide-UnrealEngine",
+    "Open-Source-O1/Open-O1"
   ],
   "file_trees": {},
   "version": 2

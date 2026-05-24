@@ -1,113 +1,120 @@
 # 塔防游戏 ECS + GAS 知识库
-> 自动生成 · 2026-05-24 11:50
+> 自动生成 · 2026-05-24 12:10
 
-已分析 48 个仓库
+已分析 82 个仓库
 
 ## 塔防专项模式
 
-### DOTS Archetype
-# Unity游戏开发资源
-来源：[crazyshader/GameDev](https://github.com/crazyshader/GameDev)、[0xmzn/awesome-go-awelist](https://github.com/0xmzn/awesome-go-awelist)
+### 技能系统
+GAS 风格 Ability + Modifier 分离
+来源：[imnazake/Unify](https://github.com/imnazake/Unify), [Narxim/Narxim-GAS-Example](https://github.com/Narxim/Narxim-GAS-Example)
 
-### ECS 实体管理
-A collection of resources for 3D.
-来源：[devanshutak25/3d-resources](https://github.com/devanshutak25/3d-resources)、[v1nvn/enhansome-dotnet](https://github.com/v1nvn/enhansome-dotnet)
+### 实体管理器
+ECS 风格：实体创建/销毁/查询
+来源：[genaray/Arch](https://github.com/genaray/Arch), [friflo/Friflo.Engine.ECS](https://github.com/friflo/Friflo.Engine.ECS)
 
-### Unity 桥接
-Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
-来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
-
-### 伤害计算
-Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
-来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
-
-### 塔升级系统
-来源：[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)、[phrohdoh/stars](https://github.com/phrohdoh/stars)
-
-### 塔放置
-来源：[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)、[0xmzn/awesome-go-awelist](https://github.com/0xmzn/awesome-go-awelist)
-
-### 寻路系统
-Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
-来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
-
-### 性能优化/Burst
-Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
-来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
-
-### 技能系统/GAS
-Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
-来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
-
-### 攻击间隔/冷却
-Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
-来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
-
-### 效果系统
-# Unity游戏开发资源
-来源：[crazyshader/GameDev](https://github.com/crazyshader/GameDev)、[killop/anything_about_game](https://github.com/killop/anything_about_game)
-
-### 敌怪 AI
-A wonderful list of Game Development resources.
-来源：[killop/anything_about_game](https://github.com/killop/anything_about_game)、[freeCodeCamp/awesome-quincy-larson-emails](https://github.com/freeCodeCamp/awesome-quincy-larson-emails)
+### Unity DOTS Archetype
+DOTS 模式：chunk data layout + entity query
+来源：[genaray/Arch](https://github.com/genaray/Arch), [friflo/Friflo.Engine.ECS](https://github.com/friflo/Friflo.Engine.ECS)
 
 ### 状态机 AI
-Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
-来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
+敌怪状态机：移动/攻击/死亡
+来源：[friflo/Friflo.Engine.ECS](https://github.com/friflo/Friflo.Engine.ECS), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter)
 
-### 空间分区
-A wonderful list of Game Development resources.
-来源：[killop/anything_about_game](https://github.com/killop/anything_about_game)、[insthync/awesome-unity3d](https://github.com/insthync/awesome-unity3d)
+### 性能优化
+Burst 编译、NativeArray、JobSystem
+来源：[friflo/Friflo.Engine.ECS](https://github.com/friflo/Friflo.Engine.ECS), [AkanshDivker/Simple-ECS](https://github.com/AkanshDivker/Simple-ECS)
+
+### Unity 桥接
+纯 ECS 逻辑与 GameObject 渲染层桥接方案
+来源：[No78Vino/gameplay-ability-system-for-unity](https://github.com/No78Vino/gameplay-ability-system-for-unity), [SaiTingHu/HTFramework](https://github.com/SaiTingHu/HTFramework)
+
+### 寻路系统
+A*/BFS/网格寻路，敌人沿路径移动
+来源：[zulfajuniadi/unity-ecs-navmesh](https://github.com/zulfajuniadi/unity-ecs-navmesh), [quiver-dev/tower-defense-tutorial](https://github.com/quiver-dev/tower-defense-tutorial)
+
+### 攻击间隔
+攻速属性、独立冷却管理
+来源：[Rangerz132/gas-unity](https://github.com/Rangerz132/gas-unity), [felipeggrod/gasify](https://github.com/felipeggrod/gasify)
+
+### 塔升级系统
+塔等级/星级/进阶，属性成长曲线配置化
+来源：[prabdhal/Tower-Defence-3D](https://github.com/prabdhal/Tower-Defence-3D), [prabdhal/TD3D-UnityGame](https://github.com/prabdhal/TD3D-UnityGame)
 
 ### 行为树
-Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
-来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
+行为树节点：Sequence/Selector/Condition/Action
+来源：[friflo/Friflo.Engine.ECS](https://github.com/friflo/Friflo.Engine.ECS), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter)
+
+### 敌怪属性
+敌怪血量/攻击/速度随波次成长
+来源：[prabdhal/Tower-Defence-3D](https://github.com/prabdhal/Tower-Defence-3D), [prabdhal/TD3D-UnityGame](https://github.com/prabdhal/TD3D-UnityGame)
+
+### 系统更新
+SystemBase 按组排序更新，数据逻辑分离
+来源：[AkanshDivker/Simple-ECS](https://github.com/AkanshDivker/Simple-ECS), [annulusgames/MagicTween](https://github.com/annulusgames/MagicTween)
+
+### 敌怪 AI
+AI 决策：追踪/逃跑/施法/躲避
+来源：[quiver-dev/tower-defense-tutorial](https://github.com/quiver-dev/tower-defense-tutorial), [quiver-dev/tower-defense-godot4](https://github.com/quiver-dev/tower-defense-godot4)
+
+### 伤害计算
+攻击/防御/暴击/属性缩放公式
+来源：[Narxim/Narxim-GAS-Example](https://github.com/Narxim/Narxim-GAS-Example)
+
+### 空间分区
+GridSpatialHash O(1) 邻域查询，避免全量遍历
+来源：[MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter)
+
+### 效果系统
+伤害/治疗/控制效果排队执行
+来源：[h2v9696/UnityGAS](https://github.com/h2v9696/UnityGAS)
+
+## 项目架构线索
+
+### 配置数据
+来源：[strayTrain/SimpleGameplayAbilitySystem](https://github.com/strayTrain/SimpleGameplayAbilitySystem), [fpwong/FPGameplayAbilities](https://github.com/fpwong/FPGameplayAbilities)
+
+### 性能优化
+来源：[sschmid/Entitas](https://github.com/sschmid/Entitas)
+
+### 塔系统
+来源：[Brackeys/Tower-Defense-Tutorial](https://github.com/Brackeys/Tower-Defense-Tutorial)
+
+### AI/行为树
+来源：[Antoshidza/NSprites](https://github.com/Antoshidza/NSprites)
 
 ## 通用工程模式
 
+### 状态机模式
+状态转换清晰，可视化
+来源：[friflo/Friflo.Engine.ECS](https://github.com/friflo/Friflo.Engine.ECS), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter)
+
 ### ScriptableObject
-来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
-
-### SerializeField
-来源：[sjai013/unity-gameplay-ability-system](https://github.com/sjai013/unity-gameplay-ability-system)、[No78Vino/gameplay-ability-system-for-unity](https://github.com/No78Vino/gameplay-ability-system-for-unity)
-
-### 事件总线
-来源：[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)、[crazyshader/GameDev](https://github.com/crazyshader/GameDev)
-
-### 依赖注入
-来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
-
-### 命令模式
-来源：[v1nvn/enhansome-go](https://github.com/v1nvn/enhansome-go)、[v1nvn/enhansome-dotnet](https://github.com/v1nvn/enhansome-dotnet)
+数据资产化，配置与代码分离
+来源：[MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [Rangerz132/gas-unity](https://github.com/Rangerz132/gas-unity)
 
 ### 对象池模式
-来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[devanshutak25/3d-resources](https://github.com/devanshutak25/3d-resources)
+复用对象，减少 Instantiate/Destroy
+来源：[MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [SaiTingHu/HTFramework](https://github.com/SaiTingHu/HTFramework)
 
-### 状态机模式
-来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
+### SerializeField
+Inspector 调试，保留封装
+来源：[No78Vino/gameplay-ability-system-for-unity](https://github.com/No78Vino/gameplay-ability-system-for-unity), [sjai013/unity-gameplay-ability-system](https://github.com/sjai013/unity-gameplay-ability-system)
 
 ### 缓存友好
-来源：[0xmzn/awesome-go-awelist](https://github.com/0xmzn/awesome-go-awelist)、[v1nvn/enhansome-go](https://github.com/v1nvn/enhansome-go)
+数据连续布局，缓存命中优先
+来源：[sebas77/Svelto.ECS](https://github.com/sebas77/Svelto.ECS)
+
+### 事件总线
+解耦系统通信，Publish/Subscribe
+来源：[PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity)
 
 ## 实践洞察
 
-- "False sharing is avoided by ensuring that data accessed by different threads is not in close enough proximity for it to be loaded in a single cache line." — [SanderMertens/ecs-faq](https://github.com/SanderMertens/ecs-faq) (2025-12-17)
-- "I highly recommend reading existing resources on ECS and experimenting with the approaches they describe. Reading the code of example ECS projects can also be a good way to fast-track your understanding of how ECS applications are written." — [SanderMertens/ecs-faq](https://github.com/SanderMertens/ecs-faq) (2025-12-17)
-- "In practice ECS is used a bit more liberally. Some ECS frameworks do not have systems, and only provide methods for querying entities. Other frameworks may allow for adding things to entities than are not components. These implementations are still considered ECS by many people." — [SanderMertens/ecs-faq](https://github.com/SanderMertens/ecs-faq) (2025-12-17)
-- "Designing an ECS application starts with creating the components (data structures) that contain the game data. Important things to take into account are:" — [SanderMertens/ecs-faq](https://github.com/SanderMertens/ecs-faq) (2025-12-17)
-- "An ability is defined by two classes, deriving from `AbstractAbilityScriptableObject` and `AbstractAbilitySpec`, respectively.  It is recommended to define the `AbstractAbilitySpec` class inside the `AbstractAbilityScriptableObject`." — [sjai013/unity-gameplay-ability-system](https://github.com/sjai013/unity-gameplay-ability-system) (2022-08-12)
-- "/// What to do when the ability is cancelled.  We don't care about there for this example." — [sjai013/unity-gameplay-ability-system](https://github.com/sjai013/unity-gameplay-ability-system) (2022-08-12)
-- "Suggestions and recommendations are welcome to be filed via the GitHub issue" — [terrehbyte/awesome-ue4](https://github.com/terrehbyte/awesome-ue4) (2023-09-19)
-- "- Note: Your GitHub account must be a part of the [Epic Games organization](https://www.unrealengine.com/ue4-on-github) in order to view this." — [terrehbyte/awesome-ue4](https://github.com/terrehbyte/awesome-ue4) (2023-09-19)
-- "5. I also recommend reading this quick post by a freeCodeCamp community member on the importance of Hackathons. They opened all sorts of doors for him in his job search. (10 minute read): https://www.freecodecamp.org/news/why-every-student-should-join-hackathons/" — [freeCodeCamp/awesome-quincy-larson-emails](https://github.com/freeCodeCamp/awesome-quincy-larson-emails) (2026-02-16)
-- "Joke of the Week: *"Why do programmers prefer dark mode? Because light attracts bugs."* — ShivamLH on Reddit" — [freeCodeCamp/awesome-quincy-larson-emails](https://github.com/freeCodeCamp/awesome-quincy-larson-emails) (2026-02-16)
-- "Quote of the Week: *"In mathematics you don't understand things. You just get used to them."* — John von Neumann, mathematician and creator of von Neumann computer architecture, which is almost certainly used in the device that you're reading this on" — [freeCodeCamp/awesome-quincy-larson-emails](https://github.com/freeCodeCamp/awesome-quincy-larson-emails) (2026-02-16)
-- "**If you find these learning resources to be worth your time, consider supporting the nonprofit with a tax-deductible donation: [https://donate.freecodecamp.org](https://donate.freecodecamp.org) or with a monthly donation via their Patreon account: https://www.patreon.com/m/4797564/**" — [freeCodeCamp/awesome-quincy-larson-emails](https://github.com/freeCodeCamp/awesome-quincy-larson-emails) (2026-02-16)
-- "Quote of the Week: *"Numbers have an important story to tell. They rely on you to give them a voice."* — Stephen Few, Author and Data Analyst" — [freeCodeCamp/awesome-quincy-larson-emails](https://github.com/freeCodeCamp/awesome-quincy-larson-emails) (2026-02-16)
-- "Categorizing extensions can be a tough nut to crack, and I am open to suggestions! If you think there's a better way to group certain extensions or want to recommend new categories, please feel free to open a GitHub issue. Your input is invaluable in making this directory more useful for everyone." — [marekbrze/categorized-raycast-extensions](https://github.com/marekbrze/categorized-raycast-extensions) (2024-09-27)
-- "https://www.raycast.com/elonwoo/toggle-fn) by elonwoo - Toggle the "Use all F1, F2, etc. keys as standard function keys" option in macOS System Preferences." — [marekbrze/categorized-raycast-extensions](https://github.com/marekbrze/categorized-raycast-extensions) (2024-09-27)
-- "I hope this repository helps you make the most out of Raycast. Explore, enjoy, and don't hesitate to contribute!" — [marekbrze/categorized-raycast-extensions](https://github.com/marekbrze/categorized-raycast-extensions) (2024-09-27)
-- "https://www.raycast.com/ashleyhindle/focus-anchor) by ashleyhindle - Anchor your focus on the most important thing" — [marekbrze/categorized-raycast-extensions](https://github.com/marekbrze/categorized-raycast-extensions) (2024-09-27)
-- "https://www.raycast.com/broc-dev/tidal-controller) by broc-dev - Control your local Tidal client with your keyboard. Note: You **must** enable Accessibility permissions for Raycast in order for this extension to work." — [marekbrze/categorized-raycast-extensions](https://github.com/marekbrze/categorized-raycast-extensions) (2024-09-27)
-- "https://www.raycast.com/fe9lix/pinboard) by fe9lix - Post new bookmarks to Pinboard and search through your Pinboard bookmarks. Tip: Assign a global shortcut to the "Add Bookmark" command, select a URL, and then run the command ✨" — [marekbrze/categorized-raycast-extensions](https://github.com/marekbrze/categorized-raycast-extensions) (2024-09-27)
-- "> If you find this project helpful, please consider giving it a star ⭐. Thank you!" — [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter) (2026-05-19)
+- "That's a best practice (Based on working experience), that's not only for Attributes Sets, but for any C++ class that might get reference by another object." — [Narxim/Narxim-GAS-Example](https://github.com/Narxim/Narxim-GAS-Example) (2026-05-12)
+- "The reason is simple: a game should avoid rubber-banding death." — [Narxim/Narxim-GAS-Example](https://github.com/Narxim/Narxim-GAS-Example) (2026-05-12)
+- "- Increases a character's ability to avoid incoming attacks." — [Rangerz132/gas-unity](https://github.com/Rangerz132/gas-unity) (2026-05-15)
+- "While other frameworks typically limit user freedom to avoid exposing flaws in the archetype-based concept, Svelto." — [sebas77/Svelto.ECS](https://github.com/sebas77/Svelto.ECS) (2026-05-17)
+- "It's recommended to use extension methods when available." — [annulusgames/MagicTween](https://github.com/annulusgames/MagicTween) (2026-05-17)
+- "In most cases, the impact on performance is minimal, but it's recommended to avoid using callbacks when creating a large number of tweens." — [annulusgames/MagicTween](https://github.com/annulusgames/MagicTween) (2026-05-17)
+- "This is a very powerful concept and I don't recommend to use it until you really understand what are you doing." — [PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity) (2026-05-17)
