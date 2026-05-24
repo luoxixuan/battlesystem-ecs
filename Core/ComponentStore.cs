@@ -128,6 +128,16 @@ namespace BattleSystemECS.Core
         // Set by stealth_attack ability, consumed and reset by EnemyAISystem attack methods.
         public float[] EnemyStealthMultiplier = new float[MAX_ENTITIES];
 
+        // ==================== 敌人抗性字段（SOA） ====================
+        // EnemyStunResistance: 0-1, reduces stun duration and chance
+        public float[] EnemyStunResistance = new float[MAX_ENTITIES];
+        // EnemyFreezeResistance: 0-1, reduces freeze duration and chance
+        public float[] EnemyFreezeResistance = new float[MAX_ENTITIES];
+        // EnemySlowResistance: 0-1, reduces slow factor severity
+        public float[] EnemySlowResistance = new float[MAX_ENTITIES];
+        // EnemyDamageResistance: 0-1, reduces all damage taken (applied in TowerAttackSystem and SkillSystem)
+        public float[] EnemyDamageResistance = new float[MAX_ENTITIES];
+
         // ==================== 敌人 AI 组件的 SOA 存储 ====================
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
         public int[] EnemyAIChargeCounter = new int[MAX_ENTITIES];
@@ -411,6 +421,11 @@ namespace BattleSystemECS.Core
                 EnemyIsElite[entityId] = false;
                 EnemyStealthMultiplier[entityId] = 1f;
                 EnemyShield[entityId] = 0f;
+                // Resistance fields
+                EnemyStunResistance[entityId] = 0f;
+                EnemyFreezeResistance[entityId] = 0f;
+                EnemySlowResistance[entityId] = 0f;
+                EnemyDamageResistance[entityId] = 0f;
                 // Freeze fields (shared with stun — no separate fields needed, cleanup via StunDurationLeft/StunFlag above)
             }
 

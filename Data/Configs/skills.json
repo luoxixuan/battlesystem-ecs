@@ -177,36 +177,36 @@
     "ShieldDuration": 5,
     "Modifiers": []
   },
-        {
-        "Name": "Laser Beam",
-        "Description": "横向激光 — 打击同一 Y 轴上所有敌人",
-        "AreaShape": "line",
-        "AreaWidth": 1,
-        "AreaHeight": 1,
-        "AttackRange": 8,
-        "Cooldown": 12,
-        "DamageMultiplier": 3,
-        "AutoCast": false,
-        "Hotkey": "8",
-        "AreaRadius": 8,
-        "DotDuration": 0,
-        "DotTickInterval": 0,
-        "DotDamagePerTick": 0,
-        "HealPercent": 0,
-        "ShieldAmount": 0,
-        "ShieldDuration": 0,
-        "Modifiers": [
-          {
-            "Name": "LaserBeamDamage",
-            "Type": "Damage",
-            "Duration": 0,
-            "StackingType": "None",
-            "StackLimitCount": 0,
-            "Value": 40,
-            "EffectTag": "Normal"
-          }
-        ]
-      },
+  {
+    "Name": "Laser Beam",
+    "Description": "横向激光 — 打击同一 Y 轴上所有敌人",
+    "AreaShape": "line",
+    "AreaWidth": 1,
+    "AreaHeight": 1,
+    "AttackRange": 8,
+    "Cooldown": 12,
+    "DamageMultiplier": 3,
+    "AutoCast": false,
+    "Hotkey": "8",
+    "AreaRadius": 8,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
+    "HealPercent": 0,
+    "ShieldAmount": 0,
+    "ShieldDuration": 0,
+    "Modifiers": [
+      {
+        "Name": "LaserBeamDamage",
+        "Type": "Damage",
+        "Duration": 0,
+        "StackingType": "None",
+        "StackLimitCount": 0,
+        "Value": 40,
+        "EffectTag": "Normal"
+      }
+    ]
+  },
   {
     "Name": "Cold Nova",
     "Description": "环形 AoE 冻结 — 范围内敌人受到伤害，有概率被冻结 2 回合",
@@ -302,6 +302,79 @@
         "StackLimitCount": 0,
         "Value": 60,
         "EffectTag": "Plasma"
+      }
+    ]
+  },
+  {
+    "Name": "Artillery Strike",
+    "Description": "选择目标位置，3×3 格范围高伤害轰炸",
+    "AreaShape": "groundtarget",
+    "AreaWidth": 3,
+    "AreaHeight": 3,
+    "AttackRange": 8,
+    "Cooldown": 10,
+    "DamageMultiplier": 6,
+    "AutoCast": false,
+    "Hotkey": "F",
+    "AreaRadius": 3,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
+    "HealPercent": 0,
+    "ShieldAmount": 0,
+    "ShieldDuration": 0,
+    "FreezeDuration": 0,
+    "FreezeChance": 0,
+    "Modifiers": [
+      {
+        "Name": "ArtilleryStrikeDamage",
+        "Type": "Damage",
+        "Duration": 0,
+        "StackingType": "None",
+        "StackLimitCount": 0,
+        "Value": 50,
+        "EffectTag": "Explosion"
+      }
+    ]
+  },
+  {
+    "Name": "Meteor Strike",
+    "Description": "陨石轰击 — 远程大范围毁灭性伤害，5×5 格",
+    "AreaShape": "groundtarget",
+    "AreaWidth": 5,
+    "AreaHeight": 5,
+    "AttackRange": 10,
+    "Cooldown": 20,
+    "DamageMultiplier": 8,
+    "AutoCast": false,
+    "Hotkey": "G",
+    "AreaRadius": 5,
+    "DotDuration": 3,
+    "DotTickInterval": 1,
+    "DotDamagePerTick": 4,
+    "HealPercent": 0,
+    "ShieldAmount": 0,
+    "ShieldDuration": 0,
+    "FreezeDuration": 0,
+    "FreezeChance": 0,
+    "Modifiers": [
+      {
+        "Name": "MeteorStrikeDamage",
+        "Type": "Damage",
+        "Duration": 0,
+        "StackingType": "None",
+        "StackLimitCount": 0,
+        "Value": 70,
+        "EffectTag": "Fire"
+      },
+      {
+        "Name": "MeteorStrikeDot",
+        "Type": "Debuff",
+        "Duration": 3,
+        "StackingType": "Duration",
+        "StackLimitCount": 2,
+        "Value": 4,
+        "EffectTag": "Burn"
       }
     ]
   }

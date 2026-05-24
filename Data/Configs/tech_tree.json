@@ -92,6 +92,33 @@
           ]
         },
         {
+          "id": "iron_skin_3",
+          "name": "铁壁 III",
+          "description": "所有敌怪伤害减免 10%",
+          "cost": 2,
+          "prerequisites": ["iron_skin_2"],
+          "effects": [{ "type": "damage_resist", "value": 0.10 }]
+        },
+        {
+          "id": "cold_resist",
+          "name": "寒冰抗性",
+          "description": "冻结效果持续时间 -20%，减速效果 -15%",
+          "cost": 2,
+          "prerequisites": ["fortress"],
+          "effects": [
+            { "type": "freeze_resist", "value": 0.20 },
+            { "type": "slow_resist", "value": 0.15 }
+          ]
+        },
+        {
+          "id": "mental_edge",
+          "name": "精神壁垒",
+          "description": "眩晕持续时间 -25%",
+          "cost": 2,
+          "prerequisites": ["fortress"],
+          "effects": [{ "type": "stun_resist", "value": 0.25 }]
+        },
+        {
           "id": "immortal",
           "name": "不朽",
           "description": "死亡时复活一次，回复 50% 生命（每波一次）",

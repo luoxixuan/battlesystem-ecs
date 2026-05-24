@@ -817,7 +817,11 @@ namespace BattleSystemECS.Systems
                 float currentHealth = store.EnemyHealth[enemyId];
                 if (currentHealth <= 0f) continue; // already dead this frame
 
-                store.ApplyEnemyDamage(enemyId, damage); // accumulation pattern (consistent with TowerAttackSystem)
+                // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
+                float resist = store.EnemyDamageResistance[enemyId];
+                float finalDmg = resist >= 1f ? 0f : damage * (1f - resist);
+
+                store.ApplyEnemyDamage(enemyId, finalDmg); // accumulation pattern (consistent with TowerAttackSystem)
 
                 if (store.EnemyHealth[enemyId] <= 0f)
                     HandleKill(enemyId);

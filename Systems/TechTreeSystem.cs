@@ -42,6 +42,11 @@ namespace BattleSystemECS.Systems
         private bool _hasRespawn = false;
         private float _respawnHpPct = 0f;
         private bool _hasKnockbackImmunity = false;
+        // Enemy resistance multipliers (tech tree provides global bonuses, applied to all enemies)
+        private float _enemyStunResistance = 0f;
+        private float _enemyFreezeResistance = 0f;
+        private float _enemySlowResistance = 0f;
+        private float _enemyDamageResistance = 0f;
 
         public TechTreeSystem(ComponentStore store, IRenderer renderer, int playerId, TechTreeConfig config, GameConfig gameConfig = null)
         {
@@ -205,6 +210,27 @@ namespace BattleSystemECS.Systems
                         _hasRespawn = true;
                         _respawnHpPct = eff.value;
                         break;
+                    case "stun_resist":
+                        _enemyStunResistance += eff.value;
+                        // Global stun resistance applied to all enemies (stored in global slot 0)
+                        for (int i = 0; i < ComponentStore.MAX_ENTITIES; i++)
+                            store.EnemyStunResistance[i] += eff.value;
+                        break;
+                    case "freeze_resist":
+                        _enemyFreezeResistance += eff.value;
+                        for (int i = 0; i < ComponentStore.MAX_ENTITIES; i++)
+                            store.EnemyFreezeResistance[i] += eff.value;
+                        break;
+                    case "slow_resist":
+                        _enemySlowResistance += eff.value;
+                        for (int i = 0; i < ComponentStore.MAX_ENTITIES; i++)
+                            store.EnemySlowResistance[i] += eff.value;
+                        break;
+                    case "damage_resist":
+                        _enemyDamageResistance += eff.value;
+                        for (int i = 0; i < ComponentStore.MAX_ENTITIES; i++)
+                            store.EnemyDamageResistance[i] += eff.value;
+                        break;
                 }
             }
         }
@@ -295,10 +321,30 @@ namespace BattleSystemECS.Systems
             return 0f;
         }
 
-        /// <summary>
+/// <summary>
         /// Returns true if the player has immunity to knockback (enemy dodge lateral movement).
         /// </summary>
         public bool GetKnockbackImmunity() => _hasKnockbackImmunity;
+
+        /// <summary>
+        /// Get global stun resistance multiplier (tech tree bonus).
+        /// </summary>
+        public float GetStunResistance() => _enemyStunResistance;
+
+        /// <summary>
+        /// Get global freeze resistance multiplier (tech tree bonus).
+        /// </summary>
+        public float GetFreezeResistance() => _enemyFreezeResistance;
+
+        /// <summary>
+        /// Get global slow resistance multiplier (tech tree bonus).
+        /// </summary>
+        public float GetSlowResistance() => _enemySlowResistance;
+
+        /// <summary>
+        /// Get global damage resistance multiplier (tech tree bonus).
+        /// </summary>
+        public float GetDamageResistance() => _enemyDamageResistance;
 
         /// <summary>
         /// Check if player has respawn and consume it. Returns true if respawn was used.
