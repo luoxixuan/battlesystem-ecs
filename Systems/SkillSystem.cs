@@ -29,6 +29,10 @@ namespace BattleSystemECS.Systems
         // Cached armor stats (updated on SetTurn — used in damage calculation)
         private float _armorPenetration = 0f;
         private float _damageTakenMult = 1f;
+
+        // Cached enemy CC resistance stats (updated each SetTurn — from TechTreeSystem getters)
+        private float _enemyFreezeResistance = 0f;  // from techTreeSystem.GetFreezeResistance()
+        private float _enemySlowResistance = 0f;    // from techTreeSystem.GetSlowResistance()
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         // Tuple: (enemyId, rawDamage) — raw damage only; armor reduction handled by PlayerTowerAttackSystem and TowerAttackSystem
         private List<(int enemyId, float damage)>[] _skillDamageQueue = new List<(int, float)>[2];
@@ -85,6 +89,9 @@ namespace BattleSystemECS.Systems
             // Cache armor stats from tech tree
             _armorPenetration = techTreeSystem != null ? techTreeSystem.GetArmorPenetration() : 0f;
             _damageTakenMult = techTreeSystem != null ? techTreeSystem.GetDamageTakenMult() : 1f;
+            // Cache enemy CC resistance stats (freeze/slow duration reduction)
+            _enemyFreezeResistance = techTreeSystem != null ? techTreeSystem.GetFreezeResistance() : 0f;
+            _enemySlowResistance = techTreeSystem != null ? techTreeSystem.GetSlowResistance() : 0f;
         }
 
         /// <summary>
@@ -654,7 +661,7 @@ namespace BattleSystemECS.Systems
                         float roll = (float)Random.Shared.NextDouble();
                         if (roll < def.FreezeChance)
                         {
-                            int freezeTurns = Math.Max(1, (int)Math.Ceiling(def.FreezeDuration));
+                            int freezeTurns = Math.Max(1, (int)Math.Ceiling(def.FreezeDuration * (1f - _enemyFreezeResistance)));
                             store.ApplyEnemyFreeze(enemyId, freezeTurns);
                             renderer.Log($"[SKILL] {name} froze enemy {enemyId} for {freezeTurns} turns");
                         }

@@ -41,6 +41,10 @@ namespace BattleSystemECS.Systems
         private float _armorPenetration = 0f;  // from TechTreeSystem
         private float _damageTakenMult = 1f;   // from TechTreeSystem
 
+        // Cached enemy CC resistance stats (updated each SetTurn — from TechTreeSystem getters)
+        private float _enemyStunResistance = 0f;  // from techTreeSystem.GetStunResistance()
+        private float _enemySlowResistance = 0f;    // from techTreeSystem.GetSlowResistance()
+
         // Cached wave-based difficulty multiplier (updated each SetTurn)
         private float _waveDifficultyMult = 1f;
 
@@ -96,6 +100,10 @@ namespace BattleSystemECS.Systems
             // Cache armor stats from tech tree
             _armorPenetration = techTreeSystem != null ? techTreeSystem.GetArmorPenetration() : 0f;
             _damageTakenMult = techTreeSystem != null ? techTreeSystem.GetDamageTakenMult() : 1f;
+
+            // Cache enemy CC resistance stats from tech tree (stun/slow duration reduction)
+            _enemyStunResistance = techTreeSystem != null ? techTreeSystem.GetStunResistance() : 0f;
+            _enemySlowResistance = techTreeSystem != null ? techTreeSystem.GetSlowResistance() : 0f;
 
             // Cache wave-based difficulty multiplier (default wave 1)
             _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(1) : 1f;
@@ -362,12 +370,14 @@ namespace BattleSystemECS.Systems
                         // Firewall: apply burn DoT (continuous damage over time via BuffSystem)
                         if (buffSystem != null && slowAmount > 0f && slowDuration > 0f)
                         {
-                            buffSystem.ApplyDot(enemyId, slowAmount, (int)slowDuration);
+                            int actualDuration = (int)Math.Max(1, slowDuration * (1f - _enemySlowResistance));
+                            buffSystem.ApplyDot(enemyId, slowAmount, actualDuration);
                         }
                         // Also roll stun
                         if (stunChance > 0f && _rand.NextDouble() < stunChance)
                         {
-                            store.ApplyEnemyStun(enemyId, 1);
+                            int stunTurns = Math.Max(1, (int)Math.Ceiling(1f * (1f - _enemyStunResistance)));
+                            store.ApplyEnemyStun(enemyId, stunTurns);
                         }
                         break;
 
@@ -375,11 +385,13 @@ namespace BattleSystemECS.Systems
                         // Basic / Frost / EMP / Doom: stun + slow
                         if (stunChance > 0f && _rand.NextDouble() < stunChance)
                         {
-                            store.ApplyEnemyStun(enemyId, 1);
+                            int stunTurns = Math.Max(1, (int)Math.Ceiling(1f * (1f - _enemyStunResistance)));
+                            store.ApplyEnemyStun(enemyId, stunTurns);
                         }
                         if (slowAmount > 0f && slowDuration > 0f)
                         {
-                            store.ApplyEnemySlow(enemyId, slowAmount, (int)slowDuration);
+                            int actualDuration = (int)Math.Max(1, slowDuration * (1f - _enemySlowResistance));
+                            store.ApplyEnemySlow(enemyId, slowAmount, actualDuration);
                         }
                         break;
                 }
