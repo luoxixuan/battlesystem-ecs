@@ -1,7 +1,7 @@
 # 塔防游戏 ECS + GAS 知识库
-> 自动生成 · 2026-05-24 01:02
+> 自动生成 · 2026-05-24 11:50
 
-已分析 40 个仓库
+已分析 48 个仓库
 
 ## 塔防专项模式
 
@@ -49,7 +49,7 @@ Open registry of community-contributed AI coding skills (SKILL.md files) — dai
 
 ### 敌怪 AI
 A wonderful list of Game Development resources.
-来源：[killop/anything_about_game](https://github.com/killop/anything_about_game)
+来源：[killop/anything_about_game](https://github.com/killop/anything_about_game)、[freeCodeCamp/awesome-quincy-larson-emails](https://github.com/freeCodeCamp/awesome-quincy-larson-emails)
 
 ### 状态机 AI
 Open registry of community-contributed AI coding skills (SKILL.md files) — daily-synced to skills-hub.ai. Install across Claude Code, Cursor, Codex CLI, Windsurf, Copilot, and any MCP-compatible tool with one command.
@@ -67,6 +67,9 @@ Open registry of community-contributed AI coding skills (SKILL.md files) — dai
 
 ### ScriptableObject
 来源：[tinh2/skills-hub-registry](https://github.com/tinh2/skills-hub-registry)、[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)
+
+### SerializeField
+来源：[sjai013/unity-gameplay-ability-system](https://github.com/sjai013/unity-gameplay-ability-system)、[No78Vino/gameplay-ability-system-for-unity](https://github.com/No78Vino/gameplay-ability-system-for-unity)
 
 ### 事件总线
 来源：[KABBOUCHI/starred](https://github.com/KABBOUCHI/starred)、[crazyshader/GameDev](https://github.com/crazyshader/GameDev)
@@ -88,23 +91,23 @@ Open registry of community-contributed AI coding skills (SKILL.md files) — dai
 
 ## 实践洞察
 
-- "* [cargo-limit](https://crates.io/crates/cargo-limit) - Cargo with less noise: warnings are skipped until errors are fixed, Neovim integration, etc. [![build badge](https://github.com/cargo-limit/cargo-limit/actions/workflows/ci.yml/badge.svg)](https://github.com/cargo-limit/cargo-limit/actions)" — [rust-unofficial/awesome-rust](https://github.com/rust-unofficial/awesome-rust) (2026-05-23)
-- "- [Discover Threejs](https://discoverthreejs.com), especially the [Tips and Tricks](https://discoverthreejs.com/tips-and-tricks) chapter for best practices" — [pmndrs/react-three-fiber](https://github.com/pmndrs/react-three-fiber) (2026-05-07)
-- "If you like this project, please consider helping out. All contributions are welcome as well as donations to [Opencollective](https://opencollective.com/react-three-fiber), or in crypto `BTC: 36fuguTPxGCNnYZSRdgdh6Ea94brCAjMbH`, `ETH: 0x6E3f79Ea1d0dcedeb33D3fC6c34d2B1f156F2682`." — [pmndrs/react-three-fiber](https://github.com/pmndrs/react-three-fiber) (2026-05-07)
-- "* [ASP.NET Boilerplate](https://github.com/aspnetboilerplate/aspnetboilerplate) - A starting point for new modern ASP.NET MVC web applications with best practices and most popular tools." — [quozd/awesome-dotnet](https://github.com/quozd/awesome-dotnet) (2026-03-26)
-- "* [Population.NET](https://github.com/Authentic199/Population.NET) - A .NET library allows clients to specify the exact fields they need, reducing unnecessary data transfer by avoiding the retrieval of all fields by default." — [quozd/awesome-dotnet](https://github.com/quozd/awesome-dotnet) (2026-03-26)
-- "* [DotVVM](https://github.com/riganti/dotvvm) - MVVM framework for people who don't like to write JavaScript, with OWIN and ASP.NET Core support and a free extension for Visual Studio 2015 and 2017." — [quozd/awesome-dotnet](https://github.com/quozd/awesome-dotnet) (2026-03-26)
-- "* [AngouriMath](https://github.com/asc-community/AngouriMath) - An open-source symbolic/computer algebra library, made primarily for C# and F#. It covers a range of features and might be considered as an alternative to SymPy in .NET." — [quozd/awesome-dotnet](https://github.com/quozd/awesome-dotnet) (2026-03-26)
-- "- Best Practices (Skeleton, Methodology, Code Style...)" — [dexteryy/spellbook-of-modern-webdev](https://github.com/dexteryy/spellbook-of-modern-webdev) (2023-12-18)
-- "* [Starter Kits Recommended by the React Team](https://reactjs.org/community/starter-kits.html)" — [dexteryy/spellbook-of-modern-webdev](https://github.com/dexteryy/spellbook-of-modern-webdev) (2023-12-18)
-- "* Prefer __fine-grained classifications and deep hierarchies__ over __featureless descriptions and distractive comments__." — [dexteryy/spellbook-of-modern-webdev](https://github.com/dexteryy/spellbook-of-modern-webdev) (2023-12-18)
-- "[You Don't Need jQuery](https://github.com/oneuijs/You-Dont-Need-jQuery), \" — [dexteryy/spellbook-of-modern-webdev](https://github.com/dexteryy/spellbook-of-modern-webdev) (2023-12-18)
-- "* [Offline UX Considerations](https://developers.google.com/web/fundamentals/instant-and-offline/offline-ux)" — [dexteryy/spellbook-of-modern-webdev](https://github.com/dexteryy/spellbook-of-modern-webdev) (2023-12-18)
-- "- ES6+ Features, Intro to ES6+, Re-intro to JS, Important Proposals, Functional Programming, FRP, Static Typing, Code Style..." — [dexteryy/spellbook-of-modern-webdev](https://github.com/dexteryy/spellbook-of-modern-webdev) (2023-12-18)
-- "- :tada: [Tilesplit](https://github.com/AlexPoulsen/tilesplit) - CLI text-based tilesheet splitter and namer. Turn a spritesheet into many separate files with names you pick, or not if you don't care. Support templates and textures that are not all the same size." — [ellisonleao/magictools](https://github.com/ellisonleao/magictools) (2026-04-09)
-- "* :heavy_dollar_sign: [Pixen](https://github.com/Pixen/Pixen) - Pixel Art Editor for OSX (Warning: Pixen previously did not support custom gif palettes before becoming paid, and may still have this limiation.)" — [Kavex/GameDev-Resources](https://github.com/Kavex/GameDev-Resources) (2026-04-10)
-- "This is a catch-all category for things that don't fit anywhere else." — [Calinou/awesome-gamedev](https://github.com/Calinou/awesome-gamedev) (2026-03-21)
 - "False sharing is avoided by ensuring that data accessed by different threads is not in close enough proximity for it to be loaded in a single cache line." — [SanderMertens/ecs-faq](https://github.com/SanderMertens/ecs-faq) (2025-12-17)
 - "I highly recommend reading existing resources on ECS and experimenting with the approaches they describe. Reading the code of example ECS projects can also be a good way to fast-track your understanding of how ECS applications are written." — [SanderMertens/ecs-faq](https://github.com/SanderMertens/ecs-faq) (2025-12-17)
 - "In practice ECS is used a bit more liberally. Some ECS frameworks do not have systems, and only provide methods for querying entities. Other frameworks may allow for adding things to entities than are not components. These implementations are still considered ECS by many people." — [SanderMertens/ecs-faq](https://github.com/SanderMertens/ecs-faq) (2025-12-17)
 - "Designing an ECS application starts with creating the components (data structures) that contain the game data. Important things to take into account are:" — [SanderMertens/ecs-faq](https://github.com/SanderMertens/ecs-faq) (2025-12-17)
+- "An ability is defined by two classes, deriving from `AbstractAbilityScriptableObject` and `AbstractAbilitySpec`, respectively.  It is recommended to define the `AbstractAbilitySpec` class inside the `AbstractAbilityScriptableObject`." — [sjai013/unity-gameplay-ability-system](https://github.com/sjai013/unity-gameplay-ability-system) (2022-08-12)
+- "/// What to do when the ability is cancelled.  We don't care about there for this example." — [sjai013/unity-gameplay-ability-system](https://github.com/sjai013/unity-gameplay-ability-system) (2022-08-12)
+- "Suggestions and recommendations are welcome to be filed via the GitHub issue" — [terrehbyte/awesome-ue4](https://github.com/terrehbyte/awesome-ue4) (2023-09-19)
+- "- Note: Your GitHub account must be a part of the [Epic Games organization](https://www.unrealengine.com/ue4-on-github) in order to view this." — [terrehbyte/awesome-ue4](https://github.com/terrehbyte/awesome-ue4) (2023-09-19)
+- "5. I also recommend reading this quick post by a freeCodeCamp community member on the importance of Hackathons. They opened all sorts of doors for him in his job search. (10 minute read): https://www.freecodecamp.org/news/why-every-student-should-join-hackathons/" — [freeCodeCamp/awesome-quincy-larson-emails](https://github.com/freeCodeCamp/awesome-quincy-larson-emails) (2026-02-16)
+- "Joke of the Week: *"Why do programmers prefer dark mode? Because light attracts bugs."* — ShivamLH on Reddit" — [freeCodeCamp/awesome-quincy-larson-emails](https://github.com/freeCodeCamp/awesome-quincy-larson-emails) (2026-02-16)
+- "Quote of the Week: *"In mathematics you don't understand things. You just get used to them."* — John von Neumann, mathematician and creator of von Neumann computer architecture, which is almost certainly used in the device that you're reading this on" — [freeCodeCamp/awesome-quincy-larson-emails](https://github.com/freeCodeCamp/awesome-quincy-larson-emails) (2026-02-16)
+- "**If you find these learning resources to be worth your time, consider supporting the nonprofit with a tax-deductible donation: [https://donate.freecodecamp.org](https://donate.freecodecamp.org) or with a monthly donation via their Patreon account: https://www.patreon.com/m/4797564/**" — [freeCodeCamp/awesome-quincy-larson-emails](https://github.com/freeCodeCamp/awesome-quincy-larson-emails) (2026-02-16)
+- "Quote of the Week: *"Numbers have an important story to tell. They rely on you to give them a voice."* — Stephen Few, Author and Data Analyst" — [freeCodeCamp/awesome-quincy-larson-emails](https://github.com/freeCodeCamp/awesome-quincy-larson-emails) (2026-02-16)
+- "Categorizing extensions can be a tough nut to crack, and I am open to suggestions! If you think there's a better way to group certain extensions or want to recommend new categories, please feel free to open a GitHub issue. Your input is invaluable in making this directory more useful for everyone." — [marekbrze/categorized-raycast-extensions](https://github.com/marekbrze/categorized-raycast-extensions) (2024-09-27)
+- "https://www.raycast.com/elonwoo/toggle-fn) by elonwoo - Toggle the "Use all F1, F2, etc. keys as standard function keys" option in macOS System Preferences." — [marekbrze/categorized-raycast-extensions](https://github.com/marekbrze/categorized-raycast-extensions) (2024-09-27)
+- "I hope this repository helps you make the most out of Raycast. Explore, enjoy, and don't hesitate to contribute!" — [marekbrze/categorized-raycast-extensions](https://github.com/marekbrze/categorized-raycast-extensions) (2024-09-27)
+- "https://www.raycast.com/ashleyhindle/focus-anchor) by ashleyhindle - Anchor your focus on the most important thing" — [marekbrze/categorized-raycast-extensions](https://github.com/marekbrze/categorized-raycast-extensions) (2024-09-27)
+- "https://www.raycast.com/broc-dev/tidal-controller) by broc-dev - Control your local Tidal client with your keyboard. Note: You **must** enable Accessibility permissions for Raycast in order for this extension to work." — [marekbrze/categorized-raycast-extensions](https://github.com/marekbrze/categorized-raycast-extensions) (2024-09-27)
+- "https://www.raycast.com/fe9lix/pinboard) by fe9lix - Post new bookmarks to Pinboard and search through your Pinboard bookmarks. Tip: Assign a global shortcut to the "Add Bookmark" command, select a URL, and then run the command ✨" — [marekbrze/categorized-raycast-extensions](https://github.com/marekbrze/categorized-raycast-extensions) (2024-09-27)
+- "> If you find this project helpful, please consider giving it a star ⭐. Thank you!" — [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter) (2026-05-19)
