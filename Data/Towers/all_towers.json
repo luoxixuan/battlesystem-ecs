@@ -44,7 +44,9 @@
         "SlowDuration": 0.0,
         "SpecialAbility": {
             "AbilityType": "splash",
-            "Radius": 2
+            "Radius": 2,
+            "FalloffInnerRatio": 0.5,
+            "FalloffOuterMult": 0.5
         },
         "UpgradePath": "fast"
     },

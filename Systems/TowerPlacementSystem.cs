@@ -153,6 +153,9 @@ namespace BattleSystemECS.Systems
                 case "splash":
                 case "splash_damage":
                     store.TowerSplashRadius[towerId] = ability.Radius;
+                    // Apply falloff if specified (default 1.0 = no falloff)
+                    store.TowerFalloffInnerRatio[towerId] = ability.FalloffInnerRatio > 0f ? ability.FalloffInnerRatio : 1.0f;
+                    store.TowerFalloffOuterMult[towerId] = ability.FalloffOuterMult > 0f ? ability.FalloffOuterMult : 1.0f;
                     break;
             }
         }

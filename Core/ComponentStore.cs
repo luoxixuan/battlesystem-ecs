@@ -163,6 +163,10 @@ namespace BattleSystemECS.Core
         // Tower special abilities from upgrade path (e.g., armor pierce, splash, critical strike)
         public float[] TowerArmorPierceRatio = new float[MAX_ENTITIES];
         public float[] TowerSplashRadius = new float[MAX_ENTITIES];
+        // AOE falloff: inner ratio (0.5 = inner 50% at full damage), outer mult (0.5 = outer half damage)
+        // Default 1.0 = no falloff (all targets take full splash damage)
+        public float[] TowerFalloffInnerRatio = new float[MAX_ENTITIES];
+        public float[] TowerFalloffOuterMult = new float[MAX_ENTITIES];
         public float[] TowerCritChance = new float[MAX_ENTITIES];
         public float[] TowerCritMultiplier = new float[MAX_ENTITIES];
         public bool[] TowerHasChainLightning = new bool[MAX_ENTITIES];

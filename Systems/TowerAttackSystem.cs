@@ -537,10 +537,38 @@ namespace BattleSystemECS.Systems
                         int enemyId = candidates[ci];
                         if (!store.EnemyActive[enemyId] || enemyId == primaryEnemyId) continue;
 
-                        store.EnemyHealth[enemyId] -= splashDamage;
-                        if (store.EnemyHealth[enemyId] <= 0f)
+                        // Calculate distance-based falloff: inner ring full damage, outer ring reduced
+                        float falloffInnerRatio = store.TowerFalloffInnerRatio[towerId];
+                        float falloffOuterMult = store.TowerFalloffOuterMult[towerId];
+
+                        // Only apply falloff if it's different from the default (no falloff)
+                        if (falloffInnerRatio < 1.0f || falloffOuterMult < 1.0f)
                         {
-                            store.QueueEnemyDeath(enemyId, playerId);
+                            float ex = store.PositionX[enemyId];
+                            float ey = store.PositionY[enemyId];
+                            float dx = ex - px;
+                            float dy = ey - py;
+                            // Avoid sqrt: compare squared distance to squared inner radius
+                            float distSq = dx * dx + dy * dy;
+                            float innerRadiusSq = falloffInnerRatio * falloffInnerRatio * splashRadius * splashRadius;
+                            if (distSq > innerRadiusSq)
+                            {
+                                store.EnemyHealth[enemyId] -= splashDamage * falloffOuterMult;
+                                if (store.EnemyHealth[enemyId] <= 0f)
+                                    store.QueueEnemyDeath(enemyId, playerId);
+                            }
+                            else
+                            {
+                                store.EnemyHealth[enemyId] -= splashDamage;
+                                if (store.EnemyHealth[enemyId] <= 0f)
+                                    store.QueueEnemyDeath(enemyId, playerId);
+                            }
+                        }
+                        else
+                        {
+                            store.EnemyHealth[enemyId] -= splashDamage;
+                            if (store.EnemyHealth[enemyId] <= 0f)
+                                store.QueueEnemyDeath(enemyId, playerId);
                         }
                     }
                 }

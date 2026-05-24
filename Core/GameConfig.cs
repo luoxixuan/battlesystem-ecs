@@ -91,6 +91,10 @@ namespace BattleSystemECS.Config
         public float SlowFactor { get; set; } = 0f;
         /// <summary>Slow duration in turns</summary>
         public int SlowDuration { get; set; } = 0;
+        /// <summary>AOE falloff inner radius ratio (0.5 = inner 50% at full damage, default 1.0)</summary>
+        public float FalloffInnerRatio { get; set; } = 1.0f;
+        /// <summary>AOE falloff outer damage multiplier (0.5 = outer 50% damage, default 1.0)</summary>
+        public float FalloffOuterMult { get; set; } = 1.0f;
     }
 
     public class EnemyTypeEntry
