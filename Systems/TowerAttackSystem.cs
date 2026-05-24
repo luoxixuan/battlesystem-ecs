@@ -186,8 +186,30 @@ namespace BattleSystemECS.Systems
                 candidates.Clear();
                 store.SpatialGrid.GetEnemiesInRange(store, tx, ty, range, candidates);
 
-                int bestTarget = -1;
-                float minDistSq = float.MaxValue;
+                // Read tower targeting mode (0=Nearest, 1=Furthest, 2=LowestHealth, 3=HighestHealth, 4=FirstSpawned, 5=LastSpawned)
+                int targetingMode = store.TowerTargetingMode[towerId];
+
+int bestTarget = -1;
+                float bestScore = 0f;
+
+                // Initialize bestScore based on targeting mode to ensure first candidate is always evaluated
+                switch (targetingMode)
+                {
+                    case 1: // Furthest — maximize distance
+                        bestScore = float.MinValue;
+                        break;
+                    case 2: // LowestHealth
+                    case 4: // FirstSpawned
+                        bestScore = float.MaxValue; // minimize these scores
+                        break;
+                    case 3: // HighestHealth
+                    case 5: // LastSpawned
+                        bestScore = float.MinValue; // maximize these scores
+                        break;
+                    default: // Nearest — minimize distance
+                        bestScore = float.MaxValue;
+                        break;
+                }
 
                 for (int ci = 0; ci < candidates.Count; ci++)
                 {
@@ -201,9 +223,40 @@ namespace BattleSystemECS.Systems
                     float dy = ey - ty;
 
                     float distSq = dx * dx + dy * dy;
-                    if (distSq < minDistSq)
+
+                    float score;
+                    bool isBetter;
+                    switch (targetingMode)
                     {
-                        minDistSq = distSq;
+                        case 1: // Furthest — maximize distance
+                            score = distSq;
+                            isBetter = score > bestScore;
+                            break;
+                        case 2: // LowestHealth — minimize health
+                            score = store.EnemyHealth[enemyId];
+                            isBetter = score < bestScore;
+                            break;
+                        case 3: // HighestHealth — maximize health
+                            score = store.EnemyHealth[enemyId];
+                            isBetter = score > bestScore;
+                            break;
+                        case 4: // FirstSpawned — oldest by spawn frame (smallest frame number)
+                            score = store.EnemySpawnFrame[enemyId];
+                            isBetter = score < bestScore;
+                            break;
+                        case 5: // LastSpawned — newest by spawn frame (largest frame number)
+                            score = store.EnemySpawnFrame[enemyId];
+                            isBetter = score > bestScore;
+                            break;
+                        default: // 0 = Nearest — minimize distance (default)
+                            score = distSq;
+                            isBetter = distSq < bestScore;
+                            break;
+                    }
+
+                    if (isBetter)
+                    {
+                        bestScore = score;
                         bestTarget = enemyId;
                     }
                 }
