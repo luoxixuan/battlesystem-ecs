@@ -45,12 +45,14 @@ namespace BattleSystemECS.Systems
         private List<int> _lineAreaHits = new List<int>(64);
         private List<int> _coneAreaHits = new List<int>(64);
         private List<int> _groundTargetHits = new List<int>(64);
+        private List<int> _slowAreaHits = new List<int>(64);
         private readonly object _singleTargetCandidatesLock = new object();
         private readonly object _crossAreaHitsLock = new object();
         private readonly object _boxAreaHitsLock = new object();
         private readonly object _lineAreaHitsLock = new object();
         private readonly object _coneAreaHitsLock = new object();
         private readonly object _groundTargetHitsLock = new object();
+        private readonly object _slowAreaHitsLock = new object();
 
         // Poison Nova DoT constants
         private const float POISON_NOVA_DURATION = 5f;
@@ -140,7 +142,9 @@ namespace BattleSystemECS.Systems
                     StackingBehavior.None, 1,  // dotStacking, dotMaxStacks
                     sc.FreezeDuration,
                     sc.FreezeChance,  // Cold Nova freeze fields
-                    sc.ConeAngleDegrees  // cone angle in degrees (only meaningful for AreaShape="cone")
+                    sc.ConeAngleDegrees,  // cone angle in degrees (only meaningful for AreaShape="cone")
+                    sc.SlowAmount,         // Slow Nova speed reduction (0 = no slow)
+                    sc.SlowDuration        // Slow Nova duration in seconds (0 = no slow)
                 );
                 store.AddAbility(playerId, def);
                 renderer.Log($"[SKILL] {sc.Name} registered (shape: {sc.AreaShape}, radius: {sc.AreaRadius}, DoT: {sc.DotDuration}s/{sc.DotTickInterval}s×{sc.DotDamagePerTick})");
@@ -276,6 +280,9 @@ namespace BattleSystemECS.Systems
                     break;
                 case 10: // GroundTarget — player selects a point, AoE around that point
                     enemiesHit = CastGroundTarget(finalDamage, def.AreaRadius, def.Name);
+                    break;
+                case 11: // Slow — circle AoE that slows enemies in radius (move speed reduction, non-freeze)
+                    enemiesHit = CastSlowArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def);
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -668,6 +675,57 @@ namespace BattleSystemECS.Systems
                     }
                     hitCount++;
                 }
+            }
+            return hitCount;
+        }
+
+        /// <summary>
+        /// Slow AreaShape: circle AoE that slows enemies in radius (non-freeze, move speed reduction).
+        /// Reuses circular range query + applies slow via ApplySlow with factor + duration.
+        /// Follows two-phase pattern (parallel collect → serial apply).
+        /// </summary>
+        private int CastSlowArea(float finalDamage, float playerX, float playerY,
+            int radius, string name, GameplayAbilityDef def)
+        {
+            if (_activeEnemyList == null) return 0;
+            var activeEnemyIds = _activeEnemyList;
+
+            int radiusSq = radius * radius;
+            _slowAreaHits.Clear();
+
+            Parallel.ForEach(activeEnemyIds, enemyId =>
+            {
+                if (enemyId == playerId) return;
+                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyHealth <= 0f) return;
+
+                float enemyX = store.PositionX[enemyId];
+                float enemyY = store.PositionY[enemyId];
+
+                float dx = enemyX - playerX;
+                float dy = enemyY - playerY;
+                float distSq = dx * dx + dy * dy;
+
+                if (distSq <= radiusSq)
+                {
+                    lock (_slowAreaHitsLock) { _slowAreaHits.Add(enemyId); }
+                }
+            });
+
+            // Serial phase: apply damage and slow effect
+            int hitCount = 0;
+            foreach (int enemyId in _slowAreaHits)
+            {
+                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+
+                if (def.SlowAmount > 0f && def.SlowDuration > 0f)
+                {
+                    // Apply slow factor (e.g., 0.5 = 50% speed) + duration in turns
+                    int slowTurns = Math.Max(1, (int)Math.Ceiling(def.SlowDuration * (1f - _enemySlowResistance)));
+                    store.ApplySlow(enemyId, def.SlowAmount, slowTurns);
+                    renderer.Log($"[SKILL] {name} slowed enemy {enemyId} by {def.SlowAmount:F2}x for {slowTurns} turns");
+                }
+                hitCount++;
             }
             return hitCount;
         }

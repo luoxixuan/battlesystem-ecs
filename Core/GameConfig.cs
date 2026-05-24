@@ -222,6 +222,9 @@ namespace BattleSystemECS.Config
         public float FreezeChance { get; set; }
         /// <summary>Cone angle in degrees for AreaShape="cone". Controls fan spread. Default: 60.</summary>
         public float ConeAngleDegrees { get; set; } = 60.0f;
+        // Slow fields (Slow Nova — move speed reduction AoE)
+        public float SlowAmount { get; set; }
+        public float SlowDuration { get; set; }
     }
 
     public class BehaviorTreeDef

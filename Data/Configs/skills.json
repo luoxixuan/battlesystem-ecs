@@ -377,5 +377,29 @@
         "EffectTag": "Burn"
       }
     ]
+  },
+  {
+    "Name": "Slow Nova",
+    "Description": "环形 AoE 减速 — 范围内敌人受到伤害，移动速度降低 50%，持续 3 秒",
+    "AreaShape": "slow",
+    "AreaWidth": 5,
+    "AreaHeight": 5,
+    "AttackRange": 4,
+    "Cooldown": 15,
+    "DamageMultiplier": 2,
+    "AutoCast": false,
+    "Hotkey": "P",
+    "AreaRadius": 4,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
+    "HealPercent": 0,
+    "ShieldAmount": 0,
+    "ShieldDuration": 0,
+    "FreezeDuration": 0,
+    "FreezeChance": 0,
+    "SlowAmount": 0.5,
+    "SlowDuration": 3.0,
+    "Modifiers": []
   }
 ]

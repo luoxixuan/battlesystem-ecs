@@ -20,6 +20,7 @@ namespace BattleSystemECS.Core.GAS
         public const int Cone = 9;    // Cone/Triangle: directional fan-shaped AoE (e.g. Dragon Breath).
                                        // coneAngleDegrees controls fan spread (passed via GameplayAbilityDef)
         public const int GroundTarget = 10; // Ground target: player selects a point on the map, AoE hits enemies within radius.
+        public const int Slow = 11;          // Slow: circle AoE that slows enemies in radius (non-freeze, move speed reduction)
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -37,6 +38,7 @@ namespace BattleSystemECS.Core.GAS
                 "freeze" => Freeze,
                 "cone" => Cone,
                 "groundtarget" => GroundTarget,
+                "slow" => Slow,
                 _ => Single
             };
         }
@@ -77,6 +79,9 @@ namespace BattleSystemECS.Core.GAS
         // Freeze fields (Cold Nova)
         public float FreezeDuration;     // turns to freeze enemy; 0 = no freeze
         public float FreezeChance;       // probability [0,1] of freeze applying per enemy
+        // Slow fields (Slow Nova — non-freeze move speed reduction)
+        public float SlowAmount;         // speed multiplier (e.g. 0.5 = 50% speed); 0 = no slow
+        public float SlowDuration;       // seconds of slow effect; 0 = no slow
         /// <summary>Cone angle in degrees for AreaShape.Cone. Fan spread. Default: 60.</summary>
         public float ConeAngleDegrees;   // degrees, used only when AreaShape == Cone
 
@@ -87,6 +92,7 @@ namespace BattleSystemECS.Core.GAS
             StackingBehavior dotStacking = StackingBehavior.None, int dotMaxStacks = 1,
             float freezeDuration = 0f, float freezeChance = 0f,
             float coneAngleDegrees = 60.0f,
+            float slowAmount = 0f, float slowDuration = 0f,
             params int[] requiredBuffs)
         {
             Name = name; Description = desc; Cooldown = cooldown; Cost = cost;
@@ -96,6 +102,7 @@ namespace BattleSystemECS.Core.GAS
             DotStackingBehavior = dotStacking; DotMaxStacks = dotMaxStacks;
             HealPercent = healPercent; ShieldAmount = shieldAmount; ShieldDuration = shieldDuration;
             FreezeDuration = freezeDuration; FreezeChance = freezeChance;
+            SlowAmount = slowAmount; SlowDuration = slowDuration;
             ConeAngleDegrees = coneAngleDegrees;
             RequiredBuffs = requiredBuffs;
         }

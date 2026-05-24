@@ -933,6 +933,10 @@ namespace BattleSystemECS.Config
             skill.AutoCast = autoCast;
             skill.Hotkey = ExtractString(json, "Hotkey");
             skill.ConeAngleDegrees = ExtractFloat(json, "ConeAngleDegrees");
+            skill.FreezeDuration = ExtractFloat(json, "FreezeDuration");
+            skill.FreezeChance = ExtractFloat(json, "FreezeChance");
+            skill.SlowAmount = ExtractFloat(json, "SlowAmount");
+            skill.SlowDuration = ExtractFloat(json, "SlowDuration");
             return skill;
         }
     }
