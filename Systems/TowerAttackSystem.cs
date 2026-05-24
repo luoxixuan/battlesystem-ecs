@@ -48,6 +48,10 @@ namespace BattleSystemECS.Systems
         // Cached wave-based difficulty multiplier (updated each SetTurn)
         private float _waveDifficultyMult = 1f;
 
+        // Cached crit bonuses from TechTreeSystem (updated each SetTurn)
+        private float _critRateBonus = 0f;      // from techTreeSystem.GetCritRateBonus()
+        private float _critDamageBonus = 1f;     // from techTreeSystem.GetCritDamageMult()
+
         // Shared random for debuff chance rolls — uses Random.Shared (.NET 6+ thread-safe)
         private static readonly Random _rand = Random.Shared;
 
@@ -104,6 +108,10 @@ namespace BattleSystemECS.Systems
             // Cache enemy CC resistance stats from tech tree (stun/slow duration reduction)
             _enemyStunResistance = techTreeSystem != null ? techTreeSystem.GetStunResistance() : 0f;
             _enemySlowResistance = techTreeSystem != null ? techTreeSystem.GetSlowResistance() : 0f;
+
+            // Cache crit bonuses from tech tree (avoid per-tower calls in hot path)
+            _critRateBonus = techTreeSystem != null ? techTreeSystem.GetCritRateBonus() : 0f;
+            _critDamageBonus = techTreeSystem != null ? techTreeSystem.GetCritDamageMult() : 1f;
 
             // Cache wave-based difficulty multiplier (default wave 1)
             _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(1) : 1f;
@@ -295,9 +303,10 @@ namespace BattleSystemECS.Systems
                                 lock (splashLock) { splashBag.Add((bestTarget, baseDmg * 0.5f, store.PlayerEntityId, towerId)); }
                             }
                             // Special ability: critical strike
-                            if (store.TowerCritChance[towerId] > 0f && _rand.NextDouble() < store.TowerCritChance[towerId])
+                            float critRate = store.TowerCritChance[towerId] + _critRateBonus;
+                            if (critRate > 0f && _rand.NextDouble() < critRate)
                             {
-                                float critBonus = baseDmg * (store.TowerCritMultiplier[towerId] - 1f);
+                                float critBonus = baseDmg * (store.TowerCritMultiplier[towerId] * _critDamageBonus - 1f);
                                 if (critBonus > 0f)
                                     lock (damageLock) { bag.Add((bestTarget, critBonus, store.PlayerEntityId)); }
                             }
