@@ -19,6 +19,7 @@ namespace BattleSystemECS.Core.GAS
         public const int Freeze = 8;  // Cold Nova: circle AoE + freeze on hit
         public const int Cone = 9;    // Cone/Triangle: directional fan-shaped AoE (e.g. Dragon Breath).
                                        // coneAngleDegrees controls fan spread (passed via GameplayAbilityDef)
+        public const int GroundTarget = 10; // Ground target: player selects a point on the map, AoE hits enemies within radius.
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -35,6 +36,7 @@ namespace BattleSystemECS.Core.GAS
                 "line" => Line,
                 "freeze" => Freeze,
                 "cone" => Cone,
+                "groundtarget" => GroundTarget,
                 _ => Single
             };
         }

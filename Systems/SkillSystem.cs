@@ -40,11 +40,13 @@ namespace BattleSystemECS.Systems
         private List<int> _boxAreaHits = new List<int>(64);
         private List<int> _lineAreaHits = new List<int>(64);
         private List<int> _coneAreaHits = new List<int>(64);
+        private List<int> _groundTargetHits = new List<int>(64);
         private readonly object _singleTargetCandidatesLock = new object();
         private readonly object _crossAreaHitsLock = new object();
         private readonly object _boxAreaHitsLock = new object();
         private readonly object _lineAreaHitsLock = new object();
         private readonly object _coneAreaHitsLock = new object();
+        private readonly object _groundTargetHitsLock = new object();
 
         // Poison Nova DoT constants
         private const float POISON_NOVA_DURATION = 5f;
@@ -264,6 +266,9 @@ namespace BattleSystemECS.Systems
                     break;
                 case 9: // Cone — directional fan-shaped AoE
                     enemiesHit = CastConeArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def.ConeAngleDegrees);
+                    break;
+                case 10: // GroundTarget — player selects a point, AoE around that point
+                    enemiesHit = CastGroundTarget(finalDamage, def.AreaRadius, def.Name);
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -675,6 +680,55 @@ namespace BattleSystemECS.Systems
         {
             store.ApplyPlayerShield(playerId, def.ShieldAmount, def.ShieldDuration);
             renderer.Log($"[SKILL] {def.Name} cast — Shield={def.ShieldAmount:F0}, Duration={def.ShieldDuration:F0}s");
+        }
+
+        /// <summary>
+        /// GroundTarget AreaShape: player selects a point on the map (via stored target position),
+        /// then AoE damages all enemies within radius of that point.
+        /// For benchmark purposes, defaults to player's own position as target.
+        /// Follows two-phase pattern (parallel collect → serial apply).
+        /// </summary>
+        private int CastGroundTarget(float finalDamage, int radius, string name)
+        {
+            if (_activeEnemyList == null) return 0;
+            var activeEnemyIds = _activeEnemyList;
+
+            int radiusSq = radius * radius;
+
+            // For benchmark compatibility, use player's current position as target.
+            // In real gameplay, this would read a stored mouse-click target coordinate.
+            float targetX = store.PositionX[playerId];
+            float targetY = store.PositionY[playerId];
+
+            _groundTargetHits.Clear();
+
+            Parallel.ForEach(activeEnemyIds, enemyId =>
+            {
+                if (enemyId == playerId) return;
+                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyHealth <= 0f) return;
+
+                float enemyX = store.PositionX[enemyId];
+                float enemyY = store.PositionY[enemyId];
+
+                float dx = enemyX - targetX;
+                float dy = enemyY - targetY;
+                float distSq = dx * dx + dy * dy;
+
+                if (distSq <= radiusSq)
+                {
+                    lock (_groundTargetHitsLock) { _groundTargetHits.Add(enemyId); }
+                }
+            });
+
+            // Serial phase: apply damage and count
+            int hitCount = 0;
+            foreach (int enemyId in _groundTargetHits)
+            {
+                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+                hitCount++;
+            }
+            return hitCount;
         }
 
         /// <summary>
