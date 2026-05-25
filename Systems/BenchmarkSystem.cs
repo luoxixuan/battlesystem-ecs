@@ -69,6 +69,7 @@ namespace BattleSystemECS.Systems
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
             var towerAttack  = new TowerAttackSystem(store, logger, null);
             var auraTower    = new AuraTowerSystem(store);
+            var projectile   = new ProjectileSystem(store, logger);
             var gold         = new GoldSystem(store, logger);
             var upgrade      = new UpgradeSystem(store, logger, playerId, gameConfig);
             var skill        = new SkillSystem(store, logger, playerId, gameConfig);
@@ -198,6 +199,7 @@ namespace BattleSystemECS.Systems
 
                 sw.Restart(); towerAttack.SetTurn(turn); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
                 sw.Restart(); auraTower.SetTurn(); auraTower.ResolveAuraBuffs();
+                sw.Restart(); projectile.Update(1f);
                 sw.Restart(); gold.SetTurn(turn); gold.Update(); tGold += sw.ElapsedTicks;
                 sw.Restart(); upgrade.Update(); tUpgrade += sw.ElapsedTicks;
                 sw.Restart(); skill.Update(1f);
@@ -375,6 +377,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
             var towerAttack   = new TowerAttackSystem(store, logger, null);
             var auraTower     = new AuraTowerSystem(store);
+            var projectile    = new ProjectileSystem(store, logger);
             var gold          = new GoldSystem(store, logger);
             var upgrade       = new UpgradeSystem(store, logger, playerId, gameConfig);
             var skill         = new SkillSystem(store, logger, playerId, gameConfig);
@@ -406,6 +409,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
                 sw.Restart(); playerAttack.SetTurn(turn); playerAttack.Update(); tPlayerAttack += sw.ElapsedTicks;
                 sw.Restart(); towerAttack.SetTurn(turn); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
                 sw.Restart(); auraTower.SetTurn(); auraTower.ResolveAuraBuffs();
+                sw.Restart(); projectile.Update(1f);
                 sw.Restart(); gold.SetTurn(turn); gold.Update(); tGold += sw.ElapsedTicks;
                 sw.Restart(); upgrade.Update(); tUpgrade += sw.ElapsedTicks;
                 sw.Restart(); skill.Update(1f);
