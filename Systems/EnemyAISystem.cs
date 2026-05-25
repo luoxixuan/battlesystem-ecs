@@ -30,6 +30,7 @@ namespace BattleSystemECS.Systems
         private List<int> _activeEnemyList;
         private float _playerX, _playerY;
         private bool _playerHasKnockbackImmunity;
+        private float _currentDeltaTime;
 
         // Attack event batch — ping-pong double-buffer to eliminate per-frame GC allocation.
         // Collected in parallel phase, executed in serial phase.
@@ -60,7 +61,7 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Called at the start of each turn with the current turn number.
         /// </summary>
-        public void SetTurn(int turn)
+        public void SetTurn(int turn, float deltaTime = 0f)
         {
             currentTurn = turn;
             _playerX = store.PositionX[playerId];
@@ -68,6 +69,7 @@ namespace BattleSystemECS.Systems
             _activeEnemyList = store.GetCachedActiveEnemyIds();
             _cachedPlayerHealth = store.PlayerCurrentHealth[playerId];
             _playerHasKnockbackImmunity = techTreeSystem?.GetKnockbackImmunity() ?? false;
+            _currentDeltaTime = deltaTime;
         }
 
         /// <summary>
@@ -98,10 +100,58 @@ namespace BattleSystemECS.Systems
 
                     // Check BT evaluation cache — also track stun duration changes
                     float enemyHealth = store.EnemyHealth[enemyId];
+                    float enemyMaxHealth = store.EnemyMaxHealth[enemyId];
                     float playerHealth = store.PlayerCurrentHealth[playerId];
                     int chargeCounter = store.GetEnemyAIChargeCounter(enemyId);
                     bool stunFlag = store.EnemyStunFlag[enemyId];
                     float stunDuration = store.EnemyStunDurationLeft[enemyId];
+
+                    // ── Boss Phase / Enrage updates ──────────────────────────────────
+                    // 1. Decrement enrage timer (every frame, O(1))
+                    float enrageTimer = store.EnemyEnrageTimer[enemyId];
+                    if (enrageTimer > 0f)
+                    {
+                        enrageTimer -= _currentDeltaTime;
+                        if (enrageTimer <= 0f)
+                        {
+                            enrageTimer = 0f;
+                            store.EnemyIsEnraged[enemyId] = true;
+                            // TODO: apply enrage stat boost (speed/damage mult) via GameConfig lookup
+                        }
+                        store.EnemyEnrageTimer[enemyId] = enrageTimer;
+                    }
+
+                    // 2. Check health-based phase transition
+                    string thresholdsStr = store.EnemyPhaseThresholds[enemyId];
+                    if (!string.IsNullOrEmpty(thresholdsStr))
+                    {
+                        int currentPhase = store.EnemyBossPhase[enemyId];
+                        float healthFraction = (enemyMaxHealth > 0f) ? enemyHealth / enemyMaxHealth : 1f;
+
+                        // Parse CSV thresholds once per frame per boss (stored as "0.75,0.50,0.25")
+                        // Phase N transitions when health drops below thresholds[N]
+                        // currentPhase starts at 0; if health < 0.75 → phase 1; if < 0.50 → phase 2; etc.
+                        string[] parts = thresholdsStr.Split(',');
+                        for (int ph = 0; ph < parts.Length; ph++)
+                        {
+                            if (float.TryParse(parts[ph], System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out float threshold))
+                            {
+                                if (healthFraction < threshold)
+                                {
+                                    int newPhase = ph + 1;
+                                    if (newPhase > currentPhase)
+                                    {
+                                        store.EnemyBossPhase[enemyId] = newPhase;
+                                        // TODO: trigger phase ability via EnemyAbilitySystem.EnqueueAbility
+                                        // TODO: apply phase stat multiplier (speed/damage mult) via GameConfig lookup
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     if (_enemyHealthCache[enemyId] == enemyHealth &&
                         _cachedPlayerHealth == playerHealth &&
                         _enemyChargeCounterCache[enemyId] == chargeCounter &&

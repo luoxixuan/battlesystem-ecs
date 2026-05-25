@@ -141,6 +141,23 @@ namespace BattleSystemECS.Core
         // Set by stealth_attack ability, consumed and reset by EnemyAISystem attack methods.
         public float[] EnemyStealthMultiplier = new float[MAX_ENTITIES];
 
+        // ==================== Boss Phase / Enrage 字段（SOA） ====================
+        // EnemyBossPhase: current phase index for boss enemies (0 = phase 1, 1 = phase 2, etc.)
+        // Non-boss enemies default to 0.
+        public int[] EnemyBossPhase = new int[MAX_ENTITIES];
+        // EnemyPhaseThreshold: health fraction (0-1) at which next phase triggers.
+        // E.g., threshold=0.5f → when health drops below 50% max, phase increments.
+        // Multiple thresholds stored as CSV string: "0.75,0.50,0.25" — parsed at spawn.
+        // Default empty = no phase transitions (phase 0 only).
+        public string[] EnemyPhaseThresholds = new string[MAX_ENTITIES];
+        // EnemyEnrageTimer: seconds until enrage mode activates for this enemy (0 = no enrage).
+        // When timer reaches 0, the enemy enters permanent enrage (speed/damage boost).
+        // Default 0 = no enrage timer.
+        public float[] EnemyEnrageTimer = new float[MAX_ENTITIES];
+        // EnemyIsEnraged: true once enrage condition is met (permanent flag, no cooldown).
+        // When true, the enemy's base stats are boosted per enrage config.
+        public bool[] EnemyIsEnraged = new bool[MAX_ENTITIES];
+
         // ==================== 敌人抗性字段（SOA） ====================
         // EnemyStunResistance: 0-1, reduces stun duration and chance
         public float[] EnemyStunResistance = new float[MAX_ENTITIES];
@@ -446,6 +463,11 @@ namespace BattleSystemECS.Core
                 EnemyFreezeResistance[entityId] = 0f;
                 EnemySlowResistance[entityId] = 0f;
                 EnemyDamageResistance[entityId] = 0f;
+                // Boss phase / enrage fields
+                EnemyBossPhase[entityId] = 0;
+                EnemyPhaseThresholds[entityId] = null;
+                EnemyEnrageTimer[entityId] = 0f;
+                EnemyIsEnraged[entityId] = false;
                 // Freeze fields (shared with stun — no separate fields needed, cleanup via StunDurationLeft/StunFlag above)
             }
 
@@ -687,12 +709,13 @@ namespace BattleSystemECS.Core
             if (fullName != null)
             {
                 bool isElite = fullName.StartsWith("[ELITE]");
+                bool isBoss = fullName.StartsWith("[BOSS]");
                 bool isFlying = false; // default: enemies are ground units
                 EnemyIsElite[entityId] = isElite;
                 EnemyIsFlying[entityId] = isFlying;
                 // 剥除 [BOSS]/[ELITE] 前缀，保留基础类型名
                 string nameToStore = fullName;
-                if (isElite || fullName.StartsWith("[BOSS]"))
+                if (isElite || isBoss)
                 {
                     int spaceIdx = fullName.IndexOf(' ');
                     nameToStore = (spaceIdx > 0) ? fullName.Substring(spaceIdx + 1) : fullName;

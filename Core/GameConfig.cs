@@ -37,6 +37,13 @@ namespace BattleSystemECS.Config
         public float Armor { get; set; } = 0f;
         // Shield: absorbs incoming damage before health. Boss/Elite types can have shield.
         public float Shield { get; set; } = 0f;
+        // Boss: true if this monster type is a boss (participates in phase/enrage system).
+        public bool IsBoss { get; set; } = false;
+        // Phases: ordered list of boss phase definitions (by threshold, descending).
+        // Example: [{\"threshold\": 0.75, \"abilityId\": \"phase2_buff\"}, {\"threshold\": 0.50, \"abilityId\": \"enrage\"}]
+        public List<BossPhaseDef> Phases { get; set; } = new List<BossPhaseDef>();
+        // Enrage: enrage configuration (timer-based). Null = no enrage.
+        public BossEnrageConfig Enrage { get; set; }
     }
 
     public class TowerConfig
@@ -193,6 +200,39 @@ namespace BattleSystemECS.Config
         // summon_minion ability fields
         public float MinionHealthMult { get; set; } // health multiplier for summoned minion
         public float MinionDamageMult { get; set; } // damage multiplier for summoned minion
+    }
+
+    /// <summary>
+    /// Boss phase definition — loaded from monster JSON (phases[] field).
+    /// Each phase specifies a health threshold and the ability to trigger on phase entry.
+    /// </summary>
+    public class BossPhaseDef
+    {
+        // Health fraction (0-1) at which this phase activates. E.g., 0.5 = 50% max HP.
+        public float Threshold { get; set; }
+        // Ability ID to trigger when phase activates (e.g., "boss_summon", "boss_enrage").
+        // Empty = no ability triggered on phase entry.
+        public string AbilityId { get; set; }
+        // Speed multiplier applied when this phase activates (1.0 = no change, 1.5 = +50%).
+        public float SpeedMult { get; set; } = 1.0f;
+        // Damage multiplier applied when this phase activates (1.0 = no change, 1.25 = +25%).
+        public float DamageMult { get; set; } = 1.0f;
+        // New behavior tree subtree to use during this phase.
+        // Empty = continue using current BT.
+        public string NewBehaviorTree { get; set; }
+    }
+
+    /// <summary>
+    /// Boss enrage configuration — loaded from monster JSON (enrage{} field).
+    /// </summary>
+    public class BossEnrageConfig
+    {
+        // Time in seconds after spawn before enrage activates (0 = no timer-based enrage).
+        public float EnrageAfterSeconds { get; set; }
+        // Speed multiplier when enrage activates (1.0 = no change).
+        public float SpeedMult { get; set; } = 1.0f;
+        // Damage multiplier when enrage activates (1.0 = no change).
+        public float DamageMult { get; set; } = 1.0f;
     }
 
     public class SkillConfig

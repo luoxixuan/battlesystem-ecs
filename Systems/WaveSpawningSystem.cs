@@ -301,6 +301,27 @@ namespace BattleSystemECS.Systems
                     _multiSpawnedForType++;
                     enemiesSpawnedInWave++;
                     totalEnemiesSpawned++;
+
+                    // Initialize boss phase fields if this is a boss enemy
+                    if (isBossWave && monsterConfig.IsBoss)
+                    {
+                        // Build CSV string from Phases thresholds: "0.75,0.50,0.25"
+                        if (monsterConfig.Phases != null && monsterConfig.Phases.Count > 0)
+                        {
+                            var thresholds = new System.Text.StringBuilder();
+                            for (int p = 0; p < monsterConfig.Phases.Count; p++)
+                            {
+                                if (p > 0) thresholds.Append(',');
+                                thresholds.Append(monsterConfig.Phases[p].Threshold.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                            }
+                            store.EnemyPhaseThresholds[enemyId] = thresholds.ToString();
+                        }
+                        // Initialize enrage timer from config
+                        if (monsterConfig.Enrage != null && monsterConfig.Enrage.EnrageAfterSeconds > 0f)
+                        {
+                            store.EnemyEnrageTimer[enemyId] = monsterConfig.Enrage.EnrageAfterSeconds;
+                        }
+                    }
                 }
 
                 renderer.Log($"[SPAWN] Spawned {enemiesSpawnedInWave} enemies (batch 5) for Wave {currentWave}");

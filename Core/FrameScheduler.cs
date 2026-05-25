@@ -86,7 +86,7 @@ namespace BattleSystemECS.Core
             WaveSpawning?.Update();
 
             // ── Phase 2: AI + Abilities ───────────────────────────────────
-            EnemyAI?.SetTurn(turn);
+            EnemyAI?.SetTurn(turn, deltaTime);
             EnemyAI?.Update();
 
             EnemyAbility?.SetTurn(turn);
