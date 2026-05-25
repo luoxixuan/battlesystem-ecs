@@ -234,6 +234,16 @@ namespace BattleSystemECS.Core
         // 协同增益倍率（从 JSON config 读取并应用，如 bonusChainCount, dotDamageBonus）
         public float[] TowerSynergyMultiplier = new float[MAX_ENTITIES];
 
+        // ==================== 光环辅助塔（Aura Tower）字段（SOA）====================
+        // TowerIsAuraTower: true if this tower is an aura (support) tower that buffs nearby friendly towers
+        public bool[] TowerIsAuraTower = new bool[MAX_ENTITIES];
+        // TowerAuraRadius: radius within which the aura effect applies (in grid units)
+        public float[] TowerAuraRadius = new float[MAX_ENTITIES];
+        // TowerAuraAttackSpeedBonus: attack speed multiplier bonus granted to towers in range (e.g. 0.2 = +20%)
+        public float[] TowerAuraAttackSpeedBonus = new float[MAX_ENTITIES];
+        // TowerAuraDamageBonus: damage multiplier bonus granted to towers in range (e.g. 0.15 = +15%)
+        public float[] TowerAuraDamageBonus = new float[MAX_ENTITIES];
+
         // ==================== 技能组件的 SOA 存储 ====================
         public string[] SkillName = new string[MAX_PLAYERS];
         public float[] SkillDamageMultiplier = new float[MAX_PLAYERS];
@@ -496,6 +506,11 @@ namespace BattleSystemECS.Core
                 TowerSlowDuration[entityId] = 0f;
                 TowerCanHitAir[entityId] = false;
                 TowerCanHitGround[entityId] = false;
+                // Aura tower fields
+                TowerIsAuraTower[entityId] = false;
+                TowerAuraRadius[entityId] = 0f;
+                TowerAuraAttackSpeedBonus[entityId] = 0f;
+                TowerAuraDamageBonus[entityId] = 0f;
             }
 
             // ── Phase 4: recycle ID ───────────────────────────────────────────────
@@ -766,6 +781,11 @@ namespace BattleSystemECS.Core
             TowerStunChance[entityId] = stunChance;
             TowerSlowAmount[entityId] = slowAmount;
             TowerSlowDuration[entityId] = slowDuration;
+            // Aura tower fields: default to non-aura (false/0)
+            TowerIsAuraTower[entityId] = false;
+            TowerAuraRadius[entityId] = 0f;
+            TowerAuraAttackSpeedBonus[entityId] = 0f;
+            TowerAuraDamageBonus[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); }
         }
@@ -776,6 +796,11 @@ namespace BattleSystemECS.Core
             TowerActive[entityId] = false;
             TowerUpgradePathId[entityId] = null;
             TowerSelected[entityId] = false;
+            // Aura tower fields reset
+            TowerIsAuraTower[entityId] = false;
+            TowerAuraRadius[entityId] = 0f;
+            TowerAuraAttackSpeedBonus[entityId] = 0f;
+            TowerAuraDamageBonus[entityId] = 0f;
             lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
         }
 

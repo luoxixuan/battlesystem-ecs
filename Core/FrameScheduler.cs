@@ -42,6 +42,7 @@ namespace BattleSystemECS.Core
         public ComboSystem? Combo { get; set; }
         public AutoSkillSystem? AutoSkill { get; set; }
         public WeatherSystem? Weather { get; set; }
+        public AuraTowerSystem? AuraTower { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -103,6 +104,7 @@ namespace BattleSystemECS.Core
             TowerAttack?.SetTurn(turn);
             TowerSynergy?.SetTurn();
             Skill?.SetTurn(turn);
+            AuraTower?.SetTurn();
 
             // ── Phase 5: Spatial Rebuild ──────────────────────────────────
             store.RebuildSpatialGrid();
@@ -111,6 +113,7 @@ namespace BattleSystemECS.Core
             PlayerTowerAttack?.Update();
             TowerAttack?.Update(deltaTime);
             TowerSynergy?.Update();
+            AuraTower?.ResolveAuraBuffs();
 
             // ── Phase 7: Skill / Buff Damage ──────────────────────────────
             Buff?.Update(deltaTime);

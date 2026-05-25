@@ -35,6 +35,7 @@ namespace BattleSystemECS.Core
         private ComboSystem comboSystem;                   // Combo Kill 连击系统
         private AutoSkillSystem autoSkillSystem;           // 自动技能施放系统（BuildPhase）
         private TowerSynergySystem towerSynergySystem;    // 塔协同增益系统
+        private AuraTowerSystem auraTowerSystem;          // 光环辅助塔系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -169,6 +170,14 @@ namespace BattleSystemECS.Core
             autoSkillSystem = new AutoSkillSystem(store, logger, playerId, skillSystem, gameConfig.AutoSkill);
             logger.Log("[BOOTSTRAP]      AutoSkillSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating TowerSynergySystem...");
+            towerSynergySystem = new TowerSynergySystem(store, logger);
+            logger.Log("[BOOTSTRAP]      TowerSynergySystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating AuraTowerSystem...");
+            auraTowerSystem = new AuraTowerSystem(store);
+            logger.Log("[BOOTSTRAP]      AuraTowerSystem created successfully!");
+
             // Wire OnEnemyKilled → ComboSystem (连击计数链路)
             store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
 
@@ -203,6 +212,7 @@ namespace BattleSystemECS.Core
             scheduler.PlayerTowerAttack = playerTowerAttackSystem;
             scheduler.TowerAttack = towerAttackSystem;
             scheduler.TowerSynergy = towerSynergySystem;
+            scheduler.AuraTower = auraTowerSystem;
             scheduler.Skill = skillSystem;
             scheduler.Buff = buffSystem;
             scheduler.Combo = comboSystem;
