@@ -786,6 +786,8 @@ namespace BattleSystemECS.Core
             TowerAuraRadius[entityId] = 0f;
             TowerAuraAttackSpeedBonus[entityId] = 0f;
             TowerAuraDamageBonus[entityId] = 0f;
+            TowerCanHitAir[entityId] = true;
+            TowerCanHitGround[entityId] = true;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); }
         }
