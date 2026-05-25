@@ -65,8 +65,11 @@ namespace BattleSystemECS.Systems
                 // Mud (1) and Ice (2): apply slow
                 if (terrainId == 1 || terrainId == 2)
                 {
-                    store.EnemySlowFactor[enemyId] = terrain.MoveSpeedMult;
-                    store.EnemySlowDurationLeft[enemyId] = 2f;
+                    store.EnemyTerrainMoveSpeedMult[enemyId] = terrain.MoveSpeedMult;
+                }
+                else
+                {
+                    store.EnemyTerrainMoveSpeedMult[enemyId] = 1f;
                 }
 
                 // Lava (3): apply DoT

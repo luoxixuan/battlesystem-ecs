@@ -86,6 +86,8 @@ namespace BattleSystemECS.Systems
                 }
 
                 float moveSpeed = store.EnemyMoveSpeed[enemyId];
+                // Apply terrain move speed modifier (Mud/Ice slow)
+                moveSpeed *= store.EnemyTerrainMoveSpeedMult[enemyId];
 
                 // Enum-based action dispatch — O(1) per enemy, no string comparison
                 EnemyActionType actionEnum = store.GetEnemyActionEnum(enemyId);

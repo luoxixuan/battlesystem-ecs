@@ -44,6 +44,7 @@ namespace BattleSystemECS.Core
         public WeatherSystem? Weather { get; set; }
         public AuraTowerSystem? AuraTower { get; set; }
         public ProjectileSystem? Projectile { get; set; }
+        public TerrainSystem? Terrain { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -99,6 +100,10 @@ namespace BattleSystemECS.Core
             // ── Phase 3: Movement ──────────────────────────────────────────
             EnemyMovement?.SetTurn(turn);
             EnemyMovement?.Update();
+
+            // ── Phase 3.5: Terrain Effects (after movement, before combat) ──
+            Terrain?.SetTurn();
+            Terrain?.Update(deltaTime);
 
             // ── Phase 4: Combat — SetTurn ─────────────────────────────────
             PlayerTowerAttack?.SetTurn(turn);

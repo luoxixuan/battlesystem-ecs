@@ -443,6 +443,10 @@ namespace BattleSystemECS.Config
         // Weather system configuration
         public WeatherConfig Weather { get; set; } = new WeatherConfig();
 
+        // Terrain system configuration (direction 2)
+        public List<TerrainTypeConfig> TerrainTypes { get; set; } = new List<TerrainTypeConfig>();
+        public int[][] MapTerrainGrid { get; set; } = Array.Empty<int[]>();
+
         public GameConfig()
         {
             InitializeDefaultConfig();
@@ -948,5 +952,16 @@ namespace BattleSystemECS.Config
         // Intensity range for random selection
         public float MinIntensity { get; set; } = 0.5f;
         public float MaxIntensity { get; set; } = 1.0f;
+    }
+
+    public class TerrainTypeConfig
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public float MoveSpeedMult { get; set; } = 1.0f;
+        public float DotDamagePerTick { get; set; }
+        public int DotDuration { get; set; }
+        public float TowerRangeBonus { get; set; }
     }
 }

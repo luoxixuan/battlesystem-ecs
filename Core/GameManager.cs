@@ -37,6 +37,7 @@ namespace BattleSystemECS.Core
         private TowerSynergySystem towerSynergySystem;    // 塔协同增益系统
         private AuraTowerSystem auraTowerSystem;          // 光环辅助塔系统
         private ProjectileSystem projectileSystem;        // 弹道/飞行道具系统
+        private TerrainSystem terrainSystem;              // 地形效果系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -183,6 +184,11 @@ namespace BattleSystemECS.Core
             projectileSystem = new ProjectileSystem(store, logger);
             logger.Log("[BOOTSTRAP]      ProjectileSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating TerrainSystem...");
+            terrainSystem = new TerrainSystem(store, playerId, gameConfig);
+            terrainSystem.SetBuffSystem(buffSystem);
+            logger.Log("[BOOTSTRAP]      TerrainSystem created successfully!");
+
             // Wire OnEnemyKilled → ComboSystem (连击计数链路)
             store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
 
@@ -219,12 +225,22 @@ namespace BattleSystemECS.Core
             scheduler.TowerSynergy = towerSynergySystem;
             scheduler.AuraTower = auraTowerSystem;
             scheduler.Projectile = projectileSystem;
+            scheduler.Terrain = terrainSystem;
             scheduler.Skill = skillSystem;
             scheduler.Buff = buffSystem;
             scheduler.Combo = comboSystem;
             scheduler.AutoSkill = autoSkillSystem;
             scheduler.Gold = goldSystem;
             scheduler.Upgrade = upgradeSystem;
+
+            // 初始化地形网格（方向二：地图地块系统）
+            if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)
+            {
+                int h = gameConfig.MapTerrainGrid.Length;
+                int w = h > 0 ? gameConfig.MapTerrainGrid[0].Length : 0;
+                store.InitTerrainGrid(w, h, gameConfig.MapTerrainGrid);
+                logger.Log($"[BOOTSTRAP]    - Terrain grid initialized: {w}x{h}");
+            }
 
             // 初始化状态机
             stateMachine = new StateMachine();

@@ -44,6 +44,9 @@ namespace BattleSystemECS.Config
                 // Load weather config
                 LoadWeatherConfig(gameConfig, renderer);
 
+                // Load terrain config
+                LoadTerrainConfig(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -1044,6 +1047,65 @@ namespace BattleSystemECS.Config
                 }
             }
             catch { return defaultValue; }
+        }
+
+        private static void LoadTerrainConfig(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string terrainFile = "Data/Configs/terrain.json";
+            try
+            {
+                if (!File.Exists(terrainFile))
+                {
+                    renderer.Log("[TERRAIN] Terrain config file not found: " + terrainFile + ", using defaults");
+                    return;
+                }
+                string json = File.ReadAllText(terrainFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[TERRAIN] Terrain config file is empty: " + terrainFile);
+                    return;
+                }
+
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                // Parse terrainTypes
+                if (root.TryGetProperty("terrainTypes", out var typesArr))
+                {
+                    foreach (var elem in typesArr.EnumerateArray())
+                    {
+                        var tc = new TerrainTypeConfig();
+                        if (elem.TryGetProperty("id", out var idProp)) tc.Id = idProp.GetInt32();
+                        if (elem.TryGetProperty("name", out var nameProp)) tc.Name = nameProp.GetString() ?? "";
+                        if (elem.TryGetProperty("description", out var descProp)) tc.Description = descProp.GetString() ?? "";
+                        if (elem.TryGetProperty("moveSpeedMult", out var msmProp)) tc.MoveSpeedMult = (float)msmProp.GetDouble();
+                        if (elem.TryGetProperty("dotDamagePerTick", out var ddpProp)) tc.DotDamagePerTick = (float)ddpProp.GetDouble();
+                        if (elem.TryGetProperty("dotDuration", out var ddProp)) tc.DotDuration = ddProp.GetInt32();
+                        if (elem.TryGetProperty("towerRangeBonus", out var trbProp)) tc.TowerRangeBonus = (float)trbProp.GetDouble();
+                        gameConfig.TerrainTypes.Add(tc);
+                    }
+                }
+
+                // Parse mapTerrain grid
+                if (root.TryGetProperty("mapTerrain", out var gridArr))
+                {
+                    var grid = new List<int[]>();
+                    foreach (var row in gridArr.EnumerateArray())
+                    {
+                        var rowList = new List<int>();
+                        foreach (var cell in row.EnumerateArray())
+                            rowList.Add(cell.GetInt32());
+                        grid.Add(rowList.ToArray());
+                    }
+                    gameConfig.MapTerrainGrid = grid.ToArray();
+                }
+
+                renderer.Log("[TERRAIN] Loaded terrain config from " + terrainFile + " (" + gameConfig.TerrainTypes.Count + " types, " + gameConfig.MapTerrainGrid.Length + " rows)");
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[TERRAIN] Failed to load terrain config: " + ex.Message);
+            }
         }
     }
 }
