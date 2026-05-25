@@ -131,6 +131,8 @@ namespace BattleSystemECS.Core
         public float[] EnemyStunDurationLeft = new float[MAX_ENTITIES];
         // EnemySlowFactor: speed multiplier (0.5 = 50% speed), 0 = no slow
         public float[] EnemySlowFactor = new float[MAX_ENTITIES];
+        // EnemyTerrainMoveSpeedMult: terrain-based speed multiplier (1.0 = normal, 0.5 = mud slow)
+        public float[] EnemyTerrainMoveSpeedMult = new float[MAX_ENTITIES];
         // EnemyMoveSpeedBase: stores original speed for slow recovery
         public float[] EnemyMoveSpeedBase = new float[MAX_ENTITIES];
         // EnemySlowDurationLeft: tower-slow duration in turns. Separate from EnemyBuffDurationLeft
@@ -303,6 +305,43 @@ namespace BattleSystemECS.Core
             _spatialGrid.SetMapSize(width, height);
         }
 
+        // ==================== 地形系统字段 ====================
+        private int[] _mapTerrainGrid = Array.Empty<int>();
+        private int _mapTerrainWidth;
+        private int _mapTerrainHeight;
+
+        public void InitTerrainGrid(int width, int height, int[][] terrainData)
+        {
+            _mapTerrainWidth = width;
+            _mapTerrainHeight = height;
+            _mapTerrainGrid = new int[width * height];
+            for (int y = 0; y < height; y++)
+            {
+                if (terrainData != null && y < terrainData.Length && terrainData[y] != null)
+                {
+                    for (int x = 0; x < width; x++)
+                        _mapTerrainGrid[y * width + x] = x < terrainData[y].Length ? terrainData[y][x] : 0;
+                }
+                else
+                {
+                    for (int x = 0; x < width; x++)
+                        _mapTerrainGrid[y * width + x] = 0;
+                }
+            }
+        }
+
+        public int GetTerrain(int x, int y)
+        {
+            if (x < 0 || x >= _mapTerrainWidth || y < 0 || y >= _mapTerrainHeight)
+                return 0;
+            return _mapTerrainGrid[y * _mapTerrainWidth + x];
+        }
+
+        public int GetTerrainAtPosition(float worldX, float worldY)
+        {
+            return GetTerrain((int)worldX, (int)worldY);
+        }
+
         private readonly ConcurrentStack<int> freeEntityIds = new ConcurrentStack<int>();
         private readonly Dictionary<int, string> entityNames = new Dictionary<int, string>();
         private readonly object entityNamesLock = new object(); // H-1: thread-safe access to entityNames
@@ -468,6 +507,7 @@ namespace BattleSystemECS.Core
                 EnemyStunFlag[entityId] = false;
                 EnemyStunDurationLeft[entityId] = 0f;
                 EnemySlowFactor[entityId] = 0f;
+                EnemyTerrainMoveSpeedMult[entityId] = 1f;
                 EnemyMoveSpeedBase[entityId] = 0f;
                 EnemySlowDurationLeft[entityId] = 0f;
                 EnemyIsElite[entityId] = false;

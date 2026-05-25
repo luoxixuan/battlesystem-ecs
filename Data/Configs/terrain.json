@@ -1,0 +1,71 @@
+{
+  "terrainTypes": [
+    {
+      "id": 0,
+      "name": "Clear",
+      "description": "Normal terrain, no effects",
+      "moveSpeedMult": 1.0,
+      "dotDamagePerTick": 0,
+      "dotDuration": 0,
+      "towerRangeBonus": 0
+    },
+    {
+      "id": 1,
+      "name": "Mud",
+      "description": "Slows enemies by 50%",
+      "moveSpeedMult": 0.5,
+      "dotDamagePerTick": 0,
+      "dotDuration": 0,
+      "towerRangeBonus": 0
+    },
+    {
+      "id": 2,
+      "name": "Ice",
+      "description": "Slides enemies further (1.5x inertia)",
+      "moveSpeedMult": 0.8,
+      "dotDamagePerTick": 0,
+      "dotDuration": 0,
+      "towerRangeBonus": 0
+    },
+    {
+      "id": 3,
+      "name": "Lava",
+      "description": " Deals 10 damage/second DoT to enemies standing on it",
+      "moveSpeedMult": 1.0,
+      "dotDamagePerTick": 10,
+      "dotDuration": 5,
+      "towerRangeBonus": 0
+    },
+    {
+      "id": 4,
+      "name": "HighGround",
+      "description": "Towers on this tile gain +20% attack range",
+      "moveSpeedMult": 1.0,
+      "dotDamagePerTick": 0,
+      "dotDuration": 0,
+      "towerRangeBonus": 0.2
+    }
+  ],
+  "mapTerrain": [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 1, 1, 0, 0, 1, 1, 0, 0],
+    [0, 0, 1, 1, 0, 0, 1, 1, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 3, 3, 0, 0, 0, 0, 3, 3, 0],
+    [0, 3, 3, 0, 0, 0, 0, 3, 3, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  ]
+}
