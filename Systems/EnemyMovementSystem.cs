@@ -97,7 +97,7 @@ namespace BattleSystemECS.Systems
                 float x = store.PositionX[enemyId];
                 float y = store.PositionY[enemyId];
 
-                // Simplified switch: only Retreat needs special handling.
+// Simplified switch: only Retreat needs special handling.
                 // MoveToTarget, None, and default all fall through to direction = -1.
                 switch (actionEnum)
                 {
@@ -108,6 +108,23 @@ namespace BattleSystemECS.Systems
                     case EnemyActionType.Dodge:
                         // X-axis lateral dodge is handled inline in EnemyAISystem (serial).
                         // Here we still apply forward Y movement toward player.
+                        break;
+
+                    case EnemyActionType.Fear:
+                        // Fear: run away from player (direction = +1, toward y=max)
+                        direction = 1;
+                        break;
+
+                    case EnemyActionType.Taunt:
+                        // Taunt: attack the forced target instead of moving.
+                        // Skip movement this frame. TowerAttackSystem handles the taunt target attack.
+                        direction = 0; // zero movement
+                        break;
+
+                    case EnemyActionType.Charm:
+                        // Charm: attack nearest enemy instead of moving.
+                        // Skip movement this frame. Find nearest enemy and attack it.
+                        direction = 0;
                         break;
 
                     default:

@@ -165,6 +165,14 @@ namespace BattleSystemECS.Core
         // When true, the enemy's base stats are boosted per enrage config.
         public bool[] EnemyIsEnraged = new bool[MAX_ENTITIES];
 
+        // ==================== Fear / Taunt / Charm 行为控制字段（SOA） ====================
+        // EnemyFearDurationLeft: turns remaining for fear effect. When > 0, enemy runs away (direction = +1).
+        public float[] EnemyFearDurationLeft = new float[MAX_ENTITIES];
+        // EnemyTauntTargetId: entity ID that this enemy is forced to attack (taunt effect). -1 = no taunt.
+        public int[] EnemyTauntTargetId = new int[MAX_ENTITIES];
+        // EnemyCharmDurationLeft: turns remaining for charm effect. When > 0, enemy attacks other enemies.
+        public float[] EnemyCharmDurationLeft = new float[MAX_ENTITIES];
+
         // ==================== 敌人抗性字段（SOA） ====================
         // EnemyStunResistance: 0-1, reduces stun duration and chance
         public float[] EnemyStunResistance = new float[MAX_ENTITIES];
@@ -515,6 +523,10 @@ namespace BattleSystemECS.Core
                 EnemyStealthMultiplier[entityId] = 1f;
                 EnemyShield[entityId] = 0f;
                 EnemyThornsRatio[entityId] = 0f;
+                // Fear / Taunt / Charm fields
+                EnemyFearDurationLeft[entityId] = 0f;
+                EnemyTauntTargetId[entityId] = -1;
+                EnemyCharmDurationLeft[entityId] = 0f;
                 // Resistance fields
                 EnemyStunResistance[entityId] = 0f;
                 EnemyFreezeResistance[entityId] = 0f;

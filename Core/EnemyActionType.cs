@@ -20,6 +20,9 @@ namespace BattleSystemECS.Components
         StunAoe = 10,
         SlowAoe = 11,
         HealAllies = 12,
-        StealthAttack = 13
+        StealthAttack = 13,
+        Fear = 14,      // 恐惧：向反方向逃跑（远离玩家）
+        Taunt = 15,     // 嘲讽：强制攻击特定目标
+        Charm = 16      // 魅惑：攻击其他敌人
     }
 }
