@@ -1,0 +1,37 @@
+{
+  "mutators": [
+    {
+      "id": "fast_wave",
+      "name": "Fast Wave",
+      "description": "Enemies move 50% faster",
+      "effectType": "speed_mult",
+      "speedMult": 1.5,
+      "triggerWaveStart": 3
+    },
+    {
+      "id": "regen_mist",
+      "name": "Regeneration Mist",
+      "description": "All enemies regenerate 2% max health per second",
+      "effectType": "regen",
+      "regenRate": 0.02,
+      "triggerWaveStart": 6
+    },
+    {
+      "id": "explosive_death",
+      "name": "Explosive Death",
+      "description": "Enemies explode on death dealing 50% of their max health as damage to nearby enemies",
+      "effectType": "explosive_death",
+      "explosionDamageRatio": 0.5,
+      "explosionRadius": 2.0,
+      "triggerWaveStart": 8
+    },
+    {
+      "id": "dense_wave",
+      "name": "Dense Wave",
+      "description": "Enemies spawn in larger groups",
+      "effectType": "dense_spawn",
+      "spawnBatchSize": 8,
+      "triggerWaveStart": 4
+    }
+  ]
+}

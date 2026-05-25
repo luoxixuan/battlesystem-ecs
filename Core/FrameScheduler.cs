@@ -46,6 +46,7 @@ namespace BattleSystemECS.Core
         public PathfindingSystem? Pathfinding { get; set; }
         public ProjectileSystem? Projectile { get; set; }
         public TerrainSystem? Terrain { get; set; }
+        public WaveMutatorSystem? WaveMutator { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -106,6 +107,10 @@ namespace BattleSystemECS.Core
             // ── Phase 3.5: Terrain Effects (after movement, before combat) ──
             Terrain?.SetTurn();
             Terrain?.Update(deltaTime);
+
+            // ── Phase 3.6: Wave Mutators (global wave modifiers) ─────────────
+            WaveMutator?.SetTurn(turn);
+            WaveMutator?.Update(deltaTime);
 
             // ── Phase 4: Combat — SetTurn ─────────────────────────────────
             PlayerTowerAttack?.SetTurn(turn);

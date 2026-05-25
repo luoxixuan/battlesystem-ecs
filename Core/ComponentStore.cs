@@ -88,6 +88,10 @@ namespace BattleSystemECS.Core
         // WaveCompleteGold: gold awarded when wave was completed (for tech tree bonus calculation)
         public float[] PlayerWaveCompleteGold = new float[MAX_PLAYERS];
 
+        // ==================== Wave Mutator 组件（SOA） ====================
+        // CurrentWaveMutatorId: index into WaveMutatorDefs[] for the active mutator this wave, -1 = none
+        public int[] CurrentWaveMutatorId = new int[MAX_PLAYERS];
+
         // ==================== Combo Kill 连击组件（SOA） ====================
         // ComboCount: current consecutive kill streak within combo window
         public float[] PlayerComboCount = new float[MAX_PLAYERS];
@@ -469,6 +473,7 @@ namespace BattleSystemECS.Core
                 PlayerComboGoldMult[i] = 1f;
                 PlayerComboDamageMult[i] = 1f;
                 PlayerComboKillStreak[i] = 0f;
+                CurrentWaveMutatorId[i] = -1;
             }
         }
 

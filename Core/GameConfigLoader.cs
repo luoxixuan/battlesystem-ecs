@@ -47,6 +47,9 @@ namespace BattleSystemECS.Config
                 // Load terrain config
                 LoadTerrainConfig(gameConfig, renderer);
 
+                // Load wave mutators config
+                LoadWaveMutatorsConfig(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -1047,6 +1050,55 @@ namespace BattleSystemECS.Config
                 }
             }
             catch { return defaultValue; }
+        }
+
+        private static void LoadWaveMutatorsConfig(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string mutatorFile = "Data/Configs/wave_mutators.json";
+            try
+            {
+                if (!File.Exists(mutatorFile))
+                {
+                    renderer.Log("[MUTATOR] Wave mutators config file not found: " + mutatorFile + ", using defaults");
+                    return;
+                }
+                string json = File.ReadAllText(mutatorFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[MUTATOR] Wave mutators config file is empty: " + mutatorFile);
+                    return;
+                }
+
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("mutators", out var mutatorsArr))
+                {
+                    var defs = new List<WaveMutatorDef>();
+                    foreach (var elem in mutatorsArr.EnumerateArray())
+                    {
+                        var m = new WaveMutatorDef();
+                        m.Id = elem.TryGetProperty("id", out var idProp) ? idProp.GetString() ?? "" : "";
+                        m.Name = elem.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "" : "";
+                        m.Description = elem.TryGetProperty("description", out var descProp) ? descProp.GetString() ?? "" : "";
+                        m.EffectType = elem.TryGetProperty("effectType", out var etProp) ? etProp.GetString() ?? "" : "";
+                        m.SpeedMult = elem.TryGetProperty("speedMult", out var smProp) ? (float)smProp.GetDouble() : 1.0f;
+                        m.RegenRate = elem.TryGetProperty("regenRate", out var rrProp) ? (float)rrProp.GetDouble() : 0f;
+                        m.ExplosionDamageRatio = elem.TryGetProperty("explosionDamageRatio", out var edrProp) ? (float)edrProp.GetDouble() : 0f;
+                        m.ExplosionRadius = elem.TryGetProperty("explosionRadius", out var erProp) ? (float)erProp.GetDouble() : 0f;
+                        m.SpawnBatchSize = elem.TryGetProperty("spawnBatchSize", out var sbProp) ? sbProp.GetInt32() : 5;
+                        m.TriggerWaveStart = elem.TryGetProperty("triggerWaveStart", out var twsProp) ? twsProp.GetInt32() : 0;
+                        defs.Add(m);
+                    }
+                    gameConfig.WaveMutatorDefs = defs.ToArray();
+                }
+
+                renderer.Log("[MUTATOR] Loaded wave mutators config from " + mutatorFile + " (" + gameConfig.WaveMutatorDefs.Length + " mutators)");
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[MUTATOR] Failed to load wave mutators config: " + ex.Message);
+            }
         }
 
         private static void LoadTerrainConfig(GameConfig gameConfig, IRenderer renderer)

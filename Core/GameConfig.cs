@@ -239,6 +239,30 @@ namespace BattleSystemECS.Config
         public float DamageMult { get; set; } = 1.0f;
     }
 
+    /// <summary>
+    /// Wave mutator definition — loaded from wave_mutators.json.
+    /// A mutator applies a global modifier to all enemies during a specific wave.
+    /// </summary>
+    public class WaveMutatorDef
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        // "speed_mult" | "regen" | "explosive_death" | "dense_spawn"
+        public string EffectType { get; set; }
+        // For speed_mult
+        public float SpeedMult { get; set; } = 1.0f;
+        // For regen
+        public float RegenRate { get; set; } = 0f;
+        // For explosive_death
+        public float ExplosionDamageRatio { get; set; } = 0f;
+        public float ExplosionRadius { get; set; } = 0f;
+        // For dense_spawn
+        public int SpawnBatchSize { get; set; } = 5;
+        // Wave number (1-indexed) at which this mutator activates
+        public int TriggerWaveStart { get; set; } = 0;
+    }
+
     public class SkillConfig
     {
         public string Name { get; set; }
@@ -439,6 +463,9 @@ namespace BattleSystemECS.Config
 
         // Auto Skill configuration (BuildPhase auto-casting)
         public AutoSkillConfig AutoSkill { get; set; } = new AutoSkillConfig();
+
+        // Wave mutator definitions (loaded from wave_mutators.json)
+        public WaveMutatorDef[] WaveMutatorDefs { get; set; } = Array.Empty<WaveMutatorDef>();
 
         // Map dimensions (Bug#30 fix: magic numbers 10 and 20 in GameManager/EnemyMovementSystem)
         public int MapWidth { get; set; } = 10;

@@ -39,6 +39,7 @@ namespace BattleSystemECS.Core
         private ProjectileSystem projectileSystem;        // 弹道/飞行道具系统
         private TerrainSystem terrainSystem;              // 地形效果系统
         private PathfindingSystem pathfindingSystem;     // 路径分叉/路点系统
+        private WaveMutatorSystem waveMutatorSystem;    // 波次词缀/突变器系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -195,6 +196,11 @@ namespace BattleSystemECS.Core
             terrainSystem.SetBuffSystem(buffSystem);
             logger.Log("[BOOTSTRAP]      TerrainSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating WaveMutatorSystem...");
+            waveMutatorSystem = new WaveMutatorSystem(store, playerId, logger);
+            waveMutatorSystem.LoadMutators(gameConfig.WaveMutatorDefs);
+            logger.Log("[BOOTSTRAP]      WaveMutatorSystem created successfully!");
+
             // Wire OnEnemyKilled → ComboSystem (连击计数链路)
             store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
 
@@ -218,6 +224,7 @@ namespace BattleSystemECS.Core
                 towerAttackSystem.SetWaveNumber(wave);
                 skillSystem.SetWaveNumber(wave);
                 comboSystem.ResetCombo(playerId);
+                waveMutatorSystem.OnWaveStart(wave);
             };
 
             // 初始化统一帧调度器
@@ -233,6 +240,7 @@ namespace BattleSystemECS.Core
             scheduler.Projectile = projectileSystem;
             scheduler.Terrain = terrainSystem;
             scheduler.Pathfinding = pathfindingSystem;
+            scheduler.WaveMutator = waveMutatorSystem;
             scheduler.Skill = skillSystem;
             scheduler.Buff = buffSystem;
             scheduler.Combo = comboSystem;
