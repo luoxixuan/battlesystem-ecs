@@ -135,6 +135,8 @@ namespace BattleSystemECS.Core
         // Used by ResolveEnemiesKilledThisFrame to correctly award GoldOnEliteKill instead of
         // the broken EnemyTypeName == "Elite" check (EnemyTypeName stores base type names).
         public bool[] EnemyIsElite = new bool[MAX_ENTITIES];
+        // EnemyIsFlying: true if this enemy is a flying unit (can only be hit by anti-air towers)
+        public bool[] EnemyIsFlying = new bool[MAX_ENTITIES];
         // EnemyStealthMultiplier: per-entity stealth attack damage multiplier.
         // Set by stealth_attack ability, consumed and reset by EnemyAISystem attack methods.
         public float[] EnemyStealthMultiplier = new float[MAX_ENTITIES];
@@ -192,6 +194,12 @@ namespace BattleSystemECS.Core
         public float[] TowerCritMultiplier = new float[MAX_ENTITIES];
         public bool[] TowerHasChainLightning = new bool[MAX_ENTITIES];
         public bool[] TowerHasFreezeAoe = new bool[MAX_ENTITIES];
+        // Tower anti-air flags: controls which height layers a tower can attack
+        // TowerCanHitAir=true: tower can attack flying enemies (anti-air tower)
+        // TowerCanHitGround=true: tower can attack ground enemies
+        // Both can be true (multi-type tower) or false (invalid — will skip all targets)
+        public bool[] TowerCanHitAir = new bool[MAX_ENTITIES];
+        public bool[] TowerCanHitGround = new bool[MAX_ENTITIES];
         // Tower special ability parameters from TowerSpecialAbility config
         public float[] TowerSpecialAbilityRadius = new float[MAX_ENTITIES];
         public float[] TowerSpecialAbilityDamageMult = new float[MAX_ENTITIES];
@@ -430,6 +438,7 @@ namespace BattleSystemECS.Core
                 EnemyMoveSpeedBase[entityId] = 0f;
                 EnemySlowDurationLeft[entityId] = 0f;
                 EnemyIsElite[entityId] = false;
+                EnemyIsFlying[entityId] = false;
                 EnemyStealthMultiplier[entityId] = 1f;
                 EnemyShield[entityId] = 0f;
                 // Resistance fields
@@ -456,6 +465,8 @@ namespace BattleSystemECS.Core
                 TowerStunChance[entityId] = 0f;
                 TowerSlowAmount[entityId] = 0f;
                 TowerSlowDuration[entityId] = 0f;
+                TowerCanHitAir[entityId] = false;
+                TowerCanHitGround[entityId] = false;
             }
 
             // ── Phase 4: recycle ID ───────────────────────────────────────────────
@@ -676,7 +687,9 @@ namespace BattleSystemECS.Core
             if (fullName != null)
             {
                 bool isElite = fullName.StartsWith("[ELITE]");
+                bool isFlying = false; // default: enemies are ground units
                 EnemyIsElite[entityId] = isElite;
+                EnemyIsFlying[entityId] = isFlying;
                 // 剥除 [BOSS]/[ELITE] 前缀，保留基础类型名
                 string nameToStore = fullName;
                 if (isElite || fullName.StartsWith("[BOSS]"))

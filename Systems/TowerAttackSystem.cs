@@ -216,6 +216,13 @@ int bestTarget = -1;
                     int enemyId = candidates[ci];
                     if (!store.EnemyActive[enemyId]) continue;
 
+                    // Height-layer filter: skip enemies that this tower cannot hit
+                    bool enemyFlying = store.EnemyIsFlying[enemyId];
+                    bool canHitAir = store.TowerCanHitAir[towerId];
+                    bool canHitGround = store.TowerCanHitGround[towerId];
+                    if (enemyFlying && !canHitAir) continue;
+                    if (!enemyFlying && !canHitGround) continue;
+
                     float ex = store.PositionX[enemyId];
                     float ey = store.PositionY[enemyId];
 
