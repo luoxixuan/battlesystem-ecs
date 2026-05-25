@@ -68,6 +68,10 @@ namespace BattleSystemECS.Config
         // Determines which upgrade curve the tower follows.
         // When null/empty, defaults to "standard".
         public string UpgradePath { get; set; }
+        // Ammo system: 0 = unlimited ammo (no reload needed)
+        public int MaxAmmo { get; set; } = 0;
+        // Reload time in seconds (0 = instant/unlimited)
+        public float ReloadTime { get; set; } = 0f;
     }
 
     /// <summary>

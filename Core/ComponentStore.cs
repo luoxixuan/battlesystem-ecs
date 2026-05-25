@@ -238,6 +238,18 @@ namespace BattleSystemECS.Core
         public float[] TowerSpecialAbilityDotDamage = new float[MAX_ENTITIES];
         public float[] TowerSpecialAbilityDotInterval = new float[MAX_ENTITIES];
 
+        // ==================== 塔弹药系统（Ammo）====================
+        // TowerCurrentAmmo: current ammo count (0 = empty)
+        public int[] TowerCurrentAmmo = new int[MAX_ENTITIES];
+        // TowerMaxAmmo: maximum ammo capacity (0 = unlimited/infinite)
+        public int[] TowerMaxAmmo = new int[MAX_ENTITIES];
+        // TowerReloadTime: total time to fully reload (seconds)
+        public float[] TowerReloadTime = new float[MAX_ENTITIES];
+        // TowerReloadProgress: current reload progress (0 to TowerReloadTime)
+        public float[] TowerReloadProgress = new float[MAX_ENTITIES];
+        // TowerIsReloading: true if tower is currently reloading
+        public bool[] TowerIsReloading = new bool[MAX_ENTITIES];
+
         // ==================== 塔协同增益组件 (Tower Synergy) ====================
         // 每个塔的协同 ID 索引，-1 表示无协同
         public int[] TowerSynergyId = new int[MAX_ENTITIES];
@@ -563,6 +575,12 @@ namespace BattleSystemECS.Core
                 TowerAuraRadius[entityId] = 0f;
                 TowerAuraAttackSpeedBonus[entityId] = 0f;
                 TowerAuraDamageBonus[entityId] = 0f;
+                // Ammo fields
+                TowerCurrentAmmo[entityId] = 0;
+                TowerMaxAmmo[entityId] = 0;
+                TowerReloadTime[entityId] = 0f;
+                TowerReloadProgress[entityId] = 0f;
+                TowerIsReloading[entityId] = false;
             }
 
             // ── Phase 4: recycle ID ───────────────────────────────────────────────
@@ -840,6 +858,12 @@ namespace BattleSystemECS.Core
             TowerAuraDamageBonus[entityId] = 0f;
             TowerCanHitAir[entityId] = true;
             TowerCanHitGround[entityId] = true;
+            // Ammo fields: default to unlimited (maxAmmo=0 means infinite)
+            TowerCurrentAmmo[entityId] = 0;
+            TowerMaxAmmo[entityId] = 0;
+            TowerReloadTime[entityId] = 0f;
+            TowerReloadProgress[entityId] = 0f;
+            TowerIsReloading[entityId] = false;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); }
         }
@@ -855,6 +879,12 @@ namespace BattleSystemECS.Core
             TowerAuraRadius[entityId] = 0f;
             TowerAuraAttackSpeedBonus[entityId] = 0f;
             TowerAuraDamageBonus[entityId] = 0f;
+            // Ammo fields reset
+            TowerCurrentAmmo[entityId] = 0;
+            TowerMaxAmmo[entityId] = 0;
+            TowerReloadTime[entityId] = 0f;
+            TowerReloadProgress[entityId] = 0f;
+            TowerIsReloading[entityId] = false;
             lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
         }
 

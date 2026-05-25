@@ -184,6 +184,9 @@ namespace BattleSystemECS.Systems
                 float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId]);
                 if (store.TowerLastAttackTime[towerId] < attackInterval) return;
 
+                // Ammo check: skip targeting for towers that are reloading and empty
+                if (store.TowerMaxAmmo[towerId] > 0 && store.TowerCurrentAmmo[towerId] <= 0) return;
+
                 float tx = store.PositionX[towerId];
                 float ty = store.PositionY[towerId];
                 int range = store.TowerRange[towerId];
@@ -278,6 +281,19 @@ int bestTarget = -1;
                 if (bestTarget != -1)
                 {
                     store.TowerLastAttackTime[towerId] = 0f;
+
+                    // Consume ammo for towers with limited ammo (MaxAmmo > 0)
+                    if (store.TowerMaxAmmo[towerId] > 0)
+                    {
+                        store.TowerCurrentAmmo[towerId]--;
+                        // Start reload if empty (reload starts after last shot fired)
+                        if (store.TowerCurrentAmmo[towerId] <= 0 && store.TowerReloadTime[towerId] > 0f)
+                        {
+                            store.TowerIsReloading[towerId] = true;
+                            store.TowerReloadProgress[towerId] = 0f;
+                        }
+                    }
+
                     float baseDmg = store.TowerAttackDamage[towerId];
                     // Apply enemy armor reduction + tech tree damage taken multiplier + wave scaling
                     baseDmg *= Math.Max(0.01f, 1f - store.EnemyArmor[bestTarget] * (1f - _armorPenetration)) * _damageTakenMult;

@@ -110,6 +110,14 @@ namespace BattleSystemECS.Systems
                         tc.StunChance, tc.SlowAmount, tc.SlowDuration);
                     // Apply tower targeting mode from config
                     store.SetTowerTargetingMode(towerId, tc.TargetingMode);
+                    // Apply ammo system if configured (0 = unlimited)
+                    if (tc.MaxAmmo > 0)
+                    {
+                        store.TowerMaxAmmo[towerId] = tc.MaxAmmo;
+                        store.TowerCurrentAmmo[towerId] = tc.MaxAmmo;
+                        store.TowerReloadTime[towerId] = tc.ReloadTime;
+                        store.TowerIsReloading[towerId] = false;
+                    }
                     // Apply tower's innate special ability (e.g., chain_lightning for Tesla)
                     if (tc.SpecialAbility != null)
                     {
