@@ -41,6 +41,7 @@ namespace BattleSystemECS.Core
         public UpgradeSystem? Upgrade { get; set; }
         public ComboSystem? Combo { get; set; }
         public AutoSkillSystem? AutoSkill { get; set; }
+        public WeatherSystem? Weather { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -77,6 +78,9 @@ namespace BattleSystemECS.Core
             }
 
             // ── WavePhase / Intermission: full combat pipeline ──────────────
+
+            // ── Phase 0.5: Weather update (before combat) ───────────────────
+            Weather?.Update(deltaTime);
 
             // ── Phase 1: 生成 ─────────────────────────────────────────────
             WaveSpawning?.Update();

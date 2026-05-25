@@ -58,9 +58,17 @@ namespace BattleSystemECS.Core
         // Player slow: tracks remaining slow turns and factor
         public float[] PlayerSlowFactor = new float[MAX_PLAYERS];
         public int[] PlayerSlowDuration = new int[MAX_PLAYERS];
-        // Base lives: number of leaks allowed before game over (independent of health)
+// Base lives: number of leaks allowed before game over (independent of health)
         public int[] PlayerBaseLives = new int[MAX_PLAYERS];
         public int[] PlayerMaxBaseLives = new int[MAX_PLAYERS];
+
+        // ==================== 天气与环境效果组件 (SOA) ====================
+        // WeatherType: current weather condition. 0=Clear, 1=Rain, 2=Fog, 3=Storm
+        public int[] CurrentWeather = new int[MAX_PLAYERS];
+        // WeatherIntensity: 0-1 strength of current weather effect (slows enemies, affects towers)
+        public float[] WeatherIntensity = new float[MAX_PLAYERS];
+        // WeatherTimer: turns remaining for current weather (-1 = permanent until changed)
+        public float[] WeatherTimer = new float[MAX_PLAYERS];
 
         // ==================== 科技树组件的 SOA 存储 ====================
         public int[] PlayerResearchPoints = new int[MAX_PLAYERS];
@@ -519,6 +527,10 @@ namespace BattleSystemECS.Core
             PlayerBuffFlags[entityId] = BuffType.None;
             PlayerBaseLives[entityId] = baseLives;
             PlayerMaxBaseLives[entityId] = baseLives;
+            // Weather: default to clear (type 0), intensity 0
+            CurrentWeather[entityId] = 0;
+            WeatherIntensity[entityId] = 0f;
+            WeatherTimer[entityId] = -1f;
 
             PlayerEntityId = entityId;
         }
@@ -1333,6 +1345,42 @@ public float GetPlayerCurrentHealth(int playerId)
             if (playerId < 0 || playerId >= MAX_PLAYERS) return;
             if (PlayerBaseLives[playerId] > 0)
                 PlayerBaseLives[playerId]--;
+        }
+
+        public int GetCurrentWeather(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            return CurrentWeather[playerId];
+        }
+
+        public void SetCurrentWeather(int playerId, int weatherType)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            CurrentWeather[playerId] = weatherType;
+        }
+
+        public float GetWeatherIntensity(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            return WeatherIntensity[playerId];
+        }
+
+        public void SetWeatherIntensity(int playerId, float intensity)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            WeatherIntensity[playerId] = intensity;
+        }
+
+        public float GetWeatherTimer(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return -1f;
+            return WeatherTimer[playerId];
+        }
+
+        public void SetWeatherTimer(int playerId, float timer)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            WeatherTimer[playerId] = timer;
         }
 
         public void SetPlayerCurrentHealth(int playerId, float currentHealth)

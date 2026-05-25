@@ -1,0 +1,43 @@
+{
+  "globalEnemySpeedMult": 1.0,
+  "globalTowerRangeMult": 1.0,
+  "globalTowerDamageMult": 1.0,
+  "types": [
+    {
+      "type": "Clear",
+      "enemySpeedMult": 1.0,
+      "towerRangeMult": 1.0,
+      "towerDamageMult": 1.0,
+      "defaultDuration": -1,
+      "minIntensity": 1.0,
+      "maxIntensity": 1.0
+    },
+    {
+      "type": "Rain",
+      "enemySpeedMult": 0.8,
+      "towerRangeMult": 0.95,
+      "towerDamageMult": 1.0,
+      "defaultDuration": 10,
+      "minIntensity": 0.6,
+      "maxIntensity": 1.0
+    },
+    {
+      "type": "Fog",
+      "enemySpeedMult": 0.9,
+      "towerRangeMult": 0.85,
+      "towerDamageMult": 1.05,
+      "defaultDuration": 15,
+      "minIntensity": 0.5,
+      "maxIntensity": 1.0
+    },
+    {
+      "type": "Storm",
+      "enemySpeedMult": 0.7,
+      "towerRangeMult": 0.9,
+      "towerDamageMult": 1.1,
+      "defaultDuration": 8,
+      "minIntensity": 0.7,
+      "maxIntensity": 1.0
+    }
+  ]
+}

@@ -400,6 +400,9 @@ namespace BattleSystemECS.Config
         public int MapWidth { get; set; } = 10;
         public int MapHeight { get; set; } = 20;
 
+        // Weather system configuration
+        public WeatherConfig Weather { get; set; } = new WeatherConfig();
+
         public GameConfig()
         {
             InitializeDefaultConfig();
@@ -870,5 +873,40 @@ namespace BattleSystemECS.Config
                 _ => TowerUpgradeAbility.None,
             };
         }
+    }
+
+    /// <summary>
+    /// Weather system configuration — defines weather types and their effects.
+    /// </summary>
+    public class WeatherConfig
+    {
+        // Weather type IDs (used as array indices)
+        public const int Clear = 0;
+        public const int Rain = 1;
+        public const int Fog = 2;
+        public const int Storm = 3;
+
+        // Global config
+        public float GlobalEnemySpeedMult { get; set; } = 1.0f;
+        public float GlobalTowerRangeMult { get; set; } = 1.0f;
+        public float GlobalTowerDamageMult { get; set; } = 1.0f;
+        // Per-type overrides
+        public Dictionary<string, WeatherTypeConfig> Types { get; set; } = new();
+    }
+
+    public class WeatherTypeConfig
+    {
+        public string Name { get; set; } = "";
+        // Multiplier applied to enemy move speed while this weather is active
+        public float EnemySpeedMult { get; set; } = 1.0f;
+        // Multiplier applied to tower attack range
+        public float TowerRangeMult { get; set; } = 1.0f;
+        // Multiplier applied to all tower damage
+        public float TowerDamageMult { get; set; } = 1.0f;
+        // Default duration in turns (-1 = permanent until changed)
+        public float DefaultDuration { get; set; } = -1f;
+        // Intensity range for random selection
+        public float MinIntensity { get; set; } = 0.5f;
+        public float MaxIntensity { get; set; } = 1.0f;
     }
 }

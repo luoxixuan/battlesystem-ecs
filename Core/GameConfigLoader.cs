@@ -41,6 +41,9 @@ namespace BattleSystemECS.Config
                 // Load phase behaviors
                 LoadPhaseBehaviors(gameConfig, renderer);
 
+                // Load weather config
+                LoadWeatherConfig(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -939,6 +942,108 @@ namespace BattleSystemECS.Config
             skill.SlowAmount = ExtractFloat(json, "SlowAmount");
             skill.SlowDuration = ExtractFloat(json, "SlowDuration");
             return skill;
+        }
+
+        private static void LoadWeatherConfig(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string weatherFile = "Data/Configs/weather.json";
+            try
+            {
+                if (!File.Exists(weatherFile))
+                {
+                    renderer.Log("[WEATHER] Weather config file not found: " + weatherFile + ", using defaults");
+                    return;
+                }
+                string json = File.ReadAllText(weatherFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[WEATHER] Weather config file is empty: " + weatherFile);
+                    return;
+                }
+                ParseWeatherConfig(gameConfig, json);
+                renderer.Log("[WEATHER] Loaded weather config from " + weatherFile);
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[WEATHER] Failed to load weather config: " + ex.Message);
+            }
+        }
+
+        private static void ParseWeatherConfig(GameConfig gameConfig, string json)
+        {
+            var config = new WeatherConfig();
+
+            // Global multipliers
+            config.GlobalEnemySpeedMult = ExtractFloat(json, "globalEnemySpeedMult", 1.0f);
+            config.GlobalTowerRangeMult = ExtractFloat(json, "globalTowerRangeMult", 1.0f);
+            config.GlobalTowerDamageMult = ExtractFloat(json, "globalTowerDamageMult", 1.0f);
+
+            // Parse types array — each entry: { "type": "Rain", "enemySpeedMult": 0.8, ... }
+            int typesStart = json.IndexOf("\"types\"");
+            if (typesStart >= 0)
+            {
+                int arrStart = json.IndexOf('[', typesStart);
+                int arrEnd = json.IndexOf(']', arrStart);
+                if (arrStart >= 0 && arrEnd > arrStart)
+                {
+                    string arr = json.Substring(arrStart + 1, arrEnd - arrStart - 1);
+                    int pos = 0;
+                    while (pos < arr.Length)
+                    {
+                        while (pos < arr.Length && (char.IsWhiteSpace(arr[pos]) || arr[pos] == ',')) pos++;
+                        if (pos >= arr.Length) break;
+                        if (arr[pos] == '{')
+                        {
+                            int objEnd = FindMatchingBrace(arr, pos);
+                            if (objEnd == -1) break;
+                            string obj = arr.Substring(pos, objEnd - pos + 1);
+                            var typeConfig = new WeatherTypeConfig();
+                            typeConfig.Name = ExtractString(obj, "type");
+                            typeConfig.EnemySpeedMult = ExtractFloat(obj, "enemySpeedMult", 1.0f);
+                            typeConfig.TowerRangeMult = ExtractFloat(obj, "towerRangeMult", 1.0f);
+                            typeConfig.TowerDamageMult = ExtractFloat(obj, "towerDamageMult", 1.0f);
+                            typeConfig.DefaultDuration = ExtractFloat(obj, "defaultDuration", -1f);
+                            typeConfig.MinIntensity = ExtractFloat(obj, "minIntensity", 0.5f);
+                            typeConfig.MaxIntensity = ExtractFloat(obj, "maxIntensity", 1.0f);
+                            if (!string.IsNullOrEmpty(typeConfig.Name))
+                                config.Types[typeConfig.Name] = typeConfig;
+                            pos = objEnd + 1;
+                        }
+                        else { pos++; }
+                    }
+                }
+            }
+            gameConfig.Weather = config;
+        }
+
+        private static float ExtractFloat(string json, string key, float defaultValue = 0f)
+        {
+            try
+            {
+                // Try quoted float
+                int keyPos = json.IndexOf("\"" + key + "\"");
+                if (keyPos < 0) return defaultValue;
+                int colonPos = json.IndexOf(':', keyPos);
+                if (colonPos < 0) return defaultValue;
+                int start = colonPos + 1;
+                while (start < json.Length && (char.IsWhiteSpace(json[start]) || json[start] == ',')) start++;
+                if (start >= json.Length) return defaultValue;
+                if (json[start] == '"')
+                {
+                    int end = json.IndexOf('"', start + 1);
+                    if (end < 0) return defaultValue;
+                    if (float.TryParse(json.Substring(start + 1, end - start - 1), out float result)) return result;
+                    return defaultValue;
+                }
+                else
+                {
+                    int end = start;
+                    while (end < json.Length && (char.IsDigit(json[end]) || json[end] == '.' || json[end] == '-' || json[end] == 'e' || json[end] == 'E')) end++;
+                    if (float.TryParse(json.Substring(start, end - start), out float result)) return result;
+                    return defaultValue;
+                }
+            }
+            catch { return defaultValue; }
         }
     }
 }
