@@ -43,6 +43,7 @@ namespace BattleSystemECS.Core
         public AutoSkillSystem? AutoSkill { get; set; }
         public WeatherSystem? Weather { get; set; }
         public AuraTowerSystem? AuraTower { get; set; }
+        public PathfindingSystem? Pathfinding { get; set; }
         public ProjectileSystem? Projectile { get; set; }
         public TerrainSystem? Terrain { get; set; }
 
@@ -98,6 +99,7 @@ namespace BattleSystemECS.Core
             EnemyAbility?.Update();
 
             // ── Phase 3: Movement ──────────────────────────────────────────
+            Pathfinding?.SetTurn(turn);
             EnemyMovement?.SetTurn(turn);
             EnemyMovement?.Update();
 

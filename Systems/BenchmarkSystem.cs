@@ -78,6 +78,8 @@ namespace BattleSystemECS.Systems
             var comboSystem  = new ComboSystem(store, gameConfig.Combo);
             var map          = new MapSystem(logger, store);
             map.SetMapSize(10, 20);
+            var pathfinding  = new PathfindingSystem(store);
+            enemyMovement.SetPathfindingSystem(pathfinding);
 
             // Place towers — use AddTower so ActiveTowerIds is populated (matching real game flow)
             int t1 = store.CreateEntity();
@@ -387,6 +389,8 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             towerAttack.SetBuffSystem(buffSystem);
             var map           = new MapSystem(logger, store);
             map.SetMapSize(10, 20);
+            var pathfinding   = new PathfindingSystem(store);
+            enemyMovement.SetPathfindingSystem(pathfinding);
             var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
 
             long tWaveSpawn = 0, tEnemyAI = 0, tMoveAttack = 0;

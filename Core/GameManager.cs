@@ -38,6 +38,7 @@ namespace BattleSystemECS.Core
         private AuraTowerSystem auraTowerSystem;          // 光环辅助塔系统
         private ProjectileSystem projectileSystem;        // 弹道/飞行道具系统
         private TerrainSystem terrainSystem;              // 地形效果系统
+        private PathfindingSystem pathfindingSystem;     // 路径分叉/路点系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -103,6 +104,11 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]    - Creating EnemyMovementSystem...");
             enemyMovementSystem = new EnemyMovementSystem(store, playerId, gameConfig.MapWidth);
             logger.Log("[BOOTSTRAP]      EnemyMovementSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating PathfindingSystem...");
+            pathfindingSystem = new PathfindingSystem(store);
+            enemyMovementSystem.SetPathfindingSystem(pathfindingSystem);
+            logger.Log("[BOOTSTRAP]      PathfindingSystem created and wired to EnemyMovementSystem!");
 
             // 初始化塔防系统
             logger.Log("[BOOTSTRAP]    - Creating TowerPlacementSystem...");
@@ -226,6 +232,7 @@ namespace BattleSystemECS.Core
             scheduler.AuraTower = auraTowerSystem;
             scheduler.Projectile = projectileSystem;
             scheduler.Terrain = terrainSystem;
+            scheduler.Pathfinding = pathfindingSystem;
             scheduler.Skill = skillSystem;
             scheduler.Buff = buffSystem;
             scheduler.Combo = comboSystem;

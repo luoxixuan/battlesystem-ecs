@@ -12,6 +12,7 @@ namespace BattleSystemECS.Systems
     /// 直接访问 ComponentStore 的数组，无字典查询，无 struct 复制
     /// 性能提升：10-100 倍
     /// Movement direction is driven by EnemyAISystem via EnemyActionEnum.
+    /// When EnemyPathId >= 0, movement follows waypoints from PathfindingSystem.
     /// </summary>
     public class EnemyMovementSystem
     {
@@ -23,11 +24,22 @@ namespace BattleSystemECS.Systems
         private List<int> _activeEnemyList;
         private float _playerX;
 
+        // PathfindingSystem reference for waypoint-based movement
+        private PathfindingSystem _pathfinding;
+
         public EnemyMovementSystem(Core.ComponentStore store, int playerId, int mapWidth = 10)
         {
             this.store = store;
             this.playerId = playerId;
             this.mapWidthMinusOne = mapWidth - 1f;
+        }
+
+        /// <summary>
+        /// Inject PathfindingSystem for waypoint-based navigation.
+        /// </summary>
+        public void SetPathfindingSystem(PathfindingSystem pathfinding)
+        {
+            _pathfinding = pathfinding;
         }
 
         public void SetTurn(int turn)
@@ -92,10 +104,29 @@ namespace BattleSystemECS.Systems
                 // Enum-based action dispatch — O(1) per enemy, no string comparison
                 EnemyActionType actionEnum = store.GetEnemyActionEnum(enemyId);
 
-                // Default: move toward player (direction = -1, toward y=0)
-                int direction = -1;
                 float x = store.PositionX[enemyId];
                 float y = store.PositionY[enemyId];
+
+                // Waypoint-based movement: if enemy has an assigned path, follow waypoints
+                if (store.EnemyPathId[enemyId] >= 0 && _pathfinding != null)
+                {
+                    // Waypoint-following mode: move toward current target waypoint
+                    var (dx, dy) = _pathfinding.GetDirectionToNextNode(enemyId);
+                    // Use normalized direction × moveSpeed for consistent traversal speed
+                    x += dx * moveSpeed;
+                    y += dy * moveSpeed;
+
+                    // Clamp to map bounds
+                    if (x < 0f) x = 0f;
+                    if (x > mapWidthMinusOne) x = mapWidthMinusOne;
+
+                    store.PositionX[enemyId] = x;
+                    store.PositionY[enemyId] = y;
+                    return; // waypoint movement replaces enum-based movement
+                }
+
+                // Default: move toward player (direction = -1, toward y=0)
+                int direction = -1;
 
 // Simplified switch: only Retreat needs special handling.
                 // MoveToTarget, None, and default all fall through to direction = -1.

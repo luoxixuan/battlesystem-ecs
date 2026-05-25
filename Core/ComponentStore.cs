@@ -165,6 +165,13 @@ namespace BattleSystemECS.Core
         // When true, the enemy's base stats are boosted per enrage config.
         public bool[] EnemyIsEnraged = new bool[MAX_ENTITIES];
 
+        // ==================== 路径分叉 / 路点系统字段（SOA） ====================
+        // EnemyPathId: which path this enemy is assigned to (-1 = no path, use default straight movement)
+        // 0 = default (straight Y-axis), 1 = fork_left, 2 = fork_right, 3 = ring
+        public int[] EnemyPathId = new int[MAX_ENTITIES];
+        // EnemyPathNodeIndex: current waypoint index in the assigned path (-1 = reached goal / leaked)
+        public int[] EnemyPathNodeIndex = new int[MAX_ENTITIES];
+
         // ==================== Fear / Taunt / Charm 行为控制字段（SOA） ====================
         // EnemyFearDurationLeft: turns remaining for fear effect. When > 0, enemy runs away (direction = +1).
         public float[] EnemyFearDurationLeft = new float[MAX_ENTITIES];
@@ -539,6 +546,9 @@ namespace BattleSystemECS.Core
                 EnemyFearDurationLeft[entityId] = 0f;
                 EnemyTauntTargetId[entityId] = -1;
                 EnemyCharmDurationLeft[entityId] = 0f;
+                // Path / waypoint fields
+                EnemyPathId[entityId] = -1;
+                EnemyPathNodeIndex[entityId] = 0;
                 // Resistance fields
                 EnemyStunResistance[entityId] = 0f;
                 EnemyFreezeResistance[entityId] = 0f;
@@ -792,6 +802,9 @@ namespace BattleSystemECS.Core
             EnemyGoldReward[entityId] = goldReward;
             EnemyWaveNumber[entityId] = waveNumber;
             EnemyActive[entityId] = true;
+            // Path/waypoint: default -1 = no path (use straight Y-axis movement)
+            EnemyPathId[entityId] = -1;
+            EnemyPathNodeIndex[entityId] = 0;
             EnemySpawnFrame[entityId] = CurrentFrame;
             EnemyArmor[entityId] = armor;
             EnemyShield[entityId] = shield;  // configurable initial shield
