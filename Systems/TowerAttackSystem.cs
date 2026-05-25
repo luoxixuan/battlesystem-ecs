@@ -37,6 +37,11 @@ namespace BattleSystemECS.Systems
         private readonly object _healQueueLock = new object();
         private int _healQueueIdx = 0;
 
+        // Ping-pong double-buffer for thorns damage reflect (enemy -> player)
+        private List<(int playerId, float damage)>[] _thornsQueue = new List<(int, float)>[2];
+        private readonly object _thornsQueueLock = new object();
+        private int _thornsQueueIdx = 0;
+
         // Cached player armor stats (updated each SetTurn)
         private float _armorPenetration = 0f;  // from TechTreeSystem
         private float _damageTakenMult = 1f;   // from TechTreeSystem
@@ -83,6 +88,8 @@ namespace BattleSystemECS.Systems
             _debuffQueue[1] = new List<(int, int)>(256);
             _healQueue[0] = new List<(int, float)>(64);
             _healQueue[1] = new List<(int, float)>(64);
+            _thornsQueue[0] = new List<(int, float)>(64);
+            _thornsQueue[1] = new List<(int, float)>(64);
             _chainDamageQueue[0] = new List<(int, int, float, int, int)>(64);
             _chainDamageQueue[1] = new List<(int, int, float, int, int)>(64);
             _splashDamageQueue[0] = new List<(int, float, int, int)>(64);
@@ -402,6 +409,13 @@ int bestTarget = -1;
                 float resist = store.EnemyDamageResistance[enemyId];
                 float finalDmg = resist >= 1f ? 0f : damage * (1f - resist);
                 store.EnemyHealth[enemyId] -= finalDmg;
+                // Thorns: enemy reflects damage back to the player (tower attacker)
+                float thornsRatio = store.EnemyThornsRatio[enemyId];
+                if (thornsRatio > 0f && finalDmg > 0f)
+                {
+                    float thornsDamage = finalDmg * thornsRatio;
+                    lock (_thornsQueueLock) { _thornsQueue[_thornsQueueIdx].Add((playerId, thornsDamage)); }
+                }
                 if (store.EnemyHealth[enemyId] <= 0f)
                 {
                     store.QueueEnemyDeath(enemyId, playerId);
@@ -416,6 +430,9 @@ int bestTarget = -1;
 
             // Phase 2d (serial): resolve Leech lifesteal heals
             ResolveLeechHealing();
+
+            // Phase 2e (serial): resolve thorns damage reflect (enemy -> player)
+            ResolveThornsDamage();
 
             System.Threading.Thread.MemoryBarrier(); // ensure drain completes
 
@@ -680,6 +697,23 @@ int bestTarget = -1;
                 float currentHealth = store.GetPlayerCurrentHealth(playerId);
                 float newHealth = Math.Min(currentHealth + healAmount, maxHealth);
                 store.SetPlayerCurrentHealth(playerId, newHealth);
+            }
+        }
+
+        /// <summary>
+        /// Phase 2e: resolve thorns damage — enemy reflects damage back to the attacking player.
+        /// </summary>
+        private void ResolveThornsDamage()
+        {
+            int readIdx = _thornsQueueIdx;
+            int writeIdx = 1 - _thornsQueueIdx;
+            _thornsQueueIdx = writeIdx;
+            _thornsQueue[writeIdx].Clear();
+
+            foreach (var (playerId, thornsDamage) in _thornsQueue[readIdx])
+            {
+                if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) continue;
+                store.DecreasePlayerHealth(playerId, thornsDamage);
             }
         }
     }

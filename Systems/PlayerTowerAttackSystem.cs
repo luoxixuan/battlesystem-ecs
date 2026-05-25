@@ -64,6 +64,10 @@ namespace BattleSystemECS.Systems
         private readonly object _damageQueueLock = new object();
         private int _damageQueueIdx = 0;
 
+        // Ping-pong double-buffer for thorns damage reflect (enemy -> player, from player attacking enemy)
+        private List<float>[] _thornsQueue = new List<float>[2];
+        private int _thornsQueueIdx = 0;
+
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
             : this(store, renderer, playerId, gameConfig, null)
         {
@@ -77,6 +81,8 @@ namespace BattleSystemECS.Systems
             this.techTreeSystem = techTreeSystem;
             _damageQueue[0] = new List<(int, float)>(256);
             _damageQueue[1] = new List<(int, float)>(256);
+            _thornsQueue[0] = new List<float>(64);
+            _thornsQueue[1] = new List<float>(64);
         }
 
         public void SetTurn(int turn)
@@ -180,8 +186,25 @@ _damageQueue[writeIdx].Clear(); // clear the bag threads will write to next fram
                 if (!store.EnemyActive[enemyId]) continue;
                 float prevHealth = store.EnemyHealth[enemyId];
                 store.ApplyEnemyDamage(enemyId, damage);
+                // Thorns: enemy reflects damage back to the player
+                float thornsRatio = store.EnemyThornsRatio[enemyId];
+                if (thornsRatio > 0f && damage > 0f)
+                {
+                    float thornsDamage = damage * thornsRatio;
+                    _thornsQueue[_thornsQueueIdx].Add(thornsDamage);
+                }
                 if (store.EnemyHealth[enemyId] <= 0f && prevHealth > 0f)
                     store.QueueEnemyDeath(enemyId, playerId);
+            }
+
+            // Phase 2b (serial): resolve thorns damage reflect (enemy -> player)
+            int thornsReadIdx = _thornsQueueIdx;
+            int thornsWriteIdx = 1 - _thornsQueueIdx;
+            _thornsQueueIdx = thornsWriteIdx;
+            _thornsQueue[thornsWriteIdx].Clear();
+            foreach (float thornsDamage in _thornsQueue[thornsReadIdx])
+            {
+                store.DecreasePlayerHealth(playerId, thornsDamage);
             }
         }
     }

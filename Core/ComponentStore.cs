@@ -38,6 +38,8 @@ namespace BattleSystemECS.Core
         // Player shield: absorbs damage before health, independent of armor
         public float[] PlayerShield = new float[MAX_PLAYERS];
         public float[] PlayerShieldDuration = new float[MAX_PLAYERS]; // seconds remaining
+        // Player thorns: reflects a fraction of damage taken back to the attacking enemy.
+        public float[] PlayerThornsRatio = new float[MAX_PLAYERS];
         public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float[] PlayerGold = new float[MAX_PLAYERS];
         public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
@@ -117,6 +119,9 @@ namespace BattleSystemECS.Core
         // Enemy shield: absorbs incoming damage before it reaches EnemyHealth.
         // Shield is consumed first; remaining damage penetrates to health.
         public float[] EnemyShield = new float[MAX_ENTITIES];
+        // Enemy thorns: reflects a fraction of damage taken back to the attacker (player/tower).
+        // Applied after damage is dealt, in the same frame's serial phase.
+        public float[] EnemyThornsRatio = new float[MAX_ENTITIES];
         // ==================== 敌人 CC (Crowd Control) 字段 ====================
         // Grouped together after all enemy hot-path fields to preserve cache locality
         // EnemyStunFlag: legacy bool, kept for backward compat; use EnemyStunDurationLeft for correctness
@@ -382,6 +387,7 @@ namespace BattleSystemECS.Core
                 PlayerWaveCompleteGold[i] = 0f;
                 PlayerShield[i] = 0f;
                 PlayerShieldDuration[i] = 0f;
+                PlayerThornsRatio[i] = 0f;
                 PlayerComboGoldMult[i] = 1f;
                 PlayerComboDamageMult[i] = 1f;
                 PlayerComboKillStreak[i] = 0f;
@@ -458,6 +464,7 @@ namespace BattleSystemECS.Core
                 EnemyIsFlying[entityId] = false;
                 EnemyStealthMultiplier[entityId] = 1f;
                 EnemyShield[entityId] = 0f;
+                EnemyThornsRatio[entityId] = 0f;
                 // Resistance fields
                 EnemyStunResistance[entityId] = 0f;
                 EnemyFreezeResistance[entityId] = 0f;
