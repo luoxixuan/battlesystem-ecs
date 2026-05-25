@@ -216,6 +216,8 @@ namespace BattleSystemECS.Core
         public float[] TowerUpgradeCost = new float[MAX_ENTITIES];
         // Upgrade path ID per tower (e.g., "standard", "fast", "tank") — drives config-driven upgrade curves
         public string[] TowerUpgradePathId = new string[MAX_ENTITIES];
+        // Tower fusion tier: incremented each time this tower is merged (0 = never merged)
+        public int[] TowerFusionTier = new int[MAX_ENTITIES];
         public bool[] TowerActive = new bool[MAX_ENTITIES];
         public float[] TowerLastAttackTime = new float[MAX_ENTITIES];
         // Tower debuff parameters (read from TowerConfig per tower type)
@@ -574,6 +576,7 @@ namespace BattleSystemECS.Core
                 TowerLevel[entityId] = 0;
                 TowerUpgradeCost[entityId] = 0f;
                 TowerUpgradePathId[entityId] = null;
+                TowerFusionTier[entityId] = 0;
                 TowerLastAttackTime[entityId] = 0f;
                 TowerStunChance[entityId] = 0f;
                 TowerSlowAmount[entityId] = 0f;
@@ -859,6 +862,7 @@ namespace BattleSystemECS.Core
             TowerLevel[entityId] = level;
             TowerUpgradeCost[entityId] = cost;
             TowerUpgradePathId[entityId] = upgradePathId ?? "standard";
+            TowerFusionTier[entityId] = 0;
             TowerActive[entityId] = true;
             TowerLastAttackTime[entityId] = 0f;
             TowerStunChance[entityId] = stunChance;
@@ -886,6 +890,7 @@ namespace BattleSystemECS.Core
             if (entityId < 0 || entityId >= MAX_ENTITIES) return;
             TowerActive[entityId] = false;
             TowerUpgradePathId[entityId] = null;
+            TowerFusionTier[entityId] = 0;
             TowerSelected[entityId] = false;
             // Aura tower fields reset
             TowerIsAuraTower[entityId] = false;
