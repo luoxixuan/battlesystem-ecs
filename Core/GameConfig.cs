@@ -14,6 +14,7 @@ namespace BattleSystemECS.Config
         public float AttackInterval { get; set; }
         public float AttackDamage { get; set; }
         public float MaxHealth { get; set; }
+        public int StartingLives { get; set; } = 10;  // 初始基地生命数（漏怪次数上限）
         public int CurrentLevel { get; set; }
         public float UpgradeThreshold { get; set; }
         public List<string> StartingSkills { get; set; } = new List<string>();

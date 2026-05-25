@@ -58,6 +58,9 @@ namespace BattleSystemECS.Core
         // Player slow: tracks remaining slow turns and factor
         public float[] PlayerSlowFactor = new float[MAX_PLAYERS];
         public int[] PlayerSlowDuration = new int[MAX_PLAYERS];
+        // Base lives: number of leaks allowed before game over (independent of health)
+        public int[] PlayerBaseLives = new int[MAX_PLAYERS];
+        public int[] PlayerMaxBaseLives = new int[MAX_PLAYERS];
 
         // ==================== 科技树组件的 SOA 存储 ====================
         public int[] PlayerResearchPoints = new int[MAX_PLAYERS];
@@ -500,9 +503,9 @@ namespace BattleSystemECS.Core
             PositionY[entityId] = y;
         }
 
-        // ==================== 玩家组件访问 ====================
+// ==================== 玩家组件访问 ====================
 
-        public void AddPlayer(int entityId, float attackRange, float attackSpeed, float attackDamage, int currentLevel)
+        public void AddPlayer(int entityId, float attackRange, float attackSpeed, float attackDamage, int currentLevel, int baseLives = 10)
         {
             if (entityId < 0 || entityId >= MAX_PLAYERS) return;
 
@@ -514,6 +517,8 @@ namespace BattleSystemECS.Core
             PlayerUpgradeThreshold[entityId] = 1000f;  // 提高到 1000 以更快升级测试技能
             PlayerBuffs[entityId] = new List<string>();
             PlayerBuffFlags[entityId] = BuffType.None;
+            PlayerBaseLives[entityId] = baseLives;
+            PlayerMaxBaseLives[entityId] = baseLives;
 
             PlayerEntityId = entityId;
         }
@@ -1305,10 +1310,29 @@ namespace BattleSystemECS.Core
             PlayerMaxHealth[playerId] = maxHealth;
         }
 
-        public float GetPlayerCurrentHealth(int playerId)
+public float GetPlayerCurrentHealth(int playerId)
         {
             if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
             return PlayerCurrentHealth[playerId];
+        }
+
+        public int GetPlayerBaseLives(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            return PlayerBaseLives[playerId];
+        }
+
+        public void SetPlayerBaseLives(int playerId, int lives)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            PlayerBaseLives[playerId] = lives;
+        }
+
+        public void DecrementPlayerBaseLives(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (PlayerBaseLives[playerId] > 0)
+                PlayerBaseLives[playerId]--;
         }
 
         public void SetPlayerCurrentHealth(int playerId, float currentHealth)

@@ -4158,6 +4158,7 @@
                    "Type":  "Tower",
                    "AttackRange":  3,
                    "MaxHealth":  200,
+                   "StartingLives":  10,
                    "StartingSkills":  [
                                           "Circuit Breaker #1",
                                           "Plasma Surge #2",

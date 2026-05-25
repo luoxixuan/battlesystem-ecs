@@ -645,6 +645,7 @@ namespace BattleSystemECS.Config
             player.CurrentLevel = ExtractInt(json, "CurrentLevel");
             player.UpgradeThreshold = ExtractFloat(json, "UpgradeThreshold");
             player.MaxHealth = ExtractFloat(json, "MaxHealth");
+            player.StartingLives = ExtractInt(json, "StartingLives");
             player.StartingSkills = ParseStringArray(json, "StartingSkills");
 
             return player;

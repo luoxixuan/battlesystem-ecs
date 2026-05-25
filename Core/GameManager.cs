@@ -244,7 +244,7 @@ namespace BattleSystemECS.Core
             float upgradeThreshold = gameConfig.Player.UpgradeThreshold;
 
             // 添加玩家组件（SOA）
-            store.AddPlayer(id, attackRange, attackSpeed, attackDamage, currentLevel);
+            store.AddPlayer(id, attackRange, attackSpeed, attackDamage, currentLevel, gameConfig.Player.StartingLives);
             store.SetPlayerMaxHealth(id, maxHealth);
             store.SetPlayerCurrentHealth(id, maxHealth);
             store.SetPlayerUpgradeThreshold(id, upgradeThreshold);
@@ -430,7 +430,7 @@ namespace BattleSystemECS.Core
             Console.WriteLine();
         }
 
-        /// <summary>
+/// <summary>
         /// 检查是否有敌人到达底部
         /// </summary>
         private bool CheckEnemiesAtBottom()
@@ -445,8 +445,20 @@ namespace BattleSystemECS.Core
 
                 if (store.EnemyActive[enemyId] && y <= 0f)
                 {
-                    logger.Log("[INFO] Enemy reached bottom (y=" + y + "), Game Over!");
-                    return true;
+                    // Enemy leaked — decrement base lives
+                    store.DecrementPlayerBaseLives(playerId);
+                    int remaining = store.GetPlayerBaseLives(playerId);
+                    logger.Log("[INFO] Enemy reached bottom! Base lives: " + remaining + " remaining.");
+
+                    // Remove the enemy that reached bottom (leaked)
+                    store.QueueEnemyDeath(enemyId, playerId);
+
+                    if (remaining <= 0)
+                    {
+                        logger.Log("[INFO] Game Over! No base lives remaining.");
+                        return true;  // game over
+                    }
+                    return false;  // still alive, continue
                 }
             }
 
