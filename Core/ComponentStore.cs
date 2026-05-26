@@ -111,6 +111,12 @@ namespace BattleSystemECS.Core
         // ComboGoldMult: current gold bonus multiplier = min(1 + ComboCount * ComboGoldBonusPerKill, ComboMaxMultiplier)
         public float[] PlayerComboGoldMult = new float[MAX_PLAYERS];
 
+        // ==================== Bank / Interest System 组件（SOA） ====================
+        // PlayerBankedGold: gold stored in the bank (earns interest each wave)
+        public float[] PlayerBankedGold = new float[MAX_PLAYERS];
+        // PlayerInterestRate: interest rate multiplier (0.05f = 5% per wave, capped at InterestRateCap)
+        public float[] PlayerInterestRate = new float[MAX_PLAYERS];
+
         // ==================== 敌人组件的 SOA 存储 ====================
         public float[] EnemyHealth = new float[MAX_ENTITIES];
         public float[] EnemyMaxHealth = new float[MAX_ENTITIES];
@@ -515,6 +521,8 @@ namespace BattleSystemECS.Core
                 CurrentWaveMutatorId[i] = -1;
                 GlobalTimeScale[i] = 1f;
                 GlobalTimeScaleDuration[i] = 0f;
+                PlayerBankedGold[i] = 0f;
+                PlayerInterestRate[i] = 0.05f; // default 5% interest per wave
             }
         }
 

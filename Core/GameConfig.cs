@@ -499,6 +499,9 @@ namespace BattleSystemECS.Config
         public List<TerrainTypeConfig> TerrainTypes { get; set; } = new List<TerrainTypeConfig>();
         public int[][] MapTerrainGrid { get; set; } = Array.Empty<int[]>();
 
+        // Bank / Interest system configuration (direction 2)
+        public BankConfig Bank { get; set; } = new BankConfig();
+
         public GameConfig()
         {
             InitializeDefaultConfig();
@@ -969,6 +972,19 @@ namespace BattleSystemECS.Config
                 _ => TowerUpgradeAbility.None,
             };
         }
+    }
+
+    /// <summary>
+    /// Bank / Interest system configuration.
+    /// </summary>
+    public class BankConfig
+    {
+        // Base interest rate per wave (0.05f = 5% of banked gold)
+        public float InterestRateBase { get; set; } = 0.05f;
+        // Maximum interest rate cap (even with bonuses, rate cannot exceed this)
+        public float InterestRateCap { get; set; } = 0.20f;
+        // Maximum gold that can be stored in the bank
+        public float BankGoldCap { get; set; } = 100000f;
     }
 
     /// <summary>

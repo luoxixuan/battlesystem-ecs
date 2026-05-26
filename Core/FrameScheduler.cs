@@ -47,6 +47,7 @@ namespace BattleSystemECS.Core
         public ProjectileSystem? Projectile { get; set; }
         public TerrainSystem? Terrain { get; set; }
         public WaveMutatorSystem? WaveMutator { get; set; }
+        public InterestSystem? Interest { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -88,11 +89,12 @@ namespace BattleSystemECS.Core
 
             if (Phase == GameState.BuildPhase)
             {
-                // ── BuildPhase: tower placement/upgrade UI only ────────────
+// ── BuildPhase: tower placement/upgrade UI only ───────────
                 Gold?.Update();
                 Upgrade?.Update();
                 Skill?.Update(deltaTime); // skill cooldown ticking
                 AutoSkill?.Update();      // auto-cast ready skills
+                Interest?.Update();       // bank/interest system
                 return;
             }
 
