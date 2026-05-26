@@ -41,6 +41,7 @@ namespace BattleSystemECS.Core
         private PathfindingSystem pathfindingSystem;     // 路径分叉/路点系统
         private WaveMutatorSystem waveMutatorSystem;    // 波次词缀/突变器系统
         private InterestSystem interestSystem;          // 银行/利息系统
+        private SaveSystem saveSystem;                  // 存档/回放系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -204,7 +205,11 @@ namespace BattleSystemECS.Core
 
             logger.Log("[BOOTSTRAP]    - Creating InterestSystem...");
             interestSystem = new InterestSystem(store, logger, gameConfig, playerId);
-            logger.Log("[BOOTSTRAP]      InterestSystem created successfully!");
+            logger.Log("      InterestSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating SaveSystem...");
+            saveSystem = new SaveSystem(store, playerId);
+            logger.Log("      SaveSystem created successfully!");
 
             // Wire OnEnemyKilled → ComboSystem (连击计数链路)
             store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
@@ -222,6 +227,7 @@ namespace BattleSystemECS.Core
             // 订阅波次完成事件 → 产出研究点数
             waveSpawningSystem.OnWaveComplete += () => techTreeSystem.OnWaveComplete();
             waveSpawningSystem.OnWaveComplete += () => interestSystem.OnWaveComplete();
+            waveSpawningSystem.OnWaveComplete += () => saveSystem?.SaveCheckpoint();
             // 订阅波次开始事件 → 同步波次伤害缩放到所有攻击系统
             waveSpawningSystem.OnWaveStart += () =>
             {
