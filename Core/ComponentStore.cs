@@ -190,6 +190,13 @@ namespace BattleSystemECS.Core
         public int[] EnemyPathId = new int[MAX_ENTITIES];
         // EnemyPathNodeIndex: current waypoint index in the assigned path (-1 = reached goal / leaked)
         public int[] EnemyPathNodeIndex = new int[MAX_ENTITIES];
+        // EnemyTeleportCooldown: turns remaining until teleport is ready (0 = ready / no cooldown)
+        public float[] EnemyTeleportCooldown = new float[MAX_ENTITIES];
+        // EnemyTeleportDestinationX/Y: target position for teleport/blink destination
+        public float[] EnemyTeleportDestinationX = new float[MAX_ENTITIES];
+        public float[] EnemyTeleportDestinationY = new float[MAX_ENTITIES];
+        // EnemyTeleportType: 0=none, 1=blink_to_destination, 2=portal_entry, 3=random_phase_ahead, 4=retreat_to_player
+        public int[] EnemyTeleportType = new int[MAX_ENTITIES];
 
         // ==================== Fear / Taunt / Charm 行为控制字段（SOA） ====================
         // EnemyFearDurationLeft: turns remaining for fear effect. When > 0, enemy runs away (direction = +1).
@@ -592,6 +599,11 @@ namespace BattleSystemECS.Core
                 // Path / waypoint fields
                 EnemyPathId[entityId] = -1;
                 EnemyPathNodeIndex[entityId] = 0;
+                // Teleport / portal fields
+                EnemyTeleportCooldown[entityId] = 0f;
+                EnemyTeleportDestinationX[entityId] = 0f;
+                EnemyTeleportDestinationY[entityId] = 0f;
+                EnemyTeleportType[entityId] = 0;
                 // Resistance fields
                 EnemyStunResistance[entityId] = 0f;
                 EnemyFreezeResistance[entityId] = 0f;
@@ -853,6 +865,11 @@ namespace BattleSystemECS.Core
             EnemyArmor[entityId] = armor;
             EnemyShield[entityId] = shield;  // configurable initial shield
             EnemyEvasion[entityId] = 0f;  // default to no evasion
+            // Teleport: default no cooldown (ready), no destination, type=0 (none)
+            EnemyTeleportCooldown[entityId] = 0f;
+            EnemyTeleportDestinationX[entityId] = 0f;
+            EnemyTeleportDestinationY[entityId] = 0f;
+            EnemyTeleportType[entityId] = 0;
 
             // 缓存怪物类型名（如 "NormalL1W1E0" -> "Normal"），避免每帧解析
             // 同时检测 [ELITE]/[BOSS] 前缀来正确标记精英/首领
