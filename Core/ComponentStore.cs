@@ -284,6 +284,12 @@ namespace BattleSystemECS.Core
         public float[] TowerSpecialAbilityDotDamage = new float[MAX_ENTITIES];
         public float[] TowerSpecialAbilityDotInterval = new float[MAX_ENTITIES];
 
+        // ==================== 塔散射/多重射击（Scatter / Multi-shot）====================
+        // TowerProjectileCount: number of projectiles fired per attack (1 = single shot, >1 = scatter/multicast)
+        public int[] TowerProjectileCount = new int[MAX_ENTITIES];
+        // TowerScatterAngle: angular spread in radians for multi-shot (0 = all projectiles aimed at target)
+        public float[] TowerScatterAngle = new float[MAX_ENTITIES];
+
         // ==================== 塔弹药系统（Ammo）====================
         // TowerCurrentAmmo: current ammo count (0 = empty)
         public int[] TowerCurrentAmmo = new int[MAX_ENTITIES];
@@ -655,9 +661,12 @@ namespace BattleSystemECS.Core
                 TowerReloadTime[entityId] = 0f;
                 TowerReloadProgress[entityId] = 0f;
                 TowerIsReloading[entityId] = false;
+                // Scatter/multicast fields
+                TowerProjectileCount[entityId] = 0;
+                TowerScatterAngle[entityId] = 0f;
             }
 
-            // ── Phase 4: recycle ID ───────────────────────────────────────────────
+            // ── Phase 4: recycle ID ────────────────────────────────────────────────
             freeEntityIds.Push(entityId);
         }
 
@@ -950,6 +959,9 @@ namespace BattleSystemECS.Core
             TowerIsReloading[entityId] = false;
             TowerArmorShredBonus[entityId] = 0f;
             TowerAccuracy[entityId] = 1f;  // default to always-hit
+            // Scatter/multicast fields: default to single shot (1 projectile, 0 spread)
+            TowerProjectileCount[entityId] = 1;
+            TowerScatterAngle[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); }
         }

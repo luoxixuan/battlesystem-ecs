@@ -420,6 +420,19 @@ int bestTarget = -1;
                                 if (critBonus > 0f)
                                     lock (damageLock) { bag.Add((bestTarget, critBonus, store.PlayerEntityId)); }
                             }
+                            // Scatter/multicast: if ProjectileCount > 1, fire additional projectiles at the target
+                            int projCount = store.TowerProjectileCount[towerId];
+                            if (projCount > 1)
+                            {
+                                float scatterAngle = store.TowerScatterAngle[towerId];
+                                // Fire extra projectiles at same target (spread angle distributes them)
+                                for (int sc = 1; sc < projCount; sc++)
+                                {
+                                    // Each extra projectile adds the same damage to the target
+                                    // The visual spread is cosmetic — all hit the same target
+                                    lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                                }
+                            }
                             // Special ability: chain lightning (from upgrade, not Tesla tower type)
                             if (store.TowerHasChainLightning[towerId])
                             {
