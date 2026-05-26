@@ -328,6 +328,22 @@ namespace BattleSystemECS.Core
         public float[] ObstacleY = new float[MAX_OBSTACLES];
         public int[] ObstacleType = new int[MAX_OBSTACLES];  // index into ObstacleDefs[]
 
+        // ==================== 持久性地面 hazard 区域组件（HazardZone）====================
+        // 地面上的持久性区域效果（油沼减速、电网麻痹、火墙DoT等）
+        // 站在区域内的敌人持续受影响，离开后效果消失
+        public const int MAX_HAZARD_ZONES = 500;
+        public bool[] HazardZoneActive = new bool[MAX_HAZARD_ZONES];
+        public float[] HazardZoneX = new float[MAX_HAZARD_ZONES];
+        public float[] HazardZoneY = new float[MAX_HAZARD_ZONES];
+        public float[] HazardZoneRadius = new float[MAX_HAZARD_ZONES];
+        public float[] HazardZoneMaxRadius = new float[MAX_HAZARD_ZONES];
+        public int[] HazardZoneType = new int[MAX_HAZARD_ZONES];  // 0=none, 1=slow, 2=damage, 3=stun
+        public float[] HazardZoneDuration = new float[MAX_HAZARD_ZONES];  // seconds remaining
+        public float[] HazardZoneDamagePerSec = new float[MAX_HAZARD_ZONES];  // for type=2 (DoT)
+        public float[] HazardZoneOwnerTowerId = new float[MAX_HAZARD_ZONES];  // tower that created this zone (-1 = none)
+        private List<int> _activeHazardZoneIds = new List<int>();
+        private int _nextHazardZoneId = 0;
+
         // ==================== 技能组件的 SOA 存储 ====================
         public string[] SkillName = new string[MAX_PLAYERS];
         public float[] SkillDamageMultiplier = new float[MAX_PLAYERS];
@@ -1011,6 +1027,63 @@ namespace BattleSystemECS.Core
             ObstacleY[obstacleId] = 0f;
             ObstacleType[obstacleId] = -1;
             _activeObstacleIds.Remove(obstacleId);
+        }
+
+        // ==================== 持久性地面 HazardZone 管理 ====================
+        /// <summary>Add a hazard zone at the given position with specified type and parameters.</summary>
+        public int AddHazardZone(float x, float y, float radius, int hazardType, float duration, float damagePerSec = 0f, int ownerTowerId = -1)
+        {
+            int zoneId = -1;
+            lock (activeIdsLock)
+            {
+                // Find a free slot
+                for (int i = 0; i < MAX_HAZARD_ZONES; i++)
+                {
+                    int candidateId = (_nextHazardZoneId + i) % MAX_HAZARD_ZONES;
+                    if (!HazardZoneActive[candidateId])
+                    {
+                        zoneId = candidateId;
+                        _nextHazardZoneId = (candidateId + 1) % MAX_HAZARD_ZONES;
+                        break;
+                    }
+                }
+            }
+            if (zoneId < 0) return -1; // no free slots
+
+            HazardZoneActive[zoneId] = true;
+            HazardZoneX[zoneId] = x;
+            HazardZoneY[zoneId] = y;
+            HazardZoneRadius[zoneId] = radius;
+            HazardZoneMaxRadius[zoneId] = radius;
+            HazardZoneType[zoneId] = hazardType;
+            HazardZoneDuration[zoneId] = duration;
+            HazardZoneDamagePerSec[zoneId] = damagePerSec;
+            HazardZoneOwnerTowerId[zoneId] = ownerTowerId;
+            _activeHazardZoneIds.Add(zoneId);
+            return zoneId;
+        }
+
+        /// <summary>Remove a hazard zone by ID.</summary>
+        public void RemoveHazardZone(int zoneId)
+        {
+            if (zoneId < 0 || zoneId >= MAX_HAZARD_ZONES) return;
+            if (!HazardZoneActive[zoneId]) return;
+            HazardZoneActive[zoneId] = false;
+            HazardZoneX[zoneId] = 0f;
+            HazardZoneY[zoneId] = 0f;
+            HazardZoneRadius[zoneId] = 0f;
+            HazardZoneMaxRadius[zoneId] = 0f;
+            HazardZoneType[zoneId] = 0;
+            HazardZoneDuration[zoneId] = 0f;
+            HazardZoneDamagePerSec[zoneId] = 0f;
+            HazardZoneOwnerTowerId[zoneId] = -1;
+            _activeHazardZoneIds.Remove(zoneId);
+        }
+
+        /// <summary>Get list of active hazard zone IDs. O(n) over active zones, zero GC.</summary>
+        public List<int> GetCachedActiveHazardZoneIds()
+        {
+            return _activeHazardZoneIds;
         }
 
         // ==================== 塔选中状态管理 ====================
