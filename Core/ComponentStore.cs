@@ -261,6 +261,8 @@ namespace BattleSystemECS.Core
         public float[] TowerSplashRadius = new float[MAX_ENTITIES];
         // Tower armor shred bonus: bonus armor reduction applied to target on hit (stacks)
         public float[] TowerArmorShredBonus = new float[MAX_ENTITIES];
+        // Tower shield break bonus: extra damage multiplier applied to shielded enemies (shreds shield first)
+        public float[] TowerShieldBreakBonus = new float[MAX_ENTITIES];
         // Tower accuracy: probability that this tower's attack hits the target (0.0-1.0, 1.0 = always hit)
         // Accuracy < 1.0 results in random misses, creating evasion gameplay for fast enemies
         public float[] TowerAccuracy = new float[MAX_ENTITIES];
@@ -974,6 +976,7 @@ namespace BattleSystemECS.Core
             TowerReloadProgress[entityId] = 0f;
             TowerIsReloading[entityId] = false;
             TowerArmorShredBonus[entityId] = 0f;
+            TowerShieldBreakBonus[entityId] = 0f;
             TowerAccuracy[entityId] = 1f;  // default to always-hit
             // Scatter/multicast fields: default to single shot (1 projectile, 0 spread)
             TowerProjectileCount[entityId] = 1;
@@ -1001,6 +1004,7 @@ namespace BattleSystemECS.Core
             TowerReloadProgress[entityId] = 0f;
             TowerIsReloading[entityId] = false;
             TowerArmorShredBonus[entityId] = 0f;
+            TowerShieldBreakBonus[entityId] = 0f;
             lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
         }
 
