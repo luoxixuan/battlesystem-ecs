@@ -126,6 +126,11 @@ namespace BattleSystemECS.Core
         // Enemy thorns: reflects a fraction of damage taken back to the attacker (player/tower).
         // Applied after damage is dealt, in the same frame's serial phase.
         public float[] EnemyThornsRatio = new float[MAX_ENTITIES];
+        // Armor Shred: stacks of armor reduction applied by attacker (e.g. AcidTower debuff)
+        // Each stack reduces armor by a fixed amount (_armorShredPerStack in TechTree)
+        public float[] EnemyArmorShredStacks = new float[MAX_ENTITIES];
+        // Duration in turns remaining for armor shred stacks. 0 = no active shred.
+        public float[] EnemyArmorShredDuration = new float[MAX_ENTITIES];
         // ==================== 敌人 CC (Crowd Control) 字段 ====================
         // Grouped together after all enemy hot-path fields to preserve cache locality
         // EnemyStunFlag: legacy bool, kept for backward compat; use EnemyStunDurationLeft for correctness
@@ -231,6 +236,8 @@ namespace BattleSystemECS.Core
         // Tower special abilities from upgrade path (e.g., armor pierce, splash, critical strike)
         public float[] TowerArmorPierceRatio = new float[MAX_ENTITIES];
         public float[] TowerSplashRadius = new float[MAX_ENTITIES];
+        // Tower armor shred bonus: bonus armor reduction applied to target on hit (stacks)
+        public float[] TowerArmorShredBonus = new float[MAX_ENTITIES];
         // AOE falloff: inner ratio (0.5 = inner 50% at full damage), outer mult (0.5 = outer half damage)
         // Default 1.0 = no falloff (all targets take full splash damage)
         public float[] TowerFalloffInnerRatio = new float[MAX_ENTITIES];
@@ -561,6 +568,8 @@ namespace BattleSystemECS.Core
                 EnemyStealthMultiplier[entityId] = 1f;
                 EnemyShield[entityId] = 0f;
                 EnemyThornsRatio[entityId] = 0f;
+                EnemyArmorShredStacks[entityId] = 0f;
+                EnemyArmorShredDuration[entityId] = 0f;
                 // Fear / Taunt / Charm fields
                 EnemyFearDurationLeft[entityId] = 0f;
                 EnemyTauntTargetId[entityId] = -1;
@@ -898,6 +907,7 @@ namespace BattleSystemECS.Core
             TowerReloadTime[entityId] = 0f;
             TowerReloadProgress[entityId] = 0f;
             TowerIsReloading[entityId] = false;
+            TowerArmorShredBonus[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); }
         }
@@ -920,6 +930,7 @@ namespace BattleSystemECS.Core
             TowerReloadTime[entityId] = 0f;
             TowerReloadProgress[entityId] = 0f;
             TowerIsReloading[entityId] = false;
+            TowerArmorShredBonus[entityId] = 0f;
             lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
         }
 

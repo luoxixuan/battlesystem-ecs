@@ -47,6 +47,8 @@ namespace BattleSystemECS.Systems
         private float _enemyFreezeResistance = 0f;
         private float _enemySlowResistance = 0f;
         private float _enemyDamageResistance = 0f;
+        // Armor shred per stack: flat armor reduction applied per stack (from AcidTower path upgrade)
+        private float _armorShredPerStack = 0f;
 
         public TechTreeSystem(ComponentStore store, IRenderer renderer, int playerId, TechTreeConfig config, GameConfig gameConfig = null)
         {
@@ -198,6 +200,7 @@ namespace BattleSystemECS.Systems
                     case "crit_rate_add":           _critRateAdd += eff.value; break;
                     case "crit_damage_mult":        _critDamageMult += eff.value; break;
                     case "armor_penetration":       _armorPenetration += eff.value; break;
+                    case "armor_shred":            _armorShredPerStack += eff.value; break;
                     case "gold_on_wave_bonus":      _goldOnWaveBonus += eff.value; break;
                     case "low_hp_regen":
                         _lowHpRegenThreshold = LOW_HP_REGEN_THRESHOLD;
@@ -297,6 +300,11 @@ namespace BattleSystemECS.Systems
         /// Get armor penetration ratio.
         /// </summary>
         public float GetArmorPenetration() => _armorPenetration;
+
+        /// <summary>
+        /// Get armor shred per stack (flat reduction per armor shred stack applied to enemies).
+        /// </summary>
+        public float GetArmorShredPerStack() => _armorShredPerStack;
 
         /// <summary>
         /// Get bonus gold on wave complete.

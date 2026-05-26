@@ -56,6 +56,8 @@ namespace BattleSystemECS.Systems
         // Cached crit bonuses from TechTreeSystem (updated each SetTurn)
         private float _critRateBonus = 0f;      // from techTreeSystem.GetCritRateBonus()
         private float _critDamageBonus = 1f;     // from techTreeSystem.GetCritDamageMult()
+        // Cached armor shred per stack from TechTreeSystem (flat armor reduction per stack)
+        private float _armorShredPerStack = 0f;
 
         // Shared random for debuff chance rolls — uses Random.Shared (.NET 6+ thread-safe)
         private static readonly Random _rand = Random.Shared;
@@ -119,6 +121,9 @@ namespace BattleSystemECS.Systems
             // Cache crit bonuses from tech tree (avoid per-tower calls in hot path)
             _critRateBonus = techTreeSystem != null ? techTreeSystem.GetCritRateBonus() : 0f;
             _critDamageBonus = techTreeSystem != null ? techTreeSystem.GetCritDamageMult() : 1f;
+
+            // Cache armor shred per stack from tech tree
+            _armorShredPerStack = techTreeSystem != null ? techTreeSystem.GetArmorShredPerStack() : 0f;
 
             // Cache wave-based difficulty multiplier (default wave 1)
             _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(1) : 1f;
@@ -295,8 +300,15 @@ int bestTarget = -1;
                     }
 
                     float baseDmg = store.TowerAttackDamage[towerId];
-                    // Apply enemy armor reduction + tech tree damage taken multiplier + wave scaling
-                    baseDmg *= Math.Max(0.01f, 1f - store.EnemyArmor[bestTarget] * (1f - _armorPenetration)) * _damageTakenMult;
+                    // Apply enemy armor reduction + armor shred + tech tree damage taken multiplier + wave scaling
+                    // Step 1: apply armor penetration (attacker's penetration ratio)
+                    float effectiveArmor = store.EnemyArmor[bestTarget] * (1f - _armorPenetration);
+                    // Step 2: apply flat armor shred stacks (debuff applied by attacker, e.g. AcidTower)
+                    float armorShredStacks = store.EnemyArmorShredStacks[bestTarget];
+                    if (armorShredStacks > 0f && _armorShredPerStack > 0f)
+                        effectiveArmor = Math.Max(0f, effectiveArmor - armorShredStacks * _armorShredPerStack);
+                    // Step 3: apply effective armor to damage
+                    baseDmg *= Math.Max(0.01f, 1f - effectiveArmor) * _damageTakenMult;
                     if (_waveDifficultyMult != 1.0f) baseDmg *= _waveDifficultyMult;
 
                     // Apply tower synergy multiplier (e.g. bonus damage when combo towers are placed together)
@@ -374,10 +386,17 @@ int bestTarget = -1;
                             // Special ability: armor pierce (reduces enemy armor effectiveness)
                             if (store.TowerArmorPierceRatio[towerId] > 0f)
                             {
-                                float effectiveArmor = store.EnemyArmor[bestTarget] * (1f - store.TowerArmorPierceRatio[towerId]);
-                                float pierceBonus = baseDmg * (1f - Math.Max(0.01f, 1f - effectiveArmor));
+                                float pierceEffectiveArmor = store.EnemyArmor[bestTarget] * (1f - store.TowerArmorPierceRatio[towerId]);
+                                float pierceBonus = baseDmg * (1f - Math.Max(0.01f, 1f - pierceEffectiveArmor));
                                 if (pierceBonus > 0f)
                                     lock (damageLock) { bag.Add((bestTarget, pierceBonus, store.PlayerEntityId)); }
+                            }
+                            // Armor shred debuff: apply stack on hit if tower has armor shred bonus
+                            float armorShredBonus = store.TowerArmorShredBonus[towerId];
+                            if (armorShredBonus > 0f && _armorShredPerStack > 0f)
+                            {
+                                store.EnemyArmorShredStacks[bestTarget] += armorShredBonus;
+                                store.EnemyArmorShredDuration[bestTarget] = 5f; // 5-turn duration, refreshed on re-apply
                             }
                             // Special ability: splash damage (AOE)
                             if (store.TowerSplashRadius[towerId] > 0f)
@@ -498,7 +517,35 @@ int bestTarget = -1;
                         break;
                 }
             }
+
+            // Phase 3b (serial): decay armor shred duration (1 turn per frame)
+            DecayArmorShredStacks();
+
             System.Threading.Thread.MemoryBarrier();
+        }
+
+        /// <summary>
+        /// Decay armor shred duration by 1 turn. When duration reaches 0, clear shred stacks.
+        /// Called once per frame in the debuff phase.
+        /// </summary>
+        private void DecayArmorShredStacks()
+        {
+            var enemyIds = store.GetCachedActiveEnemyIds();
+            int count = enemyIds.Count;
+            for (int i = 0; i < count; i++)
+            {
+                int enemyId = enemyIds[i];
+                float duration = store.EnemyArmorShredDuration[enemyId];
+                if (duration > 0f)
+                {
+                    store.EnemyArmorShredDuration[enemyId] = duration - 1f;
+                    if (store.EnemyArmorShredDuration[enemyId] <= 0f)
+                    {
+                        store.EnemyArmorShredStacks[enemyId] = 0f;
+                        store.EnemyArmorShredDuration[enemyId] = 0f;
+                    }
+                }
+            }
         }
 
         private const int TESLA_MAX_CHAIN_HOPS = 3;        // primary + 3 hops
