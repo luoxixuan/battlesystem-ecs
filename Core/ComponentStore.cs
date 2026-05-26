@@ -279,6 +279,16 @@ namespace BattleSystemECS.Core
         // TowerAuraDamageBonus: damage multiplier bonus granted to towers in range (e.g. 0.15 = +15%)
         public float[] TowerAuraDamageBonus = new float[MAX_ENTITIES];
 
+        // ==================== 路障/墙体组件（Obstacle）====================
+        // 路障是可被敌人攻击的放置物（冰墙、地雷等）
+        public const int MAX_OBSTACLES = 5000;
+        public bool[] ObstacleActive = new bool[MAX_OBSTACLES];
+        public float[] ObstacleHealth = new float[MAX_OBSTACLES];
+        public float[] ObstacleMaxHealth = new float[MAX_OBSTACLES];
+        public float[] ObstacleX = new float[MAX_OBSTACLES];
+        public float[] ObstacleY = new float[MAX_OBSTACLES];
+        public int[] ObstacleType = new int[MAX_OBSTACLES];  // index into ObstacleDefs[]
+
         // ==================== 技能组件的 SOA 存储 ====================
         public string[] SkillName = new string[MAX_PLAYERS];
         public float[] SkillDamageMultiplier = new float[MAX_PLAYERS];
@@ -304,6 +314,7 @@ namespace BattleSystemECS.Core
         public int PlayerEntityId { get; private set; } = 1;
         private List<int> _activeEnemyIds = new List<int>();
         private List<int> _activeTowerIds = new List<int>();
+        private List<int> _activeObstacleIds = new List<int>();
         private int nextEntityId = 2; // 从 2 开始，1 是玩家
         public int CurrentFrame { get; private set; } = 0;
 
@@ -311,8 +322,9 @@ namespace BattleSystemECS.Core
         // Caller responsibility: read-only access only. Consistent with ref-return patterns in ECS frameworks.
         public IReadOnlyList<int> ActiveEnemyIds => _activeEnemyIds;
         public IReadOnlyList<int> ActiveTowerIds => _activeTowerIds;
+        public IReadOnlyList<int> ActiveObstacleIds => _activeObstacleIds;
 
-        // Spatial Grid — O(1) range query for TowerAttackSystem
+        // Spatial Grid
         private readonly SpatialGrid _spatialGrid = new SpatialGrid();
 
         /// <summary>
@@ -909,6 +921,31 @@ namespace BattleSystemECS.Core
             TowerReloadProgress[entityId] = 0f;
             TowerIsReloading[entityId] = false;
             lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
+        }
+
+        // ==================== 路障管理 ====================
+        public void AddObstacle(int obstacleId, int typeId, float x, float y, float maxHealth)
+        {
+            if (obstacleId < 0 || obstacleId >= MAX_OBSTACLES) return;
+            ObstacleActive[obstacleId] = true;
+            ObstacleType[obstacleId] = typeId;
+            ObstacleX[obstacleId] = x;
+            ObstacleY[obstacleId] = y;
+            ObstacleHealth[obstacleId] = maxHealth;
+            ObstacleMaxHealth[obstacleId] = maxHealth;
+            _activeObstacleIds.Add(obstacleId);
+        }
+
+        public void RemoveObstacle(int obstacleId)
+        {
+            if (obstacleId < 0 || obstacleId >= MAX_OBSTACLES) return;
+            ObstacleActive[obstacleId] = false;
+            ObstacleHealth[obstacleId] = 0f;
+            ObstacleMaxHealth[obstacleId] = 0f;
+            ObstacleX[obstacleId] = 0f;
+            ObstacleY[obstacleId] = 0f;
+            ObstacleType[obstacleId] = -1;
+            _activeObstacleIds.Remove(obstacleId);
         }
 
         // ==================== 塔选中状态管理 ====================

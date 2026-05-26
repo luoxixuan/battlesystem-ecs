@@ -263,6 +263,24 @@ namespace BattleSystemECS.Config
         public int TriggerWaveStart { get; set; } = 0;
     }
 
+    /// <summary>
+    /// Defines a placeable obstacle type (wooden barricade, ice wall, spike trap).
+    /// </summary>
+    public class ObstacleDef
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        // Gold cost to place
+        public float Cost { get; set; }
+        // Max health of the obstacle
+        public float MaxHealth { get; set; }
+        // Whether enemies attack this obstacle when in range
+        public bool CanBeAttacked { get; set; } = true;
+        // Damage dealt to enemies when they walk over (spike trap)
+        public float TrapDamage { get; set; } = 0f;
+    }
+
     public class SkillConfig
     {
         public string Name { get; set; }
@@ -466,6 +484,9 @@ namespace BattleSystemECS.Config
 
         // Wave mutator definitions (loaded from wave_mutators.json)
         public WaveMutatorDef[] WaveMutatorDefs { get; set; } = Array.Empty<WaveMutatorDef>();
+
+        // Obstacle definitions (loaded from obstacles.json)
+        public ObstacleDef[] ObstacleDefs { get; set; } = Array.Empty<ObstacleDef>();
 
         // Map dimensions (Bug#30 fix: magic numbers 10 and 20 in GameManager/EnemyMovementSystem)
         public int MapWidth { get; set; } = 10;

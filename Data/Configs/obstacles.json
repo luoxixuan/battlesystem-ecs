@@ -1,0 +1,31 @@
+{
+  "obstacles": [
+    {
+      "id": "wooden_barricade",
+      "name": "Wooden Barricade",
+      "description": "Low-cost barricade that blocks enemy pathing and absorbs attacks",
+      "cost": 25.0,
+      "maxHealth": 100.0,
+      "canBeAttacked": true,
+      "trapDamage": 0.0
+    },
+    {
+      "id": "steel_wall",
+      "name": "Steel Wall",
+      "description": "High-cost, high-HP wall that delays enemies longer",
+      "cost": 75.0,
+      "maxHealth": 500.0,
+      "canBeAttacked": true,
+      "trapDamage": 0.0
+    },
+    {
+      "id": "spike_trap",
+      "name": "Spike Trap",
+      "description": "Deals damage to enemies that walk over it",
+      "cost": 40.0,
+      "maxHealth": 50.0,
+      "canBeAttacked": true,
+      "trapDamage": 15.0
+    }
+  ]
+}
