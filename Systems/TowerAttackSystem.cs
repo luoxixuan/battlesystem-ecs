@@ -285,6 +285,14 @@ int bestTarget = -1;
 
                 if (bestTarget != -1)
                 {
+                    // Accuracy check: if tower accuracy < 1.0, roll for miss
+                    float towerAccuracy = store.TowerAccuracy[towerId];
+                    if (towerAccuracy < 1f && _rand.NextDouble() >= towerAccuracy) return;
+
+                    // Enemy evasion: if enemy has evasion > 0, roll for dodge (after accuracy check passes)
+                    float enemyEvasion = store.EnemyEvasion[bestTarget];
+                    if (enemyEvasion > 0f && _rand.NextDouble() < enemyEvasion) return;
+
                     store.TowerLastAttackTime[towerId] = 0f;
 
                     // Consume ammo for towers with limited ammo (MaxAmmo > 0)

@@ -120,6 +120,9 @@ namespace BattleSystemECS.Core
         public int[] EnemySpawnFrame = new int[MAX_ENTITIES];
         // Armor: reduces incoming damage. Affected by attacker's armor penetration.
         public float[] EnemyArmor = new float[MAX_ENTITIES];
+        // Enemy evasion: probability that this enemy dodges an incoming attack (0.0-1.0, 0.0 = never evade)
+        // Applied after hitChance roll; if evasion succeeds the attack deals 0 damage (not a miss sound effect)
+        public float[] EnemyEvasion = new float[MAX_ENTITIES];
         // Enemy shield: absorbs incoming damage before it reaches EnemyHealth.
         // Shield is consumed first; remaining damage penetrates to health.
         public float[] EnemyShield = new float[MAX_ENTITIES];
@@ -238,6 +241,9 @@ namespace BattleSystemECS.Core
         public float[] TowerSplashRadius = new float[MAX_ENTITIES];
         // Tower armor shred bonus: bonus armor reduction applied to target on hit (stacks)
         public float[] TowerArmorShredBonus = new float[MAX_ENTITIES];
+        // Tower accuracy: probability that this tower's attack hits the target (0.0-1.0, 1.0 = always hit)
+        // Accuracy < 1.0 results in random misses, creating evasion gameplay for fast enemies
+        public float[] TowerAccuracy = new float[MAX_ENTITIES];
         // AOE falloff: inner ratio (0.5 = inner 50% at full damage), outer mult (0.5 = outer half damage)
         // Default 1.0 = no falloff (all targets take full splash damage)
         public float[] TowerFalloffInnerRatio = new float[MAX_ENTITIES];
@@ -837,6 +843,7 @@ namespace BattleSystemECS.Core
             EnemySpawnFrame[entityId] = CurrentFrame;
             EnemyArmor[entityId] = armor;
             EnemyShield[entityId] = shield;  // configurable initial shield
+            EnemyEvasion[entityId] = 0f;  // default to no evasion
 
             // 缓存怪物类型名（如 "NormalL1W1E0" -> "Normal"），避免每帧解析
             // 同时检测 [ELITE]/[BOSS] 前缀来正确标记精英/首领
@@ -908,6 +915,7 @@ namespace BattleSystemECS.Core
             TowerReloadProgress[entityId] = 0f;
             TowerIsReloading[entityId] = false;
             TowerArmorShredBonus[entityId] = 0f;
+            TowerAccuracy[entityId] = 1f;  // default to always-hit
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); }
         }
