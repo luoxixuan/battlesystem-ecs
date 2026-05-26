@@ -72,6 +72,13 @@ namespace BattleSystemECS.Core
         // WeatherTimer: turns remaining for current weather (-1 = permanent until changed)
         public float[] WeatherTimer = new float[MAX_PLAYERS];
 
+        // ==================== Time Dilation / Bullet Time 组件（SOA） ====================
+        // GlobalTimeScale: per-player time scale multiplier (1.0 = normal, 0.5 = 50% speed, 0.3 = bullet time)
+        // Applied at the start of FrameScheduler.Tick() to slow/fast all game systems.
+        public float[] GlobalTimeScale = new float[MAX_PLAYERS];
+        // GlobalTimeScaleDuration: remaining turns for the current time scale effect. 0 = inactive.
+        public float[] GlobalTimeScaleDuration = new float[MAX_PLAYERS];
+
         // ==================== 科技树组件的 SOA 存储 ====================
         public int[] PlayerResearchPoints = new int[MAX_PLAYERS];
         public HashSet<string>[] PlayerUnlockedTechs = new HashSet<string>[MAX_PLAYERS];
@@ -499,6 +506,8 @@ namespace BattleSystemECS.Core
                 PlayerComboDamageMult[i] = 1f;
                 PlayerComboKillStreak[i] = 0f;
                 CurrentWaveMutatorId[i] = -1;
+                GlobalTimeScale[i] = 1f;
+                GlobalTimeScaleDuration[i] = 0f;
             }
         }
 

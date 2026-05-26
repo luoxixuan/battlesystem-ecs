@@ -72,6 +72,20 @@ namespace BattleSystemECS.Core
             store.BeginFrame();
             store.SetTurnCCFlags();
 
+            // ── Time Dilation: apply per-player time scale (bullet time / fast-forward) ──
+            //衰减剩余持续时间
+            if (store.GlobalTimeScaleDuration[0] > 0f)
+            {
+                store.GlobalTimeScaleDuration[0] -= 1f;
+                if (store.GlobalTimeScaleDuration[0] <= 0f)
+                {
+                    store.GlobalTimeScaleDuration[0] = 0f;
+                    store.GlobalTimeScale[0] = 1f; // 恢复到正常速度
+                }
+            }
+            // 应用时间缩放到 deltaTime
+            float effectiveDelta = deltaTime * store.GlobalTimeScale[0];
+
             if (Phase == GameState.BuildPhase)
             {
                 // ── BuildPhase: tower placement/upgrade UI only ────────────
@@ -85,17 +99,17 @@ namespace BattleSystemECS.Core
             // ── WavePhase / Intermission: full combat pipeline ──────────────
 
             // ── Phase 0.5: Weather update (before combat) ───────────────────
-            Weather?.Update(deltaTime);
+            Weather?.Update(effectiveDelta);
 
             // ── Phase 1: 生成 ─────────────────────────────────────────────
             WaveSpawning?.Update();
 
             // ── Phase 2: AI + Abilities ───────────────────────────────────
-            EnemyAI?.SetTurn(turn, deltaTime);
+            EnemyAI?.SetTurn(turn, effectiveDelta);
             EnemyAI?.Update();
 
             EnemyAbility?.SetTurn(turn);
-            EnemyAbility?.UpdateCooldowns(deltaTime);
+            EnemyAbility?.UpdateCooldowns(effectiveDelta);
             EnemyAbility?.ExecuteAbilities();
             EnemyAbility?.Update();
 
@@ -106,11 +120,11 @@ namespace BattleSystemECS.Core
 
             // ── Phase 3.5: Terrain Effects (after movement, before combat) ──
             Terrain?.SetTurn();
-            Terrain?.Update(deltaTime);
+            Terrain?.Update(effectiveDelta);
 
             // ── Phase 3.6: Wave Mutators (global wave modifiers) ─────────────
             WaveMutator?.SetTurn(turn);
-            WaveMutator?.Update(deltaTime);
+            WaveMutator?.Update(effectiveDelta);
 
             // ── Phase 4: Combat — SetTurn ─────────────────────────────────
             PlayerTowerAttack?.SetTurn(turn);
@@ -124,16 +138,16 @@ namespace BattleSystemECS.Core
 
             // ── Phase 6: Combat — Update ──────────────────────────────────
             PlayerTowerAttack?.Update();
-            TowerAttack?.Update(deltaTime);
+            TowerAttack?.Update(effectiveDelta);
             TowerSynergy?.Update();
             AuraTower?.ResolveAuraBuffs();
-            Projectile?.Update(deltaTime);
+            Projectile?.Update(effectiveDelta);
 
             // ── Phase 7: Skill / Buff Damage ──────────────────────────────
-            Buff?.Update(deltaTime);
+            Buff?.Update(effectiveDelta);
             Skill?.ResolveSkillDamage();
             Buff?.ResolveDotDamage();
-            Skill?.Update(deltaTime); // skill cooldown ticking (WavePhase only path)
+            Skill?.Update(effectiveDelta); // skill cooldown ticking (WavePhase only path)
 
             // ── Phase 9: Death Resolve ─────────────────────────────────────
             // Collect kill events before resolving so ComboSystem can subscribe

@@ -21,6 +21,7 @@ namespace BattleSystemECS.Core.GAS
                                        // coneAngleDegrees controls fan spread (passed via GameplayAbilityDef)
         public const int GroundTarget = 10; // Ground target: player selects a point on the map, AoE hits enemies within radius.
         public const int Slow = 11;          // Slow: circle AoE that slows enemies in radius (non-freeze, move speed reduction)
+        public const int TimeWarp = 12;     // TimeWarp: applies GlobalTimeScale + GlobalTimeScaleDuration to slow/fast game time
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -39,6 +40,7 @@ namespace BattleSystemECS.Core.GAS
                 "cone" => Cone,
                 "groundtarget" => GroundTarget,
                 "slow" => Slow,
+                "time_warp" => TimeWarp,
                 _ => Single
             };
         }

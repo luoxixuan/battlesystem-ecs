@@ -284,6 +284,10 @@ namespace BattleSystemECS.Systems
                 case 11: // Slow — circle AoE that slows enemies in radius (move speed reduction, non-freeze)
                     enemiesHit = CastSlowArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def);
                     break;
+                case 12: // TimeWarp — slow/fast game time
+                    CastTimeWarp(def);
+                    enemiesHit = 0;
+                    break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
                     return;
@@ -745,6 +749,23 @@ namespace BattleSystemECS.Systems
         {
             store.ApplyPlayerShield(playerId, def.ShieldAmount, def.ShieldDuration);
             renderer.Log($"[SKILL] {def.Name} cast — Shield={def.ShieldAmount:F0}, Duration={def.ShieldDuration:F0}s");
+        }
+
+        /// <summary>
+        /// TimeWarp AreaShape: applies GlobalTimeScale (slow/fast time) + GlobalTimeScaleDuration.
+        /// The time scale is stored in ShieldAmount (e.g., 0.3 = 30% speed = bullet time).
+        /// The duration is stored in ShieldDuration (seconds remaining).
+        /// </summary>
+        private void CastTimeWarp(GameplayAbilityDef def)
+        {
+            float timeScale = def.ShieldAmount; // 0.3 = bullet time, 2.0 = fast forward
+            float duration = def.ShieldDuration; // seconds
+
+            store.GlobalTimeScale[playerId] = timeScale;
+            store.GlobalTimeScaleDuration[playerId] = duration;
+
+            string mode = timeScale < 1f ? "BULLET TIME" : "FAST FORWARD";
+            renderer.Log($"[SKILL] {def.Name} cast — {mode} {timeScale:F1}x speed for {duration:F0}s");
         }
 
         /// <summary>
