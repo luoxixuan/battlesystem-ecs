@@ -33,6 +33,7 @@ namespace BattleSystemECS.Core
         private TechTreeSystem techTreeSystem;            // 科技树系统
         private BuffSystem buffSystem;                    // Buff/DoT 追踪系统
         private ComboSystem comboSystem;                   // Combo Kill 连击系统
+        private TowerExperienceSystem towerExperienceSystem; // Tower XP / Mastery 系统
         private AutoSkillSystem autoSkillSystem;           // 自动技能施放系统（BuildPhase）
         private TowerSynergySystem towerSynergySystem;    // 塔协同增益系统
         private AuraTowerSystem auraTowerSystem;          // 光环辅助塔系统
@@ -175,7 +176,11 @@ namespace BattleSystemECS.Core
 
             logger.Log("[BOOTSTRAP]    - Creating ComboSystem (Combo Kill tracking)...");
             comboSystem = new ComboSystem(store, gameConfig.Combo);
-            logger.Log("[BOOTSTRAP]      ComboSystem created successfully!");
+            logger.Log("      ComboSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating TowerExperienceSystem (Tower XP & Mastery)...");
+            towerExperienceSystem = new TowerExperienceSystem(store, gameConfig);
+            logger.Log("      TowerExperienceSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating AutoSkillSystem (BuildPhase auto-casting)...");
             autoSkillSystem = new AutoSkillSystem(store, logger, playerId, skillSystem, gameConfig.AutoSkill);
@@ -213,12 +218,16 @@ namespace BattleSystemECS.Core
 
             // Wire OnEnemyKilled → ComboSystem (连击计数链路)
             store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
+            // Wire OnTowerKill → TowerExperienceSystem (XP 授予链路)
+            store.OnTowerKill += (enemyId, playerId, towerId) => towerExperienceSystem.HandleEnemyKilled(enemyId, playerId, towerId);
 
             // Wire BuffSystem into SkillSystem for Poison Nova DoT application
             skillSystem.InjectDotSystem(buffSystem);
 
             // Wire BuffSystem into TowerAttackSystem for Firewall DoT and Leech lifesteal
             towerAttackSystem.SetBuffSystem(buffSystem);
+            // Wire TowerExperienceSystem into TowerAttackSystem for XP grant on kills
+            towerAttackSystem.SetTowerExperienceSystem(towerExperienceSystem);
 
             logger.Log("[BOOTSTRAP]    - Creating PlayerTowerAttackSystem...");
             playerTowerAttackSystem = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig, techTreeSystem);

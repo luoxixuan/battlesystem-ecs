@@ -434,6 +434,46 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Tower Mastery Level definition — XP threshold and bonuses granted at each level.
+    /// </summary>
+    public class TowerMasteryLevelConfig
+    {
+        /// <summary>Mastery level (1 = fresh, 2 = 2nd tier, etc.)</summary>
+        public int Level { get; set; }
+        /// <summary>Total XP required to reach this level (cumulative threshold)</summary>
+        public float XPThreshold { get; set; }
+        /// <summary>Damage multiplier bonus granted at this level (e.g. 0.1 = +10% damage)</summary>
+        public float DamageBonus { get; set; }
+        /// <summary>Attack speed multiplier bonus granted at this level (e.g. 0.05 = +5% attack speed)</summary>
+        public float AttackSpeedBonus { get; set; }
+        /// <summary>Range bonus granted at this level (flat tiles, e.g. 1 = +1 tile range)</summary>
+        public int RangeBonus { get; set; }
+    }
+
+    /// <summary>
+    /// Tower Mastery System configuration — level progression table and XP sources.
+    /// </summary>
+    public class TowerMasteryConfig
+    {
+        /// <summary>XP granted per enemy kill (scaled by enemy gold reward multiplier). Default: 10</summary>
+        public float XPPerKill { get; set; } = 10f;
+        /// <summary>Elite kill bonus XP (flat add on top of XPPerKill). Default: 50</summary>
+        public float XPPerEliteKill { get; set; } = 50f;
+        /// <summary>Mastery level definitions sorted by level ascending.</summary>
+        public List<TowerMasteryLevelConfig> Levels { get; set; } = new List<TowerMasteryLevelConfig>
+        {
+            new TowerMasteryLevelConfig { Level = 1, XPThreshold = 0f,    DamageBonus = 0f,    AttackSpeedBonus = 0f, RangeBonus = 0 },
+            new TowerMasteryLevelConfig { Level = 2, XPThreshold = 100f,   DamageBonus = 0.05f, AttackSpeedBonus = 0.02f, RangeBonus = 0 },
+            new TowerMasteryLevelConfig { Level = 3, XPThreshold = 300f,   DamageBonus = 0.10f, AttackSpeedBonus = 0.05f, RangeBonus = 1 },
+            new TowerMasteryLevelConfig { Level = 4, XPThreshold = 600f,  DamageBonus = 0.15f, AttackSpeedBonus = 0.08f, RangeBonus = 1 },
+            new TowerMasteryLevelConfig { Level = 5, XPThreshold = 1000f, DamageBonus = 0.20f, AttackSpeedBonus = 0.10f, RangeBonus = 2 },
+            new TowerMasteryLevelConfig { Level = 6, XPThreshold = 1500f, DamageBonus = 0.25f, AttackSpeedBonus = 0.12f, RangeBonus = 2 },
+            new TowerMasteryLevelConfig { Level = 7, XPThreshold = 2200f, DamageBonus = 0.30f, AttackSpeedBonus = 0.15f, RangeBonus = 3 },
+            new TowerMasteryLevelConfig { Level = 8, XPThreshold = 3000f, DamageBonus = 0.35f, AttackSpeedBonus = 0.18f, RangeBonus = 3 },
+        };
+    }
+
+    /// <summary>
     /// Auto-skill selection strategy when multiple skills are ready.
     /// </summary>
     public enum AutoSkillStrategy
@@ -486,6 +526,9 @@ namespace BattleSystemECS.Config
 
         // Auto Skill configuration (BuildPhase auto-casting)
         public AutoSkillConfig AutoSkill { get; set; } = new AutoSkillConfig();
+
+        // Tower Mastery / XP system configuration
+        public TowerMasteryConfig TowerMastery { get; set; } = new TowerMasteryConfig();
 
         // Wave mutator definitions (loaded from wave_mutators.json)
         public WaveMutatorDef[] WaveMutatorDefs { get; set; } = Array.Empty<WaveMutatorDef>();

@@ -17,13 +17,14 @@ namespace BattleSystemECS.Systems
         private IRenderer logger;
         private TechTreeSystem techTreeSystem;
         private BuffSystem buffSystem;
+        private TowerExperienceSystem towerExperienceSystem;
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate lists, pre-allocated in SetTurn
         private List<int>[] _towerCandidates = Array.Empty<List<int>>();
 
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
-        private List<(int enemyId, float damage, int playerId)>[] _damageQueue = new List<(int, float, int)>[2];
+        private List<(int enemyId, float damage, int playerId, int towerId)>[] _damageQueue = new List<(int, float, int, int)>[2];
         private readonly object _damageQueueLock = new object();
         private int _damageQueueIdx = 0;
 
@@ -76,6 +77,11 @@ namespace BattleSystemECS.Systems
         private readonly object _splashDamageQueueLock = new object();
         private int _splashDamageQueueIdx = 0;
 
+        // Ping-pong double-buffer for tower kill events (granted XP on kill)
+        private List<(int enemyId, int playerId, int towerId)>[] _towerKillQueue = new List<(int, int, int)>[2];
+        private readonly object _towerKillQueueLock = new object();
+        private int _towerKillQueueIdx = 0;
+
         // Leech lifesteal rate: 30% of damage dealt is returned as player heal
         private const float LEECH_LIFESTEAL_RATE = 0.30f;
 
@@ -84,8 +90,8 @@ namespace BattleSystemECS.Systems
             this.store = store;
             this.logger = logger;
             this.techTreeSystem = techTreeSystem;
-            _damageQueue[0] = new List<(int, float, int)>(256);
-            _damageQueue[1] = new List<(int, float, int)>(256);
+            _damageQueue[0] = new List<(int, float, int, int)>(256);
+            _damageQueue[1] = new List<(int, float, int, int)>(256);
             _debuffQueue[0] = new List<(int, int)>(256);
             _debuffQueue[1] = new List<(int, int)>(256);
             _healQueue[0] = new List<(int, float)>(64);
@@ -96,6 +102,8 @@ namespace BattleSystemECS.Systems
             _chainDamageQueue[1] = new List<(int, int, float, int, int)>(64);
             _splashDamageQueue[0] = new List<(int, float, int, int)>(64);
             _splashDamageQueue[1] = new List<(int, float, int, int)>(64);
+            _towerKillQueue[0] = new List<(int, int, int)>(64);
+            _towerKillQueue[1] = new List<(int, int, int)>(64);
         }
 
         /// <summary>
@@ -104,6 +112,14 @@ namespace BattleSystemECS.Systems
         public void SetBuffSystem(BuffSystem buffSystem)
         {
             this.buffSystem = buffSystem;
+        }
+
+        /// <summary>
+        /// Inject TowerExperienceSystem reference for XP grant on kills.
+        /// </summary>
+        public void SetTowerExperienceSystem(TowerExperienceSystem system)
+        {
+            this.towerExperienceSystem = system;
         }
 
         public void SetTurn(int turn)
@@ -356,14 +372,14 @@ int bestTarget = -1;
                     {
                         case "AOE":
                             // Damage + area splash (handled via upgrade special ability mechanism)
-                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             // AOE towers naturally use splash — just mark the primary hit
                             // The splash resolution is handled in ResolveSplashDamage() if splash is set
                             break;
 
                         case "Sniper":
                             // High single-target damage + mark (bonus damage on next hit)
-                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             // Apply mark debuff: next tower hit deals +20% damage
                             if (store.EnemyArmor[bestTarget] >= 0)
                             {
@@ -384,7 +400,7 @@ int bestTarget = -1;
 
                         case "Leech":
                             // Damage + lifesteal (heal player)
-                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             float healAmount = baseDmg * LEECH_LIFESTEAL_RATE;
                             if (healAmount > 0f)
                                 lock (healLock) { healBag.Add((store.PlayerEntityId, healAmount)); }
@@ -392,38 +408,38 @@ int bestTarget = -1;
 
                         case "Frost":
                             // Damage + tower slow debuff (handled by debuff phase)
-                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             break;
 
                         case "Stun":
                             // High-stun tower: damage + stun roll in debuff phase
-                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             break;
 
                         case "EMP":
                             // EMP tower: damage + stun + slow (debuff phase)
-                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             break;
 
                         case "Firewall":
                             // Damage + Firewall DoT (handled by debuff phase)
-                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             break;
 
                         default:
                             // Basic / unknown: standard damage + standard debuff check
-                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                            lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             // Special ability: armor pierce (reduces enemy armor effectiveness)
                             if (store.TowerArmorPierceRatio[towerId] > 0f)
                             {
                                 float pierceEffectiveArmor = store.EnemyArmor[bestTarget] * (1f - store.TowerArmorPierceRatio[towerId]);
                                 float pierceBonus = baseDmg * (1f - Math.Max(0.01f, 1f - pierceEffectiveArmor));
                                 if (pierceBonus > 0f)
-                                    lock (damageLock) { bag.Add((bestTarget, pierceBonus, store.PlayerEntityId)); }
+                                    lock (damageLock) { bag.Add((bestTarget, pierceBonus, store.PlayerEntityId, towerId)); }
                             }
                             // Armor shred debuff: apply stack on hit if tower has armor shred bonus
                             float armorShredBonus = store.TowerArmorShredBonus[towerId];
@@ -444,7 +460,7 @@ int bestTarget = -1;
                             {
                                 float critBonus = baseDmg * (store.TowerCritMultiplier[towerId] * _critDamageBonus - 1f);
                                 if (critBonus > 0f)
-                                    lock (damageLock) { bag.Add((bestTarget, critBonus, store.PlayerEntityId)); }
+                                    lock (damageLock) { bag.Add((bestTarget, critBonus, store.PlayerEntityId, towerId)); }
                             }
                             // Scatter/multicast: if ProjectileCount > 1, fire additional projectiles at the target
                             int projCount = store.TowerProjectileCount[towerId];
@@ -456,7 +472,7 @@ int bestTarget = -1;
                                 {
                                     // Each extra projectile adds the same damage to the target
                                     // The visual spread is cosmetic — all hit the same target
-                                    lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId)); }
+                                    lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                                 }
                             }
                             // Special ability: chain lightning (from upgrade, not Tesla tower type)
@@ -484,7 +500,7 @@ int bestTarget = -1;
             int writeIdx = 1 - _damageQueueIdx;
             _damageQueueIdx = writeIdx;
             _damageQueue[writeIdx].Clear();
-            foreach (var (enemyId, damage, playerId) in _damageQueue[readIdx])
+            foreach (var (enemyId, damage, playerId, towerId) in _damageQueue[readIdx])
             {
                 if (!store.EnemyActive[enemyId]) continue;
                 // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
@@ -500,7 +516,9 @@ int bestTarget = -1;
                 }
                 if (store.EnemyHealth[enemyId] <= 0f)
                 {
+                    // Queue both the enemy death and the tower kill for XP
                     store.QueueEnemyDeath(enemyId, playerId);
+                    store.QueueTowerKill(enemyId, playerId, towerId);
                 }
             }
 

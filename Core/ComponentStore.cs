@@ -328,6 +328,14 @@ namespace BattleSystemECS.Core
         // TowerTurnRate: maximum angular change per second in radians (e.g. PI = 180°/sec, 0 = instant/snap)
         public float[] TowerTurnRate = new float[MAX_ENTITIES];
 
+        // ==================== 塔经验/熟练度系统 (Tower XP & Mastery) ====================
+        // TowerExperience: accumulated experience points for each tower (kills grant XP)
+        public float[] TowerExperience = new float[MAX_ENTITIES];
+        // TowerMasteryLevel: current mastery level (1 = fresh, increases with XP thresholds)
+        public int[] TowerMasteryLevel = new int[MAX_ENTITIES];
+        // TowerKillCount: total enemies killed by this tower (used for mastery tracking)
+        public int[] TowerKillCount = new int[MAX_ENTITIES];
+
         // ==================== 路障/墙体组件（Obstacle）====================
         // 路障是可被敌人攻击的放置物（冰墙、地雷等）
         public const int MAX_OBSTACLES = 5000;
@@ -465,11 +473,18 @@ namespace BattleSystemECS.Core
         private ConcurrentBag<(int enemyId, int playerId)>[] _deathQueue = new ConcurrentBag<(int, int)>[2];
         private int _deathQueueIdx = 0;
 
+        // Tower kill queue: (enemyId, playerId, towerId) — parallel-safe
+        private ConcurrentBag<(int, int, int)>[] _towerKillQueue = new ConcurrentBag<(int, int, int)>[2];
+        private int _towerKillQueueIdx = 0;
+
         private bool _deathQueueResolved = false;
 
         // Combo kill callback — fired once per killed enemy during ResolveEnemiesKilledThisFrame.
         // Safe for serial use only (called from the resolve loop inside a foreach).
         public event Action<int, int> OnEnemyKilled;
+        // Tower kill callback — fired when a tower scores the killing blow.
+        // Parameters: (enemyId, playerId, towerId). Thread-safe, serial context.
+        public event Action<int, int, int> OnTowerKill;
 
         public void BeginFrame()
         {
@@ -499,6 +514,34 @@ namespace BattleSystemECS.Core
             _deathQueue[_deathQueueIdx].Add((enemyId, playerId));
         }
 
+        /// <summary>
+        /// Queue a tower kill event from a parallel or serial context.
+        /// The towerId is used by TowerExperienceSystem to grant XP.
+        /// </summary>
+        public void QueueTowerKill(int enemyId, int playerId, int towerId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            _towerKillQueue[_towerKillQueueIdx].Add((enemyId, playerId, towerId));
+        }
+
+        /// <summary>
+        /// Serially process all queued tower kill events.
+        /// Must be called after OnEnemyKilled but before the frame ends.
+        /// </summary>
+        private void ResolveTowerKillsThisFrame()
+        {
+            int readIdx = _towerKillQueueIdx;
+            int writeIdx = 1 - _towerKillQueueIdx;
+            _towerKillQueueIdx = writeIdx;
+            foreach (var (enemyId, playerId, towerId) in _towerKillQueue[readIdx])
+            {
+                OnTowerKill?.Invoke(enemyId, playerId, towerId);
+            }
+            _towerKillQueue[writeIdx].Clear();
+        }
+
 
         /// <summary>
         /// Serially process all queued enemy deaths this frame.
@@ -519,6 +562,8 @@ namespace BattleSystemECS.Core
                 if (_goldOnEliteKill > 0f && EnemyIsElite[enemyId])
                     PlayerGold[playerId] += _goldOnEliteKill;
                 OnEnemyKilled?.Invoke(enemyId, playerId);
+                // Fire tower kill event (for TowerExperienceSystem XP grant) — serial, safe
+                ResolveTowerKillsThisFrame();
                 DestroyEntity(enemyId);
             }
             _deathQueue[writeIdx].Clear();
@@ -530,6 +575,9 @@ namespace BattleSystemECS.Core
             // Initialize ping-pong death queue buffers
             _deathQueue[0] = new ConcurrentBag<(int, int)>();
             _deathQueue[1] = new ConcurrentBag<(int, int)>();
+            // Initialize tower kill queue buffers
+            _towerKillQueue[0] = new ConcurrentBag<(int, int, int)>();
+            _towerKillQueue[1] = new ConcurrentBag<(int, int, int)>();
             // Initialize player buffs
             for (int i = 0; i < MAX_PLAYERS; i++)
             {
