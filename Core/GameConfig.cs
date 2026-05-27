@@ -538,6 +538,9 @@ namespace BattleSystemECS.Config
         // Wave mutator definitions (loaded from wave_mutators.json)
         public WaveMutatorDef[] WaveMutatorDefs { get; set; } = Array.Empty<WaveMutatorDef>();
 
+        // Pickup item definitions (loaded from pickup_defs.json)
+        public PickupDef[] PickupDefs { get; set; } = Array.Empty<PickupDef>();
+
         // Obstacle definitions (loaded from obstacles.json)
         public ObstacleDef[] ObstacleDefs { get; set; } = Array.Empty<ObstacleDef>();
 
@@ -1103,5 +1106,18 @@ namespace BattleSystemECS.Config
         public float DotDamagePerTick { get; set; }
         public int DotDuration { get; set; }
         public float TowerRangeBonus { get; set; }
+    }
+
+    /// <summary>
+    /// Pickup item definition — loaded from pickup_defs.json.
+    /// </summary>
+    public class PickupDef
+    {
+        public string Type { get; set; } = "";
+        public float Value { get; set; }
+        public float CollectRadius { get; set; } = 1.5f;
+        public float LifetimeSeconds { get; set; } = 30f;
+        public string Color { get; set; } = "White";
+        public string Fx { get; set; } = "None";
     }
 }

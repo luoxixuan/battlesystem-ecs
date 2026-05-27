@@ -50,6 +50,7 @@ namespace BattleSystemECS.Core
         public InterestSystem? Interest { get; set; }
         public EnemyAffixSystem? EnemyAffix { get; set; }
         public ManaSystem? Mana { get; set; }
+        public PickupSystem? Pickup { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -151,6 +152,7 @@ namespace BattleSystemECS.Core
             TowerSynergy?.Update();
             AuraTower?.ResolveAuraBuffs();
             Projectile?.Update(effectiveDelta);
+            Pickup?.Update(effectiveDelta);
             Mana?.Update(effectiveDelta, isBuildPhase: false); // mana regen (wave phase = normal regen)
 
             // ── Phase 7: Skill / Buff Damage ──────────────────────────────

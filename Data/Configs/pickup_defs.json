@@ -1,0 +1,42 @@
+[
+    {
+        "Type": "GoldPile",
+        "Value": 10,
+        "CollectRadius": 1.5,
+        "LifetimeSeconds": 30.0,
+        "Color": "Gold",
+        "Fx": "Coin"
+    },
+    {
+        "Type": "HealthPack",
+        "Value": 50,
+        "CollectRadius": 1.5,
+        "LifetimeSeconds": 25.0,
+        "Color": "Red",
+        "Fx": "Heal"
+    },
+    {
+        "Type": "ManaOrb",
+        "Value": 30,
+        "CollectRadius": 1.5,
+        "LifetimeSeconds": 25.0,
+        "Color": "Blue",
+        "Fx": "Mana"
+    },
+    {
+        "Type": "SpeedBoost",
+        "Value": 15,
+        "CollectRadius": 1.5,
+        "LifetimeSeconds": 20.0,
+        "Color": "Yellow",
+        "Fx": "Buff"
+    },
+    {
+        "Type": "DamageBoost",
+        "Value": 10,
+        "CollectRadius": 1.5,
+        "LifetimeSeconds": 20.0,
+        "Color": "Orange",
+        "Fx": "Buff"
+    }
+]

@@ -94,6 +94,23 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         public int[] PlayerResearchPoints = new int[MAX_PLAYERS];
         public HashSet<string>[] PlayerUnlockedTechs = new HashSet<string>[MAX_PLAYERS];
 
+        // ==================== 掉落物/拾取道具组件（SOA）====================
+        // PickupX / PickupY: world position of each pickup
+        public float[] PickupX = new float[MAX_ENTITIES];
+        public float[] PickupY = new float[MAX_ENTITIES];
+        // PickupType: type index into GameConfig.PickupDefs (0-4 = GoldPile/HealthPack/ManaOrb/SpeedBoost/DamageBoost), -1 = empty slot
+        public int[] PickupType = new int[MAX_ENTITIES];
+        // PickupValue: effect value (e.g. gold amount, healing amount)
+        public float[] PickupValue = new float[MAX_ENTITIES];
+        // PickupOwnerId: player ID who can collect this pickup (only that player can pick it up)
+        public int[] PickupOwnerId = new int[MAX_ENTITIES];
+        // PickupActive: true if slot is occupied
+        public bool[] PickupActive = new bool[MAX_ENTITIES];
+        // PickupLifetime: seconds remaining before auto-expire; 0 = inactive
+        public float[] PickupLifetime = new float[MAX_ENTITIES];
+        private int _pickupCount = 0;
+        public int PickupCount => _pickupCount;
+
         // ==================== 波次状态组件 ====================
         // WaveIndex: current wave number (0-indexed), -1 = no wave started
         public int[] PlayerWaveIndex = new int[MAX_PLAYERS];

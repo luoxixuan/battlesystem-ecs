@@ -50,6 +50,9 @@ namespace BattleSystemECS.Config
                 // Load wave mutators config
                 LoadWaveMutatorsConfig(gameConfig, renderer);
 
+                // Load pickup definitions
+                LoadPickupDefs(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -1162,6 +1165,48 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[TERRAIN] Failed to load terrain config: " + ex.Message);
+            }
+        }
+
+        private static void LoadPickupDefs(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string pickupFile = "Data/Configs/pickup_defs.json";
+            try
+            {
+                if (!File.Exists(pickupFile))
+                {
+                    renderer.Log("[PICKUP] Pickup defs file not found: " + pickupFile + ", using defaults");
+                    return;
+                }
+                string json = File.ReadAllText(pickupFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[PICKUP] Pickup defs file is empty: " + pickupFile);
+                    return;
+                }
+
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var defs = new List<PickupDef>();
+                foreach (var elem in root.EnumerateArray())
+                {
+                    var p = new PickupDef();
+                    p.Type = elem.TryGetProperty("Type", out var t) ? t.GetString() ?? "" : "";
+                    p.Value = elem.TryGetProperty("Value", out var v) ? (float)v.GetDouble() : 0f;
+                    p.CollectRadius = elem.TryGetProperty("CollectRadius", out var cr) ? (float)cr.GetDouble() : 1.5f;
+                    p.LifetimeSeconds = elem.TryGetProperty("LifetimeSeconds", out var ls) ? (float)ls.GetDouble() : 30f;
+                    p.Color = elem.TryGetProperty("Color", out var c) ? c.GetString() ?? "White" : "White";
+                    p.Fx = elem.TryGetProperty("Fx", out var fx) ? fx.GetString() ?? "None" : "None";
+                    defs.Add(p);
+                }
+
+                gameConfig.PickupDefs = defs.ToArray();
+                renderer.Log("[PICKUP] Loaded " + defs.Count + " pickup defs from " + pickupFile);
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[PICKUP] Failed to load pickup defs: " + ex.Message);
             }
         }
     }

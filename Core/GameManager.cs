@@ -44,6 +44,7 @@ namespace BattleSystemECS.Core
         private InterestSystem interestSystem;          // 银行/利息系统
         private ManaSystem manaSystem;                  // 法力/能量池系统
         private SaveSystem saveSystem;                  // 存档/回放系统
+        private PickupSystem pickupSystem;             // 掉落物/拾取道具系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -225,6 +226,10 @@ namespace BattleSystemECS.Core
             saveSystem = new SaveSystem(store, playerId);
             logger.Log("      SaveSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating PickupSystem...");
+            pickupSystem = new PickupSystem(store, gameConfig, logger);
+            logger.Log("      PickupSystem created successfully!");
+
             // Wire OnEnemyKilled → ComboSystem (连击计数链路)
             store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
             // Wire OnTowerKill → TowerExperienceSystem (XP 授予链路)
@@ -273,6 +278,7 @@ namespace BattleSystemECS.Core
             scheduler.WaveMutator = waveMutatorSystem;
             scheduler.Interest = interestSystem;
             scheduler.Mana = manaSystem;
+            scheduler.Pickup = pickupSystem;
             scheduler.Skill = skillSystem;
             scheduler.Buff = buffSystem;
             scheduler.Combo = comboSystem;
