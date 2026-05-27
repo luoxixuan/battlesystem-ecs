@@ -1,0 +1,50 @@
+[
+  {
+    "fissionId": "slime",
+    "sourceMonsterType": "Slime",
+    "childMonsterType": "MiniSlime",
+    "childrenCount": 2,
+    "healthScale": 0.4,
+    "damageScale": 0.3,
+    "speedScale": 1.2,
+    "goldScale": 0.5,
+    "maxGeneration": 2,
+    "description": "Slime splits into 2 MiniSlimes at 40% health each, up to 2 generations"
+  },
+  {
+    "fissionId": "spider",
+    "sourceMonsterType": "Spider",
+    "childMonsterType": "Spiderling",
+    "childrenCount": 3,
+    "healthScale": 0.3,
+    "damageScale": 0.25,
+    "speedScale": 1.3,
+    "goldScale": 0.4,
+    "maxGeneration": 3,
+    "description": "Spider spawns 3 Spiderlings, up to 3 generations"
+  },
+  {
+    "fissionId": "worm",
+    "sourceMonsterType": "Worm",
+    "childMonsterType": "WormSegment",
+    "childrenCount": 2,
+    "healthScale": 0.5,
+    "damageScale": 0.4,
+    "speedScale": 1.1,
+    "goldScale": 0.5,
+    "maxGeneration": 2,
+    "description": "Worm splits into 2 segments, up to 2 generations"
+  },
+  {
+    "fissionId": "goo",
+    "sourceMonsterType": "Goo",
+    "childMonsterType": "GooBlob",
+    "childrenCount": 4,
+    "healthScale": 0.25,
+    "damageScale": 0.2,
+    "speedScale": 1.4,
+    "goldScale": 0.3,
+    "maxGeneration": 3,
+    "description": "Goo splits into 4 blobs, up to 3 generations"
+  }
+]
