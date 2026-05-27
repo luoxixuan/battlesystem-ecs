@@ -40,7 +40,9 @@ namespace BattleSystemECS.Core
         public float[] PlayerShieldDuration = new float[MAX_PLAYERS]; // seconds remaining
         // Player thorns: reflects a fraction of damage taken back to the attacking enemy.
         public float[] PlayerThornsRatio = new float[MAX_PLAYERS];
-        public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
+public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
+        // Player damage type: 0=Physical, 1=Magic, 2=True. Drives which resistance enemies use.
+        public int[] PlayerDamageType = new int[MAX_PLAYERS];
         public float[] PlayerGold = new float[MAX_PLAYERS];
         public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         private float _goldKillMultiplier = 1.0f;
@@ -133,6 +135,9 @@ namespace BattleSystemECS.Core
         public int[] EnemySpawnFrame = new int[MAX_ENTITIES];
         // Armor: reduces incoming damage. Affected by attacker's armor penetration.
         public float[] EnemyArmor = new float[MAX_ENTITIES];
+        // Enemy magic resistance: reduces incoming Magic damage (0.0-1.0 fraction reduction)
+        // Separate from armor (physical). Physical ignores magic resist, Magic ignores armor.
+        public float[] EnemyMagicResist = new float[MAX_ENTITIES];
         // Enemy evasion: probability that this enemy dodges an incoming attack (0.0-1.0, 0.0 = never evade)
         // Applied after hitChance roll; if evasion succeeds the attack deals 0 damage (not a miss sound effect)
         public float[] EnemyEvasion = new float[MAX_ENTITIES];
@@ -255,6 +260,8 @@ namespace BattleSystemECS.Core
         public int[] TowerTargetingMode = new int[MAX_ENTITIES];
         // Tower projectile homing: if true, this tower's projectiles track targets mid-flight
         public bool[] TowerProjectileHoming = new bool[MAX_ENTITIES];
+        // Tower damage type: 0=Physical, 1=Magic, 2=True. Determines which resistance the target uses.
+        public int[] TowerDamageType = new int[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
         public string[] TowerType = new string[MAX_ENTITIES];
@@ -951,7 +958,7 @@ namespace BattleSystemECS.Core
 
         // ==================== 敌人组件访问 ====================
 
-        public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber, string fullName = null, float armor = 0f, float shield = 0f)
+        public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber, string fullName = null, float armor = 0f, float shield = 0f, float magicResist = 0f)
         {
             int entityId = CreateEntity();
 
@@ -977,6 +984,7 @@ namespace BattleSystemECS.Core
             EnemyPathNodeIndex[entityId] = 0;
             EnemySpawnFrame[entityId] = CurrentFrame;
             EnemyArmor[entityId] = armor;
+            EnemyMagicResist[entityId] = magicResist;
             EnemyShield[entityId] = shield;  // configurable initial shield
             EnemyEvasion[entityId] = 0f;  // default to no evasion
             // Teleport: default no cooldown (ready), no destination, type=0 (none)
@@ -1025,7 +1033,7 @@ namespace BattleSystemECS.Core
         /// <summary>
         /// Add a tower with debuff parameters.
         /// </summary>
-        public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost, string upgradePathId, float stunChance, float slowAmount, float slowDuration)
+        public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost, string upgradePathId, float stunChance, float slowAmount, float slowDuration, int damageType = 0, float turnRate = 0f)
         {
             if (entityId < 0 || entityId >= MAX_ENTITIES) return;
             TowerType[entityId] = type;
@@ -1060,6 +1068,9 @@ namespace BattleSystemECS.Core
             // Scatter/multicast fields: default to single shot (1 projectile, 0 spread)
             TowerProjectileCount[entityId] = 1;
             TowerScatterAngle[entityId] = 0f;
+            // Damage type and turn rate from config
+            TowerDamageType[entityId] = damageType;
+            TowerTurnRate[entityId] = turnRate;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); }
         }
@@ -1085,6 +1096,7 @@ namespace BattleSystemECS.Core
             TowerProjectileHoming[entityId] = false;
             TowerArmorShredBonus[entityId] = 0f;
             TowerShieldBreakBonus[entityId] = 0f;
+            TowerDamageType[entityId] = 0;
             lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
         }
 

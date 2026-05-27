@@ -35,6 +35,9 @@ namespace BattleSystemECS.Config
         // Armor: reduces incoming damage. Tank/Elite/Boss types get high armor (5-15),
         // Normal/Fast types get low armor (0-2). Affected by attacker's armor penetration.
         public float Armor { get; set; } = 0f;
+        // MagicResist: reduces incoming Magic damage (0.0-1.0 fraction reduction).
+        // Separate from armor. Physical ignores magic resist, Magic ignores armor.
+        public float MagicResist { get; set; } = 0f;
         // Shield: absorbs incoming damage before health. Boss/Elite types can have shield.
         public float Shield { get; set; } = 0f;
         // Boss: true if this monster type is a boss (participates in phase/enrage system).
@@ -77,6 +80,8 @@ namespace BattleSystemECS.Config
         // Turn rate: maximum angular change per second in radians (e.g. PI = 180°/sec, 0 = instant/snap to target)
         // Default 0 means instant rotation (existing behavior unchanged)
         public float TurnRate { get; set; } = 0f;
+        // DamageType: 0=Physical (reduced by armor), 1=Magic (reduced by magic resist), 2=True (ignores all defenses)
+        public int DamageType { get; set; } = 0;
     }
 
     /// <summary>

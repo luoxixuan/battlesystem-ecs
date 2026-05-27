@@ -156,7 +156,7 @@ namespace BattleSystemECS.Systems
                 float enemyHealth = store.EnemyHealth[enemyId];
                 if (enemyHealth <= 0f) return;
 
-                // H-3 fix: crit rolled per-enemy inside parallel loop, not once per frame globally.
+// H-3 fix: crit rolled per-enemy inside parallel loop, not once per frame globally.
                 // Optimized: merged crit rate threshold (precomputed _critRateThreshold) eliminates branch
                 float finalDamage = baseDamage;
                 if (GetDeterministicRandom(_currentTurn, enemyId, playerId) < (int)(_critRateThreshold * 0x7FFFFFFF))
@@ -164,11 +164,23 @@ namespace BattleSystemECS.Systems
                     finalDamage *= (1f + _critDamageBonus);
                 }
 
-                // Apply enemy armor reduction (armor = flat reduction; armor pen ignores a fraction)
-                // Fast path: skip computation when enemy has no armor (common in benchmarks)
-                float enemyArmor = store.EnemyArmor[enemyId];
-                if (enemyArmor > 0f)
-                    finalDamage *= Math.Max(0.01f, 1f - enemyArmor * (1f - _armorPenetration));
+                // Apply damage type resistance (Physical=armor, Magic=magicResist, True=bypass all)
+                int dmgType = store.PlayerDamageType[playerId];
+                if (dmgType == 2)  // True — bypasses all defenses
+                {
+                    // no resistance applied — skip to damageTakenMult below
+                }
+                else if (dmgType == 1)  // Magic — uses magic resist only
+                {
+                    float magicResist = store.EnemyMagicResist[enemyId];
+                    finalDamage *= Math.Max(0.01f, 1f - magicResist);
+                }
+                else  // Physical (default) — uses armor + armor pen
+                {
+                    float enemyArmor = store.EnemyArmor[enemyId];
+                    if (enemyArmor > 0f)
+                        finalDamage *= Math.Max(0.01f, 1f - enemyArmor * (1f - _armorPenetration));
+                }
 
                 // Apply tech tree damage taken multiplier (e.g. "Iron Wall II" reduces incoming damage)
                 finalDamage *= _damageTakenMult;

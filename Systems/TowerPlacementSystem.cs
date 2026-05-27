@@ -107,7 +107,7 @@ namespace BattleSystemECS.Systems
                     string upgradePath = tc.UpgradePath;
                     if (string.IsNullOrEmpty(upgradePath)) upgradePath = "standard";
                     store.AddTower(towerId, type, damage, range, speed, 1, cost, upgradePath,
-                        tc.StunChance, tc.SlowAmount, tc.SlowDuration);
+                        tc.StunChance, tc.SlowAmount, tc.SlowDuration, tc.DamageType, tc.TurnRate);
                     // Apply tower targeting mode from config
                     store.SetTowerTargetingMode(towerId, tc.TargetingMode);
                     // Apply ammo system if configured (0 = unlimited)
@@ -120,8 +120,7 @@ namespace BattleSystemECS.Systems
                     }
                     // Apply homing projectile flag for tracking towers
                     store.SetTowerProjectileHoming(towerId, tc.ProjectileHoming);
-                    // Apply turn rate for turret rotation delay (0 = instant snap, >0 = gradual rotation)
-                    store.TowerTurnRate[towerId] = tc.TurnRate;
+                    // Apply turn rate for turret rotation delay (already set via AddTower params)
                     // Initialize facing angle to point at nearest enemy (or 0 if none)
                     store.TowerFacingAngle[towerId] = 0f;
                     // Apply tower's innate special ability (e.g., chain_lightning for Tesla)

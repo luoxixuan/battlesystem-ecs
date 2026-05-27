@@ -350,15 +350,31 @@ int bestTarget = -1;
                     }
 
                     float baseDmg = store.TowerAttackDamage[towerId];
-                    // Apply enemy armor reduction + armor shred + tech tree damage taken multiplier + wave scaling
-                    // Step 1: apply armor penetration (attacker's penetration ratio)
-                    float effectiveArmor = store.EnemyArmor[bestTarget] * (1f - _armorPenetration);
-                    // Step 2: apply flat armor shred stacks (debuff applied by attacker, e.g. AcidTower)
-                    float armorShredStacks = store.EnemyArmorShredStacks[bestTarget];
-                    if (armorShredStacks > 0f && _armorShredPerStack > 0f)
-                        effectiveArmor = Math.Max(0f, effectiveArmor - armorShredStacks * _armorShredPerStack);
-                    // Step 3: apply effective armor to damage
-                    baseDmg *= Math.Max(0.01f, 1f - effectiveArmor) * _damageTakenMult;
+                    // ── Damage type resolution ───────────────────────────────────────────
+                    // Physical: reduced by armor (affected by armor penetration + shred)
+                    // Magic: reduced by magic resist (no armor interaction)
+                    // True: ignores armor and magic resist entirely
+                    int dmgType = store.TowerDamageType[towerId];
+                    if (dmgType == 2)  // True damage — bypasses all defenses
+                    {
+                        baseDmg *= _damageTakenMult;
+                    }
+                    else if (dmgType == 1)  // Magic damage — uses magic resist only
+                    {
+                        float magicResist = store.EnemyMagicResist[bestTarget];
+                        baseDmg *= Math.Max(0.01f, 1f - magicResist) * _damageTakenMult;
+                    }
+                    else  // Physical (default, dmgType==0) — uses armor + armor shred + pen
+                    {
+                        // Step 1: apply armor penetration (attacker's penetration ratio)
+                        float effectiveArmor = store.EnemyArmor[bestTarget] * (1f - _armorPenetration);
+                        // Step 2: apply flat armor shred stacks (debuff applied by attacker, e.g. AcidTower)
+                        float armorShredStacks = store.EnemyArmorShredStacks[bestTarget];
+                        if (armorShredStacks > 0f && _armorShredPerStack > 0f)
+                            effectiveArmor = Math.Max(0f, effectiveArmor - armorShredStacks * _armorShredPerStack);
+                        // Step 3: apply effective armor to damage
+                        baseDmg *= Math.Max(0.01f, 1f - effectiveArmor) * _damageTakenMult;
+                    }
                     if (_waveDifficultyMult != 1.0f) baseDmg *= _waveDifficultyMult;
 
                     // Apply tower synergy multiplier (e.g. bonus damage when combo towers are placed together)

@@ -276,6 +276,7 @@ namespace BattleSystemECS.Systems
                     float scaledMaxHealth = monsterConfig.MaxHealth * healthMult;
                     float scaledDamage = monsterConfig.Damage * damageMult;
                     float scaledArmor = monsterConfig.Armor * armorMult;
+                    float scaledMagicResist = monsterConfig.MagicResist * armorMult;
                     float scaledSpeed = monsterConfig.MoveSpeed * speedMult;
 
                     string enemyName = $"{monsterType}L{currentLevel}W{currentWave}T{_multiTypeIndex}E{_multiSpawnedForType}";
@@ -291,7 +292,8 @@ namespace BattleSystemECS.Systems
                         currentWave,
                         enemyName,
                         scaledArmor,
-                        monsterConfig.Shield
+                        monsterConfig.Shield,
+                        scaledMagicResist
                     );
                     if (enemyId < 0)
                     {

@@ -613,6 +613,8 @@ namespace BattleSystemECS.Config
             tower.TargetingMode = ExtractInt(json, "TargetingMode");
             tower.SpecialAbility = ParseTowerSpecialAbility(json);
             tower.ProjectileHoming = ExtractBool(json, "ProjectileHoming");
+            tower.TurnRate = ExtractFloat(json, "TurnRate");
+            tower.DamageType = ExtractInt(json, "DamageType");
             return tower;
         }
 
@@ -704,6 +706,8 @@ namespace BattleSystemECS.Config
             monster.AttackInterval = ExtractFloat(json, "AttackInterval");
             monster.GoldReward = ExtractInt(json, "GoldReward");
             monster.Skills = ParseStringArray(json, "Skills");
+            monster.Armor = ExtractFloat(json, "Armor");
+            monster.MagicResist = ExtractFloat(json, "MagicResist");
 
             return monster;
         }
