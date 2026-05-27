@@ -618,6 +618,7 @@ namespace BattleSystemECS.Config
             tower.ProjectileHoming = ExtractBool(json, "ProjectileHoming");
             tower.TurnRate = ExtractFloat(json, "TurnRate");
             tower.DamageType = ExtractInt(json, "DamageType");
+            tower.InterceptRate = ExtractFloat(json, "InterceptRate");
             return tower;
         }
 

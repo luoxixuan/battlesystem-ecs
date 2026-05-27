@@ -51,6 +51,8 @@ namespace BattleSystemECS.Core
         public EnemyAffixSystem? EnemyAffix { get; set; }
         public ManaSystem? Mana { get; set; }
         public PickupSystem? Pickup { get; set; }
+        public EnemyProjectileSystem? EnemyProjectile { get; set; }
+        public PointDefenseSystem? PointDefense { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -146,12 +148,18 @@ namespace BattleSystemECS.Core
             // ── Phase 5: Spatial Rebuild ──────────────────────────────────
             store.RebuildSpatialGrid();
 
+            // ── Phase 5.5: Point Defense — intercept enemy projectiles before they hit ──
+            PointDefense?.SetTurn(turn);
+            PointDefense?.Update(effectiveDelta);
+
             // ── Phase 6: Combat — Update ──────────────────────────────────
             PlayerTowerAttack?.Update();
             TowerAttack?.Update(effectiveDelta);
             TowerSynergy?.Update();
             AuraTower?.ResolveAuraBuffs();
             Projectile?.Update(effectiveDelta);
+            // Update enemy projectiles (moves them toward player base)
+            EnemyProjectile?.Update(effectiveDelta);
             Pickup?.Update(effectiveDelta);
             Mana?.Update(effectiveDelta, isBuildPhase: false); // mana regen (wave phase = normal regen)
 

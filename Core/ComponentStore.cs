@@ -286,10 +286,13 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
 
         // ==================== 塔组件的 SOA 存储 ====================
         // Tower targeting mode: controls which enemy the tower selects as its target.
-        // Maps to TowerTargetingMode enum: Nearest=0, Furthest=1, LowestHealth=2, HighestHealth=3, FirstSpawned=4, LastSpawned=5
+        // Maps to TowerTargetingMode enum: Nearest=0, Furthest=1, LowestHealth=2, HighestHealth=3, FirstSpawned=4, LastSpawned=5, Intercept=6
         public int[] TowerTargetingMode = new int[MAX_ENTITIES];
         // Tower projectile homing: if true, this tower's projectiles track targets mid-flight
         public bool[] TowerProjectileHoming = new bool[MAX_ENTITIES];
+        // Tower intercept rate: probability of intercepting enemy projectiles (for PointDefense towers)
+        // Stored separately from TowerCritChance to keep concerns isolated (reuse CritChance as intercept rate when needed)
+        public float[] TowerInterceptRate = new float[MAX_ENTITIES];
         // Tower damage type: 0=Physical, 1=Magic, 2=True. Determines which resistance the target uses.
         public int[] TowerDamageType = new int[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
@@ -1306,6 +1309,13 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         {
             if (towerId < 0 || towerId >= MAX_ENTITIES) return;
             TowerProjectileHoming[towerId] = isHoming;
+        }
+
+        /// <summary>Sets the intercept rate for a PointDefense tower.</summary>
+        public void SetTowerInterceptRate(int towerId, float rate)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            TowerInterceptRate[towerId] = rate;
         }
 
         public float GetEnemyHealth(int enemyId)

@@ -120,6 +120,8 @@ namespace BattleSystemECS.Systems
                     }
                     // Apply homing projectile flag for tracking towers
                     store.SetTowerProjectileHoming(towerId, tc.ProjectileHoming);
+                    // Apply intercept rate for PointDefense towers
+                    store.SetTowerInterceptRate(towerId, tc.InterceptRate);
                     // Apply turn rate for turret rotation delay (already set via AddTower params)
                     // Initialize facing angle to point at nearest enemy (or 0 if none)
                     store.TowerFacingAngle[towerId] = 0f;

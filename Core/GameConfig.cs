@@ -82,6 +82,8 @@ namespace BattleSystemECS.Config
         public float TurnRate { get; set; } = 0f;
         // DamageType: 0=Physical (reduced by armor), 1=Magic (reduced by magic resist), 2=True (ignores all defenses)
         public int DamageType { get; set; } = 0;
+        // InterceptRate: for PointDefense towers (TargetingMode=6), probability of intercepting enemy projectiles (0.0-1.0)
+        public float InterceptRate { get; set; } = 0.5f;
     }
 
     /// <summary>
