@@ -314,6 +314,12 @@ namespace BattleSystemECS.Systems
                     store.EnemyFissionDefId[enemyId] = fissionDefId;
                     store.EnemyFissionGeneration[enemyId] = 0;
 
+                    // Initialize morph capability (transform mid-wave)
+                    int morphDefId = gameConfig.GetMorphDefIdBySourceType(monsterType);
+                    store.EnemyMorphDefId[enemyId] = morphDefId;
+                    store.EnemyIsMorphed[enemyId] = false;
+                    store.EnemyMorphTriggered[enemyId] = false;
+
                     // Assign per-enemy affixes (1-3 random affixes from EnemyAffixSystem)
                     _enemyAffixSystem?.AssignAffixesAtSpawn(enemyId, scaledMaxHealth);
 

@@ -55,6 +55,7 @@ namespace BattleSystemECS.Core
         public PointDefenseSystem? PointDefense { get; set; }
         public TowerOverchargeSystem? TowerOvercharge { get; set; }
         public EnemyFissionSystem? EnemyFission { get; set; }
+        public EnemyMorphSystem? EnemyMorph { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -138,6 +139,9 @@ namespace BattleSystemECS.Core
             // ── Phase 3.6: Wave Mutators (global wave modifiers) ─────────────
             WaveMutator?.SetTurn(turn);
             WaveMutator?.Update(effectiveDelta);
+
+            // ── Phase 3.7: Enemy Morph — transform mid-wave enemies before combat ──
+            EnemyMorph?.Update(effectiveDelta);
 
             // ── Phase 4: Combat — SetTurn ─────────────────────────────────
             PlayerTowerAttack?.SetTurn(turn);

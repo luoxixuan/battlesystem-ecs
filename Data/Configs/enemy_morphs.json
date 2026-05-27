@@ -1,0 +1,50 @@
+[
+  {
+    "morphId": "werewolf",
+    "sourceMonsterType": "Wolf",
+    "targetMonsterType": "DireWolf",
+    "triggerType": "HP_THRESHOLD",
+    "triggerValue": 0.5,
+    "description": "Wolf transforms into DireWolf at 50% HP — +50% speed, +30% damage",
+    "speedMultOnMorph": 1.5,
+    "damageMultOnMorph": 1.3,
+    "healthMultOnMorph": 1.2,
+    "duration": 0.0
+  },
+  {
+    "morphId": "stonegolem",
+    "sourceMonsterType": "RockGolem",
+    "targetMonsterType": "StoneGolem",
+    "triggerType": "HP_THRESHOLD",
+    "triggerValue": 0.3,
+    "description": "RockGolem hardens into StoneGolem at 30% HP — +100% armor, +20% damage",
+    "speedMultOnMorph": 1.0,
+    "damageMultOnMorph": 1.2,
+    "healthMultOnMorph": 1.5,
+    "duration": 0.0
+  },
+  {
+    "morphId": "ghost",
+    "sourceMonsterType": "Spirit",
+    "targetMonsterType": "VengefulSpirit",
+    "triggerType": "HP_THRESHOLD",
+    "triggerValue": 0.4,
+    "description": "Spirit becomes VengefulSpirit at 40% HP — ignores tower range, +60% damage",
+    "speedMultOnMorph": 1.4,
+    "damageMultOnMorph": 1.6,
+    "healthMultOnMorph": 1.0,
+    "duration": 0.0
+  },
+  {
+    "morphId": "dragon_whelp",
+    "sourceMonsterType": "Drake",
+    "targetMonsterType": "DragonWhelp",
+    "triggerType": "HP_THRESHOLD",
+    "triggerValue": 0.25,
+    "description": "Drake immaturely transforms at 25% HP into DragonWhelp",
+    "speedMultOnMorph": 1.3,
+    "damageMultOnMorph": 1.8,
+    "healthMultOnMorph": 2.0,
+    "duration": 0.0
+  }
+]

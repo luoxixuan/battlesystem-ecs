@@ -283,6 +283,32 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Enemy morph (transform mid-wave) definition — loaded from enemy_morphs.json.
+    /// When a monster's health drops below a threshold (or time trigger fires), it transforms
+    /// into a different monster type with scaled stats.
+    /// </summary>
+    public class MorphDef
+    {
+        public string MorphId { get; set; } = "";
+        // Source monster type that triggers morph (e.g., "Wolf")
+        public string SourceMonsterType { get; set; } = "";
+        // Target monster type after morph (e.g., "DireWolf")
+        public string TargetMonsterType { get; set; } = "";
+        // Trigger type: "HP_THRESHOLD" | "TIME"
+        public string TriggerType { get; set; } = "HP_THRESHOLD";
+        // For HP_THRESHOLD: morph when health drops below this fraction (0.0-1.0)
+        // For TIME: morph after this many seconds since spawn
+        public float TriggerValue { get; set; } = 0.5f;
+        public string Description { get; set; } = "";
+        // Stat multipliers applied on morph
+        public float SpeedMultOnMorph { get; set; } = 1.0f;
+        public float DamageMultOnMorph { get; set; } = 1.0f;
+        public float HealthMultOnMorph { get; set; } = 1.0f;
+        // Morph duration in seconds (0 = instant, permanent)
+        public float Duration { get; set; } = 0f;
+    }
+
+    /// <summary>
     /// Wave mutator definition — loaded from wave_mutators.json.
     /// A mutator applies a global modifier to all enemies during a specific wave.
     /// </summary>
@@ -646,6 +672,15 @@ namespace BattleSystemECS.Config
         public int GetFissionDefIdBySourceType(string monsterType)
         {
             return Array.FindIndex(FissionDefs, f => f.SourceMonsterType == monsterType);
+        }
+
+        // Enemy morph definitions (loaded from enemy_morphs.json)
+        public MorphDef[] MorphDefs { get; set; } = Array.Empty<MorphDef>();
+
+        // GetMorphDefId: returns index into MorphDefs[] for a monster type, -1 if none
+        public int GetMorphDefIdBySourceType(string monsterType)
+        {
+            return Array.FindIndex(MorphDefs, m => m.SourceMonsterType == monsterType);
         }
 
         // Pickup item definitions (loaded from pickup_defs.json)

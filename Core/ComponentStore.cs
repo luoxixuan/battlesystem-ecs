@@ -240,6 +240,14 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // Capped at FissionDef.MaxGeneration — once reached, no more fission on death
         public int[] EnemyFissionGeneration = new int[MAX_ENTITIES];
 
+        // ==================== Enemy Morph (Transform Mid-Wave) ====================
+        // EnemyMorphDefId: index into GameConfig.MorphDefs for this enemy's morph definition (-1 = none)
+        public int[] EnemyMorphDefId = new int[MAX_ENTITIES];
+        // EnemyIsMorphed: true once this enemy has completed a morph transformation
+        public bool[] EnemyIsMorphed = new bool[MAX_ENTITIES];
+        // EnemyMorphTriggered: set to true when trigger condition is met (consumed at morph execution)
+        public bool[] EnemyMorphTriggered = new bool[MAX_ENTITIES];
+
         // ==================== 路径分叉 / 路点系统字段（SOA） ====================
         // EnemyPathId: which path this enemy is assigned to (-1 = no path, use default straight movement)
         // 0 = default (straight Y-axis), 1 = fork_left, 2 = fork_right, 3 = ring

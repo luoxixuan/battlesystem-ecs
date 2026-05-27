@@ -56,6 +56,9 @@ namespace BattleSystemECS.Config
                 // Load enemy fission definitions
                 LoadFissionDefs(gameConfig, renderer);
 
+                // Load enemy morph definitions
+                LoadMorphDefs(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -1261,6 +1264,54 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[FISSION] Failed to load fission defs: " + ex.Message);
+            }
+        }
+
+        private static void LoadMorphDefs(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string morphFile = "Data/Configs/enemy_morphs.json";
+            try
+            {
+                if (!File.Exists(morphFile))
+                {
+                    renderer.Log("[MORPH] Enemy morph config file not found: " + morphFile + ", morph disabled");
+                    return;
+                }
+                string json = File.ReadAllText(morphFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[MORPH] Enemy morph config file is empty: " + morphFile);
+                    return;
+                }
+
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    var defs = new List<MorphDef>();
+                    foreach (var elem in root.EnumerateArray())
+                    {
+                        var m = new MorphDef();
+                        m.MorphId = elem.TryGetProperty("morphId", out var mid) ? mid.GetString() ?? "" : "";
+                        m.SourceMonsterType = elem.TryGetProperty("sourceMonsterType", out var smt) ? smt.GetString() ?? "" : "";
+                        m.TargetMonsterType = elem.TryGetProperty("targetMonsterType", out var tmt) ? tmt.GetString() ?? "" : "";
+                        m.TriggerType = elem.TryGetProperty("triggerType", out var tt) ? tt.GetString() ?? "HP_THRESHOLD" : "HP_THRESHOLD";
+                        m.TriggerValue = elem.TryGetProperty("triggerValue", out var tv) ? (float)tv.GetDouble() : 0.5f;
+                        m.Description = elem.TryGetProperty("description", out var desc) ? desc.GetString() ?? "" : "";
+                        m.SpeedMultOnMorph = elem.TryGetProperty("speedMultOnMorph", out var sms) ? (float)sms.GetDouble() : 1.0f;
+                        m.DamageMultOnMorph = elem.TryGetProperty("damageMultOnMorph", out var dms) ? (float)dms.GetDouble() : 1.0f;
+                        m.HealthMultOnMorph = elem.TryGetProperty("healthMultOnMorph", out var hms) ? (float)hms.GetDouble() : 1.0f;
+                        m.Duration = elem.TryGetProperty("duration", out var dur) ? (float)dur.GetDouble() : 0f;
+                        defs.Add(m);
+                    }
+                    gameConfig.MorphDefs = defs.ToArray();
+                    renderer.Log("[MORPH] Loaded " + defs.Count + " morph defs from " + morphFile);
+                }
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[MORPH] Failed to load morph defs: " + ex.Message);
             }
         }
     }
