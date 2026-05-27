@@ -229,6 +229,14 @@ namespace BattleSystemECS.Core
         //          Teleporter(传送), Regen(回复), Explosive(全屏爆炸)
         public BuffType[] EnemyAffixFlags = new BuffType[MAX_ENTITIES];
 
+        // ==================== 元素状态组件（SOA）====================
+        // EnemyElementStatus: bit-mask of active elements on this enemy (ElementType flags)
+        // Multiple elements can coexist (e.g., Fire + Poison = Pyroclastic)
+        public ElementType[] EnemyElementStatus = new ElementType[MAX_ENTITIES];
+        // EnemyElementTimer: remaining duration (in seconds) for each element bit flag
+        // Indexed by element ordinal (0-3), matches ElementType bit positions
+        public float[] EnemyElementTimer = new float[MAX_ENTITIES * 4];
+
         // ==================== 敌人 AI 组件的 SOA 存储 ====================
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
         public int[] EnemyAIChargeCounter = new int[MAX_ENTITIES];

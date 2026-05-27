@@ -1,3 +1,5 @@
+using BattleSystemECS.Components;
+
 namespace BattleSystemECS.Core
 {
     /// <summary>
@@ -33,6 +35,14 @@ namespace BattleSystemECS.Core
     {
         public int EnemyId;
         public int Turn;
+        public float Damage;
+    }
+
+    public class ElementalReactionEvent
+    {
+        public int EnemyId;
+        public int SourceEntityId;
+        public ElementalReactionType ReactionType;
         public float Damage;
     }
 }
