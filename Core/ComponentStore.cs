@@ -90,6 +90,10 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // GlobalTimeScaleDuration: remaining turns for the current time scale effect. 0 = inactive.
         public float[] GlobalTimeScaleDuration = new float[MAX_PLAYERS];
 
+        // ==================== Ascension/Difficulty Modifier 组件 ====================
+        // AscensionModifierStacks: tracks stack count for each ascension modifier (up to 64 unique modifiers)
+        public int[] AscensionModifierStacks = new int[64];
+
         // ==================== 科技树组件的 SOA 存储 ====================
         public int[] PlayerResearchPoints = new int[MAX_PLAYERS];
         public HashSet<string>[] PlayerUnlockedTechs = new HashSet<string>[MAX_PLAYERS];

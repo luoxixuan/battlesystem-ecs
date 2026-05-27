@@ -43,6 +43,7 @@ namespace BattleSystemECS.Core
         private WaveMutatorSystem waveMutatorSystem;    // 波次词缀/突变器系统
         private InterestSystem interestSystem;          // 银行/利息系统
         private ManaSystem manaSystem;                  // 法力/能量池系统
+        private AscensionSystem ascensionSystem;       // 进阶难度修改器系统
         private SaveSystem saveSystem;                  // 存档/回放系统
         private PickupSystem pickupSystem;             // 掉落物/拾取道具系统
 
@@ -229,6 +230,15 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]    - Creating PickupSystem...");
             pickupSystem = new PickupSystem(store, gameConfig, logger);
             logger.Log("      PickupSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating AscensionSystem...");
+            ascensionSystem = new AscensionSystem(store, logger, gameConfig);
+            // Pre-select some default modifiers for demonstration
+            ascensionSystem.SelectModifier("tough_enemies");
+            logger.Log("      AscensionSystem created successfully!");
+
+            // Wire AscensionSystem into WaveSpawningSystem for enemy HP/speed scaling
+            waveSpawningSystem.SetAscensionSystem(ascensionSystem);
 
             // Wire OnEnemyKilled → ComboSystem (连击计数链路)
             store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);

@@ -495,6 +495,56 @@ namespace BattleSystemECS.Config
         Random = 4
     }
 
+    /// <summary>
+    /// Ascension/Difficulty Modifier definition — loaded from ascension_modifiers.json.
+    /// A modifier applies a persistent positive or negative challenge to the player after
+    /// completing a run (Slay the Spire-style). Players opt-in to modifiers to earn
+    /// higher scores or unlock rewards.
+    /// </summary>
+    public class AscensionModifierDef
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        // Category: "enemy" | "tower" | "player" | "economy"
+        public string Category { get; set; }
+        // Stacks: whether this modifier can be applied multiple times (e.g. +1 each level)
+        public bool CanStack { get; set; }
+        // Max stack count (only meaningful if CanStack=true)
+        public int MaxStack { get; set; } = 1;
+
+        // Enemy modifiers
+        // HP multiplier applied when enemies spawn (1.3 = +30% HP)
+        public float EnemyHpMult { get; set; } = 1.0f;
+        // Damage multiplier applied to all enemy attacks
+        public float EnemyDamageMult { get; set; } = 1.0f;
+        // Speed multiplier applied to all enemy movement
+        public float EnemySpeedMult { get; set; } = 1.0f;
+        // Flat gold bonus per enemy kill (can be negative to reduce rewards)
+        public float EnemyGoldBonus { get; set; } = 0f;
+        // Flat HP regeneration per second to all enemies
+        public float EnemyRegenRate { get; set; } = 0f;
+
+        // Tower modifiers
+        // Damage multiplier applied to all tower attacks (0.8 = -20% tower damage)
+        public float TowerDamageMult { get; set; } = 1.0f;
+        // Attack speed multiplier for all towers
+        public float TowerAttackSpeedMult { get; set; } = 1.0f;
+        // Range penalty in tiles (negative = shorter range)
+        public int TowerRangePenalty { get; set; } = 0;
+
+        // Player modifiers
+        // Starting gold when a new run begins
+        public float PlayerStartGold { get; set; } = -1f; // -1 means "use default"
+        // Starting lives
+        public int PlayerStartLives { get; set; } = -1;  // -1 means "use default"
+        // Gold earned multiplier (0.9 = -10% gold from kills)
+        public float GoldEarnedMult { get; set; } = 1.0f;
+
+        // Scoring multiplier — rewards score multiplied by this when modifier is active
+        public float ScoreMultiplier { get; set; } = 1.0f;
+    }
+
     public class GameConfig
     {
         public PlayerConfig Player { get; set; } = new PlayerConfig();
@@ -506,6 +556,9 @@ namespace BattleSystemECS.Config
 
         // Phase behavior keyed by GameState name
         public Dictionary<string, PhaseBehaviorDef> PhaseBehaviors { get; set; } = new Dictionary<string, PhaseBehaviorDef>();
+
+        // Ascension/Difficulty modifier definitions (loaded from ascension_modifiers.json)
+        public AscensionModifierDef[] AscensionModifiers { get; set; } = Array.Empty<AscensionModifierDef>();
 
         // Tower upgrade paths (config-driven upgrade curves)
         public Dictionary<string, TowerUpgradePathConfig> TowerUpgradePaths { get; set; } = new Dictionary<string, TowerUpgradePathConfig>();

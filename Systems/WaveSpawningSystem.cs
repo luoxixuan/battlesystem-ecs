@@ -86,6 +86,12 @@ namespace BattleSystemECS.Systems
             this._enemyAffixSystem = enemyAffixSystem;
         }
 
+        private AscensionSystem _ascensionSystem;
+        public void SetAscensionSystem(AscensionSystem ascensionSystem)
+        {
+            _ascensionSystem = ascensionSystem;
+        }
+
         private WaveSpawnConfig LoadWaveSpawnConfig()
         {
             const string configPath = "Data/Configs/wave_spawn.json";
@@ -305,6 +311,9 @@ namespace BattleSystemECS.Systems
 
                     // Assign per-enemy affixes (1-3 random affixes from EnemyAffixSystem)
                     _enemyAffixSystem?.AssignAffixesAtSpawn(enemyId, scaledMaxHealth);
+
+                    // Apply ascension/difficulty modifier scaling
+                    _ascensionSystem?.ApplyEnemyScaling(enemyId);
 
                     _multiSpawnedForType++;
                     enemiesSpawnedInWave++;
