@@ -19,6 +19,23 @@ namespace BattleSystemECS.Core
     }
 
     /// <summary>
+    /// Objective type for the current level — defines the win condition.
+    /// </summary>
+    public enum ObjectiveType
+    {
+        /// Default: kill all enemies in all waves.
+        KillAll = 0,
+        /// Escort: protect an NPC that moves toward the goal. Win when NPC survives, lose when it dies.
+        Escort = 1,
+        /// Survival: survive a fixed number of waves. Win when all waves cleared.
+        Survival = 2,
+        /// Timed: eliminate all enemies within a time limit. Win when timer expires with enemies remaining.
+        Timed = 3,
+        /// Endless: survive as many waves as possible. Score = total waves cleared.
+        Endless = 4
+    }
+
+    /// <summary>
     /// State machine controller — manages transitions and notifies listeners.
     /// </summary>
     public class StateMachine

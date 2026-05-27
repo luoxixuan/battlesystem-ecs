@@ -198,6 +198,17 @@ namespace BattleSystemECS.Config
         public int LevelNumber { get; set; }
         public int WaveCount { get; set; }
         public List<WaveConfig> Waves { get; set; } = new List<WaveConfig>();
+        // Objective type for this level — defaults to KillAll if omitted.
+        // KillAll=0, Escort=1, Survival=2, Timed=3, Endless=4
+        public int ObjectiveType { get; set; } = 0;
+        // For Escort mode: escort NPC max health
+        public float EscortNpcMaxHealth { get; set; } = 100f;
+        // For Escort mode: escort NPC movement speed (tiles/sec)
+        public float EscortNpcSpeed { get; set; } = 0.5f;
+        // For Timed mode: time limit in seconds
+        public float ObjectiveTimeLimit { get; set; } = 120f;
+        // For Survival mode: number of waves to survive
+        public int SurvivalWaveCount { get; set; } = 10;
     }
 
     /// <summary>

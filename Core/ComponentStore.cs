@@ -83,6 +83,24 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // WeatherTimer: turns remaining for current weather (-1 = permanent until changed)
         public float[] WeatherTimer = new float[MAX_PLAYERS];
 
+        // ==================== Objective System 组件 (Escort / Survival / Timed) ====================
+        // CurrentObjectiveType: active objective type for this level (ObjectiveType enum, 0=KillAll default)
+        public int[] CurrentObjectiveType = new int[MAX_PLAYERS];
+        // Escort NPC: position and state (Survival objective)
+        public float[] EscortNpcX = new float[MAX_PLAYERS];
+        public float[] EscortNpcY = new float[MAX_PLAYERS];
+        public float[] EscortNpcHealth = new float[MAX_PLAYERS];
+        public float[] EscortNpcMaxHealth = new float[MAX_PLAYERS];
+        public bool[] EscortNpcActive = new bool[MAX_PLAYERS];  // true when escort NPC is alive
+        public float[] EscortNpcSpeed = new float[MAX_PLAYERS];  // movement speed in tiles/sec
+        // Survival timer: remaining seconds in Timed mode, or remaining waves in Survival mode
+        public float[] ObjectiveTimer = new float[MAX_PLAYERS];
+        public int[] ObjectiveWavesRemaining = new int[MAX_PLAYERS];
+        public float[] ObjectiveTimeLimit = new float[MAX_PLAYERS];  // seconds for Timed mode
+        // Objective score: tracks performance (used for Endless mode scoring)
+        public int[] ObjectiveWaveScore = new int[MAX_PLAYERS];
+        public float[] ObjectiveHealthScore = new float[MAX_PLAYERS];  // remaining health at game end
+
         // ==================== Time Dilation / Bullet Time 组件（SOA） ====================
         // GlobalTimeScale: per-player time scale multiplier (1.0 = normal, 0.5 = 50% speed, 0.3 = bullet time)
         // Applied at the start of FrameScheduler.Tick() to slow/fast all game systems.

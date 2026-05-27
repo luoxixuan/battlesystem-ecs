@@ -56,6 +56,7 @@ namespace BattleSystemECS.Core
         public TowerOverchargeSystem? TowerOvercharge { get; set; }
         public EnemyFissionSystem? EnemyFission { get; set; }
         public EnemyMorphSystem? EnemyMorph { get; set; }
+        public ObjectiveSystem? Objective { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -104,6 +105,7 @@ namespace BattleSystemECS.Core
                 AutoSkill?.Update();      // auto-cast ready skills
                 Interest?.Update();       // bank/interest system
                 Mana?.Update(deltaTime, isBuildPhase: true); // mana regen (build phase = higher regen)
+                Objective?.Update(deltaTime, Phase); // escort NPC movement, objective timers
                 return;
             }
 
@@ -192,6 +194,9 @@ namespace BattleSystemECS.Core
 
             // ── Phase 9.5: Enemy Fission — spawn children after death resolve ─────
             EnemyFission?.Update();
+
+            // ── Phase 9.6: Objective System — update objective state ─────────────
+            Objective?.Update(effectiveDelta, Phase);
         }
 
         /// <summary>

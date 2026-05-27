@@ -48,6 +48,7 @@ namespace BattleSystemECS.Core
         private PickupSystem pickupSystem;             // 掉落物/拾取道具系统
         private EnemyFissionSystem enemyFissionSystem; // 敌人分裂/裂殖系统
         private EnemyMorphSystem enemyMorphSystem;   // 敌人变形/进化系统
+        private ObjectiveSystem objectiveSystem;      // 特殊目标/护送模式系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -191,6 +192,10 @@ logger.Log("      ComboSystem created successfully!");
             enemyMorphSystem = new EnemyMorphSystem(store, gameConfig, logger);
             logger.Log("      EnemyMorphSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating ObjectiveSystem (Escort/Survival/Timed objectives)... ");
+            objectiveSystem = new ObjectiveSystem(store, playerId);
+            logger.Log("      ObjectiveSystem created successfully!");
+
             logger.Log("[BOOTSTRAP]    - Creating TowerExperienceSystem (Tower XP & Mastery)... ");
             towerExperienceSystem = new TowerExperienceSystem(store, gameConfig);
             logger.Log("      TowerExperienceSystem created successfully!");
@@ -307,6 +312,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.Upgrade = upgradeSystem;
             scheduler.EnemyFission = enemyFissionSystem;
             scheduler.EnemyMorph = enemyMorphSystem;
+            scheduler.Objective = objectiveSystem;
 
             // 初始化地形网格（方向二：地图地块系统）
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)
@@ -425,6 +431,9 @@ logger.Log("      ComboSystem created successfully!");
 
                 // 设置波次关卡
                 waveSpawningSystem.SetLevel(currentLevel);
+
+                // 初始化目标系统（特殊目标模式：Escort / Survival / Timed / Endless）
+                objectiveSystem.InitializeFromLevel(levelConfig, gameConfig.MapHeight);
 
                 // ── Phase: BuildPhase ──────────────────────────────────────────
                 // Transition from Init → BuildPhase and show enter message
