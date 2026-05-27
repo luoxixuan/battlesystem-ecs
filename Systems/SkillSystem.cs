@@ -917,8 +917,9 @@ namespace BattleSystemECS.Systems
             foreach (var (enemyId, damage) in _skillDamageQueue[readIdx])
             {
                 if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) continue;
-                float currentHealth = store.EnemyHealth[enemyId];
-                if (currentHealth <= 0f) continue; // already dead this frame
+                if (store.EnemyHealth[enemyId] <= 0f) continue; // already dead this frame
+                // Invulnerability check: skip damage if enemy is invulnerable
+                if (store.EnemyIsInvulnerable[enemyId]) continue;
 
                 // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
                 float resist = store.EnemyDamageResistance[enemyId];

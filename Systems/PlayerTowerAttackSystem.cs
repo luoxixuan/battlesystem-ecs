@@ -196,6 +196,8 @@ _damageQueue[writeIdx].Clear(); // clear the bag threads will write to next fram
             foreach (var (enemyId, damage) in _damageQueue[readIdx])
             {
                 if (!store.EnemyActive[enemyId]) continue;
+                // Invulnerability check: skip damage if enemy is invulnerable
+                if (store.EnemyIsInvulnerable[enemyId]) continue;
                 float prevHealth = store.EnemyHealth[enemyId];
                 store.ApplyEnemyDamage(enemyId, damage);
                 // Thorns: enemy reflects damage back to the player

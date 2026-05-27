@@ -145,6 +145,8 @@ namespace BattleSystemECS.Systems
                 if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) continue;
                 float currentHealth = store.EnemyHealth[enemyId];
                 if (currentHealth <= 0f) continue;
+                // Invulnerability check: skip damage if enemy is invulnerable
+                if (store.EnemyIsInvulnerable[enemyId]) continue;
 
                 store.EnemyHealth[enemyId] -= damage;
                 if (store.EnemyHealth[enemyId] <= 0f)

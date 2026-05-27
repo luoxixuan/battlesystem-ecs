@@ -225,6 +225,14 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // When true, the enemy's base stats are boosted per enrage config.
         public bool[] EnemyIsEnraged = new bool[MAX_ENTITIES];
 
+        // ==================== Boss Invulnerable Phase（无敌阶段） ====================
+        // EnemyIsInvulnerable: true when the enemy is in an invulnerable phase (e.g. Boss skill animation).
+        // When true, the enemy takes 0 damage from all sources.
+        public bool[] EnemyIsInvulnerable = new bool[MAX_ENTITIES];
+        // EnemyInvulnerablePhaseName: name of the active invulnerable phase (e.g. "shield", "teleport", "rage").
+        // Used for UI/feedback. Empty = not in invulnerable phase.
+        public string[] EnemyInvulnerablePhaseName = new string[MAX_ENTITIES];
+
         // ==================== Enemy Fission (Split on Death) ====================
         // EnemyFissionDefId: index into GameConfig.FissionDefs for this enemy's fission definition (-1 = none)
         public int[] EnemyFissionDefId = new int[MAX_ENTITIES];
@@ -784,6 +792,9 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
                 EnemyPhaseThresholds[entityId] = null;
                 EnemyEnrageTimer[entityId] = 0f;
                 EnemyIsEnraged[entityId] = false;
+                // Invulnerable phase fields
+                EnemyIsInvulnerable[entityId] = false;
+                EnemyInvulnerablePhaseName[entityId] = null;
                 // Freeze fields (shared with stun — no separate fields needed, cleanup via StunDurationLeft/StunFlag above)
             }
 

@@ -539,6 +539,8 @@ int bestTarget = -1;
             foreach (var (enemyId, damage, playerId, towerId) in _damageQueue[readIdx])
             {
                 if (!store.EnemyActive[enemyId]) continue;
+                // Invulnerability check: if enemy is invulnerable, skip damage
+                if (store.EnemyIsInvulnerable[enemyId]) continue;
                 // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
                 float resist = store.EnemyDamageResistance[enemyId];
                 float finalDmg = resist >= 1f ? 0f : damage * (1f - resist);
@@ -688,6 +690,7 @@ int bestTarget = -1;
                 else
                 {
                     // Phase 2: apply chain hop damage
+                    if (store.EnemyIsInvulnerable[enemyId]) continue;
                     store.EnemyHealth[enemyId] -= damage;
                     if (store.EnemyHealth[enemyId] <= 0f)
                     {
@@ -793,6 +796,7 @@ int bestTarget = -1;
             foreach (var (primaryEnemyId, splashDamage, playerId, towerId) in _splashDamageQueue[readIdx])
             {
                 if (!store.EnemyActive[primaryEnemyId]) continue;
+                if (store.EnemyIsInvulnerable[primaryEnemyId]) continue;
                 if (store.TowerSplashRadius[towerId] <= 0f) continue;
 
                 float px = store.PositionX[primaryEnemyId];
@@ -810,6 +814,7 @@ int bestTarget = -1;
                     {
                         int enemyId = candidates[ci];
                         if (!store.EnemyActive[enemyId] || enemyId == primaryEnemyId) continue;
+                        if (store.EnemyIsInvulnerable[enemyId]) continue;
 
                         // Apply damage resistance per target (same formula as basic tower damage)
                         float resist = store.EnemyDamageResistance[enemyId];
@@ -910,6 +915,7 @@ int bestTarget = -1;
             foreach (var (bounceLevel, enemyId, damage, playerId, tid) in _bounceDamageQueue[readIdx])
             {
                 if (!store.EnemyActive[enemyId]) continue;
+                if (store.EnemyIsInvulnerable[enemyId]) continue;
                 if (bounceLevel < 0) continue;
 
                 // Bounce search: only search if bounces remain for this tower
