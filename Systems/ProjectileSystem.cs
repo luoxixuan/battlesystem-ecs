@@ -25,6 +25,8 @@ namespace BattleSystemECS.Systems
         private int[] _projTowerId = new int[MAX_PROJ];
         private float[] _projSpeed = new float[MAX_PROJ];
         private bool[] _projActive = new bool[MAX_PROJ];
+        // Homing flag: if true, projectile recalculates direction toward target each frame (turns mid-flight)
+        private bool[] _projIsHoming = new bool[MAX_PROJ];
         private int _activeProjectileCount;
 
         // Ping-pong damage queue (same pattern as TowerAttackSystem)
@@ -48,7 +50,7 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Spawn a projectile from a tower toward a target enemy.
         /// </summary>
-        public void Fire(int towerId, int targetId, float damage, int playerId, float speed)
+        public void Fire(int towerId, int targetId, float damage, int playerId, float speed, bool isHoming = false)
         {
             if (_activeProjectileCount >= MAX_PROJ) return;
 
@@ -67,6 +69,7 @@ namespace BattleSystemECS.Systems
             _projPlayerId[projId] = playerId;
             _projTowerId[projId] = towerId;
             _projSpeed[projId] = speed;
+            _projIsHoming[projId] = isHoming;
             _projVelX[projId] = 0f;
             _projVelY[projId] = 0f;
             _projActive[projId] = true;
@@ -100,8 +103,13 @@ namespace BattleSystemECS.Systems
                         float nx = dx / dist;
                         float ny = dy / dist;
                         float speed = _projSpeed[i];
-                        _projVelX[i] = nx * speed;
-                        _projVelY[i] = ny * speed;
+                        // Homing projectiles update direction every frame (turn mid-flight).
+                        // Non-homing projectiles only get initial direction from Fire() — no mid-flight correction.
+                        if (_projIsHoming[i])
+                        {
+                            _projVelX[i] = nx * speed;
+                            _projVelY[i] = ny * speed;
+                        }
                     }
                     else
                     {

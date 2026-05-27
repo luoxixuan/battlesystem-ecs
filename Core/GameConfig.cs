@@ -72,6 +72,8 @@ namespace BattleSystemECS.Config
         public int MaxAmmo { get; set; } = 0;
         // Reload time in seconds (0 = instant/unlimited)
         public float ReloadTime { get; set; } = 0f;
+        // Homing projectile: if true, projectile tracks target and turns mid-flight
+        public bool ProjectileHoming { get; set; } = false;
     }
 
     /// <summary>

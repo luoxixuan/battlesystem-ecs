@@ -612,6 +612,7 @@ namespace BattleSystemECS.Config
             tower.SlowDuration = ExtractFloat(json, "SlowDuration");
             tower.TargetingMode = ExtractInt(json, "TargetingMode");
             tower.SpecialAbility = ParseTowerSpecialAbility(json);
+            tower.ProjectileHoming = ExtractBool(json, "ProjectileHoming");
             return tower;
         }
 

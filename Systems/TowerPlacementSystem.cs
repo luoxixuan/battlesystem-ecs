@@ -118,6 +118,8 @@ namespace BattleSystemECS.Systems
                         store.TowerReloadTime[towerId] = tc.ReloadTime;
                         store.TowerIsReloading[towerId] = false;
                     }
+                    // Apply homing projectile flag for tracking towers
+                    store.SetTowerProjectileHoming(towerId, tc.ProjectileHoming);
                     // Apply tower's innate special ability (e.g., chain_lightning for Tesla)
                     if (tc.SpecialAbility != null)
                     {

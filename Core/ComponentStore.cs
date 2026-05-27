@@ -238,6 +238,8 @@ namespace BattleSystemECS.Core
         // Tower targeting mode: controls which enemy the tower selects as its target.
         // Maps to TowerTargetingMode enum: Nearest=0, Furthest=1, LowestHealth=2, HighestHealth=3, FirstSpawned=4, LastSpawned=5
         public int[] TowerTargetingMode = new int[MAX_ENTITIES];
+        // Tower projectile homing: if true, this tower's projectiles track targets mid-flight
+        public bool[] TowerProjectileHoming = new bool[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
         public string[] TowerType = new string[MAX_ENTITIES];
@@ -679,6 +681,7 @@ namespace BattleSystemECS.Core
                 TowerReloadTime[entityId] = 0f;
                 TowerReloadProgress[entityId] = 0f;
                 TowerIsReloading[entityId] = false;
+                TowerProjectileHoming[entityId] = false;
                 // Scatter/multicast fields
                 TowerProjectileCount[entityId] = 0;
                 TowerScatterAngle[entityId] = 0f;
@@ -1003,6 +1006,7 @@ namespace BattleSystemECS.Core
             TowerReloadTime[entityId] = 0f;
             TowerReloadProgress[entityId] = 0f;
             TowerIsReloading[entityId] = false;
+            TowerProjectileHoming[entityId] = false;
             TowerArmorShredBonus[entityId] = 0f;
             TowerShieldBreakBonus[entityId] = 0f;
             lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
@@ -1177,6 +1181,13 @@ namespace BattleSystemECS.Core
         {
             if (towerId < 0 || towerId >= MAX_ENTITIES) return;
             TowerTargetingMode[towerId] = mode;
+        }
+
+        /// <summary>Sets the projectile homing flag for a tower.</summary>
+        public void SetTowerProjectileHoming(int towerId, bool isHoming)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            TowerProjectileHoming[towerId] = isHoming;
         }
 
         public float GetEnemyHealth(int enemyId)
