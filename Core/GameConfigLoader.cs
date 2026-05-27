@@ -53,6 +53,9 @@ namespace BattleSystemECS.Config
                 // Load pickup definitions
                 LoadPickupDefs(gameConfig, renderer);
 
+                // Load enemy fission definitions
+                LoadFissionDefs(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -1211,6 +1214,53 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[PICKUP] Failed to load pickup defs: " + ex.Message);
+            }
+        }
+
+        private static void LoadFissionDefs(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string fissionFile = "Data/Configs/enemy_fission.json";
+            try
+            {
+                if (!File.Exists(fissionFile))
+                {
+                    renderer.Log("[FISSION] Enemy fission config file not found: " + fissionFile + ", fission disabled");
+                    return;
+                }
+                string json = File.ReadAllText(fissionFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[FISSION] Enemy fission config file is empty: " + fissionFile);
+                    return;
+                }
+
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    var defs = new List<FissionDef>();
+                    foreach (var elem in root.EnumerateArray())
+                    {
+                        var f = new FissionDef();
+                        f.FissionId = elem.TryGetProperty("fissionId", out var fid) ? fid.GetString() ?? "" : "";
+                        f.SourceMonsterType = elem.TryGetProperty("sourceMonsterType", out var smt) ? smt.GetString() ?? "" : "";
+                        f.ChildMonsterType = elem.TryGetProperty("childMonsterType", out var cmt) ? cmt.GetString() ?? "" : "";
+                        f.ChildrenCount = elem.TryGetProperty("childrenCount", out var cc) ? cc.GetInt32() : 2;
+                        f.HealthScale = elem.TryGetProperty("healthScale", out var hs) ? (float)hs.GetDouble() : 0.4f;
+                        f.DamageScale = elem.TryGetProperty("damageScale", out var ds) ? (float)ds.GetDouble() : 0.3f;
+                        f.SpeedScale = elem.TryGetProperty("speedScale", out var ss) ? (float)ss.GetDouble() : 1.2f;
+                        f.GoldScale = elem.TryGetProperty("goldScale", out var gs) ? (float)gs.GetDouble() : 0.5f;
+                        f.MaxGeneration = elem.TryGetProperty("maxGeneration", out var mg) ? mg.GetInt32() : 2;
+                        defs.Add(f);
+                    }
+                    gameConfig.FissionDefs = defs.ToArray();
+                    renderer.Log("[FISSION] Loaded " + defs.Count + " fission defs from " + fissionFile);
+                }
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[FISSION] Failed to load fission defs: " + ex.Message);
             }
         }
     }

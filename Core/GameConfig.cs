@@ -258,6 +258,31 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Enemy fission (split on death) definition — loaded from enemy_fission.json.
+    /// When a monster with fission dies, it spawns N child enemies at the death location.
+    /// </summary>
+    public class FissionDef
+    {
+        public string FissionId { get; set; } = "";
+        // Source monster type that triggers fission (e.g., "Slime")
+        public string SourceMonsterType { get; set; } = "";
+        // Child monster type spawned on fission
+        public string ChildMonsterType { get; set; } = "";
+        // Number of children spawned
+        public int ChildrenCount { get; set; } = 2;
+        // Health scale of children relative to parent (0.4 = 40% of parent's current health)
+        public float HealthScale { get; set; } = 0.4f;
+        // Damage scale of children
+        public float DamageScale { get; set; } = 0.3f;
+        // Speed scale of children
+        public float SpeedScale { get; set; } = 1.2f;
+        // Gold reward scale of children
+        public float GoldScale { get; set; } = 0.5f;
+        // Maximum fission generations (parent + children + grandchildren...)
+        public int MaxGeneration { get; set; } = 2;
+    }
+
+    /// <summary>
     /// Wave mutator definition — loaded from wave_mutators.json.
     /// A mutator applies a global modifier to all enemies during a specific wave.
     /// </summary>
@@ -601,6 +626,27 @@ namespace BattleSystemECS.Config
 
         // Wave mutator definitions (loaded from wave_mutators.json)
         public WaveMutatorDef[] WaveMutatorDefs { get; set; } = Array.Empty<WaveMutatorDef>();
+
+        // Enemy fission definitions (loaded from enemy_fission.json)
+        public FissionDef[] FissionDefs { get; set; } = Array.Empty<FissionDef>();
+
+        // Look up a fission def by its FissionId
+        public FissionDef GetFissionDef(string fissionId)
+        {
+            return FissionDefs.FirstOrDefault(f => f.FissionId == fissionId);
+        }
+
+        // Look up a fission def by source monster type
+        public FissionDef GetFissionDefBySourceType(string monsterType)
+        {
+            return FissionDefs.FirstOrDefault(f => f.SourceMonsterType == monsterType);
+        }
+
+        // GetFissionDefId: returns index into FissionDefs[] for a monster type, -1 if none
+        public int GetFissionDefIdBySourceType(string monsterType)
+        {
+            return Array.FindIndex(FissionDefs, f => f.SourceMonsterType == monsterType);
+        }
 
         // Pickup item definitions (loaded from pickup_defs.json)
         public PickupDef[] PickupDefs { get; set; } = Array.Empty<PickupDef>();

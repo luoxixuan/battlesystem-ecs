@@ -225,6 +225,13 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // When true, the enemy's base stats are boosted per enrage config.
         public bool[] EnemyIsEnraged = new bool[MAX_ENTITIES];
 
+        // ==================== Enemy Fission (Split on Death) ====================
+        // EnemyFissionDefId: index into GameConfig.FissionDefs for this enemy's fission definition (-1 = none)
+        public int[] EnemyFissionDefId = new int[MAX_ENTITIES];
+        // EnemyFissionGeneration: current fission generation (0 = original spawn, 1 = first generation children, etc.)
+        // Capped at FissionDef.MaxGeneration — once reached, no more fission on death
+        public int[] EnemyFissionGeneration = new int[MAX_ENTITIES];
+
         // ==================== 路径分叉 / 路点系统字段（SOA） ====================
         // EnemyPathId: which path this enemy is assigned to (-1 = no path, use default straight movement)
         // 0 = default (straight Y-axis), 1 = fork_left, 2 = fork_right, 3 = ring

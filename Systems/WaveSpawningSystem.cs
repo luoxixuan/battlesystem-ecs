@@ -309,6 +309,11 @@ namespace BattleSystemECS.Systems
                     store.SetEntityName(enemyId, enemyName);
                     store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(monsterType);
 
+                    // Initialize fission capability (split-on-death)
+                    int fissionDefId = gameConfig.GetFissionDefIdBySourceType(monsterType);
+                    store.EnemyFissionDefId[enemyId] = fissionDefId;
+                    store.EnemyFissionGeneration[enemyId] = 0;
+
                     // Assign per-enemy affixes (1-3 random affixes from EnemyAffixSystem)
                     _enemyAffixSystem?.AssignAffixesAtSpawn(enemyId, scaledMaxHealth);
 

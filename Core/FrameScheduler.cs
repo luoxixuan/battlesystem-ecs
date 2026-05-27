@@ -54,6 +54,7 @@ namespace BattleSystemECS.Core
         public EnemyProjectileSystem? EnemyProjectile { get; set; }
         public PointDefenseSystem? PointDefense { get; set; }
         public TowerOverchargeSystem? TowerOvercharge { get; set; }
+        public EnemyFissionSystem? EnemyFission { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -184,6 +185,9 @@ namespace BattleSystemECS.Core
             // Subscribers can read store.TotalKills delta or the combo counters directly.
             store.ResolveEnemiesKilledThisFrame();
             Combo?.Update(deltaTime); // decay already called above — safe to call again (idempotent)
+
+            // ── Phase 9.5: Enemy Fission — spawn children after death resolve ─────
+            EnemyFission?.Update();
         }
 
         /// <summary>

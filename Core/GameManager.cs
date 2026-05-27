@@ -46,6 +46,7 @@ namespace BattleSystemECS.Core
         private AscensionSystem ascensionSystem;       // 进阶难度修改器系统
         private SaveSystem saveSystem;                  // 存档/回放系统
         private PickupSystem pickupSystem;             // 掉落物/拾取道具系统
+        private EnemyFissionSystem enemyFissionSystem; // 敌人分裂/裂殖系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -179,9 +180,13 @@ namespace BattleSystemECS.Core
 
             logger.Log("[BOOTSTRAP]    - Creating ComboSystem (Combo Kill tracking)...");
             comboSystem = new ComboSystem(store, gameConfig.Combo);
-            logger.Log("      ComboSystem created successfully!");
+logger.Log("      ComboSystem created successfully!");
 
-            logger.Log("[BOOTSTRAP]    - Creating TowerExperienceSystem (Tower XP & Mastery)...");
+            logger.Log("[BOOTSTRAP]    - Creating EnemyFissionSystem (Split-on-death)... ");
+            enemyFissionSystem = new EnemyFissionSystem(store, gameConfig, logger);
+            logger.Log("      EnemyFissionSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating TowerExperienceSystem (Tower XP & Mastery)... ");
             towerExperienceSystem = new TowerExperienceSystem(store, gameConfig);
             logger.Log("      TowerExperienceSystem created successfully!");
 
@@ -295,6 +300,7 @@ namespace BattleSystemECS.Core
             scheduler.AutoSkill = autoSkillSystem;
             scheduler.Gold = goldSystem;
             scheduler.Upgrade = upgradeSystem;
+            scheduler.EnemyFission = enemyFissionSystem;
 
             // 初始化地形网格（方向二：地图地块系统）
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)
