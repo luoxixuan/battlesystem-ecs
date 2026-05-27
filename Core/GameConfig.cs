@@ -84,6 +84,12 @@ namespace BattleSystemECS.Config
         public int DamageType { get; set; } = 0;
         // InterceptRate: for PointDefense towers (TargetingMode=6), probability of intercepting enemy projectiles (0.0-1.0)
         public float InterceptRate { get; set; } = 0.5f;
+        // Bouncing projectile: number of bounces after initial hit (0 = no bounce)
+        public int Bounces { get; set; } = 0;
+        // BounceRange: search radius in tiles for finding next bounce target
+        public float BounceRange { get; set; } = 0f;
+        // BounceDamageFalloff: damage multiplier per bounce (1.0 = full damage, 0.7 = 70%)
+        public float BounceDamageFalloff { get; set; } = 1f;
     }
 
     /// <summary>

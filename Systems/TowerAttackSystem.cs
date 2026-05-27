@@ -82,6 +82,14 @@ namespace BattleSystemECS.Systems
         private readonly object _towerKillQueueLock = new object();
         private int _towerKillQueueIdx = 0;
 
+        // Ping-pong double-buffer for bounce damage events
+        // Tuple: (bounceLevel, enemyId, damage, playerId, towerId)
+        //   bounceLevel=0: initial hit (already in _damageQueue)
+        //   bounceLevel=1..N: bounce hop damage
+        private List<(int bounceLevel, int enemyId, float damage, int playerId, int towerId)>[] _bounceDamageQueue = new List<(int, int, float, int, int)>[2];
+        private readonly object _bounceDamageQueueLock = new object();
+        private int _bounceDamageQueueIdx = 0;
+
         // Leech lifesteal rate: 30% of damage dealt is returned as player heal
         private const float LEECH_LIFESTEAL_RATE = 0.30f;
 
@@ -104,6 +112,8 @@ namespace BattleSystemECS.Systems
             _splashDamageQueue[1] = new List<(int, float, int, int)>(64);
             _towerKillQueue[0] = new List<(int, int, int)>(64);
             _towerKillQueue[1] = new List<(int, int, int)>(64);
+            _bounceDamageQueue[0] = new List<(int, int, float, int, int)>(64);
+            _bounceDamageQueue[1] = new List<(int, int, float, int, int)>(64);
         }
 
         /// <summary>
@@ -190,11 +200,13 @@ namespace BattleSystemECS.Systems
             var chainBag = _chainDamageQueue[_chainDamageQueueIdx];
             var healBag = _healQueue[_healQueueIdx];
             var splashBag = _splashDamageQueue[_splashDamageQueueIdx];
+            var bounceBag = _bounceDamageQueue[_bounceDamageQueueIdx];
             var damageLock = _damageQueueLock;
             var debuffLock = _debuffQueueLock;
             var chainLock = _chainDamageQueueLock;
             var healLock = _healQueueLock;
             var splashLock = _splashDamageQueueLock;
+            var bounceLock = _bounceDamageQueueLock;
 
             Parallel.For(0, activeTowerIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, ti =>
             {
@@ -496,6 +508,14 @@ int bestTarget = -1;
                             {
                                 lock (chainLock) { chainBag.Add((0, bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             }
+                            // Bouncing projectile: if bounces > 0 and this isn't already a bounce hit
+                            if (store.TowerBouncesRemaining[towerId] > 0 && store.TowerBounceHitsRemaining[towerId] == 0)
+                            {
+                                // Reset bounce counter for this attack — primary hit
+                                store.TowerBounceHitsRemaining[towerId] = store.TowerBouncesRemaining[towerId];
+                                // Queue primary target for bounce resolution
+                                lock (bounceLock) { bounceBag.Add((0, bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
+                            }
                             // Special ability: freeze AOE (from upgrade)
                             if (store.TowerHasFreezeAoe[towerId])
                             {
@@ -543,6 +563,9 @@ int bestTarget = -1;
 
             // Phase 2c (serial): resolve splash damage from upgrade special ability
             ResolveSplashDamage();
+
+            // Phase 2e (serial): resolve bouncing projectiles
+            ResolveBounceDamage();
 
             // Phase 2d (serial): resolve Leech lifesteal heals
             ResolveLeechHealing();
@@ -601,6 +624,12 @@ int bestTarget = -1;
 
             // Phase 3b (serial): decay armor shred duration (1 turn per frame)
             DecayArmorShredStacks();
+
+            // Reset bounce hit counter at end of attack resolution for all active towers
+            foreach (var tid in store.ActiveTowerIds)
+            {
+                store.TowerBounceHitsRemaining[tid] = 0;
+            }
 
             System.Threading.Thread.MemoryBarrier();
         }
@@ -858,6 +887,70 @@ int bestTarget = -1;
             {
                 if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) continue;
                 store.DecreasePlayerHealth(playerId, thornsDamage);
+            }
+        }
+
+        /// <summary>
+        /// Resolve bouncing projectile chain: for each bounce entry, find the next nearest
+        /// enemy within bounce range and queue bounce damage. All bounce damage flows through
+        /// _damageQueue (same ping-pong queue as tower attack damage) for consistent deferred
+        /// resolution. BounceLevel 0 = primary hit (already applied via _damageQueue before this
+        /// call). BounceLevel >= 1 = bounce hop damage, applied via _damageQueue here.
+        /// </summary>
+        private void ResolveBounceDamage()
+        {
+            int readIdx = _bounceDamageQueueIdx;
+            int writeIdx = 1 - _bounceDamageQueueIdx;
+            _bounceDamageQueue[writeIdx].Clear();
+            _bounceDamageQueueIdx = writeIdx;
+
+            var enemyIds = store.GetCachedActiveEnemyIds();
+            int enemyCount = enemyIds.Count;
+
+            foreach (var (bounceLevel, enemyId, damage, playerId, tid) in _bounceDamageQueue[readIdx])
+            {
+                if (!store.EnemyActive[enemyId]) continue;
+                if (bounceLevel < 0) continue;
+
+                // Bounce search: only search if bounces remain for this tower
+                int bouncesLeft = store.TowerBounceHitsRemaining[tid];
+                if (bouncesLeft <= 0) continue;
+
+                float bounceRange = store.TowerBounceRange[tid];
+                float falloff = store.TowerBounceDamageFalloff[tid];
+                if (bounceRange <= 0f) continue;
+
+                // Find nearest enemy within bounceRange (excluding self and dead)
+                int bestBounce = -1;
+                float bestDistSq = float.MaxValue;
+                float ex = store.PositionX[enemyId];
+                float ey = store.PositionY[enemyId];
+                float rangeSq = bounceRange * bounceRange;
+
+                for (int i = 0; i < enemyCount; i++)
+                {
+                    int eid = enemyIds[i];
+                    if (eid == enemyId || !store.EnemyActive[eid]) continue;
+                    float dx = store.PositionX[eid] - ex;
+                    float dy = store.PositionY[eid] - ey;
+                    float dSq = dx * dx + dy * dy;
+                    if (dSq <= rangeSq && dSq < bestDistSq)
+                    {
+                        bestDistSq = dSq;
+                        bestBounce = eid;
+                    }
+                }
+
+                if (bestBounce != -1)
+                {
+                    float nextDmg = damage * falloff;
+                    // Decrement bounce counter
+                    store.TowerBounceHitsRemaining[tid]--;
+                    // Queue next bounce for chain tracking (writeIdx = current frame's queue)
+                    lock (_bounceDamageQueueLock) { _bounceDamageQueue[writeIdx].Add((bounceLevel + 1, bestBounce, nextDmg, playerId, tid)); }
+                    // Apply bounce damage through _damageQueue (deferred, same pattern as chain/splash)
+                    lock (_damageQueueLock) { _damageQueue[_damageQueueIdx].Add((bestBounce, nextDmg, playerId, tid)); }
+                }
             }
         }
     }

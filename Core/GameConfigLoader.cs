@@ -619,6 +619,9 @@ namespace BattleSystemECS.Config
             tower.TurnRate = ExtractFloat(json, "TurnRate");
             tower.DamageType = ExtractInt(json, "DamageType");
             tower.InterceptRate = ExtractFloat(json, "InterceptRate");
+            tower.Bounces = ExtractInt(json, "Bounces");
+            tower.BounceRange = ExtractFloat(json, "BounceRange");
+            tower.BounceDamageFalloff = ExtractFloat(json, "BounceDamageFalloff");
             return tower;
         }
 

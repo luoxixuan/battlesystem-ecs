@@ -349,6 +349,16 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // TowerScatterAngle: angular spread in radians for multi-shot (0 = all projectiles aimed at target)
         public float[] TowerScatterAngle = new float[MAX_ENTITIES];
 
+        // ==================== 塔弹跳/弹射 (Bouncing Projectiles) ====================
+        // TowerBouncesRemaining: number of bounces left after initial hit (0 = no bounce, like scatter)
+        // TowerBounceRange: search radius in tiles for finding next bounce target
+        // TowerBounceDamageFalloff: damage multiplier per bounce (0.8 = 80% of previous hit's damage)
+        // TowerBounceHitsRemaining: per-attack counter — tracks bounces consumed in current attack
+        public int[] TowerBouncesRemaining = new int[MAX_ENTITIES];
+        public float[] TowerBounceRange = new float[MAX_ENTITIES];
+        public float[] TowerBounceDamageFalloff = new float[MAX_ENTITIES];
+        public int[] TowerBounceHitsRemaining = new int[MAX_ENTITIES];
+
         // ==================== 塔弹药系统（Ammo）====================
         // TowerCurrentAmmo: current ammo count (0 = empty)
         public int[] TowerCurrentAmmo = new int[MAX_ENTITIES];
@@ -1101,6 +1111,11 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
             // Scatter/multicast fields: default to single shot (1 projectile, 0 spread)
             TowerProjectileCount[entityId] = 1;
             TowerScatterAngle[entityId] = 0f;
+            // Bouncing projectile fields: default to no bounce
+            TowerBouncesRemaining[entityId] = 0;
+            TowerBounceRange[entityId] = 0f;
+            TowerBounceDamageFalloff[entityId] = 1f;
+            TowerBounceHitsRemaining[entityId] = 0;
             // Damage type and turn rate from config
             TowerDamageType[entityId] = damageType;
             TowerTurnRate[entityId] = turnRate;
@@ -1127,6 +1142,7 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
             TowerReloadProgress[entityId] = 0f;
             TowerIsReloading[entityId] = false;
             TowerProjectileHoming[entityId] = false;
+            TowerBouncesRemaining[entityId] = 0;
             TowerArmorShredBonus[entityId] = 0f;
             TowerShieldBreakBonus[entityId] = 0f;
             TowerDamageType[entityId] = 0;
