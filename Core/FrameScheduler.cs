@@ -48,6 +48,7 @@ namespace BattleSystemECS.Core
         public TerrainSystem? Terrain { get; set; }
         public WaveMutatorSystem? WaveMutator { get; set; }
         public InterestSystem? Interest { get; set; }
+        public EnemyAffixSystem? EnemyAffix { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -114,6 +115,9 @@ namespace BattleSystemECS.Core
             EnemyAbility?.UpdateCooldowns(effectiveDelta);
             EnemyAbility?.ExecuteAbilities();
             EnemyAbility?.Update();
+
+            // ── Phase 2.5: Enemy Affixes (per-enemy affix effects) ──────────
+            EnemyAffix?.Update(effectiveDelta);
 
             // ── Phase 3: Movement ──────────────────────────────────────────
             Pathfinding?.SetTurn(turn);

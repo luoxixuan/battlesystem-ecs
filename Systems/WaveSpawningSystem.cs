@@ -59,6 +59,7 @@ namespace BattleSystemECS.Systems
         private int totalEnemiesSpawned = 0;
         private Random _spawnRandom;
         private readonly object _spawnRandomLock = new object();
+        private readonly EnemyAffixSystem _enemyAffixSystem;
 
         // Multi-type support
         private string[] _multiTypes = Array.Empty<string>();
@@ -76,12 +77,13 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public event System.Action OnWaveStart;
 
-        public WaveSpawningSystem(Core.ComponentStore store, IRenderer renderer, GameConfig gameConfig)
+        public WaveSpawningSystem(Core.ComponentStore store, IRenderer renderer, GameConfig gameConfig, EnemyAffixSystem enemyAffixSystem = null)
         {
             this.store = store;
             this.renderer = renderer;
             this.gameConfig = gameConfig;
             this.spawnConfig = LoadWaveSpawnConfig();
+            this._enemyAffixSystem = enemyAffixSystem;
         }
 
         private WaveSpawnConfig LoadWaveSpawnConfig()
@@ -298,6 +300,10 @@ namespace BattleSystemECS.Systems
                     }
                     store.SetEntityName(enemyId, enemyName);
                     store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(monsterType);
+
+                    // Assign per-enemy affixes (1-3 random affixes from EnemyAffixSystem)
+                    _enemyAffixSystem?.AssignAffixesAtSpawn(enemyId, scaledMaxHealth);
+
                     _multiSpawnedForType++;
                     enemiesSpawnedInWave++;
                     totalEnemiesSpawned++;

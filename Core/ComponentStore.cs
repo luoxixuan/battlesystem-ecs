@@ -222,6 +222,13 @@ namespace BattleSystemECS.Core
         // EnemyDamageResistance: 0-1, reduces all damage taken (applied in TowerAttackSystem and SkillSystem)
         public float[] EnemyDamageResistance = new float[MAX_ENTITIES];
 
+        // ==================== 敌人词缀组件（SOA）====================
+        // EnemyAffixFlags: bit-mask of active affixes (see BuffType affix bits 16-22)
+        // Each enemy spawns with 1-3 random affixes; stored as a flag set for O(1) HasAffix() checks.
+        // Affixes: ExtraFast(×1.5 speed), Vampiric(回复), Molten(爆炸), Shielding(初始护盾),
+        //          Teleporter(传送), Regen(回复), Explosive(全屏爆炸)
+        public BuffType[] EnemyAffixFlags = new BuffType[MAX_ENTITIES];
+
         // ==================== 敌人 AI 组件的 SOA 存储 ====================
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
         public int[] EnemyAIChargeCounter = new int[MAX_ENTITIES];
@@ -913,6 +920,13 @@ namespace BattleSystemECS.Core
         {
             if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
             return (PlayerBuffFlags[playerId] & BuffType.CritRateBoost) != 0;
+        }
+
+        // ── O(1) enemy affix flag helpers ─────────────────────────────────
+        public bool HasAffix(int enemyId, BuffType affix)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return false;
+            return (EnemyAffixFlags[enemyId] & affix) != 0;
         }
 
         public float GetPlayerUpgradeThreshold(int playerId)
