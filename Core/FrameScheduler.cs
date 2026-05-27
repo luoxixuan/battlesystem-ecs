@@ -49,6 +49,7 @@ namespace BattleSystemECS.Core
         public WaveMutatorSystem? WaveMutator { get; set; }
         public InterestSystem? Interest { get; set; }
         public EnemyAffixSystem? EnemyAffix { get; set; }
+        public ManaSystem? Mana { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -96,6 +97,7 @@ namespace BattleSystemECS.Core
                 Skill?.Update(deltaTime); // skill cooldown ticking
                 AutoSkill?.Update();      // auto-cast ready skills
                 Interest?.Update();       // bank/interest system
+                Mana?.Update(deltaTime, isBuildPhase: true); // mana regen (build phase = higher regen)
                 return;
             }
 
@@ -138,6 +140,7 @@ namespace BattleSystemECS.Core
             TowerSynergy?.SetTurn();
             Skill?.SetTurn(turn);
             AuraTower?.SetTurn();
+            Mana?.SetTurn(); // cache tech tree mana bonuses
 
             // ── Phase 5: Spatial Rebuild ──────────────────────────────────
             store.RebuildSpatialGrid();
@@ -148,6 +151,7 @@ namespace BattleSystemECS.Core
             TowerSynergy?.Update();
             AuraTower?.ResolveAuraBuffs();
             Projectile?.Update(effectiveDelta);
+            Mana?.Update(effectiveDelta, isBuildPhase: false); // mana regen (wave phase = normal regen)
 
             // ── Phase 7: Skill / Buff Damage ──────────────────────────────
             Buff?.Update(effectiveDelta);

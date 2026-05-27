@@ -49,6 +49,10 @@ namespace BattleSystemECS.Systems
         private float _enemyDamageResistance = 0f;
         // Armor shred per stack: flat armor reduction applied per stack (from AcidTower path upgrade)
         private float _armorShredPerStack = 0f;
+        // Mana system bonuses (from tech tree)
+        private float _maxManaBonus = 0f;
+        private float _manaRegenBonus = 0f;
+        private float _manaCostMultiplier = 1f;
 
         public TechTreeSystem(ComponentStore store, IRenderer renderer, int playerId, TechTreeConfig config, GameConfig gameConfig = null)
         {
@@ -353,6 +357,22 @@ namespace BattleSystemECS.Systems
         /// Get global damage resistance multiplier (tech tree bonus).
         /// </summary>
         public float GetDamageResistance() => _enemyDamageResistance;
+
+        /// <summary>
+        /// Get max mana bonus from tech tree (flat additive bonus to max mana).
+        /// </summary>
+        public float GetMaxManaBonus() => _maxManaBonus;
+
+        /// <summary>
+        /// Get mana regen bonus from tech tree (additive bonus to regen/sec).
+        /// </summary>
+        public float GetManaRegenBonus() => _manaRegenBonus;
+
+        /// <summary>
+        /// Get mana cost multiplier from tech tree (multiplicative cost modifier).
+        /// Values less than 1.0 reduce mana costs (discount), greater than 1.0 increase them.
+        /// </summary>
+        public float GetManaCostMultiplier() => _manaCostMultiplier;
 
         /// <summary>
         /// Check if player has respawn and consume it. Returns true if respawn was used.

@@ -42,6 +42,7 @@ namespace BattleSystemECS.Core
         private PathfindingSystem pathfindingSystem;     // 路径分叉/路点系统
         private WaveMutatorSystem waveMutatorSystem;    // 波次词缀/突变器系统
         private InterestSystem interestSystem;          // 银行/利息系统
+        private ManaSystem manaSystem;                  // 法力/能量池系统
         private SaveSystem saveSystem;                  // 存档/回放系统
 
         // 统一帧调度器（所有帧路径统一入口）
@@ -212,6 +213,14 @@ namespace BattleSystemECS.Core
             interestSystem = new InterestSystem(store, logger, gameConfig, playerId);
             logger.Log("      InterestSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating ManaSystem...");
+            manaSystem = new ManaSystem(store, logger, gameConfig, playerId, techTreeSystem);
+            manaSystem.Initialize();
+            logger.Log("      ManaSystem created successfully!");
+
+            // Wire ManaSystem into SkillSystem for mana cost checking
+            skillSystem.InjectManaSystem(manaSystem);
+
             logger.Log("[BOOTSTRAP]    - Creating SaveSystem...");
             saveSystem = new SaveSystem(store, playerId);
             logger.Log("      SaveSystem created successfully!");
@@ -263,6 +272,7 @@ namespace BattleSystemECS.Core
             scheduler.Pathfinding = pathfindingSystem;
             scheduler.WaveMutator = waveMutatorSystem;
             scheduler.Interest = interestSystem;
+            scheduler.Mana = manaSystem;
             scheduler.Skill = skillSystem;
             scheduler.Buff = buffSystem;
             scheduler.Combo = comboSystem;

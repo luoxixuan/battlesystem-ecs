@@ -44,7 +44,16 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Player damage type: 0=Physical, 1=Magic, 2=True. Drives which resistance enemies use.
         public int[] PlayerDamageType = new int[MAX_PLAYERS];
         public float[] PlayerGold = new float[MAX_PLAYERS];
-        public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
+public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
+        // ==================== 法力/能量池资源系统 (Mana Pool) ====================
+        // PlayerMana: current mana points for each player
+        public float[] PlayerMana = new float[MAX_PLAYERS];
+        // PlayerMaxMana: maximum mana cap
+        public float[] PlayerMaxMana = new float[MAX_PLAYERS];
+        // PlayerManaRegen: mana regeneration rate per second
+        public float[] PlayerManaRegen = new float[MAX_PLAYERS];
+        // PlayerManaCost: cost multiplier for skill mana consumption
+        public float[] PlayerManaCost = new float[MAX_PLAYERS];
         private float _goldKillMultiplier = 1.0f;
         public float GoldKillMultiplier { get => _goldKillMultiplier; set => _goldKillMultiplier = value; }
         // all_income_mult: extra multiplier layered on top of gold kill multiplier

@@ -23,6 +23,7 @@ namespace BattleSystemECS.Systems
         private GameConfig gameConfig;
         private TechTreeSystem techTreeSystem;
         private BuffSystem dotSystem;
+        private ManaSystem manaSystem; // optional — null if mana system not yet initialized
         private List<int> _activeEnemyList;
         // Cached wave-based difficulty multiplier (updated via SetWaveNumber)
         private float _waveDifficultyMult = 1f;
@@ -80,6 +81,14 @@ namespace BattleSystemECS.Systems
         public void InjectDotSystem(BuffSystem dotSystem)
         {
             this.dotSystem = dotSystem;
+        }
+
+        /// <summary>
+        /// Inject ManaSystem for mana cost checking. Called by GameManager after ManaSystem construction.
+        /// </summary>
+        public void InjectManaSystem(ManaSystem manaSystem)
+        {
+            this.manaSystem = manaSystem;
         }
 
         /// <summary>
@@ -214,7 +223,15 @@ namespace BattleSystemECS.Systems
                         renderer.Log($"[SKILL] '{skillName}' on cooldown: {inst.CurrentCooldown:F1}s remaining (epsilon-consistent via CanActivate())");
                         return;
                     }
+                    float cost = inst.Definition.Cost;
+                    if (cost > 0f && manaSystem != null && !manaSystem.HasEnoughMana(cost))
+                    {
+                        renderer.Log($"[SKILL] Not enough mana for '{skillName}': need {cost:F0}, have {manaSystem.GetCurrentMana():F0}");
+                        return;
+                    }
                     ExecuteAbility(inst.Definition, slot);
+                    if (cost > 0f && manaSystem != null)
+                        manaSystem.ConsumeMana(cost);
                     return;
                 }
             }

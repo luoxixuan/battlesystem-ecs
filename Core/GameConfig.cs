@@ -554,6 +554,8 @@ namespace BattleSystemECS.Config
 
         // Bank / Interest system configuration (direction 2)
         public BankConfig Bank { get; set; } = new BankConfig();
+        // Mana/Energy pool system (direction 5)
+        public ManaConfig Mana { get; set; } = new ManaConfig();
 
         public GameConfig()
         {
@@ -1038,6 +1040,23 @@ namespace BattleSystemECS.Config
         public float InterestRateCap { get; set; } = 0.20f;
         // Maximum gold that can be stored in the bank
         public float BankGoldCap { get; set; } = 100000f;
+    }
+
+    /// <summary>
+    /// Mana/Energy pool system configuration — defines mana regeneration and costs.
+    /// </summary>
+    public class ManaConfig
+    {
+        // Base mana points at game start
+        public float BaseMana { get; set; } = 100f;
+        // Maximum mana cap
+        public float MaxManaBase { get; set; } = 100f;
+        // Mana regeneration per second (in active combat)
+        public float ManaRegenPerSec { get; set; } = 5f;
+        // Mana regen in BuildPhase (typically higher for preparation)
+        public float ManaRegenBuildPhase { get; set; } = 10f;
+        // Multiplier on all mana costs (buff/debuff from tech tree)
+        public float ManaCostMultiplier { get; set; } = 1f;
     }
 
     /// <summary>
