@@ -371,6 +371,16 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // TowerIsReloading: true if tower is currently reloading
         public bool[] TowerIsReloading = new bool[MAX_ENTITIES];
 
+        // ==================== 塔超载/过载系统（Overcharge）====================
+        // TowerIsOvercharged: true if tower is currently in overcharged (boosted) state
+        public bool[] TowerIsOvercharged = new bool[MAX_ENTITIES];
+        // TowerOverchargeDuration: remaining overcharge duration in seconds (0 = inactive)
+        public float[] TowerOverchargeDuration = new float[MAX_ENTITIES];
+        // TowerOverchargeCooldown: remaining cooldown before overcharge can be activated again (seconds)
+        public float[] TowerOverchargeCooldown = new float[MAX_ENTITIES];
+        // TowerCanOvercharge: true if this tower type supports overcharge (from config)
+        public bool[] TowerCanOvercharge = new bool[MAX_ENTITIES];
+
         // ==================== 塔协同增益组件 (Tower Synergy) ====================
         // 每个塔的协同 ID 索引，-1 表示无协同
         public int[] TowerSynergyId = new int[MAX_ENTITIES];
@@ -804,6 +814,11 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
                 // Scatter/multicast fields
                 TowerProjectileCount[entityId] = 0;
                 TowerScatterAngle[entityId] = 0f;
+                // Overcharge fields
+                TowerIsOvercharged[entityId] = false;
+                TowerOverchargeDuration[entityId] = 0f;
+                TowerOverchargeCooldown[entityId] = 0f;
+                TowerCanOvercharge[entityId] = false;
             }
 
             // ── Phase 4: recycle ID ────────────────────────────────────────────────
@@ -1116,6 +1131,11 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
             TowerBounceRange[entityId] = 0f;
             TowerBounceDamageFalloff[entityId] = 1f;
             TowerBounceHitsRemaining[entityId] = 0;
+            // Overcharge fields: default to inactive (no overcharge, cooldown=0)
+            TowerIsOvercharged[entityId] = false;
+            TowerOverchargeDuration[entityId] = 0f;
+            TowerOverchargeCooldown[entityId] = 0f;
+            TowerCanOvercharge[entityId] = false;
             // Damage type and turn rate from config
             TowerDamageType[entityId] = damageType;
             TowerTurnRate[entityId] = turnRate;

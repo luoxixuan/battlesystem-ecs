@@ -6131,5 +6131,14 @@
                "comboDamageBonusPerKill": 0.05,
                "comboGoldBonusPerKill": 0.10,
                "comboMaxMultiplier": 3.0
+           },
+           "TowerOvercharge": {
+               "DamageMultiplier": 2.0,
+               "AttackSpeedMultiplier": 1.5,
+               "RangeMultiplier": 1.2,
+               "Duration": 5.0,
+               "Cooldown": 30.0,
+               "ManaCost": 20.0,
+               "MinManaRequired": 10.0
            }
-}
+       }

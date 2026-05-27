@@ -53,6 +53,7 @@ namespace BattleSystemECS.Core
         public PickupSystem? Pickup { get; set; }
         public EnemyProjectileSystem? EnemyProjectile { get; set; }
         public PointDefenseSystem? PointDefense { get; set; }
+        public TowerOverchargeSystem? TowerOvercharge { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -140,6 +141,7 @@ namespace BattleSystemECS.Core
             // ── Phase 4: Combat — SetTurn ─────────────────────────────────
             PlayerTowerAttack?.SetTurn(turn);
             TowerAttack?.SetTurn(turn);
+            TowerOvercharge?.SetTurn(turn);
             TowerSynergy?.SetTurn();
             Skill?.SetTurn(turn);
             AuraTower?.SetTurn();
@@ -154,6 +156,7 @@ namespace BattleSystemECS.Core
 
             // ── Phase 6: Combat — Update ──────────────────────────────────
             PlayerTowerAttack?.Update();
+            TowerOvercharge?.Update(effectiveDelta);
             TowerAttack?.Update(effectiveDelta);
             TowerSynergy?.Update();
             AuraTower?.ResolveAuraBuffs();

@@ -593,6 +593,9 @@ namespace BattleSystemECS.Config
         // Auto Skill configuration (BuildPhase auto-casting)
         public AutoSkillConfig AutoSkill { get; set; } = new AutoSkillConfig();
 
+        // Tower Overcharge configuration
+        public TowerOverchargeConfig TowerOvercharge { get; set; } = new TowerOverchargeConfig();
+
         // Tower Mastery / XP system configuration
         public TowerMasteryConfig TowerMastery { get; set; } = new TowerMasteryConfig();
 
@@ -1167,6 +1170,28 @@ namespace BattleSystemECS.Config
         public float DotDamagePerTick { get; set; }
         public int DotDuration { get; set; }
         public float TowerRangeBonus { get; set; }
+    }
+
+    /// <summary>
+    /// Tower overcharge (overdrive/boost) configuration.
+    /// Allows players to temporarily boost tower damage/attack speed at the cost of mana.
+    /// </summary>
+    public class TowerOverchargeConfig
+    {
+        /// <summary>Damage multiplier while overcharge is active (e.g. 2.0 = double damage)</summary>
+        public float DamageMultiplier { get; set; } = 2.0f;
+        /// <summary>Attack speed multiplier while overcharge is active (e.g. 1.5 = 50% faster)</summary>
+        public float AttackSpeedMultiplier { get; set; } = 1.5f;
+        /// <summary>Range bonus multiplier while overcharge is active (e.g. 1.2 = +20% range)</summary>
+        public float RangeMultiplier { get; set; } = 1.2f;
+        /// <summary>Duration of the overcharge boost in seconds</summary>
+        public float Duration { get; set; } = 5.0f;
+        /// <summary>Cooldown before the same tower can be overcharged again (seconds)</summary>
+        public float Cooldown { get; set; } = 30.0f;
+        /// <summary>Mana cost to activate overcharge per tower</summary>
+        public float ManaCost { get; set; } = 20f;
+        /// <summary>Player must have at least this much mana to activate overcharge</summary>
+        public float MinManaRequired { get; set; } = 10f;
     }
 
     /// <summary>
