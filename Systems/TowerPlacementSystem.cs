@@ -120,6 +120,10 @@ namespace BattleSystemECS.Systems
                     }
                     // Apply homing projectile flag for tracking towers
                     store.SetTowerProjectileHoming(towerId, tc.ProjectileHoming);
+                    // Apply turn rate for turret rotation delay (0 = instant snap, >0 = gradual rotation)
+                    store.TowerTurnRate[towerId] = tc.TurnRate;
+                    // Initialize facing angle to point at nearest enemy (or 0 if none)
+                    store.TowerFacingAngle[towerId] = 0f;
                     // Apply tower's innate special ability (e.g., chain_lightning for Tesla)
                     if (tc.SpecialAbility != null)
                     {

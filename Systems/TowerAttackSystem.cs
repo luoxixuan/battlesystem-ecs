@@ -285,6 +285,32 @@ int bestTarget = -1;
 
                 if (bestTarget != -1)
                 {
+                    // Tower rotation / aim check: if TurnRate > 0, tower gradually rotates toward target
+                    float turnRate = store.TowerTurnRate[towerId];
+                    if (turnRate > 0f)
+                    {
+                        float ex = store.PositionX[bestTarget];
+                        float ey = store.PositionY[bestTarget];
+                        float dx = ex - tx;
+                        float dy = ey - ty;
+                        float desiredAngle = (float)Math.Atan2(dy, dx);
+
+                        // Normalize angle difference to [-PI, PI]
+                        float currentAngle = store.TowerFacingAngle[towerId];
+                        float angleDiff = desiredAngle - currentAngle;
+                        while (angleDiff > Math.PI) angleDiff -= 2f * (float)Math.PI;
+                        while (angleDiff < -Math.PI) angleDiff += 2f * (float)Math.PI;
+
+                        // Rotate at most turnRate radians per second, skip attack while turning
+                        float maxTurn = turnRate * deltaTime;
+                        if (Math.Abs(angleDiff) > 0.1f)
+                        {
+                            float turn = Math.Clamp(angleDiff, -maxTurn, maxTurn);
+                            store.TowerFacingAngle[towerId] = currentAngle + turn;
+                            return;
+                        }
+                    }
+
                     // Accuracy check: if tower accuracy < 1.0, roll for miss
                     float towerAccuracy = store.TowerAccuracy[towerId];
                     if (towerAccuracy < 1f && _rand.NextDouble() >= towerAccuracy) return;

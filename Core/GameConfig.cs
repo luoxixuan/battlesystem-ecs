@@ -74,6 +74,9 @@ namespace BattleSystemECS.Config
         public float ReloadTime { get; set; } = 0f;
         // Homing projectile: if true, projectile tracks target and turns mid-flight
         public bool ProjectileHoming { get; set; } = false;
+        // Turn rate: maximum angular change per second in radians (e.g. PI = 180°/sec, 0 = instant/snap to target)
+        // Default 0 means instant rotation (existing behavior unchanged)
+        public float TurnRate { get; set; } = 0f;
     }
 
     /// <summary>

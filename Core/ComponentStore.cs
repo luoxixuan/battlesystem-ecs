@@ -322,6 +322,12 @@ namespace BattleSystemECS.Core
         // TowerAuraDamageBonus: damage multiplier bonus granted to towers in range (e.g. 0.15 = +15%)
         public float[] TowerAuraDamageBonus = new float[MAX_ENTITIES];
 
+        // ==================== 塔旋转/瞄准延迟 (Turret Rotation & Turn Rate) ====================
+        // TowerFacingAngle: current facing angle in radians (0 = East, PI/2 = North)
+        public float[] TowerFacingAngle = new float[MAX_ENTITIES];
+        // TowerTurnRate: maximum angular change per second in radians (e.g. PI = 180°/sec, 0 = instant/snap)
+        public float[] TowerTurnRate = new float[MAX_ENTITIES];
+
         // ==================== 路障/墙体组件（Obstacle）====================
         // 路障是可被敌人攻击的放置物（冰墙、地雷等）
         public const int MAX_OBSTACLES = 5000;
