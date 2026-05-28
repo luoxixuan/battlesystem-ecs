@@ -452,6 +452,23 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Defines a heal-over-time enemy healer unit type.
+    /// Healers restore HP to nearby wounded allies every heal interval.
+    /// </summary>
+    public class HealerDef
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        // Heal amount per tick (flat HP)
+        public float HealAmount { get; set; }
+        // Cooldown/interval between heal ticks (in seconds)
+        public float HealInterval { get; set; }
+        // Range within which the healer can target allies (in tiles)
+        public float HealRange { get; set; }
+    }
+
+    /// <summary>
     /// Defines a gold-stealing thief enemy type.
     /// Thieves skip base damage and instead steal gold when reaching the end.
     /// </summary>
@@ -795,6 +812,15 @@ namespace BattleSystemECS.Config
 
         // Gold-stealing thief definitions (inline with monster configs)
         public ThiefDef[] ThiefDefs { get; set; } = Array.Empty<ThiefDef>();
+
+        // Heal-over-time healer unit definitions
+        public HealerDef[] HealerDefs { get; set; } = Array.Empty<HealerDef>();
+
+        // Look up a healer def by its Id
+        public HealerDef GetHealerDef(string healerId)
+        {
+            return HealerDefs.FirstOrDefault(h => h.Id == healerId);
+        }
 
         // Look up a fission def by its FissionId
         public FissionDef GetFissionDef(string fissionId)

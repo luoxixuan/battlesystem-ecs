@@ -68,6 +68,7 @@ namespace BattleSystemECS.Core
         public AdaptiveDifficultySystem? AdaptiveDifficulty { get; set; }
         public CorpseEffectSystem? CorpseEffect { get; set; }
         public NestSystem? Nest { get; set; }
+        public EnemyHealerSystem? EnemyHealer { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -164,6 +165,10 @@ namespace BattleSystemECS.Core
 
             // ── Phase 3.7: Enemy Morph — transform mid-wave enemies before combat ──
             EnemyMorph?.Update(effectiveDelta);
+
+            // ── Phase 3.75: Enemy Healer — heal-over-time for healer units ──────
+            EnemyHealer?.SetTurn(turn);
+            EnemyHealer?.Update(effectiveDelta);
 
             // ── Phase 3.8: Enemy Steal Gold — process thieves that reached the base ──
             StealGold?.Update();

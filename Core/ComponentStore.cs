@@ -345,6 +345,14 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // EnemyVanguardCoverCount: number of allies currently protected by this vanguard (computed each frame)
         public int[] EnemyVanguardCoverCount = new int[MAX_ENTITIES];
 
+        // ==================== 敌人治疗单位组件（SOA）====================
+        // EnemyHealerHealAmount: flat HP restored per heal tick (0 = not a healer)
+        public float[] EnemyHealerHealAmount = new float[MAX_ENTITIES];
+        // EnemyHealerHealInterval: heal cooldown / interval in seconds (also used as range for heal check)
+        public float[] EnemyHealerHealInterval = new float[MAX_ENTITIES];
+        // EnemyHealerHealTargetPriority: 0=lowest_health, 1=highest_threat (future extension)
+        public int[] EnemyHealerHealTargetPriority = new int[MAX_ENTITIES];
+
         // ==================== 金币窃取敌人组件（SOA）====================
         // EnemyCanStealGold: true if this enemy is a thief that steals gold instead of damaging base
         public bool[] EnemyCanStealGold = new bool[MAX_ENTITIES];
