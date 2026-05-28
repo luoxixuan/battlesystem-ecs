@@ -35,6 +35,12 @@ namespace BattleSystemECS.Systems
                 return;
             }
 
+            if (scenario == 5)
+            {
+                RunFullGameBenchmark();
+                return;
+            }
+
             Console.WriteLine($"\n[BENCHMARK] Full 12-System Benchmark: {scenario} entities");
 
             var logger = new ConsoleLogger();
@@ -448,6 +454,175 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
             Console.WriteLine($"[BENCHMARK]   ----------------------------------------");
             Console.WriteLine($"[BENCHMARK]   TOTAL:          {msTotal,7:F2} ms");
             Console.WriteLine($"\n[BENCHMARK] Throughput: {fps:F0} FPS  ({msTotal/frames:F2} ms/frame)");
+        }
+
+        /// <summary>
+        /// 完整一局压测 — 5 关、真实波次生成、完整战斗流程。
+        /// 测量从第一帧到最后一帧的总帧数和墙钟时间，计算真实游戏吞吐量。
+        /// </summary>
+        private void RunFullGameBenchmark()
+        {
+            Console.WriteLine("\n[BENCHMARK] Full Game: 5 levels, real wave spawning, full combat pipeline");
+
+            var logger = new ConsoleLogger();
+            var gameConfig = GameConfigLoader.LoadConfig(logger);
+
+            int playerId = 1;
+            store.AddPlayer(playerId, 10f, 1f, 50f, 1, 20);
+            store.PlayerMaxHealth[playerId] = 200f;
+            store.PlayerCurrentHealth[playerId] = 200f;
+            store.SetPlayerGold(playerId, 9999f);
+            store.PositionX[playerId] = 5f;
+            store.PositionY[playerId] = 0f;
+            store.PositionActive[playerId] = true;
+
+            // 创建所有系统（对齐 GameManager.Initialize）
+            var scheduler = new FrameScheduler(store, gameConfig);
+
+            var waveSpawning = new WaveSpawningSystem(store, logger, gameConfig);
+            var enemyAbility  = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
+            var benchTechTree = new TechTreeSystem(store, logger, playerId, null, gameConfig);
+            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbility, benchTechTree);
+            var enemyMovement = new EnemyMovementSystem(store, playerId);
+            var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
+            var towerAttack   = new TowerAttackSystem(store, logger, null);
+            var auraTower     = new AuraTowerSystem(store);
+            var projectile    = new ProjectileSystem(store, logger);
+            var gold          = new GoldSystem(store, logger);
+            var upgrade       = new UpgradeSystem(store, logger, playerId, gameConfig);
+            var skill         = new SkillSystem(store, logger, playerId, gameConfig);
+            var buffSystem    = new BuffSystem(store, playerId);
+            var comboSystem   = new ComboSystem(store, gameConfig.Combo);
+            skill.InjectDotSystem(buffSystem);
+            towerAttack.SetBuffSystem(buffSystem);
+            var pathfinding   = new PathfindingSystem(store);
+            enemyMovement.SetPathfindingSystem(pathfinding);
+
+            // 布线 FrameScheduler
+            scheduler.WaveSpawning   = waveSpawning;
+            scheduler.EnemyAI        = enemyAI;
+            scheduler.EnemyAbility   = enemyAbility;
+            scheduler.EnemyMovement  = enemyMovement;
+            scheduler.PlayerTowerAttack = playerAttack;
+            scheduler.TowerAttack    = towerAttack;
+            scheduler.AuraTower      = auraTower;
+            scheduler.Projectile     = projectile;
+            scheduler.Gold           = gold;
+            scheduler.Upgrade        = upgrade;
+            scheduler.Skill          = skill;
+            scheduler.Buff           = buffSystem;
+            scheduler.Combo          = comboSystem;
+            scheduler.Pathfinding    = pathfinding;
+            scheduler.TechTree       = benchTechTree;
+            scheduler.Phase          = GameState.BuildPhase;
+
+            // 放塔（对齐交互式游戏）
+            int t1 = store.CreateEntity();
+            store.PositionX[t1] = 2f; store.PositionY[t1] = 5f;
+            store.AddTower(t1, "Basic", 15f, 3, 1.5f, 1, 100f);
+
+            int t2 = store.CreateEntity();
+            store.PositionX[t2] = 7f; store.PositionY[t2] = 12f;
+            store.AddTower(t2, "Sniper", 25f, 5, 0.8f, 1, 200f);
+
+            ConsoleLogger.EnableLog = false;
+            var totalSw = Stopwatch.StartNew();
+
+            int totalFrames = 0;
+            int maxLevels = gameConfig.Levels.Count;
+            int completedLevels = 0;
+            string endReason = "Victory";
+
+            for (int level = 1; level <= maxLevels; level++)
+            {
+                var levelConfig = gameConfig.GetLevelConfig(level);
+                if (levelConfig == null) continue;
+
+                waveSpawning.SetLevel(level);
+                store.RebuildSpatialGrid();
+
+                // ── BuildPhase ──────────────────────────────────
+                scheduler.Phase = GameState.BuildPhase;
+                for (int bf = 0; bf < 10; bf++)
+                {
+                    totalFrames++;
+                    scheduler.TickGameTurn(1f, totalFrames);
+                }
+
+                // ── WavePhase ───────────────────────────────────
+                scheduler.Phase = GameState.WavePhase;
+                bool levelDone = false;
+                int levelMaxFrames = 10000;  // 安全上限，防止死循环
+                int levelFrameStart = totalFrames;
+                while (!levelDone && (totalFrames - levelFrameStart) < levelMaxFrames)
+                {
+                    totalFrames++;
+                    scheduler.TickGameTurn(1f, totalFrames);
+
+                    // 游戏结束检测：玩家死亡
+                    if (store.PlayerCurrentHealth[playerId] <= 0f)
+                    {
+                        endReason = "PlayerDeath";
+                        levelDone = true;
+                        break;
+                    }
+
+                    // 敌人到达底部检测
+                    var activeEnemyIds = store.GetCachedActiveEnemyIds();
+                    bool leaked = false;
+                    foreach (var eid in activeEnemyIds)
+                    {
+                        if (store.EnemyActive[eid] && store.PositionY[eid] <= 0f)
+                        {
+                            store.DecrementPlayerBaseLives(playerId);
+                            store.QueueEnemyDeath(eid, playerId);
+                            if (store.GetPlayerBaseLives(playerId) <= 0)
+                            {
+                                endReason = "BaseDestroyed";
+                                leaked = true;
+                                break;
+                            }
+                        }
+                    }
+                    store.ResolveEnemiesKilledThisFrame();
+                    if (leaked) { levelDone = true; break; }
+
+                    // 关卡完成检测：WaveSpawningSystem 内部会将 currentLevel++ 当所有波次完成
+                    int spawnedLevel = waveSpawning.GetCurrentLevel();
+                    bool allWavesDone = spawnedLevel > level;
+                    int activeCount = store.GetCachedActiveEnemyIds().Count;
+                    if (allWavesDone && activeCount == 0)
+                    {
+                        completedLevels++;
+                        levelDone = true;
+                    }
+                }
+
+                // 游戏结束则停止后续关卡
+                if (endReason != "Victory") break;
+
+                // 安全上限触发
+                if ((totalFrames - levelFrameStart) >= levelMaxFrames)
+                {
+                    endReason = $"Level{level}Timeout";
+                    Console.WriteLine($"[BENCHMARK] WARNING: Level {level} hit {levelMaxFrames} frame limit!");
+                    break;
+                }
+            }
+
+            totalSw.Stop();
+            ConsoleLogger.EnableLog = true;
+
+            double msTotal = totalSw.Elapsed.TotalMilliseconds;
+            double fps = 1000.0 * totalFrames / msTotal;
+
+            Console.WriteLine($"\n[BENCHMARK] Full Game Results:");
+            Console.WriteLine($"[BENCHMARK]   End reason:  {endReason}");
+            Console.WriteLine($"[BENCHMARK]   Levels:      {completedLevels}/{maxLevels}");
+            Console.WriteLine($"[BENCHMARK]   Total frames: {totalFrames}");
+            Console.WriteLine($"[BENCHMARK]   Wall-clock:  {msTotal:F2} ms ({msTotal/1000:F2} s)");
+            Console.WriteLine($"[BENCHMARK]   Avg frame:   {msTotal/totalFrames:F3} ms/frame");
+            Console.WriteLine($"[BENCHMARK]   Throughput:  {fps:F0} FPS");
         }
     }
 }

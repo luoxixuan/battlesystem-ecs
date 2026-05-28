@@ -10,6 +10,7 @@ namespace BattleSystemECS
             // Non-interactive benchmark runner:
             //   dotnet run 2        → mode 2 benchmark (hand-merged loop)
             //   dotnet run 4        → mode 4 benchmark (real system chain)
+            //   dotnet run 5        → mode 5 benchmark (full game)
             //   dotnet run          → interactive game
             if (args.Length > 0 && int.TryParse(args[0], out int mode))
             {
@@ -20,6 +21,10 @@ namespace BattleSystemECS
                 else if (mode == 4)
                 {
                     RunBenchmarkDirect(4);
+                }
+                else if (mode == 5)
+                {
+                    RunBenchmarkDirect(5);
                 }
                 else if (mode == 3)
                 {
