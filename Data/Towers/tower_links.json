@@ -1,0 +1,74 @@
+{
+  "links": [
+    {
+      "id": "lightning_frost_combo",
+      "name": "⚡❄️ 霜雷射线",
+      "requiredTowerTypes": ["Tesla", "Frost"],
+      "description": "Tesla+Frost相邻：每秒对路径上所有敌人造成雷+冰混合伤害",
+      "comboEffect": {
+        "damagePerSecond": 15.0,
+        "slowAmount": 0.3,
+        "slowDuration": 2.0,
+        "chainRange": 3,
+        "chainCount": 2
+      },
+      "cooldown": 3.0,
+      "minDistance": 1,
+      "maxDistance": 2
+    },
+    {
+      "id": "firewall_leech_heal",
+      "name": "🔥💉 燃魂汲取",
+      "requiredTowerTypes": ["Firewall", "Leech"],
+      "description": "Firewall+Leech相邻：燃烧伤害的30%转化为玩家生命",
+      "comboEffect": {
+        "lifestealPercent": 0.3,
+        "dotDamageBonus": 0.5
+      },
+      "cooldown": 0.0,
+      "minDistance": 1,
+      "maxDistance": 2
+    },
+    {
+      "id": "tesla_tesla_arc",
+      "name": "⚡⚡ 双电弧",
+      "requiredTowerTypes": ["Tesla", "Tesla"],
+      "description": "2座Tesla相邻：链式闪电弹射次数+2，伤害+25%",
+      "comboEffect": {
+        "bonusChainCount": 2,
+        "damageMultiplier": 1.25,
+        "chainRange": 4
+      },
+      "cooldown": 0.0,
+      "minDistance": 1,
+      "maxDistance": 2
+    },
+    {
+      "id": "frost_cryo_wall",
+      "name": "❄️🧊 冰墙封锁",
+      "requiredTowerTypes": ["Frost", "Cryo"],
+      "description": "Frost+Cryo相邻：范围减速+25%，敌人移速降低50%",
+      "comboEffect": {
+        "slowAmount": 0.5,
+        "slowDuration": 3.0,
+        "aoeRadius": 2
+      },
+      "cooldown": 5.0,
+      "minDistance": 1,
+      "maxDistance": 2
+    },
+    {
+      "id": "plasma_nano_surge",
+      "name": "💥🔬 等离子冲击",
+      "requiredTowerTypes": ["Plasma", "Nano"],
+      "description": "Plasma+Nano相邻：对最大生命值>50%的敌人伤害+40%",
+      "comboEffect": {
+        "damageVsHighHealthMult": 1.4,
+        "healthThreshold": 0.5
+      },
+      "cooldown": 4.0,
+      "minDistance": 1,
+      "maxDistance": 2
+    }
+  ]
+}

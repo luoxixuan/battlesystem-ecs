@@ -61,6 +61,7 @@ namespace BattleSystemECS.Core
         public ResourceNodeSystem? ResourceNode { get; set; }
         public TelegraphSystem? Telegraph { get; set; }
         public TowerSilenceSystem? TowerSilence { get; set; }
+        public TowerLinkSystem? TowerLink { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -155,6 +156,7 @@ namespace BattleSystemECS.Core
             TowerAttack?.SetTurn(turn);
             TowerOvercharge?.SetTurn(turn);
             TowerSynergy?.SetTurn();
+            TowerLink?.SetTurn();
             Skill?.SetTurn(turn);
             AuraTower?.SetTurn();
             Mana?.SetTurn(); // cache tech tree mana bonuses
@@ -174,6 +176,7 @@ namespace BattleSystemECS.Core
             TowerOvercharge?.Update(effectiveDelta);
             TowerAttack?.Update(effectiveDelta);
             TowerSynergy?.Update();
+            TowerLink?.Update();
             AuraTower?.ResolveAuraBuffs();
             TowerSilence?.Update(effectiveDelta);
             Projectile?.Update(effectiveDelta);

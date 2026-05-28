@@ -498,6 +498,16 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // TowerSilenceSourceId: enemy entity ID that applied this silence (-1 = none/unknown)
         public int[] TowerSilenceSourceId = new int[MAX_ENTITIES];
 
+        // ==================== 塔联动/组合攻击 (Tower Link Combo) ====================
+        // TowerLinkPartnerId: the tower ID of the partner tower in an active link combo (-1 = none)
+        public int[] TowerLinkPartnerId = new int[MAX_ENTITIES];
+        // TowerLinkComboType: the combo identifier string from tower_links.json (null = no active combo)
+        public string[] TowerLinkComboType = new string[MAX_ENTITIES];
+        // TowerLinkCooldown: remaining cooldown in seconds before the link combo can activate again (0 = ready)
+        public float[] TowerLinkCooldown = new float[MAX_ENTITIES];
+        // TowerLinkDamageBonus: additive damage bonus from link combo (applied as damage mult)
+        public float[] TowerLinkDamageBonus = new float[MAX_ENTITIES];
+
         // ==================== 塔旋转/瞄准延迟 (Turret Rotation & Turn Rate) ====================
         // TowerFacingAngle: current facing angle in radians (0 = East, PI/2 = North)
         public float[] TowerFacingAngle = new float[MAX_ENTITIES];
@@ -1472,6 +1482,49 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         {
             if (towerId < 0 || towerId >= MAX_ENTITIES) return;
             TowerInterceptRate[towerId] = rate;
+        }
+
+        // ==================== 塔联动/组合攻击 (Tower Link Combo) ====================
+        /// <summary>Gets the link combo partner tower ID (-1 = no partner).</summary>
+        public int GetTowerLinkPartnerId(int towerId)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return -1;
+            return TowerLinkPartnerId[towerId];
+        }
+
+        /// <summary>Sets the link combo partner tower ID.</summary>
+        public void SetTowerLinkPartnerId(int towerId, int partnerId)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            TowerLinkPartnerId[towerId] = partnerId;
+        }
+
+        /// <summary>Gets the link combo cooldown in seconds.</summary>
+        public float GetTowerLinkCooldown(int towerId)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return 0f;
+            return TowerLinkCooldown[towerId];
+        }
+
+        /// <summary>Sets the link combo cooldown in seconds.</summary>
+        public void SetTowerLinkCooldown(int towerId, float cooldown)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            TowerLinkCooldown[towerId] = cooldown;
+        }
+
+        /// <summary>Gets the link combo damage bonus multiplier.</summary>
+        public float GetTowerLinkDamageBonus(int towerId)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return 0f;
+            return TowerLinkDamageBonus[towerId];
+        }
+
+        /// <summary>Sets the link combo damage bonus multiplier.</summary>
+        public void SetTowerLinkDamageBonus(int towerId, float bonus)
+        {
+            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            TowerLinkDamageBonus[towerId] = bonus;
         }
 
         public float GetEnemyHealth(int enemyId)

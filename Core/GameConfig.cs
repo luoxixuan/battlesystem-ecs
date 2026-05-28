@@ -1381,4 +1381,53 @@ namespace BattleSystemECS.Config
         ManaSpring = 1,
         TechRelic = 2
     }
+
+    /// <summary>
+    /// Tower link combo definition — loaded from Data/Towers/tower_links.json.
+    /// Defines behavior when two specific tower types are placed adjacent to each other.
+    /// </summary>
+    public class TowerLinkDef
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        /// <summary>
+        /// Ordered pair of tower types that trigger this link combo.
+        /// For bidirectional checks, both orderings are tried.
+        /// </summary>
+        public string[] RequiredTowerTypes { get; set; } = Array.Empty<string>();
+        public string Description { get; set; } = "";
+        public TowerLinkEffect ComboEffect { get; set; } = new();
+        /// <summary>Cooldown in seconds between combo activations (0 = no cooldown).</summary>
+        public float Cooldown { get; set; } = 0f;
+        /// <summary>Minimum grid distance between linked towers (inclusive).</summary>
+        public int MinDistance { get; set; } = 1;
+        /// <summary>Maximum grid distance between linked towers (inclusive).</summary>
+        public int MaxDistance { get; set; } = 2;
+    }
+
+    public class TowerLinkEffect
+    {
+        /// <summary>Flat damage per second for lightning-style combo attacks.</summary>
+        public float DamagePerSecond { get; set; } = 0f;
+        /// <summary>Slow multiplier applied to enemies in the combo area.</summary>
+        public float SlowAmount { get; set; } = 0f;
+        /// <summary>Slow duration in turns.</summary>
+        public float SlowDuration { get; set; } = 0f;
+        /// <summary>Chain lightning range in grid cells.</summary>
+        public int ChainRange { get; set; } = 0;
+        /// <summary>Additional chain lightning hops.</summary>
+        public int ChainCount { get; set; } = 0;
+        /// <summary>Lifesteal fraction (0.3 = 30% of damage as heal).</summary>
+        public float LifestealPercent { get; set; } = 0f;
+        /// <summary>DoT damage bonus multiplier.</summary>
+        public float DotDamageBonus { get; set; } = 0f;
+        /// <summary>Damage multiplier for the link tower's primary attack.</summary>
+        public float DamageMultiplier { get; set; } = 1f;
+        /// <summary>Radius for AOE effects.</summary>
+        public int AoeRadius { get; set; } = 0;
+        /// <summary>Damage multiplier vs enemies above health threshold.</summary>
+        public float DamageVsHighHealthMult { get; set; } = 1f;
+        /// <summary>Enemy health fraction threshold (e.g. 0.5 = 50% max HP).</summary>
+        public float HealthThreshold { get; set; } = 0.5f;
+    }
 }
