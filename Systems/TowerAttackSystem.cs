@@ -607,6 +607,12 @@ int bestTarget = -1;
                 // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
                 float resist = store.EnemyDamageResistance[enemyId];
                 float finalDmg = resist >= 1f ? 0f : damage * (1f - resist);
+                // Vanguard damage transfer: if this enemy is protected by a vanguard, transfer a fraction to the vanguard
+                float vanguardTransfer = store.EnemyVanguardDmgTransfer[enemyId];
+                if (vanguardTransfer > 0f && finalDmg > 0f)
+                {
+                    ResolveVanguardDamageTransfer(enemyId, finalDmg, vanguardTransfer);
+                }
                 store.EnemyHealth[enemyId] -= finalDmg;
                 // Thorns: enemy reflects damage back to the player (tower attacker)
                 float thornsRatio = store.EnemyThornsRatio[enemyId];
@@ -733,6 +739,50 @@ int bestTarget = -1;
                         store.EnemyArmorShredDuration[enemyId] = 0f;
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Vanguard damage transfer: if the target enemy is protected by a vanguard,
+        /// transfer a fraction of damage taken to the vanguard entity.
+        /// O(enemies) scan for vanguard in front-line positions; vanguard must be alive and active.
+        /// </summary>
+        private void ResolveVanguardDamageTransfer(int protectedEnemyId, float damage, float transferRatio)
+        {
+            float transferredDamage = damage * transferRatio;
+            if (transferredDamage <= 0f) return;
+
+            var enemyIds = store.GetCachedActiveEnemyIds();
+            int count = enemyIds.Count;
+            float targetX = store.PositionX[protectedEnemyId];
+            float targetY = store.PositionY[protectedEnemyId];
+
+            // Vanguard must be in front (lower Y = closer to player base = front line)
+            // Scan for a living vanguard ahead of the protected enemy
+            for (int i = 0; i < count; i++)
+            {
+                int vanguardId = enemyIds[i];
+                if (!store.EnemyActive[vanguardId]) continue;
+                if (!store.EnemyIsVanguard[vanguardId]) continue;
+                if (store.EnemyHealth[vanguardId] <= 0f) continue;
+
+                float vx = store.PositionX[vanguardId];
+                float vy = store.PositionY[vanguardId];
+
+                // Vanguard must be ahead (lower Y = front) and within cover range
+                if (vy >= targetY) continue; // not ahead
+
+                float coverRange = store.EnemyVanguardCoverRange[vanguardId];
+                float dy = targetY - vy;
+                if (coverRange >= 0f && dy > coverRange) continue; // outside cover range
+
+                // Found a protecting vanguard — apply transferred damage to it
+                store.EnemyHealth[vanguardId] -= transferredDamage;
+                if (store.EnemyHealth[vanguardId] <= 0f)
+                {
+                    store.QueueEnemyDeath(vanguardId, store.PlayerEntityId);
+                }
+                return; // only one vanguard shields each enemy (first match wins)
             }
         }
 

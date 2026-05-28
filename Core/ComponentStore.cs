@@ -335,6 +335,16 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // EnemyDamageResistance: 0-1, reduces all damage taken (applied in TowerAttackSystem and SkillSystem)
         public float[] EnemyDamageResistance = new float[MAX_ENTITIES];
 
+        // ==================== 肉盾/前锋掩护组件（SOA）====================
+        // EnemyIsVanguard: true if this enemy is a vanguard (shield bearer) protecting allies behind it
+        public bool[] EnemyIsVanguard = new bool[MAX_ENTITIES];
+        // EnemyVanguardCoverRange: how many cells ahead this vanguard protects (-1 = full row)
+        public float[] EnemyVanguardCoverRange = new float[MAX_ENTITIES];
+        // EnemyVanguardDmgTransfer: fraction of damage taken by protected enemies that transfers to vanguard (0-1)
+        public float[] EnemyVanguardDmgTransfer = new float[MAX_ENTITIES];
+        // EnemyVanguardCoverCount: number of allies currently protected by this vanguard (computed each frame)
+        public int[] EnemyVanguardCoverCount = new int[MAX_ENTITIES];
+
         // ==================== 敌人词缀组件（SOA）====================
         // EnemyAffixFlags: bit-mask of active affixes (see BuffType affix bits 16-22)
         // Each enemy spawns with 1-3 random affixes; stored as a flag set for O(1) HasAffix() checks.
@@ -1190,6 +1200,11 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
             EnemyMagicResist[entityId] = magicResist;
             EnemyShield[entityId] = shield;  // configurable initial shield
             EnemyEvasion[entityId] = 0f;  // default to no evasion
+            // Vanguard: default not a vanguard (false = not protecting anyone)
+            EnemyIsVanguard[entityId] = false;
+            EnemyVanguardCoverRange[entityId] = 0f;
+            EnemyVanguardDmgTransfer[entityId] = 0f;
+            EnemyVanguardCoverCount[entityId] = 0;
             // Teleport: default no cooldown (ready), no destination, type=0 (none)
             EnemyTeleportCooldown[entityId] = 0f;
             EnemyTeleportDestinationX[entityId] = 0f;
