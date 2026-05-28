@@ -43,9 +43,10 @@ dotnet build
 dotnet run
 
 # 非交互式压测（推荐在 CI / 脚本中使用）
-dotnet run 2   # mode 2：合并热路径压测（手写合并循环）
-dotnet run 4   # mode 4：真实系统链路压测（调用真实系统 Update 链）
+dotnet run 2   # mode 2：合并热路径压测（手写合并循环，10K 敌，500 帧）
+dotnet run 4   # mode 4：真实系统链路压测（真实 Update 链，10K 敌，500 帧）
 dotnet run 3   # mode 3：微基准测试（单系统操作级性能剖析）
+dotnet run 5   # mode 5：完整一局压测（5 关全通，真实波次生成）
 
 # 运行单元测试（必须全部通过）
 dotnet test BattleSystemECS.Tests
