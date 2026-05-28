@@ -63,6 +63,7 @@ namespace BattleSystemECS.Core
         public TowerSilenceSystem? TowerSilence { get; set; }
         public TowerLinkSystem? TowerLink { get; set; }
         public AdaptiveDifficultySystem? AdaptiveDifficulty { get; set; }
+        public CorpseEffectSystem? CorpseEffect { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -214,6 +215,9 @@ namespace BattleSystemECS.Core
             // ── Phase 9.6: Objective System — update objective state ─────────────
             Objective?.Update(effectiveDelta, Phase);
             ResourceNode?.Update(effectiveDelta, Phase); // resource node production
+
+            // ── Phase 9.65: Corpse Effect System — tick ground effect durations and apply ─
+            CorpseEffect?.Update(effectiveDelta);
 
             // ── Phase 9.7: Wave Branch — pause combat while player selects branch ──
             if (WaveBranch?.IsBranchActive == true)

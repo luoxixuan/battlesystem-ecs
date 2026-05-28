@@ -59,6 +59,9 @@ namespace BattleSystemECS.Config
                 // Load enemy morph definitions
                 LoadMorphDefs(gameConfig, renderer);
 
+                // Load corpse ground effect definitions (direction 9)
+                LoadCorpseEffectDefs(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -1314,6 +1317,54 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[MORPH] Failed to load morph defs: " + ex.Message);
+            }
+        }
+
+        private static void LoadCorpseEffectDefs(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string corpseFile = "Data/Configs/corpse_effects.json";
+            try
+            {
+                if (!File.Exists(corpseFile))
+                {
+                    renderer.Log("[CORPSE] Corpse effect defs file not found: " + corpseFile + ", using defaults (no corpse effects)");
+                    return;
+                }
+                string json = File.ReadAllText(corpseFile);
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    var defs = new List<CorpseEffectDef>();
+                    foreach (var elem in root.EnumerateArray())
+                    {
+                        var c = new CorpseEffectDef();
+                        c.Id = elem.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "";
+                        c.Name = elem.TryGetProperty("name", out var name) ? name.GetString() ?? "" : "";
+                        c.EffectType = elem.TryGetProperty("effectType", out var et) ? et.GetInt32() : 0;
+                        c.Duration = elem.TryGetProperty("duration", out var dur) ? (float)dur.GetDouble() : 5f;
+                        c.Radius = elem.TryGetProperty("radius", out var rad) ? (float)rad.GetDouble() : 1.5f;
+                        c.DamagePerTick = elem.TryGetProperty("damagePerTick", out var dpt) ? (float)dpt.GetDouble() : 0f;
+                        c.TickInterval = elem.TryGetProperty("tickInterval", out var ti) ? (float)ti.GetDouble() : 1f;
+                        c.SlowAmount = elem.TryGetProperty("slowAmount", out var sa) ? (float)sa.GetDouble() : 1f;
+                        if (elem.TryGetProperty("monsterTypes", out var mtElem) && mtElem.ValueKind == System.Text.Json.JsonValueKind.Array)
+                        {
+                            c.MonsterTypes = new List<string>();
+                            foreach (var mt in mtElem.EnumerateArray())
+                            {
+                                c.MonsterTypes.Add(mt.GetString() ?? "");
+                            }
+                        }
+                        defs.Add(c);
+                    }
+                    gameConfig.CorpseEffectDefs = defs;
+                    renderer.Log("[CORPSE] Loaded " + defs.Count + " corpse effect defs from " + corpseFile);
+                }
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[CORPSE] Failed to load corpse effect defs: " + ex.Message);
             }
         }
     }

@@ -556,6 +556,24 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         private List<int> _activeHazardZoneIds = new List<int>();
         private int _nextHazardZoneId = 0;
 
+        // ==================== 敌人尸体残留效果组件（CorpseGroundEffect）====================
+        // 敌人死亡后在死亡位置生成的地面效果（毒池、黏液、火焰地带等）
+        // 与 HazardZone 不同：HazardZone 由塔技能创建，CorpseEffect 由敌人死亡触发
+        public const int MAX_CORPSE_EFFECTS = 2000;
+        public bool[] CorpseEffectActive = new bool[MAX_CORPSE_EFFECTS];
+        public float[] CorpseEffectX = new float[MAX_CORPSE_EFFECTS];
+        public float[] CorpseEffectY = new float[MAX_CORPSE_EFFECTS];
+        // EffectType: 0=Poison(DoT), 1=Slow, 2=Ice(freeze), 3=Fire(DoT), 4=Healing, 5=DamageBoost
+        public int[] CorpseEffectType = new int[MAX_CORPSE_EFFECTS];
+        public float[] CorpseEffectRadius = new float[MAX_CORPSE_EFFECTS];
+        public float[] CorpseEffectDuration = new float[MAX_CORPSE_EFFECTS];  // seconds remaining
+        public float[] CorpseEffectDamagePerTick = new float[MAX_CORPSE_EFFECTS];
+        public float[] CorpseEffectSlowAmount = new float[MAX_CORPSE_EFFECTS];  // for Slow type
+        public float[] CorpseEffectTickTimer = new float[MAX_CORPSE_EFFECTS];  // accumulator for tick timing
+        public float[] CorpseEffectTickInterval = new float[MAX_CORPSE_EFFECTS];  // configured tick interval (from JSON)
+        private List<int> _activeCorpseEffectIds = new List<int>();
+        private int _nextCorpseEffectId = 0;
+
         // ==================== 技能组件的 SOA 存储 ====================
         public string[] SkillName = new string[MAX_PLAYERS];
         public float[] SkillDamageMultiplier = new float[MAX_PLAYERS];
@@ -1390,6 +1408,66 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         public List<int> GetCachedActiveHazardZoneIds()
         {
             return _activeHazardZoneIds;
+        }
+
+        // ==================== 尸体残留效果（CorpseEffect）管理 API ====================
+
+/// <summary>
+/// Queue a corpse ground effect at a position when an enemy dies.
+/// Called from EnemyFissionSystem or ResolveEnemiesKilledThisFrame.
+/// Returns zone ID or -1 if no free slots.
+/// </summary>
+public int AddCorpseEffect(float x, float y, int effectType, float radius, float duration, float damagePerTick = 0f, float slowAmount = 1f, float tickInterval = 1f)
+        {
+            int zoneId = -1;
+            for (int i = 0; i < MAX_CORPSE_EFFECTS; i++)
+            {
+                int candidateId = (_nextCorpseEffectId + i) % MAX_CORPSE_EFFECTS;
+                if (!CorpseEffectActive[candidateId])
+                {
+                    zoneId = candidateId;
+                    _nextCorpseEffectId = (candidateId + 1) % MAX_CORPSE_EFFECTS;
+                    break;
+                }
+            }
+            if (zoneId < 0) return -1; // no free slots
+
+            CorpseEffectActive[zoneId] = true;
+            CorpseEffectX[zoneId] = x;
+            CorpseEffectY[zoneId] = y;
+            CorpseEffectType[zoneId] = effectType;
+            CorpseEffectRadius[zoneId] = radius;
+            CorpseEffectDuration[zoneId] = duration;
+            CorpseEffectDamagePerTick[zoneId] = damagePerTick;
+            CorpseEffectSlowAmount[zoneId] = slowAmount;
+            CorpseEffectTickTimer[zoneId] = 0f;
+            CorpseEffectTickInterval[zoneId] = tickInterval;
+            _activeCorpseEffectIds.Add(zoneId);
+            return zoneId;
+        }
+
+        /// <summary>Remove a corpse effect by ID.</summary>
+        public void RemoveCorpseEffect(int zoneId)
+        {
+            if (zoneId < 0 || zoneId >= MAX_CORPSE_EFFECTS) return;
+            if (!CorpseEffectActive[zoneId]) return;
+            CorpseEffectActive[zoneId] = false;
+            CorpseEffectX[zoneId] = 0f;
+            CorpseEffectY[zoneId] = 0f;
+            CorpseEffectType[zoneId] = 0;
+            CorpseEffectRadius[zoneId] = 0f;
+            CorpseEffectDuration[zoneId] = 0f;
+            CorpseEffectDamagePerTick[zoneId] = 0f;
+            CorpseEffectSlowAmount[zoneId] = 1f;
+            CorpseEffectTickTimer[zoneId] = 0f;
+            CorpseEffectTickInterval[zoneId] = 1f;
+            _activeCorpseEffectIds.Remove(zoneId);
+        }
+
+        /// <summary>Get list of active corpse effect IDs. O(n) over active zones, zero GC.</summary>
+        public List<int> GetCachedActiveCorpseEffectIds()
+        {
+            return _activeCorpseEffectIds;
         }
 
         // ==================== 塔选中状态管理 ====================

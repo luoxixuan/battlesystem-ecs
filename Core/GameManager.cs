@@ -54,6 +54,7 @@ namespace BattleSystemECS.Core
         private WeatherSystem weatherSystem;          // 天气系统
         private TelegraphSystem telegraphSystem;     // 弹道预警区域系统
         private AdaptiveDifficultySystem adaptiveDifficultySystem; // 动态难度系统
+        private CorpseEffectSystem corpseEffectSystem; // 敌人尸体残留效果系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -298,6 +299,12 @@ logger.Log("      ComboSystem created successfully!");
             // Wire AscensionSystem into WaveSpawningSystem for enemy HP/speed scaling
             waveSpawningSystem.SetAscensionSystem(ascensionSystem);
 
+            logger.Log("[BOOTSTRAP]    - Creating CorpseEffectSystem (Enemy corpse ground effects)...");
+            corpseEffectSystem = new CorpseEffectSystem(store, gameConfig, buffSystem, logger);
+            corpseEffectSystem.LoadCorpseEffects();
+            corpseEffectSystem.SubscribeToOnEnemyKilled();
+            logger.Log("      CorpseEffectSystem created successfully!");
+
             // Wire OnEnemyKilled → ComboSystem (连击计数链路)
             store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
             // Wire OnTowerKill → TowerExperienceSystem (XP 授予链路)
@@ -363,6 +370,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.Weather = weatherSystem;
             scheduler.Telegraph = telegraphSystem;
             scheduler.AdaptiveDifficulty = adaptiveDifficultySystem;
+            scheduler.CorpseEffect = corpseEffectSystem;
 
             // 初始化地形网格（方向二：地图地块系统）
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)

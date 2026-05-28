@@ -758,6 +758,9 @@ namespace BattleSystemECS.Config
         public List<TerrainTypeConfig> TerrainTypes { get; set; } = new List<TerrainTypeConfig>();
         public int[][] MapTerrainGrid { get; set; } = Array.Empty<int[]>();
 
+        // Corpse ground effect definitions (direction 9)
+        public List<CorpseEffectDef> CorpseEffectDefs { get; set; } = new List<CorpseEffectDef>();
+
         // Bank / Interest system configuration (direction 2)
         public BankConfig Bank { get; set; } = new BankConfig();
         // Mana/Energy pool system (direction 5)
@@ -1429,5 +1432,41 @@ namespace BattleSystemECS.Config
         public float DamageVsHighHealthMult { get; set; } = 1f;
         /// <summary>Enemy health fraction threshold (e.g. 0.5 = 50% max HP).</summary>
         public float HealthThreshold { get; set; } = 0.5f;
+    }
+
+    /// <summary>
+    /// Corpse ground effect definition — loaded from Data/Configs/corpse_effects.json.
+    /// Defines what ground effect a monster type leaves behind when it dies.
+    /// </summary>
+    public class CorpseEffectDef
+    {
+        /// <summary>Unique identifier for this corpse effect, e.g. "poison_pool", "slime_slow"</summary>
+        public string Id { get; set; } = "";
+        /// <summary>Display name, e.g. "Poison Pool", "Slime Patch"</summary>
+        public string Name { get; set; } = "";
+        /// <summary>Effect type: 0=Poison (DoT), 1=Slow, 2=Ice (freeze), 3=Fire (DoT), 4=Healing, 5=DamageBoost</summary>
+        public int EffectType { get; set; } = 0;
+        /// <summary>Duration in seconds the corpse effect persists.</summary>
+        public float Duration { get; set; } = 5f;
+        /// <summary>Radius in grid units.</summary>
+        public float Radius { get; set; } = 1.5f;
+        /// <summary>Damage per tick (for DoT types).</summary>
+        public float DamagePerTick { get; set; } = 0f;
+        /// <summary>Tick interval in seconds.</summary>
+        public float TickInterval { get; set; } = 1f;
+        /// <summary>Slow multiplier (0.5 = 50% speed, for Slow type).</summary>
+        public float SlowAmount { get; set; } = 1f;
+        /// <summary>Enemy types that leave this corpse effect (comma-separated in JSON).</summary>
+        public List<string> MonsterTypes { get; set; } = new List<string>();
+    }
+
+    public enum CorpseEffectTypeEnum
+    {
+        Poison = 0,
+        Slow = 1,
+        Ice = 2,
+        Fire = 3,
+        Healing = 4,
+        DamageBoost = 5
     }
 }

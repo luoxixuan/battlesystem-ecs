@@ -1,0 +1,46 @@
+[
+  {
+    "id": "poison_pool",
+    "name": "Poison Pool",
+    "effectType": 0,
+    "duration": 5.0,
+    "radius": 1.5,
+    "damagePerTick": 10.0,
+    "tickInterval": 1.0,
+    "slowAmount": 1.0,
+    "monsterTypes": ["PoisonSpider", "VenomMite", "ToxicSlime"]
+  },
+  {
+    "id": "slime_slow",
+    "name": "Slime Patch",
+    "effectType": 1,
+    "duration": 4.0,
+    "radius": 1.2,
+    "damagePerTick": 0.0,
+    "tickInterval": 1.0,
+    "slowAmount": 0.5,
+    "monsterTypes": ["Slime", "Jelly", "Bouncer"]
+  },
+  {
+    "id": "ice_patch",
+    "name": "Ice Patch",
+    "effectType": 2,
+    "duration": 3.0,
+    "radius": 1.0,
+    "damagePerTick": 0.0,
+    "tickInterval": 1.0,
+    "slowAmount": 0.2,
+    "monsterTypes": ["IceElemental", "FrostShade", "CryoSlime"]
+  },
+  {
+    "id": "fire_ground",
+    "name": "Fire Ground",
+    "effectType": 3,
+    "duration": 4.0,
+    "radius": 1.5,
+    "damagePerTick": 8.0,
+    "tickInterval": 1.0,
+    "slowAmount": 1.0,
+    "monsterTypes": ["FireDemon", "FlameImp", "InfernoSlime"]
+  }
+]
