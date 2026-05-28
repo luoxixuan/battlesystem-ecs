@@ -191,6 +191,35 @@ namespace BattleSystemECS.Config
             }
             return EnemyCount;
         }
+
+        // ── Wave Branching: if non-empty, player chooses which path to take next ──
+        // When WaveBranches.Count > 0, the wave is a branch point and these options are shown.
+        public List<WaveBranchOption> WaveBranches { get; set; } = new List<WaveBranchOption>();
+        // [Internal] Set by WaveBranchSystem when player selects a branch option.
+        // WaveSpawningSystem reads this on SetLevel to override the wave's enemy composition.
+        public WaveBranchOption AppliedBranchOption { get; set; }
+    }
+
+    /// <summary>
+    /// Wave branch option — one possible next wave the player can choose from.
+    /// Shown at branch points during Intermission before the next wave starts.
+    /// </summary>
+    public class WaveBranchOption
+    {
+        // Display name shown to the player (e.g., "Swarm Wave", "Elite Rush", "Boss Wave")
+        public string Name { get; set; } = "";
+        // Monster type for this branch option
+        public string MonsterType { get; set; } = "";
+        // Number of enemies for this branch option
+        public int EnemyCount { get; set; } = 10;
+        // Gold bonus awarded when this option is chosen
+        public float GoldBonus { get; set; } = 0f;
+        // Research points bonus awarded when this option is chosen
+        public int ResearchBonus { get; set; } = 0;
+        // Difficulty hint shown to the player: "Easy" / "Medium" / "Hard" / "Extreme"
+        public string Difficulty { get; set; } = "Medium";
+        // Optional: multi-type enemy composition
+        public List<EnemyTypeEntry> EnemyTypes { get; set; } = new List<EnemyTypeEntry>();
     }
 
     public class LevelConfig

@@ -57,6 +57,7 @@ namespace BattleSystemECS.Core
         public EnemyFissionSystem? EnemyFission { get; set; }
         public EnemyMorphSystem? EnemyMorph { get; set; }
         public ObjectiveSystem? Objective { get; set; }
+        public WaveBranchSystem? WaveBranch { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -197,6 +198,13 @@ namespace BattleSystemECS.Core
 
             // ── Phase 9.6: Objective System — update objective state ─────────────
             Objective?.Update(effectiveDelta, Phase);
+
+            // ── Phase 9.7: Wave Branch — pause combat while player selects branch ──
+            if (WaveBranch?.IsBranchActive == true)
+            {
+                // Combat paused — branch UI is showing. Skip remaining combat systems this frame.
+                return;
+            }
         }
 
         /// <summary>

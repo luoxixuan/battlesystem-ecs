@@ -49,6 +49,7 @@ namespace BattleSystemECS.Core
         private EnemyFissionSystem enemyFissionSystem; // 敌人分裂/裂殖系统
         private EnemyMorphSystem enemyMorphSystem;   // 敌人变形/进化系统
         private ObjectiveSystem objectiveSystem;      // 特殊目标/护送模式系统
+        private WaveBranchSystem waveBranchSystem;   // 波次分支/玩家选择系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -196,6 +197,22 @@ logger.Log("      ComboSystem created successfully!");
             objectiveSystem = new ObjectiveSystem(store, playerId);
             logger.Log("      ObjectiveSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating WaveBranchSystem (branch selection)... ");
+            waveBranchSystem = new WaveBranchSystem(store, logger, gameConfig, stateMachine);
+            // Wire branch system into wave completion: check for branch points
+            waveSpawningSystem.OnWaveComplete += () =>
+            {
+                techTreeSystem.OnWaveComplete();
+                interestSystem.OnWaveComplete();
+                saveSystem?.SaveCheckpoint();
+                // Check if this wave has branch options
+                waveBranchSystem.CheckAndActivateBranch(
+                    waveSpawningSystem.GetCurrentWave() - 1, // OnWaveComplete fires after wave number advanced
+                    waveSpawningSystem.GetCurrentLevel()
+                );
+            };
+            logger.Log("      WaveBranchSystem created successfully!");
+
             logger.Log("[BOOTSTRAP]    - Creating TowerExperienceSystem (Tower XP & Mastery)... ");
             towerExperienceSystem = new TowerExperienceSystem(store, gameConfig);
             logger.Log("      TowerExperienceSystem created successfully!");
@@ -313,6 +330,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.EnemyFission = enemyFissionSystem;
             scheduler.EnemyMorph = enemyMorphSystem;
             scheduler.Objective = objectiveSystem;
+            scheduler.WaveBranch = waveBranchSystem;
 
             // 初始化地形网格（方向二：地图地块系统）
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)
@@ -331,6 +349,7 @@ logger.Log("      ComboSystem created successfully!");
             stateMachine.OnEnter(GameState.BuildPhase, () => { scheduler.Phase = GameState.BuildPhase; });
             stateMachine.OnEnter(GameState.WavePhase, () => { scheduler.Phase = GameState.WavePhase; });
             stateMachine.OnEnter(GameState.Intermission, () => { scheduler.Phase = GameState.WavePhase; }); // intermission 仍运行战斗引擎（显示信息）
+            stateMachine.OnEnter(GameState.BranchSelection, () => { scheduler.Phase = GameState.WavePhase; }); // combat paused by WaveBranch.IsBranchActive
 
             logger.Log("[BOOTSTRAP] ========== Game Initialization Complete ==========");
             Console.WriteLine();

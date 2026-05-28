@@ -13,6 +13,7 @@ namespace BattleSystemECS.Core
         BuildPhase,     // Player places/upgrades towers
         WavePhase,      // Active combat — waves spawning and fighting
         Intermission,   // Between waves (brief pause / info display)
+        BranchSelection, // Player selects next wave type from 2-3 options
         LevelComplete,  // All waves in current level cleared
         GameOver,       // Player defeated
         Victory         // All levels cleared
@@ -113,6 +114,10 @@ namespace BattleSystemECS.Core
                         || to == GameState.LevelComplete;
 
                 case GameState.Intermission:
+                    return to == GameState.WavePhase
+                        || to == GameState.BranchSelection;
+
+                case GameState.BranchSelection:
                     return to == GameState.WavePhase;
 
                 case GameState.LevelComplete:

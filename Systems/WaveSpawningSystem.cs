@@ -181,6 +181,19 @@ namespace BattleSystemECS.Systems
             }
         }
 
+        /// <summary>
+        /// Returns the currently active WaveConfig for this wave.
+        /// If a branch was selected, this reflects the AppliedBranchOption.
+        /// </summary>
+        public WaveConfig GetCurrentWaveConfig()
+        {
+            var levelConfig = gameConfig.GetLevelConfig(currentLevel);
+            if (levelConfig == null) return null;
+            int idx = currentWave - 1;
+            if (idx < 0 || idx >= levelConfig.Waves.Count) return null;
+            return levelConfig.Waves[idx];
+        }
+
         public void Update()
         {
             var levelConfig = gameConfig.GetLevelConfig(currentLevel);
