@@ -238,6 +238,8 @@ namespace BattleSystemECS.Config
         public float ObjectiveTimeLimit { get; set; } = 120f;
         // For Survival mode: number of waves to survive
         public int SurvivalWaveCount { get; set; } = 10;
+        // Resource nodes on this map — populated from level JSON or resource_nodes.json
+        public List<ResourceNodeDef> ResourceNodes { get; set; } = new List<ResourceNodeDef>();
     }
 
     /// <summary>
@@ -1326,5 +1328,41 @@ namespace BattleSystemECS.Config
         public float LifetimeSeconds { get; set; } = 30f;
         public string Color { get; set; } = "White";
         public string Fx { get; set; } = "None";
+    }
+
+    /// <summary>
+    /// Resource node definition — a fixed map object that produces gold, mana, or research.
+    /// Nodes can be captured by towers or neutral, and can be destroyed by enemies.
+    /// </summary>
+    public class ResourceNodeDef
+    {
+        /// <summary>Unique identifier for this node, e.g. "gold_mine_1"</summary>
+        public string Id { get; set; } = "";
+        /// <summary>Display name, e.g. "Gold Mine", "Mana Spring"</summary>
+        public string Name { get; set; } = "";
+        /// <summary>Node type: 0=GoldMine, 1=ManaSpring, 2=TechRelic</summary>
+        public int Type { get; set; } = 0;
+        /// <summary>Map X coordinate</summary>
+        public float X { get; set; }
+        /// <summary>Map Y coordinate</summary>
+        public float Y { get; set; }
+        /// <summary>Production rate: gold/sec for GoldMine, mana/sec for ManaSpring, research/sec for TechRelic</summary>
+        public float ProductionRate { get; set; } = 1f;
+        /// <summary>Max health (if destructible). 0 = indestructible.</summary>
+        public float MaxHealth { get; set; } = 0f;
+        /// <summary>Initial ownership: -1 = neutral, 0 = player 0</summary>
+        public int InitialOwner { get; set; } = -1;
+        /// <summary>Radius for enemy capture (enemies within this range start capturing)</summary>
+        public float CaptureRadius { get; set; } = 2f;
+    }
+
+    /// <summary>
+    /// Resource node type enumeration.
+    /// </summary>
+    public enum ResourceNodeTypeEnum
+    {
+        GoldMine = 0,
+        ManaSpring = 1,
+        TechRelic = 2
     }
 }

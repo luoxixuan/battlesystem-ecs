@@ -9,5 +9,29 @@
     { "WaveNumber": 3, "MonsterType": "Fast", "EnemyCount": 10 },
     { "WaveNumber": 4, "MonsterType": "Fast", "EnemyCount": 12 },
     { "WaveNumber": 5, "MonsterType": "Electric", "EnemyCount": 8 }
+  ],
+  "ResourceNodes": [
+    {
+      "Id": "gold_mine_1",
+      "Name": "Gold Mine",
+      "Type": 0,
+      "X": 5.0,
+      "Y": 5.0,
+      "ProductionRate": 2.0,
+      "MaxHealth": 50.0,
+      "InitialOwner": 0,
+      "CaptureRadius": 2.0
+    },
+    {
+      "Id": "mana_spring_1",
+      "Name": "Mana Spring",
+      "Type": 1,
+      "X": 5.0,
+      "Y": 15.0,
+      "ProductionRate": 1.5,
+      "MaxHealth": 30.0,
+      "InitialOwner": 0,
+      "CaptureRadius": 2.0
+    }
   ]
 }

@@ -101,6 +101,32 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         public int[] ObjectiveWaveScore = new int[MAX_PLAYERS];
         public float[] ObjectiveHealthScore = new float[MAX_PLAYERS];  // remaining health at game end
 
+        // ==================== Resource Node System 组件（SOA） ====================
+        // Fixed-size arrays for map resource nodes (gold mines, mana springs, etc.)
+        public const int MAX_RESOURCE_NODES = 50;
+        // Position
+        public float[] ResourceNodeX = new float[MAX_RESOURCE_NODES];
+        public float[] ResourceNodeY = new float[MAX_RESOURCE_NODES];
+        // Ownership: -1 = neutral, 0 = player 0, etc.
+        public int[] ResourceNodeOwner = new int[MAX_RESOURCE_NODES];
+        // Node type: 0=GoldMine, 1=ManaSpring, 2=TechRelic
+        public int[] ResourceNodeType = new int[MAX_RESOURCE_NODES];
+        // Is the node active (not destroyed)?
+        public bool[] ResourceNodeActive = new bool[MAX_RESOURCE_NODES];
+        // Production rate: gold/sec for GoldMine, mana/sec for ManaSpring
+        public float[] ResourceNodeProductionRate = new float[MAX_RESOURCE_NODES];
+        // Remaining health (for destructible nodes)
+        public float[] ResourceNodeHealth = new float[MAX_RESOURCE_NODES];
+        public float[] ResourceNodeMaxHealth = new float[MAX_RESOURCE_NODES];
+        // Accumulated resources (produced since last collection)
+        public float[] ResourceNodeAccumulated = new float[MAX_RESOURCE_NODES];
+        // Capture progress: -1 = full owner, 0..1 = being captured (higher = closer to owner)
+        public float[] ResourceNodeCaptureProgress = new float[MAX_RESOURCE_NODES];
+        // Active tower IDs on this node (0 = none)
+        public int[] ResourceNodeTowerId = new int[MAX_RESOURCE_NODES];
+        // Count of live nodes (maintained by ResourceNodeSystem)
+        public int ActiveResourceNodeCount = 0;
+
         // ==================== Time Dilation / Bullet Time 组件（SOA） ====================
         // GlobalTimeScale: per-player time scale multiplier (1.0 = normal, 0.5 = 50% speed, 0.3 = bullet time)
         // Applied at the start of FrameScheduler.Tick() to slow/fast all game systems.

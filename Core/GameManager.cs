@@ -50,6 +50,7 @@ namespace BattleSystemECS.Core
         private EnemyMorphSystem enemyMorphSystem;   // 敌人变形/进化系统
         private ObjectiveSystem objectiveSystem;      // 特殊目标/护送模式系统
         private WaveBranchSystem waveBranchSystem;   // 波次分支/玩家选择系统
+        private ResourceNodeSystem resourceNodeSystem; // 地图资源节点系统（金矿/法力泉/科技遗迹）
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -213,6 +214,10 @@ logger.Log("      ComboSystem created successfully!");
             };
             logger.Log("      WaveBranchSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating ResourceNodeSystem (map resource nodes)... ");
+            resourceNodeSystem = new ResourceNodeSystem(store, logger, playerId);
+            logger.Log("      ResourceNodeSystem created successfully!");
+
             logger.Log("[BOOTSTRAP]    - Creating TowerExperienceSystem (Tower XP & Mastery)... ");
             towerExperienceSystem = new TowerExperienceSystem(store, gameConfig);
             logger.Log("      TowerExperienceSystem created successfully!");
@@ -331,6 +336,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.EnemyMorph = enemyMorphSystem;
             scheduler.Objective = objectiveSystem;
             scheduler.WaveBranch = waveBranchSystem;
+            scheduler.ResourceNode = resourceNodeSystem;
 
             // 初始化地形网格（方向二：地图地块系统）
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)
@@ -453,6 +459,9 @@ logger.Log("      ComboSystem created successfully!");
 
                 // 初始化目标系统（特殊目标模式：Escort / Survival / Timed / Endless）
                 objectiveSystem.InitializeFromLevel(levelConfig, gameConfig.MapHeight);
+
+                // 初始化资源节点系统（地图资源节点：金矿/法力泉/科技遗迹）
+                resourceNodeSystem.InitializeFromLevel(levelConfig);
 
                 // ── Phase: BuildPhase ──────────────────────────────────────────
                 // Transition from Init → BuildPhase and show enter message
