@@ -240,8 +240,9 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // EnemyMoveSpeedBase: stores original speed for slow recovery
         public float[] EnemyMoveSpeedBase = new float[MAX_ENTITIES];
         // EnemySlowDurationLeft: tower-slow duration in turns. Separate from EnemyBuffDurationLeft
-        // which is used by buff_allies ability. This prevents double-decrement and cross-clearing.
         public float[] EnemySlowDurationLeft = new float[MAX_ENTITIES];
+        // EnemyKnockbackForceLeft: remaining knockback force applied this frame (decays to 0)
+        public float[] EnemyKnockbackForceLeft = new float[MAX_ENTITIES];
         // EnemyIsElite: true if this enemy was spawned as an elite ([ELITE] prefix in fullName).
         // Used by ResolveEnemiesKilledThisFrame to correctly award GoldOnEliteKill instead of
         // the broken EnemyTypeName == "Elite" check (EnemyTypeName stores base type names).
@@ -321,6 +322,8 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         public float[] EnemyFreezeResistance = new float[MAX_ENTITIES];
         // EnemySlowResistance: 0-1, reduces slow factor severity
         public float[] EnemySlowResistance = new float[MAX_ENTITIES];
+        // EnemyKnockbackResistance: 0-1, reduces knockback distance taken from towers
+        public float[] EnemyKnockbackResistance = new float[MAX_ENTITIES];
         // EnemyDamageResistance: 0-1, reduces all damage taken (applied in TowerAttackSystem and SkillSystem)
         public float[] EnemyDamageResistance = new float[MAX_ENTITIES];
 
@@ -409,6 +412,13 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         public float[] TowerSpecialAbilityDamageMult = new float[MAX_ENTITIES];
         public float[] TowerSpecialAbilityDotDamage = new float[MAX_ENTITIES];
         public float[] TowerSpecialAbilityDotInterval = new float[MAX_ENTITIES];
+
+        // ==================== 塔击退/位移效果 (Knockback) ====================
+        // TowerKnockbackForce: strength of knockback applied to enemies on hit (0 = no knockback)
+        // Positive values push enemies backward along the path direction
+        public float[] TowerKnockbackForce = new float[MAX_ENTITIES];
+        // TowerKnockbackRadius: radius within which knockback force is fully applied (beyond it, no effect)
+        public float[] TowerKnockbackRadius = new float[MAX_ENTITIES];
 
         // ==================== 塔散射/多重射击（Scatter / Multi-shot）====================
         // TowerProjectileCount: number of projectiles fired per attack (1 = single shot, >1 = scatter/multicast)
@@ -815,6 +825,7 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
                 EnemyTerrainMoveSpeedMult[entityId] = 1f;
                 EnemyMoveSpeedBase[entityId] = 0f;
                 EnemySlowDurationLeft[entityId] = 0f;
+                EnemyKnockbackForceLeft[entityId] = 0f;
                 EnemyIsElite[entityId] = false;
                 EnemyIsFlying[entityId] = false;
                 EnemyStealthMultiplier[entityId] = 1f;
@@ -838,6 +849,7 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
                 EnemyStunResistance[entityId] = 0f;
                 EnemyFreezeResistance[entityId] = 0f;
                 EnemySlowResistance[entityId] = 0f;
+                EnemyKnockbackResistance[entityId] = 0f;
                 EnemyDamageResistance[entityId] = 0f;
                 // Boss phase / enrage fields
                 EnemyBossPhase[entityId] = 0;
@@ -1206,6 +1218,9 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
             TowerOverchargeDuration[entityId] = 0f;
             TowerOverchargeCooldown[entityId] = 0f;
             TowerCanOvercharge[entityId] = false;
+            // Knockback fields: default to no knockback (0 force = no effect)
+            TowerKnockbackForce[entityId] = 0f;
+            TowerKnockbackRadius[entityId] = 0f;
             // Damage type and turn rate from config
             TowerDamageType[entityId] = damageType;
             TowerTurnRate[entityId] = turnRate;
@@ -1643,6 +1658,15 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
             if (baseSpeed > 0f)
                 EnemyMoveSpeed[enemyId] = baseSpeed;
             EnemySlowFactor[enemyId] = 0f;
+        }
+
+        /// <summary>Applies knockback force to an enemy. Force is applied instantly and consumed in ResolveKnockback.</summary>
+        public void ApplyEnemyKnockback(int enemyId, float force)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (force <= 0f) return;
+            // Add to existing force (in case multiple towers hit simultaneously)
+            EnemyKnockbackForceLeft[enemyId] += force;
         }
 
         /// <summary>

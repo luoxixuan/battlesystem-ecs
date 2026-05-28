@@ -63,6 +63,9 @@ namespace BattleSystemECS.Systems
         // Shared random for debuff chance rolls — uses Random.Shared (.NET 6+ thread-safe)
         private static readonly Random _rand = Random.Shared;
 
+        // Map width minus one (used for knockback bound clamping)
+        private readonly float _mapWidthMinusOne;
+
         // Ping-pong double-buffer for Tesla chain lightning damage events
         // Tuple: (chainId, enemyId, damage, playerId, towerId)
         //   - chainId=-1: non-chain basic damage (from default case chain upgrade)
@@ -93,11 +96,12 @@ namespace BattleSystemECS.Systems
         // Leech lifesteal rate: 30% of damage dealt is returned as player heal
         private const float LEECH_LIFESTEAL_RATE = 0.30f;
 
-        public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem = null)
+        public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem = null, int mapWidth = 10)
         {
             this.store = store;
             this.logger = logger;
             this.techTreeSystem = techTreeSystem;
+            this._mapWidthMinusOne = mapWidth - 1f;
             _damageQueue[0] = new List<(int, float, int, int)>(256);
             _damageQueue[1] = new List<(int, float, int, int)>(256);
             _debuffQueue[0] = new List<(int, int)>(256);
@@ -591,6 +595,13 @@ int bestTarget = -1;
                 float slowAmount = store.TowerSlowAmount[towerId];
                 float slowDuration = store.TowerSlowDuration[towerId];
 
+                // Apply knockback if tower has knockback force
+                float kbForce = store.TowerKnockbackForce[towerId];
+                if (kbForce > 0f)
+                {
+                    store.ApplyEnemyKnockback(enemyId, kbForce);
+                }
+
                 switch (towerType)
                 {
                     case "Firewall":
@@ -626,6 +637,9 @@ int bestTarget = -1;
 
             // Phase 3b (serial): decay armor shred duration (1 turn per frame)
             DecayArmorShredStacks();
+
+            // Phase 3c (serial): resolve tower knockback — push enemies backward
+            ResolveKnockback();
 
             // Reset bounce hit counter at end of attack resolution for all active towers
             foreach (var tid in store.ActiveTowerIds)
@@ -892,6 +906,41 @@ int bestTarget = -1;
             {
                 if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) continue;
                 store.DecreasePlayerHealth(playerId, thornsDamage);
+            }
+        }
+
+        /// <summary>
+        /// Phase 2f: resolve tower knockback — push enemies backward along the path.
+        /// Knockback moves the enemy toward y=max (retreat direction), opposite to normal movement.
+        /// Resistance is applied so high-resistance enemies take reduced knockback.
+        /// </summary>
+        private void ResolveKnockback()
+        {
+            var enemyIds = store.GetCachedActiveEnemyIds();
+            int count = enemyIds.Count;
+
+            for (int i = 0; i < count; i++)
+            {
+                int enemyId = enemyIds[i];
+                if (!store.EnemyActive[enemyId]) continue;
+
+                float kbForce = store.EnemyKnockbackForceLeft[enemyId];
+                if (kbForce <= 0f) continue;
+
+                // Apply resistance: effectiveForce = force * (1 - resistance)
+                float resist = store.EnemyKnockbackResistance[enemyId];
+                float effectiveForce = kbForce * (1f - resist);
+                if (effectiveForce <= 0f) continue;
+
+                // Push enemy backward (positive y direction = retreat = away from player)
+                float y = store.PositionY[enemyId];
+                float maxY = _mapWidthMinusOne; // same bound as EnemyMovementSystem
+                y += effectiveForce;
+                if (y > maxY) y = maxY;
+                store.PositionY[enemyId] = y;
+
+                // Decay knockback force by 1 per frame (single frame duration by default)
+                store.EnemyKnockbackForceLeft[enemyId] = 0f; // consume entire knockback this frame
             }
         }
 
