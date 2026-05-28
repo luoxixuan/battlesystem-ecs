@@ -148,6 +148,13 @@ namespace BattleSystemECS.Systems
                         store.TowerDemolishStunDuration[towerId] = tc.Demolish.DemolishStunDuration;
                         logger.Log($"[TOWER] {tc.Name} 牺牲效果: 半径 {tc.Demolish.DemolishRadius}, 伤害 {tc.Demolish.DemolishDamage}");
                     }
+                    // Apply income tower properties (passive gold generation)
+                    if (tc.IsIncomeTower)
+                    {
+                        store.TowerIsIncomeTower[towerId] = true;
+                        store.TowerGoldPerSecond[towerId] = tc.GoldPerSecond;
+                        logger.Log($"[TOWER] {tc.Name} 经济塔: 每秒 +{tc.GoldPerSecond} 金币");
+                    }
                 }
                 else
                 {

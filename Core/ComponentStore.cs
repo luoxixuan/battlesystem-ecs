@@ -528,6 +528,12 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // TowerSilenceSourceId: enemy entity ID that applied this silence (-1 = none/unknown)
         public int[] TowerSilenceSourceId = new int[MAX_ENTITIES];
 
+        // ==================== 塔被动资源生产（Income Tower）====================
+        // TowerIsIncomeTower: true if this tower generates gold passively instead of attacking
+        public bool[] TowerIsIncomeTower = new bool[MAX_ENTITIES];
+        // TowerGoldPerSecond: gold generated per second by this income tower
+        public float[] TowerGoldPerSecond = new float[MAX_ENTITIES];
+
         // ==================== 塔牺牲/自毁系统 (Tower Demolish) ====================
         // TowerDemolishEffectRadius: radius of demolish AoE effect in tiles (0 = no demolish)
         public float[] TowerDemolishEffectRadius = new float[MAX_ENTITIES];

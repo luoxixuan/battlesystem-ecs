@@ -271,6 +271,9 @@ namespace BattleSystemECS.Systems
                 // Silence check: skip if tower is silenced by enemy ability
                 if (store.TowerIsSilenced[towerId]) return;
 
+                // Income tower check: skip attack logic for income-generating towers
+                if (store.TowerIsIncomeTower[towerId]) return;
+
                 float tx = store.PositionX[towerId];
                 float ty = store.PositionY[towerId];
                 int range = store.TowerRange[towerId];

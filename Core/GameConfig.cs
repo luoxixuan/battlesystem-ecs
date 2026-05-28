@@ -102,6 +102,10 @@ namespace BattleSystemECS.Config
         public float PierceDmgFalloff { get; set; } = 1f;
         // Tower demolish (sacrifice): if non-null, tower can be detonated for AoE damage
         public TowerDemolishConfig Demolish { get; set; }
+        // Income tower: if true, tower generates gold passively instead of attacking
+        public bool IsIncomeTower { get; set; } = false;
+        // GoldPerSecond: gold generated per second (only meaningful if IsIncomeTower = true)
+        public float GoldPerSecond { get; set; } = 0f;
     }
 
     /// <summary>

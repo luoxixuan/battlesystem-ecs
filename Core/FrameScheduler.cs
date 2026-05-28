@@ -43,6 +43,7 @@ namespace BattleSystemECS.Core
         public AutoSkillSystem? AutoSkill { get; set; }
         public WeatherSystem? Weather { get; set; }
         public AuraTowerSystem? AuraTower { get; set; }
+        public TowerIncomeSystem? TowerIncome { get; set; }
         public PathfindingSystem? Pathfinding { get; set; }
         public ProjectileSystem? Projectile { get; set; }
         public TerrainSystem? Terrain { get; set; }
@@ -109,6 +110,7 @@ namespace BattleSystemECS.Core
             {
 // ── BuildPhase: tower placement/upgrade UI only ───────────
                 Gold?.Update();
+                TowerIncome?.Update(deltaTime); // income tower gold production (build phase runs every frame)
                 Upgrade?.Update();
                 Skill?.Update(deltaTime); // skill cooldown ticking
                 AutoSkill?.Update();      // auto-cast ready skills
@@ -220,11 +222,12 @@ namespace BattleSystemECS.Core
             // ── Phase 9.5: Enemy Fission — spawn children after death resolve ─────
             EnemyFission?.Update();
 
-            // ── Phase 9.6: Objective System — update objective state ─────────────
+// ── Phase 9.6: Objective System — update objective state ─────────────
             Objective?.Update(effectiveDelta, Phase);
             ResourceNode?.Update(effectiveDelta, Phase); // resource node production
+            TowerIncome?.Update(effectiveDelta);         // income tower gold production
 
-            // ── Phase 9.65: Corpse Effect System — tick ground effect durations and apply ─
+            // ── Phase 9.65: Corpse Effect System — tick ground effect durations and apply ──
             CorpseEffect?.Update(effectiveDelta);
 
             // ── Phase 9.7: Wave Branch — pause combat while player selects branch ──
