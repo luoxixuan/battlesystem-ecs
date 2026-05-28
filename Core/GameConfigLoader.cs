@@ -628,6 +628,8 @@ namespace BattleSystemECS.Config
             tower.Bounces = ExtractInt(json, "Bounces");
             tower.BounceRange = ExtractFloat(json, "BounceRange");
             tower.BounceDamageFalloff = ExtractFloat(json, "BounceDamageFalloff");
+            tower.PierceCount = ExtractInt(json, "PierceCount");
+            tower.PierceDmgFalloff = ExtractFloat(json, "PierceDmgFalloff");
             return tower;
         }
 

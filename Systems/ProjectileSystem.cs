@@ -27,6 +27,9 @@ namespace BattleSystemECS.Systems
         private bool[] _projActive = new bool[MAX_PROJ];
         // Homing flag: if true, projectile recalculates direction toward target each frame (turns mid-flight)
         private bool[] _projIsHoming = new bool[MAX_PROJ];
+        // Piercing: number of additional enemies this projectile can pierce through after the initial hit
+        private int[] _projPierceRemaining = new int[MAX_PROJ];
+        private float[] _projPierceDmgFalloff = new float[MAX_PROJ];
         private int _activeProjectileCount;
 
         // Ping-pong damage queue (same pattern as TowerAttackSystem)
@@ -50,7 +53,15 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Spawn a projectile from a tower toward a target enemy.
         /// </summary>
-        public void Fire(int towerId, int targetId, float damage, int playerId, float speed, bool isHoming = false)
+        /// <param name="towerId">Source tower ID</param>
+        /// <param name="targetId">Target enemy ID</param>
+        /// <param name="damage">Base damage</param>
+        /// <param name="playerId">Owning player</param>
+        /// <param name="speed">Projectile speed</param>
+        /// <param name="isHoming">Whether projectile tracks target mid-flight</param>
+        /// <param name="pierceCount">Number of enemies to pierce through (0 = no pierce)</param>
+        /// <param name="pierceDmgFalloff">Damage multiplier after each pierce (1.0 = full damage)</param>
+        public void Fire(int towerId, int targetId, float damage, int playerId, float speed, bool isHoming = false, int pierceCount = 0, float pierceDmgFalloff = 1f)
         {
             if (_activeProjectileCount >= MAX_PROJ) return;
 
@@ -70,6 +81,8 @@ namespace BattleSystemECS.Systems
             _projTowerId[projId] = towerId;
             _projSpeed[projId] = speed;
             _projIsHoming[projId] = isHoming;
+            _projPierceRemaining[projId] = pierceCount;
+            _projPierceDmgFalloff[projId] = pierceDmgFalloff;
             _projVelX[projId] = 0f;
             _projVelY[projId] = 0f;
             _projActive[projId] = true;
@@ -142,10 +155,75 @@ namespace BattleSystemECS.Systems
 
                 if (proximitySq <= hitThresholdSq)
                 {
-                    ResolveHit(i);
-                    _projActive[i] = false;
-                    _activeProjectileCount--;
-                    resolvedHits++;
+                    int pierceLeft = _projPierceRemaining[i];
+                    if (pierceLeft > 0)
+                    {
+                        // Piercing projectile: apply damage, then find next target along trajectory
+                        ResolveHit(i);
+                        // Decrement pierce counter
+                        _projPierceRemaining[i]--;
+
+                        // Find next target in roughly the same direction (forward cone)
+                        float projVelX = _projVelX[i];
+                        float projVelY = _projVelY[i];
+                        float vLenSq = projVelX * projVelX + projVelY * projVelY;
+                        int nextTargetId = -1;
+                        if (vLenSq > 0.001f)
+                        {
+                            float vLen = MathF.Sqrt(vLenSq);
+                            float dirX = projVelX / vLen;
+                            float dirY = projVelY / vLen;
+                            // Search all active enemies for one in the forward cone (dot product > 0)
+                            var enemyIds = store.GetCachedActiveEnemyIds();
+                            float bestDot = -1f;
+                            float projX = _projX[i];
+                            float projY = _projY[i];
+
+                            for (int eidx = 0; eidx < enemyIds.Count; eidx++)
+                            {
+                                int eid = enemyIds[eidx];
+                                if (eid == targetId || !store.EnemyActive[eid]) continue;
+                                float edx = store.PositionX[eid] - projX;
+                                float edy = store.PositionY[eid] - projY;
+                                float eDistSq = edx * edx + edy * edy;
+                                // Only consider enemies that are close enough (within 20 units)
+                                if (eDistSq > 400f) continue;
+                                float eDist = MathF.Sqrt(eDistSq);
+                                float eDirX = edx / eDist;
+                                float eDirY = edy / eDist;
+                                float dot = eDirX * dirX + eDirY * dirY;
+                                // Must be generally in front (dot > 0.5 = ~60 degree cone)
+                                if (dot > 0.5f && dot > bestDot)
+                                {
+                                    bestDot = dot;
+                                    nextTargetId = eid;
+                                }
+                            }
+                        }
+
+                        if (nextTargetId >= 0)
+                        {
+                            // Retarget to next enemy, apply damage falloff for subsequent hits
+                            float falloff = _projPierceDmgFalloff[i];
+                            _projDamage[i] *= falloff;
+                            _projTargetId[i] = nextTargetId;
+                            // Keep projectile active — it continues flying
+                        }
+                        else
+                        {
+                            // No valid next target — deactivate
+                            _projActive[i] = false;
+                            _activeProjectileCount--;
+                        }
+                    }
+                    else
+                    {
+                        // Non-piercing or pierce exhausted — normal hit, deactivate
+                        ResolveHit(i);
+                        _projActive[i] = false;
+                        _activeProjectileCount--;
+                        resolvedHits++;
+                    }
                 }
             }
 

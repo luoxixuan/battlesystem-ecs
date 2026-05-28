@@ -90,6 +90,10 @@ namespace BattleSystemECS.Config
         public float BounceRange { get; set; } = 0f;
         // BounceDamageFalloff: damage multiplier per bounce (1.0 = full damage, 0.7 = 70%)
         public float BounceDamageFalloff { get; set; } = 1f;
+        // Piercing projectile: number of enemies the projectile can pierce through (0 = no pierce)
+        public int PierceCount { get; set; } = 0;
+        // PierceDmgFalloff: damage multiplier after each pierce (1.0 = full damage, 0.7 = 70%)
+        public float PierceDmgFalloff { get; set; } = 1f;
     }
 
     /// <summary>

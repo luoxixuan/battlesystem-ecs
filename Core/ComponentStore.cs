@@ -436,6 +436,14 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         public float[] TowerBounceDamageFalloff = new float[MAX_ENTITIES];
         public int[] TowerBounceHitsRemaining = new int[MAX_ENTITIES];
 
+        // ==================== 塔穿透弹道系统（Piercing Projectile）====================
+        // TowerProjectilePierceCount: number of enemies the projectile can pierce through (0 = no pierce)
+        // TowerProjectilePierceDmgFalloff: damage multiplier after each pierce (1.0 = full damage, 0.7 = 70%)
+        // TowerPierceHitsRemaining: per-attack counter — tracks pierce consumed in current attack
+        public int[] TowerProjectilePierceCount = new int[MAX_ENTITIES];
+        public float[] TowerProjectilePierceDmgFalloff = new float[MAX_ENTITIES];
+        public int[] TowerPierceHitsRemaining = new int[MAX_ENTITIES];
+
         // ==================== 塔弹药系统（Ammo）====================
         // TowerCurrentAmmo: current ammo count (0 = empty)
         public int[] TowerCurrentAmmo = new int[MAX_ENTITIES];
@@ -1213,6 +1221,10 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
             TowerBounceRange[entityId] = 0f;
             TowerBounceDamageFalloff[entityId] = 1f;
             TowerBounceHitsRemaining[entityId] = 0;
+            // Piercing projectile fields: default to no pierce
+            TowerProjectilePierceCount[entityId] = 0;
+            TowerProjectilePierceDmgFalloff[entityId] = 1f;
+            TowerPierceHitsRemaining[entityId] = 0;
             // Overcharge fields: default to inactive (no overcharge, cooldown=0)
             TowerIsOvercharged[entityId] = false;
             TowerOverchargeDuration[entityId] = 0f;
