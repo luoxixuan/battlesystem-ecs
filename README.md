@@ -130,18 +130,7 @@ dotnet test
 
 ## Bug 追踪
 
-详见 `docs/bug-fix.md`。
-
-| 严重度 | 总数 | 已修复 | 未修复 |
-|--------|------|--------|--------|
-| HIGH   | 13   | 13     | 0      |
-| MEDIUM | 15   | 15     | 0      |
-| LOW    | 9    | 9      | 0      |
-| INFO   | 6    | 6      | 0      |
-| **合计** | **46** | **46** | **0** |
-
-> ⚠️ mode 4（真实系统链路 benchmark）才是主要性能指标，mode 2 是合并热路径，两者不再混淆。
-> ✅ 2026-05-13：PlayerAttack/TowerAttack damage queue 改为 damage 累加（`d707920`），死亡队列自清空（`7ef56aa`），EnemyAI 两阶段（`ccc42e3`）
+详见 [`docs/design-and-bugs.md`](docs/design-and-bugs.md)。所有 48 项 Bug 已全部修复。
 
 ---
 
