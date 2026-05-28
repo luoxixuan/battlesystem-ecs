@@ -42,6 +42,12 @@ namespace BattleSystemECS.Config
         public float Shield { get; set; } = 0f;
         // Boss: true if this monster type is a boss (participates in phase/enrage system).
         public bool IsBoss { get; set; } = false;
+        // IsThief: true if this enemy steals gold instead of damaging base (GoldStealing direction)
+        public bool IsThief { get; set; } = false;
+        // StealAmount: gold stolen when thief reaches player base
+        public float StealAmount { get; set; } = 0f;
+        // GoldOnReturn: bonus gold awarded when player kills thief after it escapes
+        public float GoldOnReturn { get; set; } = 0f;
         // Phases: ordered list of boss phase definitions (by threshold, descending).
         // Example: [{\"threshold\": 0.75, \"abilityId\": \"phase2_buff\"}, {\"threshold\": 0.50, \"abilityId\": \"enrage\"}]
         public List<BossPhaseDef> Phases { get; set; } = new List<BossPhaseDef>();
@@ -419,6 +425,21 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Defines a gold-stealing thief enemy type.
+    /// Thieves skip base damage and instead steal gold when reaching the end.
+    /// </summary>
+    public class ThiefDef
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        // Gold amount stolen when thief reaches the player's base
+        public float StealAmount { get; set; }
+        // Bonus gold awarded when player kills the thief after it escapes
+        public float GoldOnReturn { get; set; }
+    }
+
+    /// <summary>
     /// Defines a placeable obstacle type (wooden barricade, ice wall, spike trap).
     /// </summary>
     public class ObstacleDef
@@ -742,6 +763,9 @@ namespace BattleSystemECS.Config
         // Enemy fission definitions (loaded from enemy_fission.json)
         public FissionDef[] FissionDefs { get; set; } = Array.Empty<FissionDef>();
 
+        // Gold-stealing thief definitions (inline with monster configs)
+        public ThiefDef[] ThiefDefs { get; set; } = Array.Empty<ThiefDef>();
+
         // Look up a fission def by its FissionId
         public FissionDef GetFissionDef(string fissionId)
         {
@@ -758,6 +782,12 @@ namespace BattleSystemECS.Config
         public int GetFissionDefIdBySourceType(string monsterType)
         {
             return Array.FindIndex(FissionDefs, f => f.SourceMonsterType == monsterType);
+        }
+
+        // Look up a thief def by its Id
+        public ThiefDef GetThiefDef(string thiefId)
+        {
+            return ThiefDefs.FirstOrDefault(t => t.Id == thiefId);
         }
 
         // Enemy morph definitions (loaded from enemy_morphs.json)

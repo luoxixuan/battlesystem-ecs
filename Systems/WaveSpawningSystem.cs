@@ -350,6 +350,14 @@ namespace BattleSystemECS.Systems
                     store.EnemyIsMorphed[enemyId] = false;
                     store.EnemyMorphTriggered[enemyId] = false;
 
+                    // Initialize gold-stealing thief properties
+                    if (monsterConfig.IsThief)
+                    {
+                        store.EnemyCanStealGold[enemyId] = true;
+                        store.EnemyStealAmount[enemyId] = monsterConfig.StealAmount;
+                        store.EnemyGoldOnReturn[enemyId] = monsterConfig.GoldOnReturn;
+                    }
+
                     // Assign per-enemy affixes (1-3 random affixes from EnemyAffixSystem)
                     _enemyAffixSystem?.AssignAffixesAtSpawn(enemyId, scaledMaxHealth);
 

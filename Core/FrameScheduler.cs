@@ -57,6 +57,7 @@ namespace BattleSystemECS.Core
         public TowerDemolishSystem? Demolish { get; set; }
         public EnemyFissionSystem? EnemyFission { get; set; }
         public EnemyMorphSystem? EnemyMorph { get; set; }
+        public EnemyStealGoldSystem? StealGold { get; set; }
         public ObjectiveSystem? Objective { get; set; }
         public WaveBranchSystem? WaveBranch { get; set; }
         public ResourceNodeSystem? ResourceNode { get; set; }
@@ -156,6 +157,9 @@ namespace BattleSystemECS.Core
 
             // ── Phase 3.7: Enemy Morph — transform mid-wave enemies before combat ──
             EnemyMorph?.Update(effectiveDelta);
+
+            // ── Phase 3.8: Enemy Steal Gold — process thieves that reached the base ──
+            StealGold?.Update();
 
             // ── Phase 4: Combat — SetTurn ─────────────────────────────────
             PlayerTowerAttack?.SetTurn(turn);

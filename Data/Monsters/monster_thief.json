@@ -1,0 +1,19 @@
+{
+  "Name": "Swift Thief",
+  "Type": "Thief",
+  "Health": 20,
+  "MaxHealth": 20,
+  "Damage": 0,
+  "MoveSpeed": 0.8,
+  "AttackRange": 1,
+  "AttackInterval": 0.7,
+  "GoldReward": 8,
+  "Armor": 0,
+  "MagicResist": 0,
+  "Shield": 0,
+  "IsBoss": false,
+  "IsThief": true,
+  "StealAmount": 30,
+  "GoldOnReturn": 15,
+  "Skills": ["Normal Attack"]
+}

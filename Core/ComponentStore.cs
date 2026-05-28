@@ -44,7 +44,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Player damage type: 0=Physical, 1=Magic, 2=True. Drives which resistance enemies use.
         public int[] PlayerDamageType = new int[MAX_PLAYERS];
         public float[] PlayerGold = new float[MAX_PLAYERS];
-public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
+        public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // ==================== 法力/能量池资源系统 (Mana Pool) ====================
         // PlayerMana: current mana points for each player
         public float[] PlayerMana = new float[MAX_PLAYERS];
@@ -344,6 +344,18 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         public float[] EnemyVanguardDmgTransfer = new float[MAX_ENTITIES];
         // EnemyVanguardCoverCount: number of allies currently protected by this vanguard (computed each frame)
         public int[] EnemyVanguardCoverCount = new int[MAX_ENTITIES];
+
+        // ==================== 金币窃取敌人组件（SOA）====================
+        // EnemyCanStealGold: true if this enemy is a thief that steals gold instead of damaging base
+        public bool[] EnemyCanStealGold = new bool[MAX_ENTITIES];
+        // EnemyStealAmount: amount of gold this enemy steals when reaching the end
+        public float[] EnemyStealAmount = new float[MAX_ENTITIES];
+        // EnemyStolenGold: total gold this enemy has stolen (for tracking/debugging)
+        public float[] EnemyStolenGold = new float[MAX_ENTITIES];
+        // EnemyGoldOnReturn: bonus gold awarded when player kills a thief after it escapes
+        public float[] EnemyGoldOnReturn = new float[MAX_ENTITIES];
+        // EnemyHasStolenGold: set to true when thief escapes with stolen gold (skips gold reward on death)
+        public bool[] EnemyHasStolenGold = new bool[MAX_ENTITIES];
 
         // ==================== 敌人词缀组件（SOA）====================
         // EnemyAffixFlags: bit-mask of active affixes (see BuffType affix bits 16-22)
@@ -796,7 +808,21 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
             {
                 if (!EnemyActive[enemyId]) continue; // already destroyed this frame
                 TotalKills++;
-                float goldReward = EnemyGoldReward[enemyId] * _goldKillMultiplier * _allIncomeMultKill;
+
+                // Gold reward logic:
+                // - Thief that escaped (HasStolenGold): no gold reward, but if killed later -> GoldOnReturn bonus
+                // - Thief killed before escaping: normal gold reward (IsThief but HasStolenGold=false)
+                // - Normal enemy: normal gold reward
+                float goldReward;
+                if (EnemyHasStolenGold[enemyId])
+                {
+                    // Thief was caught AFTER escaping — award GoldOnReturn bonus instead of normal reward
+                    goldReward = EnemyGoldOnReturn[enemyId] * _goldKillMultiplier * _allIncomeMultKill;
+                }
+                else
+                {
+                    goldReward = EnemyGoldReward[enemyId] * _goldKillMultiplier * _allIncomeMultKill;
+                }
                 goldReward *= PlayerComboGoldMult[playerId];
                 PlayerGold[playerId] += goldReward;
                 if (_goldOnEliteKill > 0f && EnemyIsElite[enemyId])
@@ -1105,7 +1131,7 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         {
             if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
             return PlayerGold[playerId];
-        }
+}
 
         public float GetPlayerTotalGold(int playerId)
         {
@@ -1116,6 +1142,17 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         {
             if (playerId < 0 || playerId >= MAX_PLAYERS) return;
             PlayerGold[playerId] = gold;
+        }
+
+        /// <summary>
+        /// Remove gold from player (thief steal, penalty, etc.). Clamps to 0.
+        /// </summary>
+        public void LoseGold(int playerId, float amount)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS || amount <= 0f) return;
+            float current = PlayerGold[playerId];
+            float newGold = Math.Max(0f, current - amount);
+            PlayerGold[playerId] = newGold;
         }
 
         public int GetPlayerLevel(int playerId)
@@ -1223,6 +1260,12 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
             EnemyVanguardCoverRange[entityId] = 0f;
             EnemyVanguardDmgTransfer[entityId] = 0f;
             EnemyVanguardCoverCount[entityId] = 0;
+            // Thief: default not a gold thief
+            EnemyCanStealGold[entityId] = false;
+            EnemyStealAmount[entityId] = 0f;
+            EnemyStolenGold[entityId] = 0f;
+            EnemyGoldOnReturn[entityId] = 0f;
+            EnemyHasStolenGold[entityId] = false;
             // Teleport: default no cooldown (ready), no destination, type=0 (none)
             EnemyTeleportCooldown[entityId] = 0f;
             EnemyTeleportDestinationX[entityId] = 0f;
