@@ -994,6 +994,7 @@ namespace BattleSystemECS.Config
             skill.FreezeChance = ExtractFloat(json, "FreezeChance");
             skill.SlowAmount = ExtractFloat(json, "SlowAmount");
             skill.SlowDuration = ExtractFloat(json, "SlowDuration");
+            skill.ManaCost = ExtractFloat(json, "ManaCost");
             return skill;
         }
 

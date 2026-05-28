@@ -137,7 +137,7 @@ namespace BattleSystemECS.Systems
                 var def = new GameplayAbilityDef(
                     sc.Name,
                     sc.Description,
-                    sc.Cooldown, 0f,   // cooldown, cost
+                    sc.Cooldown, sc.ManaCost,   // cooldown, mana cost
                     -1, sc.DamageMultiplier > 0 ? sc.DamageMultiplier : 1f,  // fixed base damage multiplier
                     sc.AutoCast ? AbilityActivation.Passive : AbilityActivation.Instant,
                     AreaShapeType.FromString(sc.AreaShape),

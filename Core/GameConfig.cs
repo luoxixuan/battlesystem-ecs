@@ -532,6 +532,8 @@ namespace BattleSystemECS.Config
         // Slow fields (Slow Nova — move speed reduction AoE)
         public float SlowAmount { get; set; }
         public float SlowDuration { get; set; }
+        // Mana cost for casting this skill (0 = free)
+        public float ManaCost { get; set; }
     }
 
     public class BehaviorTreeDef
