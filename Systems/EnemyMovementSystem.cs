@@ -26,6 +26,8 @@ namespace BattleSystemECS.Systems
 
         // PathfindingSystem reference for waypoint-based movement
         private PathfindingSystem _pathfinding;
+        // WeatherSystem reference for dynamic weather effects
+        private WeatherSystem _weather;
 
         public EnemyMovementSystem(Core.ComponentStore store, int playerId, int mapWidth = 10)
         {
@@ -40,6 +42,14 @@ namespace BattleSystemECS.Systems
         public void SetPathfindingSystem(PathfindingSystem pathfinding)
         {
             _pathfinding = pathfinding;
+        }
+
+        /// <summary>
+        /// Inject WeatherSystem for dynamic weather effects on enemy movement.
+        /// </summary>
+        public void SetWeatherSystem(WeatherSystem weather)
+        {
+            _weather = weather;
         }
 
         public void SetTurn(int turn)
@@ -100,6 +110,9 @@ namespace BattleSystemECS.Systems
                 float moveSpeed = store.EnemyMoveSpeed[enemyId];
                 // Apply terrain move speed modifier (Mud/Ice slow)
                 moveSpeed *= store.EnemyTerrainMoveSpeedMult[enemyId];
+                // Apply weather move speed modifier (Rain/Fog/Storm slow)
+                if (_weather != null)
+                    moveSpeed *= _weather.GetEnemySpeedMultiplier(playerId);
 
                 // Enum-based action dispatch — O(1) per enemy, no string comparison
                 EnemyActionType actionEnum = store.GetEnemyActionEnum(enemyId);

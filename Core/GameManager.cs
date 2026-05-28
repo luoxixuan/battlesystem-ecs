@@ -51,6 +51,7 @@ namespace BattleSystemECS.Core
         private ObjectiveSystem objectiveSystem;      // 特殊目标/护送模式系统
         private WaveBranchSystem waveBranchSystem;   // 波次分支/玩家选择系统
         private ResourceNodeSystem resourceNodeSystem; // 地图资源节点系统（金矿/法力泉/科技遗迹）
+        private WeatherSystem weatherSystem;          // 天气系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -134,7 +135,7 @@ namespace BattleSystemECS.Core
 
             logger.Log("[BOOTSTRAP]    - Creating TowerAttackSystem...");
             towerAttackSystem = new TowerAttackSystem(store, logger, techTreeSystem);
-            logger.Log("[BOOTSTRAP]      TowerAttackSystem created successfully!");
+            logger.Log("      TowerAttackSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating TowerSynergySystem...");
             towerSynergySystem = new TowerSynergySystem(store, logger);
@@ -217,6 +218,12 @@ logger.Log("      ComboSystem created successfully!");
             logger.Log("[BOOTSTRAP]    - Creating ResourceNodeSystem (map resource nodes)... ");
             resourceNodeSystem = new ResourceNodeSystem(store, logger, playerId);
             logger.Log("      ResourceNodeSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating WeatherSystem (dynamic weather effects)... ");
+            weatherSystem = new WeatherSystem(store, gameConfig);
+            logger.Log("      WeatherSystem created successfully!");
+            enemyMovementSystem.SetWeatherSystem(weatherSystem);
+            towerAttackSystem.SetWeatherSystem(weatherSystem);
 
             logger.Log("[BOOTSTRAP]    - Creating TowerExperienceSystem (Tower XP & Mastery)... ");
             towerExperienceSystem = new TowerExperienceSystem(store, gameConfig);
@@ -339,6 +346,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.Objective = objectiveSystem;
             scheduler.WaveBranch = waveBranchSystem;
             scheduler.ResourceNode = resourceNodeSystem;
+            scheduler.Weather = weatherSystem;
 
             // 初始化地形网格（方向二：地图地块系统）
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)

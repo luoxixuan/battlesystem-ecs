@@ -19,6 +19,7 @@ namespace BattleSystemECS.Systems
         private BuffSystem buffSystem;
         private TowerExperienceSystem towerExperienceSystem;
         private ProjectileSystem projectileSystem;
+        private WeatherSystem _weatherSystem; // injected for weather effects
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate lists, pre-allocated in SetTurn
@@ -75,6 +76,10 @@ namespace BattleSystemECS.Systems
         private List<(int chainId, int enemyId, float damage, int playerId, int towerId)>[] _chainDamageQueue = new List<(int, int, float, int, int)>[2];
         private readonly object _chainDamageQueueLock = new object();
         private int _chainDamageQueueIdx = 0;
+
+        // Cached weather multipliers (updated each SetTurn from WeatherSystem)
+        private float _weatherRangeMult = 1f;
+        private float _weatherDamageMult = 1f;
 
         // Ping-pong double-buffer for splash damage events (from upgrade special abilities)
         private List<(int primaryEnemyId, float splashDamage, int playerId, int towerId)>[] _splashDamageQueue = new List<(int, float, int, int)>[2];
@@ -153,9 +158,29 @@ namespace BattleSystemECS.Systems
             this.projectileSystem = projectileSystem;
         }
 
+        /// <summary>
+        /// Inject WeatherSystem reference for dynamic weather effects on tower range and damage.
+        /// </summary>
+        public void SetWeatherSystem(WeatherSystem weather)
+        {
+            _weatherSystem = weather;
+        }
+
         public void SetTurn(int turn)
         {
             _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
+
+            // Cache weather multipliers (updated each turn)
+            if (_weatherSystem != null)
+            {
+                _weatherRangeMult = _weatherSystem.GetTowerRangeMultiplier(0);
+                _weatherDamageMult = _weatherSystem.GetTowerDamageMultiplier(0);
+            }
+            else
+            {
+                _weatherRangeMult = 1f;
+                _weatherDamageMult = 1f;
+            }
 
             // Cache armor stats from tech tree
             _armorPenetration = techTreeSystem != null ? techTreeSystem.GetArmorPenetration() : 0f;
@@ -250,7 +275,8 @@ namespace BattleSystemECS.Systems
                 // Spatial grid: query O(cells) instead of O(enemies) — reuse pre-allocated list
                 var candidates = _towerCandidates[ti];
                 candidates.Clear();
-                store.SpatialGrid.GetEnemiesInRange(store, tx, ty, range, candidates);
+                int effectiveRange = (int)(range * _weatherRangeMult);
+                store.SpatialGrid.GetEnemiesInRange(store, tx, ty, effectiveRange, candidates);
 
                 // Read tower targeting mode (0=Nearest, 1=Furthest, 2=LowestHealth, 3=HighestHealth, 4=FirstSpawned, 5=LastSpawned)
                 int targetingMode = store.TowerTargetingMode[towerId];
@@ -415,6 +441,9 @@ int bestTarget = -1;
                     // Apply tower synergy multiplier (e.g. bonus damage when combo towers are placed together)
                     float synergyMult = store.GetTowerSynergyMultiplier(towerId);
                     if (synergyMult > 1.0f) baseDmg *= synergyMult;
+
+                    // Apply weather damage multiplier (e.g. Storm gives towers +10% damage)
+                    if (_weatherDamageMult != 1f) baseDmg *= _weatherDamageMult;
 
                     // ── Tower type-specific mechanics ─────────────────────────────────────
                     string towerType = store.TowerType[towerId] ?? "Basic";
