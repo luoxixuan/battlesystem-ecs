@@ -67,6 +67,7 @@ namespace BattleSystemECS.Core
         public TowerLinkSystem? TowerLink { get; set; }
         public AdaptiveDifficultySystem? AdaptiveDifficulty { get; set; }
         public CorpseEffectSystem? CorpseEffect { get; set; }
+        public NestSystem? Nest { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -131,6 +132,10 @@ namespace BattleSystemECS.Core
 
             // ── Phase 1: 生成 ─────────────────────────────────────────────
             WaveSpawning?.Update();
+
+            // ── Phase 1.5: Nest / Spawner Structures ────────────────────
+            Nest?.SetTurn(turn);
+            Nest?.Update(effectiveDelta);
 
             // ── Phase 2: AI + Abilities ───────────────────────────────────
             EnemyAI?.SetTurn(turn, effectiveDelta);

@@ -372,6 +372,25 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Indexed by element ordinal (0-3), matches ElementType bit positions
         public float[] EnemyElementTimer = new float[MAX_ENTITIES * 4];
 
+        // ==================== 敌人产卵/巢穴组件（SOA）====================
+        // NestDefId: index into GameConfig.NestDefs for this entity (-1 = not a nest)
+        public int[] NestDefId = new int[MAX_ENTITIES];
+        // NestHealth / NestMaxHealth: health of the nest structure (separate from enemy HP)
+        public float[] NestHealth = new float[MAX_ENTITIES];
+        public float[] NestMaxHealth = new float[MAX_ENTITIES];
+        // NestSpawnTimer: countdown to next spawn (in seconds)
+        public float[] NestSpawnTimer = new float[MAX_ENTITIES];
+        // NestSpawnInterval: time between spawns for this nest
+        public float[] NestSpawnInterval = new float[MAX_ENTITIES];
+        // NestMonsterTypeStr: monster type string for the minion this nest spawns
+        public string[] NestMonsterTypeStr = new string[MAX_ENTITIES];
+        // NestMaxAlive: max minions alive from this nest simultaneously
+        public int[] NestMaxAlive = new int[MAX_ENTITIES];
+        // NestActiveCount: current number of alive minions from this nest
+        public int[] NestActiveCount = new int[MAX_ENTITIES];
+        // NestOriginId: parent nest entity ID for a minion (nestId for minions, -1 for nests themselves)
+        public int[] NestOriginId = new int[MAX_ENTITIES];
+
         // ==================== 敌人 AI 组件的 SOA 存储 ====================
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
         public int[] EnemyAIChargeCounter = new int[MAX_ENTITIES];
@@ -960,6 +979,16 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
                 EnemyFearDurationLeft[entityId] = 0f;
                 EnemyTauntTargetId[entityId] = -1;
                 EnemyCharmDurationLeft[entityId] = 0f;
+                // Nest / spawner fields
+                NestDefId[entityId] = -1;
+                NestHealth[entityId] = 0f;
+                NestMaxHealth[entityId] = 0f;
+                NestSpawnTimer[entityId] = 0f;
+                NestSpawnInterval[entityId] = 0f;
+                NestMonsterTypeStr[entityId] = null;
+                NestMaxAlive[entityId] = 0;
+                NestActiveCount[entityId] = 0;
+                NestOriginId[entityId] = -1;
                 // Path / waypoint fields
                 EnemyPathId[entityId] = -1;
                 EnemyPathNodeIndex[entityId] = 0;

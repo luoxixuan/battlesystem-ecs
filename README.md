@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-29, commit `b2eddc0`）
+## 性能基准（2026-05-29, commit `d0946f2`）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **~5129 FPS**，400 帧，~0.20 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10624 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5501 FPS** |
+| **mode 5**（完整一局） | **~5016 FPS**，400 帧，~0.20 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10653 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5302 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -135,7 +135,7 @@ dotnet test
 ---
 
 ## 更新记录
-
+- **2026-05-29**: 方向七：敌人产卵巢穴 Nest System（NestSystem.cs，NestDef配置类，NestHealth/SpawnTimer/ActiveCount等SOA组件，GameConfig.NestDefs，FrameScheduler Phase 1.5注入）（bench2: 10653, bench4: 5302, bench5: 5016）
 - **2026-05-29**: 自动基准更新（bench2: 10624, bench4: 5501, bench5: 5129）
 - **2026-05-29**: 方向九：塔被动资源生产 Tower Passive Resource Generation（TowerIsIncomeTower/TowerGoldPerSecond），TowerIncomeSystem，GameConfig.IsIncomeTower/GoldPerSecond，PlaceTower 配置读取，经济塔跳过攻击逻辑，BuildPhase+WavePhase 双阶段产金（bench2: 10033, bench4: 5294, bench5: 4831）
 - **2026-05-29**: 方向三：金币窃取敌人 Gold-Stealing Enemies（EnemyCanStealGold/StealAmount/StolenGold/HasStolenGold），ThiefDef 配置类，EnemyStealGoldSystem，ComponentStore.LoseGold()，小偷偷金币不扣血，击杀逃跑小偷奖励 GoldOnReturn（bench2: 10600, bench4: 5411, bench5: 4704）

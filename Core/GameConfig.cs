@@ -379,6 +379,29 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Enemy spawner nest structure definition — loaded from nests.json (referenced in level configs).
+    /// Nests are static structures that periodically spawn minions at their location.
+    /// Unlike WaveSpawning (time-based), nests produce continuously and can be destroyed.
+    /// </summary>
+    public class NestDef
+    {
+        public string Id { get; set; } = "";
+        // X/Y position on the map (in tiles)
+        public float X { get; set; }
+        public float Y { get; set; }
+        // Monster type to spawn (must match a MonsterConfig.Type)
+        public string MonsterType { get; set; } = "";
+        // Spawn interval in seconds
+        public float SpawnInterval { get; set; } = 5f;
+        // Maximum alive minions from this nest at any time
+        public int MaxAlive { get; set; } = 3;
+        // Nest health (can be destroyed by towers)
+        public float MaxHealth { get; set; } = 500f;
+        // Armor (reduces incoming damage from attacks)
+        public float Armor { get; set; } = 5f;
+    }
+
+    /// <summary>
     /// Enemy morph (transform mid-wave) definition — loaded from enemy_morphs.json.
     /// When a monster's health drops below a threshold (or time trigger fires), it transforms
     /// into a different monster type with scaled stats.
@@ -766,6 +789,9 @@ namespace BattleSystemECS.Config
 
         // Enemy fission definitions (loaded from enemy_fission.json)
         public FissionDef[] FissionDefs { get; set; } = Array.Empty<FissionDef>();
+
+        // Nest / spawner structure definitions (loaded from nests.json)
+        public NestDef[] NestDefs { get; set; } = Array.Empty<NestDef>();
 
         // Gold-stealing thief definitions (inline with monster configs)
         public ThiefDef[] ThiefDefs { get; set; } = Array.Empty<ThiefDef>();
