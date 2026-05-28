@@ -444,6 +444,14 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         public float[] TowerProjectilePierceDmgFalloff = new float[MAX_ENTITIES];
         public int[] TowerPierceHitsRemaining = new int[MAX_ENTITIES];
 
+        // ==================== 塔弹道分裂/子母弹系统（Projectile Fragmentation）====================
+        // TowerProjectileFragmentCount: number of child projectiles spawned on impact (0 = no fragmentation)
+        // TowerProjectileFragmentRange: search radius in tiles for finding fragment targets
+        // TowerProjectileFragmentDmgMult: damage multiplier for each fragment relative to parent projectile
+        public int[] TowerProjectileFragmentCount = new int[MAX_ENTITIES];
+        public float[] TowerProjectileFragmentRange = new float[MAX_ENTITIES];
+        public float[] TowerProjectileFragmentDmgMult = new float[MAX_ENTITIES];
+
         // ==================== 塔弹药系统（Ammo）====================
         // TowerCurrentAmmo: current ammo count (0 = empty)
         public int[] TowerCurrentAmmo = new int[MAX_ENTITIES];
@@ -1225,6 +1233,10 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
             TowerProjectilePierceCount[entityId] = 0;
             TowerProjectilePierceDmgFalloff[entityId] = 1f;
             TowerPierceHitsRemaining[entityId] = 0;
+            // Fragmentation/projectile split fields: default to no fragmentation
+            TowerProjectileFragmentCount[entityId] = 0;
+            TowerProjectileFragmentRange[entityId] = 0f;
+            TowerProjectileFragmentDmgMult[entityId] = 1f;
             // Overcharge fields: default to inactive (no overcharge, cooldown=0)
             TowerIsOvercharged[entityId] = false;
             TowerOverchargeDuration[entityId] = 0f;
@@ -1260,6 +1272,9 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
             TowerIsReloading[entityId] = false;
             TowerProjectileHoming[entityId] = false;
             TowerBouncesRemaining[entityId] = 0;
+            TowerProjectileFragmentCount[entityId] = 0;
+            TowerProjectileFragmentRange[entityId] = 0f;
+            TowerProjectileFragmentDmgMult[entityId] = 1f;
             TowerArmorShredBonus[entityId] = 0f;
             TowerShieldBreakBonus[entityId] = 0f;
             TowerDamageType[entityId] = 0;

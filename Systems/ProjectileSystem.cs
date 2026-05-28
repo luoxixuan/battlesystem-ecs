@@ -30,6 +30,10 @@ namespace BattleSystemECS.Systems
         // Piercing: number of additional enemies this projectile can pierce through after the initial hit
         private int[] _projPierceRemaining = new int[MAX_PROJ];
         private float[] _projPierceDmgFalloff = new float[MAX_PROJ];
+        // Fragmentation: number of child projectiles to spawn on impact (0 = no fragmentation)
+        private int[] _projFragmentCount = new int[MAX_PROJ];
+        private float[] _projFragmentRange = new float[MAX_PROJ];
+        private float[] _projFragmentDmgMult = new float[MAX_PROJ];
         private int _activeProjectileCount;
 
         // Ping-pong damage queue (same pattern as TowerAttackSystem)
@@ -61,7 +65,10 @@ namespace BattleSystemECS.Systems
         /// <param name="isHoming">Whether projectile tracks target mid-flight</param>
         /// <param name="pierceCount">Number of enemies to pierce through (0 = no pierce)</param>
         /// <param name="pierceDmgFalloff">Damage multiplier after each pierce (1.0 = full damage)</param>
-        public void Fire(int towerId, int targetId, float damage, int playerId, float speed, bool isHoming = false, int pierceCount = 0, float pierceDmgFalloff = 1f)
+        /// <param name="fragmentCount">Number of child projectiles to spawn on impact (0 = no fragmentation)</param>
+        /// <param name="fragmentRange">Search radius for fragment targets</param>
+        /// <param name="fragmentDmgMult">Damage multiplier for each fragment relative to parent</param>
+        public void Fire(int towerId, int targetId, float damage, int playerId, float speed, bool isHoming = false, int pierceCount = 0, float pierceDmgFalloff = 1f, int fragmentCount = 0, float fragmentRange = 0f, float fragmentDmgMult = 1f)
         {
             if (_activeProjectileCount >= MAX_PROJ) return;
 
@@ -83,6 +90,9 @@ namespace BattleSystemECS.Systems
             _projIsHoming[projId] = isHoming;
             _projPierceRemaining[projId] = pierceCount;
             _projPierceDmgFalloff[projId] = pierceDmgFalloff;
+            _projFragmentCount[projId] = fragmentCount;
+            _projFragmentRange[projId] = fragmentRange;
+            _projFragmentDmgMult[projId] = fragmentDmgMult;
             _projVelX[projId] = 0f;
             _projVelY[projId] = 0f;
             _projActive[projId] = true;
@@ -248,6 +258,7 @@ namespace BattleSystemECS.Systems
             int targetId = _projTargetId[projId];
             float damage = _projDamage[projId];
             int playerId = _projPlayerId[projId];
+            int towerId = _projTowerId[projId];
 
             // Thorns reflect: enemy reflects a fraction of projectile damage
             float thornsRatio = store.EnemyThornsRatio[targetId];
@@ -264,6 +275,109 @@ namespace BattleSystemECS.Systems
             {
                 _damageQueue[_damageQueueIdx].Add((targetId, damage, playerId));
             }
+
+            // Fragmentation: spawn child projectiles on impact
+            int fragCount = _projFragmentCount[projId];
+            if (fragCount > 0)
+            {
+                float fragRange = _projFragmentRange[projId];
+                float fragDmgMult = _projFragmentDmgMult[projId];
+                float projX = _projX[projId];
+                float projY = _projY[projId];
+                float speed = _projSpeed[projId];
+                bool isHoming = _projIsHoming[projId];
+                SpawnFragments(towerId, projX, projY, targetId, damage * fragDmgMult, playerId, speed, isHoming, fragCount, fragRange);
+            }
+        }
+
+        /// <summary>
+        /// Spawn N child projectiles in a fan pattern from the impact position, each targeting a nearby enemy.
+        /// </summary>
+        private void SpawnFragments(int towerId, float originX, float originY, int parentTargetId, float fragmentDamage, int playerId, float speed, bool isHoming, int fragCount, float fragRange)
+        {
+            var enemyIds = store.GetCachedActiveEnemyIds();
+            // Collect candidates within range
+            var candidates = new System.Collections.Generic.List<(int enemyId, float dx, float dy, float distSq)>(fragCount * 2);
+            float rangeSq = fragRange * fragRange;
+
+            for (int i = 0; i < enemyIds.Count; i++)
+            {
+                int eid = enemyIds[i];
+                if (eid == parentTargetId || !store.EnemyActive[eid]) continue;
+                float edx = store.PositionX[eid] - originX;
+                float edy = store.PositionY[eid] - originY;
+                float distSq = edx * edx + edy * edy;
+                if (distSq <= rangeSq)
+                {
+                    candidates.Add((eid, edx, edy, distSq));
+                }
+            }
+
+            if (candidates.Count == 0) return;
+
+            // Sort by distance (closest first)
+            candidates.Sort((a, b) => a.distSq.CompareTo(b.distSq));
+
+            int toSpawn = Math.Min(fragCount, candidates.Count);
+            float totalAngle = MathF.PI * 2f; // full circle fan
+            for (int i = 0; i < toSpawn; i++)
+            {
+                int eid = candidates[i].enemyId;
+                // Fan angle: distribute fragments evenly in a full circle
+                float angle = (totalAngle / toSpawn) * i;
+                float nx = MathF.Cos(angle);
+                float ny = MathF.Sin(angle);
+                // Target position = current position + direction * small offset (so fragment flies outward)
+                float targetX = originX + nx * 0.5f;
+                float targetY = originY + ny * 0.5f;
+                // Find approximate enemy to target for homing
+                FireAtPoint(towerId, eid, fragmentDamage, playerId, speed, isHoming, targetX, targetY);
+            }
+        }
+
+        /// <summary>
+        /// Fire a fragment projectile toward a fixed world position (used by fragmentation).
+        /// </summary>
+        private void FireAtPoint(int towerId, int targetId, float damage, int playerId, float speed, bool isHoming, float targetX, float targetY)
+        {
+            if (_activeProjectileCount >= MAX_PROJ) return;
+
+            int projId = -1;
+            for (int i = 0; i < MAX_PROJ; i++)
+            {
+                if (!_projActive[i]) { projId = i; break; }
+            }
+            if (projId < 0) return;
+
+            _projX[projId] = store.PositionX[towerId];
+            _projY[projId] = store.PositionY[towerId];
+            _projTargetId[projId] = targetId;
+            _projDamage[projId] = damage;
+            _projPlayerId[projId] = playerId;
+            _projTowerId[projId] = towerId;
+            _projSpeed[projId] = speed;
+            _projIsHoming[projId] = isHoming;
+            _projPierceRemaining[projId] = 0;
+            _projPierceDmgFalloff[projId] = 1f;
+            _projFragmentCount[projId] = 0;
+            _projFragmentRange[projId] = 0f;
+            _projFragmentDmgMult[projId] = 1f;
+
+            float dx = targetX - _projX[projId];
+            float dy = targetY - _projY[projId];
+            float dist = MathF.Sqrt(dx * dx + dy * dy);
+            if (dist > 0.01f)
+            {
+                _projVelX[projId] = (dx / dist) * speed;
+                _projVelY[projId] = (dy / dist) * speed;
+            }
+            else
+            {
+                _projVelX[projId] = 0f;
+                _projVelY[projId] = 0f;
+            }
+            _projActive[projId] = true;
+            _activeProjectileCount++;
         }
     }
 }

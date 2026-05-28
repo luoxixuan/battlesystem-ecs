@@ -289,6 +289,8 @@ logger.Log("      ComboSystem created successfully!");
             towerAttackSystem.SetBuffSystem(buffSystem);
             // Wire TowerExperienceSystem into TowerAttackSystem for XP grant on kills
             towerAttackSystem.SetTowerExperienceSystem(towerExperienceSystem);
+            // Wire ProjectileSystem into TowerAttackSystem for fragment projectile spawning
+            towerAttackSystem.SetProjectileSystem(projectileSystem);
 
             logger.Log("[BOOTSTRAP]    - Creating PlayerTowerAttackSystem...");
             playerTowerAttackSystem = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig, techTreeSystem);

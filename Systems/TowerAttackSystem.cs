@@ -18,6 +18,7 @@ namespace BattleSystemECS.Systems
         private TechTreeSystem techTreeSystem;
         private BuffSystem buffSystem;
         private TowerExperienceSystem towerExperienceSystem;
+        private ProjectileSystem projectileSystem;
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate lists, pre-allocated in SetTurn
@@ -93,6 +94,12 @@ namespace BattleSystemECS.Systems
         private readonly object _bounceDamageQueueLock = new object();
         private int _bounceDamageQueueIdx = 0;
 
+        // Fragment projectile events: collected parallel, fired serial via ProjectileSystem
+        // Tuple: (enemyId, damage, playerId, towerId, fragCount, fragRange)
+        private List<(int enemyId, float damage, int playerId, int towerId, int fragCount, float fragRange)>[] _fragmentQueue = new List<(int, float, int, int, int, float)>[2];
+        private readonly object _fragmentQueueLock = new object();
+        private int _fragmentQueueIdx = 0;
+
         // Leech lifesteal rate: 30% of damage dealt is returned as player heal
         private const float LEECH_LIFESTEAL_RATE = 0.30f;
 
@@ -118,6 +125,8 @@ namespace BattleSystemECS.Systems
             _towerKillQueue[1] = new List<(int, int, int)>(64);
             _bounceDamageQueue[0] = new List<(int, int, float, int, int)>(64);
             _bounceDamageQueue[1] = new List<(int, int, float, int, int)>(64);
+            _fragmentQueue[0] = new List<(int, float, int, int, int, float)>(64);
+            _fragmentQueue[1] = new List<(int, float, int, int, int, float)>(64);
         }
 
         /// <summary>
@@ -134,6 +143,14 @@ namespace BattleSystemECS.Systems
         public void SetTowerExperienceSystem(TowerExperienceSystem system)
         {
             this.towerExperienceSystem = system;
+        }
+
+        /// <summary>
+        /// Inject ProjectileSystem reference for fragment (split) projectile spawning.
+        /// </summary>
+        public void SetProjectileSystem(ProjectileSystem projectileSystem)
+        {
+            this.projectileSystem = projectileSystem;
         }
 
         public void SetTurn(int turn)
@@ -205,12 +222,14 @@ namespace BattleSystemECS.Systems
             var healBag = _healQueue[_healQueueIdx];
             var splashBag = _splashDamageQueue[_splashDamageQueueIdx];
             var bounceBag = _bounceDamageQueue[_bounceDamageQueueIdx];
+            var fragmentBag = _fragmentQueue[_fragmentQueueIdx];
             var damageLock = _damageQueueLock;
             var debuffLock = _debuffQueueLock;
             var chainLock = _chainDamageQueueLock;
             var healLock = _healQueueLock;
             var splashLock = _splashDamageQueueLock;
             var bounceLock = _bounceDamageQueueLock;
+            var fragmentLock = _fragmentQueueLock;
 
             Parallel.For(0, activeTowerIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, ti =>
             {
@@ -512,6 +531,14 @@ int bestTarget = -1;
                             {
                                 lock (chainLock) { chainBag.Add((0, bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             }
+                            // Fragmentation/projectile split: if fragmentCount > 0, queue fragment spawning on impact
+                            int fragCount = store.TowerProjectileFragmentCount[towerId];
+                            if (fragCount > 0 && projectileSystem != null)
+                            {
+                                float fragRange = store.TowerProjectileFragmentRange[towerId];
+                                float fragDmgMult = store.TowerProjectileFragmentDmgMult[towerId];
+                                lock (fragmentLock) { fragmentBag.Add((bestTarget, baseDmg * fragDmgMult, store.PlayerEntityId, towerId, fragCount, fragRange)); }
+                            }
                             // Bouncing projectile: if bounces > 0 and this isn't already a bounce hit
                             if (store.TowerBouncesRemaining[towerId] > 0 && store.TowerBounceHitsRemaining[towerId] == 0)
                             {
@@ -640,6 +667,9 @@ int bestTarget = -1;
 
             // Phase 3c (serial): resolve tower knockback — push enemies backward
             ResolveKnockback();
+
+            // Phase 3d (serial): resolve fragmentation projectiles — spawn child projectiles
+            ResolveFragmentProjectiles();
 
             // Reset bounce hit counter at end of attack resolution for all active towers
             foreach (var tid in store.ActiveTowerIds)
@@ -889,6 +919,76 @@ int bestTarget = -1;
                 float currentHealth = store.GetPlayerCurrentHealth(playerId);
                 float newHealth = Math.Min(currentHealth + healAmount, maxHealth);
                 store.SetPlayerCurrentHealth(playerId, newHealth);
+            }
+        }
+
+        /// <summary>
+        /// Phase 3d: resolve fragmentation projectiles — spawn child projectiles at impact position.
+        /// Each fragment targets a nearby enemy within the configured fragment range.
+        /// </summary>
+        private void ResolveFragmentProjectiles()
+        {
+            if (projectileSystem == null) return;
+
+            int readIdx = _fragmentQueueIdx;
+            int writeIdx = 1 - _fragmentQueueIdx;
+            _fragmentQueueIdx = writeIdx;
+            _fragmentQueue[writeIdx].Clear();
+
+            foreach (var (enemyId, damage, playerId, towerId, fragCount, fragRange) in _fragmentQueue[readIdx])
+            {
+                if (!store.EnemyActive[enemyId]) continue;
+                if (fragCount <= 0) continue;
+
+                float originX = store.PositionX[enemyId];
+                float originY = store.PositionY[enemyId];
+
+                var enemyIds = store.GetCachedActiveEnemyIds();
+                var candidates = new System.Collections.Generic.List<(int eid, float distSq)>(fragCount * 2);
+                float rangeSq = fragRange * fragRange;
+
+                for (int i = 0; i < enemyIds.Count; i++)
+                {
+                    int eid = enemyIds[i];
+                    if (eid == enemyId || !store.EnemyActive[eid]) continue;
+                    float edx = store.PositionX[eid] - originX;
+                    float edy = store.PositionY[eid] - originY;
+                    float distSq = edx * edx + edy * edy;
+                    if (distSq <= rangeSq)
+                    {
+                        candidates.Add((eid, distSq));
+                    }
+                }
+
+                if (candidates.Count == 0) continue;
+
+                candidates.Sort((a, b) => a.distSq.CompareTo(b.distSq));
+
+                int toSpawn = Math.Min(fragCount, candidates.Count);
+                float totalAngle = MathF.PI * 2f; // full circle fan spread
+                for (int i = 0; i < toSpawn; i++)
+                {
+                    int eid = candidates[i].eid;
+                    float angle = (totalAngle / toSpawn) * i;
+                    float nx = MathF.Cos(angle);
+                    float ny = MathF.Sin(angle);
+                    float targetX = originX + nx * 0.5f;
+                    float targetY = originY + ny * 0.5f;
+
+                    // Retrieve tower properties for the fragment projectile
+                    // Note: TowerProjectileSpeed uses a default of 10f if not configured
+                    float speed = 10f;
+                    bool isHoming = store.TowerProjectileHoming[towerId];
+                    int pierceCount = store.TowerProjectilePierceCount[towerId];
+                    float pierceFalloff = store.TowerProjectilePierceDmgFalloff[towerId];
+                    int towerFragCount = store.TowerProjectileFragmentCount[towerId];
+                    float towerFragRange = store.TowerProjectileFragmentRange[towerId];
+                    float towerFragDmgMult = store.TowerProjectileFragmentDmgMult[towerId];
+
+                    // Fire fragment projectile — uses homing to track the target enemy
+                    projectileSystem.Fire(towerId, eid, damage, playerId, speed, isHoming,
+                        pierceCount, pierceFalloff, towerFragCount, towerFragRange, towerFragDmgMult);
+                }
             }
         }
 
