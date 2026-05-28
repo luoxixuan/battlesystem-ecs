@@ -268,6 +268,9 @@ namespace BattleSystemECS.Systems
                 // Ammo check: skip targeting for towers that are reloading and empty
                 if (store.TowerMaxAmmo[towerId] > 0 && store.TowerCurrentAmmo[towerId] <= 0) return;
 
+                // Silence check: skip if tower is silenced by enemy ability
+                if (store.TowerIsSilenced[towerId]) return;
+
                 float tx = store.PositionX[towerId];
                 float ty = store.PositionY[towerId];
                 int range = store.TowerRange[towerId];

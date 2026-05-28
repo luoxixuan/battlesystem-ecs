@@ -490,6 +490,14 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // TowerAuraDamageBonus: damage multiplier bonus granted to towers in range (e.g. 0.15 = +15%)
         public float[] TowerAuraDamageBonus = new float[MAX_ENTITIES];
 
+        // ==================== 塔沉默/禁用系统 (Tower Silence) ====================
+        // TowerIsSilenced: true if this tower is currently silenced (cannot attack). Set by enemy abilities.
+        public bool[] TowerIsSilenced = new bool[MAX_ENTITIES];
+        // TowerSilenceTimer: remaining silence duration in turns (decremented each turn). 0 = not silenced.
+        public float[] TowerSilenceTimer = new float[MAX_ENTITIES];
+        // TowerSilenceSourceId: enemy entity ID that applied this silence (-1 = none/unknown)
+        public int[] TowerSilenceSourceId = new int[MAX_ENTITIES];
+
         // ==================== 塔旋转/瞄准延迟 (Turret Rotation & Turn Rate) ====================
         // TowerFacingAngle: current facing angle in radians (0 = East, PI/2 = North)
         public float[] TowerFacingAngle = new float[MAX_ENTITIES];

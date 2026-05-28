@@ -60,6 +60,7 @@ namespace BattleSystemECS.Core
         public WaveBranchSystem? WaveBranch { get; set; }
         public ResourceNodeSystem? ResourceNode { get; set; }
         public TelegraphSystem? Telegraph { get; set; }
+        public TowerSilenceSystem? TowerSilence { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -174,6 +175,7 @@ namespace BattleSystemECS.Core
             TowerAttack?.Update(effectiveDelta);
             TowerSynergy?.Update();
             AuraTower?.ResolveAuraBuffs();
+            TowerSilence?.Update(effectiveDelta);
             Projectile?.Update(effectiveDelta);
             // Update enemy projectiles (moves them toward player base)
             EnemyProjectile?.Update(effectiveDelta);

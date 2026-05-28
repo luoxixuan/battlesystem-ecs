@@ -274,6 +274,12 @@ namespace BattleSystemECS.Config
         public float TelegraphDuration { get; set; }
         // TelegraphColor: 0=red, 1=blue, 2=yellow (for renderer)
         public int TelegraphColor { get; set; }
+
+        // Silence tower fields (for silence_tower abilities)
+        // SilenceRadius: radius within which towers are silenced (-1 = not a silence ability)
+        public float SilenceRadius { get; set; }
+        // SilenceDuration: how many turns silenced towers cannot attack
+        public float SilenceDuration { get; set; }
     }
 
     /// <summary>

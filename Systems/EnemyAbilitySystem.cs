@@ -144,6 +144,9 @@ namespace BattleSystemECS.Systems
                 case "summon_minion":
                     ExecuteSummonMinion(enemyId, ability);
                     break;
+                case "silence_tower":
+                    ExecuteSilenceTower(enemyId, ability);
+                    break;
                 default:
                     // Unknown ability type — log and set cooldown to prevent infinite retry
                     logger.Log($"[ABILITY] Unknown ability type '{ability.AbilityType}' on enemy {enemyId}, ignoring");
@@ -371,6 +374,37 @@ namespace BattleSystemECS.Systems
             store.AddActiveEnemyId(minionId);
 
             logger.Log($"[ABILITY] Enemy {enemyId} summons minion {minionId} (HP: {baseHealth * healthMult:F0}, DMG: {baseDamage * damageMult:F0}) ({ability.Name})");
+        }
+
+        private void ExecuteSilenceTower(int enemyId, EnemyAbilityDef ability)
+        {
+            if (ability.SilenceRadius <= 0 || ability.SilenceDuration <= 0) return;
+
+            float enemyX = store.PositionX[enemyId];
+            float enemyY = store.PositionY[enemyId];
+
+            // Silence all towers within the specified radius
+            var activeTowerIds = store.ActiveTowerIds;
+            int silencedCount = 0;
+            for (int i = 0; i < activeTowerIds.Count; i++)
+            {
+                int towerId = activeTowerIds[i];
+                float tx = store.PositionX[towerId];
+                float ty = store.PositionY[towerId];
+                float dx = tx - enemyX;
+                float dy = ty - enemyY;
+                float dist = (float)Math.Sqrt(dx * dx + dy * dy);
+                if (dist <= ability.SilenceRadius)
+                {
+                    // Apply silence to this tower
+                    store.TowerIsSilenced[towerId] = true;
+                    store.TowerSilenceTimer[towerId] = ability.SilenceDuration;
+                    store.TowerSilenceSourceId[towerId] = enemyId;
+                    silencedCount++;
+                }
+            }
+
+            logger.Log($"[ABILITY] Enemy {enemyId} silences {silencedCount} towers for {ability.SilenceDuration:F0} turns (radius={ability.SilenceRadius:F1}) ({ability.Name})");
         }
 
         /// <summary>
