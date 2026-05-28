@@ -135,6 +135,19 @@ namespace BattleSystemECS.Systems
                         ApplyTowerSpecialAbility(store, towerId, tc.SpecialAbility);
                         logger.Log($"[TOWER] {tc.Name} 固有能力: {tc.SpecialAbility.AbilityType}");
                     }
+                    // Apply demolish config if tower supports sacrifice
+                    if (tc.Demolish != null)
+                    {
+                        store.TowerDemolishEffectRadius[towerId] = tc.Demolish.DemolishRadius;
+                        store.TowerDemolishDamage[towerId] = tc.Demolish.DemolishDamage;
+                        store.TowerDemolishEffectType[towerId] = tc.Demolish.DemolishEffectType;
+                        store.TowerDemolishDotDamage[towerId] = tc.Demolish.DemolishDotDamagePerTick;
+                        store.TowerDemolishDotDuration[towerId] = tc.Demolish.DemolishDotDuration;
+                        store.TowerDemolishDotInterval[towerId] = tc.Demolish.DemolishDotInterval > 0f
+                            ? tc.Demolish.DemolishDotInterval : 1f;
+                        store.TowerDemolishStunDuration[towerId] = tc.Demolish.DemolishStunDuration;
+                        logger.Log($"[TOWER] {tc.Name} 牺牲效果: 半径 {tc.Demolish.DemolishRadius}, 伤害 {tc.Demolish.DemolishDamage}");
+                    }
                 }
                 else
                 {
@@ -205,6 +218,35 @@ namespace BattleSystemECS.Systems
 
             logger.Log($"[TOWER] 出售塔 #{towerId} (Lv.{level})，返还 {goldInt} 金币");
             return sellGold;
+        }
+
+        /// <summary>
+        /// Demolish (sacrifice) a tower, triggering its AoE demolish effect.
+        /// The tower is permanently destroyed with no gold refund.
+        /// The demolish effect is processed by TowerDemolishSystem.
+        /// </summary>
+        /// <returns>True if demolish was triggered, false if the tower cannot be demolished.</returns>
+        public bool DemolishTower(int towerId)
+        {
+            if (towerId < 0 || towerId >= ComponentStore.MAX_ENTITIES || !store.TowerActive[towerId])
+            {
+                logger.Log($"[TOWER] 拆除失败: 实体 {towerId} 不是激活的防御塔");
+                return false;
+            }
+
+            float radius = store.TowerDemolishEffectRadius[towerId];
+            if (radius <= 0f)
+            {
+                logger.Log($"[TOWER] 拆除失败: 塔 #{towerId} 没有可拆卸的 AoE 效果");
+                return false;
+            }
+
+            // Mark tower for demolish — consumed by TowerDemolishSystem.Update()
+            store.TowerIsMarkedForDemolish[towerId] = true;
+            int level = store.TowerLevel[towerId];
+            logger.Log($"[TOWER] 拆除塔 #{towerId} (Lv.{level})，AoE 半径 {radius}");
+
+            return true;
         }
 
         /// <summary>

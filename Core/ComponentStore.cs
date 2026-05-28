@@ -516,6 +516,24 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // TowerSilenceSourceId: enemy entity ID that applied this silence (-1 = none/unknown)
         public int[] TowerSilenceSourceId = new int[MAX_ENTITIES];
 
+        // ==================== 塔牺牲/自毁系统 (Tower Demolish) ====================
+        // TowerDemolishEffectRadius: radius of demolish AoE effect in tiles (0 = no demolish)
+        public float[] TowerDemolishEffectRadius = new float[MAX_ENTITIES];
+        // TowerDemolishDamage: raw damage dealt by demolish explosion
+        public float[] TowerDemolishDamage = new float[MAX_ENTITIES];
+        // TowerDemolishEffectType: 0=None, 1=Fire, 2=Ice, 3=Lightning, 4=Poison, 5=Arcane
+        public int[] TowerDemolishEffectType = new int[MAX_ENTITIES];
+        // TowerIsMarkedForDemolish: true when player triggers demolish (consumed this frame)
+        public bool[] TowerIsMarkedForDemolish = new bool[MAX_ENTITIES];
+        // TowerDemolishDotDamage: DoT damage per tick for fire/poison demolish
+        public float[] TowerDemolishDotDamage = new float[MAX_ENTITIES];
+        // TowerDemolishDotDuration: total duration of the demolish DoT in seconds
+        public float[] TowerDemolishDotDuration = new float[MAX_ENTITIES];
+        // TowerDemolishDotInterval: interval between DoT ticks in seconds
+        public float[] TowerDemolishDotInterval = new float[MAX_ENTITIES];
+        // TowerDemolishStunDuration: stun duration for ice/lightning demolish (turns)
+        public int[] TowerDemolishStunDuration = new int[MAX_ENTITIES];
+
         // ==================== 塔联动/组合攻击 (Tower Link Combo) ====================
         // TowerLinkPartnerId: the tower ID of the partner tower in an active link combo (-1 = none)
         public int[] TowerLinkPartnerId = new int[MAX_ENTITIES];

@@ -633,7 +633,31 @@ namespace BattleSystemECS.Config
             tower.BounceDamageFalloff = ExtractFloat(json, "BounceDamageFalloff");
             tower.PierceCount = ExtractInt(json, "PierceCount");
             tower.PierceDmgFalloff = ExtractFloat(json, "PierceDmgFalloff");
+            tower.Demolish = ParseTowerDemolishConfig(json);
             return tower;
+        }
+
+        private static TowerDemolishConfig ParseTowerDemolishConfig(string json)
+        {
+            string key = "\"Demolish\"";
+            int idx = json.IndexOf(key);
+            if (idx < 0) return null;
+
+            int braceStart = json.IndexOf('{', idx);
+            if (braceStart < 0) return null;
+            int braceEnd = FindMatchingBrace(json, braceStart);
+            if (braceEnd < 0) return null;
+
+            string subJson = json.Substring(braceStart, braceEnd - braceStart + 1);
+            var cfg = new TowerDemolishConfig();
+            cfg.DemolishRadius = ExtractFloat(subJson, "DemolishRadius");
+            cfg.DemolishDamage = ExtractFloat(subJson, "DemolishDamage");
+            cfg.DemolishEffectType = ExtractInt(subJson, "DemolishEffectType");
+            cfg.DemolishDotDamagePerTick = ExtractFloat(subJson, "DemolishDotDamagePerTick");
+            cfg.DemolishDotDuration = ExtractFloat(subJson, "DemolishDotDuration");
+            cfg.DemolishDotInterval = ExtractFloat(subJson, "DemolishDotInterval");
+            cfg.DemolishStunDuration = ExtractInt(subJson, "DemolishStunDuration");
+            return cfg;
         }
 
         private static TowerSpecialAbility ParseTowerSpecialAbility(string json)

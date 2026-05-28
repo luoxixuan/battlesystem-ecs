@@ -54,6 +54,7 @@ namespace BattleSystemECS.Core
         public EnemyProjectileSystem? EnemyProjectile { get; set; }
         public PointDefenseSystem? PointDefense { get; set; }
         public TowerOverchargeSystem? TowerOvercharge { get; set; }
+        public TowerDemolishSystem? Demolish { get; set; }
         public EnemyFissionSystem? EnemyFission { get; set; }
         public EnemyMorphSystem? EnemyMorph { get; set; }
         public ObjectiveSystem? Objective { get; set; }
@@ -179,6 +180,9 @@ namespace BattleSystemECS.Core
             // ── Phase 6: Combat — Update ──────────────────────────────────
             PlayerTowerAttack?.Update();
             TowerOvercharge?.Update(effectiveDelta);
+            // TowerDemolish: process any towers marked for sacrifice this frame
+            // Runs before TowerAttack so demolish damage is resolved before regular attacks
+            Demolish?.Update();
             TowerAttack?.Update(effectiveDelta);
             TowerSynergy?.Update();
             TowerLink?.Update();

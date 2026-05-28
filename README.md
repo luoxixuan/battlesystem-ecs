@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-28, commit `a19ab00`）
+## 性能基准（2026-05-29, commit `7d3a5f1`）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **~4809 FPS**，400 帧，~0.21 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~9265 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5058 FPS** |
+| **mode 5**（完整一局） | **~5121 FPS**，400 帧，~0.20 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10642 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5509 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -136,6 +136,7 @@ dotnet test
 
 ## 更新记录
 
+- **2026-05-29**: 方向六：塔牺牲/自毁效果 Tower Demolish（AoE 拆除，Fire/Ice/Lightning/Poison/Arcane 五种效果类型），TowerDemolishSystem，DemolishTower() 入口（bench2: 10642, bench4: 5509, bench5: 5121）✅
 - **2026-05-28**: 方向八：肉盾/前锋敌人 Vanguard（EnemyIsVanguard/EnemyVanguardCoverRange/EnemyVanguardDmgTransfer），TowerAttackSystem 伤害结算时检测并转移伤害（bench2: 9265, bench4: 5058, bench5: 4809）
 - **2026-05-28**: 自动基准更新（bench2: 10735, bench4: 5046, bench5: 4096）⚠️ mode 4/5 显著下降，疑似新增方向系统引入开销
 - **2026-05-28**: mode 5（完整一局压测）上线 — 5 关全通 400 帧 6520 FPS

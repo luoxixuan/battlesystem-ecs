@@ -94,6 +94,8 @@ namespace BattleSystemECS.Config
         public int PierceCount { get; set; } = 0;
         // PierceDmgFalloff: damage multiplier after each pierce (1.0 = full damage, 0.7 = 70%)
         public float PierceDmgFalloff { get; set; } = 1f;
+        // Tower demolish (sacrifice): if non-null, tower can be detonated for AoE damage
+        public TowerDemolishConfig Demolish { get; set; }
     }
 
     /// <summary>
@@ -127,8 +129,34 @@ namespace BattleSystemECS.Config
         public int SlowDuration { get; set; } = 0;
         /// <summary>AOE falloff inner radius ratio (0.5 = inner 50% at full damage, default 1.0)</summary>
         public float FalloffInnerRatio { get; set; } = 1.0f;
-        /// <summary>AOE falloff outer damage multiplier (0.5 = outer 50% damage, default 1.0)</summary>
-        public float FalloffOuterMult { get; set; } = 1.0f;
+/// <summary>AOE falloff outer damage multiplier (0.5 = outer 50% damage, default 1.0)</summary>
+        public float FalloffOuterMult { get; set; } = 1f;
+    }
+
+    /// <summary>
+    /// Tower demolish (sacrifice) configuration — when triggered, the tower
+    /// detonates with a powerful AoE effect and is permanently destroyed.
+    /// </summary>
+    public class TowerDemolishConfig
+    {
+        /// <summary>Radius of the demolish AoE explosion in tiles.</summary>
+        public float DemolishRadius { get; set; } = 0f;
+        /// <summary>Raw damage dealt to all enemies in the AoE radius.</summary>
+        public float DemolishDamage { get; set; } = 0f;
+        /// <summary>
+        /// Effect type: 0=None, 1=Fire, 2=Ice, 3=Lightning, 4=Poison, 5=Arcane.
+        /// Fire applies burning DoT, Ice applies freeze stun, Lightning applies stun,
+        /// Poison applies poison DoT, Arcane applies no extra CC.
+        /// </summary>
+        public int DemolishEffectType { get; set; } = 0;
+        /// <summary>DoT damage per tick for fire/poison demolish effects.</summary>
+        public float DemolishDotDamagePerTick { get; set; } = 0f;
+        /// <summary>Total duration of the DoT effect in seconds.</summary>
+        public float DemolishDotDuration { get; set; } = 0f;
+        /// <summary>DoT tick interval in seconds.</summary>
+        public float DemolishDotInterval { get; set; } = 1f;
+        /// <summary>Stun duration in turns for ice/lightning demolish effects (0 = no stun).</summary>
+        public int DemolishStunDuration { get; set; } = 0;
     }
 
     public class EnemyTypeEntry
