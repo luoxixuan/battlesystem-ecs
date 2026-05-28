@@ -575,6 +575,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
                         if (store.EnemyActive[eid] && store.PositionY[eid] <= 0f)
                         {
                             store.DecrementPlayerBaseLives(playerId);
+                            store.EnemiesLeakedThisWave[playerId]++; // track leak for adaptive difficulty
                             store.QueueEnemyDeath(eid, playerId);
                             if (store.GetPlayerBaseLives(playerId) <= 0)
                             {

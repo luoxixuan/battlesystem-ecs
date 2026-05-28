@@ -92,6 +92,12 @@ namespace BattleSystemECS.Systems
             _ascensionSystem = ascensionSystem;
         }
 
+        private AdaptiveDifficultySystem _adaptiveDifficulty;
+        public void SetAdaptiveDifficulty(AdaptiveDifficultySystem adaptiveDifficulty)
+        {
+            _adaptiveDifficulty = adaptiveDifficulty;
+        }
+
         private WaveSpawnConfig LoadWaveSpawnConfig()
         {
             const string configPath = "Data/Configs/wave_spawn.json";
@@ -298,6 +304,17 @@ namespace BattleSystemECS.Systems
                     float scaledMagicResist = monsterConfig.MagicResist * armorMult;
                     float scaledSpeed = monsterConfig.MoveSpeed * speedMult;
 
+                    // ── 动态难度缩放（Adaptive Difficulty）──
+                    // Apply adaptive difficulty multiplier to enemy stats
+                    if (_adaptiveDifficulty != null)
+                    {
+                        float adaptMult = _adaptiveDifficulty.GetDifficultyMult(0); // player 0
+                        scaledHealth *= adaptMult;
+                        scaledMaxHealth *= adaptMult;
+                        scaledDamage *= adaptMult;
+                        scaledSpeed *= adaptMult; // speed scales slightly
+                    }
+
                     string enemyName = $"{monsterType}L{currentLevel}W{currentWave}T{_multiTypeIndex}E{_multiSpawnedForType}";
                     if (isBossWave) enemyName = "[BOSS] " + enemyName;
                     else if (isEliteWave) enemyName = "[ELITE] " + enemyName;
@@ -373,6 +390,10 @@ namespace BattleSystemECS.Systems
                 ClearMultiTypeState();
                 enemiesSpawnedInWave = 0;
                 currentWave++;
+
+                // Trigger adaptive difficulty evaluation (before OnWaveComplete so new difficulty is ready for next wave)
+                _adaptiveDifficulty?.OnWaveComplete(0); // player 0
+
                 OnWaveComplete?.Invoke();
 
                 if (currentWave > levelConfig.Waves.Count)

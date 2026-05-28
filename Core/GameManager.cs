@@ -53,6 +53,7 @@ namespace BattleSystemECS.Core
         private ResourceNodeSystem resourceNodeSystem; // 地图资源节点系统（金矿/法力泉/科技遗迹）
         private WeatherSystem weatherSystem;          // 天气系统
         private TelegraphSystem telegraphSystem;     // 弹道预警区域系统
+        private AdaptiveDifficultySystem adaptiveDifficultySystem; // 动态难度系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -232,6 +233,12 @@ logger.Log("      ComboSystem created successfully!");
             // Wire TelegraphSystem into EnemyAbilitySystem for warning zone queuing
             enemyAbilitySystem.SetTelegraphSystem(telegraphSystem);
 
+            logger.Log("[BOOTSTRAP]    - Creating AdaptiveDifficultySystem (dynamic difficulty scaling)... ");
+            adaptiveDifficultySystem = new AdaptiveDifficultySystem(store, gameConfig);
+            logger.Log("      AdaptiveDifficultySystem created successfully!");
+            // Wire into WaveSpawningSystem and scheduler
+            waveSpawningSystem.SetAdaptiveDifficulty(adaptiveDifficultySystem);
+
             logger.Log("[BOOTSTRAP]    - Creating TowerExperienceSystem (Tower XP & Mastery)... ");
             towerExperienceSystem = new TowerExperienceSystem(store, gameConfig);
             logger.Log("      TowerExperienceSystem created successfully!");
@@ -355,6 +362,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.ResourceNode = resourceNodeSystem;
             scheduler.Weather = weatherSystem;
             scheduler.Telegraph = telegraphSystem;
+            scheduler.AdaptiveDifficulty = adaptiveDifficultySystem;
 
             // 初始化地形网格（方向二：地图地块系统）
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)

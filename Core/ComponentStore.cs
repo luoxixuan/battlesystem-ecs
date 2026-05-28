@@ -101,6 +101,14 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         public int[] ObjectiveWaveScore = new int[MAX_PLAYERS];
         public float[] ObjectiveHealthScore = new float[MAX_PLAYERS];  // remaining health at game end
 
+        // ==================== Adaptive Difficulty System 组件（SOA） ====================
+        // EnemiesLeakedThisWave: track leaks during current wave (used to compute difficulty adjustment)
+        public int[] EnemiesLeakedThisWave = new int[MAX_PLAYERS];
+        // AdaptiveDifficultyLevel: difficulty multiplier applied to enemy health/damage/speed (1.0 = normal, >1 = harder)
+        public float[] AdaptiveDifficultyLevel = new float[MAX_PLAYERS];
+        // AdaptiveDifficultyScore: cumulative performance score (higher = better player performance)
+        public float[] AdaptiveDifficultyScore = new float[MAX_PLAYERS];
+
         // ==================== Resource Node System 组件（SOA） ====================
         // Fixed-size arrays for map resource nodes (gold mines, mana springs, etc.)
         public const int MAX_RESOURCE_NODES = 50;
@@ -789,6 +797,9 @@ public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
                 GlobalTimeScaleDuration[i] = 0f;
                 PlayerBankedGold[i] = 0f;
                 PlayerInterestRate[i] = 0.05f; // default 5% interest per wave
+                EnemiesLeakedThisWave[i] = 0;
+                AdaptiveDifficultyLevel[i] = 1.0f;
+                AdaptiveDifficultyScore[i] = 0f;
             }
         }
 

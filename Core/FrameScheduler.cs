@@ -62,6 +62,7 @@ namespace BattleSystemECS.Core
         public TelegraphSystem? Telegraph { get; set; }
         public TowerSilenceSystem? TowerSilence { get; set; }
         public TowerLinkSystem? TowerLink { get; set; }
+        public AdaptiveDifficultySystem? AdaptiveDifficulty { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -119,6 +120,9 @@ namespace BattleSystemECS.Core
 
             // ── Phase 0.5: Weather update (before combat) ───────────────────
             Weather?.Update(effectiveDelta);
+
+            // ── Phase 0.6: Adaptive Difficulty update ───────────────────────
+            AdaptiveDifficulty?.Update(effectiveDelta);
 
             // ── Phase 1: 生成 ─────────────────────────────────────────────
             WaveSpawning?.Update();
