@@ -59,6 +59,7 @@ namespace BattleSystemECS.Core
         public ObjectiveSystem? Objective { get; set; }
         public WaveBranchSystem? WaveBranch { get; set; }
         public ResourceNodeSystem? ResourceNode { get; set; }
+        public TelegraphSystem? Telegraph { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -163,6 +164,9 @@ namespace BattleSystemECS.Core
             // ── Phase 5.5: Point Defense — intercept enemy projectiles before they hit ──
             PointDefense?.SetTurn(turn);
             PointDefense?.Update(effectiveDelta);
+
+            // ── Phase 5.6: Telegraph System — update warning zones countdown ──
+            Telegraph?.Update(effectiveDelta);
 
             // ── Phase 6: Combat — Update ──────────────────────────────────
             PlayerTowerAttack?.Update();

@@ -52,6 +52,7 @@ namespace BattleSystemECS.Core
         private WaveBranchSystem waveBranchSystem;   // 波次分支/玩家选择系统
         private ResourceNodeSystem resourceNodeSystem; // 地图资源节点系统（金矿/法力泉/科技遗迹）
         private WeatherSystem weatherSystem;          // 天气系统
+        private TelegraphSystem telegraphSystem;     // 弹道预警区域系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -225,6 +226,12 @@ logger.Log("      ComboSystem created successfully!");
             enemyMovementSystem.SetWeatherSystem(weatherSystem);
             towerAttackSystem.SetWeatherSystem(weatherSystem);
 
+            logger.Log("[BOOTSTRAP]    - Creating TelegraphSystem (warning zones for AoE abilities)... ");
+            telegraphSystem = new TelegraphSystem(store, logger, gameConfig);
+            logger.Log("      TelegraphSystem created successfully!");
+            // Wire TelegraphSystem into EnemyAbilitySystem for warning zone queuing
+            enemyAbilitySystem.SetTelegraphSystem(telegraphSystem);
+
             logger.Log("[BOOTSTRAP]    - Creating TowerExperienceSystem (Tower XP & Mastery)... ");
             towerExperienceSystem = new TowerExperienceSystem(store, gameConfig);
             logger.Log("      TowerExperienceSystem created successfully!");
@@ -347,6 +354,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.WaveBranch = waveBranchSystem;
             scheduler.ResourceNode = resourceNodeSystem;
             scheduler.Weather = weatherSystem;
+            scheduler.Telegraph = telegraphSystem;
 
             // 初始化地形网格（方向二：地图地块系统）
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)

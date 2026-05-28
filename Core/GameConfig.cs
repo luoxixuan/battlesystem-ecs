@@ -268,6 +268,12 @@ namespace BattleSystemECS.Config
         // summon_minion ability fields
         public float MinionHealthMult { get; set; } // health multiplier for summoned minion
         public float MinionDamageMult { get; set; } // damage multiplier for summoned minion
+
+        // Telegraph/warning zone fields (for aoe_damage, stun_aoe, slow_aoe abilities)
+        // TelegraphDuration: warning turns before AoE lands (0 = instant damage, no telegraph)
+        public float TelegraphDuration { get; set; }
+        // TelegraphColor: 0=red, 1=blue, 2=yellow (for renderer)
+        public int TelegraphColor { get; set; }
     }
 
     /// <summary>

@@ -20,6 +20,7 @@ namespace BattleSystemECS.Systems
         private readonly int playerId;
         private readonly GameConfig gameConfig;
         private readonly Dictionary<string, EnemyAbilityDef> _abilityLookup;
+        private TelegraphSystem _telegraphSystem;
 
         // Ping-pong double-buffer for ability events — collected parallel, applied serial.
         private ConcurrentBag<AbilityEvent>[] _abilityEvents = new ConcurrentBag<AbilityEvent>[2];
@@ -48,6 +49,14 @@ namespace BattleSystemECS.Systems
 
             _abilityEvents[0] = new ConcurrentBag<AbilityEvent>();
             _abilityEvents[1] = new ConcurrentBag<AbilityEvent>();
+        }
+
+        /// <summary>
+        /// Inject TelegraphSystem reference for warning zone queuing.
+        /// </summary>
+        public void SetTelegraphSystem(TelegraphSystem telegraphSystem)
+        {
+            _telegraphSystem = telegraphSystem;
         }
 
         /// <summary>
@@ -172,17 +181,35 @@ namespace BattleSystemECS.Systems
                 float baseDamage = store.EnemyDamage[enemyId];
                 float aoeDamage = baseDamage * ability.DamageMultiplier;
 
-                store.DecreasePlayerHealth(playerId, aoeDamage);
-                float remaining = store.GetPlayerCurrentHealth(playerId);
-
-                EventBus.Instance.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
+                // Queue as telegraph zone if telegraph duration > 0, otherwise instant damage
+                if (_telegraphSystem != null && ability.TelegraphDuration > 0f)
                 {
-                    Damage = aoeDamage,
-                    RemainingHealth = remaining,
-                    AttackerId = enemyId
-                });
+                    _telegraphSystem.QueueTelegraphZone(
+                        enemyId,
+                        playerX, playerY,
+                        ability.AoeRadius,
+                        ability.TelegraphDuration,
+                        aoeDamage,
+                        playerId,
+                        TelegraphSystem.SHAPE_CIRCLE,
+                        60f, 0f,
+                        ability.TelegraphColor);
+                    logger.Log($"[ABILITY] Enemy {enemyId} AOE telegraph zone queued for {ability.TelegraphDuration:F0} turns, damage={aoeDamage:F1} ({ability.Name})");
+                }
+                else
+                {
+                    store.DecreasePlayerHealth(playerId, aoeDamage);
+                    float remaining = store.GetPlayerCurrentHealth(playerId);
 
-                logger.Log($"[ABILITY] Enemy {enemyId} AOE hits player for {aoeDamage:F1} damage ({ability.Name}). HP: {remaining:F1}");
+                    EventBus.Instance.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
+                    {
+                        Damage = aoeDamage,
+                        RemainingHealth = remaining,
+                        AttackerId = enemyId
+                    });
+
+                    logger.Log($"[ABILITY] Enemy {enemyId} AOE hits player for {aoeDamage:F1} damage ({ability.Name}). HP: {remaining:F1}");
+                }
             }
             else
             {
