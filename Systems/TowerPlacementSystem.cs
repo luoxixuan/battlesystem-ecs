@@ -195,6 +195,17 @@ namespace BattleSystemECS.Systems
                         store.TowerTimeScale[towerId] = tc.TimeScale;
                         logger.Log($"[TOWER] {tc.Name} 时间塔: 半径 {tc.TimeFieldRadius}, 时间缩放 {tc.TimeScale:F1}x");
                     }
+                    // Apply construction delay if configured (tower starts building, cannot attack)
+                    if (tc.ConstructionTime > 0f)
+                    {
+                        store.TowerIsConstructing[towerId] = true;
+                        store.TowerConstructionProgress[towerId] = 0f;
+                        store.TowerConstructionTime[towerId] = tc.ConstructionTime;
+                        store.TowerConstructionHP[towerId] = tc.ConstructionHP;
+                        store.TowerConstructionMaxHP[towerId] = tc.ConstructionHP;
+                        store.TowerIsVulnerableDuringConstruction[towerId] = tc.IsVulnerableDuringConstruction;
+                        logger.Log($"[TOWER] {tc.Name} 进入建造阶段: 需 {tc.ConstructionTime}s, HP {tc.ConstructionHP}");
+                    }
                 }
                 else
                 {

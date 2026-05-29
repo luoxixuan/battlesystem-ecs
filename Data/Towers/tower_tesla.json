@@ -9,6 +9,9 @@
   "StunChance": 0.0,
   "SlowAmount": 0.0,
   "SlowDuration": 0.0,
+  "ConstructionTime": 5.0,
+  "ConstructionHP": 50.0,
+  "IsVulnerableDuringConstruction": false,
   "SpecialAbility": {
     "AbilityType": "chain_lightning",
     "Radius": 3

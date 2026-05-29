@@ -8,5 +8,8 @@
   "relocateBaseCost": 50,
   "relocateCostDecreasePerLevel": 5,
   "minRelocateCost": 20,
-  "allowRelocateInWave": false
+  "allowRelocateInWave": false,
+  "defaultConstructionTime": 0,
+  "defaultConstructionHP": 0,
+  "isVulnerableDuringConstruction": false
 }

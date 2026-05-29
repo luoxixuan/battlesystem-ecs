@@ -82,6 +82,7 @@ namespace BattleSystemECS.Core
         public RandomEventSystem? RandomEvent { get; set; }
         public ChronoTowerSystem? ChronoTower { get; set; }
         public TowerRelocateSystem? TowerRelocate { get; set; }
+        public TowerConstructionSystem? Construction { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -145,8 +146,11 @@ namespace BattleSystemECS.Core
             // ── Phase 0.55: Day/Night cycle update ────────────────────────────
             DayNight?.Update(effectiveDelta);
 
-            // ── Phase 0.6: Adaptive Difficulty update ────────────────────────
+// ── Phase 0.6: Adaptive Difficulty update ───────────────────────
             AdaptiveDifficulty?.Update(effectiveDelta);
+
+            // ── Phase 0.62: Tower Construction update (both phases) ───────────
+            Construction?.Update(effectiveDelta);
 
             // ── Phase 0.65: Random Mid-Wave Events ────────────────────────────
             int waveNum = WaveSpawning?.GetCurrentWave() ?? 1;

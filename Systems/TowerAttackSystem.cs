@@ -301,6 +301,9 @@ namespace BattleSystemECS.Systems
                 // Income tower check: skip attack logic for income-generating towers
                 if (store.TowerIsIncomeTower[towerId]) return;
 
+                // Construction check: skip towers that are still under construction
+                if (store.TowerIsConstructing[towerId]) return;
+
                 float tx = store.PositionX[towerId];
                 float ty = store.PositionY[towerId];
                 int range = store.TowerRange[towerId];

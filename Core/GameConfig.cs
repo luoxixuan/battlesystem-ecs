@@ -174,6 +174,12 @@ namespace BattleSystemECS.Config
         public float TimeFieldRadius { get; set; } = 0f;
         // TimeScale: time scale applied to enemies in the field (e.g. 0.5 = 50% speed)
         public float TimeScale { get; set; } = 1f;
+        // Construction: time in seconds for this tower to complete construction (0 = instant, no construction phase)
+        public float ConstructionTime { get; set; } = 0f;
+        // ConstructionHP: maximum HP during construction phase (tower takes damage from enemies during build)
+        public float ConstructionHP { get; set; } = 0f;
+        // IsVulnerableDuringConstruction: if true, enemies can attack this tower while it's under construction
+        public bool IsVulnerableDuringConstruction { get; set; } = false;
     }
 
     /// <summary>

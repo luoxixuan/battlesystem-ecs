@@ -760,6 +760,20 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // TowerGoldPerSecond: gold generated per second by this income tower
         public float[] TowerGoldPerSecond = new float[MAX_ENTITIES];
 
+        // ==================== 塔建造延迟系统 (Tower Construction) ====================
+        // TowerIsConstructing: true if tower is in construction phase (cannot attack, can be damaged)
+        public bool[] TowerIsConstructing = new bool[MAX_ENTITIES];
+        // TowerConstructionProgress: 0.0 to 1.0, progress toward completion
+        public float[] TowerConstructionProgress = new float[MAX_ENTITIES];
+        // TowerConstructionTime: total time in seconds required to complete construction
+        public float[] TowerConstructionTime = new float[MAX_ENTITIES];
+        // TowerConstructionHP: current construction HP (takes damage from enemies during construction)
+        public float[] TowerConstructionHP = new float[MAX_ENTITIES];
+        // TowerConstructionMaxHP: maximum construction HP (set from config, decreases on hit)
+        public float[] TowerConstructionMaxHP = new float[MAX_ENTITIES];
+        // TowerIsVulnerableDuringConstruction: if true, enemies can attack this tower during construction
+        public bool[] TowerIsVulnerableDuringConstruction = new bool[MAX_ENTITIES];
+
         // ==================== 塔牺牲/自毁系统 (Tower Demolish) ====================
         // TowerDemolishEffectRadius: radius of demolish AoE effect in tiles (0 = no demolish)
         public float[] TowerDemolishEffectRadius = new float[MAX_ENTITIES];
@@ -1700,6 +1714,13 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             // Knockback fields: default to no knockback (0 force = no effect)
             TowerKnockbackForce[entityId] = 0f;
             TowerKnockbackRadius[entityId] = 0f;
+            // Construction fields: default to not in construction (active immediately)
+            TowerIsConstructing[entityId] = false;
+            TowerConstructionProgress[entityId] = 1f; // start at 100% (complete)
+            TowerConstructionTime[entityId] = 0f;
+            TowerConstructionHP[entityId] = 0f;
+            TowerConstructionMaxHP[entityId] = 0f;
+            TowerIsVulnerableDuringConstruction[entityId] = false;
             // Damage type and turn rate from config
             TowerDamageType[entityId] = damageType;
             TowerTurnRate[entityId] = turnRate;
@@ -1761,6 +1782,13 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             TowerArmorShredBonus[entityId] = 0f;
             TowerShieldBreakBonus[entityId] = 0f;
             TowerDamageType[entityId] = 0;
+            // Construction fields reset
+            TowerIsConstructing[entityId] = false;
+            TowerConstructionProgress[entityId] = 1f;
+            TowerConstructionTime[entityId] = 0f;
+            TowerConstructionHP[entityId] = 0f;
+            TowerConstructionMaxHP[entityId] = 0f;
+            TowerIsVulnerableDuringConstruction[entityId] = false;
             lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
         }
 
