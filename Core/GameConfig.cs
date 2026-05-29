@@ -1001,6 +1001,9 @@ namespace BattleSystemECS.Config
         // Weather system configuration
         public WeatherConfig Weather { get; set; } = new WeatherConfig();
 
+        // Day/Night cycle system configuration
+        public DayNightConfig DayNight { get; set; } = new DayNightConfig();
+
         // Terrain system configuration (direction 2)
         public List<TerrainTypeConfig> TerrainTypes { get; set; } = new List<TerrainTypeConfig>();
         public int[][] MapTerrainGrid { get; set; } = Array.Empty<int[]>();
@@ -1551,6 +1554,38 @@ namespace BattleSystemECS.Config
         // Intensity range for random selection
         public float MinIntensity { get; set; } = 0.5f;
         public float MaxIntensity { get; set; } = 1.0f;
+    }
+
+    /// <summary>
+    /// Day/Night cycle configuration — global environmental phase that alternates
+    /// between Day (buffs towers) and Night (buffs enemies).
+    /// Loaded from day_night.json and applied via DayNightSystem.
+    /// </summary>
+    public class DayNightConfig
+    {
+        // Phase IDs
+        public const int Day = 0;
+        public const int Night = 1;
+
+        // Duration of each phase in seconds (-1 = no day/night cycles)
+        public float DayDuration { get; set; } = 60f;
+        public float NightDuration { get; set; } = 45f;
+
+        // Day bonuses to towers
+        public float DayTowerRangeBonus { get; set; } = 0.20f;  // +20% tower range during day
+        public float DayEnemySpeedBonus { get; set; } = 0.10f;  // +10% enemy speed during day
+
+        // Night bonuses to enemies (and penalties to towers)
+        public float NightTowerRangePenalty { get; set; } = -0.30f;  // -30% tower range during night
+        public float NightEnemySpeedBonus { get; set; } = 0.0f;      // no speed bonus by default
+        public float NightEnemyDamageBonus { get; set; } = 0.15f;    // +15% enemy damage during night
+
+        // Sentinel tower: special night-active tower that gains bonus range at night
+        // (stored as a bonus multiplier, not a separate tower type)
+        public float SentinelNightRangeBonus { get; set; } = 0.50f;  // +50% range at night
+
+        // Whether cycles repeat (true = infinite day/night, false = single day then stuck)
+        public bool RepeatCycles { get; set; } = true;
     }
 
     public class TerrainTypeConfig

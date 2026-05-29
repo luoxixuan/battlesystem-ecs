@@ -42,6 +42,7 @@ namespace BattleSystemECS.Core
         public ComboSystem? Combo { get; set; }
         public AutoSkillSystem? AutoSkill { get; set; }
         public WeatherSystem? Weather { get; set; }
+        public DayNightSystem? DayNight { get; set; }
         public AuraTowerSystem? AuraTower { get; set; }
         public TowerIncomeSystem? TowerIncome { get; set; }
         public PathfindingSystem? Pathfinding { get; set; }
@@ -132,10 +133,13 @@ namespace BattleSystemECS.Core
 
             // ── WavePhase / Intermission: full combat pipeline ──────────────
 
-            // ── Phase 0.5: Weather update (before combat) ───────────────────
+// ── Phase 0.5: Weather update (before combat) ───────────────────
             Weather?.Update(effectiveDelta);
 
-            // ── Phase 0.6: Adaptive Difficulty update ───────────────────────
+            // ── Phase 0.55: Day/Night cycle update ────────────────────────────
+            DayNight?.Update(effectiveDelta);
+
+            // ── Phase 0.6: Adaptive Difficulty update ────────────────────────
             AdaptiveDifficulty?.Update(effectiveDelta);
 
             // ── Phase 1: 生成 ─────────────────────────────────────────────

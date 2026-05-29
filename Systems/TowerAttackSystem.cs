@@ -21,6 +21,7 @@ namespace BattleSystemECS.Systems
         private TowerExperienceSystem towerExperienceSystem;
         private ProjectileSystem projectileSystem;
         private WeatherSystem _weatherSystem; // injected for weather effects
+        private DayNightSystem _dayNightSystem; // injected for day/night cycle effects
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate lists, pre-allocated in SetTurn
@@ -81,6 +82,9 @@ namespace BattleSystemECS.Systems
         // Cached weather multipliers (updated each SetTurn from WeatherSystem)
         private float _weatherRangeMult = 1f;
         private float _weatherDamageMult = 1f;
+
+        // Cached day/night cycle multipliers (updated each SetTurn from DayNightSystem)
+        private float _dayNightRangeMult = 1f;
 
         // Ping-pong double-buffer for splash damage events (from upgrade special abilities)
         private List<(int primaryEnemyId, float splashDamage, int playerId, int towerId)>[] _splashDamageQueue = new List<(int, float, int, int)>[2];
@@ -175,6 +179,14 @@ namespace BattleSystemECS.Systems
             _weatherSystem = weather;
         }
 
+        /// <summary>
+        /// Inject DayNightSystem reference for day/night cycle effects on tower range.
+        /// </summary>
+        public void SetDayNightSystem(DayNightSystem dayNight)
+        {
+            _dayNightSystem = dayNight;
+        }
+
         public void SetTurn(int turn)
         {
             _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
@@ -190,6 +202,12 @@ namespace BattleSystemECS.Systems
                 _weatherRangeMult = 1f;
                 _weatherDamageMult = 1f;
             }
+
+            // Cache day/night cycle range multiplier (updated each turn)
+            if (_dayNightSystem != null)
+                _dayNightRangeMult = _dayNightSystem.GetTowerRangeMultiplier(0);
+            else
+                _dayNightRangeMult = 1f;
 
             // Cache armor stats from tech tree
             _armorPenetration = techTreeSystem != null ? techTreeSystem.GetArmorPenetration() : 0f;
@@ -290,7 +308,7 @@ namespace BattleSystemECS.Systems
                 // Spatial grid: query O(cells) instead of O(enemies) — reuse pre-allocated list
                 var candidates = _towerCandidates[ti];
                 candidates.Clear();
-                int effectiveRange = (int)(range * _weatherRangeMult);
+                int effectiveRange = (int)(range * _weatherRangeMult * _dayNightRangeMult);
                 store.SpatialGrid.GetEnemiesInRange(store, tx, ty, effectiveRange, candidates);
 
                 // Read tower targeting mode (0=Nearest, 1=Furthest, 2=LowestHealth, 3=HighestHealth, 4=FirstSpawned, 5=LastSpawned)

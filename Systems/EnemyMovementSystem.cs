@@ -28,6 +28,8 @@ namespace BattleSystemECS.Systems
         private PathfindingSystem _pathfinding;
         // WeatherSystem reference for dynamic weather effects
         private WeatherSystem _weather;
+        // DayNightSystem reference for day/night cycle effects
+        private DayNightSystem _dayNight;
 
         public EnemyMovementSystem(Core.ComponentStore store, int playerId, int mapWidth = 10)
         {
@@ -50,6 +52,14 @@ namespace BattleSystemECS.Systems
         public void SetWeatherSystem(WeatherSystem weather)
         {
             _weather = weather;
+        }
+
+        /// <summary>
+        /// Inject DayNightSystem for day/night cycle effects on enemy movement.
+        /// </summary>
+        public void SetDayNightSystem(DayNightSystem dayNight)
+        {
+            _dayNight = dayNight;
         }
 
         public void SetTurn(int turn)
@@ -113,6 +123,9 @@ namespace BattleSystemECS.Systems
                 // Apply weather move speed modifier (Rain/Fog/Storm slow)
                 if (_weather != null)
                     moveSpeed *= _weather.GetEnemySpeedMultiplier(playerId);
+                // Apply day/night cycle speed modifier
+                if (_dayNight != null)
+                    moveSpeed *= _dayNight.GetEnemySpeedMultiplier(playerId);
 
                 // Enum-based action dispatch — O(1) per enemy, no string comparison
                 EnemyActionType actionEnum = store.GetEnemyActionEnum(enemyId);

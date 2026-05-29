@@ -1,0 +1,11 @@
+{
+  "dayDuration": 60.0,
+  "nightDuration": 45.0,
+  "dayTowerRangeBonus": 0.20,
+  "dayEnemySpeedBonus": 0.10,
+  "nightTowerRangePenalty": -0.30,
+  "nightEnemySpeedBonus": 0.0,
+  "nightEnemyDamageBonus": 0.15,
+  "sentinelNightRangeBonus": 0.50,
+  "repeatCycles": true
+}

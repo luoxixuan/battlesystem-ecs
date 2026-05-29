@@ -83,6 +83,14 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // WeatherTimer: turns remaining for current weather (-1 = permanent until changed)
         public float[] WeatherTimer = new float[MAX_PLAYERS];
 
+        // ==================== 昼夜循环系统组件 (SOA) ====================
+        // GlobalDayNightPhase: current phase. 0=Day, 1=Night. Same for all players in this simplified version.
+        public int[] GlobalDayNightPhase = new int[MAX_PLAYERS];
+        // GlobalDayNightTimer: remaining seconds in the current phase. Countdown from DayDuration or NightDuration.
+        public float[] GlobalDayNightTimer = new float[MAX_PLAYERS];
+        // GlobalDayNightCycleCount: how many Day→Night cycles have occurred (for difficulty scaling)
+        public int[] GlobalDayNightCycleCount = new int[MAX_PLAYERS];
+
         // ==================== Objective System 组件 (Escort / Survival / Timed) ====================
         // CurrentObjectiveType: active objective type for this level (ObjectiveType enum, 0=KillAll default)
         public int[] CurrentObjectiveType = new int[MAX_PLAYERS];
@@ -2518,6 +2526,43 @@ public float GetPlayerCurrentHealth(int playerId)
         {
             if (playerId < 0 || playerId >= MAX_PLAYERS) return;
             WeatherTimer[playerId] = timer;
+        }
+
+        // ==================== 昼夜循环系统访问方法 ====================
+        public int GetDayNightPhase(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            return GlobalDayNightPhase[playerId];
+        }
+
+        public void SetDayNightPhase(int playerId, int phase)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            GlobalDayNightPhase[playerId] = phase;
+        }
+
+        public float GetDayNightTimer(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return -1f;
+            return GlobalDayNightTimer[playerId];
+        }
+
+        public void SetDayNightTimer(int playerId, float timer)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            GlobalDayNightTimer[playerId] = timer;
+        }
+
+        public int GetDayNightCycleCount(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            return GlobalDayNightCycleCount[playerId];
+        }
+
+        public void IncrementDayNightCycleCount(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            GlobalDayNightCycleCount[playerId]++;
         }
 
         public void SetPlayerCurrentHealth(int playerId, float currentHealth)

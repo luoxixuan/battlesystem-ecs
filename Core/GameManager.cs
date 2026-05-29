@@ -56,6 +56,7 @@ namespace BattleSystemECS.Core
         private WaveBranchSystem waveBranchSystem;   // 波次分支/玩家选择系统
         private ResourceNodeSystem resourceNodeSystem; // 地图资源节点系统（金矿/法力泉/科技遗迹）
         private WeatherSystem weatherSystem;          // 天气系统
+        private DayNightSystem dayNightSystem;       // 昼夜循环系统
         private TelegraphSystem telegraphSystem;     // 弹道预警区域系统
         private AdaptiveDifficultySystem adaptiveDifficultySystem; // 动态难度系统
         private CorpseEffectSystem corpseEffectSystem; // 敌人尸体残留效果系统
@@ -237,6 +238,13 @@ logger.Log("      ComboSystem created successfully!");
             enemyMovementSystem.SetWeatherSystem(weatherSystem);
             towerAttackSystem.SetWeatherSystem(weatherSystem);
 
+            logger.Log("[BOOTSTRAP]    - Creating DayNightSystem (day/night cycle)... ");
+            dayNightSystem = new DayNightSystem(store, gameConfig);
+            logger.Log("      DayNightSystem created successfully!");
+            dayNightSystem.Initialize(playerId);
+            enemyMovementSystem.SetDayNightSystem(dayNightSystem);
+            towerAttackSystem.SetDayNightSystem(dayNightSystem);
+
             logger.Log("[BOOTSTRAP]    - Creating TelegraphSystem (warning zones for AoE abilities)... ");
             telegraphSystem = new TelegraphSystem(store, logger, gameConfig);
             logger.Log("      TelegraphSystem created successfully!");
@@ -389,6 +397,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.WaveBranch = waveBranchSystem;
             scheduler.ResourceNode = resourceNodeSystem;
             scheduler.Weather = weatherSystem;
+            scheduler.DayNight = dayNightSystem;
             scheduler.Telegraph = telegraphSystem;
             scheduler.AdaptiveDifficulty = adaptiveDifficultySystem;
             scheduler.CorpseEffect = corpseEffectSystem;
