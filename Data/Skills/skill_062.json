@@ -1,1 +1,1 @@
-﻿{"Description":"8x8 Plasma Spike","Hotkey":"R","AttackRange":4,"Cooldown":6.7,"Name":"Plasma Spike #62","AreaWidth":8,"DamageMultiplier":6.4,"AutoCast":false,"AreaHeight":8}
+﻿{"Description": "8x8 Plasma Spike", "Hotkey": "R", "AttackRange": 4, "Cooldown": 6.7, "Name": "Plasma Spike #62", "AreaWidth": 8, "DamageMultiplier": 6.4, "AutoCast": false, "AreaHeight": 8, "ManaCost": 70}

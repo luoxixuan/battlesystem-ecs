@@ -1,1 +1,1 @@
-﻿{"Description":"9x9 Railgun Bomb","Hotkey":"S","AttackRange":5,"Cooldown":6.8,"Name":"Railgun Bomb #63","AreaWidth":9,"DamageMultiplier":6.5,"AutoCast":false,"AreaHeight":9}
+﻿{"Description": "9x9 Railgun Bomb", "Hotkey": "S", "AttackRange": 5, "Cooldown": 6.8, "Name": "Railgun Bomb #63", "AreaWidth": 9, "DamageMultiplier": 6.5, "AutoCast": false, "AreaHeight": 9, "ManaCost": 70}

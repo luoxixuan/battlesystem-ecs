@@ -1,1 +1,1 @@
-﻿{"Description":"8x8 Phase Leech","Hotkey":"2","AttackRange":13,"Cooldown":11.2,"Name":"Phase Leech #107","AreaWidth":8,"DamageMultiplier":3.1,"AutoCast":false,"AreaHeight":8}
+﻿{"Description": "8x8 Phase Leech", "Hotkey": "2", "AttackRange": 13, "Cooldown": 11.2, "Name": "Phase Leech #107", "AreaWidth": 8, "DamageMultiplier": 3.1, "AutoCast": false, "AreaHeight": 8, "ManaCost": 85}

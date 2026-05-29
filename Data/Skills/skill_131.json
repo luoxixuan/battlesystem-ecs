@@ -1,1 +1,1 @@
-﻿{"Description":"5x5 Data Leech","Hotkey":"Q","AttackRange":13,"Cooldown":13.6,"Name":"Data Leech #131","AreaWidth":5,"DamageMultiplier":5.5,"AutoCast":false,"AreaHeight":5}
+﻿{"Description": "5x5 Data Leech", "Hotkey": "Q", "AttackRange": 13, "Cooldown": 13.6, "Name": "Data Leech #131", "AreaWidth": 5, "DamageMultiplier": 5.5, "AutoCast": false, "AreaHeight": 5, "ManaCost": 100}

@@ -1,1 +1,1 @@
-﻿{"Description":"2x2 Circuit Worm","Hotkey":"V","AttackRange":7,"Cooldown":10.6,"Name":"Circuit Worm #101","AreaWidth":2,"DamageMultiplier":2.5,"AutoCast":false,"AreaHeight":2}
+﻿{"Description": "2x2 Circuit Worm", "Hotkey": "V", "AttackRange": 7, "Cooldown": 10.6, "Name": "Circuit Worm #101", "AreaWidth": 2, "DamageMultiplier": 2.5, "AutoCast": false, "AreaHeight": 2, "ManaCost": 80}

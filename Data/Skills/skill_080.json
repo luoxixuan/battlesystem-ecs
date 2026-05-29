@@ -1,1 +1,1 @@
-﻿{"Description":"8x8 Quantum Strike","Hotkey":"A","AttackRange":10,"Cooldown":8.5,"Name":"Quantum Strike #80","AreaWidth":8,"DamageMultiplier":0.4,"AutoCast":false,"AreaHeight":8}
+﻿{"Description": "8x8 Quantum Strike", "Hotkey": "A", "AttackRange": 10, "Cooldown": 8.5, "Name": "Quantum Strike #80", "AreaWidth": 8, "DamageMultiplier": 0.4, "AutoCast": false, "AreaHeight": 8, "ManaCost": 60}

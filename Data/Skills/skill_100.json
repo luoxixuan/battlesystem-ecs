@@ -1,1 +1,1 @@
-﻿{"Description":"1x1 Quantum Storm","Hotkey":"U","AttackRange":6,"Cooldown":10.5,"Name":"Quantum Storm #100","AreaWidth":1,"DamageMultiplier":2.4,"AutoCast":false,"AreaHeight":1}
+﻿{"Description": "1x1 Quantum Storm", "Hotkey": "U", "AttackRange": 6, "Cooldown": 10.5, "Name": "Quantum Storm #100", "AreaWidth": 1, "DamageMultiplier": 2.4, "AutoCast": false, "AreaHeight": 1, "ManaCost": 75}

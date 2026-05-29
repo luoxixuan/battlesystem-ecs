@@ -1,1 +1,1 @@
-﻿{"Description":"6x6 Circuit Cascade","Hotkey":"1","AttackRange":11,"Cooldown":14.6,"Name":"Circuit Cascade #141","AreaWidth":6,"DamageMultiplier":6.5,"AutoCast":false,"AreaHeight":6}
+﻿{"Description": "6x6 Circuit Cascade", "Hotkey": "1", "AttackRange": 11, "Cooldown": 14.6, "Name": "Circuit Cascade #141", "AreaWidth": 6, "DamageMultiplier": 6.5, "AutoCast": false, "AreaHeight": 6, "ManaCost": 110}

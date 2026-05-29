@@ -1,1 +1,1 @@
-﻿{"Description":"8x8 Railgun Blast","Hotkey":"3","AttackRange":13,"Cooldown":14.8,"Name":"Railgun Blast #143","AreaWidth":8,"DamageMultiplier":6.7,"AutoCast":false,"AreaHeight":8}
+﻿{"Description": "8x8 Railgun Blast", "Hotkey": "3", "AttackRange": 13, "Cooldown": 14.8, "Name": "Railgun Blast #143", "AreaWidth": 8, "DamageMultiplier": 6.7, "AutoCast": false, "AreaHeight": 8, "ManaCost": 110}

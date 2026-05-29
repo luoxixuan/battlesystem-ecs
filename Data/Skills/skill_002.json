@@ -1,1 +1,1 @@
-﻿{"Description":"2x2 Plasma Surge","Hotkey":"2","AttackRange":4,"Cooldown":0.7,"Name":"Plasma Surge #2","AreaWidth":2,"DamageMultiplier":0.4,"AutoCast":false,"AreaHeight":2}
+﻿{"Description": "2x2 Plasma Surge", "Hotkey": "2", "AttackRange": 4, "Cooldown": 0.7, "Name": "Plasma Surge #2", "AreaWidth": 2, "DamageMultiplier": 0.4, "AutoCast": false, "AreaHeight": 2, "ManaCost": 20}

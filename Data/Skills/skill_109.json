@@ -1,1 +1,1 @@
-﻿{"Description":"1x1 System Protocol","Hotkey":"4","AttackRange":3,"Cooldown":11.4,"Name":"System Protocol #109","AreaWidth":1,"DamageMultiplier":3.3,"AutoCast":false,"AreaHeight":1}
+﻿{"Description": "1x1 System Protocol", "Hotkey": "4", "AttackRange": 3, "Cooldown": 11.4, "Name": "System Protocol #109", "AreaWidth": 1, "DamageMultiplier": 3.3, "AutoCast": false, "AreaHeight": 1, "ManaCost": 85}

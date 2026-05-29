@@ -1,1 +1,1 @@
-﻿{"Description":"3x3 Railgun Shot","Hotkey":"3","AttackRange":5,"Cooldown":0.8,"Name":"Railgun Shot #3","AreaWidth":3,"DamageMultiplier":0.5,"AutoCast":false,"AreaHeight":3}
+﻿{"Description": "3x3 Railgun Shot", "Hotkey": "3", "AttackRange": 5, "Cooldown": 0.8, "Name": "Railgun Shot #3", "AreaWidth": 3, "DamageMultiplier": 0.5, "AutoCast": false, "AreaHeight": 3, "ManaCost": 25}

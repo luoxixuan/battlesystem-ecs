@@ -1,1 +1,1 @@
-﻿{"Description":"3x3 Neon Crash","Hotkey":"M","AttackRange":11,"Cooldown":6.2,"Name":"Neon Crash #57","AreaWidth":3,"DamageMultiplier":5.9,"AutoCast":false,"AreaHeight":3}
+﻿{"Description": "3x3 Neon Crash", "Hotkey": "M", "AttackRange": 11, "Cooldown": 6.2, "Name": "Neon Crash #57", "AreaWidth": 3, "DamageMultiplier": 5.9, "AutoCast": false, "AreaHeight": 3, "ManaCost": 65}

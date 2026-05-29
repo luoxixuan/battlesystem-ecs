@@ -1,1 +1,1 @@
-﻿{"Description":"7x7 Cyber Breaker","Hotkey":"P","AttackRange":3,"Cooldown":3,"Name":"Cyber Breaker #25","AreaWidth":7,"DamageMultiplier":2.7,"AutoCast":false,"AreaHeight":7}
+﻿{"Description": "7x7 Cyber Breaker", "Hotkey": "P", "AttackRange": 3, "Cooldown": 3, "Name": "Cyber Breaker #25", "AreaWidth": 7, "DamageMultiplier": 2.7, "AutoCast": false, "AreaHeight": 7, "ManaCost": 40}

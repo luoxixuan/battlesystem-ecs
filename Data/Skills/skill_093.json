@@ -1,1 +1,1 @@
-﻿{"Description":"3x3 Blackout Cascade","Hotkey":"N","AttackRange":11,"Cooldown":9.8,"Name":"Blackout Cascade #93","AreaWidth":3,"DamageMultiplier":1.7,"AutoCast":false,"AreaHeight":3}
+﻿{"Description": "3x3 Blackout Cascade", "Hotkey": "N", "AttackRange": 11, "Cooldown": 9.8, "Name": "Blackout Cascade #93", "AreaWidth": 3, "DamageMultiplier": 1.7, "AutoCast": false, "AreaHeight": 3, "ManaCost": 70}

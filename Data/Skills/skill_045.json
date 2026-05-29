@@ -1,1 +1,1 @@
-﻿{"Description":"9x9 Cyber Cascade","Hotkey":"A","AttackRange":11,"Cooldown":5,"Name":"Cyber Cascade #45","AreaWidth":9,"DamageMultiplier":4.7,"AutoCast":false,"AreaHeight":9}
+﻿{"Description": "9x9 Cyber Cascade", "Hotkey": "A", "AttackRange": 11, "Cooldown": 5, "Name": "Cyber Cascade #45", "AreaWidth": 9, "DamageMultiplier": 4.7, "AutoCast": false, "AreaHeight": 9, "ManaCost": 55}

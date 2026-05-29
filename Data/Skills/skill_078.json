@@ -1,1 +1,1 @@
-﻿{"Description":"6x6 Chrome Burst","Hotkey":"8","AttackRange":8,"Cooldown":8.3,"Name":"Chrome Burst #78","AreaWidth":6,"DamageMultiplier":0.2,"AutoCast":false,"AreaHeight":6}
+﻿{"Description": "6x6 Chrome Burst", "Hotkey": "8", "AttackRange": 8, "Cooldown": 8.3, "Name": "Chrome Burst #78", "AreaWidth": 6, "DamageMultiplier": 0.2, "AutoCast": false, "AreaHeight": 6, "ManaCost": 60}

@@ -1,1 +1,1 @@
-﻿{"Description":"5x5 Virus Leech","Hotkey":"O","AttackRange":13,"Cooldown":6.4,"Name":"Virus Leech #59","AreaWidth":5,"DamageMultiplier":6.1,"AutoCast":false,"AreaHeight":5}
+﻿{"Description": "5x5 Virus Leech", "Hotkey": "O", "AttackRange": 13, "Cooldown": 6.4, "Name": "Virus Leech #59", "AreaWidth": 5, "DamageMultiplier": 6.1, "AutoCast": false, "AreaHeight": 5, "ManaCost": 70}

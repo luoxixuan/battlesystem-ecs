@@ -1,1 +1,1 @@
-﻿{"Description":"3x3 Quantum Field","Hotkey":"F","AttackRange":14,"Cooldown":12.5,"Name":"Quantum Field #120","AreaWidth":3,"DamageMultiplier":4.4,"AutoCast":false,"AreaHeight":3}
+﻿{"Description": "3x3 Quantum Field", "Hotkey": "F", "AttackRange": 14, "Cooldown": 12.5, "Name": "Quantum Field #120", "AreaWidth": 3, "DamageMultiplier": 4.4, "AutoCast": false, "AreaHeight": 3, "ManaCost": 95}

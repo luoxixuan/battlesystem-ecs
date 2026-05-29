@@ -1,1 +1,1 @@
-﻿{"Description":"7x7 Null Surge","Hotkey":"Z","AttackRange":12,"Cooldown":7.5,"Name":"Null Surge #70","AreaWidth":7,"DamageMultiplier":7.2,"AutoCast":false,"AreaHeight":7}
+﻿{"Description": "7x7 Null Surge", "Hotkey": "Z", "AttackRange": 12, "Cooldown": 7.5, "Name": "Null Surge #70", "AreaWidth": 7, "DamageMultiplier": 7.2, "AutoCast": false, "AreaHeight": 7, "ManaCost": 75}

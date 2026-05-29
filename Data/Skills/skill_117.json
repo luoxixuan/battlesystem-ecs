@@ -1,1 +1,1 @@
-﻿{"Description":"9x9 Neon Cascade","Hotkey":"C","AttackRange":11,"Cooldown":12.2,"Name":"Neon Cascade #117","AreaWidth":9,"DamageMultiplier":4.1,"AutoCast":false,"AreaHeight":9}
+﻿{"Description": "9x9 Neon Cascade", "Hotkey": "C", "AttackRange": 11, "Cooldown": 12.2, "Name": "Neon Cascade #117", "AreaWidth": 9, "DamageMultiplier": 4.1, "AutoCast": false, "AreaHeight": 9, "ManaCost": 90}

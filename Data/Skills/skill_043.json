@@ -1,1 +1,1 @@
-﻿{"Description":"7x7 Railgun Flux","Hotkey":"8","AttackRange":9,"Cooldown":4.8,"Name":"Railgun Flux #43","AreaWidth":7,"DamageMultiplier":4.5,"AutoCast":false,"AreaHeight":7}
+﻿{"Description": "7x7 Railgun Flux", "Hotkey": "8", "AttackRange": 9, "Cooldown": 4.8, "Name": "Railgun Flux #43", "AreaWidth": 7, "DamageMultiplier": 4.5, "AutoCast": false, "AreaHeight": 7, "ManaCost": 55}

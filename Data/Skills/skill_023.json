@@ -1,1 +1,1 @@
-﻿{"Description":"5x5 Railgun Blast","Hotkey":"N","AttackRange":13,"Cooldown":2.8,"Name":"Railgun Blast #23","AreaWidth":5,"DamageMultiplier":2.5,"AutoCast":false,"AreaHeight":5}
+﻿{"Description": "5x5 Railgun Blast", "Hotkey": "N", "AttackRange": 13, "Cooldown": 2.8, "Name": "Railgun Blast #23", "AreaWidth": 5, "DamageMultiplier": 2.5, "AutoCast": false, "AreaHeight": 5, "ManaCost": 40}

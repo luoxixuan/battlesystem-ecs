@@ -1,1 +1,1 @@
-﻿{"Description":"3x3 Virus Bomb","Hotkey":"4","AttackRange":5,"Cooldown":4.4,"Name":"Virus Bomb #39","AreaWidth":3,"DamageMultiplier":4.1,"AutoCast":false,"AreaHeight":3}
+﻿{"Description": "3x3 Virus Bomb", "Hotkey": "4", "AttackRange": 5, "Cooldown": 4.4, "Name": "Virus Bomb #39", "AreaWidth": 3, "DamageMultiplier": 4.1, "AutoCast": false, "AreaHeight": 3, "ManaCost": 50}

@@ -1,1 +1,1 @@
-﻿{"Description":"1x1 Cyber Breaker","Hotkey":"5","AttackRange":3,"Cooldown":15,"Name":"Cyber Breaker #145","AreaWidth":1,"DamageMultiplier":6.9,"AutoCast":false,"AreaHeight":1}
+﻿{"Description": "1x1 Cyber Breaker", "Hotkey": "5", "AttackRange": 3, "Cooldown": 15, "Name": "Cyber Breaker #145", "AreaWidth": 1, "DamageMultiplier": 6.9, "AutoCast": false, "AreaHeight": 1, "ManaCost": 115}

@@ -1,1 +1,1 @@
-﻿{"Description":"6x6 Phase Bomb","Hotkey":"H","AttackRange":5,"Cooldown":9.2,"Name":"Phase Bomb #87","AreaWidth":6,"DamageMultiplier":1.1,"AutoCast":false,"AreaHeight":6}
+﻿{"Description": "6x6 Phase Bomb", "Hotkey": "H", "AttackRange": 5, "Cooldown": 9.2, "Name": "Phase Bomb #87", "AreaWidth": 6, "DamageMultiplier": 1.1, "AutoCast": false, "AreaHeight": 6, "ManaCost": 65}

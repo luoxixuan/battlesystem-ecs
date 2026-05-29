@@ -1,1 +1,1 @@
-﻿{"Description":"5x5 Plasma Surge","Hotkey":"H","AttackRange":4,"Cooldown":12.7,"Name":"Plasma Surge #122","AreaWidth":5,"DamageMultiplier":4.6,"AutoCast":false,"AreaHeight":5}
+﻿{"Description": "5x5 Plasma Surge", "Hotkey": "H", "AttackRange": 4, "Cooldown": 12.7, "Name": "Plasma Surge #122", "AreaWidth": 5, "DamageMultiplier": 4.6, "AutoCast": false, "AreaHeight": 5, "ManaCost": 95}

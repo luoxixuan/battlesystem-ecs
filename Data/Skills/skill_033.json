@@ -1,1 +1,1 @@
-﻿{"Description":"6x6 Blackout Crash","Hotkey":"X","AttackRange":11,"Cooldown":3.8,"Name":"Blackout Crash #33","AreaWidth":6,"DamageMultiplier":3.5,"AutoCast":false,"AreaHeight":6}
+﻿{"Description": "6x6 Blackout Crash", "Hotkey": "X", "AttackRange": 11, "Cooldown": 3.8, "Name": "Blackout Crash #33", "AreaWidth": 6, "DamageMultiplier": 3.5, "AutoCast": false, "AreaHeight": 6, "ManaCost": 45}

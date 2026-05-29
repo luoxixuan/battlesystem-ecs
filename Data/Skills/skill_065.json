@@ -1,1 +1,1 @@
-﻿{"Description":"2x2 Cyber Nova","Hotkey":"U","AttackRange":7,"Cooldown":7,"Name":"Cyber Nova #65","AreaWidth":2,"DamageMultiplier":6.7,"AutoCast":false,"AreaHeight":2}
+﻿{"Description": "2x2 Cyber Nova", "Hotkey": "U", "AttackRange": 7, "Cooldown": 7, "Name": "Cyber Nova #65", "AreaWidth": 2, "DamageMultiplier": 6.7, "AutoCast": false, "AreaHeight": 2, "ManaCost": 75}

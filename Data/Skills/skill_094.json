@@ -1,1 +1,1 @@
-﻿{"Description":"4x4 Neural Surge","Hotkey":"O","AttackRange":12,"Cooldown":9.9,"Name":"Neural Surge #94","AreaWidth":4,"DamageMultiplier":1.8,"AutoCast":false,"AreaHeight":4}
+﻿{"Description": "4x4 Neural Surge", "Hotkey": "O", "AttackRange": 12, "Cooldown": 9.9, "Name": "Neural Surge #94", "AreaWidth": 4, "DamageMultiplier": 1.8, "AutoCast": false, "AreaHeight": 4, "ManaCost": 70}

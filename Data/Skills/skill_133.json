@@ -1,1 +1,1 @@
-﻿{"Description":"7x7 Blackout Protocol","Hotkey":"S","AttackRange":3,"Cooldown":13.8,"Name":"Blackout Protocol #133","AreaWidth":7,"DamageMultiplier":5.7,"AutoCast":false,"AreaHeight":7}
+﻿{"Description": "7x7 Blackout Protocol", "Hotkey": "S", "AttackRange": 3, "Cooldown": 13.8, "Name": "Blackout Protocol #133", "AreaWidth": 7, "DamageMultiplier": 5.7, "AutoCast": false, "AreaHeight": 7, "ManaCost": 105}

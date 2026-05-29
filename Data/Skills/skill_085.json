@@ -1,1 +1,1 @@
-﻿{"Description":"4x4 Cyber Protocol","Hotkey":"F","AttackRange":3,"Cooldown":9,"Name":"Cyber Protocol #85","AreaWidth":4,"DamageMultiplier":0.9,"AutoCast":false,"AreaHeight":4}
+﻿{"Description": "4x4 Cyber Protocol", "Hotkey": "F", "AttackRange": 3, "Cooldown": 9, "Name": "Cyber Protocol #85", "AreaWidth": 4, "DamageMultiplier": 0.9, "AutoCast": false, "AreaHeight": 4, "ManaCost": 65}

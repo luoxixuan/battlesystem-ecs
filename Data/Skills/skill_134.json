@@ -1,1 +1,1 @@
-﻿{"Description":"8x8 Neural Spike","Hotkey":"T","AttackRange":4,"Cooldown":13.9,"Name":"Neural Spike #134","AreaWidth":8,"DamageMultiplier":5.8,"AutoCast":false,"AreaHeight":8}
+﻿{"Description": "8x8 Neural Spike", "Hotkey": "T", "AttackRange": 4, "Cooldown": 13.9, "Name": "Neural Spike #134", "AreaWidth": 8, "DamageMultiplier": 5.8, "AutoCast": false, "AreaHeight": 8, "ManaCost": 105}

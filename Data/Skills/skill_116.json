@@ -1,1 +1,1 @@
-﻿{"Description":"8x8 Shock Beam","Hotkey":"B","AttackRange":10,"Cooldown":12.1,"Name":"Shock Beam #116","AreaWidth":8,"DamageMultiplier":4,"AutoCast":false,"AreaHeight":8}
+﻿{"Description": "8x8 Shock Beam", "Hotkey": "B", "AttackRange": 10, "Cooldown": 12.1, "Name": "Shock Beam #116", "AreaWidth": 8, "DamageMultiplier": 4, "AutoCast": false, "AreaHeight": 8, "ManaCost": 90}

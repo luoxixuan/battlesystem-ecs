@@ -1,1 +1,1 @@
-﻿{"Description":"4x4 Quantum Wave","Hotkey":"5","AttackRange":6,"Cooldown":4.5,"Name":"Quantum Wave #40","AreaWidth":4,"DamageMultiplier":4.2,"AutoCast":false,"AreaHeight":4}
+﻿{"Description": "4x4 Quantum Wave", "Hotkey": "5", "AttackRange": 6, "Cooldown": 4.5, "Name": "Quantum Wave #40", "AreaWidth": 4, "DamageMultiplier": 4.2, "AutoCast": false, "AreaHeight": 4, "ManaCost": 50}

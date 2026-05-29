@@ -1,1 +1,1 @@
-﻿{"Description":"9x9 Circuit Crash","Hotkey":"B","AttackRange":11,"Cooldown":8.6,"Name":"Circuit Crash #81","AreaWidth":9,"DamageMultiplier":0.5,"AutoCast":false,"AreaHeight":9}
+﻿{"Description": "9x9 Circuit Crash", "Hotkey": "B", "AttackRange": 11, "Cooldown": 8.6, "Name": "Circuit Crash #81", "AreaWidth": 9, "DamageMultiplier": 0.5, "AutoCast": false, "AreaHeight": 9, "ManaCost": 60}

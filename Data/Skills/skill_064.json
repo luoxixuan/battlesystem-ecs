@@ -1,1 +1,1 @@
-﻿{"Description":"1x1 Ion Wave","Hotkey":"T","AttackRange":6,"Cooldown":6.9,"Name":"Ion Wave #64","AreaWidth":1,"DamageMultiplier":6.6,"AutoCast":false,"AreaHeight":1}
+﻿{"Description": "1x1 Ion Wave", "Hotkey": "T", "AttackRange": 6, "Cooldown": 6.9, "Name": "Ion Wave #64", "AreaWidth": 1, "DamageMultiplier": 6.6, "AutoCast": false, "AreaHeight": 1, "ManaCost": 70}

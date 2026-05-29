@@ -1,1 +1,1 @@
-﻿{"Description":"1x1 Overclock Storm","Hotkey":"S","AttackRange":6,"Cooldown":3.3,"Name":"Overclock Storm #28","AreaWidth":1,"DamageMultiplier":3,"AutoCast":false,"AreaHeight":1}
+﻿{"Description": "1x1 Overclock Storm", "Hotkey": "S", "AttackRange": 6, "Cooldown": 3.3, "Name": "Overclock Storm #28", "AreaWidth": 1, "DamageMultiplier": 3, "AutoCast": false, "AreaHeight": 1, "ManaCost": 45}

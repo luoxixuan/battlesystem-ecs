@@ -1,1 +1,1 @@
-﻿{"Description":"9x9 Null Pulse","Hotkey":"K","AttackRange":8,"Cooldown":9.5,"Name":"Null Pulse #90","AreaWidth":9,"DamageMultiplier":1.4,"AutoCast":false,"AreaHeight":9}
+﻿{"Description": "9x9 Null Pulse", "Hotkey": "K", "AttackRange": 8, "Cooldown": 9.5, "Name": "Null Pulse #90", "AreaWidth": 9, "DamageMultiplier": 1.4, "AutoCast": false, "AreaHeight": 9, "ManaCost": 70}

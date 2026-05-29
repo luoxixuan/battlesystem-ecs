@@ -1,1 +1,1 @@
-﻿{"Description":"6x6 Firewall Burst","Hotkey":"6","AttackRange":8,"Cooldown":1.1,"Name":"Firewall Burst #6","AreaWidth":6,"DamageMultiplier":0.8,"AutoCast":false,"AreaHeight":6}
+﻿{"Description": "6x6 Firewall Burst", "Hotkey": "6", "AttackRange": 8, "Cooldown": 1.1, "Name": "Firewall Burst #6", "AreaWidth": 6, "DamageMultiplier": 0.8, "AutoCast": false, "AreaHeight": 6, "ManaCost": 25}

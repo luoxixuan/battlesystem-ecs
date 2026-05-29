@@ -1,1 +1,1 @@
-﻿{"Description":"4x4 Chrome Zone","Hotkey":"N","AttackRange":12,"Cooldown":6.3,"Name":"Chrome Zone #58","AreaWidth":4,"DamageMultiplier":6,"AutoCast":false,"AreaHeight":4}
+﻿{"Description": "4x4 Chrome Zone", "Hotkey": "N", "AttackRange": 12, "Cooldown": 6.3, "Name": "Chrome Zone #58", "AreaWidth": 4, "DamageMultiplier": 6, "AutoCast": false, "AreaHeight": 4, "ManaCost": 65}

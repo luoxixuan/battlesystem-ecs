@@ -1,1 +1,1 @@
-﻿{"Description":"3x3 Overclock Field","Hotkey":"D","AttackRange":14,"Cooldown":5.3,"Name":"Overclock Field #48","AreaWidth":3,"DamageMultiplier":5,"AutoCast":false,"AreaHeight":3}
+﻿{"Description": "3x3 Overclock Field", "Hotkey": "D", "AttackRange": 14, "Cooldown": 5.3, "Name": "Overclock Field #48", "AreaWidth": 3, "DamageMultiplier": 5, "AutoCast": false, "AreaHeight": 3, "ManaCost": 60}

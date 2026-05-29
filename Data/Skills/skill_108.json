@@ -1,1 +1,1 @@
-﻿{"Description":"9x9 Overclock Gate","Hotkey":"3","AttackRange":14,"Cooldown":11.3,"Name":"Overclock Gate #108","AreaWidth":9,"DamageMultiplier":3.2,"AutoCast":false,"AreaHeight":9}
+﻿{"Description": "9x9 Overclock Gate", "Hotkey": "3", "AttackRange": 14, "Cooldown": 11.3, "Name": "Overclock Gate #108", "AreaWidth": 9, "DamageMultiplier": 3.2, "AutoCast": false, "AreaHeight": 9, "ManaCost": 85}

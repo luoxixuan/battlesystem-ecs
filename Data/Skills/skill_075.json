@@ -1,1 +1,1 @@
-﻿{"Description":"3x3 Doom Shot","Hotkey":"5","AttackRange":5,"Cooldown":8,"Name":"Doom Shot #75","AreaWidth":3,"DamageMultiplier":7.7,"AutoCast":false,"AreaHeight":3}
+﻿{"Description": "3x3 Doom Shot", "Hotkey": "5", "AttackRange": 5, "Cooldown": 8, "Name": "Doom Shot #75", "AreaWidth": 3, "DamageMultiplier": 7.7, "AutoCast": false, "AreaHeight": 3, "ManaCost": 80}

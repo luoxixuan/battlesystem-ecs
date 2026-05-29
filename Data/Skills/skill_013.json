@@ -1,1 +1,1 @@
-﻿{"Description":"4x4 Blackout Protocol","Hotkey":"D","AttackRange":3,"Cooldown":1.8,"Name":"Blackout Protocol #13","AreaWidth":4,"DamageMultiplier":1.5,"AutoCast":false,"AreaHeight":4}
+﻿{"Description": "4x4 Blackout Protocol", "Hotkey": "D", "AttackRange": 3, "Cooldown": 1.8, "Name": "Blackout Protocol #13", "AreaWidth": 4, "DamageMultiplier": 1.5, "AutoCast": false, "AreaHeight": 4, "ManaCost": 30}

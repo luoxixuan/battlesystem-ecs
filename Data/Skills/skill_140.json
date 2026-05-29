@@ -1,1 +1,1 @@
-﻿{"Description":"5x5 Quantum Beam","Hotkey":"Z","AttackRange":10,"Cooldown":14.5,"Name":"Quantum Beam #140","AreaWidth":5,"DamageMultiplier":6.4,"AutoCast":false,"AreaHeight":5}
+﻿{"Description": "5x5 Quantum Beam", "Hotkey": "Z", "AttackRange": 10, "Cooldown": 14.5, "Name": "Quantum Beam #140", "AreaWidth": 5, "DamageMultiplier": 6.4, "AutoCast": false, "AreaHeight": 5, "ManaCost": 110}

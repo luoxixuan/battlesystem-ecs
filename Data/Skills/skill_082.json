@@ -1,1 +1,1 @@
-﻿{"Description":"1x1 Plasma Zone","Hotkey":"C","AttackRange":12,"Cooldown":8.7,"Name":"Plasma Zone #82","AreaWidth":1,"DamageMultiplier":0.6,"AutoCast":false,"AreaHeight":1}
+﻿{"Description": "1x1 Plasma Zone", "Hotkey": "C", "AttackRange": 12, "Cooldown": 8.7, "Name": "Plasma Zone #82", "AreaWidth": 1, "DamageMultiplier": 0.6, "AutoCast": false, "AreaHeight": 1, "ManaCost": 60}

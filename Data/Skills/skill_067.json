@@ -1,1 +1,1 @@
-﻿{"Description":"4x4 Phase Flux","Hotkey":"W","AttackRange":9,"Cooldown":7.2,"Name":"Phase Flux #67","AreaWidth":4,"DamageMultiplier":6.9,"AutoCast":false,"AreaHeight":4}
+﻿{"Description": "4x4 Phase Flux", "Hotkey": "W", "AttackRange": 9, "Cooldown": 7.2, "Name": "Phase Flux #67", "AreaWidth": 4, "DamageMultiplier": 6.9, "AutoCast": false, "AreaHeight": 4, "ManaCost": 75}

@@ -1,1 +1,1 @@
-﻿{"Description":"3x3 Phase Shot","Hotkey":"7","AttackRange":5,"Cooldown":15.2,"Name":"Phase Shot #147","AreaWidth":3,"DamageMultiplier":7.1,"AutoCast":false,"AreaHeight":3}
+﻿{"Description": "3x3 Phase Shot", "Hotkey": "7", "AttackRange": 5, "Cooldown": 15.2, "Name": "Phase Shot #147", "AreaWidth": 3, "DamageMultiplier": 7.1, "AutoCast": false, "AreaHeight": 3, "ManaCost": 115}

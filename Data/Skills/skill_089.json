@@ -1,1 +1,1 @@
-﻿{"Description":"8x8 System Nova","Hotkey":"J","AttackRange":7,"Cooldown":9.4,"Name":"System Nova #89","AreaWidth":8,"DamageMultiplier":1.3,"AutoCast":false,"AreaHeight":8}
+﻿{"Description": "8x8 System Nova", "Hotkey": "J", "AttackRange": 7, "Cooldown": 9.4, "Name": "System Nova #89", "AreaWidth": 8, "DamageMultiplier": 1.3, "AutoCast": false, "AreaHeight": 8, "ManaCost": 70}

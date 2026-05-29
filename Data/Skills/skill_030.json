@@ -1,1 +1,1 @@
-﻿{"Description":"3x3 Null Burst","Hotkey":"U","AttackRange":8,"Cooldown":3.5,"Name":"Null Burst #30","AreaWidth":3,"DamageMultiplier":3.2,"AutoCast":false,"AreaHeight":3}
+﻿{"Description": "3x3 Null Burst", "Hotkey": "U", "AttackRange": 8, "Cooldown": 3.5, "Name": "Null Burst #30", "AreaWidth": 3, "DamageMultiplier": 3.2, "AutoCast": false, "AreaHeight": 3, "ManaCost": 45}

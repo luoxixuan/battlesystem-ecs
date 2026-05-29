@@ -1,1 +1,1 @@
-﻿{"Description":"2x2 Null Spike","Hotkey":"5","AttackRange":4,"Cooldown":11.5,"Name":"Null Spike #110","AreaWidth":2,"DamageMultiplier":3.4,"AutoCast":false,"AreaHeight":2}
+﻿{"Description": "2x2 Null Spike", "Hotkey": "5", "AttackRange": 4, "Cooldown": 11.5, "Name": "Null Spike #110", "AreaWidth": 2, "DamageMultiplier": 3.4, "AutoCast": false, "AreaHeight": 2, "ManaCost": 85}

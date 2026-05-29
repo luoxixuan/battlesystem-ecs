@@ -1,1 +1,1 @@
-﻿{"Description":"8x8 Overclock Strike","Hotkey":"8","AttackRange":10,"Cooldown":1.3,"Name":"Overclock Strike #8","AreaWidth":8,"DamageMultiplier":1,"AutoCast":false,"AreaHeight":8}
+﻿{"Description": "8x8 Overclock Strike", "Hotkey": "8", "AttackRange": 10, "Cooldown": 1.3, "Name": "Overclock Strike #8", "AreaWidth": 8, "DamageMultiplier": 1, "AutoCast": false, "AreaHeight": 8, "ManaCost": 25}

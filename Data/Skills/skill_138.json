@@ -1,1 +1,1 @@
-﻿{"Description":"3x3 Chrome Pulse","Hotkey":"X","AttackRange":8,"Cooldown":14.3,"Name":"Chrome Pulse #138","AreaWidth":3,"DamageMultiplier":6.2,"AutoCast":false,"AreaHeight":3}
+﻿{"Description": "3x3 Chrome Pulse", "Hotkey": "X", "AttackRange": 8, "Cooldown": 14.3, "Name": "Chrome Pulse #138", "AreaWidth": 3, "DamageMultiplier": 6.2, "AutoCast": false, "AreaHeight": 3, "ManaCost": 105}

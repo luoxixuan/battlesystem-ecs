@@ -1,1 +1,1 @@
-﻿{"Description":"4x4 Plasma Surge","Hotkey":"M","AttackRange":12,"Cooldown":2.7,"Name":"Plasma Surge #22","AreaWidth":4,"DamageMultiplier":2.4,"AutoCast":false,"AreaHeight":4}
+﻿{"Description": "4x4 Plasma Surge", "Hotkey": "M", "AttackRange": 12, "Cooldown": 2.7, "Name": "Plasma Surge #22", "AreaWidth": 4, "DamageMultiplier": 2.4, "AutoCast": false, "AreaHeight": 4, "ManaCost": 40}

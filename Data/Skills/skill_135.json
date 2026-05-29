@@ -1,1 +1,1 @@
-﻿{"Description":"9x9 Doom Bomb","Hotkey":"U","AttackRange":5,"Cooldown":14,"Name":"Doom Bomb #135","AreaWidth":9,"DamageMultiplier":5.9,"AutoCast":false,"AreaHeight":9}
+﻿{"Description": "9x9 Doom Bomb", "Hotkey": "U", "AttackRange": 5, "Cooldown": 14, "Name": "Doom Bomb #135", "AreaWidth": 9, "DamageMultiplier": 5.9, "AutoCast": false, "AreaHeight": 9, "ManaCost": 105}

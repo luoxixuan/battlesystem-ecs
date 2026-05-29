@@ -1,1 +1,1 @@
-﻿{"Description":"1x1 Blackout Breaker","Hotkey":"3","AttackRange":3,"Cooldown":7.8,"Name":"Blackout Breaker #73","AreaWidth":1,"DamageMultiplier":7.5,"AutoCast":false,"AreaHeight":1}
+﻿{"Description": "1x1 Blackout Breaker", "Hotkey": "3", "AttackRange": 3, "Cooldown": 7.8, "Name": "Blackout Breaker #73", "AreaWidth": 1, "DamageMultiplier": 7.5, "AutoCast": false, "AreaHeight": 1, "ManaCost": 80}

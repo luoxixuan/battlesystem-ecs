@@ -1,1 +1,1 @@
-﻿{"Description":"5x5 Neon Worm","Hotkey":"7","AttackRange":7,"Cooldown":8.2,"Name":"Neon Worm #77","AreaWidth":5,"DamageMultiplier":7.9,"AutoCast":false,"AreaHeight":5}
+﻿{"Description": "5x5 Neon Worm", "Hotkey": "7", "AttackRange": 7, "Cooldown": 8.2, "Name": "Neon Worm #77", "AreaWidth": 5, "DamageMultiplier": 7.9, "AutoCast": false, "AreaHeight": 5, "ManaCost": 80}

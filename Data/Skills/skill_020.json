@@ -1,1 +1,1 @@
-﻿{"Description":"2x2 Quantum Beam","Hotkey":"K","AttackRange":10,"Cooldown":2.5,"Name":"Quantum Beam #20","AreaWidth":2,"DamageMultiplier":2.2,"AutoCast":false,"AreaHeight":2}
+﻿{"Description": "2x2 Quantum Beam", "Hotkey": "K", "AttackRange": 10, "Cooldown": 2.5, "Name": "Quantum Beam #20", "AreaWidth": 2, "DamageMultiplier": 2.2, "AutoCast": false, "AreaHeight": 2, "ManaCost": 35}

@@ -1,1 +1,1 @@
-﻿{"Description":"1x1 Data Flux","Hotkey":"L","AttackRange":9,"Cooldown":9.6,"Name":"Data Flux #91","AreaWidth":1,"DamageMultiplier":1.5,"AutoCast":false,"AreaHeight":1}
+﻿{"Description": "1x1 Data Flux", "Hotkey": "L", "AttackRange": 9, "Cooldown": 9.6, "Name": "Data Flux #91", "AreaWidth": 1, "DamageMultiplier": 1.5, "AutoCast": false, "AreaHeight": 1, "ManaCost": 70}

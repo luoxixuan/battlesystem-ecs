@@ -1,1 +1,1 @@
-﻿{"Description":"7x7 Firewall Zone","Hotkey":"1","AttackRange":12,"Cooldown":11.1,"Name":"Firewall Zone #106","AreaWidth":7,"DamageMultiplier":3,"AutoCast":false,"AreaHeight":7}
+﻿{"Description": "7x7 Firewall Zone", "Hotkey": "1", "AttackRange": 12, "Cooldown": 11.1, "Name": "Firewall Zone #106", "AreaWidth": 7, "DamageMultiplier": 3, "AutoCast": false, "AreaHeight": 7, "ManaCost": 80}

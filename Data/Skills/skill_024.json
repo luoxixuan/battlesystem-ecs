@@ -1,1 +1,1 @@
-﻿{"Description":"6x6 Ion Field","Hotkey":"O","AttackRange":14,"Cooldown":2.9,"Name":"Ion Field #24","AreaWidth":6,"DamageMultiplier":2.6,"AutoCast":false,"AreaHeight":6}
+﻿{"Description": "6x6 Ion Field", "Hotkey": "O", "AttackRange": 14, "Cooldown": 2.9, "Name": "Ion Field #24", "AreaWidth": 6, "DamageMultiplier": 2.6, "AutoCast": false, "AreaHeight": 6, "ManaCost": 40}

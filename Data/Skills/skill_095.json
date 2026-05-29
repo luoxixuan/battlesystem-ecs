@@ -1,1 +1,1 @@
-﻿{"Description":"5x5 Doom Blast","Hotkey":"P","AttackRange":13,"Cooldown":10,"Name":"Doom Blast #95","AreaWidth":5,"DamageMultiplier":1.9,"AutoCast":false,"AreaHeight":5}
+﻿{"Description": "5x5 Doom Blast", "Hotkey": "P", "AttackRange": 13, "Cooldown": 10, "Name": "Doom Blast #95", "AreaWidth": 5, "DamageMultiplier": 1.9, "AutoCast": false, "AreaHeight": 5, "ManaCost": 75}
