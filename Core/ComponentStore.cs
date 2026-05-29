@@ -618,6 +618,20 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // TowerCurseDmgTakenIncrease: additional damage taken bonus applied to cursed enemies (e.g. 0.25 = +25% damage taken)
         public float[] TowerCurseDmgTakenIncrease = new float[MAX_ENTITIES];
 
+        // ==================== 牵引/磁力/漩涡塔 (Pull / Magnet / Vortex Towers) ====================
+        // TowerIsPullTower: true if this tower applies gravitational pull to nearby enemies
+        public bool[] TowerIsPullTower = new bool[MAX_ENTITIES];
+        // TowerPullStrength: pull force magnitude (units per second toward tower center)
+        public float[] TowerPullStrength = new float[MAX_ENTITIES];
+        // TowerPullRadius: radius within which enemies are pulled toward the tower
+        public float[] TowerPullRadius = new float[MAX_ENTITIES];
+        // TowerPullCooldown: cooldown between pull pulses in seconds (0 = continuous pull)
+        public float[] TowerPullCooldown = new float[MAX_ENTITIES];
+        // TowerPullTimer: remaining cooldown time in seconds
+        public float[] TowerPullTimer = new float[MAX_ENTITIES];
+        // EnemyIsBeingPulled: true if this enemy is currently affected by a pull effect
+        public bool[] EnemyIsBeingPulled = new bool[MAX_ENTITIES];
+
         // ==================== 塔被动资源生产（Income Tower）====================
         // TowerIsIncomeTower: true if this tower generates gold passively instead of attacking
         public bool[] TowerIsIncomeTower = new bool[MAX_ENTITIES];
@@ -1081,6 +1095,8 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
                 EnemyCurseSpeedReduction[entityId] = 0f;
                 EnemyCurseArmorReduction[entityId] = 0f;
                 EnemyCurseDmgTakenIncrease[entityId] = 0f;
+                // Pull debuff field (applied by pull towers)
+                EnemyIsBeingPulled[entityId] = false;
                 // Boss phase / enrage fields
                 EnemyBossPhase[entityId] = 0;
                 EnemyPhaseThresholds[entityId] = null;
@@ -1466,6 +1482,12 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             TowerCurseSpeedReduction[entityId] = 0f;
             TowerCurseArmorReduction[entityId] = 0f;
             TowerCurseDmgTakenIncrease[entityId] = 0f;
+            // Pull tower fields: default to non-pull (false/0)
+            TowerIsPullTower[entityId] = false;
+            TowerPullStrength[entityId] = 0f;
+            TowerPullRadius[entityId] = 0f;
+            TowerPullCooldown[entityId] = 0f;
+            TowerPullTimer[entityId] = 0f;
             // Ammo fields: default to unlimited (maxAmmo=0 means infinite)
             TowerCurrentAmmo[entityId] = 0;
             TowerMaxAmmo[entityId] = 0;
@@ -1529,6 +1551,12 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             TowerCurseSpeedReduction[entityId] = 0f;
             TowerCurseArmorReduction[entityId] = 0f;
             TowerCurseDmgTakenIncrease[entityId] = 0f;
+            // Pull tower fields reset
+            TowerIsPullTower[entityId] = false;
+            TowerPullStrength[entityId] = 0f;
+            TowerPullRadius[entityId] = 0f;
+            TowerPullCooldown[entityId] = 0f;
+            TowerPullTimer[entityId] = 0f;
             // Ammo fields reset
             TowerCurrentAmmo[entityId] = 0;
             TowerMaxAmmo[entityId] = 0;

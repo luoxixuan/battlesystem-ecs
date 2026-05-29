@@ -67,6 +67,7 @@ namespace BattleSystemECS.Core
         public TowerDispelSystem? Dispel { get; set; }
         public CurseAuraSystem? Curse { get; set; }
         public TowerLinkSystem? TowerLink { get; set; }
+        public PullTowerSystem? PullTower { get; set; }
         public AdaptiveDifficultySystem? AdaptiveDifficulty { get; set; }
         public CorpseEffectSystem? CorpseEffect { get; set; }
         public NestSystem? Nest { get; set; }
@@ -189,6 +190,7 @@ namespace BattleSystemECS.Core
             Skill?.SetTurn(turn);
             AuraTower?.SetTurn();
             Curse?.SetTurn();
+            PullTower?.SetTurn();
             Mana?.SetTurn(); // cache tech tree mana bonuses
 
             // ── Phase 5: Spatial Rebuild ──────────────────────────────────
@@ -212,6 +214,7 @@ namespace BattleSystemECS.Core
             TowerLink?.Update();
             AuraTower?.ResolveAuraBuffs();
             Curse?.ResolveCurseDebuffs();
+            PullTower?.Update(effectiveDelta);
             TowerSilence?.Update(effectiveDelta);
             Dispel?.Update(effectiveDelta);
             Projectile?.Update(effectiveDelta);

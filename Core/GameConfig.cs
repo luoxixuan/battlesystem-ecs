@@ -124,6 +124,14 @@ namespace BattleSystemECS.Config
         public float CurseArmorReduction { get; set; } = 0f;
         // CurseDmgTakenIncrease: additional damage taken bonus applied to cursed enemies (0.25 = +25% damage taken)
         public float CurseDmgTakenIncrease { get; set; } = 0f;
+        // Pull tower: if true, tower applies gravitational pull to enemies in range
+        public bool IsPullTower { get; set; } = false;
+        // PullStrength: force magnitude pulling enemies toward the tower per second
+        public float PullStrength { get; set; } = 0f;
+        // PullRadius: radius within which enemies are pulled toward the tower
+        public float PullRadius { get; set; } = 0f;
+        // PullCooldown: seconds between pull pulses (0 = continuous/always-on pull)
+        public float PullCooldown { get; set; } = 0f;
     }
 
     /// <summary>

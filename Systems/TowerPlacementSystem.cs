@@ -166,6 +166,16 @@ namespace BattleSystemECS.Systems
                         store.TowerCurseDmgTakenIncrease[towerId] = tc.CurseDmgTakenIncrease;
                         logger.Log($"[TOWER] {tc.Name} 诅咒塔: 半径 {tc.CurseRadius}, 减伤 {tc.CurseDmgReduction}, 减速 {tc.CurseSpeedReduction}, 护甲削减 {tc.CurseArmorReduction}, 增伤 {tc.CurseDmgTakenIncrease}");
                     }
+                    // Apply pull tower properties (gravitational pull)
+                    if (tc.IsPullTower)
+                    {
+                        store.TowerIsPullTower[towerId] = true;
+                        store.TowerPullStrength[towerId] = tc.PullStrength;
+                        store.TowerPullRadius[towerId] = tc.PullRadius;
+                        store.TowerPullCooldown[towerId] = tc.PullCooldown;
+                        store.TowerPullTimer[towerId] = 0f;
+                        logger.Log($"[TOWER] {tc.Name} 牵引塔: 半径 {tc.PullRadius}, 拉力 {tc.PullStrength}, 冷却 {tc.PullCooldown}");
+                    }
                 }
                 else
                 {

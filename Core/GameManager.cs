@@ -38,6 +38,7 @@ namespace BattleSystemECS.Core
         private TowerSynergySystem towerSynergySystem;    // 塔协同增益系统
         private AuraTowerSystem auraTowerSystem;          // 光环辅助塔系统
         private CurseAuraSystem curseAuraSystem;          // 诅咒光环塔系统
+        private PullTowerSystem pullTowerSystem;          // 牵引塔系统
         private ProjectileSystem projectileSystem;        // 弹道/飞行道具系统
         private TerrainSystem terrainSystem;              // 地形效果系统
         private PathfindingSystem pathfindingSystem;     // 路径分叉/路点系统
@@ -256,6 +257,7 @@ logger.Log("      ComboSystem created successfully!");
             logger.Log("[BOOTSTRAP]    - Creating AuraTowerSystem...");
             auraTowerSystem = new AuraTowerSystem(store);
             curseAuraSystem = new CurseAuraSystem(store);
+            pullTowerSystem = new PullTowerSystem(store);
             logger.Log("[BOOTSTRAP]      AuraTowerSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating ProjectileSystem...");
@@ -352,6 +354,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.TowerSynergy = towerSynergySystem;
             scheduler.AuraTower = auraTowerSystem;
             scheduler.Curse = curseAuraSystem;
+            scheduler.PullTower = pullTowerSystem;
             scheduler.Projectile = projectileSystem;
             scheduler.Terrain = terrainSystem;
             scheduler.Pathfinding = pathfindingSystem;
