@@ -112,6 +112,18 @@ namespace BattleSystemECS.Config
         public bool IsIncomeTower { get; set; } = false;
         // GoldPerSecond: gold generated per second (only meaningful if IsIncomeTower = true)
         public float GoldPerSecond { get; set; } = 0f;
+        // Curse tower: if true, tower applies curse aura debuff to nearby enemies
+        public bool IsCurseTower { get; set; } = false;
+        // CurseRadius: radius within which the curse effect applies (in grid units)
+        public float CurseRadius { get; set; } = 0f;
+        // CurseDmgReduction: damage reduction applied to cursed enemies (0.2 = -20% damage)
+        public float CurseDmgReduction { get; set; } = 0f;
+        // CurseSpeedReduction: move speed reduction applied to cursed enemies (0.3 = -30% speed)
+        public float CurseSpeedReduction { get; set; } = 0f;
+        // CurseArmorReduction: armor reduction applied to cursed enemies (0.15 = -15% armor)
+        public float CurseArmorReduction { get; set; } = 0f;
+        // CurseDmgTakenIncrease: additional damage taken bonus applied to cursed enemies (0.25 = +25% damage taken)
+        public float CurseDmgTakenIncrease { get; set; } = 0f;
     }
 
     /// <summary>

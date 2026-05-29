@@ -155,6 +155,17 @@ namespace BattleSystemECS.Systems
                         store.TowerGoldPerSecond[towerId] = tc.GoldPerSecond;
                         logger.Log($"[TOWER] {tc.Name} 经济塔: 每秒 +{tc.GoldPerSecond} 金币");
                     }
+                    // Apply curse tower properties (debuff aura)
+                    if (tc.IsCurseTower)
+                    {
+                        store.TowerIsCurseTower[towerId] = true;
+                        store.TowerCurseRadius[towerId] = tc.CurseRadius;
+                        store.TowerCurseDmgReduction[towerId] = tc.CurseDmgReduction;
+                        store.TowerCurseSpeedReduction[towerId] = tc.CurseSpeedReduction;
+                        store.TowerCurseArmorReduction[towerId] = tc.CurseArmorReduction;
+                        store.TowerCurseDmgTakenIncrease[towerId] = tc.CurseDmgTakenIncrease;
+                        logger.Log($"[TOWER] {tc.Name} 诅咒塔: 半径 {tc.CurseRadius}, 减伤 {tc.CurseDmgReduction}, 减速 {tc.CurseSpeedReduction}, 护甲削减 {tc.CurseArmorReduction}, 增伤 {tc.CurseDmgTakenIncrease}");
+                    }
                 }
                 else
                 {

@@ -234,6 +234,15 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float[] EnemyArmorShredStacks = new float[MAX_ENTITIES];
         // Duration in turns remaining for armor shred stacks. 0 = no active shred.
         public float[] EnemyArmorShredDuration = new float[MAX_ENTITIES];
+        // Curse debuff: stacks of curse applied by curse towers. Each aura accumulates additively.
+        // CurseDmgReduction: damage output reduction (e.g. 0.2 = -20% attack damage)
+        public float[] EnemyCurseDmgReduction = new float[MAX_ENTITIES];
+        // CurseSpeedReduction: move speed reduction (e.g. 0.3 = -30% move speed)
+        public float[] EnemyCurseSpeedReduction = new float[MAX_ENTITIES];
+        // CurseArmorReduction: armor reduction (e.g. 0.15 = -15% armor)
+        public float[] EnemyCurseArmorReduction = new float[MAX_ENTITIES];
+        // CurseDmgTakenIncrease: additional damage taken bonus (e.g. 0.25 = +25% damage taken from attacks)
+        public float[] EnemyCurseDmgTakenIncrease = new float[MAX_ENTITIES];
         // ==================== 敌人 CC (Crowd Control) 字段 ====================
         // Grouped together after all enemy hot-path fields to preserve cache locality
         // EnemyStunFlag: legacy bool, kept for backward compat; use EnemyStunDurationLeft for correctness
@@ -594,6 +603,20 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float[] TowerDispelTimer = new float[MAX_ENTITIES];
         // TowerDispelImmunityTimer: immunity duration in turns after dispel expires (prevents rapid re-dispel)
         public float[] TowerDispelImmunityTimer = new float[MAX_ENTITIES];
+
+        // ==================== 诅咒/削弱光环塔 (Curse Tower) ====================
+        // TowerIsCurseTower: true if this tower is a curse aura tower that debuffs nearby enemies
+        public bool[] TowerIsCurseTower = new bool[MAX_ENTITIES];
+        // TowerCurseRadius: radius within which the curse effect applies (in grid units)
+        public float[] TowerCurseRadius = new float[MAX_ENTITIES];
+        // TowerCurseDmgReduction: damage reduction applied to cursed enemies (e.g. 0.2 = -20% damage)
+        public float[] TowerCurseDmgReduction = new float[MAX_ENTITIES];
+        // TowerCurseSpeedReduction: speed reduction applied to cursed enemies (e.g. 0.3 = -30% move speed)
+        public float[] TowerCurseSpeedReduction = new float[MAX_ENTITIES];
+        // TowerCurseArmorReduction: armor reduction applied to cursed enemies (e.g. 0.15 = -15% armor)
+        public float[] TowerCurseArmorReduction = new float[MAX_ENTITIES];
+        // TowerCurseDmgTakenIncrease: additional damage taken bonus applied to cursed enemies (e.g. 0.25 = +25% damage taken)
+        public float[] TowerCurseDmgTakenIncrease = new float[MAX_ENTITIES];
 
         // ==================== 塔被动资源生产（Income Tower）====================
         // TowerIsIncomeTower: true if this tower generates gold passively instead of attacking
@@ -1053,6 +1076,11 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
                 EnemySlowResistance[entityId] = 0f;
                 EnemyKnockbackResistance[entityId] = 0f;
                 EnemyDamageResistance[entityId] = 0f;
+                // Curse debuff fields (applied by curse towers)
+                EnemyCurseDmgReduction[entityId] = 0f;
+                EnemyCurseSpeedReduction[entityId] = 0f;
+                EnemyCurseArmorReduction[entityId] = 0f;
+                EnemyCurseDmgTakenIncrease[entityId] = 0f;
                 // Boss phase / enrage fields
                 EnemyBossPhase[entityId] = 0;
                 EnemyPhaseThresholds[entityId] = null;
@@ -1092,6 +1120,13 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
                 TowerIsDispelled[entityId] = false;
                 TowerDispelTimer[entityId] = 0f;
                 TowerDispelImmunityTimer[entityId] = 0f;
+                // Curse tower fields
+                TowerIsCurseTower[entityId] = false;
+                TowerCurseRadius[entityId] = 0f;
+                TowerCurseDmgReduction[entityId] = 0f;
+                TowerCurseSpeedReduction[entityId] = 0f;
+                TowerCurseArmorReduction[entityId] = 0f;
+                TowerCurseDmgTakenIncrease[entityId] = 0f;
                 // Ammo fields
                 TowerCurrentAmmo[entityId] = 0;
                 TowerMaxAmmo[entityId] = 0;
@@ -1424,6 +1459,13 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             TowerAuraDamageBonus[entityId] = 0f;
             TowerCanHitAir[entityId] = true;
             TowerCanHitGround[entityId] = true;
+            // Curse tower fields: default to non-curse (false/0)
+            TowerIsCurseTower[entityId] = false;
+            TowerCurseRadius[entityId] = 0f;
+            TowerCurseDmgReduction[entityId] = 0f;
+            TowerCurseSpeedReduction[entityId] = 0f;
+            TowerCurseArmorReduction[entityId] = 0f;
+            TowerCurseDmgTakenIncrease[entityId] = 0f;
             // Ammo fields: default to unlimited (maxAmmo=0 means infinite)
             TowerCurrentAmmo[entityId] = 0;
             TowerMaxAmmo[entityId] = 0;
@@ -1480,6 +1522,13 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             TowerIsDispelled[entityId] = false;
             TowerDispelTimer[entityId] = 0f;
             TowerDispelImmunityTimer[entityId] = 0f;
+            // Curse tower fields reset
+            TowerIsCurseTower[entityId] = false;
+            TowerCurseRadius[entityId] = 0f;
+            TowerCurseDmgReduction[entityId] = 0f;
+            TowerCurseSpeedReduction[entityId] = 0f;
+            TowerCurseArmorReduction[entityId] = 0f;
+            TowerCurseDmgTakenIncrease[entityId] = 0f;
             // Ammo fields reset
             TowerCurrentAmmo[entityId] = 0;
             TowerMaxAmmo[entityId] = 0;
