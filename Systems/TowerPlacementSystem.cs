@@ -187,6 +187,14 @@ namespace BattleSystemECS.Systems
                         store.TowerBleedDuration[towerId] = tc.BleedDuration;
                         logger.Log($"[TOWER] {tc.Name} 流血塔: 每击 {tc.BleedStacksPerHit} 层, 伤害 {tc.BleedDmgPct * 100}% HP/层, 间隔 {tc.BleedTickInterval}s, 最大 {tc.BleedMaxStacks} 层");
                     }
+                    // Apply chrono tower properties (time dilation field)
+                    if (tc.IsChronoTower)
+                    {
+                        store.TowerIsChronoTower[towerId] = true;
+                        store.TowerTimeFieldRadius[towerId] = tc.TimeFieldRadius;
+                        store.TowerTimeScale[towerId] = tc.TimeScale;
+                        logger.Log($"[TOWER] {tc.Name} 时间塔: 半径 {tc.TimeFieldRadius}, 时间缩放 {tc.TimeScale:F1}x");
+                    }
                 }
                 else
                 {

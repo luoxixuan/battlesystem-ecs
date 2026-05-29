@@ -63,6 +63,7 @@ namespace BattleSystemECS.Core
         private CorpseEffectSystem corpseEffectSystem; // 敌人尸体残留效果系统
         private PathModifierSystem pathModifierSystem; // 路径修改塔系统
         private RandomEventSystem randomEventSystem; // 随机事件/中期惊喜系统
+        private ChronoTowerSystem chronoTowerSystem; // 时间操纵塔系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -339,6 +340,10 @@ logger.Log("      ComboSystem created successfully!");
             randomEventSystem = new RandomEventSystem(store, gameConfig);
             logger.Log("      RandomEventSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating ChronoTowerSystem (time dilation fields)...");
+            chronoTowerSystem = new ChronoTowerSystem(store);
+            logger.Log("      ChronoTowerSystem created successfully!");
+
             // Wire OnEnemyKilled → ComboSystem (连击计数链路)
             store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
             // Wire OnEnemyKilled → NecromancerSystem (queue corpses for resurrection)
@@ -416,6 +421,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.CorpseEffect = corpseEffectSystem;
             scheduler.PathModifier = pathModifierSystem;
             scheduler.RandomEvent = randomEventSystem;
+            scheduler.ChronoTower = chronoTowerSystem;
 
             // 初始化地形网格（方向二：地图地块系统）
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)

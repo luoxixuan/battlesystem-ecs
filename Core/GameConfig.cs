@@ -168,6 +168,12 @@ namespace BattleSystemECS.Config
         public float BleedMaxStacks { get; set; } = 0f;
         // BleedDuration: total duration in seconds for bleed effect
         public float BleedDuration { get; set; } = 0f;
+        // Chrono tower: if true, tower creates a time dilation field that slows enemies within radius
+        public bool IsChronoTower { get; set; } = false;
+        // TimeFieldRadius: radius of the time dilation field (in grid units)
+        public float TimeFieldRadius { get; set; } = 0f;
+        // TimeScale: time scale applied to enemies in the field (e.g. 0.5 = 50% speed)
+        public float TimeScale { get; set; } = 1f;
     }
 
     /// <summary>

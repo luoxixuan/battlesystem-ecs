@@ -80,6 +80,7 @@ namespace BattleSystemECS.Core
         public EnemyBurrowSystem? Burrow { get; set; }
         public NecromancerSystem? Necromancer { get; set; }
         public RandomEventSystem? RandomEvent { get; set; }
+        public ChronoTowerSystem? ChronoTower { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -225,6 +226,10 @@ namespace BattleSystemECS.Core
 
             // ── Phase 5: Spatial Rebuild ──────────────────────────────────
             store.RebuildSpatialGrid();
+
+            // ── Phase 5.1: Chrono Tower — time dilation fields, after spatial rebuild ─
+            ChronoTower?.SetTurn();
+            ChronoTower?.Update();
 
             // ── Phase 5.5: Point Defense — intercept enemy projectiles before they hit ──
             PointDefense?.SetTurn(turn);

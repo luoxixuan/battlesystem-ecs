@@ -674,6 +674,18 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // 协同增益倍率（从 JSON config 读取并应用，如 bonusChainCount, dotDamageBonus）
         public float[] TowerSynergyMultiplier = new float[MAX_ENTITIES];
 
+        // ==================== 时间操纵塔（Chrono Tower）字段（SOA）====================
+        // TowerIsChronoTower: true if this tower is a Chrono Tower that slows enemies in a time field
+        public bool[] TowerIsChronoTower = new bool[MAX_ENTITIES];
+        // TowerTimeFieldRadius: radius of the time dilation field (in grid units), 0 = no field
+        public float[] TowerTimeFieldRadius = new float[MAX_ENTITIES];
+        // TowerTimeScale: time scale applied to enemies within this tower's field (e.g. 0.5 = 50% speed)
+        public float[] TowerTimeScale = new float[MAX_ENTITIES];
+        // EnemyTimeScale: per-enemy time scale multiplier from Chrono Tower fields (1.0 = normal)
+        // This is an accumulated value — multiple chrono towers take the minimum (slowest)
+        // Initialized to 1f so new enemies start at normal speed (no 0f default freeze risk)
+        public float[] EnemyTimeScale = new float[MAX_ENTITIES];
+
         // ==================== 光环辅助塔（Aura Tower）字段（SOA）====================
         // TowerIsAuraTower: true if this tower is an aura (support) tower that buffs nearby friendly towers
         public bool[] TowerIsAuraTower = new bool[MAX_ENTITIES];
@@ -1085,6 +1097,10 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             // Initialize tower kill queue buffers
             _towerKillQueue[0] = new ConcurrentBag<(int, int, int)>();
             _towerKillQueue[1] = new ConcurrentBag<(int, int, int)>();
+            // Initialize per-enemy time scale to 1f (normal speed) for all slots
+            // ChronoTowerSystem accumulates the minimum (slowest) from nearby towers each frame
+            for (int i = 0; i < MAX_ENTITIES; i++)
+                EnemyTimeScale[i] = 1f;
             // Initialize player buffs
             for (int i = 0; i < MAX_PLAYERS; i++)
             {
@@ -1698,6 +1714,10 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             TowerUpgradePathId[entityId] = null;
             TowerFusionTier[entityId] = 0;
             TowerSelected[entityId] = false;
+            // Chrono tower fields
+            TowerIsChronoTower[entityId] = false;
+            TowerTimeFieldRadius[entityId] = 0f;
+            TowerTimeScale[entityId] = 0f;
             // Aura tower fields reset
             TowerIsAuraTower[entityId] = false;
             TowerAuraRadius[entityId] = 0f;

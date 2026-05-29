@@ -120,6 +120,8 @@ namespace BattleSystemECS.Systems
                 float moveSpeed = store.EnemyMoveSpeed[enemyId];
                 // Apply terrain move speed modifier (Mud/Ice slow)
                 moveSpeed *= store.EnemyTerrainMoveSpeedMult[enemyId];
+                // Apply Chrono Tower time dilation (per-enemy, accumulated min across all chrono towers)
+                moveSpeed *= store.EnemyTimeScale[enemyId];
                 // Apply weather move speed modifier (Rain/Fog/Storm slow)
                 if (_weather != null)
                     moveSpeed *= _weather.GetEnemySpeedMultiplier(playerId);
