@@ -68,6 +68,7 @@ namespace BattleSystemECS.Core
         public CurseAuraSystem? Curse { get; set; }
         public TowerLinkSystem? TowerLink { get; set; }
         public PullTowerSystem? PullTower { get; set; }
+        public BleedSystem? Bleed { get; set; }
         public AdaptiveDifficultySystem? AdaptiveDifficulty { get; set; }
         public CorpseEffectSystem? CorpseEffect { get; set; }
         public NestSystem? Nest { get; set; }
@@ -232,6 +233,8 @@ namespace BattleSystemECS.Core
             Buff?.Update(effectiveDelta);
             Skill?.ResolveSkillDamage();
             Buff?.ResolveDotDamage();
+            Bleed?.Update(effectiveDelta);
+            Bleed?.ResolveBleedDamage();
             Skill?.Update(effectiveDelta); // skill cooldown ticking (WavePhase only path)
 
             // ── Phase 9: Death Resolve ─────────────────────────────────────

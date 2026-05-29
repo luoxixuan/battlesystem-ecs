@@ -176,6 +176,17 @@ namespace BattleSystemECS.Systems
                         store.TowerPullTimer[towerId] = 0f;
                         logger.Log($"[TOWER] {tc.Name} 牵引塔: 半径 {tc.PullRadius}, 拉力 {tc.PullStrength}, 冷却 {tc.PullCooldown}");
                     }
+                    // Apply bleed tower properties (stacking physical DoT)
+                    if (tc.IsBleedTower)
+                    {
+                        store.TowerIsBleedTower[towerId] = tc.IsBleedTower;
+                        store.TowerBleedStacksPerHit[towerId] = tc.BleedStacksPerHit;
+                        store.TowerBleedDmgPct[towerId] = tc.BleedDmgPct;
+                        store.TowerBleedTickInterval[towerId] = tc.BleedTickInterval > 0f ? tc.BleedTickInterval : 1f;
+                        store.TowerBleedMaxStacks[towerId] = tc.BleedMaxStacks;
+                        store.TowerBleedDuration[towerId] = tc.BleedDuration;
+                        logger.Log($"[TOWER] {tc.Name} 流血塔: 每击 {tc.BleedStacksPerHit} 层, 伤害 {tc.BleedDmgPct * 100}% HP/层, 间隔 {tc.BleedTickInterval}s, 最大 {tc.BleedMaxStacks} 层");
+                    }
                 }
                 else
                 {

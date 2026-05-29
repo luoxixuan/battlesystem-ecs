@@ -17,6 +17,7 @@ namespace BattleSystemECS.Systems
         private IRenderer logger;
         private TechTreeSystem techTreeSystem;
         private BuffSystem buffSystem;
+        private BleedSystem bleedSystem;
         private TowerExperienceSystem towerExperienceSystem;
         private ProjectileSystem projectileSystem;
         private WeatherSystem _weatherSystem; // injected for weather effects
@@ -140,6 +141,14 @@ namespace BattleSystemECS.Systems
         public void SetBuffSystem(BuffSystem buffSystem)
         {
             this.buffSystem = buffSystem;
+        }
+
+        /// <summary>
+        /// Inject BleedSystem reference for bleed application on tower hits.
+        /// </summary>
+        public void SetBleedSystem(BleedSystem bleedSystem)
+        {
+            this.bleedSystem = bleedSystem;
         }
 
         /// <summary>
@@ -706,7 +715,13 @@ int bestTarget = -1;
             // Phase 3b (serial): decay armor shred duration (1 turn per frame)
             DecayArmorShredStacks();
 
-            // Phase 3c (serial): resolve tower knockback — push enemies backward
+            // Phase 3c (serial): apply bleed stacks from bleed towers (Slash/Pierce type)
+            if (bleedSystem != null)
+            {
+                ApplyBleedStacks();
+            }
+
+            // Phase 3d (serial): resolve tower knockback — push enemies backward
             ResolveKnockback();
 
             // Phase 3d (serial): resolve fragmentation projectiles — spawn child projectiles
@@ -741,6 +756,44 @@ int bestTarget = -1;
                         store.EnemyArmorShredStacks[enemyId] = 0f;
                         store.EnemyArmorShredDuration[enemyId] = 0f;
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Apply bleed stacks from bleed towers to enemies in their attack range.
+        /// Called during Phase 3c debuff resolution (after armor shred decay, before knockback).
+        /// Only applies to towers with TowerIsBleedTower = true.
+        /// </summary>
+        private void ApplyBleedStacks()
+        {
+            foreach (int towerId in store.ActiveTowerIds)
+            {
+                if (!store.TowerIsBleedTower[towerId]) continue;
+
+                float stacksPerHit = store.TowerBleedStacksPerHit[towerId];
+                float dmgPct = store.TowerBleedDmgPct[towerId];
+                float duration = store.TowerBleedDuration[towerId];
+                if (stacksPerHit <= 0f || dmgPct <= 0f || duration <= 0f) continue;
+
+                // Tower position for range check
+                float tx = store.PositionX[towerId];
+                float ty = store.PositionY[towerId];
+                int range = store.TowerRange[towerId];
+                int rangeSq = range * range;
+
+                // Get all enemies in range (no need to check "bestTarget" — bleed applies to all in range)
+                foreach (int enemyId in store.ActiveEnemyIds)
+                {
+                    float ex = store.PositionX[enemyId];
+                    float ey = store.PositionY[enemyId];
+                    float dx = ex - tx;
+                    float dy = ey - ty;
+                    if (dx * dx + dy * dy > rangeSq) continue;
+                    if (!store.EnemyActive[enemyId]) continue;
+
+                    // Apply bleed: dmgPerStack = dmgPct (already a fraction like 0.01 = 1% of max HP per stack)
+                    bleedSystem.ApplyBleedFromTower(towerId, enemyId, stacksPerHit, dmgPct, duration);
                 }
             }
         }

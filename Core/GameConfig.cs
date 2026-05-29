@@ -132,6 +132,18 @@ namespace BattleSystemECS.Config
         public float PullRadius { get; set; } = 0f;
         // PullCooldown: seconds between pull pulses (0 = continuous/always-on pull)
         public float PullCooldown { get; set; } = 0f;
+        // Bleed tower: if true, tower applies stacking bleed on hit (Slash/Pierce type)
+        public bool IsBleedTower { get; set; } = false;
+        // BleedStacksPerHit: number of bleed stacks applied per successful hit
+        public float BleedStacksPerHit { get; set; } = 0f;
+        // BleedDmgPct: each stack deals BleedDmgPct * target's EnemyMaxHealth as damage per tick
+        public float BleedDmgPct { get; set; } = 0f;
+        // BleedTickInterval: seconds between bleed damage ticks
+        public float BleedTickInterval { get; set; } = 1f;
+        // BleedMaxStacks: maximum stacks that can be applied by this tower (0 = no cap)
+        public float BleedMaxStacks { get; set; } = 0f;
+        // BleedDuration: total duration in seconds for bleed effect
+        public float BleedDuration { get; set; } = 0f;
     }
 
     /// <summary>

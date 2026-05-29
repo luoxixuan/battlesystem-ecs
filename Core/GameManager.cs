@@ -39,6 +39,7 @@ namespace BattleSystemECS.Core
         private AuraTowerSystem auraTowerSystem;          // 光环辅助塔系统
         private CurseAuraSystem curseAuraSystem;          // 诅咒光环塔系统
         private PullTowerSystem pullTowerSystem;          // 牵引塔系统
+        private BleedSystem bleedSystem;                // 流血/撕裂 DoT 系统
         private ProjectileSystem projectileSystem;        // 弹道/飞行道具系统
         private TerrainSystem terrainSystem;              // 地形效果系统
         private PathfindingSystem pathfindingSystem;     // 路径分叉/路点系统
@@ -259,7 +260,8 @@ logger.Log("      ComboSystem created successfully!");
             auraTowerSystem = new AuraTowerSystem(store);
             curseAuraSystem = new CurseAuraSystem(store);
             pullTowerSystem = new PullTowerSystem(store);
-            logger.Log("[BOOTSTRAP]      AuraTowerSystem created successfully!");
+            bleedSystem = new BleedSystem(store, playerId);
+            logger.Log("[BOOTSTRAP]      PullTowerSystem + BleedSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating ProjectileSystem...");
             projectileSystem = new ProjectileSystem(store, logger);
@@ -324,6 +326,7 @@ logger.Log("      ComboSystem created successfully!");
 
             // Wire BuffSystem into TowerAttackSystem for Firewall DoT and Leech lifesteal
             towerAttackSystem.SetBuffSystem(buffSystem);
+            towerAttackSystem.SetBleedSystem(bleedSystem);
             // Wire TowerExperienceSystem into TowerAttackSystem for XP grant on kills
             towerAttackSystem.SetTowerExperienceSystem(towerExperienceSystem);
             // Wire ProjectileSystem into TowerAttackSystem for fragment projectile spawning
@@ -360,6 +363,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.AuraTower = auraTowerSystem;
             scheduler.Curse = curseAuraSystem;
             scheduler.PullTower = pullTowerSystem;
+            scheduler.Bleed = bleedSystem;
             scheduler.Projectile = projectileSystem;
             scheduler.Terrain = terrainSystem;
             scheduler.Pathfinding = pathfindingSystem;

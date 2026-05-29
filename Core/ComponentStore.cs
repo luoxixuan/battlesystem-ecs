@@ -261,6 +261,20 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float[] EnemyCurseArmorReduction = new float[MAX_ENTITIES];
         // CurseDmgTakenIncrease: additional damage taken bonus (e.g. 0.25 = +25% damage taken from attacks)
         public float[] EnemyCurseDmgTakenIncrease = new float[MAX_ENTITIES];
+        // ==================== 流血/撕裂 DoT (Bleed — Stacking Physical DoT) ====================
+        // EnemyBleedStacks: current number of bleed stacks on this enemy (0 = no bleed)
+        // Each stack deals damage equal to bleedPct * EnemyMaxHealth per tick
+        public float[] EnemyBleedStacks = new float[MAX_ENTITIES];
+        // EnemyBleedDamagePerStack: raw damage per stack per tick (set by tower on application)
+        public float[] EnemyBleedDamagePerStack = new float[MAX_ENTITIES];
+        // EnemyBleedTimer: remaining time in seconds until next bleed tick (decays to 0 → trigger tick)
+        public float[] EnemyBleedTimer = new float[MAX_ENTITIES];
+        // EnemyBleedMaxStacks: maximum bleed stacks this enemy can have (Boss = 0 = immune)
+        public float[] EnemyBleedMaxStacks = new float[MAX_ENTITIES];
+        // EnemyBleedResistance: fraction of bleed application that is resisted (0 = no resist, 0.7 = 70% resist)
+        public float[] EnemyBleedResistance = new float[MAX_ENTITIES];
+        // EnemyBleedDurationLeft: total duration remaining for the bleed effect in seconds
+        public float[] EnemyBleedDurationLeft = new float[MAX_ENTITIES];
         // ==================== 敌人 CC (Crowd Control) 字段 ====================
         // Grouped together after all enemy hot-path fields to preserve cache locality
         // EnemyStunFlag: legacy bool, kept for backward compat; use EnemyStunDurationLeft for correctness
@@ -649,6 +663,20 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float[] TowerPullTimer = new float[MAX_ENTITIES];
         // EnemyIsBeingPulled: true if this enemy is currently affected by a pull effect
         public bool[] EnemyIsBeingPulled = new bool[MAX_ENTITIES];
+
+        // ==================== 流血/撕裂塔 (Bleed / Hemorrhage Towers) ====================
+        // TowerIsBleedTower: true if this tower applies stacking bleed on hit (Slash/Pierce type)
+        public bool[] TowerIsBleedTower = new bool[MAX_ENTITIES];
+        // TowerBleedStacksPerHit: number of bleed stacks applied per successful hit
+        public float[] TowerBleedStacksPerHit = new float[MAX_ENTITIES];
+        // TowerBleedDmgPct: each stack deals TowerBleedDmgPct * target's EnemyMaxHealth per tick
+        public float[] TowerBleedDmgPct = new float[MAX_ENTITIES];
+        // TowerBleedTickInterval: seconds between bleed damage ticks (default 1f)
+        public float[] TowerBleedTickInterval = new float[MAX_ENTITIES];
+        // TowerBleedMaxStacks: maximum stacks that can be applied by this tower (0 = no cap)
+        public float[] TowerBleedMaxStacks = new float[MAX_ENTITIES];
+        // TowerBleedDuration: total duration in seconds for bleed effect
+        public float[] TowerBleedDuration = new float[MAX_ENTITIES];
 
         // ==================== 塔被动资源生产（Income Tower）====================
         // TowerIsIncomeTower: true if this tower generates gold passively instead of attacking
@@ -1115,6 +1143,13 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
                 EnemyCurseDmgTakenIncrease[entityId] = 0f;
                 // Pull debuff field (applied by pull towers)
                 EnemyIsBeingPulled[entityId] = false;
+                // Bleed/rupture debuff fields (applied by Slash/Pierce towers)
+                EnemyBleedStacks[entityId] = 0f;
+                EnemyBleedDamagePerStack[entityId] = 0f;
+                EnemyBleedTimer[entityId] = 0f;
+                EnemyBleedMaxStacks[entityId] = 0f;
+                EnemyBleedResistance[entityId] = 0f;
+                EnemyBleedDurationLeft[entityId] = 0f;
                 // Boss phase / enrage fields
                 EnemyBossPhase[entityId] = 0;
                 EnemyPhaseThresholds[entityId] = null;
@@ -1506,6 +1541,13 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             TowerPullRadius[entityId] = 0f;
             TowerPullCooldown[entityId] = 0f;
             TowerPullTimer[entityId] = 0f;
+            // Bleed tower fields: default to non-bleed (false/0)
+            TowerIsBleedTower[entityId] = false;
+            TowerBleedStacksPerHit[entityId] = 0f;
+            TowerBleedDmgPct[entityId] = 0f;
+            TowerBleedTickInterval[entityId] = 1f;
+            TowerBleedMaxStacks[entityId] = 0f;
+            TowerBleedDuration[entityId] = 0f;
             // Ammo fields: default to unlimited (maxAmmo=0 means infinite)
             TowerCurrentAmmo[entityId] = 0;
             TowerMaxAmmo[entityId] = 0;
@@ -1575,6 +1617,13 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             TowerPullRadius[entityId] = 0f;
             TowerPullCooldown[entityId] = 0f;
             TowerPullTimer[entityId] = 0f;
+            // Bleed tower fields reset
+            TowerIsBleedTower[entityId] = false;
+            TowerBleedStacksPerHit[entityId] = 0f;
+            TowerBleedDmgPct[entityId] = 0f;
+            TowerBleedTickInterval[entityId] = 1f;
+            TowerBleedMaxStacks[entityId] = 0f;
+            TowerBleedDuration[entityId] = 0f;
             // Ammo fields reset
             TowerCurrentAmmo[entityId] = 0;
             TowerMaxAmmo[entityId] = 0;
