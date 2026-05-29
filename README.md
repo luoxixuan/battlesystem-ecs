@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-29, commit `7211aea`）
+## 性能基准（2026-05-29, commit `b1f2a3d`）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **~5169 FPS**，400 帧，~0.19 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10293 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5614 FPS** |
+| **mode 5**（完整一局） | **~4979 FPS**，400 帧，~0.20 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10375 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5216 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -138,7 +138,7 @@ dotnet test
 
 > 仅记录功能上线和重大修复。日常基准波动见顶部性能基准表。
 
-- **2026-05-29**: 8 项业务系统扩展 — 法力消耗系统（150技能ManaCost）、金币窃取敌人（ThiefDef）、敌方治疗者（EnemyHealerSystem）、敌人驱散净化（TowerDispelSystem）、塔牺牲/自毁（TowerDemolishSystem）、敌人产卵巢穴（NestSystem）、塔被动产金（TowerIncomeSystem）、召唤战斗单位修复；bench2: 10406, bench4: 5638, bench5: 5050
+- **2026-05-29**: 8 项业务系统扩展 — 法力消耗系统（150技能ManaCost）、金币窃取敌人（ThiefDef）、敌方治疗者（EnemyHealerSystem）、敌人驱散净化（TowerDispelSystem）、塔牺牲/自毁（TowerDemolishSystem）、敌人产卵巢穴（NestSystem）、塔被动产金（TowerIncomeSystem）、召唤战斗单位修复；方向八：飞行/浮空敌人（EnemyIsFlying + TowerCanHitAir/Ground + 障碍物/地形跳过）；bench2: 10406→10375, bench4: 5638→5216, bench5: 5050→4979
 - **2026-05-28**: mode 5 完整一局压测上线（5关全通，400帧，6520 FPS）
 - **2026-05-28**: 方向八：肉盾/前锋敌人（Vanguard，伤害转移）；bench2: 9265, bench4: 5058, bench5: 4809
 - **2026-05-13**: 科技树系统上线（3分支 × 5节点，研究点数每波产出）

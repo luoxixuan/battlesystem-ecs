@@ -40,6 +40,12 @@ namespace BattleSystemECS.Config
         public float MagicResist { get; set; } = 0f;
         // Shield: absorbs incoming damage before health. Boss/Elite types can have shield.
         public float Shield { get; set; } = 0f;
+        // IsFlying: true if this is an airborne enemy (ignores obstacles, terrain effects)
+        public bool IsFlying { get; set; } = false;
+        // FlightHeight: flight altitude level (1=low, 2=high) — only meaningful if IsFlying=true
+        public float FlightHeight { get; set; } = 0f;
+        // CanLand: true if this flying enemy can land mid-flight and become a ground unit
+        public bool CanLand { get; set; } = false;
         // Boss: true if this monster type is a boss (participates in phase/enrage system).
         public bool IsBoss { get; set; } = false;
         // IsThief: true if this enemy steals gold instead of damaging base (GoldStealing direction)

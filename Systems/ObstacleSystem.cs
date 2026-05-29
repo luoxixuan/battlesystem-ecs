@@ -87,6 +87,10 @@ namespace BattleSystemECS.Systems
                 if (!store.EnemyActive[enemyId])
                     continue;
 
+                // Flying enemies ignore obstacle traps (they fly over barricades/spike traps)
+                if (store.EnemyIsFlying[enemyId])
+                    continue;
+
                 int enemyGridX = (int)store.PositionX[enemyId];
                 int enemyGridY = (int)store.PositionY[enemyId];
 

@@ -339,6 +339,14 @@ namespace BattleSystemECS.Systems
                     store.SetEntityName(enemyId, enemyName);
                     store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(monsterType);
 
+                    // Initialize flying enemy properties from monster config
+                    if (monsterConfig.IsFlying)
+                    {
+                        store.EnemyIsFlying[enemyId] = true;
+                        store.EnemyFlightHeight[enemyId] = monsterConfig.FlightHeight;
+                        store.EnemyCanLand[enemyId] = monsterConfig.CanLand;
+                    }
+
                     // Initialize fission capability (split-on-death)
                     int fissionDefId = gameConfig.GetFissionDefIdBySourceType(monsterType);
                     store.EnemyFissionDefId[enemyId] = fissionDefId;

@@ -53,6 +53,9 @@ namespace BattleSystemECS.Systems
             {
                 if (!store.EnemyActive[enemyId]) continue;
 
+                // Flying enemies ignore terrain effects (mud, ice, lava)
+                if (store.EnemyIsFlying[enemyId]) continue;
+
                 float worldX = store.PositionX[enemyId];
                 float worldY = store.PositionY[enemyId];
                 int terrainId = store.GetTerrainAtPosition(worldX, worldY);

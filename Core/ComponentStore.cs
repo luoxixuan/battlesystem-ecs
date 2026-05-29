@@ -257,6 +257,11 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public bool[] EnemyIsElite = new bool[MAX_ENTITIES];
         // EnemyIsFlying: true if this enemy is a flying unit (can only be hit by anti-air towers)
         public bool[] EnemyIsFlying = new bool[MAX_ENTITIES];
+        // EnemyFlightHeight: flight altitude level (0=ground, 1=low altitude, 2=high altitude)
+        // Affects which tower types can target this enemy
+        public float[] EnemyFlightHeight = new float[MAX_ENTITIES];
+        // EnemyCanLand: true if this flying enemy can land and become a ground unit
+        public bool[] EnemyCanLand = new bool[MAX_ENTITIES];
         // EnemyStealthMultiplier: per-entity stealth attack damage multiplier.
         // Set by stealth_attack ability, consumed and reset by EnemyAISystem attack methods.
         public float[] EnemyStealthMultiplier = new float[MAX_ENTITIES];
@@ -1013,6 +1018,8 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
                 EnemyKnockbackForceLeft[entityId] = 0f;
                 EnemyIsElite[entityId] = false;
                 EnemyIsFlying[entityId] = false;
+                EnemyFlightHeight[entityId] = 0f;
+                EnemyCanLand[entityId] = false;
                 EnemyStealthMultiplier[entityId] = 1f;
                 EnemyShield[entityId] = 0f;
                 EnemyThornsRatio[entityId] = 0f;

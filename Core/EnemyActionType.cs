@@ -23,6 +23,7 @@ namespace BattleSystemECS.Components
         StealthAttack = 13,
         Fear = 14,      // 恐惧：向反方向逃跑（远离玩家）
         Taunt = 15,     // 嘲讽：强制攻击特定目标
-        Charm = 16      // 魅惑：攻击其他敌人
+        Charm = 16,     // 魅惑：攻击其他敌人
+        Land = 17       // 着陆：飞行敌人着陆变为地面单位
     }
 }
