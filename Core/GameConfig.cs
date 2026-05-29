@@ -436,6 +436,29 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Path modifier definition — represents a path modification node placed by the player.
+    /// When an enemy enters the modifier's influence zone, it is forced to follow the
+    /// target path instead of its default path.
+    /// </summary>
+    public class PathModifierDef
+    {
+        public string Id { get; set; } = "";
+        // Name displayed to the player
+        public string Name { get; set; } = "";
+        // Cost in gold to place this modifier
+        public float Cost { get; set; } = 50f;
+        // Radius of influence in grid tiles
+        public float Radius { get; set; } = 2f;
+        // Target path ID to assign when enemy is inside influence zone
+        // 0 = default, 1 = fork_left, 2 = fork_right, 3 = ring
+        public int TargetPathId { get; set; } = 1;
+        // Duration in turns (0 = permanent)
+        public float Duration { get; set; } = 0f;
+        // Description for UI
+        public string Description { get; set; } = "";
+    }
+
+    /// <summary>
     /// Enemy morph (transform mid-wave) definition — loaded from enemy_morphs.json.
     /// When a monster's health drops below a threshold (or time trigger fires), it transforms
     /// into a different monster type with scaled stats.
@@ -960,6 +983,9 @@ namespace BattleSystemECS.Config
 
         // Corpse ground effect definitions (direction 9)
         public List<CorpseEffectDef> CorpseEffectDefs { get; set; } = new List<CorpseEffectDef>();
+
+        // Path modifier tower definitions (direction 7)
+        public List<PathModifierDef> PathModifiers { get; set; } = new List<PathModifierDef>();
 
         // Bank / Interest system configuration (direction 2)
         public BankConfig Bank { get; set; } = new BankConfig();

@@ -57,6 +57,7 @@ namespace BattleSystemECS.Core
         private TelegraphSystem telegraphSystem;     // 弹道预警区域系统
         private AdaptiveDifficultySystem adaptiveDifficultySystem; // 动态难度系统
         private CorpseEffectSystem corpseEffectSystem; // 敌人尸体残留效果系统
+        private PathModifierSystem pathModifierSystem; // 路径修改塔系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -309,6 +310,10 @@ logger.Log("      ComboSystem created successfully!");
             corpseEffectSystem.SubscribeToOnEnemyKilled();
             logger.Log("      CorpseEffectSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating PathModifierSystem (path modification towers)...");
+            pathModifierSystem = new PathModifierSystem(store);
+            logger.Log("      PathModifierSystem created successfully!");
+
             // Wire OnEnemyKilled → ComboSystem (连击计数链路)
             store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
             // Wire OnTowerKill → TowerExperienceSystem (XP 授予链路)
@@ -377,6 +382,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.Telegraph = telegraphSystem;
             scheduler.AdaptiveDifficulty = adaptiveDifficultySystem;
             scheduler.CorpseEffect = corpseEffectSystem;
+            scheduler.PathModifier = pathModifierSystem;
 
             // 初始化地形网格（方向二：地图地块系统）
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)

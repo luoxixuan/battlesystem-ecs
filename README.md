@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-29, commit `4da4784`）
+## 性能基准（2026-05-29, commit `af95740`）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **~4947 FPS**，400 帧，~0.20 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10214 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5344 FPS** |
+| **mode 5**（完整一局） | **~4826 FPS**，400 帧，~0.21 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10112 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5545 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -138,6 +138,7 @@ dotnet test
 
 > 仅记录功能上线和重大修复。日常基准波动见顶部性能基准表。
 
+- **2026-05-29**: 方向七：路径修改塔（PathModifierSystem + PathModifierDef + ComponentStore.PathModifier 组件）；bench2: 10112, bench4: 5545, bench5: 4826
 - **2026-05-29**: 方向三：牵引/磁力/漩涡塔（PullTowerSystem + TowerIsPullTower/PullStrength/PullRadius + EnemyIsBeingPulled）；bench2: 10128→10214, bench4: 5345→5344, bench5: 5007→4947
 - **2026-05-29**: 8 项业务系统扩展 — 法力消耗系统（150技能ManaCost）、金币窃取敌人（ThiefDef）、敌方治疗者（EnemyHealerSystem）、敌人驱散净化（TowerDispelSystem）、塔牺牲/自毁（TowerDemolishSystem）、敌人产卵巢穴（NestSystem）、塔被动产金（TowerIncomeSystem）、召唤战斗单位修复；方向八：飞行/浮空敌人（EnemyIsFlying + TowerCanHitAir/Ground + 障碍物/地形跳过）；bench2: 10406→10375, bench4: 5638→5216, bench5: 5050→4979
 - **2026-05-29**: 方向六：诅咒/削弱光环（CurseAuraSystem + TowerCurse/EnemyCurse 字段 + CurseTowerConfig）；bench2: 10375→10128, bench4: 5216→5345, bench5: 4979→5007

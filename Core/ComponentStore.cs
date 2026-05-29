@@ -135,6 +135,24 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Count of live nodes (maintained by ResourceNodeSystem)
         public int ActiveResourceNodeCount = 0;
 
+        // ==================== 路径修改塔组件（SOA）====================
+        // PathModifierX/Y: world position of the path modification influence point
+        public float[] PathModifierX = new float[MAX_ENTITIES];
+        public float[] PathModifierY = new float[MAX_ENTITIES];
+        // PathModifierRadius: radius of influence — enemies within range have their path rerouted
+        public float[] PathModifierRadius = new float[MAX_ENTITIES];
+        // PathModifierActive: true if this path modifier is currently active
+        public bool[] PathModifierActive = new bool[MAX_ENTITIES];
+        // PathModifierOwnerId: player who placed this modifier (-1 = neutral/none)
+        public int[] PathModifierOwnerId = new int[MAX_ENTITIES];
+        // PathModifierTargetPathId: the path ID enemies should follow when inside the influence zone
+        public int[] PathModifierTargetPathId = new int[MAX_ENTITIES];
+        // PathModifierTurnsRemaining: countdown until the modifier expires (0 = permanent)
+        public float[] PathModifierTurnsRemaining = new float[MAX_ENTITIES];
+        // ActivePathModifierCount: number of active path modifiers in the store
+        private int _activePathModifierCount = 0;
+        public int ActivePathModifierCount => _activePathModifierCount;
+
         // ==================== Time Dilation / Bullet Time 组件（SOA） ====================
         // GlobalTimeScale: per-player time scale multiplier (1.0 = normal, 0.5 = 50% speed, 0.3 = bullet time)
         // Applied at the start of FrameScheduler.Tick() to slow/fast all game systems.
@@ -2546,6 +2564,90 @@ public float GetPlayerCurrentHealth(int playerId)
             if (playerId < 0 || playerId >= MAX_PLAYERS) return new HashSet<string>();
             // L-1 fix: return a defensive copy to prevent external mutation
             return new HashSet<string>(PlayerUnlockedTechs[playerId]);
+        }
+
+        // ==================== 路径修改塔访问方法 ====================
+
+        /// <summary>
+        /// Activate a path modifier at the given position with the specified influence zone.
+        /// </summary>
+        public void ActivatePathModifier(int modifierId, float x, float y, float radius, int targetPathId, int ownerId, float turnsRemaining = 0f)
+        {
+            if (modifierId < 0 || modifierId >= MAX_ENTITIES) return;
+            PathModifierX[modifierId] = x;
+            PathModifierY[modifierId] = y;
+            PathModifierRadius[modifierId] = radius;
+            PathModifierTargetPathId[modifierId] = targetPathId;
+            PathModifierOwnerId[modifierId] = ownerId;
+            PathModifierTurnsRemaining[modifierId] = turnsRemaining;
+            PathModifierActive[modifierId] = true;
+            _activePathModifierCount++;
+        }
+
+        /// <summary>
+        /// Deactivate a path modifier by its entity ID.
+        /// </summary>
+        public void DeactivatePathModifier(int modifierId)
+        {
+            if (modifierId < 0 || modifierId >= MAX_ENTITIES) return;
+            if (!PathModifierActive[modifierId]) return;
+            PathModifierActive[modifierId] = false;
+            _activePathModifierCount = System.Math.Max(0, _activePathModifierCount - 1);
+        }
+
+        /// <summary>
+        /// Returns true if the given position is within the influence zone of any active path modifier.
+        /// </summary>
+        public bool IsWithinAnyPathModifier(float x, float y)
+        {
+            for (int i = 0; i < MAX_ENTITIES; i++)
+            {
+                if (!PathModifierActive[i]) continue;
+                float dx = PathModifierX[i] - x;
+                float dy = PathModifierY[i] - y;
+                float distSq = dx * dx + dy * dy;
+                float radius = PathModifierRadius[i];
+                if (distSq <= radius * radius)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Get the target path ID for the first active path modifier that covers the given position.
+        /// Returns -1 if no active modifier covers the position.
+        /// </summary>
+        public int GetPathModifierTargetPathId(float x, float y)
+        {
+            for (int i = 0; i < MAX_ENTITIES; i++)
+            {
+                if (!PathModifierActive[i]) continue;
+                float dx = PathModifierX[i] - x;
+                float dy = PathModifierY[i] - y;
+                float distSq = dx * dx + dy * dy;
+                float radius = PathModifierRadius[i];
+                if (distSq <= radius * radius)
+                    return PathModifierTargetPathId[i];
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Returns the modifier ID of the first active path modifier covering the given position, or -1.
+        /// </summary>
+        public int GetPathModifierIdAt(float x, float y)
+        {
+            for (int i = 0; i < MAX_ENTITIES; i++)
+            {
+                if (!PathModifierActive[i]) continue;
+                float dx = PathModifierX[i] - x;
+                float dy = PathModifierY[i] - y;
+                float distSq = dx * dx + dy * dy;
+                float radius = PathModifierRadius[i];
+                if (distSq <= radius * radius)
+                    return i;
+            }
+            return -1;
         }
     }
 }

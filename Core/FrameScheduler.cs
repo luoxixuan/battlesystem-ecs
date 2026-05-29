@@ -73,6 +73,7 @@ namespace BattleSystemECS.Core
         public NestSystem? Nest { get; set; }
         public EnemyHealerSystem? EnemyHealer { get; set; }
         public PlayerSummonSystem? Summon { get; set; }
+        public PathModifierSystem? PathModifier { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -158,6 +159,10 @@ namespace BattleSystemECS.Core
             Pathfinding?.SetTurn(turn);
             EnemyMovement?.SetTurn(turn);
             EnemyMovement?.Update();
+
+            // ── Phase 3.05: Path Modifiers — reroute enemies inside influence zones ──
+            PathModifier?.SetTurn();
+            PathModifier?.Update(effectiveDelta);
 
             // ── Phase 3.5: Terrain Effects (after movement, before combat) ──
             Terrain?.SetTurn();
