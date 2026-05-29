@@ -261,6 +261,33 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Set by stealth_attack ability, consumed and reset by EnemyAISystem attack methods.
         public float[] EnemyStealthMultiplier = new float[MAX_ENTITIES];
 
+        // ==================== 玩家召唤单位组件 (Player-Summoned Units, SOA) ====================
+        // SummonedUnitActive: true if this entity is a player-summoned combat unit
+        public bool[] SummonedUnitActive = new bool[MAX_ENTITIES];
+        // SummonedUnitType: 0=Melee, 1=Ranged, 2=Bomber
+        public int[] SummonedUnitType = new int[MAX_ENTITIES];
+        // SummonedUnitHealth / SummonedUnitMaxHealth: current and max HP
+        public float[] SummonedUnitHealth = new float[MAX_ENTITIES];
+        public float[] SummonedUnitMaxHealth = new float[MAX_ENTITIES];
+        // SummonedUnitDamage: attack damage per hit
+        public float[] SummonedUnitDamage = new float[MAX_ENTITIES];
+        // SummonedUnitMoveSpeed: movement speed (tiles/sec)
+        public float[] SummonedUnitMoveSpeed = new float[MAX_ENTITIES];
+        // SummonedUnitAttackRange: attack range (tiles)
+        public int[] SummonedUnitAttackRange = new int[MAX_ENTITIES];
+        // SummonedUnitAttackSpeed: attacks per second
+        public float[] SummonedUnitAttackSpeed = new float[MAX_ENTITIES];
+        // SummonedUnitAttackTimer: cooldown accumulator for attack timing
+        public float[] SummonedUnitAttackTimer = new float[MAX_ENTITIES];
+        // SummonedUnitDuration: remaining lifetime in seconds (0 = permanent until killed)
+        public float[] SummonedUnitDuration = new float[MAX_ENTITIES];
+        // SummonedUnitOwnerId: player who summoned this unit
+        public int[] SummonedUnitOwnerId = new int[MAX_ENTITIES];
+        // SummonedUnitTargetId: current attack target entity id (-1 = none)
+        public int[] SummonedUnitTargetId = new int[MAX_ENTITIES];
+        // SummonedUnitGoldReward: gold awarded when this unit kills an enemy
+        public int[] SummonedUnitGoldReward = new int[MAX_ENTITIES];
+
         // ==================== Boss Phase / Enrage 字段（SOA） ====================
         // EnemyBossPhase: current phase index for boss enemies (0 = phase 1, 1 = phase 2, etc.)
         // Non-boss enemies default to 0.

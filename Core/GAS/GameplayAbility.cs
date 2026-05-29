@@ -22,6 +22,7 @@ namespace BattleSystemECS.Core.GAS
         public const int GroundTarget = 10; // Ground target: player selects a point on the map, AoE hits enemies within radius.
         public const int Slow = 11;          // Slow: circle AoE that slows enemies in radius (non-freeze, move speed reduction)
         public const int TimeWarp = 12;     // TimeWarp: applies GlobalTimeScale + GlobalTimeScaleDuration to slow/fast game time
+        public const int Summon = 13;       // Summon: spawns a player-summoned combat unit at the player's position
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -41,6 +42,7 @@ namespace BattleSystemECS.Core.GAS
                 "groundtarget" => GroundTarget,
                 "slow" => Slow,
                 "time_warp" => TimeWarp,
+                "summon" => Summon,
                 _ => Single
             };
         }
@@ -107,6 +109,7 @@ namespace BattleSystemECS.Core.GAS
             SlowAmount = slowAmount; SlowDuration = slowDuration;
             ConeAngleDegrees = coneAngleDegrees;
             RequiredBuffs = requiredBuffs;
+            SummonDefId = null;
         }
 
         /// <summary>True if this ability applies a periodic DoT effect.</summary>
@@ -117,6 +120,9 @@ namespace BattleSystemECS.Core.GAS
 
         /// <summary>True if this ability applies a shield effect.</summary>
         public bool IsShield => ShieldAmount > 0f;
+
+        // Summon definition ID for summon_unit ability type (null/empty = not a summon)
+        public string SummonDefId;
     }
 
     /// <summary>

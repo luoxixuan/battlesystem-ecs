@@ -24,6 +24,7 @@ namespace BattleSystemECS.Systems
         private TechTreeSystem techTreeSystem;
         private BuffSystem dotSystem;
         private ManaSystem manaSystem; // optional — null if mana system not yet initialized
+        private PlayerSummonSystem summonSystem; // optional — null if summon system not yet initialized
         private List<int> _activeEnemyList;
         // Cached wave-based difficulty multiplier (updated via SetWaveNumber)
         private float _waveDifficultyMult = 1f;
@@ -92,6 +93,14 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// Inject PlayerSummonSystem for summoning abilities. Called by GameManager after SummonSystem construction.
+        /// </summary>
+        public void InjectSummonSystem(PlayerSummonSystem summonSystem)
+        {
+            this.summonSystem = summonSystem;
+        }
+
+        /// <summary>
         /// Cache active enemy list at turn start — uses frame-cached list (zero allocation).
         /// </summary>
         public void SetTurn(int turn)
@@ -155,6 +164,7 @@ namespace BattleSystemECS.Systems
                     sc.SlowAmount,         // Slow Nova speed reduction (0 = no slow)
                     sc.SlowDuration        // Slow Nova duration in seconds (0 = no slow)
                 );
+                def.SummonDefId = sc.SummonDefId;  // carry summon def id through to runtime def
                 store.AddAbility(playerId, def);
                 renderer.Log($"[SKILL] {sc.Name} registered (shape: {sc.AreaShape}, radius: {sc.AreaRadius}, DoT: {sc.DotDuration}s/{sc.DotTickInterval}s×{sc.DotDamagePerTick})");
             }
@@ -303,6 +313,10 @@ namespace BattleSystemECS.Systems
                     break;
                 case 12: // TimeWarp — slow/fast game time
                     CastTimeWarp(def);
+                    enemiesHit = 0;
+                    break;
+                case 13: // Summon — spawn a player-summoned combat unit
+                    CastSummon(def);
                     enemiesHit = 0;
                     break;
                 default:
@@ -783,6 +797,40 @@ namespace BattleSystemECS.Systems
 
             string mode = timeScale < 1f ? "BULLET TIME" : "FAST FORWARD";
             renderer.Log($"[SKILL] {def.Name} cast — {mode} {timeScale:F1}x speed for {duration:F0}s");
+        }
+
+        /// <summary>
+        /// Summon AreaShape: spawns a player-summoned combat unit at the player's position.
+        /// The SummonDef ID is carried in def.SummonDefId.
+        /// </summary>
+        private void CastSummon(GameplayAbilityDef def)
+        {
+            if (summonSystem == null)
+            {
+                renderer.Log($"[SUMMON] PlayerSummonSystem not available — cannot cast '{def.Name}'");
+                return;
+            }
+
+            string summonDefId = def.SummonDefId;
+            if (string.IsNullOrEmpty(summonDefId))
+            {
+                renderer.Log($"[SUMMON] Summon ability '{def.Name}' has no SummonDefId configured");
+                return;
+            }
+
+            // Find the summon definition in gameConfig
+            var summonDef = gameConfig.Summons.Find(s => s.Id == summonDefId);
+            if (summonDef == null)
+            {
+                renderer.Log($"[SUMMON] SummonDef '{summonDefId}' not found in game config");
+                return;
+            }
+
+            int unitId = summonSystem.SummonUnit(playerId, summonDef);
+            if (unitId >= 0)
+            {
+                renderer.Log($"[SUMMON] {def.Name} cast — spawned unit (ID: {unitId})");
+            }
         }
 
         /// <summary>

@@ -62,6 +62,9 @@ namespace BattleSystemECS.Config
                 // Load corpse ground effect definitions (direction 9)
                 LoadCorpseEffectDefs(gameConfig, renderer);
 
+                // Load summon definitions (direction 1: player-summoned combat units)
+                LoadSummonDefs(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -1390,6 +1393,57 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[CORPSE] Failed to load corpse effect defs: " + ex.Message);
+            }
+        }
+
+        private static void LoadSummonDefs(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string summonFile = "Data/Configs/summons.json";
+            try
+            {
+                if (!File.Exists(summonFile))
+                {
+                    renderer.Log("[SUMMON] Summon defs file not found: " + summonFile + ", using defaults (no summons)");
+                    return;
+                }
+                string json = File.ReadAllText(summonFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[SUMMON] Summon defs file is empty: " + summonFile);
+                    return;
+                }
+
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    var defs = new List<SummonDef>();
+                    foreach (var elem in root.EnumerateArray())
+                    {
+                        var s = new SummonDef();
+                        s.Id = elem.TryGetProperty("Id", out var id) ? id.GetString() ?? "" : "";
+                        s.Name = elem.TryGetProperty("Name", out var name) ? name.GetString() ?? "" : "";
+                        s.Description = elem.TryGetProperty("Description", out var desc) ? desc.GetString() ?? "" : "";
+                        s.UnitType = elem.TryGetProperty("UnitType", out var ut) ? ut.GetInt32() : 0;
+                        s.Health = elem.TryGetProperty("Health", out var hp) ? (float)hp.GetDouble() : 80f;
+                        s.Damage = elem.TryGetProperty("Damage", out var dmg) ? (float)dmg.GetDouble() : 15f;
+                        s.MoveSpeed = elem.TryGetProperty("MoveSpeed", out var ms) ? (float)ms.GetDouble() : 3f;
+                        s.AttackRange = elem.TryGetProperty("AttackRange", out var ar) ? ar.GetInt32() : 1;
+                        s.AttackSpeed = elem.TryGetProperty("AttackSpeed", out var atks) ? (float)atks.GetDouble() : 2f;
+                        s.Cost = elem.TryGetProperty("Cost", out var cost) ? (float)cost.GetDouble() : 30f;
+                        s.ManaCost = elem.TryGetProperty("ManaCost", out var mc) ? (float)mc.GetDouble() : 25f;
+                        s.Duration = elem.TryGetProperty("Duration", out var dur) ? (float)dur.GetDouble() : 15f;
+                        s.Cooldown = elem.TryGetProperty("Cooldown", out var cd) ? (float)cd.GetDouble() : 8f;
+                        defs.Add(s);
+                    }
+                    gameConfig.Summons = defs;
+                    renderer.Log("[SUMMON] Loaded " + defs.Count + " summon defs from " + summonFile);
+                }
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[SUMMON] Failed to load summon defs: " + ex.Message);
             }
         }
     }

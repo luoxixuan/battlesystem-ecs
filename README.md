@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-29, commit `bff4ff8`）
+## 性能基准（2026-05-29, commit `9b61e88`）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **~5007 FPS**，400 帧，~0.20 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10496 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5188 FPS** |
+| **mode 5**（完整一局） | **~4894 FPS**，400 帧，~0.20 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~9009 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5339 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -135,6 +135,7 @@ dotnet test
 ---
 
 ## 更新记录
+- **2026-05-29**: 恢复：修复方向一（玩家召唤战斗单位）编译错误 — LoadSummonDefs 缺失 + SummonDefId 未初始化（bench2: 9009, bench4: 5339, bench5: 4894）
 - **2026-05-29**: 方向二（续）：为全部 150 个技能 JSON 添加 ManaCost 字段（20-115，基于 Cooldown × DamageMultiplier 计算），法力系统完全打通（bench2: 10496, bench4: 5188, bench5: 5007）
 - **2026-05-29**: 方向五：敌人驱散/净化塔增益 Enemy Dispel/Purge（TowerIsDispelled/TowerDispelTimer/TowerDispelImmunityTimer），DispelEnemyDef配置类，ExecuteDispelTower()，TowerDispelSystem，FrameScheduler Phase 6.2注入，AuraTowerSystem/TowerSynergySystem跳过dispelled塔（bench2: 9260, bench4: 5276, bench5: 5029）
 - **2026-05-29**: 方向二（部分）：技能法力消耗 (SkillConfig.ManaCost → GameplayAbilityDef.Cost)，ManaSystem.HasEnoughMana/ConsumeMana 已就绪，GameConfigLoader 解析 ManaCost JSON 字段（bench2: 8494, bench4: 4661, bench5: 1066）

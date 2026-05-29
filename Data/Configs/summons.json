@@ -1,0 +1,47 @@
+[
+  {
+    "Id": "summon_wolf",
+    "Name": "Spirit Wolf",
+    "Description": "A ghostly wolf that intercepts enemies and deals melee damage. Fast and inexpensive.",
+    "UnitType": 0,
+    "Health": 80.0,
+    "Damage": 15.0,
+    "MoveSpeed": 3.5,
+    "AttackRange": 1,
+    "AttackSpeed": 2.0,
+    "Cost": 30.0,
+    "ManaCost": 25.0,
+    "Duration": 15.0,
+    "Cooldown": 8.0
+  },
+  {
+    "Id": "summon_archer",
+    "Name": "Phantom Archer",
+    "Description": "A spectral ranged attacker that fires arrows at enemies from behind the front line.",
+    "UnitType": 1,
+    "Health": 50.0,
+    "Damage": 20.0,
+    "MoveSpeed": 2.0,
+    "AttackRange": 5,
+    "AttackSpeed": 1.5,
+    "Cost": 50.0,
+    "ManaCost": 40.0,
+    "Duration": 20.0,
+    "Cooldown": 10.0
+  },
+  {
+    "Id": "summon_bomber",
+    "Name": "Soul Bomb",
+    "Description": "A volatile spirit that moves into enemy groups and detonates, dealing massive AoE damage but sacrificing itself.",
+    "UnitType": 2,
+    "Health": 30.0,
+    "Damage": 60.0,
+    "MoveSpeed": 2.5,
+    "AttackRange": 3,
+    "AttackSpeed": 0.5,
+    "Cost": 45.0,
+    "ManaCost": 35.0,
+    "Duration": 10.0,
+    "Cooldown": 12.0
+  }
+]

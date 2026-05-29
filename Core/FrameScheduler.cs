@@ -70,6 +70,7 @@ namespace BattleSystemECS.Core
         public CorpseEffectSystem? CorpseEffect { get; set; }
         public NestSystem? Nest { get; set; }
         public EnemyHealerSystem? EnemyHealer { get; set; }
+        public PlayerSummonSystem? Summon { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -173,6 +174,10 @@ namespace BattleSystemECS.Core
 
             // ── Phase 3.8: Enemy Steal Gold — process thieves that reached the base ──
             StealGold?.Update();
+
+            // ── Phase 3.85: Player Summons — update summoned unit movement and attacks ──
+            Summon?.SetTurn(turn);
+            Summon?.Update(effectiveDelta);
 
             // ── Phase 4: Combat — SetTurn ─────────────────────────────────
             PlayerTowerAttack?.SetTurn(turn);

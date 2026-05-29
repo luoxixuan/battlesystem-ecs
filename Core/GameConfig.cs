@@ -526,6 +526,36 @@ namespace BattleSystemECS.Config
         public float TrapDamage { get; set; } = 0f;
     }
 
+    /// <summary>
+    /// Defines a player-summoned combat unit (summoned via skill).
+    /// </summary>
+    public class SummonDef
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        // Unit type: 0=Melee, 1=Ranged, 2=Bomber
+        public int UnitType { get; set; }
+        // Max health
+        public float Health { get; set; }
+        // Attack damage per hit
+        public float Damage { get; set; }
+        // Movement speed (tiles/sec)
+        public float MoveSpeed { get; set; }
+        // Attack range (tiles)
+        public int AttackRange { get; set; }
+        // Attack speed (attacks/sec)
+        public float AttackSpeed { get; set; }
+        // Gold cost to summon
+        public float Cost { get; set; }
+        // Mana cost to summon
+        public float ManaCost { get; set; }
+        // Duration in seconds (0 = permanent until killed)
+        public float Duration { get; set; }
+        // Cooldown in seconds
+        public float Cooldown { get; set; }
+    }
+
     public class SkillConfig
     {
         public string Name { get; set; }
@@ -559,6 +589,8 @@ namespace BattleSystemECS.Config
         public float SlowDuration { get; set; }
         // Mana cost for casting this skill (0 = free)
         public float ManaCost { get; set; }
+        // Summon definition ID (for summon_unit ability type) — null/empty = not a summon skill
+        public string SummonDefId { get; set; }
     }
 
     public class BehaviorTreeDef
@@ -788,6 +820,7 @@ namespace BattleSystemECS.Config
         public List<SkillConfig> Skills { get; set; } = new List<SkillConfig>();
         public List<MonsterConfig> MonsterTypes { get; set; } = new List<MonsterConfig>();
         public List<TowerConfig> TowerTypes { get; set; } = new List<TowerConfig>();
+        public List<SummonDef> Summons { get; set; } = new List<SummonDef>();
         public List<LevelConfig> Levels { get; set; } = new List<LevelConfig>();
         public LevelConfig CurrentLevel { get; set; }
 
