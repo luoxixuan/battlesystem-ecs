@@ -320,5 +320,66 @@ namespace BattleSystemECS.Systems
             logger.Log($"[TOWER] 批量出售完成: {selected.Length} 塔，共返还 {(int)totalRefunded} 金币");
             return totalRefunded;
         }
+
+        /// <summary>
+        /// Relocate an active tower to a new position without changing its upgrade level.
+        /// </summary>
+        /// <param name="towerId">Tower entity ID</param>
+        /// <param name="newX">New X position</param>
+        /// <param name="newY">New Y position</param>
+        /// <param name="playerId">Player ID for gold deduction</param>
+        /// <returns>Gold deducted, or 0 if relocation failed.</returns>
+        public float RelocateTower(int towerId, int newX, int newY, int playerId = 1)
+        {
+            if (towerId < 0 || towerId >= ComponentStore.MAX_ENTITIES || !store.TowerActive[towerId])
+            {
+                logger.Log($"[TOWER] 重定位失败: 塔 #{towerId} 不存在或未激活");
+                return 0f;
+            }
+
+            // Check if new position is within map bounds
+            if (newX < 0 || newX >= 10 || newY < 0 || newY >= 50)
+            {
+                logger.Log($"[TOWER] 重定位失败: 位置 ({newX},{newY}) 超出地图范围");
+                return 0f;
+            }
+
+            // Check if new position is already occupied
+            foreach (int tid in store.ActiveTowerIds)
+            {
+                if (tid != towerId && (int)store.PositionX[tid] == newX && (int)store.PositionY[tid] == newY)
+                {
+                    logger.Log($"[TOWER] 重定位失败: 位置 ({newX},{newY}) 已被塔 #{tid} 占用");
+                    return 0f;
+                }
+            }
+
+            // Calculate relocate cost (same formula as in TowerRelocateSystem)
+            int level = store.TowerLevel[towerId];
+            float baseCost = 50f;
+            float decreasePerLevel = 5f;
+            float minCost = 20f;
+            float cost = Math.Max(baseCost - (level - 1) * decreasePerLevel, minCost);
+
+            float currentGold = store.GetPlayerGold(playerId);
+            if (currentGold < cost)
+            {
+                logger.Log($"[TOWER] 重定位失败: 金币不足 (需要 {cost}, 当前 {currentGold})");
+                return 0f;
+            }
+
+            // Record old position
+            int oldX = (int)store.PositionX[towerId];
+            int oldY = (int)store.PositionY[towerId];
+
+            // Deduct gold
+            store.SetPlayerGold(playerId, currentGold - cost);
+
+            // Update tower position
+            store.SetPosition(towerId, newX, newY);
+
+            logger.Log($"[TOWER] 塔 #{towerId} ({store.TowerType[towerId]}, Lv.{level}) 从 ({oldX},{oldY}) 移动到 ({newX},{newY})，花费 {cost} 金币");
+            return cost;
+        }
     }
 }

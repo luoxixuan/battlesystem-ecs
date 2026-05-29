@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-30, commit `c29eb2b`）
+## 性能基准（2026-05-30, commit `dc2467a`）
 
-| 指标 | 数值 |
+|| 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **~4767 FPS**，400 帧，~0.21 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10116 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5158 FPS** |
+| **mode 5**（完整一局） | **~4832 FPS**，400 帧，~0.21 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~9698 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5286 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -138,6 +138,7 @@ dotnet test
 
 > 仅记录功能上线和重大修复。日常基准波动见顶部性能基准表。
 
+- **2026-05-30**: 方向一：塔重定位/重新部署（TowerRelocateSystem + TowerPlacementSystem.RelocateTower + tower_placement.json 配置）；bench2: 9698, bench4: 5286, bench5: 4832
 - **2026-05-30**: 方向三：时间操纵塔/Chrono Tower（ChronoTowerSystem + TowerIsChronoTower/TowerTimeFieldRadius/TowerTimeScale/EnemyTimeScale 组件 + FrameScheduler Phase 5.1 注入 + EnemyMovement 集成）；bench2: 10116, bench4: 5158, bench5: 4767
 - **2026-05-30**: 方向九：敌人受伤减速/瘸腿（EnemyWoundSystem + EnemyWoundThreshold/EnemyWoundSlowRatio/EnemyIsWounded 组件 + FrameScheduler Phase 3 注入 + ClearEnemyWound）；bench2: 9800, bench4: 5116, bench5: 4594
 - **2026-05-29**: 方向五：复活/亡灵法师敌人（NecromancerSystem + EnemyCanResurrect/EnemyIsReanimated + CorpseQueue + WaveSpawning 初始化 + FrameScheduler Phase 2.6 注入）；bench2: 9871, bench4: 5122, bench5: 4882

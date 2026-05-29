@@ -4,5 +4,9 @@
   "maxTowers": 20,
   "sellRatio": 0.5,
   "minSellRatio": 0.3,
-  "sellRatioDecreasePerLevel": 0.05
+  "sellRatioDecreasePerLevel": 0.05,
+  "relocateBaseCost": 50,
+  "relocateCostDecreasePerLevel": 5,
+  "minRelocateCost": 20,
+  "allowRelocateInWave": false
 }

@@ -81,6 +81,7 @@ namespace BattleSystemECS.Core
         public NecromancerSystem? Necromancer { get; set; }
         public RandomEventSystem? RandomEvent { get; set; }
         public ChronoTowerSystem? ChronoTower { get; set; }
+        public TowerRelocateSystem? TowerRelocate { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -128,6 +129,7 @@ namespace BattleSystemECS.Core
                 Upgrade?.Update();
                 Skill?.Update(deltaTime); // skill cooldown ticking
                 AutoSkill?.Update();      // auto-cast ready skills
+                TowerRelocate?.Update(); // tower relocation cooldown tracking
                 Interest?.Update();       // bank/interest system
                 Mana?.Update(deltaTime, isBuildPhase: true); // mana regen (build phase = higher regen)
                 Objective?.Update(deltaTime, Phase); // escort NPC movement, objective timers
