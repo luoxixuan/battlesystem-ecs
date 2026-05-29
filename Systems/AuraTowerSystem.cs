@@ -82,6 +82,8 @@ namespace BattleSystemECS.Systems
                     int targetTowerId = towerIds[ti];
                     if (targetTowerId == auraTowerId) continue; // don't buff self
                     if (!store.TowerActive[targetTowerId]) continue;
+                    // Skip towers that are dispelled (aura/synergy buffs cleared, cannot receive new ones)
+                    if (store.TowerIsDispelled[targetTowerId]) continue;
 
                     float tx = store.PositionX[targetTowerId];
                     float ty = store.PositionY[targetTowerId];

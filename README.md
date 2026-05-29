@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-29, commit `e08e2ad`）
+## 性能基准（2026-05-29, commit `bff4ff8`）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **~1066 FPS**，400 帧，~0.94 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~8494 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~4661 FPS** |
+| **mode 5**（完整一局） | **~5029 FPS**，400 帧，~0.20 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~9260 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5276 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -135,6 +135,7 @@ dotnet test
 ---
 
 ## 更新记录
+- **2026-05-29**: 方向五：敌人驱散/净化塔增益 Enemy Dispel/Purge（TowerIsDispelled/TowerDispelTimer/TowerDispelImmunityTimer），DispelEnemyDef配置类，ExecuteDispelTower()，TowerDispelSystem，FrameScheduler Phase 6.2注入，AuraTowerSystem/TowerSynergySystem跳过dispelled塔（bench2: 9260, bench4: 5276, bench5: 5029）
 - **2026-05-29**: 方向二（部分）：技能法力消耗 (SkillConfig.ManaCost → GameplayAbilityDef.Cost)，ManaSystem.HasEnoughMana/ConsumeMana 已就绪，GameConfigLoader 解析 ManaCost JSON 字段（bench2: 8494, bench4: 4661, bench5: 1066）
 - **2026-05-29**: 方向四：敌方治疗/辅助单位 Enemy Healer System（EnemyHealerSystem.cs，HealerDef配置类，EnemyHealerHealAmount/HealInterval/HealTargetPriority等SOA组件，GameConfig.HealerDefs，FrameScheduler Phase 3.75注入）（bench2: 10145, bench4: 5230, bench5: 4888）
 - **2026-05-29**: 方向七：敌人产卵巢穴 Nest System（NestSystem.cs，NestDef配置类，NestHealth/SpawnTimer/ActiveCount等SOA组件，GameConfig.NestDefs，FrameScheduler Phase 1.5注入）（bench2: 10653, bench4: 5302, bench5: 5016）

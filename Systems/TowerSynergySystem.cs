@@ -155,6 +155,9 @@ namespace BattleSystemECS.Systems
             {
                 foreach (var towerId in towers)
                 {
+                    // Skip towers that are dispelled (cannot receive new synergy buffs)
+                    if (store.TowerIsDispelled[towerId]) continue;
+
                     // 对 Tesla 塔增加额外链式弹射（通过 multiplier 缩放链式伤害）
                     // bonusChainCount 存储在 TowerSynergyMultiplier 中，供 TowerAttackSystem 读取
                     float existingMult = store.GetTowerSynergyMultiplier(towerId);
@@ -169,6 +172,9 @@ namespace BattleSystemECS.Systems
             {
                 foreach (var towerId in towers)
                 {
+                    // Skip towers that are dispelled (cannot receive new synergy buffs)
+                    if (store.TowerIsDispelled[towerId]) continue;
+
                     float existingMult = store.GetTowerSynergyMultiplier(towerId);
                     float bonusMult = 1.0f + synergy.Effect.DotDamageBonus; // DoT 伤害 +X%
                     store.SetTowerSynergyMultiplier(towerId, Math.Max(existingMult, bonusMult));

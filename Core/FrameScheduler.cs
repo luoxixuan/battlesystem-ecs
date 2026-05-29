@@ -64,6 +64,7 @@ namespace BattleSystemECS.Core
         public ResourceNodeSystem? ResourceNode { get; set; }
         public TelegraphSystem? Telegraph { get; set; }
         public TowerSilenceSystem? TowerSilence { get; set; }
+        public TowerDispelSystem? Dispel { get; set; }
         public TowerLinkSystem? TowerLink { get; set; }
         public AdaptiveDifficultySystem? AdaptiveDifficulty { get; set; }
         public CorpseEffectSystem? CorpseEffect { get; set; }
@@ -204,6 +205,7 @@ namespace BattleSystemECS.Core
             TowerLink?.Update();
             AuraTower?.ResolveAuraBuffs();
             TowerSilence?.Update(effectiveDelta);
+            Dispel?.Update(effectiveDelta);
             Projectile?.Update(effectiveDelta);
             // Update enemy projectiles (moves them toward player base)
             EnemyProjectile?.Update(effectiveDelta);

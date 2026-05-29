@@ -318,6 +318,14 @@ namespace BattleSystemECS.Config
         public float SilenceRadius { get; set; }
         // SilenceDuration: how many turns silenced towers cannot attack
         public float SilenceDuration { get; set; }
+
+        // Dispel tower fields (for dispel_tower abilities)
+        // DispelRadius: radius within which tower aura/synergy buffs are removed (-1 = not a dispel ability)
+        public float DispelRadius { get; set; }
+        // DispelDuration: how many turns dispelled towers cannot receive new buffs
+        public float DispelDuration { get; set; }
+        // DispelImmunityDuration: turns of immunity after dispel expires
+        public float DispelImmunityDuration { get; set; }
     }
 
     /// <summary>
@@ -481,6 +489,23 @@ namespace BattleSystemECS.Config
         public float StealAmount { get; set; }
         // Bonus gold awarded when player kills the thief after it escapes
         public float GoldOnReturn { get; set; }
+    }
+
+    /// <summary>
+    /// Defines an enemy that can dispel (remove) tower aura/synergy buffs.
+    /// Dispel enemies release a purification wave that clears all tower增益 within radius.
+    /// </summary>
+    public class DispelEnemyDef
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        /// Radius within which tower buffs are removed (in tiles).
+        public float DispelRadius { get; set; } = 0f;
+        /// Duration in turns that dispelled towers cannot receive new buffs.
+        public float DispelDuration { get; set; } = 0f;
+        /// Immunity duration in turns after dispel expires.
+        public float ImmunityDuration { get; set; } = 0f;
     }
 
     /// <summary>

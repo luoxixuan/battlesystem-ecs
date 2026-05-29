@@ -147,6 +147,9 @@ namespace BattleSystemECS.Systems
                 case "silence_tower":
                     ExecuteSilenceTower(enemyId, ability);
                     break;
+                case "dispel_tower":
+                    ExecuteDispelTower(enemyId, ability);
+                    break;
                 default:
                     // Unknown ability type — log and set cooldown to prevent infinite retry
                     logger.Log($"[ABILITY] Unknown ability type '{ability.AbilityType}' on enemy {enemyId}, ignoring");
@@ -405,6 +408,41 @@ namespace BattleSystemECS.Systems
             }
 
             logger.Log($"[ABILITY] Enemy {enemyId} silences {silencedCount} towers for {ability.SilenceDuration:F0} turns (radius={ability.SilenceRadius:F1}) ({ability.Name})");
+        }
+
+        private void ExecuteDispelTower(int enemyId, EnemyAbilityDef ability)
+        {
+            if (ability.DispelRadius <= 0f || ability.DispelDuration <= 0f) return;
+
+            float enemyX = store.PositionX[enemyId];
+            float enemyY = store.PositionY[enemyId];
+
+            // Dispel all towers within the specified radius
+            var activeTowerIds = store.ActiveTowerIds;
+            int dispelledCount = 0;
+            for (int i = 0; i < activeTowerIds.Count; i++)
+            {
+                int towerId = activeTowerIds[i];
+                // Skip towers that are immune (in immunity period after dispel expired)
+                if (store.TowerDispelImmunityTimer[towerId] > 0f) continue;
+
+                float tx = store.PositionX[towerId];
+                float ty = store.PositionY[towerId];
+                float dx = tx - enemyX;
+                float dy = ty - enemyY;
+                float dist = (float)Math.Sqrt(dx * dx + dy * dy);
+                if (dist <= ability.DispelRadius)
+                {
+                    // Apply dispel to this tower
+                    store.TowerIsDispelled[towerId] = true;
+                    store.TowerDispelTimer[towerId] = ability.DispelDuration;
+                    // Clear immunity timer when dispel is applied (immunity starts after dispel expires)
+                    store.TowerDispelImmunityTimer[towerId] = 0f;
+                    dispelledCount++;
+                }
+            }
+
+            logger.Log($"[ABILITY] Enemy {enemyId} dispels {dispelledCount} tower buffs for {ability.DispelDuration:F0} turns (radius={ability.DispelRadius:F1}) ({ability.Name})");
         }
 
         /// <summary>

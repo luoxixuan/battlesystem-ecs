@@ -555,6 +555,14 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // TowerSilenceSourceId: enemy entity ID that applied this silence (-1 = none/unknown)
         public int[] TowerSilenceSourceId = new int[MAX_ENTITIES];
 
+        // ==================== 敌人驱散/净化塔增益 (Tower Dispel) ====================
+        // TowerIsDispelled: true if this tower's aura/synergy buffs are currently removed by enemy dispel
+        public bool[] TowerIsDispelled = new bool[MAX_ENTITIES];
+        // TowerDispelTimer: remaining dispel duration in turns (decremented each turn). 0 = not dispelled.
+        public float[] TowerDispelTimer = new float[MAX_ENTITIES];
+        // TowerDispelImmunityTimer: immunity duration in turns after dispel expires (prevents rapid re-dispel)
+        public float[] TowerDispelImmunityTimer = new float[MAX_ENTITIES];
+
         // ==================== 塔被动资源生产（Income Tower）====================
         // TowerIsIncomeTower: true if this tower generates gold passively instead of attacking
         public bool[] TowerIsIncomeTower = new bool[MAX_ENTITIES];
@@ -1046,6 +1054,10 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
                 TowerAuraRadius[entityId] = 0f;
                 TowerAuraAttackSpeedBonus[entityId] = 0f;
                 TowerAuraDamageBonus[entityId] = 0f;
+                // Dispel fields
+                TowerIsDispelled[entityId] = false;
+                TowerDispelTimer[entityId] = 0f;
+                TowerDispelImmunityTimer[entityId] = 0f;
                 // Ammo fields
                 TowerCurrentAmmo[entityId] = 0;
                 TowerMaxAmmo[entityId] = 0;
@@ -1430,6 +1442,10 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             TowerAuraRadius[entityId] = 0f;
             TowerAuraAttackSpeedBonus[entityId] = 0f;
             TowerAuraDamageBonus[entityId] = 0f;
+            // Dispel fields reset
+            TowerIsDispelled[entityId] = false;
+            TowerDispelTimer[entityId] = 0f;
+            TowerDispelImmunityTimer[entityId] = 0f;
             // Ammo fields reset
             TowerCurrentAmmo[entityId] = 0;
             TowerMaxAmmo[entityId] = 0;
