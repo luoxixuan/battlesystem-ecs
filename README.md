@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-29, commit `8f3a1c0`）
+## 性能基准（2026-05-29, commit `a1b2c3d`）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **~5087 FPS**，400 帧，~0.20 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10081 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5464 FPS** |
+| **mode 5**（完整一局） | **~4878 FPS**，400 帧，~0.21 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10115 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5487 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -138,6 +138,7 @@ dotnet test
 
 > 仅记录功能上线和重大修复。日常基准波动见顶部性能基准表。
 
+- **2026-05-29**: 方向一：钻地/潜行敌人（EnemyBurrowSystem + EnemyIsBurrowed/BurrowTimer/BurrowCooldown + Emerge AoE + TowerAttack 索敌跳过）；bench2: 10115, bench4: 5487, bench5: 4878
 - **2026-05-29**: 方向四：流血/撕裂 DoT（BleedSystem + TowerIsBleedTower/EnemyBleedStacks + 流血塔配置）；bench2: 10081, bench4: 5464, bench5: 5087
 - **2026-05-29**: 方向七：路径修改塔（PathModifierSystem + PathModifierDef + ComponentStore.PathModifier 组件）；bench2: 10112, bench4: 5545, bench5: 4826
 - **2026-05-29**: 方向三：牵引/磁力/漩涡塔（PullTowerSystem + TowerIsPullTower/PullStrength/PullRadius + EnemyIsBeingPulled）；bench2: 10128→10214, bench4: 5345→5344, bench5: 5007→4947

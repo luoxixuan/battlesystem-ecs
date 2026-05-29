@@ -46,6 +46,18 @@ namespace BattleSystemECS.Config
         public float FlightHeight { get; set; } = 0f;
         // CanLand: true if this flying enemy can land mid-flight and become a ground unit
         public bool CanLand { get; set; } = false;
+        // CanBurrow: true if this enemy can dive underground and become untargetable
+        public bool CanBurrow { get; set; } = false;
+        // BurrowDuration: how many turns the enemy stays underground
+        public float BurrowDuration { get; set; } = 0f;
+        // BurrowSpeedMult: movement speed multiplier while underground
+        public float BurrowSpeedMult { get; set; } = 1f;
+        // BurrowEmergeDamage: AoE damage dealt when emerging from ground (0 = no damage)
+        public float BurrowEmergeDamage { get; set; } = 0f;
+        // BurrowRadius: AoE radius for emerge damage
+        public float BurrowRadius { get; set; } = 0f;
+        // BurrowCooldown: turns between burrow uses (-1 = one-time, 0 = can always burrow)
+        public float BurrowCooldown { get; set; } = -1f;
         // Boss: true if this monster type is a boss (participates in phase/enrage system).
         public bool IsBoss { get; set; } = false;
         // IsThief: true if this enemy steals gold instead of damaging base (GoldStealing direction)

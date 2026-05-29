@@ -366,6 +366,24 @@ namespace BattleSystemECS.Systems
                         store.EnemyGoldOnReturn[enemyId] = monsterConfig.GoldOnReturn;
                     }
 
+                    // Initialize burrow/underground enemy properties
+                    if (monsterConfig.CanBurrow)
+                    {
+                        store.EnemyIsBurrowed[enemyId] = false;
+                        store.EnemyBurrowTimer[enemyId] = 0f;
+                        store.EnemyBurrowCooldown[enemyId] = 0f; // ready to burrow (cooldown starts on first emerge)
+                        store.EnemyBurrowCooldownRef[enemyId] = monsterConfig.BurrowCooldown;
+                        store.EnemyBurrowSpeedMult[enemyId] = monsterConfig.BurrowSpeedMult;
+                        store.EnemyBurrowEmergeDamage[enemyId] = monsterConfig.BurrowEmergeDamage;
+                        store.EnemyBurrowRadius[enemyId] = monsterConfig.BurrowRadius;
+                    }
+                    else
+                    {
+                        // Mark as non-burrowable (cooldown = -1)
+                        store.EnemyBurrowCooldown[enemyId] = -1f;
+                        store.EnemyBurrowCooldownRef[enemyId] = -1f;
+                    }
+
                     // Assign per-enemy affixes (1-3 random affixes from EnemyAffixSystem)
                     _enemyAffixSystem?.AssignAffixesAtSpawn(enemyId, scaledMaxHealth);
 

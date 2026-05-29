@@ -75,6 +75,7 @@ namespace BattleSystemECS.Core
         public EnemyHealerSystem? EnemyHealer { get; set; }
         public PlayerSummonSystem? Summon { get; set; }
         public PathModifierSystem? PathModifier { get; set; }
+        public EnemyBurrowSystem? Burrow { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -155,6 +156,11 @@ namespace BattleSystemECS.Core
 
             // ── Phase 2.5: Enemy Affixes (per-enemy affix effects) ──────────
             EnemyAffix?.Update(effectiveDelta);
+
+            // ── Phase 2.55: Enemy Burrow — underground enemy state transitions ──
+            Burrow?.SetTurn(turn);
+            Burrow?.Update();
+            Burrow?.ApplyBurrowEffects();
 
             // ── Phase 3: Movement ──────────────────────────────────────────
             Pathfinding?.SetTurn(turn);

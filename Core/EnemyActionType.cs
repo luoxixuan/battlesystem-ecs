@@ -24,6 +24,8 @@ namespace BattleSystemECS.Components
         Fear = 14,      // 恐惧：向反方向逃跑（远离玩家）
         Taunt = 15,     // 嘲讽：强制攻击特定目标
         Charm = 16,     // 魅惑：攻击其他敌人
-        Land = 17       // 着陆：飞行敌人着陆变为地面单位
+        Land = 17,      // 着陆：飞行敌人着陆变为地面单位
+        Burrow = 18,    // 钻地：敌人进入地下，不可被选中
+        Emerge = 19     // 出土：敌人从地下钻出，可造成 AoE 伤害
     }
 }

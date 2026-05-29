@@ -323,6 +323,9 @@ int bestTarget = -1;
                     int enemyId = candidates[ci];
                     if (!store.EnemyActive[enemyId]) continue;
 
+                    // Burrow filter: skip enemies that are underground (cannot be targeted)
+                    if (store.EnemyIsBurrowed[enemyId]) continue;
+
                     // Height-layer filter: skip enemies that this tower cannot hit
                     bool enemyFlying = store.EnemyIsFlying[enemyId];
                     bool canHitAir = store.TowerCanHitAir[towerId];

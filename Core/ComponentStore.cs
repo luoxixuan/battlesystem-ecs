@@ -307,6 +307,22 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Set by stealth_attack ability, consumed and reset by EnemyAISystem attack methods.
         public float[] EnemyStealthMultiplier = new float[MAX_ENTITIES];
 
+        // ==================== 钻地/潜行敌人组件 (Burrow / Underground Enemies, SOA) ====================
+        // EnemyIsBurrowed: true when enemy is underground (cannot be targeted by towers)
+        public bool[] EnemyIsBurrowed = new bool[MAX_ENTITIES];
+        // EnemyBurrowTimer: remaining underground duration in turns (0 = about to emerge)
+        public float[] EnemyBurrowTimer = new float[MAX_ENTITIES];
+        // EnemyBurrowCooldown: cooldown before can burrow again (-1 = cannot burrow, 0 = always can, >0 = turns remaining)
+        public float[] EnemyBurrowCooldown = new float[MAX_ENTITIES];
+        // EnemyBurrowCooldownRef: original cooldown value (for reset after emerge, only meaningful if CanBurrow)
+        public float[] EnemyBurrowCooldownRef = new float[MAX_ENTITIES];
+        // EnemyBurrowSpeedMult: movement speed multiplier while underground (typically faster/slower)
+        public float[] EnemyBurrowSpeedMult = new float[MAX_ENTITIES];
+        // EnemyBurrowEmergeDamage: AoE damage dealt when emerging from ground
+        public float[] EnemyBurrowEmergeDamage = new float[MAX_ENTITIES];
+        // EnemyBurrowRadius: AoE radius for emerge damage
+        public float[] EnemyBurrowRadius = new float[MAX_ENTITIES];
+
         // ==================== 玩家召唤单位组件 (Player-Summoned Units, SOA) ====================
         // SummonedUnitActive: true if this entity is a player-summoned combat unit
         public bool[] SummonedUnitActive = new bool[MAX_ENTITIES];
@@ -1141,8 +1157,16 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
                 EnemyCurseSpeedReduction[entityId] = 0f;
                 EnemyCurseArmorReduction[entityId] = 0f;
                 EnemyCurseDmgTakenIncrease[entityId] = 0f;
-                // Pull debuff field (applied by pull towers)
+// Pull debuff field (applied by pull towers)
                 EnemyIsBeingPulled[entityId] = false;
+                // Burrow/underground fields (reset on entity destruction)
+                EnemyIsBurrowed[entityId] = false;
+                EnemyBurrowTimer[entityId] = 0f;
+                EnemyBurrowCooldown[entityId] = 0f;
+                EnemyBurrowCooldownRef[entityId] = 0f;
+                EnemyBurrowSpeedMult[entityId] = 1f;
+                EnemyBurrowEmergeDamage[entityId] = 0f;
+                EnemyBurrowRadius[entityId] = 0f;
                 // Bleed/rupture debuff fields (applied by Slash/Pierce towers)
                 EnemyBleedStacks[entityId] = 0f;
                 EnemyBleedDamagePerStack[entityId] = 0f;

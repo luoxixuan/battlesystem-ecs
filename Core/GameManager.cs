@@ -51,6 +51,7 @@ namespace BattleSystemECS.Core
         private PickupSystem pickupSystem;             // 掉落物/拾取道具系统
         private EnemyFissionSystem enemyFissionSystem; // 敌人分裂/裂殖系统
         private EnemyMorphSystem enemyMorphSystem;   // 敌人变形/进化系统
+        private EnemyBurrowSystem enemyBurrowSystem; // 敌人钻地/潜行系统
         private ObjectiveSystem objectiveSystem;      // 特殊目标/护送模式系统
         private WaveBranchSystem waveBranchSystem;   // 波次分支/玩家选择系统
         private ResourceNodeSystem resourceNodeSystem; // 地图资源节点系统（金矿/法力泉/科技遗迹）
@@ -201,6 +202,10 @@ logger.Log("      ComboSystem created successfully!");
             logger.Log("[BOOTSTRAP]    - Creating EnemyMorphSystem (Mid-wave transformation)... ");
             enemyMorphSystem = new EnemyMorphSystem(store, gameConfig, logger);
             logger.Log("      EnemyMorphSystem created successfully!");
+
+            logger.Log("[BOOTSTRAP]    - Creating EnemyBurrowSystem (Burrow/Underground)... ");
+            enemyBurrowSystem = new EnemyBurrowSystem(store, playerId);
+            logger.Log("      EnemyBurrowSystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating ObjectiveSystem (Escort/Survival/Timed objectives)... ");
             objectiveSystem = new ObjectiveSystem(store, playerId);
@@ -379,6 +384,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.Upgrade = upgradeSystem;
             scheduler.EnemyFission = enemyFissionSystem;
             scheduler.EnemyMorph = enemyMorphSystem;
+            scheduler.Burrow = enemyBurrowSystem;
             scheduler.Objective = objectiveSystem;
             scheduler.WaveBranch = waveBranchSystem;
             scheduler.ResourceNode = resourceNodeSystem;
