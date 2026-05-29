@@ -4,7 +4,7 @@
 
 ---
 
-## 性能基准（2026-05-29, commit `9b61e88`）
+## 性能基准（2026-05-29, commit `24fe038`）
 
 | 指标 | 数值 |
 |------|------|
@@ -135,21 +135,11 @@ dotnet test
 ---
 
 ## 更新记录
-- **2026-05-29**: 无待执行方向，自动基准更新（bench2: 10406, bench4: 5638, bench5: 5050）
-- **2026-05-29**: 恢复：修复方向一（玩家召唤战斗单位）编译错误 — LoadSummonDefs 缺失 + SummonDefId 未初始化（bench2: 9009, bench4: 5339, bench5: 4894）
-- **2026-05-29**: 方向二（续）：为全部 150 个技能 JSON 添加 ManaCost 字段（20-115，基于 Cooldown × DamageMultiplier 计算），法力系统完全打通（bench2: 10496, bench4: 5188, bench5: 5007）
-- **2026-05-29**: 方向五：敌人驱散/净化塔增益 Enemy Dispel/Purge（TowerIsDispelled/TowerDispelTimer/TowerDispelImmunityTimer），DispelEnemyDef配置类，ExecuteDispelTower()，TowerDispelSystem，FrameScheduler Phase 6.2注入，AuraTowerSystem/TowerSynergySystem跳过dispelled塔（bench2: 9260, bench4: 5276, bench5: 5029）
-- **2026-05-29**: 方向二（部分）：技能法力消耗 (SkillConfig.ManaCost → GameplayAbilityDef.Cost)，ManaSystem.HasEnoughMana/ConsumeMana 已就绪，GameConfigLoader 解析 ManaCost JSON 字段（bench2: 8494, bench4: 4661, bench5: 1066）
-- **2026-05-29**: 方向四：敌方治疗/辅助单位 Enemy Healer System（EnemyHealerSystem.cs，HealerDef配置类，EnemyHealerHealAmount/HealInterval/HealTargetPriority等SOA组件，GameConfig.HealerDefs，FrameScheduler Phase 3.75注入）（bench2: 10145, bench4: 5230, bench5: 4888）
-- **2026-05-29**: 方向七：敌人产卵巢穴 Nest System（NestSystem.cs，NestDef配置类，NestHealth/SpawnTimer/ActiveCount等SOA组件，GameConfig.NestDefs，FrameScheduler Phase 1.5注入）（bench2: 10653, bench4: 5302, bench5: 5016）
-- **2026-05-29**: 自动基准更新（bench2: 10624, bench4: 5501, bench5: 5129）
-- **2026-05-29**: 方向九：塔被动资源生产 Tower Passive Resource Generation（TowerIsIncomeTower/TowerGoldPerSecond），TowerIncomeSystem，GameConfig.IsIncomeTower/GoldPerSecond，PlaceTower 配置读取，经济塔跳过攻击逻辑，BuildPhase+WavePhase 双阶段产金（bench2: 10033, bench4: 5294, bench5: 4831）
-- **2026-05-29**: 方向三：金币窃取敌人 Gold-Stealing Enemies（EnemyCanStealGold/StealAmount/StolenGold/HasStolenGold），ThiefDef 配置类，EnemyStealGoldSystem，ComponentStore.LoseGold()，小偷偷金币不扣血，击杀逃跑小偷奖励 GoldOnReturn（bench2: 10600, bench4: 5411, bench5: 4704）
-- **2026-05-29**: 方向六：塔牺牲/自毁效果 Tower Demolish（AoE 拆除，Fire/Ice/Lightning/Poison/Arcane 五种效果类型），TowerDemolishSystem，DemolishTower() 入口（bench2: 10642, bench4: 5509, bench5: 5121）✅
-- **2026-05-28**: 方向八：肉盾/前锋敌人 Vanguard（EnemyIsVanguard/EnemyVanguardCoverRange/EnemyVanguardDmgTransfer），TowerAttackSystem 伤害结算时检测并转移伤害（bench2: 9265, bench4: 5058, bench5: 4809）
-- **2026-05-28**: 自动基准更新（bench2: 10735, bench4: 5046, bench5: 4096）⚠️ mode 4/5 显著下降，疑似新增方向系统引入开销
-- **2026-05-28**: mode 5（完整一局压测）上线 — 5 关全通 400 帧 6520 FPS
+
+> 仅记录功能上线和重大修复。日常基准波动见顶部性能基准表。
+
+- **2026-05-29**: 8 项业务系统扩展 — 法力消耗系统（150技能ManaCost）、金币窃取敌人（ThiefDef）、敌方治疗者（EnemyHealerSystem）、敌人驱散净化（TowerDispelSystem）、塔牺牲/自毁（TowerDemolishSystem）、敌人产卵巢穴（NestSystem）、塔被动产金（TowerIncomeSystem）、召唤战斗单位修复；bench2: 10406, bench4: 5638, bench5: 5050
+- **2026-05-28**: mode 5 完整一局压测上线（5关全通，400帧，6520 FPS）
+- **2026-05-28**: 方向八：肉盾/前锋敌人（Vanguard，伤害转移）；bench2: 9265, bench4: 5058, bench5: 4809
 - **2026-05-13**: 科技树系统上线（3分支 × 5节点，研究点数每波产出）
-- **2026-05-12**: BT Cache fix + Merged pipeline，FPS 达到 8334
-- **2026-05-12**: GAS 技能系统重构（Bug#9 修复）
-- **2026-05-12**: TowerAttack 并行化（ActiveTowerIds）
+- **2026-05-12**: BT Cache fix + Merged pipeline（FPS 8334）；GAS 技能系统重构；TowerAttack 并行化（ActiveTowerIds）
