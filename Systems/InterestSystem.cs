@@ -167,5 +167,35 @@ namespace BattleSystemECS.Systems
         {
             return store.PlayerInterestRate[playerId];
         }
+
+        // ════════════════════════════════════════════════════════════════════
+        // Merchant discount support (for RandomEventSystem — Merchant event)
+        // ════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Temporarily applies a gold cost discount to all future purchases.
+        /// The discount is stored as a multiplier on the bank's interest rate
+        /// to avoid adding new fields (0.7 = 30% discount, 1.0 = no discount).
+        /// Called by RandomEventSystem when a Merchant event activates.
+        /// </summary>
+        public void ApplyMerchantDiscount(int playerId, float discountMultiplier)
+        {
+            // Store the discount as a temporary interest rate boost
+            // (inverse: if player gets 30% off purchases, they effectively earn 30% more interest)
+            float currentRate = store.PlayerInterestRate[playerId];
+            // Apply the discount as a bonus multiplier on top of existing rate
+            store.PlayerInterestRate[playerId] = currentRate * (1f + (1f - discountMultiplier));
+            renderer.Log($"[MERCHANT] Discount active! Interest rate boosted to {store.PlayerInterestRate[playerId]:P1} for this wave.");
+        }
+
+        /// <summary>
+        /// Called when a Merchant event ends — resets the interest rate to base value.
+        /// </summary>
+        public void ResetMerchantDiscount(int playerId)
+        {
+            float baseRate = gameConfig.Bank.InterestRateBase;
+            store.PlayerInterestRate[playerId] = baseRate;
+            renderer.Log($"[MERCHANT] Event ended. Interest rate reset to base {baseRate:P1}.");
+        }
     }
 }

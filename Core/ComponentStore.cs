@@ -168,6 +168,18 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // GlobalTimeScaleDuration: remaining turns for the current time scale effect. 0 = inactive.
         public float[] GlobalTimeScaleDuration = new float[MAX_PLAYERS];
 
+        // ==================== 随机事件/中期惊喜组件（Random Mid-Wave Events, SOA）====================
+        // RandomEventCooldown: cooldown in turns until next event can trigger (-1 = no event pending, 0 = ready)
+        public float[] RandomEventCooldown = new float[MAX_PLAYERS];
+        // RandomEventActiveType: currently active event type (0=None, 1=Ambush, 2=SupplyDrop, 3=Earthquake, 4=BossRush, 5=Merchant)
+        public int[] RandomEventActiveType = new int[MAX_PLAYERS];
+        // RandomEventTimer: countdown for the current event in turns (0 = immediate/one-shot event)
+        public float[] RandomEventTimer = new float[MAX_PLAYERS];
+        // RandomEventParam: event-specific parameter (e.g. gold amount for SupplyDrop, spawn count for Ambush)
+        public float[] RandomEventParam = new float[MAX_PLAYERS];
+        // RandomEventParam2: second event-specific parameter
+        public float[] RandomEventParam2 = new float[MAX_PLAYERS];
+
         // ==================== Ascension/Difficulty Modifier 组件 ====================
         // AscensionModifierStacks: tracks stack count for each ascension modifier (up to 64 unique modifiers)
         public int[] AscensionModifierStacks = new int[64];

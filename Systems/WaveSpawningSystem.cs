@@ -159,6 +159,81 @@ namespace BattleSystemECS.Systems
         public int GetCurrentLevel() => currentLevel;
         public int GetTotalEnemiesSpawned() => totalEnemiesSpawned;
 
+        /// <summary>
+        /// Injects extra enemies mid-wave (for Ambush random event).
+        /// Adds count enemies immediately without resetting multi-type state.
+        /// </summary>
+        public void InjectExtraEnemies(int count)
+        {
+            if (count <= 0) return;
+            var random = GetSpawnRandom();
+            for (int i = 0; i < count; i++)
+            {
+                float startX = (float)random.Next(0, 10);
+                float startY = 19f;
+                float waveScaling = 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.BaseHealthMultPerWave;
+                float dmgGrowth = spawnConfig.DifficultyConfig.BaseDamageMultPerWave;
+                float damageMult = 1.0f + (currentWave - 1) * dmgGrowth;
+                bool isEliteWave = currentWave >= spawnConfig.DifficultyConfig.EliteStartWave;
+                bool isBossWave = currentWave >= spawnConfig.DifficultyConfig.BossStartWave;
+
+                float healthMult = waveScaling;
+                if (isBossWave)
+                {
+                    healthMult *= spawnConfig.DifficultyConfig.BossHealthMult;
+                    damageMult *= spawnConfig.DifficultyConfig.BossDamageMult;
+                }
+                else if (isEliteWave)
+                {
+                    healthMult *= spawnConfig.DifficultyConfig.EliteHealthMult;
+                    damageMult *= spawnConfig.DifficultyConfig.EliteDamageMult;
+                }
+
+                var monsterConfig = gameConfig.GetMonsterConfig("Normal");
+                if (monsterConfig == null) continue;
+
+                float scaledHealth = monsterConfig.Health * healthMult;
+                float scaledMaxHealth = monsterConfig.MaxHealth * healthMult;
+                float scaledDamage = monsterConfig.Damage * damageMult;
+                float scaledArmor = monsterConfig.Armor * (1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.ArmorGrowthPerWave);
+                float scaledSpeed = monsterConfig.MoveSpeed * (1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.SpeedGrowthPerWave);
+
+                string enemyName = $"[AMBUSH] NormalL{currentLevel}W{currentWave}";
+                int enemyId = store.AddEnemy(startX, startY, scaledSpeed, scaledHealth, scaledMaxHealth, scaledDamage, monsterConfig.GoldReward, currentWave, enemyName, scaledArmor, monsterConfig.Shield, monsterConfig.MagicResist);
+                if (enemyId < 0) continue;
+                store.SetEntityName(enemyId, enemyName);
+                store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree("Normal");
+                totalEnemiesSpawned++;
+            }
+        }
+
+        /// <summary>
+        /// Injects a mini-boss mid-wave (for BossRush random event).
+        /// </summary>
+        public void InjectMiniBoss()
+        {
+            float startX = (float)GetSpawnRandom().Next(0, 10);
+            float startY = 19f;
+            var monsterConfig = gameConfig.GetMonsterConfig("Normal");
+            if (monsterConfig == null) return;
+
+            float waveScaling = 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.BaseHealthMultPerWave;
+            float dmgGrowth = spawnConfig.DifficultyConfig.BaseDamageMultPerWave;
+            float scaledHealth = monsterConfig.Health * waveScaling * spawnConfig.DifficultyConfig.BossHealthMult * 0.5f;
+            float scaledMaxHealth = monsterConfig.MaxHealth * waveScaling * spawnConfig.DifficultyConfig.BossHealthMult * 0.5f;
+            float scaledDamage = monsterConfig.Damage * (1.0f + (currentWave - 1) * dmgGrowth) * spawnConfig.DifficultyConfig.BossDamageMult * 0.5f;
+            float scaledArmor = monsterConfig.Armor;
+            float scaledSpeed = monsterConfig.MoveSpeed;
+
+            string enemyName = $"[BOSS RUSH] NormalL{currentLevel}W{currentWave}";
+            int enemyId = store.AddEnemy(startX, startY, scaledSpeed, scaledHealth, scaledMaxHealth, scaledDamage, monsterConfig.GoldReward * 3, currentWave, enemyName, scaledArmor, monsterConfig.Shield, monsterConfig.MagicResist);
+            if (enemyId < 0) return;
+            store.SetEntityName(enemyId, enemyName);
+            store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree("Normal");
+            store.EnemyIsElite[enemyId] = true;
+            totalEnemiesSpawned++;
+        }
+
         public void SetLevel(int levelNumber)
         {
             currentLevel = levelNumber;

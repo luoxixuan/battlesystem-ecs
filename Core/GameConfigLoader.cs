@@ -65,6 +65,9 @@ namespace BattleSystemECS.Config
                 // Load summon definitions (direction 1: player-summoned combat units)
                 LoadSummonDefs(gameConfig, renderer);
 
+                // Load random mid-wave event definitions (direction 9)
+                LoadRandomEventDefs(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -1393,6 +1396,58 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[CORPSE] Failed to load corpse effect defs: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Load random event definitions from Data/Configs/random_events.json.
+        /// </summary>
+        private static void LoadRandomEventDefs(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string eventFile = "Data/Configs/random_events.json";
+            try
+            {
+                if (!File.Exists(eventFile))
+                {
+                    renderer.Log("[EVENT] Random event defs file not found: " + eventFile + ", using defaults (events disabled)");
+                    return;
+                }
+                string json = File.ReadAllText(eventFile);
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var config = gameConfig.RandomEvents;
+                if (root.TryGetProperty("globalEventChance", out var gec))
+                    config.GlobalEventChance = (float)gec.GetDouble();
+                if (root.TryGetProperty("minEventGap", out var meg))
+                    config.MinEventGap = (float)meg.GetDouble();
+
+                if (root.TryGetProperty("events", out var eventsElem) && eventsElem.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var elem in eventsElem.EnumerateArray())
+                    {
+                        var evt = new RandomEventDef();
+                        evt.Id = elem.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "";
+                        evt.Name = elem.TryGetProperty("name", out var nm) ? nm.GetString() ?? "" : "";
+                        evt.EventType = elem.TryGetProperty("eventType", out var et) ? et.GetInt32() : 0;
+                        evt.Weight = elem.TryGetProperty("weight", out var wt) ? (float)wt.GetDouble() : 0f;
+                        evt.MinWave = elem.TryGetProperty("minWave", out var mw) ? mw.GetInt32() : 0;
+                        evt.MaxWave = elem.TryGetProperty("maxWave", out var xw) ? xw.GetInt32() : -1;
+                        evt.Cooldown = elem.TryGetProperty("cooldown", out var cd) ? (float)cd.GetDouble() : 60f;
+                        evt.Duration = elem.TryGetProperty("duration", out var dur) ? (float)dur.GetDouble() : 0f;
+                        evt.DifficultyMult = elem.TryGetProperty("difficultyMult", out var dm) ? (float)dm.GetDouble() : 1f;
+                        evt.BonusGold = elem.TryGetProperty("bonusGold", out var bg) ? (float)bg.GetDouble() : 0f;
+                        evt.BonusResearch = elem.TryGetProperty("bonusResearch", out var br) ? br.GetInt32() : 0;
+                        evt.Param = elem.TryGetProperty("param", out var p) ? (float)p.GetDouble() : 0f;
+                        evt.Param2 = elem.TryGetProperty("param2", out var p2) ? (float)p2.GetDouble() : 0f;
+                        config.Events.Add(evt);
+                    }
+                    renderer.Log("[EVENT] Loaded " + config.Events.Count + " random event defs from " + eventFile);
+                }
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[EVENT] Failed to load random event defs: " + ex.Message);
             }
         }
 

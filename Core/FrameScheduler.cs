@@ -78,6 +78,7 @@ namespace BattleSystemECS.Core
         public PathModifierSystem? PathModifier { get; set; }
         public EnemyBurrowSystem? Burrow { get; set; }
         public NecromancerSystem? Necromancer { get; set; }
+        public RandomEventSystem? RandomEvent { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -142,6 +143,11 @@ namespace BattleSystemECS.Core
 
             // ── Phase 0.6: Adaptive Difficulty update ────────────────────────
             AdaptiveDifficulty?.Update(effectiveDelta);
+
+            // ── Phase 0.65: Random Mid-Wave Events ────────────────────────────
+            int waveNum = WaveSpawning?.GetCurrentWave() ?? 1;
+            int lvlNum = WaveSpawning?.GetCurrentLevel() ?? 1;
+            RandomEvent?.Update(effectiveDelta, waveNum, lvlNum);
 
             // ── Phase 1: 生成 ─────────────────────────────────────────────
             WaveSpawning?.Update();

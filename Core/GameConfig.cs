@@ -1026,6 +1026,9 @@ namespace BattleSystemECS.Config
         // Path modifier tower definitions (direction 7)
         public List<PathModifierDef> PathModifiers { get; set; } = new List<PathModifierDef>();
 
+        // Random mid-wave event system configuration (direction 9)
+        public RandomEventConfig RandomEvents { get; set; } = new RandomEventConfig();
+
         // Bank / Interest system configuration (direction 2)
         public BankConfig Bank { get; set; } = new BankConfig();
         // Mana/Energy pool system (direction 5)
@@ -1755,6 +1758,63 @@ namespace BattleSystemECS.Config
         public float SlowAmount { get; set; } = 1f;
         /// <summary>Enemy types that leave this corpse effect (comma-separated in JSON).</summary>
         public List<string> MonsterTypes { get; set; } = new List<string>();
+    }
+
+    /// <summary>
+    /// Random mid-wave event definition — defines the structure of one random event type.
+    /// Loaded from Data/Configs/random_events.json.
+    /// </summary>
+    public class RandomEventDef
+    {
+        /// <summary>Unique identifier: ambush, supply_drop, earthquake, boss_rush, merchant</summary>
+        public string Id { get; set; } = "";
+        /// <summary>Display name shown to player when event triggers.</summary>
+        public string Name { get; set; } = "";
+        /// <summary>
+        /// Event type enum value: 1=Ambush, 2=SupplyDrop, 3=Earthquake, 4=BossRush, 5=Merchant
+        /// </summary>
+        public int EventType { get; set; } = 0;
+        /// <summary>Weight for random selection (higher = more likely). 0 = never auto-trigger.</summary>
+        public float Weight { get; set; } = 0f;
+        /// <summary>Earliest wave number this event can appear (0 = always).</summary>
+        public int MinWave { get; set; } = 0;
+        /// <summary>Latest wave number this event can appear (-1 = no limit).</summary>
+        public int MaxWave { get; set; } = -1;
+        /// <summary>Minimum time (in seconds) between consecutive events of this type.</summary>
+        public float Cooldown { get; set; } = 60f;
+        /// <summary>Event duration in turns (-1 = instant/one-shot, 0 = permanent until ended).</summary>
+        public float Duration { get; set; } = 0f;
+        /// <summary>Difficulty multiplier applied to enemy stats during this event (e.g. 1.2 = +20%).</summary>
+        public float DifficultyMult { get; set; } = 1f;
+        /// <summary>Bonus gold awarded when the event ends successfully (surviving).</summary>
+        public float BonusGold { get; set; } = 0f;
+        /// <summary>Bonus research points awarded when the event ends successfully.</summary>
+        public int BonusResearch { get; set; } = 0;
+        /// <summary>For Ambush: extra enemy count. For SupplyDrop: gold amount. For Earthquake: damage to all.</summary>
+        public float Param { get; set; } = 0f;
+        /// <summary>Secondary parameter (e.g. for AoE radius, speed penalty, etc.).</summary>
+        public float Param2 { get; set; } = 0f;
+    }
+
+    /// <summary>
+    /// Random event configuration — holds all RandomEventDefs and global settings.
+    /// </summary>
+    public class RandomEventConfig
+    {
+        /// <summary>Event type IDs matching RandomEventDef.EventType.</summary>
+        public const int None = 0;
+        public const int Ambush = 1;
+        public const int SupplyDrop = 2;
+        public const int Earthquake = 3;
+        public const int BossRush = 4;
+        public const int Merchant = 5;
+
+        /// <summary>Global probability that an event triggers at any wave start (0-1). Default: 0.3 (30%).</summary>
+        public float GlobalEventChance { get; set; } = 0.3f;
+        /// <summary>Minimum turn gap between consecutive random events.</summary>
+        public float MinEventGap { get; set; } = 30f;
+        /// <summary>All defined event types.</summary>
+        public List<RandomEventDef> Events { get; set; } = new List<RandomEventDef>();
     }
 
     public enum CorpseEffectTypeEnum
