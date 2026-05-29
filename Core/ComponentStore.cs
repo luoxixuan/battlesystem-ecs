@@ -331,6 +331,26 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // EnemyBurrowRadius: AoE radius for emerge damage
         public float[] EnemyBurrowRadius = new float[MAX_ENTITIES];
 
+        // ==================== 亡灵法师组件 (Necromancer, SOA) ====================
+        // EnemyCanResurrect: true if this enemy is a necromancer
+        public bool[] EnemyCanResurrect = new bool[MAX_ENTITIES];
+        // EnemyResurrectRange: scan radius for nearby corpses (world units)
+        public float[] EnemyResurrectRange = new float[MAX_ENTITIES];
+        // EnemyResurrectCooldown: remaining cooldown in turns (0 = ready, < 0 = no cooldown)
+        public float[] EnemyResurrectCooldown = new float[MAX_ENTITIES];
+        // EnemyResurrectCooldownRef: reference cooldown value (used to reset after use)
+        public float[] EnemyResurrectCooldownRef = new float[MAX_ENTITIES];
+        // EnemyResurrectHpMult: HP multiplier applied to reanimated minions
+        public float[] EnemyResurrectHpMult = new float[MAX_ENTITIES];
+        // EnemyMaxResurrectCount: max simultaneous reanimated minions per necromancer (0 = unlimited)
+        public int[] EnemyMaxResurrectCount = new int[MAX_ENTITIES];
+        // EnemyResurrectCorpseAgeLimit: max corpse age in seconds (default MAX_CORPSE_AGE_SEC)
+        public float[] EnemyResurrectCorpseAgeLimit = new float[MAX_ENTITIES];
+        // EnemyIsReanimated: true if this enemy was spawned as a reanimated minion by a necromancer
+        public bool[] EnemyIsReanimated = new bool[MAX_ENTITIES];
+        // EnemyOwnerId: the necromancer entity ID that owns this reanimated minion (-1 if none)
+        public int[] EnemyOwnerId = new int[MAX_ENTITIES];
+
         // ==================== 玩家召唤单位组件 (Player-Summoned Units, SOA) ====================
         // SummonedUnitActive: true if this entity is a player-summoned combat unit
         public bool[] SummonedUnitActive = new bool[MAX_ENTITIES];
@@ -794,6 +814,27 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         private List<int> _activeCorpseEffectIds = new List<int>();
         private int _nextCorpseEffectId = 0;
 
+        // ==================== 亡灵法师尸体队列（Necromancer Corpse Queue）====================
+        // Tracks recently-killed enemy corpses for necromancer resurrection.
+        // MAX_CORPSE_AGE_SEC = corpses expire after this many seconds (e.g. 30s window).
+        // MAX_CORPSE_QUEUE = circular buffer size.
+        public const float MAX_CORPSE_AGE_SEC = 30f;
+        public const int MAX_CORPSE_QUEUE = 2000;
+        // CorpseX/Y: world position where the enemy died.
+        // CorpseMonsterType: the monster type name string (for lookup by reanimated enemy).
+        // CorpseOwnerId: the necromancer entity ID that owns this corpse (-1 if unclaimed).
+        // CorpseHealth: remaining HP% of the reanimated minion (so it scales correctly).
+        // CorpseDeathTime: timestamp (in sim seconds via GameManager.SimElapsed) when the enemy died.
+        public float[] CorpseX = new float[MAX_CORPSE_QUEUE];
+        public float[] CorpseY = new float[MAX_CORPSE_QUEUE];
+        public string[] CorpseMonsterType = new string[MAX_CORPSE_QUEUE];
+        public int[] CorpseOwnerId = new int[MAX_CORPSE_QUEUE];
+        public float[] CorpseHealth = new float[MAX_CORPSE_QUEUE];
+        public float[] CorpseDeathTime = new float[MAX_CORPSE_QUEUE];
+        public bool[] CorpseActive = new bool[MAX_CORPSE_QUEUE];  // true = slot in use
+        public bool[] CorpseReanimated = new bool[MAX_CORPSE_QUEUE];  // true = already reanimated, cannot be resurrected again
+        private int _nextCorpseId = 0;
+
         // ==================== 技能组件的 SOA 存储 ====================
         public string[] SkillName = new string[MAX_PLAYERS];
         public float[] SkillDamageMultiplier = new float[MAX_PLAYERS];
@@ -1175,6 +1216,16 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
                 EnemyBurrowSpeedMult[entityId] = 1f;
                 EnemyBurrowEmergeDamage[entityId] = 0f;
                 EnemyBurrowRadius[entityId] = 0f;
+                // Necromancer / resurrect fields (reset on entity destruction)
+                EnemyCanResurrect[entityId] = false;
+                EnemyResurrectRange[entityId] = 0f;
+                EnemyResurrectCooldown[entityId] = 0f;
+                EnemyResurrectCooldownRef[entityId] = 0f;
+                EnemyResurrectHpMult[entityId] = 0f;
+                EnemyMaxResurrectCount[entityId] = 0;
+                EnemyResurrectCorpseAgeLimit[entityId] = 0f;
+                EnemyIsReanimated[entityId] = false;
+                EnemyOwnerId[entityId] = -1;
                 // Bleed/rupture debuff fields (applied by Slash/Pierce towers)
                 EnemyBleedStacks[entityId] = 0f;
                 EnemyBleedDamagePerStack[entityId] = 0f;
@@ -1813,6 +1864,49 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         public List<int> GetCachedActiveCorpseEffectIds()
         {
             return _activeCorpseEffectIds;
+        }
+
+        // ==================== 亡灵法师尸体队列 API ====================
+        /// <summary>
+        /// Queue a killed enemy as a corpse for potential necromancer resurrection.
+        /// Uses a circular buffer. Returns corpse slot index (0 to MAX_CORPSE_QUEUE-1), or -1 if full.
+        /// </summary>
+        public int NecromancerQueueCorpse(int enemyId, float x, float y, string monsterType, float hpPercent, float simTime)
+        {
+            for (int i = 0; i < MAX_CORPSE_QUEUE; i++)
+            {
+                int candidateId = (_nextCorpseId + i) % MAX_CORPSE_QUEUE;
+                if (CorpseActive[candidateId]) continue;
+
+                CorpseX[candidateId] = x;
+                CorpseY[candidateId] = y;
+                CorpseMonsterType[candidateId] = monsterType;
+                CorpseOwnerId[candidateId] = -1; // unclaimed
+                CorpseHealth[candidateId] = hpPercent;
+                CorpseDeathTime[candidateId] = simTime;
+                CorpseActive[candidateId] = true;
+                CorpseReanimated[candidateId] = false;
+                _nextCorpseId = (candidateId + 1) % MAX_CORPSE_QUEUE;
+                return candidateId;
+            }
+            return -1; // queue full
+        }
+
+        /// <summary>
+        /// Expire old corpses past the age limit. Called from NecromancerSystem or cleanup.
+        /// </summary>
+        public void ExpireCorpse(int corpseId)
+        {
+            if (corpseId < 0 || corpseId >= MAX_CORPSE_QUEUE) return;
+            if (!CorpseActive[corpseId]) return;
+            CorpseActive[corpseId] = false;
+            CorpseX[corpseId] = 0f;
+            CorpseY[corpseId] = 0f;
+            CorpseMonsterType[corpseId] = null;
+            CorpseOwnerId[corpseId] = -1;
+            CorpseHealth[corpseId] = 0f;
+            CorpseDeathTime[corpseId] = 0f;
+            CorpseReanimated[corpseId] = false;
         }
 
         // ==================== 塔选中状态管理 ====================

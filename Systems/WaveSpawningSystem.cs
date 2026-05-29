@@ -384,6 +384,34 @@ namespace BattleSystemECS.Systems
                         store.EnemyBurrowCooldownRef[enemyId] = -1f;
                     }
 
+                    // Initialize necromancer enemy properties
+                    if (monsterConfig.IsNecromancer)
+                    {
+                        store.EnemyCanResurrect[enemyId] = true;
+                        store.EnemyResurrectRange[enemyId] = monsterConfig.ResurrectRange;
+                        store.EnemyResurrectCooldown[enemyId] = 0f; // ready to resurrect
+                        store.EnemyResurrectCooldownRef[enemyId] = monsterConfig.ResurrectCooldown;
+                        store.EnemyResurrectHpMult[enemyId] = monsterConfig.ResurrectHpMult;
+                        store.EnemyMaxResurrectCount[enemyId] = monsterConfig.MaxResurrectCount;
+                        store.EnemyResurrectCorpseAgeLimit[enemyId] = monsterConfig.ResurrectCorpseAgeLimit > 0f
+                            ? monsterConfig.ResurrectCorpseAgeLimit
+                            : ComponentStore.MAX_CORPSE_AGE_SEC;
+                        store.EnemyIsReanimated[enemyId] = false;
+                        store.EnemyOwnerId[enemyId] = -1;
+                    }
+                    else
+                    {
+                        store.EnemyCanResurrect[enemyId] = false;
+                        store.EnemyResurrectRange[enemyId] = 0f;
+                        store.EnemyResurrectCooldown[enemyId] = 0f;
+                        store.EnemyResurrectCooldownRef[enemyId] = 0f;
+                        store.EnemyResurrectHpMult[enemyId] = 0f;
+                        store.EnemyMaxResurrectCount[enemyId] = 0;
+                        store.EnemyResurrectCorpseAgeLimit[enemyId] = 0f;
+                        store.EnemyIsReanimated[enemyId] = false;
+                        store.EnemyOwnerId[enemyId] = -1;
+                    }
+
                     // Assign per-enemy affixes (1-3 random affixes from EnemyAffixSystem)
                     _enemyAffixSystem?.AssignAffixesAtSpawn(enemyId, scaledMaxHealth);
 

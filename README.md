@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-29, commit `9f3a1b2`）
+## 性能基准（2026-05-29, commit `0c24bb9`）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **~5021 FPS**，400 帧，~0.20 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10483 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5135 FPS** |
+| **mode 5**（完整一局） | **~4882 FPS**，400 帧，~0.20 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~9871 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5122 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -138,6 +138,7 @@ dotnet test
 
 > 仅记录功能上线和重大修复。日常基准波动见顶部性能基准表。
 
+- **2026-05-29**: 方向五：复活/亡灵法师敌人（NecromancerSystem + EnemyCanResurrect/EnemyIsReanimated + CorpseQueue + WaveSpawning 初始化 + FrameScheduler Phase 2.6 注入）；bench2: 9871, bench4: 5122, bench5: 4882
 - **2026-05-29**: 方向二：昼夜循环系统（DayNightSystem + DayNightConfig + GlobalDayNightPhase/Timer/CycleCount 组件 + TowerAttack/EnemyMovement 集成）；bench2: 10483, bench4: 5135, bench5: 5021
 - **2026-05-29**: 方向一：钻地/潜行敌人（EnemyBurrowSystem + EnemyIsBurrowed/BurrowTimer/BurrowCooldown + Emerge AoE + TowerAttack 索敌跳过）；bench2: 10115, bench4: 5487, bench5: 4878
 - **2026-05-29**: 方向四：流血/撕裂 DoT（BleedSystem + TowerIsBleedTower/EnemyBleedStacks + 流血塔配置）；bench2: 10081, bench4: 5464, bench5: 5087

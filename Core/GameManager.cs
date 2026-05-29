@@ -52,6 +52,7 @@ namespace BattleSystemECS.Core
         private EnemyFissionSystem enemyFissionSystem; // 敌人分裂/裂殖系统
         private EnemyMorphSystem enemyMorphSystem;   // 敌人变形/进化系统
         private EnemyBurrowSystem enemyBurrowSystem; // 敌人钻地/潜行系统
+        private NecromancerSystem necromancerSystem; // 亡灵法师复活尸体系统
         private ObjectiveSystem objectiveSystem;      // 特殊目标/护送模式系统
         private WaveBranchSystem waveBranchSystem;   // 波次分支/玩家选择系统
         private ResourceNodeSystem resourceNodeSystem; // 地图资源节点系统（金矿/法力泉/科技遗迹）
@@ -208,6 +209,10 @@ logger.Log("      ComboSystem created successfully!");
             enemyBurrowSystem = new EnemyBurrowSystem(store, playerId);
             logger.Log("      EnemyBurrowSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating NecromancerSystem (Resurrect corpses as minions)... ");
+            necromancerSystem = new NecromancerSystem(store, gameConfig, logger);
+            logger.Log("      NecromancerSystem created successfully!");
+
             logger.Log("[BOOTSTRAP]    - Creating ObjectiveSystem (Escort/Survival/Timed objectives)... ");
             objectiveSystem = new ObjectiveSystem(store, playerId);
             logger.Log("      ObjectiveSystem created successfully!");
@@ -331,6 +336,8 @@ logger.Log("      ComboSystem created successfully!");
 
             // Wire OnEnemyKilled → ComboSystem (连击计数链路)
             store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
+            // Wire OnEnemyKilled → NecromancerSystem (queue corpses for resurrection)
+            store.OnEnemyKilled += (enemyId, playerId) => necromancerSystem.OnEnemyKilled(enemyId, playerId);
             // Wire OnTowerKill → TowerExperienceSystem (XP 授予链路)
             store.OnTowerKill += (enemyId, playerId, towerId) => towerExperienceSystem.HandleEnemyKilled(enemyId, playerId, towerId);
 
@@ -393,6 +400,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.EnemyFission = enemyFissionSystem;
             scheduler.EnemyMorph = enemyMorphSystem;
             scheduler.Burrow = enemyBurrowSystem;
+            scheduler.Necromancer = necromancerSystem;
             scheduler.Objective = objectiveSystem;
             scheduler.WaveBranch = waveBranchSystem;
             scheduler.ResourceNode = resourceNodeSystem;

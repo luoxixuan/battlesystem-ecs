@@ -58,6 +58,18 @@ namespace BattleSystemECS.Config
         public float BurrowRadius { get; set; } = 0f;
         // BurrowCooldown: turns between burrow uses (-1 = one-time, 0 = can always burrow)
         public float BurrowCooldown { get; set; } = -1f;
+        // IsNecromancer: true if this enemy is a necromancer that resurrects nearby corpses
+        public bool IsNecromancer { get; set; } = false;
+        // ResurrectRange: radius in world units for scanning nearby corpses
+        public float ResurrectRange { get; set; } = 0f;
+        // ResurrectCooldown: turns between resurrection uses (-1 = one-time, 0 = can always)
+        public float ResurrectCooldown { get; set; } = 0f;
+        // ResurrectHpMult: HP multiplier applied to reanimated minions (0.0-1.0)
+        public float ResurrectHpMult { get; set; } = 0f;
+        // MaxResurrectCount: max number of simultaneous reanimated minions per necromancer
+        public int MaxResurrectCount { get; set; } = 0;
+        // ResurrectCorpseAgeLimit: max age of corpses in seconds (older corpses can't be resurrected)
+        public float ResurrectCorpseAgeLimit { get; set; } = 0f;
         // Boss: true if this monster type is a boss (participates in phase/enrage system).
         public bool IsBoss { get; set; } = false;
         // IsThief: true if this enemy steals gold instead of damaging base (GoldStealing direction)

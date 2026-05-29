@@ -77,6 +77,7 @@ namespace BattleSystemECS.Core
         public PlayerSummonSystem? Summon { get; set; }
         public PathModifierSystem? PathModifier { get; set; }
         public EnemyBurrowSystem? Burrow { get; set; }
+        public NecromancerSystem? Necromancer { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -165,6 +166,10 @@ namespace BattleSystemECS.Core
             Burrow?.SetTurn(turn);
             Burrow?.Update();
             Burrow?.ApplyBurrowEffects();
+
+            // ── Phase 2.6: Necromancer — resurrect corpses as reanimated minions ──
+            Necromancer?.SetTurn(turn, turn);  // second param = sim elapsed (turn = proxy for sim seconds)
+            Necromancer?.Update(deltaTime);
 
             // ── Phase 3: Movement ──────────────────────────────────────────
             Pathfinding?.SetTurn(turn);
