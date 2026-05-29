@@ -70,6 +70,7 @@ namespace BattleSystemECS.Core
         public TowerLinkSystem? TowerLink { get; set; }
         public PullTowerSystem? PullTower { get; set; }
         public BleedSystem? Bleed { get; set; }
+        public EnemyWoundSystem? Wound { get; set; }
         public AdaptiveDifficultySystem? AdaptiveDifficulty { get; set; }
         public CorpseEffectSystem? CorpseEffect { get; set; }
         public NestSystem? Nest { get; set; }
@@ -178,6 +179,8 @@ namespace BattleSystemECS.Core
             Necromancer?.Update(deltaTime);
 
             // ── Phase 3: Movement ──────────────────────────────────────────
+            Wound?.SetTurn(turn);
+            Wound?.Update();
             Pathfinding?.SetTurn(turn);
             EnemyMovement?.SetTurn(turn);
             EnemyMovement?.Update();

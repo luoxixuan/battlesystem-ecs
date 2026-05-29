@@ -310,6 +310,14 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float[] EnemyMoveSpeedBase = new float[MAX_ENTITIES];
         // EnemySlowDurationLeft: tower-slow duration in turns. Separate from EnemyBuffDurationLeft
         public float[] EnemySlowDurationLeft = new float[MAX_ENTITIES];
+        // ==================== Enemy Wound / Cripple (HP-Threshold Slow) ====================
+        // EnemyWoundThreshold: HP fraction threshold that triggers wound slow (e.g. 0.3 = 30% HP)
+        // Default 0f = no wound mechanic. When HP drops below this ratio, wound slow activates.
+        public float[] EnemyWoundThreshold = new float[MAX_ENTITIES];
+        // EnemyWoundSlowRatio: speed multiplier when wounded (e.g. 0.5 = 50% speed)
+        public float[] EnemyWoundSlowRatio = new float[MAX_ENTITIES];
+        // EnemyIsWounded: true when HP is below wound threshold and wound mechanic is active
+        public bool[] EnemyIsWounded = new bool[MAX_ENTITIES];
         // EnemyKnockbackForceLeft: remaining knockback force applied this frame (decays to 0)
         public float[] EnemyKnockbackForceLeft = new float[MAX_ENTITIES];
         // EnemyIsElite: true if this enemy was spawned as an elite ([ELITE] prefix in fullName).
@@ -2286,6 +2294,18 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
             if (baseSpeed > 0f)
                 EnemyMoveSpeed[enemyId] = baseSpeed;
             EnemySlowFactor[enemyId] = 0f;
+        }
+
+        /// <summary>Clears wound slow effect on enemy and restores speed from wound state.</summary>
+        public void ClearEnemyWound(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!EnemyIsWounded[enemyId]) return;
+            EnemyIsWounded[enemyId] = false;
+            // Restore from base speed (wound applied additional multiplier on top of base)
+            float baseSpeed = EnemyMoveSpeedBase[enemyId];
+            if (baseSpeed > 0f)
+                EnemyMoveSpeed[enemyId] = baseSpeed;
         }
 
         /// <summary>Applies knockback force to an enemy. Force is applied instantly and consumed in ResolveKnockback.</summary>
