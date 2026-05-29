@@ -83,6 +83,7 @@ namespace BattleSystemECS.Core
         public ChronoTowerSystem? ChronoTower { get; set; }
         public TowerRelocateSystem? TowerRelocate { get; set; }
         public TowerConstructionSystem? Construction { get; set; }
+        public GlobalSkillSystem? GlobalSkill { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -135,6 +136,7 @@ namespace BattleSystemECS.Core
                 Mana?.Update(deltaTime, isBuildPhase: true); // mana regen (build phase = higher regen)
                 Objective?.Update(deltaTime, Phase); // escort NPC movement, objective timers
                 ResourceNode?.Update(deltaTime, Phase); // resource node production
+                GlobalSkill?.Update(deltaTime, isBuildPhase: true); // global skill cooldown ticking
                 return;
             }
 
@@ -229,6 +231,7 @@ namespace BattleSystemECS.Core
             Curse?.SetTurn();
             PullTower?.SetTurn();
             Mana?.SetTurn(); // cache tech tree mana bonuses
+            GlobalSkill?.SetTurn(turn);
 
             // ── Phase 5: Spatial Rebuild ──────────────────────────────────
             store.RebuildSpatialGrid();
@@ -263,6 +266,7 @@ namespace BattleSystemECS.Core
             EnemyProjectile?.Update(effectiveDelta);
             Pickup?.Update(effectiveDelta);
             Mana?.Update(effectiveDelta, isBuildPhase: false); // mana regen (wave phase = normal regen)
+            GlobalSkill?.Update(effectiveDelta, isBuildPhase: false); // global skill cooldown
 
             // ── Phase 7: Skill / Buff Damage ──────────────────────────────
             Buff?.Update(effectiveDelta);

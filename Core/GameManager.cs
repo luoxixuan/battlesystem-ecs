@@ -306,6 +306,10 @@ logger.Log("      ComboSystem created successfully!");
             manaSystem.Initialize();
             logger.Log("      ManaSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating GlobalSkillSystem (Player Global Skills / Ultimates)...");
+            var globalSkillSystem = new GlobalSkillSystem(store, gameConfig, logger, playerId, techTreeSystem);
+            logger.Log("      GlobalSkillSystem created successfully!");
+
             // Wire ManaSystem into SkillSystem for mana cost checking
             skillSystem.InjectManaSystem(manaSystem);
 
@@ -400,6 +404,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.WaveMutator = waveMutatorSystem;
             scheduler.Interest = interestSystem;
             scheduler.Mana = manaSystem;
+            scheduler.GlobalSkill = globalSkillSystem;
             scheduler.Pickup = pickupSystem;
             scheduler.Skill = skillSystem;
             scheduler.Buff = buffSystem;

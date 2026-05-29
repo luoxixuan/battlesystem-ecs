@@ -1045,6 +1045,8 @@ namespace BattleSystemECS.Config
         public BankConfig Bank { get; set; } = new BankConfig();
         // Mana/Energy pool system (direction 5)
         public ManaConfig Mana { get; set; } = new ManaConfig();
+        // Player global skills / ultimates (direction 5)
+        public List<GlobalSkillDef> GlobalSkills { get; set; } = new List<GlobalSkillDef>();
 
         public GameConfig()
         {
@@ -1546,6 +1548,47 @@ namespace BattleSystemECS.Config
         public float ManaRegenBuildPhase { get; set; } = 10f;
         // Multiplier on all mana costs (buff/debuff from tech tree)
         public float ManaCostMultiplier { get; set; } = 1f;
+    }
+
+    /// <summary>
+    /// Skill type IDs for player global skills (ultimates).
+    /// </summary>
+    public enum GlobalSkillType
+    {
+        MeteorStrike = 0,   // Full-screen AoE damage
+        TimeStop = 1,      // Freeze all enemies temporarily
+        EmergencyHeal = 2, // Restore HP to all towers
+        GoldBurst = 3      // Instant gold + temporary income boost
+    }
+
+    /// <summary>
+    /// Player global skill / ultimate ability definition.
+    /// Stored in gameConfig.GlobalSkills and referenced by GlobalSkillSystem.
+    /// </summary>
+    public class GlobalSkillDef
+    {
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        // Skill type ID (maps to GlobalSkillType enum)
+        public int SkillType { get; set; }
+        // Mana cost to activate
+        public float ManaCost { get; set; } = 0f;
+        // Cooldown in seconds (cross-wave)
+        public float Cooldown { get; set; } = 0f;
+        // For MeteorStrike: damage as % of player HP
+        public float DamagePct { get; set; } = 0f;
+        // Cap on meteor damage so one skill can't one-shot bosses
+        public float MaxDamage { get; set; } = 0f;
+        // For TimeStop: duration in seconds
+        public float Duration { get; set; } = 0f;
+        // For EmergencyHeal: heal as % of max HP
+        public float HealPct { get; set; } = 0f;
+        // For GoldBurst: flat gold awarded
+        public float GoldAmount { get; set; } = 0f;
+        // For GoldBurst: income multiplier for Duration seconds
+        public float GoldMultiplier { get; set; } = 1f;
+        // Hotkey string for UI display (e.g. "Q", "R")
+        public string Hotkey { get; set; } = "";
     }
 
     /// <summary>

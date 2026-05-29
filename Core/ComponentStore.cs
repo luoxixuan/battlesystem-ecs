@@ -54,6 +54,15 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float[] PlayerManaRegen = new float[MAX_PLAYERS];
         // PlayerManaCost: cost multiplier for skill mana consumption
         public float[] PlayerManaCost = new float[MAX_PLAYERS];
+        // ==================== 玩家全局技能/终极技能 (Global Skills / Ultimates) ====================
+        // PlayerGlobalSkillUnlocked: bit-flag of which global skills are unlocked per player (indexed by playerId * MAX_GLOBAL_SKILLS + skillIdx)
+        public bool[] PlayerGlobalSkillUnlocked = new bool[MAX_PLAYERS * 8];
+        // PlayerGlobalSkillCooldown: remaining cooldown in seconds per global skill
+        public float[] PlayerGlobalSkillCooldown = new float[MAX_PLAYERS * 8];
+        // PlayerGlobalSkillPressed: hotkey pressed signal this frame (consumed by GlobalSkillSystem)
+        public bool[] PlayerGlobalSkillPressed = new bool[MAX_PLAYERS];
+        // PlayerGlobalSkillHotkey: hotkey string per skill for UI display
+        public string[] PlayerGlobalSkillHotkey = new string[MAX_PLAYERS * 8];
         private float _goldKillMultiplier = 1.0f;
         public float GoldKillMultiplier { get => _goldKillMultiplier; set => _goldKillMultiplier = value; }
         // all_income_mult: extra multiplier layered on top of gold kill multiplier
