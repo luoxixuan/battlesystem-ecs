@@ -65,6 +65,7 @@ namespace BattleSystemECS.Core
         public EnemyLifeLinkSystem? LifeLink { get; private set; }
         public HitShieldSystem? HitShield { get; private set; }
         public ManaBurnSystem? ManaBurn { get; private set; }
+        public PhaseSystem? Phase { get; private set; }
 
         // ── Environment ──
         public TerrainSystem? Terrain { get; private set; }
@@ -155,6 +156,9 @@ namespace BattleSystemECS.Core
 
             // ── Mana Burn ──
             ManaBurn = new ManaBurnSystem(store, playerId);
+
+            // ── Phase ──
+            Phase = new PhaseSystem(store, playerId);
 
             // ── Burrow, Necromancer, LifeLink ──
             EnemyBurrow = new EnemyBurrowSystem(store, playerId);
@@ -325,6 +329,7 @@ namespace BattleSystemECS.Core
             scheduler.AI.LifeLink = LifeLink;
             scheduler.AI.EnemyAffix = null;
             scheduler.AI.ManaBurn = ManaBurn;
+            scheduler.AI.Phase = Phase;
 
             // ── Movement ──
             scheduler.Movement.Wound = null;

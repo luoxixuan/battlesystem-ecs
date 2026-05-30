@@ -307,6 +307,19 @@ namespace BattleSystemECS.Core
         public float[] EnemyMoveDirX = new float[MAX_ENTITIES];
         public float[] EnemyMoveDirY = new float[MAX_ENTITIES];
 
+        // ==================== 幽灵/相位敌人组件（SOA）====================
+        // EnemyIsPhased: true when enemy is in ghost/phase state — ignores tower attacks and obstacles
+        // Can be countered by IsAntiPhase towers (magic towers that can hit phased enemies)
+        public bool[] EnemyIsPhased = new bool[MAX_ENTITIES];
+        // EnemyPhaseDuration: total duration of phase state in seconds (0 = permanent phase)
+        public float[] EnemyPhaseDuration = new float[MAX_ENTITIES];
+        // EnemyPhaseTimer: countdown timer — when reaches 0, phase ends (unless permanent)
+        public float[] EnemyPhaseTimer = new float[MAX_ENTITIES];
+        // EnemyPhaseCooldown: seconds until phase can be activated again (0 = can phase anytime)
+        public float[] EnemyPhaseCooldown = new float[MAX_ENTITIES];
+        // EnemyIsAntiPhase: true if this tower type can damage phased enemies
+        public bool[] TowerIsAntiPhase = new bool[MAX_ENTITIES];
+
         // ==================== 肉盾/前锋掩护组件（SOA）====================
         // EnemyIsVanguard: true if this enemy is a vanguard (shield bearer) protecting allies behind it
         public bool[] EnemyIsVanguard = new bool[MAX_ENTITIES];

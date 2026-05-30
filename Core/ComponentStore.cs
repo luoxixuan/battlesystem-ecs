@@ -473,12 +473,18 @@ namespace BattleSystemECS.Core
                 EnemyLifeLinkRatio[entityId] = 0f;
                 EnemyLifeLinkCooldownLeft[entityId] = 0f;
                 EnemyIsLinked[entityId] = false;
+                // Phase / ghost fields
+                EnemyIsPhased[entityId] = false;
+                EnemyPhaseDuration[entityId] = 0f;
+                EnemyPhaseTimer[entityId] = 0f;
+                EnemyPhaseCooldown[entityId] = 0f;
             }
 
             if (wasTower)
             {
                 lock (activeIdsLock) { RemoveTowerFromList(entityId); }
                 TowerActive[entityId] = false;
+                TowerIsAntiPhase[entityId] = false;
                 TowerTargetingMode[entityId] = Components.TowerTargetingMode.Nearest;
                 TowerType[entityId] = Components.TowerType.Basic;
                 TowerAttackDamage[entityId] = 0f;

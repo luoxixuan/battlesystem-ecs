@@ -412,6 +412,9 @@ int bestTarget = -1;
                     }
                     if (!isVisible) continue;
 
+                    // Phase filter: skip phased enemies unless this tower is anti-phase (magic tower)
+                    if (store.EnemyIsPhased[enemyId] && !store.TowerIsAntiPhase[towerId]) continue;
+
                     // Height-layer filter: skip enemies that this tower cannot hit
                     bool enemyFlying = store.EnemyIsFlying[enemyId];
                     bool canHitAir = store.TowerCanHitAir[towerId];
