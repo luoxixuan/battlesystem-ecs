@@ -184,6 +184,19 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public int[] RandomEventActiveType = new int[MAX_PLAYERS];
         // RandomEventTimer: countdown for the current event in turns (0 = immediate/one-shot event)
         public float[] RandomEventTimer = new float[MAX_PLAYERS];
+
+        // ==================== 战争迷雾 / 视野系统组件 (Fog of War, SOA) ====================
+        // TowerVisionRadius: vision radius in grid units for each tower (0 = can see all enemies, no fog)
+        // Default 0 means no fog restriction (backward compatible)
+        public float[] TowerVisionRadius = new float[MAX_ENTITIES];
+        // GlobalFogDensity: global fog density multiplier applied to all tower vision radii (1.0 = normal, <1.0 = reduced visibility)
+        // WeatherSystem / DayNightSystem can modify this to simulate fog/night effects
+        public float[] GlobalFogDensity = new float[MAX_PLAYERS];
+        // TowerVisibilityMask: Dictionary<towerId, bool[]> — tower's visibility to each enemy
+        // Key: towerId (entity id of fog-of-war enabled tower)
+        // Value: bool array [enemyId] = true if enemy is visible to this tower this frame
+        // Uses Dictionary to avoid 10B-entry flat array (only towers with VisionRadius > 0 need entries)
+        public Dictionary<int, bool[]> TowerVisibilityByTower = new Dictionary<int, bool[]>();
         // RandomEventParam: event-specific parameter (e.g. gold amount for SupplyDrop, spawn count for Ambush)
         public float[] RandomEventParam = new float[MAX_PLAYERS];
         // RandomEventParam2: second event-specific parameter
@@ -1167,6 +1180,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
                 EnemiesLeakedThisWave[i] = 0;
                 AdaptiveDifficultyLevel[i] = 1.0f;
                 AdaptiveDifficultyScore[i] = 0f;
+                GlobalFogDensity[i] = 1f; // default fog density (no visibility reduction)
             }
         }
 
@@ -1755,6 +1769,8 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             // Damage type and turn rate from config
             TowerDamageType[entityId] = damageType;
             TowerTurnRate[entityId] = turnRate;
+            // Fog of War: default to no fog restriction (visionRadius=0 means see all)
+            TowerVisionRadius[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); }
         }
@@ -1820,6 +1836,9 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             TowerConstructionHP[entityId] = 0f;
             TowerConstructionMaxHP[entityId] = 0f;
             TowerIsVulnerableDuringConstruction[entityId] = false;
+            // Fog of War fields reset
+            TowerVisionRadius[entityId] = 0f;
+            TowerVisibilityByTower.Remove(entityId); // remove visibility data for this tower
             lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
         }
 

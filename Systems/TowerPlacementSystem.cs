@@ -206,6 +206,12 @@ namespace BattleSystemECS.Systems
                         store.TowerIsVulnerableDuringConstruction[towerId] = tc.IsVulnerableDuringConstruction;
                         logger.Log($"[TOWER] {tc.Name} 进入建造阶段: 需 {tc.ConstructionTime}s, HP {tc.ConstructionHP}");
                     }
+                    // Apply fog of war vision radius (0 = no fog restriction)
+                    if (tc.VisionRadius > 0f)
+                    {
+                        store.TowerVisionRadius[towerId] = tc.VisionRadius;
+                        logger.Log($"[TOWER] {tc.Name} 视野: 半径 {tc.VisionRadius}");
+                    }
                 }
                 else
                 {

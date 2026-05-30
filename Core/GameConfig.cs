@@ -180,6 +180,9 @@ namespace BattleSystemECS.Config
         public float ConstructionHP { get; set; } = 0f;
         // IsVulnerableDuringConstruction: if true, enemies can attack this tower while it's under construction
         public bool IsVulnerableDuringConstruction { get; set; } = false;
+        // VisionRadius: fog of war vision radius in grid units (0 = no fog, can see all enemies)
+        // Tower can only target enemies within this radius. Affects FogOfWarSystem.
+        public float VisionRadius { get; set; } = 0f;
     }
 
     /// <summary>

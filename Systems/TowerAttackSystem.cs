@@ -357,6 +357,19 @@ int bestTarget = -1;
                     // Burrow filter: skip enemies that are underground (cannot be targeted)
                     if (store.EnemyIsBurrowed[enemyId]) continue;
 
+                    // Fog of War filter: skip enemies not visible to this tower
+                    // TowerVisibilityByTower[towerId][enemyId] — only towers with VisionRadius > 0 have entries
+                    // Towers without fog (VisionRadius=0) are not in the dictionary — treat as visible
+                    bool isVisible = true;
+                    if (store.TowerVisionRadius[towerId] > 0f)
+                    {
+                        if (store.TowerVisibilityByTower.TryGetValue(towerId, out bool[] visArray) && visArray != null && enemyId >= 0 && enemyId < visArray.Length)
+                            isVisible = visArray[enemyId];
+                        else
+                            isVisible = false; // fog tower but enemy not in range
+                    }
+                    if (!isVisible) continue;
+
                     // Height-layer filter: skip enemies that this tower cannot hit
                     bool enemyFlying = store.EnemyIsFlying[enemyId];
                     bool canHitAir = store.TowerCanHitAir[towerId];

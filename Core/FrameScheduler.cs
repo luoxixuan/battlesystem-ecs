@@ -85,6 +85,7 @@ namespace BattleSystemECS.Core
         public TowerConstructionSystem? Construction { get; set; }
         public GlobalSkillSystem? GlobalSkill { get; set; }
         public EnemyLifeLinkSystem? LifeLink { get; set; }
+        public FogOfWarSystem? Fog { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -242,9 +243,13 @@ namespace BattleSystemECS.Core
             // ── Phase 5: Spatial Rebuild ──────────────────────────────────
             store.RebuildSpatialGrid();
 
-            // ── Phase 5.1: Chrono Tower — time dilation fields, after spatial rebuild ─
+// ── Phase 5.1: Chrono Tower — time dilation fields, after spatial rebuild ──
             ChronoTower?.SetTurn();
             ChronoTower?.Update();
+
+            // ── Phase 5.15: Fog of War — compute tower vision visibility, before TowerAttack ──
+            Fog?.SetTurn();
+            Fog?.Update();
 
             // ── Phase 5.5: Point Defense — intercept enemy projectiles before they hit ──
             PointDefense?.SetTurn(turn);
