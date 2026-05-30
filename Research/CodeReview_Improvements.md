@@ -1,9 +1,23 @@
 # BattleSystem-ECS 代码审查报告
 
 **审查日期**: 2026-05-30  
+**更新日期**: 2026-05-30（标记完成状态）  
 **代码库**: BattleSystem-ECS (Roguelike Tower Defense)  
 **核心架构**: SOA-ECS (Struct of Arrays Entity Component System)  
 **总代码量**: ~80+ C# 源文件，Core + Systems + Tests  
+
+---
+
+## 完成状态总览
+
+| 优先级 | 总数 | ✅ 已完成 | 🔄 部分完成 | ❌ 未开始 |
+|--------|------|----------|------------|----------|
+| P0 | 2 | 2 | 0 | 0 |
+| P1 | 3 | 3 | 0 | 0 |
+| P2 | 3 | 0 | 1 | 2 |
+| P3 | 2 | 0 | 2 | 0 |
+| P4 | 3 | 0 | 1 | 2 |
+| **合计** | **13** | **5** | **4** | **4** |
 
 ---
 
@@ -17,269 +31,196 @@
 
 ### P0 - 架构债务（必须解决）
 
-#### 2.1 ComponentStore 是巨型 God Class（~3000 行）
+#### 2.1 ComponentStore 是巨型 God Class（~3000 行） ✅ 已完成
 
-**问题描述**:  
-`ComponentStore.cs` 承载了全部组件数据存储、实体生命周期管理、地形查询、路径修改、尸体队列、HazardZone 管理等数十项职责。这违反了 SOLID 的单一职责原则（SRP）。
+**状态**: ✅ partial class 拆分完成 — 2026-05-30
 
-**影响**:
-- 任何组件增删都需要修改同一个文件，冲突概率极高
-- 新成员理解成本高，需要阅读 3000 行才能安全操作
-- 编译依赖重，微小的修改触发大量重新编译
-- 难以单元测试——构造一个最小 ComponentStore 需要初始化几十组数组
+**实施方案**: 将 `ComponentStore.cs` 按业务域拆为 5 个 `partial class` 文件：
+- `ComponentStore.cs` — 核心基础设施（1524行）：所有 SOA 字段、构造器、实体生命周期、死亡队列、SpatialGrid、地形、实体查询
+- `ComponentStore_Enemy.cs` — 敌人域：AddEnemy、属性访问、CC（stun/slow/freeze/knockback）、AI 访问、HasAffix、路径修改
+- `ComponentStore_Tower.cs` — 塔域：AddTower/RemoveTower、选择管理、协同增益、索敌模式、联动组合
+- `ComponentStore_Player.cs` — 玩家域：AddPlayer、攻击/金币/Buff、CC、生命值、天气/昼夜
+- `ComponentStore_World.cs` — 世界域：路障、HazardZone、CorpseEffect、亡灵队列、技能、GAS、科技树
 
-**改进建议**:
-1. **按域拆分为多个 Store**: `EnemyStore`, `TowerStore`, `PlayerStore`, `WorldStore`
-2. **引入 Store 接口抽象**: `IComponentStore<T>` 统一管理数组分配、边界检查、默认值
-3. **使用 Source Generator 或 T4 模板**自动生成重复的属性访问器代码（当前手动写了 2000+ 行 getter/setter）
+**零 API 破坏**：所有公共方法签名不变，调用方无需修改。Build 0 错误，95/95 测试通过。
 
-```csharp
-// 建议：用 partial class + 代码生成替代手工 getter/setter
-public partial class EnemyStore : SOAStoreBase
-{
-    [SOAField] public float[] Health;
-    [SOAField] public float[] MaxHealth;
-    // 自动生成：GetHealth(id), SetHealth(id, val), 边界检查，默认值
-}
-```
+**待后续**: 更深入的拆分（独立 Store class、Source Generator 生成 getter/setter）需要重改所有 System 的引用方式，留待下一阶段。
 
-**相关文件**: [Core/ComponentStore.cs](Core/ComponentStore.cs)
+**相关文件**: [Core/ComponentStore.cs](Core/ComponentStore.cs), [Core/ComponentStore_Enemy.cs](Core/ComponentStore_Enemy.cs), [Core/ComponentStore_Tower.cs](Core/ComponentStore_Tower.cs), [Core/ComponentStore_Player.cs](Core/ComponentStore_Player.cs), [Core/ComponentStore_World.cs](Core/ComponentStore_World.cs)
 
 ---
 
-#### 2.2 FrameScheduler 承担了过多系统编排职责（~330 行 Tick 方法）
+#### 2.2 FrameScheduler 承担了过多系统编排职责 ✅ 已完成
 
-**问题描述**:  
-`FrameScheduler.Tick()` 中硬编码了 40+ 个系统的调用顺序和 Phase 判断。每次新增系统都需要修改这个中心方法，是事实上的"上帝调度器"。
+**状态**: ✅ SystemGroup 模式 — 2026-05-30
 
-**影响**:
-- 系统之间隐式依赖执行顺序（Phase 编号 0.5, 0.55, 0.6... 已经说明问题）
-- 无法动态调整执行顺序或做 A/B 测试
-- BuildPhase 和 WavePhase 的分支逻辑大量重复（Gold/Upgrade/Skill 在两个分支都调用）
+**实施方案**: 
+- 引入 `ISystemGroup` 接口，将原有的 14 个 Phase 方法抽成 11 个独立 Group 类（BuildGroup、PreGameGroup、SpawningGroup、AIGroup、MovementGroup、TerrainGroup、CombatSetupGroup、SpatialGroup、CombatGroup、SkillBuffGroup、PostDeathGroup）
+- FrameScheduler 从 346 行降到 ~105 行 — 纯粹编排各 Group 的 Execute()
+- 60 个 nullable 系统属性 — 移到各 Group 内部
+- 新增系统：只改对应 Group 文件 + GameManager 中的赋值行，**不碰 FrameScheduler**
 
-**改进建议**:
-1. **引入 SystemGroup 概念**: 将系统按逻辑分组（`MovementGroup`, `CombatGroup`, `EconomyGroup`）
-2. **使用属性标记或配置文件驱动执行顺序**: `[SystemPhase(Phase.Combat, Order = 6)]`
-3. **统一 Update 接口**: 所有系统实现 `ISystem.Update(float deltaTime)`，由反射/源生成自动收集并排序
-
-```csharp
-[SystemPhase(GamePhase.Wave, Order = 20)]
-public class TowerAttackSystem : ISystem { ... }
-```
-
-**相关文件**: [Core/FrameScheduler.cs](Core/FrameScheduler.cs)
+**相关文件**: [Core/FrameScheduler.cs](Core/FrameScheduler.cs), [Core/ISystemGroup.cs](Core/ISystemGroup.cs), [Core/*Group.cs](Core/)
 
 ---
 
 ### P1 - 代码质量（强烈推荐改进）
 
-#### 2.3 魔法数字与字符串比较遍布热路径
+#### 2.3 魔法数字与字符串比较遍布热路径 ✅ 已完成
 
-**问题描述**:  
-- `TowerType` 使用 `string` 进行 `switch` 分支判断（[Systems/TowerAttackSystem.cs:512](Systems/TowerAttackSystem.cs#L512)）
-- 伤害类型 `dmgType == 0/1/2` 使用裸 int（[Systems/TowerAttackSystem.cs:480](Systems/TowerAttackSystem.cs#L480)）
-- 目标模式 `targetingMode == 0/1/2/3/4/5` 使用裸 int
+**状态**: ✅ 全迁 enum — 2026-05-30 之前
 
-**影响**:
-- 运行时字符串哈希比较开销（虽然 TowerAttackSystem 中是并行内的串行 switch，但仍有 GC 风险）
-- 可读性差，`case 2` 远不如 `case DamageType.Magic`
-- 重构时容易遗漏，编译器无法帮助检查
-
-**改进建议**:
-1. **塔类型 ID 化**: 在配置加载时分配 `ushort TowerTypeId`，所有运行时比较改为 `switch (towerTypeId)`
-2. **枚举强化**: 将 `DamageType`, `TargetingMode`, `EnemyActionType` 等全部改为 enum
-3. **常量集中管理**: 将 `TESLA_MAX_CHAIN_HOPS = 3` 等配置化，从 JSON 读取
+**实施方案**: 
+- `TowerType` → enum（`Components.TowerType`），所有 switch 从字符串比较改为编译期安全
+- `DamageType` → enum（`Components.DamageType`）：Physical/Magic/True
+- `TowerTargetingMode` → enum（`Components.TowerTargetingMode`）：Nearest/Weakest/Strongest/First/Last/Furthest
+- TowerAttackSystem 中的 `switch (targetingMode)` 全部使用 `case TowerTargetingMode.Furthest:` 等形式
 
 ---
 
-#### 2.4 中英文注释混杂，部分注释与代码不同步
+#### 2.4 中英文注释混杂，部分注释与代码不同步 ❌ 未开始
 
-**问题描述**:  
-文件中同时存在中文注释和英文注释，且部分注释已过时。例如 `ComponentStore.cs` 头部注释声称"支持 SIMD 指令"，但代码中未使用任何 SIMD（如 `System.Numerics.Vector` 或 `Vector128/256`）。
-
-**影响**:
-- 团队国际化协作困难
-- 误导性注释降低信任度
-
-**改进建议**:
-1. **统一为英文注释**（C# 社区标准），XML doc 保持英文
-2. **删除虚假声明**: 移除"支持 SIMD"等未实现的功能声明
-3. **引入 StyleCop 或 .editorconfig** 强制代码风格一致性
+**待做**: 
+- 统一注释语言（建议英文 + XML doc）
+- 删除未实现的"支持 SIMD"等虚假声明
+- 引入 StyleCop 或 .editorconfig
 
 ---
 
-#### 2.5 防御性边界检查代码大量重复
+#### 2.5 防御性边界检查代码大量重复 ✅ 已完成
 
-**问题描述**:  
-几乎每个 public 方法都包含如下模板代码：
+**状态**: ✅ 内联辅助 — 2026-05-30 之前
+
+**实施方案**: 
 ```csharp
-if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+[MethodImpl(MethodImplOptions.AggressiveInlining)]
+private static bool IsValidEntity(int id) => (uint)id < MAX_ENTITIES;
+[MethodImpl(MethodImplOptions.AggressiveInlining)]
+private static bool IsValidPlayer(int id) => (uint)id < MAX_PLAYERS;
 ```
-重复了 100+ 次。
-
-**改进建议**:
-1. **内联辅助方法**: `[MethodImpl(MethodImplOptions.AggressiveInlining)] private static bool IsValidEntity(int id) => (uint)id < MAX_ENTITIES;`
-2. **使用 Debug.Assert + Release 的 unchecked 模式**: 在 Release 构建中跳过检查（内部代码已保证安全）
-3. **代码生成**: 让源生成器自动包裹边界检查
+100+ 处手动边界检查替换为 `IsValidEntity(entityId)` / `IsValidPlayer(playerId)`。
 
 ---
 
 ### P2 - 性能优化（可选，收益明确）
 
-#### 2.6 List<T> 在热路径中造成 GC 压力
+#### 2.6 List\<T\> 在热路径中造成 GC 压力 🔄 部分完成
 
-**问题描述**:  
-- `_activeEnemyIds` 使用 `List<int>`，每帧被多个系统遍历
-- `GetCachedActiveEnemyIds()` 返回 `List<int>`，无法使用 `Span<int>` 或 `foreach ref`
-- `TowerCandidates` 是 `List<int>[]`，每个 tower 一个 List，Clear() 不会释放底层数组但会触发版本号递增
+**状态**: 🔄 暴露层已改进，底层未优化
 
-**改进建议**:
-1. **将 `_activeEnemyIds` 改为 `int[]` + `int _activeEnemyCount`**: 消除 List 的版本号检查和扩容逻辑
-2. **提供 Span 访问**: `public Span<int> GetActiveEnemies() => _activeEnemyBuffer.AsSpan(0, _activeEnemyCount);`
-3. **SpatialGrid 返回方式优化**: `GetEnemiesInRange` 使用 `Span<int>` 或 `ref struct` 收集器避免 List.Add 开销
+**已做**: `ActiveEnemyIds` / `ActiveTowerIds` 暴露为 `IReadOnlyList<int>`，TowerCandidates 数组化。
+
+**待做**: `_activeEnemyIds` 底层仍为 `List<int>` — 可改为 `int[] + int _count` 消除版本号检查和扩容逻辑。提供 `Span<int>` 访问热路径。
 
 ---
 
-#### 2.7 Parallel.For 开销可能超过收益
+#### 2.7 Parallel.For 开销可能超过收益 ❌ 未开始
 
-**问题描述**:  
-`TowerAttackSystem.Update()` 和 `EnemyAISystem.Update()` 都使用了 `Parallel.For`，但：
-- 批处理大小 256，对于小数量敌人（< 500）并行开销大于收益
-- `lock` 在并行循环内部频繁争抢（`lock(damageLock) bag.Add(...)`）
-- `Environment.ProcessorCount` 没有考虑运行时的实际负载
-
-**改进建议**:
-1. **自适应并行阈值**: 当敌人数量 < 500 时回退到串行循环
-2. **无锁队列**: 将 `lock + List.Add` 替换为 `ConcurrentQueue` 或线程本地缓冲区后批量合并
-3. **Job System 化**: 参考 Unity DOTS 的 Job System，预分配 Job 数据并批量调度
-
-```csharp
-// 建议：线程本地收集，最后合并
-Parallel.For(0, numBatches, () => new List<DamageEvent>(64),
-    (batchIdx, state, localList) => { ... localList.Add(evt); return localList; },
-    localList => { lock(finalList) finalList.AddRange(localList); });
-```
+**待做**: 自适应并行阈值（敌人数 < 500 回退串行）、无锁队列替代 lock+Add。
 
 ---
 
-#### 2.8 未真正使用 SIMD
+#### 2.8 未真正使用 SIMD ❌ 未开始
 
-**问题描述**:  
-项目多处注释声称 SOA 架构便于 SIMD，但没有任何代码使用 `Vector<T>`、`Vector128<T>` 或 `AVX` 指令集。
-
-**改进建议**:
-1. **批量属性更新**: 对 `EnemyHealth -= damage` 这类操作，可以按 4/8 个一组使用 SIMD 批量计算
-2. **距离计算**: `dx*dx + dy*dy` 的比较可以 4-wide 并行处理
-3. **注意**: 需要 Benchmark 验证——SIMD 在小数据量下不一定优于标量代码
+**待做**: 距离计算 `dx*dx + dy*dy` 可 4-wide 并行。需要 Benchmark 验证实际收益。
 
 ---
 
 ### P3 - 可维护性与工程实践
 
-#### 2.9 GameManager.Initialize() 是 300+ 行的"大泥球"
+#### 2.9 GameManager.Initialize() 是 300+ 行的"大泥球" ✅ 已完成
 
-**问题描述**:  
-`GameManager.Initialize()` 中顺序创建了 40+ 个系统，并手工进行依赖注入（`SetXxxSystem()`）。新增系统必须修改此文件。
+**状态**: ✅ SystemRegistry DI 模式 — 2026-05-30
 
-**改进建议**:
-1. **依赖注入容器**: 使用轻量级 DI（如 `Microsoft.Extensions.DependencyInjection` 或手写 ServiceLocator）
-2. **系统自注册**: 每个系统通过 `[AutoRegister]` 特性自动被发现和实例化
-3. **配置化初始化顺序**: 从 JSON 读取系统初始化顺序，允许不改代码调整依赖
+**实施方案**: 
+- 新增 `Core/SystemRegistry.cs`，集中托管所有系统的创建、依赖注入、FrameScheduler 分组赋值
+- `GameManager.Initialize()` 从 ~420 行降到 ~80 行
+- 三阶段模式：`CreateAll()` → `WireDependencies()` → `AssignToGroups()`
+- 新增系统：只改 SystemRegistry（三个方法各加一行），不碰 GameManager
 
----
-
-#### 2.10 EventBus 单例模式阻碍测试
-
-**问题描述**:  
-`EventBus.Instance` 是静态单例，测试间会残留事件处理器，导致测试互相影响。
-
-**改进建议**:
-1. **改为实例化注入**: 通过构造函数传入 `IEventBus`
-2. **测试替身**: 使用 `MockEventBus` 记录事件而不实际触发副作用
+**相关文件**: [Core/SystemRegistry.cs](Core/SystemRegistry.cs), [Core/GameManager.cs](Core/GameManager.cs)
 
 ---
 
-#### 2.11 测试覆盖率低且测试深度不足
+#### 2.10 EventBus 单例模式阻碍测试 ✅ 已完成
 
-**问题描述**:  
-- `BattleSystemECS.Tests` 仅 12 个测试文件，大多测试"不崩溃"而非正确性
-- `GameSimulationTests` 只验证了 `wave.GetTotalEnemiesSpawned() > 0`，未验证伤害公式、金币计算等核心逻辑
-- 没有性能回归测试（Benchmark 结果未自动断言）
+**状态**: ✅ IEventBus 接口提取 — 2026-05-30 之前
 
-**改进建议**:
-1. **核心公式单元测试**: 单独测试 `TowerAttackSystem` 的伤害计算公式（护甲、魔抗、暴击、天气加成等组合）
-2. **状态机测试**: 验证 BuildPhase/WavePhase 切换时各系统的调用/跳过行为
-3. **Snapshot 测试**: 对固定种子下的 10 回合运行结果做快照对比，捕获意外行为变更
-4. **基准测试断言**: 在 CI 中断言 `fps > 4000`，防止性能回退
+**实施方案**: 提取 `IEventBus` 接口，系统通过构造函数注入（`EnemyAISystem(..., IEventBus eventBus)`）。测试可通过 MockEventBus 隔离。
 
 ---
 
-#### 2.12 JSON 配置缺少校验 Schema
+#### 2.11 测试覆盖率低且测试深度不足 🔄 持续改进中
 
-**问题描述**:  
-`game_config.json` 有 260KB，但 `GameConfigLoader` 使用 `JsonDocument` 手工解析，缺少严格的 Schema 校验。
+**状态**: 🔄 数量已增长，深度不足
 
-**改进建议**:
-1. **引入 JSON Schema 校验**（如 `NJsonSchema`），在加载时报告配置错误
-2. **强类型反序列化**: 使用 `System.Text.Json` 的 `[JsonPropertyName]` + 源生成器，替代手工 `TryGetProperty`
-3. **配置热重载**: 支持开发时修改 JSON 后自动重新加载（无需重启）
+**已做**: 从 12 个测试文件增至 95 个测试用例，覆盖 ComponentStore 生命周期、FrameScheduler 调度、战斗结算、技能、塔放置等。
+
+**待做**: 核心伤害公式单元测试（护甲/魔抗/暴击/天气加成组合）、状态机切换测试、性能回归断言。
 
 ---
 
 ### P4 - 安全性与健壮性
 
-#### 2.13 并发安全性存疑
+#### 2.12 JSON 配置缺少校验 Schema ❌ 未开始
 
-**问题描述**:  
-- `ComponentStore` 使用 `lock(activeIdsLock)` 保护 `_activeEnemyIds`，但 `GetCachedActiveEnemyIds()` 直接返回内部 List 引用
-- 并行循环中系统可能意外修改 List（虽然代码审查显示没有，但框架层面无保护）
-- `ConcurrentBag` 用于死亡队列，但 `ConcurrentBag` 的 `Clear()` 不是原子操作
-
-**改进建议**:
-1. **返回只读包装**: `return _activeEnemyIds.AsReadOnly();`（注意：仍有运行时 List 修改风险，最好用 `ReadOnlySpan`）
-2. **结构体不可变约束**: `readonly struct Entity { public readonly int Id; }`
-3. **死亡队列替换**: `ConcurrentBag` → 两个 `ConcurrentQueue` 做 ping-pong，`Clear()` 改为直接丢弃整个引用
+**待做**: 引入 JSON Schema 校验（`NJsonSchema`），或改用 `System.Text.Json` 源生成器做强类型反序列化。
 
 ---
 
-#### 2.14 缺少 Dispose/资源释放模式
+#### 2.13 并发安全性存疑 🔄 部分完成
 
-**问题描述**:  
-`ComponentStore` 分配了大量数组（`MAX_ENTITIES=100000` 级别的数组有 50+ 个），但没有实现 `IDisposable`。长时间运行的服务器模式可能导致内存碎片。
+**状态**: 🔄 死亡队列已改进，List 引用暴露仍存在
 
-**改进建议**:
-1. **实现 `IDisposable`**: 在关闭关卡/游戏时释放大数组（设为 null 让 GC 回收）
-2. **对象池化**: `ArrayPool<T>.Shared` 用于临时缓冲区（如 Tesla chain 的 hit buffer）
+**已做**: `ConcurrentBag` 死亡队列替换为 ping-pong 双缓冲。
+
+**待做**: `GetCachedActiveEnemyIds()` 仍返回内部 `List<int>` 引用 — 可改为 `ReadOnlySpan<int>` 或至少返回防御性拷贝。
 
 ---
 
-## 3. 推荐的改进路线图
+#### 2.14 缺少 Dispose/资源释放模式 ❌ 未开始
 
-### 短期（1-2 周）
+**待做**: `ComponentStore` 实现 `IDisposable`，使用 `ArrayPool<T>.Shared` 管理大数组（`MAX_ENTITIES=100000` 级别的 50+ 个数组）。
+
+---
+
+## 3. 推荐的改进路线图（更新）
+
+### 短期（已完成）
+
+| 任务 | 状态 |
+|------|------|
+| 统一 DamageType/TargetingMode/TowerType 为 enum | ✅ |
+| 提取 ComponentStore 边界检查为内联辅助方法 | ✅ |
+| ComponentStore 按域 partial class 拆分 | ✅ |
+| FrameScheduler 改为 SystemGroup 模式 | ✅ |
+| GameManager 提取 SystemRegistry | ✅ |
+| EventBus 去单例化（IEventBus 接口） | ✅ |
+
+### 下一步（建议优先）
+
+| 任务 | 收益 | 风险 | 估时 |
+|------|------|------|------|
+| 热路径 `List<int>` → `int[] + Span` | 高（GC 优化） | 中 | 中 |
+| 中英文注释统一 + 删除 SIMD 虚假声明 | 中 | 低 | 小 |
+| `GetCachedActiveEnemyIds()` 防御性返回 | 中 | 低 | 小 |
+| 核心伤害公式单元测试 | 高 | 低 | 中 |
+
+### 中期（可选）
 
 | 任务 | 收益 | 风险 |
 |------|------|------|
-| 统一 DamageType/TargetingMode 为 enum | 高（编译期安全） | 低 |
-| 提取 `ComponentStore` 边界检查为内联辅助方法 | 中（代码整洁） | 低 |
-| 统一注释语言为英文，删除虚假 SIMD 声明 | 中（可维护性） | 低 |
-| 添加核心伤害公式单元测试 | 高（防回归） | 低 |
+| Parallel.For 自适应阈值 | 中 | 低 |
+| JSON 配置 Schema 校验 | 中 | 中 |
 
-### 中期（1 个月）
+### 长期
 
 | 任务 | 收益 | 风险 |
 |------|------|------|
-| 将 ComponentStore 拆分为 Domain Stores | 高（SRP） | 中（大量文件变更） |
-| FrameScheduler 改为属性/配置驱动 | 高（扩展性） | 中 |
-| 热路径 List<T> 改为数组+Span | 高（GC 优化） | 中（需仔细测试） |
-| EventBus 去单例化 | 中（测试性） | 低 |
-
-### 长期（2-3 个月）
-
-| 任务 | 收益 | 风险 |
-|------|------|------|
-| 引入 Source Generator 生成 SOA 代码 | 高（开发效率） | 高（技术复杂度） |
-| 实验 SIMD 批量计算 | 中（性能） | 高（平台兼容性） |
-| 完整的性能回归测试 + CI 集成 | 高（质量保障） | 中 |
+| 引入 Source Generator 生成 SOA 代码 | 高 | 高 |
+| 实验 SIMD 批量计算 | 中 | 高 |
+| IDisposable + ArrayPool | 中 | 低 |
+| 完整的性能回归测试 + CI 集成 | 高 | 中 |
 
 ---
 
@@ -293,19 +234,21 @@ Parallel.For(0, numBatches, () => new List<DamageEvent>(64),
 
 ---
 
-## 5. 附录：关键文件清单
+## 5. 附录：关键文件清单（更新后）
 
-| 文件 | 问题 | 优先级 |
-|------|------|--------|
-| [Core/ComponentStore.cs](Core/ComponentStore.cs) | God Class, 3000+ 行 | P0 |
-| [Core/FrameScheduler.cs](Core/FrameScheduler.cs) | 硬编码调度顺序 | P0 |
-| [Core/GameManager.cs](Core/GameManager.cs) | 300+ 行初始化泥球 | P1 |
-| [Systems/TowerAttackSystem.cs](Systems/TowerAttackSystem.cs) | 字符串 switch, 并行 lock | P1 |
-| [Systems/EnemyAISystem.cs](Systems/EnemyAISystem.cs) | Parallel.For 开销 | P2 |
-| [Core/EventBus.cs](Core/EventBus.cs) | 静态单例 | P3 |
-| [Core/SpatialGrid.cs](Core/SpatialGrid.cs) | 设计良好，建议保持 | - |
+| 文件 | 问题 | 优先级 | 状态 |
+|------|------|--------|------|
+| [Core/ComponentStore.cs](Core/ComponentStore.cs) | God Class, 3000+ 行 | P0 | ✅ partial 拆分 |
+| [Core/FrameScheduler.cs](Core/FrameScheduler.cs) | 硬编码调度顺序 | P0 | ✅ SystemGroup |
+| [Core/GameManager.cs](Core/GameManager.cs) | 300+ 行初始化泥球 | P1 | ✅ SystemRegistry |
+| [Core/SystemRegistry.cs](Core/SystemRegistry.cs) | 新增 — 系统注册中心 | — | ✅ 新增 |
+| [Systems/TowerAttackSystem.cs](Systems/TowerAttackSystem.cs) | 字符串 switch, 并行 lock | P1 | ✅ enum 迁移 |
+| [Systems/EnemyAISystem.cs](Systems/EnemyAISystem.cs) | Parallel.For 开销 | P2 | ❌ |
+| [Core/EventBus.cs](Core/EventBus.cs) | 静态单例 | P3 | ✅ IEventBus |
+| [Core/SpatialGrid.cs](Core/SpatialGrid.cs) | 设计良好，建议保持 | - | — |
 
 ---
 
 *报告生成者: Claude Code Review*  
+*更新者: Hermes (2026-05-30)*  
 *方法论: 静态代码分析 + 架构模式审查 + 性能热点识别*

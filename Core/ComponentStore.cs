@@ -968,6 +968,9 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         private List<int> _activeEnemyIds = new List<int>();
         private List<int> _activeTowerIds = new List<int>();
         private List<int> _activeObstacleIds = new List<int>();
+        // O(1) position lookup for swap-and-pop removal (avoids O(n) List.Remove)
+        private int[] _enemyIndexInList = new int[MAX_ENTITIES];
+        private int[] _towerIndexInList = new int[MAX_ENTITIES];
         private int nextEntityId = 2; // 从 2 开始，1 是玩家
         public int CurrentFrame { get; private set; } = 0;
 
@@ -1048,8 +1051,41 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         private readonly object activeIdsLock = new object(); // BUG-2: thread-safe _activeEnemyIds/_activeTowerIds removal
 
         // For test setup only — use AddEnemy() / DestroyEntity() in production code
-        public void AddActiveEnemyId(int id) => _activeEnemyIds.Add(id);
-        public void AddActiveTowerId(int id) => _activeTowerIds.Add(id);
+        public void AddActiveEnemyId(int id)
+        {
+            _activeEnemyIds.Add(id);
+            _enemyIndexInList[id] = _activeEnemyIds.Count - 1;
+        }
+        public void AddActiveTowerId(int id)
+        {
+            _activeTowerIds.Add(id);
+            _towerIndexInList[id] = _activeTowerIds.Count - 1;
+        }
+
+        // ── O(1) swap-and-pop removal helpers (avoids List.Remove O(n) scan) ──
+        private void RemoveEnemyFromList(int entityId)
+        {
+            int idx = _enemyIndexInList[entityId];
+            if (idx < 0) return;
+            int lastIdx = _activeEnemyIds.Count - 1;
+            int lastId = _activeEnemyIds[lastIdx];
+            _activeEnemyIds[idx] = lastId;
+            _enemyIndexInList[lastId] = idx;
+            _activeEnemyIds.RemoveAt(lastIdx);
+            _enemyIndexInList[entityId] = -1;
+        }
+
+        private void RemoveTowerFromList(int entityId)
+        {
+            int idx = _towerIndexInList[entityId];
+            if (idx < 0) return;
+            int lastIdx = _activeTowerIds.Count - 1;
+            int lastId = _activeTowerIds[lastIdx];
+            _activeTowerIds[idx] = lastId;
+            _towerIndexInList[lastId] = idx;
+            _activeTowerIds.RemoveAt(lastIdx);
+            _towerIndexInList[entityId] = -1;
+        }
 
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         private ConcurrentBag<(int enemyId, int playerId)>[] _deathQueue = new ConcurrentBag<(int, int)>[2];
@@ -1178,6 +1214,9 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             // ChronoTowerSystem accumulates the minimum (slowest) from nearby towers each frame
             for (int i = 0; i < MAX_ENTITIES; i++)
                 EnemyTimeScale[i] = 1f;
+            // Initialize O(1) swap-and-pop index arrays
+            for (int i = 0; i < MAX_ENTITIES; i++)
+                _enemyIndexInList[i] = _towerIndexInList[i] = -1;
             // Initialize player buffs
             for (int i = 0; i < MAX_PLAYERS; i++)
             {
@@ -1251,7 +1290,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             // ── Phase 3: archetype-specific cleanup ────────────────────────────────
             if (wasEnemy)
             {
-                lock (activeIdsLock) { _activeEnemyIds.Remove(entityId); }
+                lock (activeIdsLock) { RemoveEnemyFromList(entityId); }
                 EnemyActive[entityId] = false;
 
                 EnemyHealth[entityId] = 0f;
@@ -1367,7 +1406,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
 
             if (wasTower)
             {
-                lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
+                lock (activeIdsLock) { RemoveTowerFromList(entityId); }
                 TowerActive[entityId] = false;
                 TowerTargetingMode[entityId] = Components.TowerTargetingMode.Nearest;
                 TowerType[entityId] = Components.TowerType.Basic;

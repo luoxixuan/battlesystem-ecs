@@ -112,7 +112,7 @@ namespace BattleSystemECS.Core
             // Fog of War: default to no fog restriction (visionRadius=0 means see all)
             TowerVisionRadius[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
-            lock (activeIdsLock) { _activeTowerIds.Add(entityId); }
+            lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
 
         public void RemoveTower(int entityId)
@@ -186,7 +186,7 @@ namespace BattleSystemECS.Core
             TowerPatrolWaypointIndex[entityId] = 0;
             TowerPatrolDirection[entityId] = 1;
             TowerPatrolAttackSpeedPenalty[entityId] = 1f;
-            lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
+            lock (activeIdsLock) { RemoveTowerFromList(entityId); }
         }
 
         // ==================== 塔选中状态管理 ====================

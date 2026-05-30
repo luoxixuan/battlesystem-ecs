@@ -82,7 +82,7 @@ namespace BattleSystemECS.Core
             }
 
             // H-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
-            lock (activeIdsLock) { _activeEnemyIds.Add(entityId); }
+            lock (activeIdsLock) { _activeEnemyIds.Add(entityId); _enemyIndexInList[entityId] = _activeEnemyIds.Count - 1; }
             return entityId;
         }
 
