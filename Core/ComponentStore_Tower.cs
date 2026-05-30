@@ -350,6 +350,14 @@ namespace BattleSystemECS.Core
         public int[] TowerBeamChainCount = new int[MAX_ENTITIES];
         // TowerBeamChainDecay: damage decay per chain hop (0.7 = 70% of previous link's damage)
         public float[] TowerBeamChainDecay = new float[MAX_ENTITIES];
+        // ==================== 塔瘫痪/破坏系统（Sabotage / Tower Disable）====================
+        // TowerIsDisabled: true if tower is currently disabled/sabotaged by enemy ability
+        public bool[] TowerIsDisabled = new bool[MAX_ENTITIES];
+        // TowerDisabledTimer: countdown timer — when reaches 0, disable ends
+        public float[] TowerDisabledTimer = new float[MAX_ENTITIES];
+        // TowerDisabledDuration: total duration of disable effect in seconds
+        public float[] TowerDisabledDuration = new float[MAX_ENTITIES];
+
         // TowerBeamMaxRange: maximum range for beam targeting and chaining
         public float[] TowerBeamMaxRange = new float[MAX_ENTITIES];
 
@@ -485,6 +493,10 @@ namespace BattleSystemECS.Core
             TowerBeamChainCount[entityId] = 0;
             TowerBeamChainDecay[entityId] = 1f;
             TowerBeamMaxRange[entityId] = 0f;
+            // Sabotage/tower disable fields: default to not disabled
+            TowerIsDisabled[entityId] = false;
+            TowerDisabledTimer[entityId] = 0f;
+            TowerDisabledDuration[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
@@ -587,6 +599,10 @@ namespace BattleSystemECS.Core
             TowerBeamChainCount[entityId] = 0;
             TowerBeamChainDecay[entityId] = 1f;
             TowerBeamMaxRange[entityId] = 0f;
+            // Sabotage/tower disable fields reset
+            TowerIsDisabled[entityId] = false;
+            TowerDisabledTimer[entityId] = 0f;
+            TowerDisabledDuration[entityId] = 0f;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
         }
         #endregion

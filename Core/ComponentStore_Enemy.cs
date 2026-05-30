@@ -320,6 +320,18 @@ namespace BattleSystemECS.Core
         // EnemyIsAntiPhase: true if this tower type can damage phased enemies
         public bool[] TowerIsAntiPhase = new bool[MAX_ENTITIES];
 
+        // ==================== 敌人破坏/瘫痪塔能力组件（SOA）====================
+        // EnemyCanSabotage: true if this enemy can disable/sabotage towers (EMP-like ability)
+        public bool[] EnemyCanSabotage = new bool[MAX_ENTITIES];
+        // EnemySabotageRadius: radius within which sabotage effect applies (AoE EMP)
+        public float[] EnemySabotageRadius = new float[MAX_ENTITIES];
+        // EnemySabotageDuration: how long the target tower stays disabled in seconds
+        public float[] EnemySabotageDuration = new float[MAX_ENTITIES];
+        // EnemySabotageTimer: countdown until next sabotage attack (0 = ready to attack)
+        public float[] EnemySabotageTimer = new float[MAX_ENTITIES];
+        // EnemySabotageCooldown: cooldown between sabotage attacks in seconds
+        public float[] EnemySabotageCooldown = new float[MAX_ENTITIES];
+
         // ==================== 肉盾/前锋掩护组件（SOA）====================
         // EnemyIsVanguard: true if this enemy is a vanguard (shield bearer) protecting allies behind it
         public bool[] EnemyIsVanguard = new bool[MAX_ENTITIES];

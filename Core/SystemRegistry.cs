@@ -64,6 +64,7 @@ namespace BattleSystemECS.Core
         public NecromancerSystem? Necromancer { get; private set; }
         public EnemyLifeLinkSystem? LifeLink { get; private set; }
         public HitShieldSystem? HitShield { get; private set; }
+        public TowerSabotageSystem? TowerSabotage { get; private set; }
         public ManaBurnSystem? ManaBurn { get; private set; }
         public PhaseSystem? Phase { get; private set; }
 
@@ -153,6 +154,9 @@ namespace BattleSystemECS.Core
             // ── Hit Shield ──
             var hitShield = new HitShieldSystem(store, logger);
             HitShield = hitShield;
+
+            // ── Tower Sabotage ──
+            TowerSabotage = new TowerSabotageSystem(store);
 
             // ── Mana Burn ──
             ManaBurn = new ManaBurnSystem(store, playerId);
@@ -372,6 +376,7 @@ namespace BattleSystemECS.Core
             scheduler.Combat.Heat = null; // HeatSystem — heat accumulation + overheat state
             scheduler.Combat.Demolish = null;
             scheduler.Combat.HitShield = HitShield;
+            scheduler.Combat.TowerSabotage = TowerSabotage;
             scheduler.Combat.TowerAttack = TowerAttack;
             scheduler.Combat.TowerSynergy = TowerSynergy;
             scheduler.Combat.TowerLink = null;

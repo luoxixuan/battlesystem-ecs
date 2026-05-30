@@ -349,6 +349,9 @@ namespace BattleSystemECS.Systems
                 // Construction check: skip towers that are still under construction
                 if (store.TowerIsConstructing[towerId]) return;
 
+                // Disabled/sabotage check: skip towers that are disabled by enemy sabotage
+                if (store.TowerIsDisabled[towerId]) return;
+
                 // Overheat check: skip if tower is overheated (cannot fire)
                 if (_heatSystem != null && _heatSystem.IsOverheated(towerId)) return;
 
