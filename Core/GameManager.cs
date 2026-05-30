@@ -17,54 +17,17 @@ namespace BattleSystemECS.Core
         private ComponentStore store;
         private EntityManager entityManager;
 
-        // 游戏系统
-        private MapSystem mapSystem;
-        private PlayerTowerAttackSystem playerTowerAttackSystem;
-        private EnemyMovementSystem enemyMovementSystem;
-        private GoldSystem goldSystem;
-        private WaveSpawningSystem waveSpawningSystem;
-        private UpgradeSystem upgradeSystem;
-        private SkillSystem skillSystem;
-        private EnemyAISystem enemyAISystem;
-        private EnemyAbilitySystem enemyAbilitySystem;
-        private TowerPlacementSystem towerPlacementSystem;  // 塔建造系统
-        private TowerAttackSystem towerAttackSystem;       // 塔攻击系统
-        private TowerUpgradeSystem towerUpgradeSystem;     // 塔升级系统
-        private TechTreeSystem techTreeSystem;            // 科技树系统
-        private BuffSystem buffSystem;                    // Buff/DoT 追踪系统
-        private ComboSystem comboSystem;                   // Combo Kill 连击系统
-        private TowerExperienceSystem towerExperienceSystem; // Tower XP / Mastery 系统
-        private AutoSkillSystem autoSkillSystem;           // 自动技能施放系统（BuildPhase）
-        private TowerSynergySystem towerSynergySystem;    // 塔协同增益系统
-        private AuraTowerSystem auraTowerSystem;          // 光环辅助塔系统
-        private CurseAuraSystem curseAuraSystem;          // 诅咒光环塔系统
-        private PullTowerSystem pullTowerSystem;          // 牵引塔系统
-        private BleedSystem bleedSystem;                // 流血/撕裂 DoT 系统
-        private ProjectileSystem projectileSystem;        // 弹道/飞行道具系统
-        private TerrainSystem terrainSystem;              // 地形效果系统
-        private PathfindingSystem pathfindingSystem;     // 路径分叉/路点系统
-        private WaveMutatorSystem waveMutatorSystem;    // 波次词缀/突变器系统
-        private InterestSystem interestSystem;          // 银行/利息系统
-        private ManaSystem manaSystem;                  // 法力/能量池系统
-        private AscensionSystem ascensionSystem;       // 进阶难度修改器系统
-        private SaveSystem saveSystem;                  // 存档/回放系统
-        private PickupSystem pickupSystem;             // 掉落物/拾取道具系统
-        private EnemyFissionSystem enemyFissionSystem; // 敌人分裂/裂殖系统
-        private EnemyMorphSystem enemyMorphSystem;   // 敌人变形/进化系统
-        private EnemyBurrowSystem enemyBurrowSystem; // 敌人钻地/潜行系统
-        private NecromancerSystem necromancerSystem; // 亡灵法师复活尸体系统
-        private ObjectiveSystem objectiveSystem;      // 特殊目标/护送模式系统
-        private WaveBranchSystem waveBranchSystem;   // 波次分支/玩家选择系统
-        private ResourceNodeSystem resourceNodeSystem; // 地图资源节点系统（金矿/法力泉/科技遗迹）
-        private WeatherSystem weatherSystem;          // 天气系统
-        private DayNightSystem dayNightSystem;       // 昼夜循环系统
-        private TelegraphSystem telegraphSystem;     // 弹道预警区域系统
-        private AdaptiveDifficultySystem adaptiveDifficultySystem; // 动态难度系统
-        private CorpseEffectSystem corpseEffectSystem; // 敌人尸体残留效果系统
-        private PathModifierSystem pathModifierSystem; // 路径修改塔系统
-        private RandomEventSystem randomEventSystem; // 随机事件/中期惊喜系统
-        private ChronoTowerSystem chronoTowerSystem; // 时间操纵塔系统
-        private EnemyLifeLinkSystem enemyLifeLinkSystem; // 敌人生命链接/伤害分摊系统
+        // 系统注册中心（集中创建/依赖注入/分组赋值）
+        private SystemRegistry registry;
+
+        // 游戏系统（从 registry 暴露，Run() 中直接访问）
+        private WaveSpawningSystem waveSpawningSystem => registry.WaveSpawning!;
+        private TowerPlacementSystem towerPlacementSystem => registry.TowerPlacement!;
+        private TowerUpgradeSystem towerUpgradeSystem => registry.TowerUpgrade!;
+        private TechTreeSystem techTreeSystem => registry.TechTree!;
+        private ObjectiveSystem objectiveSystem => registry.Objective!;
+        private ResourceNodeSystem resourceNodeSystem => registry.ResourceNode!;
+        private SkillSystem skillSystem => registry.Skill!;
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -117,391 +80,33 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]    - Skills: " + gameConfig.Skills.Count);
 
             Console.WriteLine();
-            logger.Log("[BOOTSTRAP] 2. Initializing Game Systems...");
+            logger.Log("[BOOTSTRAP] 2. Initializing Player & Map...");
 
             // 初始化地图大小
-            logger.Log("[BOOTSTRAP]    - Creating MapSystem (10x20 map)...");
-            mapSystem = new MapSystem(logger, store);
-            mapSystem.SetMapSize(gameConfig.MapWidth, gameConfig.MapHeight);  // Bug#30: use config values instead of magic numbers
-            store.SetMapSize(gameConfig.MapWidth, gameConfig.MapHeight);     // Bug#2: sync SpatialGrid with MapSystem
-            logger.Log("[BOOTSTRAP]      MapSystem created successfully!");
+            var mapSystem = new MapSystem(logger, store);
+            mapSystem.SetMapSize(gameConfig.MapWidth, gameConfig.MapHeight);
+            store.SetMapSize(gameConfig.MapWidth, gameConfig.MapHeight);
 
-            // 初始化其他系统
-            logger.Log("[BOOTSTRAP]    - Creating EnemyMovementSystem...");
-            enemyMovementSystem = new EnemyMovementSystem(store, playerId, gameConfig.MapWidth);
-            logger.Log("[BOOTSTRAP]      EnemyMovementSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating PathfindingSystem...");
-            pathfindingSystem = new PathfindingSystem(store);
-            enemyMovementSystem.SetPathfindingSystem(pathfindingSystem);
-            logger.Log("[BOOTSTRAP]      PathfindingSystem created and wired to EnemyMovementSystem!");
-
-            // 初始化塔防系统
-            logger.Log("[BOOTSTRAP]    - Creating TowerPlacementSystem...");
-            towerPlacementSystem = new TowerPlacementSystem(store, logger, gameConfig);
-            logger.Log("[BOOTSTRAP]      TowerPlacementSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating TechTreeSystem...");
-            var techConfig = TechTreeSystem.LoadConfig(logger);
-            techTreeSystem = new TechTreeSystem(store, logger, playerId, techConfig, gameConfig);
-            logger.Log("[BOOTSTRAP]      TechTreeSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating TowerAttackSystem...");
-            towerAttackSystem = new TowerAttackSystem(store, logger, techTreeSystem);
-            logger.Log("      TowerAttackSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating TowerSynergySystem...");
-            towerSynergySystem = new TowerSynergySystem(store, logger);
-            towerSynergySystem.LoadSynergyConfig();
-            logger.Log("[BOOTSTRAP]      TowerSynergySystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating TowerUpgradeSystem...");
-            towerUpgradeSystem = new TowerUpgradeSystem(store, logger, gameConfig);
-            logger.Log("[BOOTSTRAP]      TowerUpgradeSystem created successfully!");
-
-            // 初始化玩家（血量 200）
-            logger.Log("[BOOTSTRAP]    - Creating Player Entity...");
+            // 初始化玩家
             InitializePlayer();
-            logger.Log("[BOOTSTRAP]      Player Entity created successfully!");
 
-            logger.Log("[BOOTSTRAP] 3. Initializing Player Skills (from config)...");
-            waveSpawningSystem = new WaveSpawningSystem(store, logger, gameConfig);
-            logger.Log("[BOOTSTRAP]      WaveSpawningSystem created successfully!");
+            // ── 初始化状态机（在系统创建之前，因为 WaveBranchSystem 需要它）──
+            stateMachine = new StateMachine();
 
-            logger.Log("[BOOTSTRAP]    - Creating UpgradeSystem...");
-            upgradeSystem = new UpgradeSystem(store, logger, playerId, gameConfig);
-            logger.Log("[BOOTSTRAP]      UpgradeSystem created successfully!");
+            Console.WriteLine();
+            logger.Log("[BOOTSTRAP] 3. Creating all game systems (SystemRegistry)...");
 
-            logger.Log("[BOOTSTRAP]    - Creating SkillSystem (config-driven)...");
-            skillSystem = new SkillSystem(store, logger, playerId, gameConfig, techTreeSystem);  // 初始化技能系统（从配置加载）
-            logger.Log("[BOOTSTRAP]      SkillSystem created successfully!");
+            // ══════════════════════════════════════════════════════════
+            //  将所有系统创建/依赖注入/分组赋值委托给 SystemRegistry
+            // ══════════════════════════════════════════════════════════
+            registry = new SystemRegistry();
+            registry.CreateAll(store, gameConfig, logger, playerId, stateMachine);
+            registry.WireDependencies(store, playerId);
 
-            // 初始化玩家技能（从配置加载）
-            skillSystem.InitializePlayerSkills();  // 初始化技能系统
-            logger.Log("[BOOTSTRAP]      Player Skills initialized successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating EventBus...");
-            var eventBus = new EventBus();
-            logger.Log("[BOOTSTRAP]      EventBus created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating EnemyAbilitySystem...");
-            enemyAbilitySystem = new EnemyAbilitySystem(store, logger, playerId, gameConfig, eventBus);
-            logger.Log("[BOOTSTRAP]      EnemyAbilitySystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating EnemyAISystem...");
-            enemyAISystem = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbilitySystem, techTreeSystem, eventBus);  // 初始化敌人 AI 系统（行为树驱动）
-            logger.Log("[BOOTSTRAP]      EnemyAISystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating GoldSystem...");
-            goldSystem = new GoldSystem(store, logger, techTreeSystem);
-            logger.Log("[BOOTSTRAP]      GoldSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating BuffSystem (DoT tracking)...");
-            buffSystem = new BuffSystem(store, playerId);
-            logger.Log("[BOOTSTRAP]      BuffSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating ComboSystem (Combo Kill tracking)...");
-            comboSystem = new ComboSystem(store, gameConfig.Combo);
-logger.Log("      ComboSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating EnemyFissionSystem (Split-on-death)... ");
-            enemyFissionSystem = new EnemyFissionSystem(store, gameConfig, logger);
-            logger.Log("      EnemyFissionSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating EnemyMorphSystem (Mid-wave transformation)... ");
-            enemyMorphSystem = new EnemyMorphSystem(store, gameConfig, logger);
-            logger.Log("      EnemyMorphSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating EnemyBurrowSystem (Burrow/Underground)... ");
-            enemyBurrowSystem = new EnemyBurrowSystem(store, playerId);
-            logger.Log("      EnemyBurrowSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating NecromancerSystem (Resurrect corpses as minions)... ");
-            necromancerSystem = new NecromancerSystem(store, gameConfig, logger);
-            logger.Log("      NecromancerSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating EnemyLifeLinkSystem (Life Link / Damage Sharing)... ");
-            enemyLifeLinkSystem = new EnemyLifeLinkSystem(store, gameConfig, logger);
-            logger.Log("      EnemyLifeLinkSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating ObjectiveSystem (Escort/Survival/Timed objectives)... ");
-            objectiveSystem = new ObjectiveSystem(store, playerId);
-            logger.Log("      ObjectiveSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating WaveBranchSystem (branch selection)... ");
-            waveBranchSystem = new WaveBranchSystem(store, logger, gameConfig, stateMachine);
-            // Wire branch system into wave completion: check for branch points
-            waveSpawningSystem.OnWaveComplete += () =>
-            {
-                techTreeSystem.OnWaveComplete();
-                interestSystem.OnWaveComplete();
-                saveSystem?.SaveCheckpoint();
-                // Check if this wave has branch options
-                waveBranchSystem.CheckAndActivateBranch(
-                    waveSpawningSystem.GetCurrentWave() - 1, // OnWaveComplete fires after wave number advanced
-                    waveSpawningSystem.GetCurrentLevel()
-                );
-            };
-            logger.Log("      WaveBranchSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating ResourceNodeSystem (map resource nodes)... ");
-            resourceNodeSystem = new ResourceNodeSystem(store, logger, playerId);
-            logger.Log("      ResourceNodeSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating WeatherSystem (dynamic weather effects)... ");
-            weatherSystem = new WeatherSystem(store, gameConfig);
-            logger.Log("      WeatherSystem created successfully!");
-            enemyMovementSystem.SetWeatherSystem(weatherSystem);
-            towerAttackSystem.SetWeatherSystem(weatherSystem);
-
-            logger.Log("[BOOTSTRAP]    - Creating DayNightSystem (day/night cycle)... ");
-            dayNightSystem = new DayNightSystem(store, gameConfig);
-            logger.Log("      DayNightSystem created successfully!");
-            dayNightSystem.Initialize(playerId);
-            enemyMovementSystem.SetDayNightSystem(dayNightSystem);
-            towerAttackSystem.SetDayNightSystem(dayNightSystem);
-
-            logger.Log("[BOOTSTRAP]    - Creating TelegraphSystem (warning zones for AoE abilities)... ");
-            telegraphSystem = new TelegraphSystem(store, logger, gameConfig, eventBus);
-            logger.Log("      TelegraphSystem created successfully!");
-            // Wire TelegraphSystem into EnemyAbilitySystem for warning zone queuing
-            enemyAbilitySystem.SetTelegraphSystem(telegraphSystem);
-
-            logger.Log("[BOOTSTRAP]    - Creating AdaptiveDifficultySystem (dynamic difficulty scaling)... ");
-            adaptiveDifficultySystem = new AdaptiveDifficultySystem(store, gameConfig);
-            logger.Log("      AdaptiveDifficultySystem created successfully!");
-            // Wire into WaveSpawningSystem and scheduler
-            waveSpawningSystem.SetAdaptiveDifficulty(adaptiveDifficultySystem);
-
-            logger.Log("[BOOTSTRAP]    - Creating TowerExperienceSystem (Tower XP & Mastery)... ");
-            towerExperienceSystem = new TowerExperienceSystem(store, gameConfig);
-            logger.Log("      TowerExperienceSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating AutoSkillSystem (BuildPhase auto-casting)...");
-            autoSkillSystem = new AutoSkillSystem(store, logger, playerId, skillSystem, gameConfig.AutoSkill);
-            logger.Log("[BOOTSTRAP]      AutoSkillSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating TowerSynergySystem...");
-            towerSynergySystem = new TowerSynergySystem(store, logger);
-            logger.Log("[BOOTSTRAP]      TowerSynergySystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating AuraTowerSystem...");
-            auraTowerSystem = new AuraTowerSystem(store);
-            curseAuraSystem = new CurseAuraSystem(store);
-            pullTowerSystem = new PullTowerSystem(store);
-            bleedSystem = new BleedSystem(store, playerId);
-            logger.Log("[BOOTSTRAP]      PullTowerSystem + BleedSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating ProjectileSystem...");
-            projectileSystem = new ProjectileSystem(store, logger);
-            logger.Log("[BOOTSTRAP]      ProjectileSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating TerrainSystem...");
-            terrainSystem = new TerrainSystem(store, playerId, gameConfig);
-            terrainSystem.SetBuffSystem(buffSystem);
-            logger.Log("[BOOTSTRAP]      TerrainSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating WaveMutatorSystem...");
-            waveMutatorSystem = new WaveMutatorSystem(store, playerId, logger);
-            waveMutatorSystem.LoadMutators(gameConfig.WaveMutatorDefs);
-            logger.Log("[BOOTSTRAP]      WaveMutatorSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating InterestSystem...");
-            interestSystem = new InterestSystem(store, logger, gameConfig, playerId);
-            logger.Log("      InterestSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating ManaSystem...");
-            manaSystem = new ManaSystem(store, logger, gameConfig, playerId, techTreeSystem);
-            manaSystem.Initialize();
-            logger.Log("      ManaSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating GlobalSkillSystem (Player Global Skills / Ultimates)...");
-            var globalSkillSystem = new GlobalSkillSystem(store, gameConfig, logger, playerId, techTreeSystem);
-            logger.Log("      GlobalSkillSystem created successfully!");
-
-            // Wire ManaSystem into SkillSystem for mana cost checking
-            skillSystem.InjectManaSystem(manaSystem);
-
-            logger.Log("[BOOTSTRAP]    - Creating SaveSystem...");
-            saveSystem = new SaveSystem(store, playerId);
-            logger.Log("      SaveSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating PickupSystem...");
-            pickupSystem = new PickupSystem(store, gameConfig, logger);
-            logger.Log("      PickupSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating AscensionSystem...");
-            ascensionSystem = new AscensionSystem(store, logger, gameConfig);
-            // Pre-select some default modifiers for demonstration
-            ascensionSystem.SelectModifier("tough_enemies");
-            logger.Log("      AscensionSystem created successfully!");
-
-            // Wire AscensionSystem into WaveSpawningSystem for enemy HP/speed scaling
-            waveSpawningSystem.SetAscensionSystem(ascensionSystem);
-
-            logger.Log("[BOOTSTRAP]    - Creating CorpseEffectSystem (Enemy corpse ground effects)...");
-            corpseEffectSystem = new CorpseEffectSystem(store, gameConfig, buffSystem, logger);
-            corpseEffectSystem.LoadCorpseEffects();
-            corpseEffectSystem.SubscribeToOnEnemyKilled();
-            logger.Log("      CorpseEffectSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating PathModifierSystem (path modification towers)... ");
-            pathModifierSystem = new PathModifierSystem(store);
-            logger.Log("      PathModifierSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating RandomEventSystem (mid-wave random events)... ");
-            randomEventSystem = new RandomEventSystem(store, gameConfig);
-            logger.Log("      RandomEventSystem created successfully!");
-
-            logger.Log("[BOOTSTRAP]    - Creating ChronoTowerSystem (time dilation fields)...");
-            chronoTowerSystem = new ChronoTowerSystem(store);
-            logger.Log("      ChronoTowerSystem created successfully!");
-
-            // Wire OnEnemyKilled → ComboSystem (连击计数链路)
-            store.OnEnemyKilled += (enemyId, playerId) => comboSystem.HandleComboIncrement(playerId);
-            // Wire OnEnemyKilled → NecromancerSystem (queue corpses for resurrection)
-            store.OnEnemyKilled += (enemyId, playerId) => necromancerSystem.OnEnemyKilled(enemyId, playerId);
-            // Wire OnTowerKill → TowerExperienceSystem (XP 授予链路)
-            store.OnTowerKill += (enemyId, playerId, towerId) => towerExperienceSystem.HandleEnemyKilled(enemyId, playerId, towerId);
-
-            // Wire BuffSystem into SkillSystem for Poison Nova DoT application
-            skillSystem.InjectDotSystem(buffSystem);
-
-            // Wire BuffSystem into TowerAttackSystem for Firewall DoT and Leech lifesteal
-            towerAttackSystem.SetBuffSystem(buffSystem);
-            towerAttackSystem.SetBleedSystem(bleedSystem);
-            // Wire TowerExperienceSystem into TowerAttackSystem for XP grant on kills
-            towerAttackSystem.SetTowerExperienceSystem(towerExperienceSystem);
-            // Wire ProjectileSystem into TowerAttackSystem for fragment projectile spawning
-            towerAttackSystem.SetProjectileSystem(projectileSystem);
-            // Wire EnemyLifeLinkSystem into TowerAttackSystem for damage-sharing link computation
-            towerAttackSystem.SetLifeLinkSystem(enemyLifeLinkSystem);
-
-            logger.Log("[BOOTSTRAP]    - Creating PlayerTowerAttackSystem...");
-            playerTowerAttackSystem = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig, techTreeSystem);
-            logger.Log("      PlayerTowerAttackSystem created successfully!");
-            // Wire EnemyLifeLinkSystem into PlayerTowerAttackSystem for damage-sharing link computation
-            playerTowerAttackSystem.SetLifeLinkSystem(enemyLifeLinkSystem);
-
-            // 订阅波次完成事件 → 产出研究点数
-            waveSpawningSystem.OnWaveComplete += () => techTreeSystem.OnWaveComplete();
-            waveSpawningSystem.OnWaveComplete += () => interestSystem.OnWaveComplete();
-            waveSpawningSystem.OnWaveComplete += () => saveSystem?.SaveCheckpoint();
-            // 订阅波次开始事件 → 同步波次伤害缩放到所有攻击系统
-            waveSpawningSystem.OnWaveStart += () =>
-            {
-                int wave = waveSpawningSystem.GetCurrentWave();
-                playerTowerAttackSystem.SetWaveNumber(wave);
-                towerAttackSystem.SetWaveNumber(wave);
-                skillSystem.SetWaveNumber(wave);
-                comboSystem.ResetCombo(playerId);
-                waveMutatorSystem.OnWaveStart(wave);
-            };
-
-            // 初始化统一帧调度器 — 系统按 Phase 分组注入
             scheduler = new FrameScheduler(store, gameConfig);
+            registry.AssignToGroups(scheduler);
 
-            // BuildPhase systems
-            scheduler.Build.Gold = goldSystem;
-            scheduler.Build.TowerIncome = null;     // not implemented yet
-            scheduler.Build.Upgrade = upgradeSystem;
-            scheduler.Build.Skill = skillSystem;
-            scheduler.Build.AutoSkill = autoSkillSystem;
-            scheduler.Build.TowerRelocate = null;   // not implemented yet
-            scheduler.Build.Interest = interestSystem;
-            scheduler.Build.Mana = manaSystem;
-            scheduler.Build.Objective = objectiveSystem;
-            scheduler.Build.ResourceNode = resourceNodeSystem;
-            scheduler.Build.GlobalSkill = globalSkillSystem;
-
-            // PreGame: weather, day/night, difficulty, events
-            scheduler.PreGame.WaveSpawning = waveSpawningSystem;
-            scheduler.PreGame.Weather = weatherSystem;
-            scheduler.PreGame.DayNight = dayNightSystem;
-            scheduler.PreGame.AdaptiveDifficulty = adaptiveDifficultySystem;
-            scheduler.PreGame.Construction = null;  // not implemented yet
-            scheduler.PreGame.RandomEvent = randomEventSystem;
-
-            // Spawning: wave + nest
-            scheduler.Spawning.WaveSpawning = waveSpawningSystem;
-            scheduler.Spawning.Nest = null;         // not implemented yet
-
-            // AI: behaviour trees, abilities, burrow, necromancer, life link, affixes
-            scheduler.AI.EnemyAI = enemyAISystem;
-            scheduler.AI.EnemyAbility = enemyAbilitySystem;
-            scheduler.AI.Burrow = enemyBurrowSystem;
-            scheduler.AI.Necromancer = necromancerSystem;
-            scheduler.AI.LifeLink = enemyLifeLinkSystem;
-            scheduler.AI.EnemyAffix = null;         // not implemented yet
-
-            // Movement: wound, pathfinding, modifiers, healer, summons
-            scheduler.Movement.Wound = null;        // not implemented yet
-            scheduler.Movement.Pathfinding = pathfindingSystem;
-            scheduler.Movement.EnemyMovement = enemyMovementSystem;
-            scheduler.Movement.PathModifier = pathModifierSystem;
-            scheduler.Movement.EnemyHealer = null;  // not implemented yet
-            scheduler.Movement.StealGold = null;    // not implemented yet
-            scheduler.Movement.Summon = null;       // not implemented yet
-
-            // Terrain + Mutators + Morph
-            scheduler.Terrain.Terrain = terrainSystem;
-            scheduler.Terrain.WaveMutator = waveMutatorSystem;
-            scheduler.Terrain.EnemyMorph = enemyMorphSystem;
-
-            // Pre-combat SetTurn
-            scheduler.CombatSetup.PlayerTowerAttack = playerTowerAttackSystem;
-            scheduler.CombatSetup.TowerAttack = towerAttackSystem;
-            scheduler.CombatSetup.TowerOvercharge = null;   // not implemented yet
-            scheduler.CombatSetup.TowerSynergy = towerSynergySystem;
-            scheduler.CombatSetup.TowerLink = null;         // not implemented yet
-            scheduler.CombatSetup.Skill = skillSystem;
-            scheduler.CombatSetup.AuraTower = auraTowerSystem;
-            scheduler.CombatSetup.Curse = curseAuraSystem;
-            scheduler.CombatSetup.PullTower = pullTowerSystem;
-            scheduler.CombatSetup.Mana = manaSystem;
-            scheduler.CombatSetup.GlobalSkill = globalSkillSystem;
-
-            // Spatial rebuild + patrol/chrono/fog/telegraph
-            scheduler.Spatial.PatrolTower = null;   // not implemented yet
-            scheduler.Spatial.ChronoTower = chronoTowerSystem;
-            scheduler.Spatial.Fog = null;           // not implemented yet
-            scheduler.Spatial.PointDefense = null;  // not implemented yet
-            scheduler.Spatial.Telegraph = telegraphSystem;
-
-            // Main combat
-            scheduler.Combat.PlayerTowerAttack = playerTowerAttackSystem;
-            scheduler.Combat.TowerOvercharge = null;     // not implemented yet
-            scheduler.Combat.Demolish = null;            // not implemented yet
-            scheduler.Combat.TowerAttack = towerAttackSystem;
-            scheduler.Combat.TowerSynergy = towerSynergySystem;
-            scheduler.Combat.TowerLink = null;           // not implemented yet
-            scheduler.Combat.AuraTower = auraTowerSystem;
-            scheduler.Combat.Curse = curseAuraSystem;
-            scheduler.Combat.PullTower = pullTowerSystem;
-            scheduler.Combat.TowerSilence = null;        // not implemented yet
-            scheduler.Combat.Dispel = null;              // not implemented yet
-            scheduler.Combat.Projectile = projectileSystem;
-            scheduler.Combat.EnemyProjectile = null;     // not implemented yet
-            scheduler.Combat.Pickup = pickupSystem;
-            scheduler.Combat.Mana = manaSystem;
-            scheduler.Combat.GlobalSkill = globalSkillSystem;
-
-            // Skill resolution + Buff DoT + Bleed
-            scheduler.SkillBuff.Buff = buffSystem;
-            scheduler.SkillBuff.Skill = skillSystem;
-            scheduler.SkillBuff.Bleed = bleedSystem;
-
-            // Post-death: fission, life link, objective, resources, corpses, combo
-            scheduler.PostDeath.EnemyFission = enemyFissionSystem;
-            scheduler.PostDeath.LifeLink = enemyLifeLinkSystem;
-            scheduler.PostDeath.Objective = objectiveSystem;
-            scheduler.PostDeath.ResourceNode = resourceNodeSystem;
-            scheduler.PostDeath.TowerIncome = null;      // not implemented yet
-            scheduler.PostDeath.CorpseEffect = corpseEffectSystem;
-            scheduler.PostDeath.WaveBranch = waveBranchSystem;
-            scheduler.PostDeath.Combo = comboSystem;
-
-            // 初始化地形网格（方向二：地图地块系统）
+            // 初始化地形网格
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)
             {
                 int h = gameConfig.MapTerrainGrid.Length;
@@ -510,15 +115,12 @@ logger.Log("      ComboSystem created successfully!");
                 logger.Log($"[BOOTSTRAP]    - Terrain grid initialized: {w}x{h}");
             }
 
-            // 初始化状态机
-            stateMachine = new StateMachine();
+            // ── Phase + StateMachine 线路 ──
             scheduler.Phase = GameState.BuildPhase;
-
-            // 注册 phase 切换回调：scheduler.Phase 跟随状态机同步
             stateMachine.OnEnter(GameState.BuildPhase, () => { scheduler.Phase = GameState.BuildPhase; });
             stateMachine.OnEnter(GameState.WavePhase, () => { scheduler.Phase = GameState.WavePhase; });
-            stateMachine.OnEnter(GameState.Intermission, () => { scheduler.Phase = GameState.WavePhase; }); // intermission 仍运行战斗引擎（显示信息）
-            stateMachine.OnEnter(GameState.BranchSelection, () => { scheduler.Phase = GameState.WavePhase; }); // combat paused by WaveBranch.IsBranchActive
+            stateMachine.OnEnter(GameState.Intermission, () => { scheduler.Phase = GameState.WavePhase; });
+            stateMachine.OnEnter(GameState.BranchSelection, () => { scheduler.Phase = GameState.WavePhase; });
 
             logger.Log("[BOOTSTRAP] ========== Game Initialization Complete ==========");
             Console.WriteLine();
@@ -549,7 +151,7 @@ logger.Log("      ComboSystem created successfully!");
             store.SetPlayerMaxHealth(id, maxHealth);
             store.SetPlayerCurrentHealth(id, maxHealth);
             store.SetPlayerUpgradeThreshold(id, upgradeThreshold);
-            store.SetPlayerGold(id, 200f); // 初始金币，允许第一波前建造 1-2 个初始塔
+            store.SetPlayerGold(id, 200f);
 
             playerId = id;
 
@@ -627,7 +229,6 @@ logger.Log("      ComboSystem created successfully!");
                 resourceNodeSystem.InitializeFromLevel(levelConfig);
 
                 // ── Phase: BuildPhase ──────────────────────────────────────────
-                // Transition from Init → BuildPhase and show enter message
                 if (stateMachine.TransitionTo(GameState.BuildPhase))
                 {
                     var pb = gameConfig.GetPhaseBehavior("BuildPhase");
@@ -643,17 +244,17 @@ logger.Log("      ComboSystem created successfully!");
                 Console.WriteLine();
                 logger.Log("========================================");
                 store.RebuildSpatialGrid();
-                mapSystem.Update();
+                registry.Map?.Update();
                 logger.Log("========================================");
 
-                // [测试] 自动部署防御塔（使用真实 TowerConfig.Type 名称，使 debuff 参数生效 — P1 修复）
+                // [测试] 自动部署防御塔
                 logger.Log("[TEST] 自动部署防御塔...");
                 int towerId1 = towerPlacementSystem.PlaceTower(2, 5, TowerType.Basic, 15.0f, 3, 1.5f, 100f);
                 int towerId2 = towerPlacementSystem.PlaceTower(7, 12, TowerType.Sniper, 25.0f, 5, 0.8f, 200f);
 
-                // [测试] 升级塔（使用真实分配的 ID）
+                // [测试] 升级塔
                 logger.Log("[TEST] 尝试升级塔...");
-                store.SetPlayerGold(store.PlayerEntityId, 500f); // 给金币
+                store.SetPlayerGold(store.PlayerEntityId, 500f);
                 if (towerId1 >= 0) towerUpgradeSystem.UpgradeTower(towerId1);
                 if (towerId2 >= 0) towerUpgradeSystem.UpgradeTower(towerId2);
 
@@ -688,10 +289,8 @@ logger.Log("      ComboSystem created successfully!");
                     scheduler.TickGameTurn(1f, turn);
 
                     // ── 游戏级逻辑 ───────────────────────────────
-                    // 注意：Gold/Upgrade/Skill cooldown 已由 TickGameTurn 处理
                     if (!store.IsPlayerAlive(playerId))
                     {
-                        // Try不朽科技复活（消耗一次复活机会）
                         if (techTreeSystem.TryRespawn())
                         {
                             logger.Log("[INFO] 不朽科技触发！玩家复活，继续游戏...");
@@ -710,15 +309,10 @@ logger.Log("      ComboSystem created successfully!");
                     if (healed > 0f)
                         logger.Log("[TECH] 喘息触发，回复 " + healed.ToString("F1") + " 生命");
 
-                    // 自动释放技能（根据冷却时间）
-                    // skillSystem.AutoCastSkill();  // 暂时注释掉，避免重复执行
-
                     // 渲染地图（SOA）
-                    // Note: RebuildSpatialGrid 已在上方系统链之前（line ~303）调用。
-                    // 冗余调用已移除（2026-05-17）。渲染会使用上一帧的敌人位置。
-                    mapSystem.Update();
+                    registry.Map?.Update();
 
-                    // 显示玩家血量（200）
+                    // 显示玩家血量
                     logger.Log("[HEALTH] Player Health: " + store.GetPlayerCurrentHealth(playerId) + " / " + store.GetPlayerMaxHealth(playerId));
 
                     // 检查敌人是否到达底部
@@ -737,35 +331,31 @@ logger.Log("      ComboSystem created successfully!");
             Console.WriteLine();
         }
 
-/// <summary>
+        /// <summary>
         /// 检查是否有敌人到达底部
         /// </summary>
         private bool CheckEnemiesAtBottom()
         {
-            // Uses frame-cached enemy list — zero allocation (no new List<int> per call)
             var activeEnemyIds = store.GetCachedActiveEnemyIds();
 
             foreach (var enemyId in activeEnemyIds)
             {
-                // SOA: 直接数组访问，无字典查询，无 struct 复制
                 float y = store.PositionY[enemyId];
 
                 if (store.EnemyActive[enemyId] && y <= 0f)
                 {
-                    // Enemy leaked — decrement base lives
                     store.DecrementPlayerBaseLives(playerId);
                     int remaining = store.GetPlayerBaseLives(playerId);
                     logger.Log("[INFO] Enemy reached bottom! Base lives: " + remaining + " remaining.");
 
-                    // Remove the enemy that reached bottom (leaked)
                     store.QueueEnemyDeath(enemyId, playerId);
 
                     if (remaining <= 0)
                     {
                         logger.Log("[INFO] Game Over! No base lives remaining.");
-                        return true;  // game over
+                        return true;
                     }
-                    return false;  // still alive, continue
+                    return false;
                 }
             }
 
