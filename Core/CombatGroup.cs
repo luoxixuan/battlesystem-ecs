@@ -6,6 +6,7 @@ namespace BattleSystemECS.Core
     {
         public Systems.PlayerTowerAttackSystem? PlayerTowerAttack { get; set; }
         public Systems.TowerOverchargeSystem? TowerOvercharge { get; set; }
+        public Systems.HeatSystem? Heat { get; set; }
         public Systems.TowerDemolishSystem? Demolish { get; set; }
         public Systems.TowerAttackSystem? TowerAttack { get; set; }
         public Systems.TowerSynergySystem? TowerSynergy { get; set; }
@@ -25,6 +26,7 @@ namespace BattleSystemECS.Core
         {
             PlayerTowerAttack?.Update();
             TowerOvercharge?.Update(deltaTime);
+            Heat?.Update(deltaTime);
             Demolish?.Update();
             TowerAttack?.Update(deltaTime);
             TowerSynergy?.Update();

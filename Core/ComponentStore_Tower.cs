@@ -307,6 +307,26 @@ namespace BattleSystemECS.Core
         // TowerProjectileGravityScale: gravity multiplier for arc projectiles (default 1.0)
         public float[] TowerProjectileGravityScale = new float[MAX_ENTITIES];
 
+        // ==================== 塔过热/热量系统 (Tower Heat / Overheat) ====================
+        // TowerHeat: current accumulated heat level for each tower (0 = cold, max = overheated)
+        public float[] TowerHeat = new float[MAX_ENTITIES];
+        // TowerMaxHeat: maximum heat capacity before overheat triggers
+        public float[] TowerMaxHeat = new float[MAX_ENTITIES];
+        // TowerHeatPerShot: heat generated per attack shot
+        public float[] TowerHeatPerShot = new float[MAX_ENTITIES];
+        // TowerHeatCooldownRate: heat dissipation rate in heat units per second (passive cooling)
+        public float[] TowerHeatCooldownRate = new float[MAX_ENTITIES];
+        // TowerIsOverheated: true if tower is currently overheated (reduced performance)
+        public bool[] TowerIsOverheated = new bool[MAX_ENTITIES];
+        // TowerOverheatTimer: remaining cooldown/lockout after overheat clears (seconds)
+        public float[] TowerOverheatTimer = new float[MAX_ENTITIES];
+        // TowerOverheatBonus: attack speed multiplier when overheated (e.g., 2.0 = double speed)
+        public float[] TowerOverheatBonus = new float[MAX_ENTITIES];
+        // TowerOverheatPenalty: damage penalty when overheated (0.0-1.0, e.g., 0.5 = -50% damage)
+        public float[] TowerOverheatPenalty = new float[MAX_ENTITIES];
+        // TowerCanOverheat: true if this tower type supports overheat (from config)
+        public bool[] TowerCanOverheat = new bool[MAX_ENTITIES];
+
         // ==================== 塔组件访问 ====================
 
         /// <summary>
@@ -416,6 +436,16 @@ namespace BattleSystemECS.Core
             TowerProjectileArcType[entityId] = 0;
             TowerProjectileArcPeakHeight[entityId] = 0f;
             TowerProjectileGravityScale[entityId] = 1f;
+            // Heat/overheat fields: default to no heat, no overheat
+            TowerHeat[entityId] = 0f;
+            TowerMaxHeat[entityId] = 0f;
+            TowerHeatPerShot[entityId] = 0f;
+            TowerHeatCooldownRate[entityId] = 0f;
+            TowerIsOverheated[entityId] = false;
+            TowerOverheatTimer[entityId] = 0f;
+            TowerOverheatBonus[entityId] = 1f;
+            TowerOverheatPenalty[entityId] = 0f;
+            TowerCanOverheat[entityId] = false;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
@@ -495,6 +525,16 @@ namespace BattleSystemECS.Core
             TowerProjectileArcType[entityId] = 0;
             TowerProjectileArcPeakHeight[entityId] = 0f;
             TowerProjectileGravityScale[entityId] = 1f;
+            // Heat/overheat fields reset
+            TowerHeat[entityId] = 0f;
+            TowerMaxHeat[entityId] = 0f;
+            TowerHeatPerShot[entityId] = 0f;
+            TowerHeatCooldownRate[entityId] = 0f;
+            TowerIsOverheated[entityId] = false;
+            TowerOverheatTimer[entityId] = 0f;
+            TowerOverheatBonus[entityId] = 1f;
+            TowerOverheatPenalty[entityId] = 0f;
+            TowerCanOverheat[entityId] = false;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
         }
         #endregion

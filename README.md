@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-30, commit `7a3f9c1`）
+## 性能基准（2026-05-30, commit `f5fdd5d`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~5011 FPS**，400 帧，~0.20 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~12116 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5349 FPS** |
+| **mode 5**（完整一局） | **~5049 FPS**，400 帧，~0.20 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11643 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5655 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -154,6 +154,7 @@ dotnet test
 - 时间操纵塔/Chrono Tower（ChronoTowerSystem）；bench2: 10116, bench4: 5158, bench5: 4767
 - 敌人受伤减速/瘸腿（EnemyWoundSystem）；bench2: 9800, bench4: 5116, bench5: 4594
 - 随机事件 Bug 修复；bench2: 9947, bench4: 5251, bench5: 5050
+- 塔过热/热量系统（HeatSystem + ComponentStore_Tower.cs）；bench2: 11643, bench4: 5655, bench5: 5049
 
 ### 2026-05-29
 - 复活/亡灵法师敌人（NecromancerSystem + CorpseQueue）；bench2: 9871, bench4: 5122, bench5: 4882

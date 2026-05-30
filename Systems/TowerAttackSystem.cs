@@ -22,6 +22,7 @@ namespace BattleSystemECS.Systems
         private ProjectileSystem projectileSystem;
         private WeatherSystem _weatherSystem; // injected for weather effects
         private DayNightSystem _dayNightSystem; // injected for day/night cycle effects
+        private HeatSystem _heatSystem; // injected for heat/overheat effects
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate arrays (zero-allocation — no List.Clear() version bump)
@@ -188,6 +189,14 @@ namespace BattleSystemECS.Systems
             _dayNightSystem = dayNight;
         }
 
+        /// <summary>
+        /// Inject HeatSystem reference for heat/overheat effects on tower attacks.
+        /// </summary>
+        public void SetHeatSystem(HeatSystem heatSystem)
+        {
+            _heatSystem = heatSystem;
+        }
+
         private EnemyLifeLinkSystem _lifeLinkSystem;
 
         /// <summary>
@@ -318,6 +327,9 @@ namespace BattleSystemECS.Systems
 
                 // Construction check: skip towers that are still under construction
                 if (store.TowerIsConstructing[towerId]) return;
+
+                // Overheat check: skip if tower is overheated (cannot fire)
+                if (_heatSystem != null && _heatSystem.IsOverheated(towerId)) return;
 
                 float tx = store.PositionX[towerId];
                 float ty = store.PositionY[towerId];
@@ -476,6 +488,12 @@ int bestTarget = -1;
                             store.TowerIsReloading[towerId] = true;
                             store.TowerReloadProgress[towerId] = 0f;
                         }
+                    }
+
+                    // Accumulate heat for towers that generate heat on each shot
+                    if (_heatSystem != null)
+                    {
+                        _heatSystem.AccumulateHeat(towerId);
                     }
 
                     float baseDmg = store.TowerAttackDamage[towerId];

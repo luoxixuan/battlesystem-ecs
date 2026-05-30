@@ -7,6 +7,7 @@ namespace BattleSystemECS.Core
         public Systems.PlayerTowerAttackSystem? PlayerTowerAttack { get; set; }
         public Systems.TowerAttackSystem? TowerAttack { get; set; }
         public Systems.TowerOverchargeSystem? TowerOvercharge { get; set; }
+        public Systems.HeatSystem? Heat { get; set; }
         public Systems.TowerSynergySystem? TowerSynergy { get; set; }
         public Systems.TowerLinkSystem? TowerLink { get; set; }
         public Systems.SkillSystem? Skill { get; set; }
@@ -21,6 +22,7 @@ namespace BattleSystemECS.Core
             PlayerTowerAttack?.SetTurn(turn);
             TowerAttack?.SetTurn(turn);
             TowerOvercharge?.SetTurn(turn);
+            Heat?.SetTurn(turn);
             TowerSynergy?.SetTurn();
             TowerLink?.SetTurn();
             Skill?.SetTurn(turn);

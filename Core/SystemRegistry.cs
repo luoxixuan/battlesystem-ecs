@@ -351,6 +351,7 @@ namespace BattleSystemECS.Core
             // ── Combat ──
             scheduler.Combat.PlayerTowerAttack = PlayerTowerAttack;
             scheduler.Combat.TowerOvercharge = null;
+            scheduler.Combat.Heat = null; // HeatSystem — heat accumulation + overheat state
             scheduler.Combat.Demolish = null;
             scheduler.Combat.TowerAttack = TowerAttack;
             scheduler.Combat.TowerSynergy = TowerSynergy;
