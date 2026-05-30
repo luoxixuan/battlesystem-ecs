@@ -15,7 +15,7 @@ namespace BattleSystemECS.Core
     /// SOA (Struct of Arrays) component storage.
     /// Provides cache-friendly continuous memory layout for high-throughput ECS operations.
     /// </summary>
-        public partial class ComponentStore
+        public partial class ComponentStore : IDisposable
         {
             #region Constants & Helpers
         public const int MAX_ENTITIES = 100000;
@@ -1576,6 +1576,193 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public ReadOnlySpan<int> GetActiveTowerSpan()
         {
             return System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_activeTowerIds);
+        }
+
+        // ==================== IDisposable ====================
+
+        /// <summary>
+        /// Release large arrays to help GC reclaim memory in long-running server scenarios.
+        /// Nullifies all SOA arrays — call only when the store is permanently done.
+        /// </summary>
+        public void Dispose()
+        {
+            PositionX = null!; PositionY = null!; PositionActive = null!;
+            PlayerAttackRange = null!; PlayerAttackSpeed = null!; PlayerAttackDamage = null!;
+            PlayerMaxHealth = null!; PlayerCurrentHealth = null!; PlayerArmor = null!;
+            PlayerShield = null!; PlayerShieldDuration = null!; PlayerThornsRatio = null!;
+            PlayerCurrentLevel = null!; PlayerDamageType = null!;
+            PlayerGold = null!; PlayerUpgradeThreshold = null!;
+            PlayerMana = null!; PlayerMaxMana = null!; PlayerManaRegen = null!; PlayerManaCost = null!;
+            PlayerGlobalSkillUnlocked = null!; PlayerGlobalSkillCooldown = null!;
+            PlayerGlobalSkillPressed = null!; PlayerGlobalSkillHotkey = null!;
+            PlayerBuffFlags = null!; PlayerStunDuration = null!;
+            PlayerSlowFactor = null!; PlayerSlowDuration = null!;
+            PlayerBaseLives = null!; PlayerMaxBaseLives = null!;
+            CurrentWeather = null!; WeatherIntensity = null!; WeatherTimer = null!;
+            GlobalDayNightPhase = null!; GlobalDayNightTimer = null!; GlobalDayNightCycleCount = null!;
+            CurrentObjectiveType = null!;
+            EscortNpcX = null!; EscortNpcY = null!; EscortNpcHealth = null!; EscortNpcMaxHealth = null!;
+            EscortNpcActive = null!; EscortNpcSpeed = null!;
+            ObjectiveTimer = null!; ObjectiveWavesRemaining = null!; ObjectiveTimeLimit = null!;
+            ObjectiveWaveScore = null!; ObjectiveHealthScore = null!;
+            EnemiesLeakedThisWave = null!; AdaptiveDifficultyLevel = null!; AdaptiveDifficultyScore = null!;
+            ResourceNodeX = null!; ResourceNodeY = null!; ResourceNodeOwner = null!; ResourceNodeType = null!;
+            ResourceNodeActive = null!; ResourceNodeProductionRate = null!;
+            ResourceNodeHealth = null!; ResourceNodeMaxHealth = null!;
+            ResourceNodeAccumulated = null!; ResourceNodeCaptureProgress = null!; ResourceNodeTowerId = null!;
+            PathModifierX = null!; PathModifierY = null!; PathModifierRadius = null!;
+            PathModifierActive = null!; PathModifierOwnerId = null!; PathModifierTargetPathId = null!;
+            PathModifierTurnsRemaining = null!;
+            GlobalTimeScale = null!; GlobalTimeScaleDuration = null!;
+            RandomEventCooldown = null!; RandomEventActiveType = null!; RandomEventTimer = null!;
+            RandomEventParam = null!; RandomEventParam2 = null!;
+            TowerVisionRadius = null!; GlobalFogDensity = null!;
+            AscensionModifierStacks = null!;
+            PlayerResearchPoints = null!;
+            PickupX = null!; PickupY = null!; PickupType = null!; PickupValue = null!;
+            PickupOwnerId = null!; PickupActive = null!; PickupLifetime = null!;
+            PlayerWaveIndex = null!; PlayerEnemiesRemaining = null!; PlayerIsWaveActive = null!;
+            PlayerWaveTimer = null!; PlayerWaveCompleteGold = null!;
+            CurrentWaveMutatorId = null!;
+            PlayerComboCount = null!; PlayerComboTimer = null!; PlayerComboDamageMult = null!;
+            PlayerComboKillStreak = null!; PlayerComboGoldMult = null!;
+            PlayerBankedGold = null!; PlayerInterestRate = null!;
+            EnemyHealth = null!; EnemyMaxHealth = null!; EnemyMoveSpeed = null!; EnemyDamage = null!;
+            EnemyGoldReward = null!; EnemyWaveNumber = null!; EnemyActive = null!;
+            EnemyChargeParam = null!; EnemyBuffDamageBonus = null!; EnemyBuffDurationLeft = null!;
+            EnemySpawnFrame = null!; EnemyArmor = null!; EnemyMagicResist = null!; EnemyEvasion = null!;
+            EnemyShield = null!; EnemyThornsRatio = null!;
+            EnemyArmorShredStacks = null!; EnemyArmorShredDuration = null!;
+            EnemyCurseDmgReduction = null!; EnemyCurseSpeedReduction = null!;
+            EnemyCurseArmorReduction = null!; EnemyCurseDmgTakenIncrease = null!;
+            EnemyBleedStacks = null!; EnemyBleedDamagePerStack = null!; EnemyBleedTimer = null!;
+            EnemyBleedMaxStacks = null!; EnemyBleedResistance = null!; EnemyBleedDurationLeft = null!;
+            EnemyStunFlag = null!; EnemyStunDurationLeft = null!; EnemySlowFactor = null!;
+            EnemyTerrainMoveSpeedMult = null!; EnemyMoveSpeedBase = null!; EnemySlowDurationLeft = null!;
+            EnemyWoundThreshold = null!; EnemyWoundSlowRatio = null!; EnemyIsWounded = null!;
+            EnemyKnockbackForceLeft = null!; EnemyIsElite = null!; EnemyIsFlying = null!;
+            EnemyFlightHeight = null!; EnemyCanLand = null!; EnemyStealthMultiplier = null!;
+            EnemyIsBurrowed = null!; EnemyBurrowTimer = null!; EnemyBurrowCooldown = null!;
+            EnemyBurrowCooldownRef = null!; EnemyBurrowSpeedMult = null!;
+            EnemyBurrowEmergeDamage = null!; EnemyBurrowRadius = null!;
+            EnemyCanResurrect = null!; EnemyResurrectRange = null!; EnemyResurrectCooldown = null!;
+            EnemyResurrectCooldownRef = null!; EnemyResurrectHpMult = null!;
+            EnemyMaxResurrectCount = null!; EnemyResurrectCorpseAgeLimit = null!;
+            EnemyIsReanimated = null!; EnemyOwnerId = null!;
+            SummonedUnitActive = null!; SummonedUnitType = null!;
+            SummonedUnitHealth = null!; SummonedUnitMaxHealth = null!;
+            SummonedUnitDamage = null!; SummonedUnitMoveSpeed = null!;
+            SummonedUnitAttackRange = null!; SummonedUnitAttackSpeed = null!; SummonedUnitAttackTimer = null!;
+            SummonedUnitDuration = null!; SummonedUnitOwnerId = null!;
+            SummonedUnitTargetId = null!; SummonedUnitGoldReward = null!;
+            EnemyBossPhase = null!; EnemyPhaseThresholds = null!;
+            EnemyEnrageTimer = null!; EnemyIsEnraged = null!;
+            EnemyIsInvulnerable = null!; EnemyInvulnerablePhaseName = null!;
+            EnemyFissionDefId = null!; EnemyFissionGeneration = null!;
+            EnemyMorphDefId = null!; EnemyIsMorphed = null!; EnemyMorphTriggered = null!;
+            EnemyIsLifeLinker = null!; EnemyLifeLinkDefId = null!; EnemyLinkedEnemyId = null!;
+            EnemyLifeLinkRatio = null!; EnemyLifeLinkCooldownLeft = null!; EnemyIsLinked = null!;
+            EnemyPathId = null!; EnemyPathNodeIndex = null!;
+            EnemyTeleportCooldown = null!; EnemyTeleportDestinationX = null!;
+            EnemyTeleportDestinationY = null!; EnemyTeleportType = null!;
+            EnemyFearDurationLeft = null!; EnemyTauntTargetId = null!; EnemyCharmDurationLeft = null!;
+            EnemyStunResistance = null!; EnemyFreezeResistance = null!; EnemySlowResistance = null!;
+            EnemyKnockbackResistance = null!; EnemyDamageResistance = null!;
+            EnemyIsVanguard = null!; EnemyVanguardCoverRange = null!; EnemyVanguardDmgTransfer = null!;
+            EnemyVanguardCoverCount = null!;
+            EnemyHealerHealAmount = null!; EnemyHealerHealInterval = null!; EnemyHealerHealTargetPriority = null!;
+            EnemyCanStealGold = null!; EnemyStealAmount = null!; EnemyStolenGold = null!;
+            EnemyGoldOnReturn = null!; EnemyHasStolenGold = null!;
+            EnemyAffixFlags = null!; EnemyElementStatus = null!; EnemyElementTimer = null!;
+            NestDefId = null!; NestHealth = null!; NestMaxHealth = null!;
+            NestSpawnTimer = null!; NestSpawnInterval = null!; NestMonsterTypeStr = null!;
+            NestMaxAlive = null!; NestActiveCount = null!; NestOriginId = null!;
+            EnemyAIAction = null!; EnemyAIChargeCounter = null!; EnemyAILastAttackTurn = null!;
+            EnemyTypeName = null!; EnemyBehaviorTree = null!; EnemyActionEnum = null!;
+            EnemyCastAbilityId = null!;
+            TowerTargetingMode = null!; TowerProjectileHoming = null!; TowerInterceptRate = null!;
+            TowerDamageType = null!; TowerSelected = null!; TowerType = null!;
+            TowerAttackDamage = null!; TowerRange = null!; TowerAttackSpeed = null!;
+            TowerLevel = null!; TowerUpgradeCost = null!; TowerUpgradePathId = null!;
+            TowerFusionTier = null!; TowerActive = null!; TowerLastAttackTime = null!;
+            TowerStunChance = null!; TowerSlowAmount = null!; TowerSlowDuration = null!;
+            TowerArmorPierceRatio = null!; TowerSplashRadius = null!;
+            TowerArmorShredBonus = null!; TowerShieldBreakBonus = null!; TowerAccuracy = null!;
+            TowerFalloffInnerRatio = null!; TowerFalloffOuterMult = null!;
+            TowerCritChance = null!; TowerCritMultiplier = null!;
+            TowerHasChainLightning = null!; TowerHasFreezeAoe = null!;
+            TowerCanHitAir = null!; TowerCanHitGround = null!;
+            TowerSpecialAbilityRadius = null!; TowerSpecialAbilityDamageMult = null!;
+            TowerSpecialAbilityDotDamage = null!; TowerSpecialAbilityDotInterval = null!;
+            TowerKnockbackForce = null!; TowerKnockbackRadius = null!;
+            TowerProjectileCount = null!; TowerScatterAngle = null!;
+            TowerBouncesRemaining = null!; TowerBounceRange = null!;
+            TowerBounceDamageFalloff = null!; TowerBounceHitsRemaining = null!;
+            TowerProjectilePierceCount = null!; TowerProjectilePierceDmgFalloff = null!;
+            TowerPierceHitsRemaining = null!;
+            TowerProjectileFragmentCount = null!; TowerProjectileFragmentRange = null!;
+            TowerProjectileFragmentDmgMult = null!;
+            TowerCurrentAmmo = null!; TowerMaxAmmo = null!; TowerReloadTime = null!;
+            TowerReloadProgress = null!; TowerIsReloading = null!;
+            TowerIsOvercharged = null!; TowerOverchargeDuration = null!;
+            TowerOverchargeCooldown = null!; TowerCanOvercharge = null!;
+            TowerSynergyId = null!; TowerSynergyMultiplier = null!;
+            TowerIsChronoTower = null!; TowerTimeFieldRadius = null!; TowerTimeScale = null!;
+            EnemyTimeScale = null!;
+            TowerIsAuraTower = null!; TowerAuraRadius = null!;
+            TowerAuraAttackSpeedBonus = null!; TowerAuraDamageBonus = null!;
+            TowerIsSilenced = null!; TowerSilenceTimer = null!; TowerSilenceSourceId = null!;
+            TowerIsDispelled = null!; TowerDispelTimer = null!; TowerDispelImmunityTimer = null!;
+            TowerIsCurseTower = null!; TowerCurseRadius = null!;
+            TowerCurseDmgReduction = null!; TowerCurseSpeedReduction = null!;
+            TowerCurseArmorReduction = null!; TowerCurseDmgTakenIncrease = null!;
+            TowerIsPullTower = null!; TowerPullStrength = null!; TowerPullRadius = null!;
+            TowerPullCooldown = null!; TowerPullTimer = null!; EnemyIsBeingPulled = null!;
+            TowerIsBleedTower = null!; TowerBleedStacksPerHit = null!; TowerBleedDmgPct = null!;
+            TowerBleedTickInterval = null!; TowerBleedMaxStacks = null!; TowerBleedDuration = null!;
+            TowerIsIncomeTower = null!; TowerGoldPerSecond = null!;
+            TowerIsConstructing = null!; TowerConstructionProgress = null!; TowerConstructionTime = null!;
+            TowerConstructionHP = null!; TowerConstructionMaxHP = null!;
+            TowerIsVulnerableDuringConstruction = null!;
+            TowerDemolishEffectRadius = null!; TowerDemolishDamage = null!; TowerDemolishEffectType = null!;
+            TowerIsMarkedForDemolish = null!;
+            TowerDemolishDotDamage = null!; TowerDemolishDotDuration = null!; TowerDemolishDotInterval = null!;
+            TowerDemolishStunDuration = null!;
+            TowerLinkPartnerId = null!; TowerLinkComboType = null!;
+            TowerLinkCooldown = null!; TowerLinkDamageBonus = null!;
+            TowerFacingAngle = null!; TowerTurnRate = null!;
+            TowerExperience = null!; TowerMasteryLevel = null!; TowerKillCount = null!;
+            TowerIsMobile = null!; TowerMoveSpeed = null!; TowerPatrolPathId = null!;
+            TowerPatrolWaypointIndex = null!; TowerPatrolDirection = null!;
+            TowerPatrolAttackSpeedPenalty = null!;
+            ObstacleActive = null!; ObstacleHealth = null!; ObstacleMaxHealth = null!;
+            ObstacleX = null!; ObstacleY = null!; ObstacleType = null!;
+            HazardZoneActive = null!; HazardZoneX = null!; HazardZoneY = null!;
+            HazardZoneRadius = null!; HazardZoneMaxRadius = null!;
+            HazardZoneType = null!; HazardZoneDuration = null!;
+            HazardZoneDamagePerSec = null!; HazardZoneOwnerTowerId = null!;
+            CorpseEffectActive = null!; CorpseEffectX = null!; CorpseEffectY = null!;
+            CorpseEffectType = null!; CorpseEffectRadius = null!; CorpseEffectDuration = null!;
+            CorpseEffectDamagePerTick = null!; CorpseEffectSlowAmount = null!;
+            CorpseEffectTickTimer = null!; CorpseEffectTickInterval = null!;
+            CorpseX = null!; CorpseY = null!; CorpseMonsterType = null!;
+            CorpseOwnerId = null!; CorpseHealth = null!; CorpseDeathTime = null!;
+            CorpseActive = null!; CorpseReanimated = null!;
+            SkillName = null!; SkillDamageMultiplier = null!;
+            SkillAreaWidth = null!; SkillAreaHeight = null!;
+            SkillAttackRange = null!; SkillCooldown = null!; SkillCurrentCooldown = null!;
+            AbilityInstances = null!; AbilityCount = null!;
+            ActiveEffects = null!; ActiveEffectCount = null!;
+            _enemyIndexInList = null!; _towerIndexInList = null!;
+        }
+
+        // IDisposable pattern — prevent double-dispose
+        private bool _disposed = false;
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
         }
     }
 }
