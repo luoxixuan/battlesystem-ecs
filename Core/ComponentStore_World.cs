@@ -97,6 +97,39 @@ namespace BattleSystemECS.Core
         public float[] RandomEventParam = new float[MAX_PLAYERS];
         // RandomEventParam2: second event-specific parameter
         public float[] RandomEventParam2 = new float[MAX_PLAYERS];
+
+        // ==================== Wind / Air Push System 组件（SOA）====================
+        // Global wind: constant wind direction and strength affecting all enemies on the map.
+        // WindDirection: angle in radians (0 = East, PI/2 = North, PI = West, 3PI/2 = South)
+        public float[] GlobalWindDirection = new float[MAX_PLAYERS];
+        // GlobalWindStrength: multiplier applied to enemy movement per frame (0.0-2.0, 1.0 = no wind)
+        // Values < 1.0 slow enemies down, values > 1.0 speed them up.
+        public float[] GlobalWindStrength = new float[MAX_PLAYERS];
+        // GlobalWindActive: true when global wind is currently applied
+        public bool[] GlobalWindActive = new bool[MAX_PLAYERS];
+        // GlobalWindDuration: remaining seconds for time-limited wind (-1 = permanent)
+        public float[] GlobalWindDuration = new float[MAX_PLAYERS];
+        // GlobalWindGustTimer: countdown to next gust event (for gusty wind patterns)
+        public float[] GlobalWindGustTimer = new float[MAX_PLAYERS];
+        // GlobalWindGustStrength: bonus strength applied during a gust (0 = no gust)
+        public float[] GlobalWindGustStrength = new float[MAX_PLAYERS];
+        // GlobalWindGustInterval: seconds between gust events (for gusty pattern)
+        public float[] GlobalWindGustInterval = new float[MAX_PLAYERS];
+
+        // Local wind sources: tower-created wind zones with position and radius.
+        // MAX_WIND_SOURCES: circular buffer size for tower wind effects.
+        public const int MAX_WIND_SOURCES = 200;
+        public bool[] WindSourceActive = new bool[MAX_WIND_SOURCES];
+        public float[] WindSourceX = new float[MAX_WIND_SOURCES];
+        public float[] WindSourceY = new float[MAX_WIND_SOURCES];
+        public float[] WindSourceRadius = new float[MAX_WIND_SOURCES];       // influence radius
+        public float[] WindSourceDirection = new float[MAX_WIND_SOURCES];   // angle in radians
+        public float[] WindSourceStrength = new float[MAX_WIND_SOURCES];    // push force multiplier
+        public float[] WindSourceDuration = new float[MAX_WIND_SOURCES];    // seconds remaining
+        public int[] WindSourceOwnerPlayer = new int[MAX_WIND_SOURCES];      // player who owns this wind source
+        public int[] WindSourceTowerId = new int[MAX_WIND_SOURCES];          // tower that created this wind (-1 = environmental)
+        private int _nextWindSourceId = 0;
+        private int _activeWindSourceCount = 0;
         // ==================== Ascension/Difficulty Modifier 组件 ====================
         // AscensionModifierStacks: tracks stack count for each ascension modifier (up to 64 unique modifiers)
         public int[] AscensionModifierStacks = new int[64];
@@ -545,6 +578,92 @@ namespace BattleSystemECS.Core
             if (count < 0) count = 0;
             if (count > MAX_ACTIVE_EFFECTS_PER_ENTITY) count = MAX_ACTIVE_EFFECTS_PER_ENTITY;
             ActiveEffectCount[entityId] = count;
+        }
+
+        // ==================== Wind Source 管理方法 ====================
+        /// <summary>Add a wind source at the given position with specified parameters.</summary>
+        public int AddWindSource(float x, float y, float radius, float direction, float strength, float duration, int ownerPlayer, int towerId = -1)
+        {
+            int sourceId = -1;
+            lock (activeIdsLock)
+            {
+                for (int i = 0; i < MAX_WIND_SOURCES; i++)
+                {
+                    int candidateId = (_nextWindSourceId + i) % MAX_WIND_SOURCES;
+                    if (!WindSourceActive[candidateId])
+                    {
+                        sourceId = candidateId;
+                        _nextWindSourceId = (candidateId + 1) % MAX_WIND_SOURCES;
+                        break;
+                    }
+                }
+            }
+            if (sourceId < 0) return -1; // no free slots
+
+            WindSourceActive[sourceId] = true;
+            WindSourceX[sourceId] = x;
+            WindSourceY[sourceId] = y;
+            WindSourceRadius[sourceId] = radius;
+            WindSourceDirection[sourceId] = direction;
+            WindSourceStrength[sourceId] = strength;
+            WindSourceDuration[sourceId] = duration;
+            WindSourceOwnerPlayer[sourceId] = ownerPlayer;
+            WindSourceTowerId[sourceId] = towerId;
+            _activeWindSourceCount++;
+            return sourceId;
+        }
+
+        /// <summary>Remove a wind source by ID.</summary>
+        public void RemoveWindSource(int sourceId)
+        {
+            if (sourceId < 0 || sourceId >= MAX_WIND_SOURCES) return;
+            if (!WindSourceActive[sourceId]) return;
+            WindSourceActive[sourceId] = false;
+            WindSourceX[sourceId] = 0f;
+            WindSourceY[sourceId] = 0f;
+            WindSourceRadius[sourceId] = 0f;
+            WindSourceDirection[sourceId] = 0f;
+            WindSourceStrength[sourceId] = 0f;
+            WindSourceDuration[sourceId] = 0f;
+            WindSourceOwnerPlayer[sourceId] = -1;
+            WindSourceTowerId[sourceId] = -1;
+            _activeWindSourceCount--;
+        }
+
+        /// <summary>Get the count of active wind sources.</summary>
+        public int GetActiveWindSourceCount() => _activeWindSourceCount;
+
+        /// <summary>Check if a wind source is still active (has duration remaining).</summary>
+        public bool IsWindSourceActive(int sourceId)
+        {
+            if (sourceId < 0 || sourceId >= MAX_WIND_SOURCES) return false;
+            return WindSourceActive[sourceId];
+        }
+
+        /// <summary>
+        /// Set global wind for a player. Overwrites any existing global wind.
+        /// </summary>
+        public void SetGlobalWind(int playerId, float direction, float strength, float duration, float gustInterval = 0f)
+        {
+            if (!IsValidPlayer(playerId)) return;
+            GlobalWindDirection[playerId] = direction;
+            GlobalWindStrength[playerId] = strength;
+            GlobalWindActive[playerId] = true;
+            GlobalWindDuration[playerId] = duration;
+            GlobalWindGustInterval[playerId] = gustInterval;
+            GlobalWindGustTimer[playerId] = gustInterval > 0f ? gustInterval : 0f;
+            GlobalWindGustStrength[playerId] = 0f;
+        }
+
+        /// <summary>Clear global wind for a player.</summary>
+        public void ClearGlobalWind(int playerId)
+        {
+            if (!IsValidPlayer(playerId)) return;
+            GlobalWindActive[playerId] = false;
+            GlobalWindStrength[playerId] = 0f;
+            GlobalWindDuration[playerId] = 0f;
+            GlobalWindGustTimer[playerId] = 0f;
+            GlobalWindGustStrength[playerId] = 0f;
         }
 
         // ==================== 科技树组件访问方法 ====================

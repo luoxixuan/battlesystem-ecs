@@ -4,12 +4,12 @@
 
 ---
 
-## 性能基准（2026-05-30, commit `62dee38`）
+## 性能基准（2026-05-30, commit `52ee5eb`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~4882 FPS**，400 帧，~0.20 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11596 FPS** |
+| **mode 5**（完整一局） | **~5018 FPS**，400 帧，~0.20 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~12001 FPS** |
 | **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5727 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
@@ -143,6 +143,7 @@ dotnet test
 
 ### 2026-05-30
 - **工程改进**：ComponentStore 按领域拆分为 5 个 partial 文件（Enemy/Tower/Player/World + 核心生命周期）；伤害公式测试补齐至 120 项
+- 风力/气流推动系统（WindSystem + ComponentStore_World.cs）；bench2: 12001, bench4: 5727, bench5: 5018
 - 敌人克隆/复制（EnemyCloneSystem）；bench2: 12155, bench4: 5701, bench5: 4714
 - 移动/巡逻塔（PatrolTowerSystem）；bench2: 9192, bench4: 4538, bench5: 4227
 - 战争迷雾/视野系统（FogOfWarSystem）；bench2: 9806, bench4: 5161, bench5: 4911
