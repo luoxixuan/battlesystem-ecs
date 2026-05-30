@@ -23,6 +23,7 @@ namespace BattleSystemECS.Systems
         private WeatherSystem _weatherSystem; // injected for weather effects
         private DayNightSystem _dayNightSystem; // injected for day/night cycle effects
         private HeatSystem _heatSystem; // injected for heat/overheat effects
+        private TowerEnergySystem _energySystem; // injected for energy system effects
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate arrays (zero-allocation — no List.Clear() version bump)
@@ -197,6 +198,14 @@ namespace BattleSystemECS.Systems
             _heatSystem = heatSystem;
         }
 
+        /// <summary>
+        /// Inject TowerEnergySystem reference for energy consumption effects on tower attacks.
+        /// </summary>
+        public void SetEnergySystem(TowerEnergySystem energySystem)
+        {
+            _energySystem = energySystem;
+        }
+
         private EnemyLifeLinkSystem _lifeLinkSystem;
 
         /// <summary>
@@ -330,6 +339,9 @@ namespace BattleSystemECS.Systems
 
                 // Overheat check: skip if tower is overheated (cannot fire)
                 if (_heatSystem != null && _heatSystem.IsOverheated(towerId)) return;
+
+                // Energy check: skip if tower doesn't have enough energy to fire
+                if (_energySystem != null && !_energySystem.HasEnergy(towerId)) return;
 
                 float tx = store.PositionX[towerId];
                 float ty = store.PositionY[towerId];
@@ -494,6 +506,12 @@ int bestTarget = -1;
                     if (_heatSystem != null)
                     {
                         _heatSystem.AccumulateHeat(towerId);
+                    }
+
+                    // Consume energy for towers that require energy to fire
+                    if (_energySystem != null)
+                    {
+                        _energySystem.ConsumeEnergy(towerId);
                     }
 
                     float baseDmg = store.TowerAttackDamage[towerId];

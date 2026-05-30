@@ -327,6 +327,20 @@ namespace BattleSystemECS.Core
         // TowerCanOverheat: true if this tower type supports overheat (from config)
         public bool[] TowerCanOverheat = new bool[MAX_ENTITIES];
 
+        // ==================== 塔能量/法力资源系统 (Tower Energy) ====================
+        // TowerEnergy: current energy level for each tower (0 = depleted, cannot fire if below TowerEnergyPerShot)
+        public float[] TowerEnergy = new float[MAX_ENTITIES];
+        // TowerMaxEnergy: maximum energy capacity (0 = no energy system)
+        public float[] TowerMaxEnergy = new float[MAX_ENTITIES];
+        // TowerEnergyPerShot: energy consumed per attack shot (0 = no energy cost)
+        public float[] TowerEnergyPerShot = new float[MAX_ENTITIES];
+        // TowerEnergyRegen: energy regeneration rate per second (passive recharge)
+        public float[] TowerEnergyRegen = new float[MAX_ENTITIES];
+        // TowerIsEnergyTower: true if this tower is an energy source that regenerates nearby towers' energy
+        public bool[] TowerIsEnergyTower = new bool[MAX_ENTITIES];
+        // TowerEnergyRegenRadius: radius within which this energy tower regenerates nearby towers
+        public float[] TowerEnergyRegenRadius = new float[MAX_ENTITIES];
+
         // ==================== 塔组件访问 ====================
 
         /// <summary>
@@ -446,6 +460,13 @@ namespace BattleSystemECS.Core
             TowerOverheatBonus[entityId] = 1f;
             TowerOverheatPenalty[entityId] = 0f;
             TowerCanOverheat[entityId] = false;
+            // Tower energy fields: default to no energy (0 capacity = no energy system)
+            TowerEnergy[entityId] = 0f;
+            TowerMaxEnergy[entityId] = 0f;
+            TowerEnergyPerShot[entityId] = 0f;
+            TowerEnergyRegen[entityId] = 0f;
+            TowerIsEnergyTower[entityId] = false;
+            TowerEnergyRegenRadius[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
@@ -535,6 +556,13 @@ namespace BattleSystemECS.Core
             TowerOverheatBonus[entityId] = 1f;
             TowerOverheatPenalty[entityId] = 0f;
             TowerCanOverheat[entityId] = false;
+            // Tower energy fields reset
+            TowerEnergy[entityId] = 0f;
+            TowerMaxEnergy[entityId] = 0f;
+            TowerEnergyPerShot[entityId] = 0f;
+            TowerEnergyRegen[entityId] = 0f;
+            TowerIsEnergyTower[entityId] = false;
+            TowerEnergyRegenRadius[entityId] = 0f;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
         }
         #endregion
