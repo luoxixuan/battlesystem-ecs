@@ -64,6 +64,7 @@ namespace BattleSystemECS.Core
         private PathModifierSystem pathModifierSystem; // 路径修改塔系统
         private RandomEventSystem randomEventSystem; // 随机事件/中期惊喜系统
         private ChronoTowerSystem chronoTowerSystem; // 时间操纵塔系统
+        private EnemyLifeLinkSystem enemyLifeLinkSystem; // 敌人生命链接/伤害分摊系统
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
@@ -215,6 +216,10 @@ logger.Log("      ComboSystem created successfully!");
             necromancerSystem = new NecromancerSystem(store, gameConfig, logger);
             logger.Log("      NecromancerSystem created successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating EnemyLifeLinkSystem (Life Link / Damage Sharing)... ");
+            enemyLifeLinkSystem = new EnemyLifeLinkSystem(store, gameConfig, logger);
+            logger.Log("      EnemyLifeLinkSystem created successfully!");
+
             logger.Log("[BOOTSTRAP]    - Creating ObjectiveSystem (Escort/Survival/Timed objectives)... ");
             objectiveSystem = new ObjectiveSystem(store, playerId);
             logger.Log("      ObjectiveSystem created successfully!");
@@ -365,10 +370,14 @@ logger.Log("      ComboSystem created successfully!");
             towerAttackSystem.SetTowerExperienceSystem(towerExperienceSystem);
             // Wire ProjectileSystem into TowerAttackSystem for fragment projectile spawning
             towerAttackSystem.SetProjectileSystem(projectileSystem);
+            // Wire EnemyLifeLinkSystem into TowerAttackSystem for damage-sharing link computation
+            towerAttackSystem.SetLifeLinkSystem(enemyLifeLinkSystem);
 
             logger.Log("[BOOTSTRAP]    - Creating PlayerTowerAttackSystem...");
             playerTowerAttackSystem = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig, techTreeSystem);
-            logger.Log("[BOOTSTRAP]      PlayerTowerAttackSystem created successfully!");
+            logger.Log("      PlayerTowerAttackSystem created successfully!");
+            // Wire EnemyLifeLinkSystem into PlayerTowerAttackSystem for damage-sharing link computation
+            playerTowerAttackSystem.SetLifeLinkSystem(enemyLifeLinkSystem);
 
             // 订阅波次完成事件 → 产出研究点数
             waveSpawningSystem.OnWaveComplete += () => techTreeSystem.OnWaveComplete();
@@ -427,6 +436,7 @@ logger.Log("      ComboSystem created successfully!");
             scheduler.PathModifier = pathModifierSystem;
             scheduler.RandomEvent = randomEventSystem;
             scheduler.ChronoTower = chronoTowerSystem;
+            scheduler.LifeLink = enemyLifeLinkSystem;
 
             // 初始化地形网格（方向二：地图地块系统）
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)

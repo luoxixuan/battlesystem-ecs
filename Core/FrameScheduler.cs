@@ -84,6 +84,7 @@ namespace BattleSystemECS.Core
         public TowerRelocateSystem? TowerRelocate { get; set; }
         public TowerConstructionSystem? Construction { get; set; }
         public GlobalSkillSystem? GlobalSkill { get; set; }
+        public EnemyLifeLinkSystem? LifeLink { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -186,6 +187,11 @@ namespace BattleSystemECS.Core
             // ── Phase 2.6: Necromancer — resurrect corpses as reanimated minions ──
             Necromancer?.SetTurn(turn, turn);  // second param = sim elapsed (turn = proxy for sim seconds)
             Necromancer?.Update(deltaTime);
+
+            // ── Phase 2.65: Enemy Life Link — establish damage-sharing links ─────
+            LifeLink?.SetTurn(turn);
+            LifeLink?.Update();
+            LifeLink?.DecrementCooldowns(effectiveDelta);
 
             // ── Phase 3: Movement ──────────────────────────────────────────
             Wound?.SetTurn(turn);
@@ -292,7 +298,10 @@ namespace BattleSystemECS.Core
             // ── Phase 9.5: Enemy Fission — spawn children after death resolve ─────
             EnemyFission?.Update();
 
-// ── Phase 9.6: Objective System — update objective state ─────────────
+            // ── Phase 9.55: Enemy Life Link break penalties ─────────────────────
+            LifeLink?.ResolveBreakPenalties();
+
+            // ── Phase 9.6: Objective System — update objective state ─────────────
             Objective?.Update(effectiveDelta, Phase);
             ResourceNode?.Update(effectiveDelta, Phase); // resource node production
             TowerIncome?.Update(effectiveDelta);         // income tower gold production

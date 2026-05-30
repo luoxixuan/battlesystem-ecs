@@ -117,9 +117,19 @@ namespace BattleSystemECS.Systems
         /// Update the cached wave difficulty multiplier when wave number changes.
         /// Call this when a new wave starts. Also called internally by SetTurn for initial setup.
         /// </summary>
-        public void SetWaveNumber(int waveNumber)
+public void SetWaveNumber(int waveNumber)
         {
             _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(waveNumber) : 1f;
+        }
+
+        private EnemyLifeLinkSystem _lifeLinkSystem;
+
+        /// <summary>
+        /// Inject EnemyLifeLinkSystem reference for damage-sharing link computation.
+        /// </summary>
+        public void SetLifeLinkSystem(EnemyLifeLinkSystem lifeLinkSystem)
+        {
+            _lifeLinkSystem = lifeLinkSystem;
         }
 
         public int GetCachedEnemyCount() => _activeEnemyList != null ? _activeEnemyList.Count : 0;
@@ -188,23 +198,40 @@ namespace BattleSystemECS.Systems
                 lock (_damageQueueLock) { _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage)); }
             });
 
-            // Phase 2 (serial): ping-pong swap — read from current bag, clear alternate for next frame
+// Phase 2 (serial): ping-pong swap — read from current bag, clear alternate for next frame
             int readIdx = _damageQueueIdx;
             int writeIdx = 1 - _damageQueueIdx;
             _damageQueueIdx = writeIdx;
-_damageQueue[writeIdx].Clear(); // clear the bag threads will write to next frame
+            _damageQueue[writeIdx].Clear(); // clear the bag threads will write to next frame
             foreach (var (enemyId, damage) in _damageQueue[readIdx])
             {
                 if (!store.EnemyActive[enemyId]) continue;
                 // Invulnerability check: skip damage if enemy is invulnerable
                 if (store.EnemyIsInvulnerable[enemyId]) continue;
                 float prevHealth = store.EnemyHealth[enemyId];
-                store.ApplyEnemyDamage(enemyId, damage);
+
+                // Life Link damage split: if enemy is linked, share damage with linked partner
+                float linkedDamage = 0f;
+                int linkedEnemyId = -1;
+                float finalDamage = damage;
+                if (_lifeLinkSystem != null && store.EnemyIsLinked[enemyId])
+                {
+                    (finalDamage, linkedDamage, linkedEnemyId) = _lifeLinkSystem.ComputeLinkedDamage(enemyId, damage);
+                }
+
+                store.ApplyEnemyDamage(enemyId, finalDamage);
+
+                // Life Link: apply shared damage to linked enemy
+                if (linkedEnemyId >= 0 && linkedDamage > 0f)
+                {
+                    ApplyLinkedDamage(linkedEnemyId, linkedDamage);
+                }
+
                 // Thorns: enemy reflects damage back to the player
                 float thornsRatio = store.EnemyThornsRatio[enemyId];
-                if (thornsRatio > 0f && damage > 0f)
+                if (thornsRatio > 0f && finalDamage > 0f)
                 {
-                    float thornsDamage = damage * thornsRatio;
+                    float thornsDamage = finalDamage * thornsRatio;
                     _thornsQueue[_thornsQueueIdx].Add(thornsDamage);
                 }
                 if (store.EnemyHealth[enemyId] <= 0f && prevHealth > 0f)
@@ -219,6 +246,36 @@ _damageQueue[writeIdx].Clear(); // clear the bag threads will write to next fram
             foreach (float thornsDamage in _thornsQueue[thornsReadIdx])
             {
                 store.DecreasePlayerHealth(playerId, thornsDamage);
+            }
+        }
+
+        /// <summary>
+        /// Apply life link shared damage to a linked enemy.
+        /// The linked enemy takes full damage (no further splitting — links are not recursive).
+        /// </summary>
+        private void ApplyLinkedDamage(int linkedEnemyId, float linkedDamage)
+        {
+            if (linkedEnemyId < 0 || linkedDamage <= 0f) return;
+            if (!store.EnemyActive[linkedEnemyId]) return;
+
+            // Apply damage resistance for the linked enemy
+            float resist = store.EnemyDamageResistance[linkedEnemyId];
+            float finalLinkedDmg = resist >= 1f ? 0f : linkedDamage * (1f - resist);
+
+            store.EnemyHealth[linkedEnemyId] -= finalLinkedDmg;
+
+            // Thorns on linked enemy (if any)
+            float thornsRatio = store.EnemyThornsRatio[linkedEnemyId];
+            if (thornsRatio > 0f && finalLinkedDmg > 0f)
+            {
+                float thornsDamage = finalLinkedDmg * thornsRatio;
+                _thornsQueue[_thornsQueueIdx].Add(thornsDamage);
+            }
+
+            // Check if linked enemy dies from shared damage
+            if (store.EnemyHealth[linkedEnemyId] <= 0f)
+            {
+                store.QueueEnemyDeath(linkedEnemyId, playerId);
             }
         }
     }

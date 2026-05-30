@@ -447,6 +447,21 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // EnemyMorphTriggered: set to true when trigger condition is met (consumed at morph execution)
         public bool[] EnemyMorphTriggered = new bool[MAX_ENTITIES];
 
+        // ==================== 敌人生命链接 / Life Link (Damage Sharing, SOA) ====================
+        // EnemyIsLifeLinker: true if this enemy is a Life Link master (can establish links with others)
+        public bool[] EnemyIsLifeLinker = new bool[MAX_ENTITIES];
+        // EnemyLifeLinkDefId: index into GameConfig.LifeLinkDefs (-1 = none, 0+ = active link definition)
+        public int[] EnemyLifeLinkDefId = new int[MAX_ENTITIES];
+        // EnemyLinkedEnemyId: the entity ID this enemy is linked to (-1 = none, -2 = is link master with no target)
+        // For link master: stores primary target; for linked enemy: stores the master ID
+        public int[] EnemyLinkedEnemyId = new int[MAX_ENTITIES];
+        // EnemyLifeLinkRatio: fraction of incoming damage shared with linked enemy (e.g. 0.5 = 50/50 split)
+        public float[] EnemyLifeLinkRatio = new float[MAX_ENTITIES];
+        // EnemyLifeLinkCooldownLeft: remaining cooldown in turns before this LifeLinker can link again
+        public float[] EnemyLifeLinkCooldownLeft = new float[MAX_ENTITIES];
+        // EnemyIsLinked: true if this enemy has an active Life Link (either as master or slave)
+        public bool[] EnemyIsLinked = new bool[MAX_ENTITIES];
+
         // ==================== 路径分叉 / 路点系统字段（SOA） ====================
         // EnemyPathId: which path this enemy is assigned to (-1 = no path, use default straight movement)
         // 0 = default (straight Y-axis), 1 = fork_left, 2 = fork_right, 3 = ring
@@ -1300,7 +1315,14 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
                 // Invulnerable phase fields
                 EnemyIsInvulnerable[entityId] = false;
                 EnemyInvulnerablePhaseName[entityId] = null;
-                // Freeze fields (shared with stun — no separate fields needed, cleanup via StunDurationLeft/StunFlag above)
+// Freeze fields (shared with stun — no separate fields needed, cleanup via StunDurationLeft/StunFlag above)
+                // Life Link fields (shared damage link)
+                EnemyIsLifeLinker[entityId] = false;
+                EnemyLifeLinkDefId[entityId] = -1;
+                EnemyLinkedEnemyId[entityId] = -1;
+                EnemyLifeLinkRatio[entityId] = 0f;
+                EnemyLifeLinkCooldownLeft[entityId] = 0f;
+                EnemyIsLinked[entityId] = false;
             }
 
             if (wasTower)

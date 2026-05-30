@@ -461,6 +461,32 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Enemy Life Link definition — loaded from life_link.json.
+    /// When a monster with life link dies, it establishes a bidirectional damage-sharing
+    /// link with a nearby ally. Linked enemies split incoming damage.
+    /// </summary>
+    public class LifeLinkDef
+    {
+        public string LifeLinkId { get; set; } = "";
+        // Source monster type that can establish life links (e.g., "SoulBinder")
+        public string SourceMonsterType { get; set; } = "";
+        // Maximum number of links this enemy can have at once (0 = no linking)
+        public int MaxLinks { get; set; } = 1;
+        // Damage sharing ratio (0.0-1.0): fraction of incoming damage shared with linked enemy
+        // e.g. 0.5 = 50% of damage goes to linked enemy, 50% stays on target
+        // e.g. 0.3 = 30% of damage shared, 70% stays on target
+        public float DamageShareRatio { get; set; } = 0.5f;
+        // Link range in world units: only enemies within this range can be linked
+        public float LinkRange { get; set; } = 3f;
+        // Cooldown in turns between link attempts (0 = no cooldown, always tries to link)
+        public float LinkCooldown { get; set; } = 5f;
+        // If true, when link master dies, linked enemy also takes damage (break penalty)
+        public bool BreakPenalty { get; set; } = true;
+        // Damage fraction applied to linked enemy when master dies (e.g. 0.25 = 25% of master's current HP)
+        public float BreakPenaltyDamageFraction { get; set; } = 0.25f;
+    }
+
+    /// <summary>
     /// Enemy spawner nest structure definition — loaded from nests.json (referenced in level configs).
     /// Nests are static structures that periodically spawn minions at their location.
     /// Unlike WaveSpawning (time-based), nests produce continuously and can be destroyed.
@@ -963,6 +989,25 @@ namespace BattleSystemECS.Config
 
         // Enemy fission definitions (loaded from enemy_fission.json)
         public FissionDef[] FissionDefs { get; set; } = Array.Empty<FissionDef>();
+
+        // Enemy life link definitions (loaded from life_link.json)
+        public LifeLinkDef[] LifeLinkDefs { get; set; } = Array.Empty<LifeLinkDef>();
+
+        // Look up a life link def by its LifeLinkId
+        public LifeLinkDef GetLifeLinkDef(string lifeLinkId)
+        {
+            return LifeLinkDefs.FirstOrDefault(l => l.LifeLinkId == lifeLinkId);
+        }
+
+        // Get life link def index by source monster type (returns -1 if none)
+        public int GetLifeLinkDefIdBySourceType(string monsterType)
+        {
+            for (int i = 0; i < LifeLinkDefs.Length; i++)
+            {
+                if (LifeLinkDefs[i].SourceMonsterType == monsterType) return i;
+            }
+            return -1;
+        }
 
         // Nest / spawner structure definitions (loaded from nests.json)
         public NestDef[] NestDefs { get; set; } = Array.Empty<NestDef>();

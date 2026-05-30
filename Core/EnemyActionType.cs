@@ -27,6 +27,7 @@ namespace BattleSystemECS.Components
         Land = 17,      // 着陆：飞行敌人着陆变为地面单位
         Burrow = 18,    // 钻地：敌人进入地下，不可被选中
         Emerge = 19,    // 出土：敌人从地下钻出，可造成 AoE 伤害
-        Resurrect = 20  // 复活：亡灵法师复活附近尸体为次级亡灵
+        Resurrect = 20,  // 复活：亡灵法师复活附近尸体为次级亡灵
+        EstablishLink = 21  // 建立生命链接：与附近敌人建立生命链接
     }
 }

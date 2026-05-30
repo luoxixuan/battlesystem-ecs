@@ -187,6 +187,16 @@ namespace BattleSystemECS.Systems
             _dayNightSystem = dayNight;
         }
 
+        private EnemyLifeLinkSystem _lifeLinkSystem;
+
+        /// <summary>
+        /// Inject EnemyLifeLinkSystem reference for damage-sharing link computation.
+        /// </summary>
+        public void SetLifeLinkSystem(EnemyLifeLinkSystem lifeLinkSystem)
+        {
+            _lifeLinkSystem = lifeLinkSystem;
+        }
+
         public void SetTurn(int turn)
         {
             _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
@@ -649,7 +659,19 @@ int bestTarget = -1;
                 {
                     ResolveVanguardDamageTransfer(enemyId, finalDmg, vanguardTransfer);
                 }
+                // Life Link damage split: if enemy is linked, share damage with linked partner
+                float linkedDamage = 0f;
+                int linkedEnemyId = -1;
+                if (_lifeLinkSystem != null && store.EnemyIsLinked[enemyId])
+                {
+                    (finalDmg, linkedDamage, linkedEnemyId) = _lifeLinkSystem.ComputeLinkedDamage(enemyId, finalDmg);
+                }
                 store.EnemyHealth[enemyId] -= finalDmg;
+                // Life Link: apply shared damage to linked enemy
+                if (linkedEnemyId >= 0 && linkedDamage > 0f)
+                {
+                    ApplyLinkedDamage(linkedEnemyId, linkedDamage, playerId);
+                }
                 // Thorns: enemy reflects damage back to the player (tower attacker)
                 float thornsRatio = store.EnemyThornsRatio[enemyId];
                 if (thornsRatio > 0f && finalDmg > 0f)
@@ -863,6 +885,38 @@ int bestTarget = -1;
                     store.QueueEnemyDeath(vanguardId, store.PlayerEntityId);
                 }
                 return; // only one vanguard shields each enemy (first match wins)
+            }
+        }
+
+        /// <summary>
+        /// Apply life link shared damage to a linked enemy.
+        /// The linked enemy takes full damage (no further splitting — links are not recursive).
+        /// Break penalties are handled by EnemyLifeLinkSystem.ResolveBreakPenalties() post death.
+        /// </summary>
+        private void ApplyLinkedDamage(int linkedEnemyId, float linkedDamage, int playerId)
+        {
+            if (linkedEnemyId < 0 || linkedDamage <= 0f) return;
+            if (!store.EnemyActive[linkedEnemyId]) return;
+
+            // Apply damage resistance for the linked enemy
+            float resist = store.EnemyDamageResistance[linkedEnemyId];
+            float finalLinkedDmg = resist >= 1f ? 0f : linkedDamage * (1f - resist);
+
+            store.EnemyHealth[linkedEnemyId] -= finalLinkedDmg;
+
+            // Thorns on linked enemy (if any — rare but possible)
+            float thornsRatio = store.EnemyThornsRatio[linkedEnemyId];
+            if (thornsRatio > 0f && finalLinkedDmg > 0f)
+            {
+                float thornsDamage = finalLinkedDmg * thornsRatio;
+                lock (_thornsQueueLock) { _thornsQueue[_thornsQueueIdx].Add((playerId, thornsDamage)); }
+            }
+
+            // Check if linked enemy dies from shared damage
+            if (store.EnemyHealth[linkedEnemyId] <= 0f)
+            {
+                store.QueueEnemyDeath(linkedEnemyId, playerId);
+                store.QueueTowerKill(linkedEnemyId, playerId, -1); // towerId=-1 (shared damage has no tower)
             }
         }
 
