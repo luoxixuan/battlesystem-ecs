@@ -6140,5 +6140,12 @@
                "Cooldown": 30.0,
                "ManaCost": 20.0,
                "MinManaRequired": 10.0
+           },
+           "PositionalDamage": {
+               "FlankAngleDegrees": 60.0,
+               "BackstabAngleDegrees": 120.0,
+               "FlankDamageMultiplier": 1.25,
+               "BackstabDamageMultiplier": 1.50
            }
        }
+   }

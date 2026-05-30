@@ -150,18 +150,26 @@ namespace BattleSystemECS.Systems
 
                     store.PositionX[enemyId] = x;
                     store.PositionY[enemyId] = y;
+                    // Update move direction for backstab calculation (waypoint-following enemy)
+                    // Normalize dx/dy only if non-zero; otherwise keep existing direction
+                    float len = (float)Math.Sqrt(dx * dx + dy * dy);
+                    if (len > 0.001f)
+                    {
+                        store.EnemyMoveDirX[enemyId] = dx / len;
+                        store.EnemyMoveDirY[enemyId] = dy / len;
+                    }
                     return; // waypoint movement replaces enum-based movement
                 }
 
                 // Default: move toward player (direction = -1, toward y=0)
-                int direction = -1;
+                int dirEnum = -1;
 
 // Simplified switch: only Retreat needs special handling.
                 // MoveToTarget, None, and default all fall through to direction = -1.
-                switch (actionEnum)
+switch (actionEnum)
                 {
                     case EnemyActionType.Retreat:
-                        direction = 1;
+                        dirEnum = 1;
                         break;
 
                     case EnemyActionType.Dodge:
@@ -171,19 +179,19 @@ namespace BattleSystemECS.Systems
 
                     case EnemyActionType.Fear:
                         // Fear: run away from player (direction = +1, toward y=max)
-                        direction = 1;
+                        dirEnum = 1;
                         break;
 
                     case EnemyActionType.Taunt:
                         // Taunt: attack the forced target instead of moving.
                         // Skip movement this frame. TowerAttackSystem handles the taunt target attack.
-                        direction = 0; // zero movement
+                        dirEnum = 0; // zero movement
                         break;
 
                     case EnemyActionType.Charm:
                         // Charm: attack nearest enemy instead of moving.
                         // Skip movement this frame. Find nearest enemy and attack it.
-                        direction = 0;
+                        dirEnum = 0;
                         break;
 
                     default:
@@ -191,7 +199,15 @@ namespace BattleSystemECS.Systems
                         break;
                 }
 
-                store.PositionY[enemyId] = y + direction * moveSpeed;
+                store.PositionY[enemyId] = y + dirEnum * moveSpeed;
+                // Update move direction for backstab calculation (default Y-axis movement)
+                // Direction: -1 = toward player (y decreases), +1 = away (y increases)
+                // Store normalized direction based on Y-axis movement
+                if (dirEnum != 0)
+                {
+                    store.EnemyMoveDirX[enemyId] = 0f;
+                    store.EnemyMoveDirY[enemyId] = (float)-dirEnum; // -1 when moving toward player, +1 when retreating
+                }
             });
         }
 

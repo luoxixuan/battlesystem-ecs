@@ -289,6 +289,14 @@ namespace BattleSystemECS.Core
         // EnemyDamageResistance: 0-1, reduces all damage taken (applied in TowerAttackSystem and SkillSystem)
         public float[] EnemyDamageResistance = new float[MAX_ENTITIES];
 
+        // ==================== 敌人移动方向（背刺系统 SOA）====================
+        // EnemyMoveDirX: normalized X component of enemy's current movement direction
+        // EnemyMoveDirY: normalized Y component of enemy's current movement direction
+        // Used for backstab/flank positional damage bonus (TowerAttackSystem).
+        // Default (0,0) = no direction (stationary or unknown heading).
+        public float[] EnemyMoveDirX = new float[MAX_ENTITIES];
+        public float[] EnemyMoveDirY = new float[MAX_ENTITIES];
+
         // ==================== 肉盾/前锋掩护组件（SOA）====================
         // EnemyIsVanguard: true if this enemy is a vanguard (shield bearer) protecting allies behind it
         public bool[] EnemyIsVanguard = new bool[MAX_ENTITIES];
