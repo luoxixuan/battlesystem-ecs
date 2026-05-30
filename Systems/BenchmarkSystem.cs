@@ -89,11 +89,11 @@ namespace BattleSystemECS.Systems
 
             // Place towers — use AddTower so ActiveTowerIds is populated (matching real game flow)
             int t1 = store.CreateEntity();
-            store.AddTower(t1, "弓箭塔", 15f, 3, 1f, 1, 50f);
+            store.AddTower(t1, TowerType.Basic, 15f, 3, 1f, 1, 50f);
             store.PositionX[t1] = 3f; store.PositionY[t1] = 15f;
 
             int t2 = store.CreateEntity();
-            store.AddTower(t2, "魔法塔", 25f, 5, 1f, 1, 100f);
+            store.AddTower(t2, TowerType.Sniper, 25f, 5, 1f, 1, 100f);
             store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
 
             int frames = 500;
@@ -371,11 +371,11 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             }
 
             int t1 = store.CreateEntity();
-            store.AddTower(t1, "弓箭塔", 15f, 3, 1f, 1, 50f);
+            store.AddTower(t1, TowerType.Basic, 15f, 3, 1f, 1, 50f);
             store.PositionX[t1] = 3f; store.PositionY[t1] = 15f;
 
             int t2 = store.CreateEntity();
-            store.AddTower(t2, "魔法塔", 25f, 5, 1f, 1, 100f);
+            store.AddTower(t2, TowerType.Sniper, 25f, 5, 1f, 1, 100f);
             store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
 
             var enemyAbility = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
@@ -519,11 +519,11 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
             // 放塔（对齐交互式游戏）
             int t1 = store.CreateEntity();
             store.PositionX[t1] = 2f; store.PositionY[t1] = 5f;
-            store.AddTower(t1, "Basic", 15f, 3, 1.5f, 1, 100f);
+            store.AddTower(t1, TowerType.Basic, 15f, 3, 1.5f, 1, 100f);
 
             int t2 = store.CreateEntity();
             store.PositionX[t2] = 7f; store.PositionY[t2] = 12f;
-            store.AddTower(t2, "Sniper", 25f, 5, 0.8f, 1, 200f);
+            store.AddTower(t2, TowerType.Sniper, 25f, 5, 0.8f, 1, 200f);
 
             ConsoleLogger.EnableLog = false;
             var totalSw = Stopwatch.StartNew();

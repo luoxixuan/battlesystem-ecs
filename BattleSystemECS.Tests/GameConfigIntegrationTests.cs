@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Xunit;
+using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
@@ -59,7 +60,6 @@ namespace BattleSystemECS.Tests
             foreach (var tower in config.TowerTypes)
             {
                 Assert.False(string.IsNullOrEmpty(tower.Name), $"Tower missing Name");
-                Assert.False(string.IsNullOrEmpty(tower.Type), $"Tower {tower.Name} missing Type");
                 Assert.True(tower.Damage > 0, $"Tower {tower.Name} has invalid Damage: {tower.Damage}");
                 Assert.True(tower.Range >= 0, $"Tower {tower.Name} has invalid Range: {tower.Range}");
                 Assert.True(tower.AttackSpeed > 0, $"Tower {tower.Name} has invalid AttackSpeed: {tower.AttackSpeed}");

@@ -63,7 +63,7 @@ namespace BattleSystemECS.Core
                     AttackSpeed = _store.TowerAttackSpeed[towerId],
                     Range = _store.TowerRange[towerId],
                     TowerLevel = _store.TowerLevel[towerId],
-                    TowerType = _store.TowerType[towerId],
+                    TowerType = _store.TowerType[towerId].ToString(),
                     TowerFusionTier = _store.TowerFusionTier[towerId],
                     TowerShieldBreakBonus = _store.TowerShieldBreakBonus[towerId],
                     TowerAccuracy = _store.TowerAccuracy[towerId],

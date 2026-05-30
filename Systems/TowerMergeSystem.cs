@@ -1,4 +1,5 @@
 using System;
+using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 
@@ -51,8 +52,8 @@ namespace BattleSystemECS.Systems
             }
 
             // Check same type
-            string type1 = store.TowerType[tower1Id];
-            string type2 = store.TowerType[tower2Id];
+            TowerType type1 = store.TowerType[tower1Id];
+            TowerType type2 = store.TowerType[tower2Id];
             if (type1 != type2)
             {
                 logger.Log($"[MERGE] Merge failed: towers must be the same type (got {type1} and {type2})");

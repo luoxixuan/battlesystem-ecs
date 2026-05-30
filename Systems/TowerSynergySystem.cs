@@ -93,12 +93,13 @@ namespace BattleSystemECS.Systems
 
             foreach (var towerId in store.ActiveTowerIds)
             {
-                string type = store.TowerType[towerId];
-                if (string.IsNullOrEmpty(type)) continue;
+                TowerType type = store.TowerType[towerId];
+                if (type == TowerType.Basic) continue;
 
-                if (!_towersByType.ContainsKey(type))
-                    _towersByType[type] = new List<int>();
-                _towersByType[type].Add(towerId);
+                string typeStr = type.ToString();
+                if (!_towersByType.ContainsKey(typeStr))
+                    _towersByType[typeStr] = new List<int>();
+                _towersByType[typeStr].Add(towerId);
             }
         }
 

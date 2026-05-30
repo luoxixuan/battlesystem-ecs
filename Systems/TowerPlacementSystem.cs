@@ -70,7 +70,7 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Place a tower at the specified location (legacy overload, no debuff support).
         /// </summary>
-        public int PlaceTower(int x, int y, string type, float damage, int range, float speed, float cost)
+        public int PlaceTower(int x, int y, TowerType type, float damage, int range, float speed, float cost)
         {
             // 1. Check if position is valid
             if (x < 0 || x >= 10 || y < 0 || y >= 20)
@@ -101,7 +101,7 @@ namespace BattleSystemECS.Systems
             // Try to look up debuff params from gameConfig if available
             if (gameConfig != null)
             {
-                var tc = gameConfig.GetTowerConfig(type);
+                var tc = gameConfig.GetTowerConfig(type.ToString());
                 if (tc != null)
                 {
                     // Read tower's configured upgrade path, default to "standard"

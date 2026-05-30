@@ -89,7 +89,7 @@ namespace BattleSystemECS.Config
     public class TowerConfig
     {
         public string Name { get; set; }
-        public string Type { get; set; }
+        public TowerType Type { get; set; }
         public float Damage { get; set; }
         public int Range { get; set; }
         public float AttackSpeed { get; set; }
@@ -1158,7 +1158,7 @@ namespace BattleSystemECS.Config
             TowerTypes.Add(new TowerConfig
             {
                 Name = "Basic Tower",
-                Type = "Basic",
+                Type = TowerType.Basic,
                 Damage = 10f,
                 Range = 3,
                 AttackSpeed = 1f,
@@ -1172,7 +1172,7 @@ namespace BattleSystemECS.Config
             TowerTypes.Add(new TowerConfig
             {
                 Name = "Sniper Tower",
-                Type = "Sniper",
+                Type = TowerType.Sniper,
                 Damage = 25f,
                 Range = 8,
                 AttackSpeed = 0.5f,
@@ -1186,7 +1186,7 @@ namespace BattleSystemECS.Config
             TowerTypes.Add(new TowerConfig
             {
                 Name = "AOE Tower",
-                Type = "AOE",
+                Type = TowerType.AOE,
                 Damage = 8f,
                 Range = 2,
                 AttackSpeed = 1.5f,
@@ -1201,7 +1201,7 @@ namespace BattleSystemECS.Config
             TowerTypes.Add(new TowerConfig
             {
                 Name = "Frost Tower",
-                Type = "Frost",
+                Type = TowerType.Frost,
                 Damage = 6f,
                 Range = 3,
                 AttackSpeed = 1.2f,
@@ -1216,7 +1216,7 @@ namespace BattleSystemECS.Config
             TowerTypes.Add(new TowerConfig
             {
                 Name = "Stun Tower",
-                Type = "Stun",
+                Type = TowerType.Stun,
                 Damage = 8f,
                 Range = 3,
                 AttackSpeed = 0.8f,
@@ -1231,7 +1231,7 @@ namespace BattleSystemECS.Config
             TowerTypes.Add(new TowerConfig
             {
                 Name = "EMP Tower",
-                Type = "EMP",
+                Type = TowerType.EMP,
                 Damage = 10f,
                 Range = 4,
                 AttackSpeed = 0.6f,
@@ -1246,7 +1246,7 @@ namespace BattleSystemECS.Config
             TowerTypes.Add(new TowerConfig
             {
                 Name = "Tesla Coil",
-                Type = "Tesla",
+                Type = TowerType.Tesla,
                 Damage = 8f,
                 Range = 4,
                 AttackSpeed = 1.5f,
@@ -1420,7 +1420,7 @@ namespace BattleSystemECS.Config
 
         public TowerConfig GetTowerConfig(string type)
         {
-            return TowerTypes.Find(t => t.Type == type);
+            return TowerTypes.Find(t => t.Type.ToString() == type);
         }
 
         public BehaviorTreeDef GetBehaviorTree(string monsterType)

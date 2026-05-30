@@ -514,18 +514,19 @@ int bestTarget = -1;
                     if (_weatherDamageMult != 1f) baseDmg *= _weatherDamageMult;
 
                     // ── Tower type-specific mechanics ─────────────────────────────────────
-                    string towerType = store.TowerType[towerId] ?? "Basic";
+                    // ── Tower type-specific mechanics ─────────────────────────────────────
+                    TowerType towerType = store.TowerType[towerId];
 
                     switch (towerType)
                     {
-                        case "AOE":
+                        case TowerType.AOE:
                             // Damage + area splash (handled via upgrade special ability mechanism)
                             lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             // AOE towers naturally use splash — just mark the primary hit
                             // The splash resolution is handled in ResolveSplashDamage() if splash is set
                             break;
 
-                        case "Sniper":
+                        case TowerType.Sniper:
                             // High single-target damage + mark (bonus damage on next hit)
                             lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             // Apply mark debuff: next tower hit deals +20% damage
@@ -539,14 +540,13 @@ int bestTarget = -1;
                             }
                             break;
 
-                        case "Tesla":
+                        case TowerType.Tesla:
                             // Chain lightning: collect primary target for serial chain resolution.
                             // ResolveTeslaChainLightning() finds nearest neighbors and chains up to 3 hops at 70% decay.
-                            // This follows the two-phase pattern: parallel collect → serial chain logic.
                             lock (chainLock) { chainBag.Add((0, bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             break;
 
-                        case "Leech":
+                        case TowerType.Leech:
                             // Damage + lifesteal (heal player)
                             lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             float healAmount = baseDmg * LEECH_LIFESTEAL_RATE;
@@ -554,25 +554,25 @@ int bestTarget = -1;
                                 lock (healLock) { healBag.Add((store.PlayerEntityId, healAmount)); }
                             break;
 
-                        case "Frost":
+                        case TowerType.Frost:
                             // Damage + tower slow debuff (handled by debuff phase)
                             lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             break;
 
-                        case "Stun":
+                        case TowerType.Stun:
                             // High-stun tower: damage + stun roll in debuff phase
                             lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             break;
 
-                        case "EMP":
+                        case TowerType.EMP:
                             // EMP tower: damage + stun + slow (debuff phase)
                             lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             break;
 
-                        case "Firewall":
+                        case TowerType.Firewall:
                             // Damage + Firewall DoT (handled by debuff phase)
                             lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
@@ -732,7 +732,7 @@ int bestTarget = -1;
             {
                 if (!store.EnemyActive[enemyId]) continue;
 
-                string towerType = store.TowerType[towerId] ?? "Basic";
+                TowerType towerType = store.TowerType[towerId];
                 float stunChance = store.TowerStunChance[towerId];
                 float slowAmount = store.TowerSlowAmount[towerId];
                 float slowDuration = store.TowerSlowDuration[towerId];
@@ -746,7 +746,7 @@ int bestTarget = -1;
 
                 switch (towerType)
                 {
-                    case "Firewall":
+                    case TowerType.Firewall:
                         // Firewall: apply burn DoT (continuous damage over time via BuffSystem)
                         if (buffSystem != null && slowAmount > 0f && slowDuration > 0f)
                         {

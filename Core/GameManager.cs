@@ -589,8 +589,8 @@ logger.Log("      ComboSystem created successfully!");
 
                 // [测试] 自动部署防御塔（使用真实 TowerConfig.Type 名称，使 debuff 参数生效 — P1 修复）
                 logger.Log("[TEST] 自动部署防御塔...");
-                int towerId1 = towerPlacementSystem.PlaceTower(2, 5, "Basic", 15.0f, 3, 1.5f, 100f);
-                int towerId2 = towerPlacementSystem.PlaceTower(7, 12, "Sniper", 25.0f, 5, 0.8f, 200f);
+                int towerId1 = towerPlacementSystem.PlaceTower(2, 5, TowerType.Basic, 15.0f, 3, 1.5f, 100f);
+                int towerId2 = towerPlacementSystem.PlaceTower(7, 12, TowerType.Sniper, 25.0f, 5, 0.8f, 200f);
 
                 // [测试] 升级塔（使用真实分配的 ID）
                 logger.Log("[TEST] 尝试升级塔...");

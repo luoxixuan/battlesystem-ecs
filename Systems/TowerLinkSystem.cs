@@ -119,8 +119,7 @@ namespace BattleSystemECS.Systems
             for (int i = 0; i < count; i++)
             {
                 int towerIdA = activeTowerIds[i];
-                string typeA = store.TowerType[towerIdA] ?? "";
-                if (string.IsNullOrEmpty(typeA)) continue;
+                TowerType typeA = store.TowerType[towerIdA];
 
                 float xA = store.PositionX[towerIdA];
                 float yA = store.PositionY[towerIdA];
@@ -128,8 +127,7 @@ namespace BattleSystemECS.Systems
                 for (int j = i + 1; j < count; j++)
                 {
                     int towerIdB = activeTowerIds[j];
-                    string typeB = store.TowerType[towerIdB] ?? "";
-                    if (string.IsNullOrEmpty(typeB)) continue;
+                    TowerType typeB = store.TowerType[towerIdB];
 
                     // Check if this pair matches any link definition
                     for (int k = 0; k < _linkDefs.Count; k++)
@@ -164,12 +162,12 @@ namespace BattleSystemECS.Systems
             }
         }
 
-        private bool IsPairMatch(string typeA, string typeB, string[] requiredTypes)
+        private bool IsPairMatch(TowerType typeA, TowerType typeB, string[] requiredTypes)
         {
             if (requiredTypes.Length < 2) return false;
             // Bidirectional: (A, B) or (B, A) must match requiredTypes
-            return (typeA == requiredTypes[0] && typeB == requiredTypes[1]) ||
-                   (typeA == requiredTypes[1] && typeB == requiredTypes[0]);
+            return (typeA.ToString() == requiredTypes[0] && typeB.ToString() == requiredTypes[1]) ||
+                   (typeA.ToString() == requiredTypes[1] && typeB.ToString() == requiredTypes[0]);
         }
 
         private int ComputeGridDistance(float x1, float y1, float x2, float y2)
@@ -294,9 +292,9 @@ namespace BattleSystemECS.Systems
             float dotBonus = link.ComboEffect.DotDamageBonus;
 
             // Find Firewall tower (A or B)
-            string typeA = store.TowerType[towerIdA] ?? "";
-            string typeB = store.TowerType[towerIdB] ?? "";
-            int firewallId = typeA == "Firewall" ? towerIdA : (typeB == "Firewall" ? towerIdB : -1);
+            TowerType typeA = store.TowerType[towerIdA];
+            TowerType typeB = store.TowerType[towerIdB];
+            int firewallId = typeA == TowerType.Firewall ? towerIdA : (typeB == TowerType.Firewall ? towerIdB : -1);
             if (firewallId == -1) return;
 
             // Buff the Firewall tower's DoT bonus (stored as link damage bonus)

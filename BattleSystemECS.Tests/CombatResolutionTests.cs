@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Xunit;
+using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
@@ -22,7 +23,7 @@ namespace BattleSystemECS.Tests
             store.AddPlayer(playerId, 5f, 5f, 10f, 1);
 
             int towerId = store.CreateEntity();
-            store.AddTower(towerId, "Arrow", 5, 3, 1f, 1, 50f);
+            store.AddTower(towerId, TowerType.Basic, 5, 3, 1f, 1, 50f);
             store.PositionActive[towerId] = true;
 
             Assert.Contains(towerId, store.ActiveTowerIds);
@@ -104,7 +105,7 @@ namespace BattleSystemECS.Tests
             store.AddPlayer(playerId, 5f, 5f, 10f, 1);
 
             int towerId = store.CreateEntity();
-            store.AddTower(towerId, "Arrow", 5, 3, 1f, 1, 50f);
+            store.AddTower(towerId, TowerType.Basic, 5, 3, 1f, 1, 50f);
             store.PositionActive[towerId] = true;
 
             Assert.Contains(towerId, store.ActiveTowerIds);
@@ -150,12 +151,12 @@ namespace BattleSystemECS.Tests
 
             // Place two towers within range
             int t1 = store.CreateEntity();
-            store.AddTower(t1, "Arrow", 20, 10, 1f, 1, 50f);
+            store.AddTower(t1, TowerType.Basic, 20, 10, 1f, 1, 50f);
             store.PositionX[t1] = 5f; store.PositionY[t1] = 1f;
             store.PositionActive[t1] = true;
 
             int t2 = store.CreateEntity();
-            store.AddTower(t2, "Arrow", 20, 10, 1f, 1, 50f);
+            store.AddTower(t2, TowerType.Basic, 20, 10, 1f, 1, 50f);
             store.PositionX[t2] = 5f; store.PositionY[t2] = 2f;
             store.PositionActive[t2] = true;
 

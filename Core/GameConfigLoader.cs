@@ -620,7 +620,7 @@ namespace BattleSystemECS.Config
         {
             var tower = new TowerConfig();
             tower.Name = ExtractString(json, "Name");
-            tower.Type = ExtractString(json, "Type");
+            tower.Type = ParseTowerType(ExtractString(json, "Type"));
             tower.Damage = ExtractFloat(json, "Damage");
             tower.Range = ExtractInt(json, "Range");
             tower.AttackSpeed = ExtractFloat(json, "AttackSpeed");
@@ -1501,6 +1501,24 @@ namespace BattleSystemECS.Config
             {
                 renderer.Log("[SUMMON] Failed to load summon defs: " + ex.Message);
             }
+        }
+
+        private static TowerType ParseTowerType(string type)
+        {
+            if (string.IsNullOrEmpty(type)) return TowerType.Basic;
+            return type switch
+            {
+                "Basic"    => TowerType.Basic,
+                "AOE"      => TowerType.AOE,
+                "Sniper"   => TowerType.Sniper,
+                "Tesla"    => TowerType.Tesla,
+                "Leech"    => TowerType.Leech,
+                "Frost"    => TowerType.Frost,
+                "Stun"     => TowerType.Stun,
+                "EMP"      => TowerType.EMP,
+                "Firewall" => TowerType.Firewall,
+                _          => TowerType.Basic
+            };
         }
     }
 }

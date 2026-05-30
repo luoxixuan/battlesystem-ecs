@@ -1,5 +1,6 @@
 using System;
 using Xunit;
+using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
@@ -76,7 +77,7 @@ namespace BattleSystemECS.Tests
 
             // Place a tower that kills enemies immediately
             int towerId = store.CreateEntity();
-            store.AddTower(towerId, "Arrow", 5, 10, 1f, 1, 999f);
+            store.AddTower(towerId, TowerType.Basic, 5, 10, 1f, 1, 999f);
             store.PositionX[towerId] = 5f;
             store.PositionY[towerId] = 1f;
             store.PositionActive[towerId] = true;

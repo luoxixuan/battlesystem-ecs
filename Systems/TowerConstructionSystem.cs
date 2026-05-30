@@ -1,4 +1,5 @@
 using System;
+using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 
 namespace BattleSystemECS.Systems
@@ -68,7 +69,7 @@ namespace BattleSystemECS.Systems
                 if (store.TowerConstructionProgress[towerId] >= 1f)
                 {
                     store.TowerIsConstructing[towerId] = false;
-                    string towerType = store.TowerType[towerId] ?? "Unknown";
+                    TowerType towerType = store.TowerType[towerId];
                     logger.Log($"[CONSTRUCTION] 塔 #{towerId} ({towerType}) 建造完成");
                 }
             }
@@ -94,7 +95,7 @@ namespace BattleSystemECS.Systems
             if (currentHP <= 0f)
             {
                 // Construction failed — destroy the tower
-                string towerType = store.TowerType[towerId] ?? "Unknown";
+                TowerType towerType = store.TowerType[towerId];
                 logger.Log($"[CONSTRUCTION] 塔 #{towerId} ({towerType}) 建造失败：HP 耗尽");
                 store.DestroyEntity(towerId);
             }

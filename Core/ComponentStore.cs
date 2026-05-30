@@ -602,7 +602,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public DamageType[] TowerDamageType = new DamageType[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
-        public string[] TowerType = new string[MAX_ENTITIES];
+        public TowerType[] TowerType = new TowerType[MAX_ENTITIES];
         public float[] TowerAttackDamage = new float[MAX_ENTITIES];
         public int[] TowerRange = new int[MAX_ENTITIES];
         public float[] TowerAttackSpeed = new float[MAX_ENTITIES];
@@ -1362,7 +1362,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
                 lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
                 TowerActive[entityId] = false;
                 TowerTargetingMode[entityId] = Components.TowerTargetingMode.Nearest;
-                TowerType[entityId] = null;
+                TowerType[entityId] = Components.TowerType.Basic;
                 TowerAttackDamage[entityId] = 0f;
                 TowerRange[entityId] = 0;
                 TowerAttackSpeed[entityId] = 0f;
@@ -1689,19 +1689,19 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         /// <summary>
         /// Add a tower with default "standard" upgrade path.
         /// </summary>
-        public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost)
+        public void AddTower(int entityId, TowerType type, float damage, int range, float speed, int level, float cost)
             => AddTower(entityId, type, damage, range, speed, level, cost, "standard", 0f, 0f, 0f);
 
         /// <summary>
         /// Add a tower with a specific upgrade path.
         /// </summary>
-        public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost, string upgradePathId)
+        public void AddTower(int entityId, TowerType type, float damage, int range, float speed, int level, float cost, string upgradePathId)
             => AddTower(entityId, type, damage, range, speed, level, cost, upgradePathId, 0f, 0f, 0f);
 
         /// <summary>
         /// Add a tower with debuff parameters.
         /// </summary>
-        public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost, string upgradePathId, float stunChance, float slowAmount, float slowDuration, DamageType damageType = DamageType.Physical, float turnRate = 0f)
+        public void AddTower(int entityId, TowerType type, float damage, int range, float speed, int level, float cost, string upgradePathId, float stunChance, float slowAmount, float slowDuration, DamageType damageType = DamageType.Physical, float turnRate = 0f)
         {
             if (!IsValidEntity(entityId)) return;
             TowerType[entityId] = type;

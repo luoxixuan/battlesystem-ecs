@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Xunit;
+using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 
 namespace BattleSystemECS.Tests
@@ -37,7 +38,7 @@ namespace BattleSystemECS.Tests
             store.AddPlayer(playerId, 3f, 3f, 10f, 1);
 
             int towerId = store.CreateEntity();
-            store.AddTower(towerId, "Arrow", 5f, 3, 1f, 1, 50f);
+            store.AddTower(towerId, TowerType.Basic, 5f, 3, 1f, 1, 50f);
             store.AddPosition(towerId, 3f, 3f);
 
             Assert.Contains(towerId, store.ActiveTowerIds);
