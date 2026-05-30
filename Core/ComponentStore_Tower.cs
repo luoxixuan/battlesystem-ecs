@@ -341,6 +341,18 @@ namespace BattleSystemECS.Core
         // TowerEnergyRegenRadius: radius within which this energy tower regenerates nearby towers
         public float[] TowerEnergyRegenRadius = new float[MAX_ENTITIES];
 
+        // ==================== 塔光束/激光连续攻击系统 (Beam Tower) ====================
+        // TowerIsBeam: true if this tower fires a continuous beam (DPS-based, not projectile)
+        public bool[] TowerIsBeam = new bool[MAX_ENTITIES];
+        // TowerBeamDPS: damage per second for beam towers (continuous damage applied per frame)
+        public float[] TowerBeamDPS = new float[MAX_ENTITIES];
+        // TowerBeamChainCount: number of chain targets for beam towers (0 = no chain, max 3)
+        public int[] TowerBeamChainCount = new int[MAX_ENTITIES];
+        // TowerBeamChainDecay: damage decay per chain hop (0.7 = 70% of previous link's damage)
+        public float[] TowerBeamChainDecay = new float[MAX_ENTITIES];
+        // TowerBeamMaxRange: maximum range for beam targeting and chaining
+        public float[] TowerBeamMaxRange = new float[MAX_ENTITIES];
+
         // ==================== 塔组件访问 ====================
 
         /// <summary>
@@ -467,6 +479,12 @@ namespace BattleSystemECS.Core
             TowerEnergyRegen[entityId] = 0f;
             TowerIsEnergyTower[entityId] = false;
             TowerEnergyRegenRadius[entityId] = 0f;
+            // Beam tower fields: default to no beam (not a beam tower)
+            TowerIsBeam[entityId] = false;
+            TowerBeamDPS[entityId] = 0f;
+            TowerBeamChainCount[entityId] = 0;
+            TowerBeamChainDecay[entityId] = 1f;
+            TowerBeamMaxRange[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
@@ -563,6 +581,12 @@ namespace BattleSystemECS.Core
             TowerEnergyRegen[entityId] = 0f;
             TowerIsEnergyTower[entityId] = false;
             TowerEnergyRegenRadius[entityId] = 0f;
+            // Beam tower fields reset
+            TowerIsBeam[entityId] = false;
+            TowerBeamDPS[entityId] = 0f;
+            TowerBeamChainCount[entityId] = 0;
+            TowerBeamChainDecay[entityId] = 1f;
+            TowerBeamMaxRange[entityId] = 0f;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
         }
         #endregion

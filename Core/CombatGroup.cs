@@ -22,6 +22,7 @@ namespace BattleSystemECS.Core
         public Systems.PickupSystem? Pickup { get; set; }
         public Systems.ManaSystem? Mana { get; set; }
         public Systems.GlobalSkillSystem? GlobalSkill { get; set; }
+        public Systems.BeamTowerSystem? BeamTower { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -43,6 +44,7 @@ namespace BattleSystemECS.Core
             Pickup?.Update(deltaTime);
             Mana?.Update(deltaTime, isBuildPhase: false);
             GlobalSkill?.Update(deltaTime, isBuildPhase: false);
+            BeamTower?.Update(deltaTime);
         }
     }
 }

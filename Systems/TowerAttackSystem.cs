@@ -334,6 +334,9 @@ namespace BattleSystemECS.Systems
                 // Income tower check: skip attack logic for income-generating towers
                 if (store.TowerIsIncomeTower[towerId]) return;
 
+                // Beam tower check: beam towers are handled by BeamTowerSystem (not projectile-based)
+                if (store.TowerIsBeam[towerId]) return;
+
                 // Construction check: skip towers that are still under construction
                 if (store.TowerIsConstructing[towerId]) return;
 
