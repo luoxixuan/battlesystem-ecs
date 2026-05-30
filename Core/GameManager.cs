@@ -398,49 +398,108 @@ logger.Log("      ComboSystem created successfully!");
                 waveMutatorSystem.OnWaveStart(wave);
             };
 
-            // 初始化统一帧调度器
+            // 初始化统一帧调度器 — 系统按 Phase 分组注入
             scheduler = new FrameScheduler(store, gameConfig);
-            scheduler.WaveSpawning = waveSpawningSystem;
-            scheduler.EnemyAI = enemyAISystem;
-            scheduler.EnemyAbility = enemyAbilitySystem;
-            scheduler.EnemyMovement = enemyMovementSystem;
-            scheduler.PlayerTowerAttack = playerTowerAttackSystem;
-            scheduler.TowerAttack = towerAttackSystem;
-            scheduler.TowerSynergy = towerSynergySystem;
-            scheduler.AuraTower = auraTowerSystem;
-            scheduler.Curse = curseAuraSystem;
-            scheduler.PullTower = pullTowerSystem;
-            scheduler.Bleed = bleedSystem;
-            scheduler.Projectile = projectileSystem;
-            scheduler.Terrain = terrainSystem;
-            scheduler.Pathfinding = pathfindingSystem;
-            scheduler.WaveMutator = waveMutatorSystem;
-            scheduler.Interest = interestSystem;
-            scheduler.Mana = manaSystem;
-            scheduler.GlobalSkill = globalSkillSystem;
-            scheduler.Pickup = pickupSystem;
-            scheduler.Skill = skillSystem;
-            scheduler.Buff = buffSystem;
-            scheduler.Combo = comboSystem;
-            scheduler.AutoSkill = autoSkillSystem;
-            scheduler.Gold = goldSystem;
-            scheduler.Upgrade = upgradeSystem;
-            scheduler.EnemyFission = enemyFissionSystem;
-            scheduler.EnemyMorph = enemyMorphSystem;
-            scheduler.Burrow = enemyBurrowSystem;
-            scheduler.Necromancer = necromancerSystem;
-            scheduler.Objective = objectiveSystem;
-            scheduler.WaveBranch = waveBranchSystem;
-            scheduler.ResourceNode = resourceNodeSystem;
-            scheduler.Weather = weatherSystem;
-            scheduler.DayNight = dayNightSystem;
-            scheduler.Telegraph = telegraphSystem;
-            scheduler.AdaptiveDifficulty = adaptiveDifficultySystem;
-            scheduler.CorpseEffect = corpseEffectSystem;
-            scheduler.PathModifier = pathModifierSystem;
-            scheduler.RandomEvent = randomEventSystem;
-            scheduler.ChronoTower = chronoTowerSystem;
-            scheduler.LifeLink = enemyLifeLinkSystem;
+
+            // BuildPhase systems
+            scheduler.Build.Gold = goldSystem;
+            scheduler.Build.TowerIncome = null;     // not implemented yet
+            scheduler.Build.Upgrade = upgradeSystem;
+            scheduler.Build.Skill = skillSystem;
+            scheduler.Build.AutoSkill = autoSkillSystem;
+            scheduler.Build.TowerRelocate = null;   // not implemented yet
+            scheduler.Build.Interest = interestSystem;
+            scheduler.Build.Mana = manaSystem;
+            scheduler.Build.Objective = objectiveSystem;
+            scheduler.Build.ResourceNode = resourceNodeSystem;
+            scheduler.Build.GlobalSkill = globalSkillSystem;
+
+            // PreGame: weather, day/night, difficulty, events
+            scheduler.PreGame.WaveSpawning = waveSpawningSystem;
+            scheduler.PreGame.Weather = weatherSystem;
+            scheduler.PreGame.DayNight = dayNightSystem;
+            scheduler.PreGame.AdaptiveDifficulty = adaptiveDifficultySystem;
+            scheduler.PreGame.Construction = null;  // not implemented yet
+            scheduler.PreGame.RandomEvent = randomEventSystem;
+
+            // Spawning: wave + nest
+            scheduler.Spawning.WaveSpawning = waveSpawningSystem;
+            scheduler.Spawning.Nest = null;         // not implemented yet
+
+            // AI: behaviour trees, abilities, burrow, necromancer, life link, affixes
+            scheduler.AI.EnemyAI = enemyAISystem;
+            scheduler.AI.EnemyAbility = enemyAbilitySystem;
+            scheduler.AI.Burrow = enemyBurrowSystem;
+            scheduler.AI.Necromancer = necromancerSystem;
+            scheduler.AI.LifeLink = enemyLifeLinkSystem;
+            scheduler.AI.EnemyAffix = null;         // not implemented yet
+
+            // Movement: wound, pathfinding, modifiers, healer, summons
+            scheduler.Movement.Wound = null;        // not implemented yet
+            scheduler.Movement.Pathfinding = pathfindingSystem;
+            scheduler.Movement.EnemyMovement = enemyMovementSystem;
+            scheduler.Movement.PathModifier = pathModifierSystem;
+            scheduler.Movement.EnemyHealer = null;  // not implemented yet
+            scheduler.Movement.StealGold = null;    // not implemented yet
+            scheduler.Movement.Summon = null;       // not implemented yet
+
+            // Terrain + Mutators + Morph
+            scheduler.Terrain.Terrain = terrainSystem;
+            scheduler.Terrain.WaveMutator = waveMutatorSystem;
+            scheduler.Terrain.EnemyMorph = enemyMorphSystem;
+
+            // Pre-combat SetTurn
+            scheduler.CombatSetup.PlayerTowerAttack = playerTowerAttackSystem;
+            scheduler.CombatSetup.TowerAttack = towerAttackSystem;
+            scheduler.CombatSetup.TowerOvercharge = null;   // not implemented yet
+            scheduler.CombatSetup.TowerSynergy = towerSynergySystem;
+            scheduler.CombatSetup.TowerLink = null;         // not implemented yet
+            scheduler.CombatSetup.Skill = skillSystem;
+            scheduler.CombatSetup.AuraTower = auraTowerSystem;
+            scheduler.CombatSetup.Curse = curseAuraSystem;
+            scheduler.CombatSetup.PullTower = pullTowerSystem;
+            scheduler.CombatSetup.Mana = manaSystem;
+            scheduler.CombatSetup.GlobalSkill = globalSkillSystem;
+
+            // Spatial rebuild + patrol/chrono/fog/telegraph
+            scheduler.Spatial.PatrolTower = null;   // not implemented yet
+            scheduler.Spatial.ChronoTower = chronoTowerSystem;
+            scheduler.Spatial.Fog = null;           // not implemented yet
+            scheduler.Spatial.PointDefense = null;  // not implemented yet
+            scheduler.Spatial.Telegraph = telegraphSystem;
+
+            // Main combat
+            scheduler.Combat.PlayerTowerAttack = playerTowerAttackSystem;
+            scheduler.Combat.TowerOvercharge = null;     // not implemented yet
+            scheduler.Combat.Demolish = null;            // not implemented yet
+            scheduler.Combat.TowerAttack = towerAttackSystem;
+            scheduler.Combat.TowerSynergy = towerSynergySystem;
+            scheduler.Combat.TowerLink = null;           // not implemented yet
+            scheduler.Combat.AuraTower = auraTowerSystem;
+            scheduler.Combat.Curse = curseAuraSystem;
+            scheduler.Combat.PullTower = pullTowerSystem;
+            scheduler.Combat.TowerSilence = null;        // not implemented yet
+            scheduler.Combat.Dispel = null;              // not implemented yet
+            scheduler.Combat.Projectile = projectileSystem;
+            scheduler.Combat.EnemyProjectile = null;     // not implemented yet
+            scheduler.Combat.Pickup = pickupSystem;
+            scheduler.Combat.Mana = manaSystem;
+            scheduler.Combat.GlobalSkill = globalSkillSystem;
+
+            // Skill resolution + Buff DoT + Bleed
+            scheduler.SkillBuff.Buff = buffSystem;
+            scheduler.SkillBuff.Skill = skillSystem;
+            scheduler.SkillBuff.Bleed = bleedSystem;
+
+            // Post-death: fission, life link, objective, resources, corpses, combo
+            scheduler.PostDeath.EnemyFission = enemyFissionSystem;
+            scheduler.PostDeath.LifeLink = enemyLifeLinkSystem;
+            scheduler.PostDeath.Objective = objectiveSystem;
+            scheduler.PostDeath.ResourceNode = resourceNodeSystem;
+            scheduler.PostDeath.TowerIncome = null;      // not implemented yet
+            scheduler.PostDeath.CorpseEffect = corpseEffectSystem;
+            scheduler.PostDeath.WaveBranch = waveBranchSystem;
+            scheduler.PostDeath.Combo = comboSystem;
 
             // 初始化地形网格（方向二：地图地块系统）
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)

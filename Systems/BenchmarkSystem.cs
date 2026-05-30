@@ -498,22 +498,26 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
             var pathfinding   = new PathfindingSystem(store);
             enemyMovement.SetPathfindingSystem(pathfinding);
 
-            // 布线 FrameScheduler
-            scheduler.WaveSpawning   = waveSpawning;
-            scheduler.EnemyAI        = enemyAI;
-            scheduler.EnemyAbility   = enemyAbility;
-            scheduler.EnemyMovement  = enemyMovement;
-            scheduler.PlayerTowerAttack = playerAttack;
-            scheduler.TowerAttack    = towerAttack;
-            scheduler.AuraTower      = auraTower;
-            scheduler.Projectile     = projectile;
-            scheduler.Gold           = gold;
-            scheduler.Upgrade        = upgrade;
-            scheduler.Skill          = skill;
-            scheduler.Buff           = buffSystem;
-            scheduler.Combo          = comboSystem;
-            scheduler.Pathfinding    = pathfinding;
-            scheduler.TechTree       = benchTechTree;
+            // 布线 FrameScheduler — 按 Phase 分组注入
+            scheduler.Spawning.WaveSpawning   = waveSpawning;
+            scheduler.AI.EnemyAI        = enemyAI;
+            scheduler.AI.EnemyAbility   = enemyAbility;
+            scheduler.Movement.EnemyMovement  = enemyMovement;
+            scheduler.Movement.Pathfinding    = pathfinding;
+            scheduler.Combat.PlayerTowerAttack = playerAttack;
+            scheduler.CombatSetup.PlayerTowerAttack = playerAttack;
+            scheduler.Combat.TowerAttack    = towerAttack;
+            scheduler.CombatSetup.TowerAttack    = towerAttack;
+            scheduler.Combat.AuraTower      = auraTower;
+            scheduler.CombatSetup.AuraTower      = auraTower;
+            scheduler.Combat.Projectile     = projectile;
+            scheduler.Build.Gold           = gold;
+            scheduler.Build.Upgrade        = upgrade;
+            scheduler.Build.Skill          = skill;
+            scheduler.CombatSetup.Skill    = skill;
+            scheduler.SkillBuff.Skill      = skill;
+            scheduler.SkillBuff.Buff       = buffSystem;
+            scheduler.PostDeath.Combo      = comboSystem;
             scheduler.Phase          = GameState.BuildPhase;
 
             // 放塔（对齐交互式游戏）

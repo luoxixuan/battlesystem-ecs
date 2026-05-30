@@ -25,11 +25,11 @@ namespace BattleSystemECS.Tests
             store.PositionY[pid] = 0f;
 
             var scheduler = new FrameScheduler(store, config);
-            scheduler.WaveSpawning = new WaveSpawningSystem(store, r, config);
-            scheduler.EnemyAI = new EnemyAISystem(store, r, pid, config, new EnemyAbilitySystem(store, r, pid, config));
-            scheduler.EnemyMovement = new EnemyMovementSystem(store, pid);
-            scheduler.Gold = new GoldSystem(store, r);
-            scheduler.Upgrade = new UpgradeSystem(store, r, pid, config);
+            scheduler.Spawning.WaveSpawning = new WaveSpawningSystem(store, r, config);
+            scheduler.AI.EnemyAI = new EnemyAISystem(store, r, pid, config, new EnemyAbilitySystem(store, r, pid, config));
+            scheduler.Movement.EnemyMovement = new EnemyMovementSystem(store, pid);
+            scheduler.Build.Gold = new GoldSystem(store, r);
+            scheduler.Build.Upgrade = new UpgradeSystem(store, r, pid, config);
 
             // Run several turns
             for (int turn = 0; turn < 5; turn++)
@@ -54,7 +54,7 @@ namespace BattleSystemECS.Tests
             store.PositionY[pid] = 0f;
 
             var scheduler = new FrameScheduler(store, config);
-            scheduler.WaveSpawning = new WaveSpawningSystem(store, r, config);
+            scheduler.Spawning.WaveSpawning = new WaveSpawningSystem(store, r, config);
 
             scheduler.TickGameTurn(1f, 0);
 
@@ -83,10 +83,12 @@ namespace BattleSystemECS.Tests
             store.PositionActive[towerId] = true;
 
             var scheduler = new FrameScheduler(store, config);
-            scheduler.WaveSpawning = new WaveSpawningSystem(store, r, config);
-            scheduler.EnemyAI = new EnemyAISystem(store, r, pid, config, new EnemyAbilitySystem(store, r, pid, config));
-            scheduler.EnemyMovement = new EnemyMovementSystem(store, pid);
-            scheduler.TowerAttack = new TowerAttackSystem(store, r);
+            scheduler.Spawning.WaveSpawning = new WaveSpawningSystem(store, r, config);
+            scheduler.AI.EnemyAI = new EnemyAISystem(store, r, pid, config, new EnemyAbilitySystem(store, r, pid, config));
+            scheduler.Movement.EnemyMovement = new EnemyMovementSystem(store, pid);
+            var towerAttack = new TowerAttackSystem(store, r);
+            scheduler.Combat.TowerAttack = towerAttack;
+            scheduler.CombatSetup.TowerAttack = towerAttack;
 
             // Run several turns
             for (int t = 0; t < 5; t++)
