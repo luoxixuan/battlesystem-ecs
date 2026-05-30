@@ -72,6 +72,7 @@ namespace BattleSystemECS.Core
         public TerrainSystem? Terrain { get; private set; }
         public PathfindingSystem? Pathfinding { get; private set; }
         public PathModifierSystem? PathModifier { get; private set; }
+        public PullSystem? Pull { get; private set; }
         public WeatherSystem? Weather { get; private set; }
         public DayNightSystem? DayNight { get; private set; }
         public WaveMutatorSystem? WaveMutator { get; private set; }
@@ -221,6 +222,7 @@ namespace BattleSystemECS.Core
 
             // ── Path modifier ──
             PathModifier = new PathModifierSystem(store);
+            Pull = new PullSystem(store, playerId);
 
             // ── Random events ──
             RandomEvent = new RandomEventSystem(store, config);
@@ -340,6 +342,7 @@ namespace BattleSystemECS.Core
             scheduler.Movement.Pathfinding = Pathfinding;
             scheduler.Movement.EnemyMovement = EnemyMovement;
             scheduler.Movement.PathModifier = PathModifier;
+            scheduler.Movement.Pull = Pull;
             scheduler.Movement.EnemyHealer = null;
             scheduler.Movement.StealGold = null;
             scheduler.Movement.Summon = null;

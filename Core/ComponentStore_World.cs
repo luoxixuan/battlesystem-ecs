@@ -130,6 +130,26 @@ namespace BattleSystemECS.Core
         public int[] WindSourceTowerId = new int[MAX_WIND_SOURCES];          // tower that created this wind (-1 = environmental)
         private int _nextWindSourceId = 0;
         private int _activeWindSourceCount = 0;
+        // ==================== Pull / Vacuum / Gravity Well 组件（SOA）====================
+        // Global pull: central gravity well that attracts all enemies toward a point.
+        public float[] GlobalPullCenterX = new float[MAX_PLAYERS];
+        public float[] GlobalPullCenterY = new float[MAX_PLAYERS];
+        public float[] GlobalPullStrength = new float[MAX_PLAYERS];
+        public float[] GlobalPullDuration = new float[MAX_PLAYERS];
+        public bool[] GlobalPullActive = new bool[MAX_PLAYERS];
+        // Local pull sources: tower-created vacuum effects with position and radius.
+        // MAX_PULL_SOURCES: circular buffer size for tower pull effects.
+        public const int MAX_PULL_SOURCES = 200;
+        public bool[] PullSourceActive = new bool[MAX_PULL_SOURCES];
+        public float[] PullSourceX = new float[MAX_PULL_SOURCES];
+        public float[] PullSourceY = new float[MAX_PULL_SOURCES];
+        public float[] PullSourceRadius = new float[MAX_PULL_SOURCES];
+        public float[] PullSourceStrength = new float[MAX_PULL_SOURCES];
+        public float[] PullSourceDuration = new float[MAX_PULL_SOURCES];
+        public int[] PullSourceOwnerPlayer = new int[MAX_PULL_SOURCES];
+        public int[] PullSourceTowerId = new int[MAX_PULL_SOURCES];
+        private int _nextPullSourceId = 0;
+        private int _activePullSourceCount = 0;
         // ==================== Ascension/Difficulty Modifier 组件 ====================
         // AscensionModifierStacks: tracks stack count for each ascension modifier (up to 64 unique modifiers)
         public int[] AscensionModifierStacks = new int[64];
@@ -664,6 +684,89 @@ namespace BattleSystemECS.Core
             GlobalWindDuration[playerId] = 0f;
             GlobalWindGustTimer[playerId] = 0f;
             GlobalWindGustStrength[playerId] = 0f;
+        }
+
+        // ==================== Pull Source 管理方法 ====================
+        /// <summary>Add a pull source at the given position with specified parameters.</summary>
+        public int AddPullSource(float x, float y, float radius, float strength, float duration, int ownerPlayer, int towerId = -1)
+        {
+            int sourceId = -1;
+            lock (activeIdsLock)
+            {
+                for (int i = 0; i < MAX_PULL_SOURCES; i++)
+                {
+                    int candidateId = (_nextPullSourceId + i) % MAX_PULL_SOURCES;
+                    if (!PullSourceActive[candidateId])
+                    {
+                        sourceId = candidateId;
+                        _nextPullSourceId = (candidateId + 1) % MAX_PULL_SOURCES;
+                        break;
+                    }
+                }
+            }
+
+            if (sourceId < 0) return -1;
+
+            PullSourceX[sourceId] = x;
+            PullSourceY[sourceId] = y;
+            PullSourceRadius[sourceId] = radius;
+            PullSourceStrength[sourceId] = strength;
+            PullSourceDuration[sourceId] = duration;
+            PullSourceOwnerPlayer[sourceId] = ownerPlayer;
+            PullSourceTowerId[sourceId] = towerId;
+            PullSourceActive[sourceId] = true;
+            _activePullSourceCount++;
+            return sourceId;
+        }
+
+        /// <summary>Remove a pull source by ID.</summary>
+        public void RemovePullSource(int sourceId)
+        {
+            if (sourceId < 0 || sourceId >= MAX_PULL_SOURCES) return;
+            if (!PullSourceActive[sourceId]) return;
+            PullSourceActive[sourceId] = false;
+            PullSourceX[sourceId] = 0f;
+            PullSourceY[sourceId] = 0f;
+            PullSourceRadius[sourceId] = 0f;
+            PullSourceStrength[sourceId] = 0f;
+            PullSourceDuration[sourceId] = 0f;
+            PullSourceOwnerPlayer[sourceId] = 0;
+            PullSourceTowerId[sourceId] = -1;
+            _activePullSourceCount--;
+        }
+
+        /// <summary>Get the count of active pull sources.</summary>
+        public int GetActivePullSourceCount() => _activePullSourceCount;
+
+        /// <summary>Check if a pull source is still active (has duration remaining).</summary>
+        public bool IsPullSourceActive(int sourceId)
+        {
+            if (sourceId < 0 || sourceId >= MAX_PULL_SOURCES) return false;
+            return PullSourceActive[sourceId];
+        }
+
+        /// <summary>
+        /// Set global gravity well pull for a player. Overwrites any existing global pull.
+        /// </summary>
+        public void SetGlobalPull(int playerId, float centerX, float centerY, float strength, float duration)
+        {
+            if (!IsValidPlayer(playerId)) return;
+            GlobalPullCenterX[playerId] = centerX;
+            GlobalPullCenterY[playerId] = centerY;
+            GlobalPullStrength[playerId] = strength;
+            GlobalPullActive[playerId] = true;
+            GlobalPullDuration[playerId] = duration;
+        }
+
+        /// <summary>Clear global pull for a player.</summary>
+        public void ClearGlobalPull(int playerId)
+        {
+            if (!IsValidPlayer(playerId)) return;
+            GlobalPullActive[playerId] = false;
+            GlobalPullStrength[playerId] = 0f;
+            GlobalPullDuration[playerId] = 0f;
+            GlobalPullCenterX[playerId] = 0f;
+            GlobalPullCenterY[playerId] = 0f;
         }
 
         // ==================== 科技树组件访问方法 ====================
