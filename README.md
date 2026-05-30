@@ -139,7 +139,9 @@ dotnet test
 ---
 
 ## 更新记录
-> 仅记录功能上线和重大修复。
+### 2026-05-31
+- 光束/激光连续塔基础设施（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094
+- N 击护盾系统（HitShieldSystem + ComponentStore_Enemy.cs + TowerAttackSystem/PlayerTowerAttackSystem）；bench2: 11546, bench4: 5590, bench5: 4824
 
 ### 2026-05-30
 - **工程改进**：ComponentStore 按领域拆分为 5 个 partial 文件（Enemy/Tower/Player/World + 核心生命周期）；伤害公式测试补齐至 120 项
@@ -157,6 +159,7 @@ dotnet test
 - 塔过热/热量系统（HeatSystem + ComponentStore_Tower.cs）；bench2: 11643, bench4: 5655, bench5: 5049
 - 塔能量/法力资源系统（TowerEnergySystem + ComponentStore_Tower.cs）；bench2: 10605, bench4: 5672, bench5: 4735
 - 光束/激光连续塔（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094
+- 塔能量/法力资源系统（TowerEnergySystem + ComponentStore_Tower.cs + TowerAttackSystem）；bench2: 10605, bench4: 5672, bench5: 4735
 
 ### 2026-05-29
 - 复活/亡灵法师敌人（NecromancerSystem + CorpseQueue）；bench2: 9871, bench4: 5122, bench5: 4882
@@ -167,15 +170,6 @@ dotnet test
 - 牵引/磁力/漩涡塔（PullTowerSystem）；bench2: 10214, bench4: 5344, bench5: 4947
 - 诅咒/削弱光环（CurseAuraSystem）；bench2: 10128, bench4: 5345, bench5: 5007
 - 8 项业务系统扩展（法力消耗/金币窃取/敌方治疗/驱散/塔自毁/产卵/被动产金/召唤修复）+ 飞行/浮空敌人；bench2: 10375, bench4: 5216, bench5: 4979
-
-### 2026-05-31
-- 光束/激光连续塔基础设施（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094
-- N 击护盾系统（HitShieldSystem + ComponentStore_Enemy.cs + TowerAttackSystem/PlayerTowerAttackSystem）；bench2: 11546, bench4: 5590, bench5: 4824
-
-### 2026-05-30
-- 塔能量/法力资源系统（TowerEnergySystem + ComponentStore_Tower.cs + TowerAttackSystem）；bench2: 10605, bench4: 5672, bench5: 4735
-
-### 2026-05-29
 - mode 5 完整一局压测上线（5关全通，400帧，6520 FPS）
 - 肉盾/前锋敌人（Vanguard，伤害转移）；bench2: 9265, bench4: 5058, bench5: 4809
 
