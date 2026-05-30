@@ -155,6 +155,8 @@ dotnet test
 - 敌人受伤减速/瘸腿（EnemyWoundSystem）；bench2: 9800, bench4: 5116, bench5: 4594
 - 随机事件 Bug 修复；bench2: 9947, bench4: 5251, bench5: 5050
 - 塔过热/热量系统（HeatSystem + ComponentStore_Tower.cs）；bench2: 11643, bench4: 5655, bench5: 5049
+- 塔能量/法力资源系统（TowerEnergySystem + ComponentStore_Tower.cs）；bench2: 10605, bench4: 5672, bench5: 4735
+- 光束/激光连续塔（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094
 
 ### 2026-05-29
 - 复活/亡灵法师敌人（NecromancerSystem + CorpseQueue）；bench2: 9871, bench4: 5122, bench5: 4882
