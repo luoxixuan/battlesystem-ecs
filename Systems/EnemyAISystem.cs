@@ -84,15 +84,12 @@ namespace BattleSystemECS.Systems
             int count = activeEnemyIds.Count;
 
             const int batchSize = 256;
-            int numBatches = (count + batchSize - 1) / batchSize;
+            const int PARALLEL_MIN_ENEMIES = 500;
 
-            Parallel.For(0, numBatches, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
-                batchIdx =>
+            if (count < PARALLEL_MIN_ENEMIES)
             {
-                int start = batchIdx * batchSize;
-                int end = Math.Min(start + batchSize, count);
-
-                for (int i = start; i < end; i++)
+                // Sequential — avoid Parallel.For overhead for small counts (< 2 batches)
+                for (int i = 0; i < count; i++)
                 {
                     int enemyId = activeEnemyIds[i];
                     if (!store.EnemyActive[enemyId])
@@ -108,8 +105,7 @@ namespace BattleSystemECS.Systems
                     bool stunFlag = store.EnemyStunFlag[enemyId];
                     float stunDuration = store.EnemyStunDurationLeft[enemyId];
 
-                    // ── Boss Phase / Enrage updates ──────────────────────────────────
-                    // 1. Decrement enrage timer (every frame, O(1))
+                    // Boss Phase / Enrage updates
                     float enrageTimer = store.EnemyEnrageTimer[enemyId];
                     if (enrageTimer > 0f)
                     {
@@ -118,21 +114,16 @@ namespace BattleSystemECS.Systems
                         {
                             enrageTimer = 0f;
                             store.EnemyIsEnraged[enemyId] = true;
-                            // TODO: apply enrage stat boost (speed/damage mult) via GameConfig lookup
                         }
                         store.EnemyEnrageTimer[enemyId] = enrageTimer;
                     }
 
-                    // 2. Check health-based phase transition
+                    // Health-based phase transition
                     string thresholdsStr = store.EnemyPhaseThresholds[enemyId];
                     if (!string.IsNullOrEmpty(thresholdsStr))
                     {
                         int currentPhase = store.EnemyBossPhase[enemyId];
                         float healthFraction = (enemyMaxHealth > 0f) ? enemyHealth / enemyMaxHealth : 1f;
-
-                        // Parse CSV thresholds once per frame per boss (stored as "0.75,0.50,0.25")
-                        // Phase N transitions when health drops below thresholds[N]
-                        // currentPhase starts at 0; if health < 0.75 → phase 1; if < 0.50 → phase 2; etc.
                         string[] parts = thresholdsStr.Split(',');
                         for (int ph = 0; ph < parts.Length; ph++)
                         {
@@ -145,8 +136,6 @@ namespace BattleSystemECS.Systems
                                     if (newPhase > currentPhase)
                                     {
                                         store.EnemyBossPhase[enemyId] = newPhase;
-                                        // TODO: trigger phase ability via EnemyAbilitySystem.EnqueueAbility
-                                        // TODO: apply phase stat multiplier (speed/damage mult) via GameConfig lookup
                                         break;
                                     }
                                 }
@@ -169,7 +158,6 @@ namespace BattleSystemECS.Systems
                     EnemyActionType actionEnum;
                     string abilityId = null;
 
-                    // If enemy is stunned, skip BT and force no action
                     if (store.EnemyStunFlag[enemyId])
                     {
                         action = "none";
@@ -228,7 +216,145 @@ namespace BattleSystemECS.Systems
                         });
                     }
                 }
-            });
+            }
+            else
+            {
+                int numBatches = (count + batchSize - 1) / batchSize;
+                Parallel.For(0, numBatches, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                    batchIdx =>
+                {
+                    int start = batchIdx * batchSize;
+                    int end = Math.Min(start + batchSize, count);
+
+                    for (int i = start; i < end; i++)
+                    {
+                        int enemyId = activeEnemyIds[i];
+                        if (!store.EnemyActive[enemyId])
+                            continue;
+
+                        var cachedBt = store.EnemyBehaviorTree[enemyId];
+
+                        // Check BT evaluation cache — also track stun duration changes
+                        float enemyHealth = store.EnemyHealth[enemyId];
+                        float enemyMaxHealth = store.EnemyMaxHealth[enemyId];
+                        float playerHealth = store.PlayerCurrentHealth[playerId];
+                        int chargeCounter = store.GetEnemyAIChargeCounter(enemyId);
+                        bool stunFlag = store.EnemyStunFlag[enemyId];
+                        float stunDuration = store.EnemyStunDurationLeft[enemyId];
+
+                        // Boss Phase / Enrage updates
+                        float enrageTimer = store.EnemyEnrageTimer[enemyId];
+                        if (enrageTimer > 0f)
+                        {
+                            enrageTimer -= _currentDeltaTime;
+                            if (enrageTimer <= 0f)
+                            {
+                                enrageTimer = 0f;
+                                store.EnemyIsEnraged[enemyId] = true;
+                            }
+                            store.EnemyEnrageTimer[enemyId] = enrageTimer;
+                        }
+
+                        // Health-based phase transition
+                        string thresholdsStr = store.EnemyPhaseThresholds[enemyId];
+                        if (!string.IsNullOrEmpty(thresholdsStr))
+                        {
+                            int currentPhase = store.EnemyBossPhase[enemyId];
+                            float healthFraction = (enemyMaxHealth > 0f) ? enemyHealth / enemyMaxHealth : 1f;
+                            string[] parts = thresholdsStr.Split(',');
+                            for (int ph = 0; ph < parts.Length; ph++)
+                            {
+                                if (float.TryParse(parts[ph], System.Globalization.NumberStyles.Float,
+                                    System.Globalization.CultureInfo.InvariantCulture, out float threshold))
+                                {
+                                    if (healthFraction < threshold)
+                                    {
+                                        int newPhase = ph + 1;
+                                        if (newPhase > currentPhase)
+                                        {
+                                            store.EnemyBossPhase[enemyId] = newPhase;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (_enemyHealthCache[enemyId] == enemyHealth &&
+                            _cachedPlayerHealth == playerHealth &&
+                            _enemyChargeCounterCache[enemyId] == chargeCounter &&
+                            _stunFlagCache[enemyId] == stunFlag &&
+                            _enemyStunDurationCache[enemyId] == stunDuration)
+                        {
+                            store.SetEnemyActionEnum(enemyId, _lastActionCache[enemyId]);
+                            continue;
+                        }
+
+                        // Cache miss: evaluate behavior tree
+                        string action;
+                        EnemyActionType actionEnum;
+                        string abilityId = null;
+
+                        if (store.EnemyStunFlag[enemyId])
+                        {
+                            action = "none";
+                            actionEnum = EnemyActionType.None;
+                            store.SetEnemyActionEnum(enemyId, actionEnum);
+                            _lastActionCache[enemyId] = actionEnum;
+                            continue;
+                        }
+
+                        if (cachedBt != null)
+                        {
+                            action = BTCachedTreeEvaluator.EvaluateWithEnumAndAbility(
+                                cachedBt, enemyId, store, playerId, currentTurn,
+                                out actionEnum, out abilityId);
+                        }
+                        else
+                        {
+                            string monsterType = store.GetEnemyTypeName(enemyId);
+                            if (string.IsNullOrEmpty(monsterType))
+                                monsterType = store.GetName(enemyId);
+                            cachedBt = gameConfig.GetCachedBehaviorTree(monsterType);
+                            if (cachedBt != null)
+                            {
+                                action = BTCachedTreeEvaluator.EvaluateWithEnumAndAbility(
+                                    cachedBt, enemyId, store, playerId, currentTurn,
+                                    out actionEnum, out abilityId);
+                            }
+                            else
+                            {
+                                action = GetFallbackAction(enemyId);
+                                actionEnum = StringToActionEnum(action);
+                            }
+                        }
+                        store.SetEnemyActionEnum(enemyId, actionEnum);
+                        store.EnemyCastAbilityId[enemyId] = abilityId;
+
+                        _enemyHealthCache[enemyId] = enemyHealth;
+                        _enemyChargeCounterCache[enemyId] = chargeCounter;
+                        _stunFlagCache[enemyId] = stunFlag;
+                        _enemyStunDurationCache[enemyId] = stunDuration;
+                        _lastActionCache[enemyId] = actionEnum;
+                        _lastActionStringCache[enemyId] = action;
+
+                        // Collect attack events
+                        if (actionEnum == EnemyActionType.AttackMelee ||
+                            actionEnum == EnemyActionType.RangedAttack ||
+                            actionEnum == EnemyActionType.ChargeAttack)
+                        {
+                            float param = (actionEnum == EnemyActionType.ChargeAttack)
+                                ? store.EnemyChargeParam[enemyId] : 0f;
+                            _attackEvents[_attackEventsIdx].Add(new AttackEvent
+                            {
+                                EnemyId = enemyId,
+                                ActionType = actionEnum,
+                                Param = param
+                            });
+                        }
+                    }
+                });
+            }
 
             // Serial action execution
             int readIdx = _attackEventsIdx;
