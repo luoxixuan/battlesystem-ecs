@@ -24,7 +24,7 @@ namespace BattleSystemECS.Core
 
         // Inline boundary check helpers — replaces 100+ manual checks with zero-overhead guards.
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        private static bool IsValidEntity(int id) => (uint)id < MAX_ENTITIES;
+        public static bool IsValidEntity(int id) => (uint)id < MAX_ENTITIES;
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         private static bool IsValidPlayer(int id) => (uint)id < MAX_PLAYERS;
 

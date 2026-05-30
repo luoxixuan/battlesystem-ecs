@@ -41,6 +41,10 @@ namespace BattleSystemECS.Config
         public float MagicResist { get; set; } = 0f;
         // Shield: absorbs incoming damage before health. Boss/Elite types can have shield.
         public float Shield { get; set; } = 0f;
+        // HitShieldCount: number of N-hit shield layers (0 = none). Blocks that many attacks completely.
+        public float HitShieldCount { get; set; } = 0f;
+        // HitShieldRegenInterval: seconds between layer regen ticks (0 = no regen).
+        public float HitShieldRegenInterval { get; set; } = 0f;
         // IsFlying: true if this is an airborne enemy (ignores obstacles, terrain effects)
         public bool IsFlying { get; set; } = false;
         // FlightHeight: flight altitude level (1=low, 2=high) — only meaningful if IsFlying=true

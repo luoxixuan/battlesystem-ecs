@@ -68,6 +68,8 @@ namespace BattleSystemECS.Systems
         private List<float>[] _thornsQueue = new List<float>[2];
         private int _thornsQueueIdx = 0;
 
+        private HitShieldSystem _hitShieldSystem;
+
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
             : this(store, renderer, playerId, gameConfig, null)
         {
@@ -130,6 +132,14 @@ public void SetWaveNumber(int waveNumber)
         public void SetLifeLinkSystem(EnemyLifeLinkSystem lifeLinkSystem)
         {
             _lifeLinkSystem = lifeLinkSystem;
+        }
+
+        /// <summary>
+        /// Inject HitShieldSystem reference for N-hit shield blocking.
+        /// </summary>
+        public void SetHitShieldSystem(HitShieldSystem hitShieldSystem)
+        {
+            _hitShieldSystem = hitShieldSystem;
         }
 
         public int GetCachedEnemyCount() => _activeEnemyList != null ? _activeEnemyList.Count : 0;
@@ -208,6 +218,8 @@ public void SetWaveNumber(int waveNumber)
                 if (!store.EnemyActive[enemyId]) continue;
                 // Invulnerability check: skip damage if enemy is invulnerable
                 if (store.EnemyIsInvulnerable[enemyId]) continue;
+                // N-Hit Shield check: if enemy has hit shield layers, consume 1 layer and block damage
+                if (_hitShieldSystem != null && _hitShieldSystem.ConsumeHitShield(enemyId)) continue;
                 float prevHealth = store.EnemyHealth[enemyId];
 
                 // Life Link damage split: if enemy is linked, share damage with linked partner

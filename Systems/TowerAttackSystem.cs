@@ -24,6 +24,7 @@ namespace BattleSystemECS.Systems
         private DayNightSystem _dayNightSystem; // injected for day/night cycle effects
         private HeatSystem _heatSystem; // injected for heat/overheat effects
         private TowerEnergySystem _energySystem; // injected for energy system effects
+        private HitShieldSystem _hitShieldSystem; // injected for N-hit shield blocking
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate arrays (zero-allocation — no List.Clear() version bump)
@@ -204,6 +205,14 @@ namespace BattleSystemECS.Systems
         public void SetEnergySystem(TowerEnergySystem energySystem)
         {
             _energySystem = energySystem;
+        }
+
+        /// <summary>
+        /// Inject HitShieldSystem reference for N-hit shield blocking.
+        /// </summary>
+        public void SetHitShieldSystem(HitShieldSystem hitShieldSystem)
+        {
+            _hitShieldSystem = hitShieldSystem;
         }
 
         private EnemyLifeLinkSystem _lifeLinkSystem;
@@ -708,6 +717,8 @@ int bestTarget = -1;
                 if (!store.EnemyActive[enemyId]) continue;
                 // Invulnerability check: if enemy is invulnerable, skip damage
                 if (store.EnemyIsInvulnerable[enemyId]) continue;
+                // N-Hit Shield check: if enemy has hit shield layers, consume 1 layer and block damage
+                if (_hitShieldSystem != null && _hitShieldSystem.ConsumeHitShield(enemyId)) continue;
                 // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
                 float resist = store.EnemyDamageResistance[enemyId];
                 float finalDmg = resist >= 1f ? 0f : damage * (1f - resist);

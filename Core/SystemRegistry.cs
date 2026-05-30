@@ -63,6 +63,7 @@ namespace BattleSystemECS.Core
         public EnemyBurrowSystem? EnemyBurrow { get; private set; }
         public NecromancerSystem? Necromancer { get; private set; }
         public EnemyLifeLinkSystem? LifeLink { get; private set; }
+        public HitShieldSystem? HitShield { get; private set; }
 
         // ── Environment ──
         public TerrainSystem? Terrain { get; private set; }
@@ -147,6 +148,10 @@ namespace BattleSystemECS.Core
             EnemyAbility = new EnemyAbilitySystem(store, logger, playerId, config, eventBus);
             EnemyAI = new EnemyAISystem(store, logger, playerId, config, EnemyAbility, TechTree, eventBus);
 
+            // ── Hit Shield ──
+            var hitShield = new HitShieldSystem(store, logger);
+            HitShield = hitShield;
+
             // ── Burrow, Necromancer, LifeLink ──
             EnemyBurrow = new EnemyBurrowSystem(store, playerId);
             Necromancer = new NecromancerSystem(store, config, logger);
@@ -227,9 +232,11 @@ namespace BattleSystemECS.Core
             TowerAttack?.SetTowerExperienceSystem(TowerExperience);
             TowerAttack?.SetProjectileSystem(Projectile);
             TowerAttack?.SetLifeLinkSystem(LifeLink);
+            TowerAttack?.SetHitShieldSystem(HitShield);
 
             // ── PlayerTowerAttack wiring ──
             PlayerTowerAttack?.SetLifeLinkSystem(LifeLink);
+            PlayerTowerAttack?.SetHitShieldSystem(HitShield);
 
             // ── Skill wiring ──
             Skill?.InjectDotSystem(Buff);
@@ -340,6 +347,7 @@ namespace BattleSystemECS.Core
             scheduler.CombatSetup.PullTower = PullTower;
             scheduler.CombatSetup.Mana = Mana;
             scheduler.CombatSetup.GlobalSkill = GlobalSkill;
+            scheduler.CombatSetup.HitShield = HitShield;
 
             // ── Spatial ──
             scheduler.Spatial.PatrolTower = null;
@@ -353,6 +361,7 @@ namespace BattleSystemECS.Core
             scheduler.Combat.TowerOvercharge = null;
             scheduler.Combat.Heat = null; // HeatSystem — heat accumulation + overheat state
             scheduler.Combat.Demolish = null;
+            scheduler.Combat.HitShield = HitShield;
             scheduler.Combat.TowerAttack = TowerAttack;
             scheduler.Combat.TowerSynergy = TowerSynergy;
             scheduler.Combat.TowerLink = null;

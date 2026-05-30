@@ -50,6 +50,16 @@ namespace BattleSystemECS.Core
         // Enemy shield: absorbs incoming damage before it reaches EnemyHealth.
         // Shield is consumed first; remaining damage penetrates to health.
         public float[] EnemyShield = new float[MAX_ENTITIES];
+        // ==================== N 击护盾 (Hit Shield — blocks N hits regardless of damage) ====================
+        // EnemyHitShieldCount: current number of hit-shield layers (0 = no hit shield, attack passes through)
+        // Each incoming tower/player attack removes exactly 1 layer — damage is fully blocked
+        public float[] EnemyHitShieldCount = new float[MAX_ENTITIES];
+        // EnemyHitShieldMax: maximum layers this enemy can have (Boss = 0 = immune to hit shields)
+        public float[] EnemyHitShieldMax = new float[MAX_ENTITIES];
+        // EnemyHitShieldTimer: seconds until next layer regenerates (0 = no regen, don't tick)
+        public float[] EnemyHitShieldTimer = new float[MAX_ENTITIES];
+        // EnemyHitShieldRegenInterval: seconds between layer regen ticks (0 = no regen)
+        public float[] EnemyHitShieldRegenInterval = new float[MAX_ENTITIES];
         // Enemy thorns: reflects a fraction of damage taken back to the attacker (player/tower).
         // Applied after damage is dealt, in the same frame's serial phase.
         public float[] EnemyThornsRatio = new float[MAX_ENTITIES];
@@ -412,6 +422,11 @@ namespace BattleSystemECS.Core
             EnemyArmor[entityId] = armor;
             EnemyMagicResist[entityId] = magicResist;
             EnemyShield[entityId] = shield;  // configurable initial shield
+            // Hit Shield: default 0 layers, 0 max, 0 regen timer
+            EnemyHitShieldCount[entityId] = 0f;
+            EnemyHitShieldMax[entityId] = 0f;
+            EnemyHitShieldTimer[entityId] = 0f;
+            EnemyHitShieldRegenInterval[entityId] = 0f;
             EnemyEvasion[entityId] = 0f;  // default to no evasion
             // Vanguard: default not a vanguard (false = not protecting anyone)
             EnemyIsVanguard[entityId] = false;

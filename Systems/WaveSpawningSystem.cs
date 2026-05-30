@@ -493,6 +493,16 @@ namespace BattleSystemECS.Systems
                     // Apply ascension/difficulty modifier scaling
                     _ascensionSystem?.ApplyEnemyScaling(enemyId);
 
+                    // Initialize N-hit shield from monster config
+                    if (monsterConfig.HitShieldCount > 0f)
+                    {
+                        store.EnemyHitShieldCount[enemyId] = monsterConfig.HitShieldCount;
+                        store.EnemyHitShieldMax[enemyId] = monsterConfig.HitShieldCount;
+                        store.EnemyHitShieldRegenInterval[enemyId] = monsterConfig.HitShieldRegenInterval;
+                        store.EnemyHitShieldTimer[enemyId] = monsterConfig.HitShieldRegenInterval > 0f
+                            ? monsterConfig.HitShieldRegenInterval : 0f;
+                    }
+
                     _multiSpawnedForType++;
                     enemiesSpawnedInWave++;
                     totalEnemiesSpawned++;

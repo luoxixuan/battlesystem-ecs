@@ -23,6 +23,7 @@ namespace BattleSystemECS.Core
         public Systems.ManaSystem? Mana { get; set; }
         public Systems.GlobalSkillSystem? GlobalSkill { get; set; }
         public Systems.BeamTowerSystem? BeamTower { get; set; }
+        public Systems.HitShieldSystem? HitShield { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -31,6 +32,7 @@ namespace BattleSystemECS.Core
             Heat?.Update(deltaTime);
             Energy?.Update(deltaTime);
             Demolish?.Update();
+            HitShield?.Update(deltaTime);
             TowerAttack?.Update(deltaTime);
             TowerSynergy?.Update();
             TowerLink?.Update();
