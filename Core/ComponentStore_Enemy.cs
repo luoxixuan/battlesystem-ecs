@@ -282,6 +282,8 @@ namespace BattleSystemECS.Core
         // ==================== Fear / Taunt / Charm 行为控制字段（SOA） ====================
         // EnemyFearDurationLeft: turns remaining for fear effect. When > 0, enemy runs away (direction = +1).
         public float[] EnemyFearDurationLeft = new float[MAX_ENTITIES];
+        // EnemyIsFeared: bool flag set when enemy is currently under fear effect (synced from fear duration)
+        public bool[] EnemyIsFeared = new bool[MAX_ENTITIES];
         // EnemyTauntTargetId: entity ID that this enemy is forced to attack (taunt effect). -1 = no taunt.
         public int[] EnemyTauntTargetId = new int[MAX_ENTITIES];
         // EnemyCharmDurationLeft: turns remaining for charm effect. When > 0, enemy attacks other enemies.

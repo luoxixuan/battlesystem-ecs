@@ -207,6 +207,14 @@ namespace BattleSystemECS.Core
         // EnemyIsBeingPulled: true if this enemy is currently affected by a pull effect
         public bool[] EnemyIsBeingPulled = new bool[MAX_ENTITIES];
 
+        // ==================== 恐惧光环塔 (Fear Aura Towers) ====================
+        // TowerFearRadius: radius within which enemies are affected by fear (0 = no fear aura)
+        public float[] TowerFearRadius = new float[MAX_ENTITIES];
+        // TowerFearDuration: duration of fear applied to enemies in the aura (in frames)
+        public float[] TowerFearDuration = new float[MAX_ENTITIES];
+        // TowerFearChance: probability (0-1) that fear is applied each frame an enemy is in range
+        public float[] TowerFearChance = new float[MAX_ENTITIES];
+
         // ==================== 流血/撕裂塔 (Bleed / Hemorrhage Towers) ====================
         // TowerIsBleedTower: true if this tower applies stacking bleed on hit (Slash/Pierce type)
         public bool[] TowerIsBleedTower = new bool[MAX_ENTITIES];

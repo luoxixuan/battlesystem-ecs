@@ -67,6 +67,7 @@ namespace BattleSystemECS.Core
         public TowerSabotageSystem? TowerSabotage { get; private set; }
         public ManaBurnSystem? ManaBurn { get; private set; }
         public PhaseSystem? Phase { get; private set; }
+        public FearSystem? Fear { get; private set; }
 
         // ── Environment ──
         public TerrainSystem? Terrain { get; private set; }
@@ -164,6 +165,9 @@ namespace BattleSystemECS.Core
 
             // ── Phase ──
             Phase = new PhaseSystem(store, playerId);
+
+            // ── Fear ──
+            Fear = new FearSystem(store, playerId);
 
             // ── Burrow, Necromancer, LifeLink ──
             EnemyBurrow = new EnemyBurrowSystem(store, playerId);
@@ -336,6 +340,7 @@ namespace BattleSystemECS.Core
             scheduler.AI.EnemyAffix = null;
             scheduler.AI.ManaBurn = ManaBurn;
             scheduler.AI.Phase = Phase;
+            scheduler.AI.Fear = Fear;
 
             // ── Movement ──
             scheduler.Movement.Wound = null;
