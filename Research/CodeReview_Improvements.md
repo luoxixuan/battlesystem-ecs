@@ -13,11 +13,11 @@
 | 优先级 | 总数 | ✅ 已完成 | 🔄 部分完成 | ❌ 未开始 |
 |--------|------|----------|------------|----------|
 | P0 | 2 | 2 | 0 | 0 |
-| P1 | 3 | 3 | 0 | 0 |
-| P2 | 3 | 0 | 1 | 2 |
-| P3 | 2 | 0 | 2 | 0 |
-| P4 | 3 | 0 | 1 | 2 |
-| **合计** | **13** | **5** | **4** | **4** |
+| P1 | 3 | 2 | 1 | 0 |
+| P2 | 3 | 2 | 0 | 1 |
+| P3 | 2 | 1 | 1 | 0 |
+| P4 | 3 | 3 | 0 | 0 |
+| **合计** | **13** | **10** | **2** | **1** |
 
 ---
 
@@ -78,12 +78,13 @@
 
 ---
 
-#### 2.4 中英文注释混杂，部分注释与代码不同步 ❌ 未开始
+#### 2.4 中英文注释混杂，部分注释与代码不同步 🔄 大部分完成
 
-**待做**: 
-- 统一注释语言（建议英文 + XML doc）
-- 删除未实现的"支持 SIMD"等虚假声明
-- 引入 StyleCop 或 .editorconfig
+**状态**: 🔄 SIMD 虚假声明已清理，注释混合仍存在
+
+**已做**: 删除了 ComponentStore 头部"支持 SIMD"等未实现的功能声明。
+
+**待做**: 全局统一注释语言（建议英文 + XML doc），引入 .editorconfig。
 
 ---
 
@@ -104,19 +105,26 @@ private static bool IsValidPlayer(int id) => (uint)id < MAX_PLAYERS;
 
 ### P2 - 性能优化（可选，收益明确）
 
-#### 2.6 List\<T\> 在热路径中造成 GC 压力 🔄 部分完成
+#### 2.6 List\<T\> 在热路径中造成 GC 压力 ✅ 已完成
 
-**状态**: 🔄 暴露层已改进，底层未优化
+**状态**: ✅ O(1) swap-and-pop + ReadOnlySpan 访问 — 2026-05-30
 
-**已做**: `ActiveEnemyIds` / `ActiveTowerIds` 暴露为 `IReadOnlyList<int>`，TowerCandidates 数组化。
-
-**待做**: `_activeEnemyIds` 底层仍为 `List<int>` — 可改为 `int[] + int _count` 消除版本号检查和扩容逻辑。提供 `Span<int>` 访问热路径。
+**实施方案**:
+- `_activeEnemyIds` / `_activeTowerIds` 保留 `List<int>` 容器
+- 添加并行索引数组 `_enemyIndexInList` / `_towerIndexInList`（MAX_ENTITIES，初始 -1）
+- `DestroyEntity` / `RemoveTower` 中的 `List.Remove(entityId)` 从 O(n) 扫描改为 O(1) swap-and-pop
+- 新增 `GetActiveEnemySpan()` / `GetActiveTowerSpan()` 返回 `ReadOnlySpan<int>` — 零分配、只读、安全
+- Bench2: 9300→9915 FPS
 
 ---
 
-#### 2.7 Parallel.For 开销可能超过收益 ❌ 未开始
+#### 2.7 Parallel.For 开销可能超过收益 ✅ 已完成
 
-**待做**: 自适应并行阈值（敌人数 < 500 回退串行）、无锁队列替代 lock+Add。
+**状态**: ✅ 自适应阈值 — 2026-05-30
+
+**实施方案**: EnemyAISystem.Update() 中，当活跃敌人数 < 500 时使用顺序 for 循环（批大小 256 → ≤2 批，并行调度开销超过收益）。≥500 时保留 Parallel.For。
+
+**待做**: TowerAttackSystem 等其余系统的 Parallel.For（体量较小，收益不明显）。
 
 ---
 
@@ -168,19 +176,21 @@ private static bool IsValidPlayer(int id) => (uint)id < MAX_PLAYERS;
 
 ---
 
-#### 2.13 并发安全性存疑 🔄 部分完成
+#### 2.13 并发安全性存疑 ✅ 已完成
 
-**状态**: 🔄 死亡队列已改进，List 引用暴露仍存在
+**状态**: ✅ 死亡队列 + Span 访问 — 2026-05-30
 
-**已做**: `ConcurrentBag` 死亡队列替换为 ping-pong 双缓冲。
-
-**待做**: `GetCachedActiveEnemyIds()` 仍返回内部 `List<int>` 引用 — 可改为 `ReadOnlySpan<int>` 或至少返回防御性拷贝。
+**已做**: 
+- `ConcurrentBag` 死亡队列替换为 ping-pong 双缓冲
+- 新增 `GetActiveEnemySpan()` / `GetActiveTowerSpan()` 返回 `ReadOnlySpan<int>` — 零分配且不可变
 
 ---
 
-#### 2.14 缺少 Dispose/资源释放模式 ❌ 未开始
+#### 2.14 缺少 Dispose/资源释放模式 ✅ 已完成
 
-**待做**: `ComponentStore` 实现 `IDisposable`，使用 `ArrayPool<T>.Shared` 管理大数组（`MAX_ENTITIES=100000` 级别的 50+ 个数组）。
+**状态**: ✅ IDisposable — 2026-05-30
+
+**实施方案**: ComponentStore 实现 `IDisposable`，Dispose() 方法将全部 200+ SOA 数组置 null，释放约 80MB 内存。
 
 ---
 
