@@ -8,25 +8,20 @@ using BattleSystemECS.Config;
 namespace BattleSystemECS.Core
 {
     /// <summary>
-    /// 统一帧调度器 — 所有帧调度路径（GameManager / Benchmark / Tests）必须走这里。
+    /// Unified frame scheduler — all frame paths (GameManager / Benchmark / Tests) go through here.
     /// 
-    /// 帧顺序（两阶段模式）：
-    ///   Phase 1 (并行可介入): AI、Abilities、Movement
-    ///   Phase 2 (串行结算):    RebuildSpatialGrid、Attack、SkillDamage、DOT、Death Resolve
+    /// Frame order (two-phase pattern):
+    ///   Phase 1 (parallel-safe):     AI, Abilities, Movement
+    ///   Phase 2 (serial settlement): RebuildSpatialGrid, Attack, SkillDamage, DOT, Death Resolve
     /// </summary>
     public class FrameScheduler
     {
         private readonly ComponentStore store;
         private readonly GameConfig gameConfig;
 
-        /// <summary>
-        /// Current game phase — controls which systems run per frame.
-        /// BuildPhase: only tower placement/upgrade UI, no combat.
-        /// WavePhase: full combat systems.
-        /// </summary>
         public GameState Phase { get; set; } = GameState.WavePhase;
 
-        // Systems — nullable，调用方按需注入
+        // Systems — nullable, injected by caller
         public WaveSpawningSystem? WaveSpawning { get; set; }
         public EnemyAISystem? EnemyAI { get; set; }
         public EnemyAbilitySystem? EnemyAbility { get; set; }
@@ -88,8 +83,6 @@ namespace BattleSystemECS.Core
         public FogOfWarSystem? Fog { get; set; }
         public PatrolTowerSystem? PatrolTower { get; set; }
 
-        // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
-        // Used by ComboSystem to increment combo counters.
         public event Action<int, int> OnEnemyKilled;
 
         public FrameScheduler(ComponentStore store, GameConfig gameConfig)
@@ -99,136 +92,170 @@ namespace BattleSystemECS.Core
         }
 
         /// <summary>
-        /// 执行一帧完整调度。
-        /// Systems are gated by current Phase:
-        ///   BuildPhase — tower placement/upgrade only (no WaveSpawning/EnemyAI/Combat)
-        ///   WavePhase  — full combat pipeline
+        /// Execute one full frame of systems, gated by current Phase.
+        /// BuildPhase: UI-only systems. WavePhase/Intermission: full combat pipeline.
         /// </summary>
-        /// <param name="deltaTime">时间步长（通常 1f）</param>
-        /// <param name="turn">当前回合编号（从 1 开始）</param>
         public void Tick(float deltaTime, int turn)
         {
-            // ── Phase 0: 帧初始化 ──────────────────────────────────────────
             store.BeginFrame();
             store.SetTurnCCFlags();
 
-            // ── Time Dilation: apply per-player time scale (bullet time / fast-forward) ──
-            //衰减剩余持续时间
+            UpdateTimeScale(ref deltaTime);
+
+            if (Phase == GameState.BuildPhase)
+            {
+                RunBuildPhase(deltaTime);
+                return;
+            }
+
+            RunWavePhase(deltaTime, turn);
+        }
+
+        /// <summary>
+        /// Full game turn with post-tick game logic, matching GameManager.Run() behavior.
+        /// </summary>
+        public void TickGameTurn(float deltaTime, int turn)
+        {
+            Tick(deltaTime, turn);
+        }
+
+        // ─── Private phase methods ───────────────────────────────────────────
+
+        private void UpdateTimeScale(ref float deltaTime)
+        {
             if (store.GlobalTimeScaleDuration[0] > 0f)
             {
                 store.GlobalTimeScaleDuration[0] -= 1f;
                 if (store.GlobalTimeScaleDuration[0] <= 0f)
                 {
                     store.GlobalTimeScaleDuration[0] = 0f;
-                    store.GlobalTimeScale[0] = 1f; // 恢复到正常速度
+                    store.GlobalTimeScale[0] = 1f;
                 }
             }
-            // 应用时间缩放到 deltaTime
-            float effectiveDelta = deltaTime * store.GlobalTimeScale[0];
+            deltaTime = deltaTime * store.GlobalTimeScale[0];
+        }
 
-            if (Phase == GameState.BuildPhase)
-            {
-// ── BuildPhase: tower placement/upgrade UI only ───────────
-                Gold?.Update();
-                TowerIncome?.Update(deltaTime); // income tower gold production (build phase runs every frame)
-                Upgrade?.Update();
-                Skill?.Update(deltaTime); // skill cooldown ticking
-                AutoSkill?.Update();      // auto-cast ready skills
-                TowerRelocate?.Update(); // tower relocation cooldown tracking
-                Interest?.Update();       // bank/interest system
-                Mana?.Update(deltaTime, isBuildPhase: true); // mana regen (build phase = higher regen)
-                Objective?.Update(deltaTime, Phase); // escort NPC movement, objective timers
-                ResourceNode?.Update(deltaTime, Phase); // resource node production
-                GlobalSkill?.Update(deltaTime, isBuildPhase: true); // global skill cooldown ticking
-                return;
-            }
+        private void RunBuildPhase(float deltaTime)
+        {
+            Gold?.Update();
+            TowerIncome?.Update(deltaTime);
+            Upgrade?.Update();
+            Skill?.Update(deltaTime);
+            AutoSkill?.Update();
+            TowerRelocate?.Update();
+            Interest?.Update();
+            Mana?.Update(deltaTime, isBuildPhase: true);
+            Objective?.Update(deltaTime, Phase);
+            ResourceNode?.Update(deltaTime, Phase);
+            GlobalSkill?.Update(deltaTime, isBuildPhase: true);
+        }
 
-            // ── WavePhase / Intermission: full combat pipeline ──────────────
+        private void RunWavePhase(float deltaTime, int turn)
+        {
+            RunPreGameSystems(deltaTime, turn);
+            RunSpawningPhase(turn, deltaTime);
+            RunAIPhase(turn, deltaTime);
+            RunEnemyAffixPhase(deltaTime);
+            RunMovementPhase(turn, deltaTime);
+            RunTerrainPhase(turn, deltaTime);
+            RunMorphPhase(deltaTime, turn);
+            RunPreCombatSetup(turn);
+            RebuildSpatial(deltaTime, turn);
+            RunCombatPhase(deltaTime);
+            RunSkillBuffDamagePhase(deltaTime);
+            RunDeathResolvePhase(deltaTime);
+            RunPostDeathPhase(deltaTime);
+        }
 
-// ── Phase 0.5: Weather update (before combat) ───────────────────
-            Weather?.Update(effectiveDelta);
+        // ── Pre-game: weather, day/night, difficulty, construction, events ──
+        private void RunPreGameSystems(float deltaTime, int turn)
+        {
+            Weather?.Update(deltaTime);
+            DayNight?.Update(deltaTime);
+            AdaptiveDifficulty?.Update(deltaTime);
+            Construction?.Update(deltaTime);
 
-            // ── Phase 0.55: Day/Night cycle update ────────────────────────────
-            DayNight?.Update(effectiveDelta);
-
-// ── Phase 0.6: Adaptive Difficulty update ───────────────────────
-            AdaptiveDifficulty?.Update(effectiveDelta);
-
-            // ── Phase 0.62: Tower Construction update (both phases) ───────────
-            Construction?.Update(effectiveDelta);
-
-            // ── Phase 0.65: Random Mid-Wave Events ────────────────────────────
             int waveNum = WaveSpawning?.GetCurrentWave() ?? 1;
-            int lvlNum = WaveSpawning?.GetCurrentLevel() ?? 1;
-            RandomEvent?.Update(effectiveDelta, waveNum, lvlNum);
+            int levelNum = WaveSpawning?.GetCurrentLevel() ?? 1;
+            RandomEvent?.Update(deltaTime, waveNum, levelNum);
+        }
 
-            // ── Phase 1: 生成 ─────────────────────────────────────────────
+        // ── Spawning: wave, nest, summoner structures ──
+        private void RunSpawningPhase(int turn, float deltaTime)
+        {
             WaveSpawning?.Update();
-
-            // ── Phase 1.5: Nest / Spawner Structures ────────────────────
             Nest?.SetTurn(turn);
-            Nest?.Update(effectiveDelta);
+            Nest?.Update(deltaTime);
+        }
 
-            // ── Phase 2: AI + Abilities ───────────────────────────────────
-            EnemyAI?.SetTurn(turn, effectiveDelta);
+        // ── AI phase: behaviour trees, abilities, burrow, necromancer, life link ──
+        private void RunAIPhase(int turn, float deltaTime)
+        {
+            EnemyAI?.SetTurn(turn, deltaTime);
             EnemyAI?.Update();
 
             EnemyAbility?.SetTurn(turn);
-            EnemyAbility?.UpdateCooldowns(effectiveDelta);
+            EnemyAbility?.UpdateCooldowns(deltaTime);
             EnemyAbility?.ExecuteAbilities();
             EnemyAbility?.Update();
 
-            // ── Phase 2.5: Enemy Affixes (per-enemy affix effects) ──────────
-            EnemyAffix?.Update(effectiveDelta);
-
-            // ── Phase 2.55: Enemy Burrow — underground enemy state transitions ──
             Burrow?.SetTurn(turn);
             Burrow?.Update();
             Burrow?.ApplyBurrowEffects();
 
-            // ── Phase 2.6: Necromancer — resurrect corpses as reanimated minions ──
-            Necromancer?.SetTurn(turn, turn);  // second param = sim elapsed (turn = proxy for sim seconds)
+            Necromancer?.SetTurn(turn, turn);
             Necromancer?.Update(deltaTime);
 
-            // ── Phase 2.65: Enemy Life Link — establish damage-sharing links ─────
             LifeLink?.SetTurn(turn);
             LifeLink?.Update();
-            LifeLink?.DecrementCooldowns(effectiveDelta);
+            LifeLink?.DecrementCooldowns(deltaTime);
+        }
 
-            // ── Phase 3: Movement ──────────────────────────────────────────
+        // ── Enemy affixes ──
+        private void RunEnemyAffixPhase(float deltaTime)
+        {
+            EnemyAffix?.Update(deltaTime);
+        }
+
+        // ── Movement: pathfinding, wound, modifiers, healer, summons, steal ──
+        private void RunMovementPhase(int turn, float deltaTime)
+        {
             Wound?.SetTurn(turn);
             Wound?.Update();
             Pathfinding?.SetTurn(turn);
             EnemyMovement?.SetTurn(turn);
             EnemyMovement?.Update();
 
-            // ── Phase 3.05: Path Modifiers — reroute enemies inside influence zones ──
             PathModifier?.SetTurn();
-            PathModifier?.Update(effectiveDelta);
+            PathModifier?.Update(deltaTime);
 
-            // ── Phase 3.5: Terrain Effects (after movement, before combat) ──
-            Terrain?.SetTurn();
-            Terrain?.Update(effectiveDelta);
-
-            // ── Phase 3.6: Wave Mutators (global wave modifiers) ─────────────
-            WaveMutator?.SetTurn(turn);
-            WaveMutator?.Update(effectiveDelta);
-
-            // ── Phase 3.7: Enemy Morph — transform mid-wave enemies before combat ──
-            EnemyMorph?.Update(effectiveDelta);
-
-            // ── Phase 3.75: Enemy Healer — heal-over-time for healer units ──────
             EnemyHealer?.SetTurn(turn);
-            EnemyHealer?.Update(effectiveDelta);
+            EnemyHealer?.Update(deltaTime);
 
-            // ── Phase 3.8: Enemy Steal Gold — process thieves that reached the base ──
             StealGold?.Update();
 
-            // ── Phase 3.85: Player Summons — update summoned unit movement and attacks ──
             Summon?.SetTurn(turn);
-            Summon?.Update(effectiveDelta);
+            Summon?.Update(deltaTime);
+        }
 
-            // ── Phase 4: Combat — SetTurn ─────────────────────────────────
+        // ── Terrain, wave mutators ──
+        private void RunTerrainPhase(int turn, float deltaTime)
+        {
+            Terrain?.SetTurn();
+            Terrain?.Update(deltaTime);
+            WaveMutator?.SetTurn(turn);
+            WaveMutator?.Update(deltaTime);
+        }
+
+        // ── Morph ──
+        private void RunMorphPhase(float deltaTime, int turn)
+        {
+            EnemyMorph?.Update(deltaTime);
+        }
+
+        // ── Pre-combat setup: SetTurn on all combat systems ──
+        private void RunPreCombatSetup(int turn)
+        {
             PlayerTowerAttack?.SetTurn(turn);
             TowerAttack?.SetTurn(turn);
             TowerOvercharge?.SetTurn(turn);
@@ -238,107 +265,82 @@ namespace BattleSystemECS.Core
             AuraTower?.SetTurn();
             Curse?.SetTurn();
             PullTower?.SetTurn();
-            Mana?.SetTurn(); // cache tech tree mana bonuses
+            Mana?.SetTurn();
             GlobalSkill?.SetTurn(turn);
+        }
 
-            // ── Phase 5: Spatial Rebuild ──────────────────────────────────
+        // ── Spatial rebuild + post-rebuild systems (patrol, chrono, fog, telegraph) ──
+        private void RebuildSpatial(float deltaTime, int turn)
+        {
             store.RebuildSpatialGrid();
 
-// ── Phase 5.0: Patrol Tower — update mobile tower positions, before Chrono/Fog ─
             PatrolTower?.SetTurn(turn);
-            PatrolTower?.Update(effectiveDelta);
+            PatrolTower?.Update(deltaTime);
 
-// ── Phase 5.1: Chrono Tower — time dilation fields, after spatial rebuild ──
             ChronoTower?.SetTurn();
             ChronoTower?.Update();
 
-            // ── Phase 5.15: Fog of War — compute tower vision visibility, before TowerAttack ──
             Fog?.SetTurn();
             Fog?.Update();
 
-            // ── Phase 5.5: Point Defense — intercept enemy projectiles before they hit ──
             PointDefense?.SetTurn(turn);
-            PointDefense?.Update(effectiveDelta);
+            PointDefense?.Update(deltaTime);
 
-            // ── Phase 5.6: Telegraph System — update warning zones countdown ──
-            Telegraph?.Update(effectiveDelta);
+            Telegraph?.Update(deltaTime);
+        }
 
-            // ── Phase 6: Combat — Update ──────────────────────────────────
+        // ── Combat: attacks, synergy, auras, curses, projectiles, mana, skills ──
+        private void RunCombatPhase(float deltaTime)
+        {
             PlayerTowerAttack?.Update();
-            TowerOvercharge?.Update(effectiveDelta);
-            // TowerDemolish: process any towers marked for sacrifice this frame
-            // Runs before TowerAttack so demolish damage is resolved before regular attacks
+            TowerOvercharge?.Update(deltaTime);
             Demolish?.Update();
-            TowerAttack?.Update(effectiveDelta);
+            TowerAttack?.Update(deltaTime);
             TowerSynergy?.Update();
             TowerLink?.Update();
             AuraTower?.ResolveAuraBuffs();
             Curse?.ResolveCurseDebuffs();
-            PullTower?.Update(effectiveDelta);
-            TowerSilence?.Update(effectiveDelta);
-            Dispel?.Update(effectiveDelta);
-            Projectile?.Update(effectiveDelta);
-            // Update enemy projectiles (moves them toward player base)
-            EnemyProjectile?.Update(effectiveDelta);
-            Pickup?.Update(effectiveDelta);
-            Mana?.Update(effectiveDelta, isBuildPhase: false); // mana regen (wave phase = normal regen)
-            GlobalSkill?.Update(effectiveDelta, isBuildPhase: false); // global skill cooldown
-
-            // ── Phase 7: Skill / Buff Damage ──────────────────────────────
-            Buff?.Update(effectiveDelta);
-            Skill?.ResolveSkillDamage();
-            Buff?.ResolveDotDamage();
-            Bleed?.Update(effectiveDelta);
-            Bleed?.ResolveBleedDamage();
-            Skill?.Update(effectiveDelta); // skill cooldown ticking (WavePhase only path)
-
-            // ── Phase 9: Death Resolve ─────────────────────────────────────
-            // Collect kill events before resolving so ComboSystem can subscribe
-            var killEvents = new List<(int enemyId, int playerId)>();
-            // Snapshot the death queue (readIdx is set by ResolveEnemiesKilledThisFrame internally)
-            // We need to collect kills AFTER ResolveEnemiesKilledThisFrame processes them.
-            // The safest approach: resolve first, then fire event. But we need the IDs.
-            // Alternative: hook into ComponentStore.ResolveEnemiesKilledThisFrame callback.
-            //
-            // For now, fire a generic "kills resolved" signal after resolve completes.
-            // Subscribers can read store.TotalKills delta or the combo counters directly.
-            store.ResolveEnemiesKilledThisFrame();
-            Combo?.Update(deltaTime); // decay already called above — safe to call again (idempotent)
-
-            // ── Phase 9.5: Enemy Fission — spawn children after death resolve ─────
-            EnemyFission?.Update();
-
-            // ── Phase 9.55: Enemy Life Link break penalties ─────────────────────
-            LifeLink?.ResolveBreakPenalties();
-
-            // ── Phase 9.6: Objective System — update objective state ─────────────
-            Objective?.Update(effectiveDelta, Phase);
-            ResourceNode?.Update(effectiveDelta, Phase); // resource node production
-            TowerIncome?.Update(effectiveDelta);         // income tower gold production
-
-            // ── Phase 9.65: Corpse Effect System — tick ground effect durations and apply ──
-            CorpseEffect?.Update(effectiveDelta);
-
-            // ── Phase 9.7: Wave Branch — pause combat while player selects branch ──
-            if (WaveBranch?.IsBranchActive == true)
-            {
-                // Combat paused — branch UI is showing. Skip remaining combat systems this frame.
-                return;
-            }
+            PullTower?.Update(deltaTime);
+            TowerSilence?.Update(deltaTime);
+            Dispel?.Update(deltaTime);
+            Projectile?.Update(deltaTime);
+            EnemyProjectile?.Update(deltaTime);
+            Pickup?.Update(deltaTime);
+            Mana?.Update(deltaTime, isBuildPhase: false);
+            GlobalSkill?.Update(deltaTime, isBuildPhase: false);
         }
 
-        /// <summary>
-        /// 游戏主循环使用的完整每回合调度（含游戏状态维护）。
-        /// 与 GameManager.Run() 行为完全对齐。
-        /// </summary>
-        public void TickGameTurn(float deltaTime, int turn)
+        // ── Skill / Buff / Bleed damage ──
+        private void RunSkillBuffDamagePhase(float deltaTime)
         {
-            Tick(deltaTime, turn);
+            Buff?.Update(deltaTime);
+            Skill?.ResolveSkillDamage();
+            Buff?.ResolveDotDamage();
+            Bleed?.Update(deltaTime);
+            Bleed?.ResolveBleedDamage();
+            Skill?.Update(deltaTime);
+        }
 
-            // ── Post-tick 游戏逻辑（GameManager 中每帧执行的非战斗逻辑）──
-            // Gold/Upgrade/Skill cooldown already handled inside Tick based on phase.
-            // Additional game-level systems that run regardless of phase:
-            // (TechTree is read-only here, Gold/Upgrade already called above)
+        // ── Death resolve + combo decay ──
+        private void RunDeathResolvePhase(float deltaTime)
+        {
+            store.ResolveEnemiesKilledThisFrame();
+            Combo?.Update(deltaTime);
+        }
+
+        // ── Post-death: fission, life link penalties, objective, resources, income, corpse ──
+        private void RunPostDeathPhase(float deltaTime)
+        {
+            EnemyFission?.Update();
+            LifeLink?.ResolveBreakPenalties();
+            Objective?.Update(deltaTime, Phase);
+            ResourceNode?.Update(deltaTime, Phase);
+            TowerIncome?.Update(deltaTime);
+            CorpseEffect?.Update(deltaTime);
+
+            // Wave branch: pause combat if branch selection is active
+            if (WaveBranch?.IsBranchActive == true)
+                return;
         }
     }
 }
