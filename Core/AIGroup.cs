@@ -1,7 +1,7 @@
 #nullable enable
 namespace BattleSystemECS.Core
 {
-    /// <summary>Enemy AI, abilities, burrow, necromancer, life link, affixes.</summary>
+    /// <summary>Enemy AI, abilities, burrow, necromancer, life link, affixes, mana burn.</summary>
     public class AIGroup : ISystemGroup
     {
         public Systems.EnemyAISystem? EnemyAI { get; set; }
@@ -10,6 +10,7 @@ namespace BattleSystemECS.Core
         public Systems.NecromancerSystem? Necromancer { get; set; }
         public Systems.EnemyLifeLinkSystem? LifeLink { get; set; }
         public Systems.EnemyAffixSystem? EnemyAffix { get; set; }
+        public Systems.ManaBurnSystem? ManaBurn { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -33,6 +34,9 @@ namespace BattleSystemECS.Core
             LifeLink?.DecrementCooldowns(deltaTime);
 
             EnemyAffix?.Update(deltaTime);
+
+            ManaBurn?.SetTurn(turn);
+            ManaBurn?.Update();
         }
     }
 }

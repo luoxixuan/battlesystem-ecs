@@ -33,6 +33,9 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float[] PlayerManaRegen = new float[MAX_PLAYERS];
         // PlayerManaCost: cost multiplier for skill mana consumption
         public float[] PlayerManaCost = new float[MAX_PLAYERS];
+        // PlayerMaxMana initialized to default value (can be configured via GameConfig)
+        private float _playerMaxManaDefault = 100f;
+        public float PlayerMaxManaDefault { get => _playerMaxManaDefault; set => _playerMaxManaDefault = value; }
         // ==================== 玩家全局技能/终极技能 (Global Skills / Ultimates) ====================
         // PlayerGlobalSkillUnlocked: bit-flag of which global skills are unlocked per player (indexed by playerId * MAX_GLOBAL_SKILLS + skillIdx)
         public bool[] PlayerGlobalSkillUnlocked = new bool[MAX_PLAYERS * 8];
@@ -388,6 +391,49 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         {
             if (!IsValidPlayer(playerId)) return false;
             return PlayerCurrentHealth[playerId] > 0f;
+        }
+
+        // ==================== 玩家法力访问方法 ====================
+        public float GetPlayerMana(int playerId)
+        {
+            if (!IsValidPlayer(playerId)) return 0f;
+            return PlayerMana[playerId];
+        }
+
+        public float GetPlayerMaxMana(int playerId)
+        {
+            if (!IsValidPlayer(playerId)) return 0f;
+            return PlayerMaxMana[playerId];
+        }
+
+        public void SetPlayerMaxMana(int playerId, float maxMana)
+        {
+            if (!IsValidPlayer(playerId)) return;
+            PlayerMaxMana[playerId] = maxMana;
+        }
+
+        public void SetPlayerMana(int playerId, float mana)
+        {
+            if (!IsValidPlayer(playerId)) return;
+            PlayerMana[playerId] = Math.Max(0f, Math.Min(mana, PlayerMaxMana[playerId]));
+        }
+
+        public void DecreasePlayerMana(int playerId, float amount)
+        {
+            if (!IsValidPlayer(playerId) || amount <= 0f) return;
+            PlayerMana[playerId] = Math.Max(0f, PlayerMana[playerId] - amount);
+        }
+
+        public void AddPlayerMana(int playerId, float amount)
+        {
+            if (!IsValidPlayer(playerId) || amount <= 0f) return;
+            PlayerMana[playerId] = Math.Min(PlayerMaxMana[playerId], PlayerMana[playerId] + amount);
+        }
+
+        public float GetPlayerManaRegen(int playerId)
+        {
+            if (!IsValidPlayer(playerId)) return 0f;
+            return PlayerManaRegen[playerId];
         }
 
         // ==================== 天气系统访问方法 ====================

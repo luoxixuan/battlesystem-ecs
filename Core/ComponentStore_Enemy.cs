@@ -337,6 +337,16 @@ namespace BattleSystemECS.Core
         // EnemyHasStolenGold: set to true when thief escapes with stolen gold (skips gold reward on death)
         public bool[] EnemyHasStolenGold = new bool[MAX_ENTITIES];
 
+        // ==================== 法力燃烧敌人组件（SOA）====================
+        // EnemyManaBurnAmount: amount of mana this enemy burns per attack (0 = no mana burn)
+        public float[] EnemyManaBurnAmount = new float[MAX_ENTITIES];
+        // EnemyManaBurnRadius: range within which mana burn is effective (0 = global effect)
+        public float[] EnemyManaBurnRadius = new float[MAX_ENTITIES];
+        // EnemyManaBurnCooldown: seconds until mana burn can be used again (0 = ready)
+        public float[] EnemyManaBurnCooldown = new float[MAX_ENTITIES];
+        // EnemyManaBurnType: 0=flat, 1=percent_current, 2=percent_max (default 0=flat)
+        public int[] EnemyManaBurnType = new int[MAX_ENTITIES];
+
         // ==================== 敌人词缀组件（SOA）====================
         // EnemyAffixFlags: bit-mask of active affixes (see BuffType affix bits 16-22)
         // Each enemy spawns with 1-3 random affixes; stored as a flag set for O(1) HasAffix() checks.
@@ -464,6 +474,12 @@ namespace BattleSystemECS.Core
                 int sepIdx = nameToStore.IndexOf('L');
                 EnemyTypeName[entityId] = (sepIdx > 0) ? nameToStore.Substring(0, sepIdx) : nameToStore;
             }
+
+            // Mana Burn: default 0 (no mana burn ability)
+            EnemyManaBurnAmount[entityId] = 0f;
+            EnemyManaBurnRadius[entityId] = 0f;
+            EnemyManaBurnCooldown[entityId] = 0f;
+            EnemyManaBurnType[entityId] = 0;
 
             // H-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeEnemyIds.Add(entityId); _enemyIndexInList[entityId] = _activeEnemyIds.Count - 1; }

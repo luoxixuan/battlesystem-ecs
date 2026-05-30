@@ -64,6 +64,7 @@ namespace BattleSystemECS.Core
         public NecromancerSystem? Necromancer { get; private set; }
         public EnemyLifeLinkSystem? LifeLink { get; private set; }
         public HitShieldSystem? HitShield { get; private set; }
+        public ManaBurnSystem? ManaBurn { get; private set; }
 
         // ── Environment ──
         public TerrainSystem? Terrain { get; private set; }
@@ -151,6 +152,9 @@ namespace BattleSystemECS.Core
             // ── Hit Shield ──
             var hitShield = new HitShieldSystem(store, logger);
             HitShield = hitShield;
+
+            // ── Mana Burn ──
+            ManaBurn = new ManaBurnSystem(store, playerId);
 
             // ── Burrow, Necromancer, LifeLink ──
             EnemyBurrow = new EnemyBurrowSystem(store, playerId);
@@ -320,6 +324,7 @@ namespace BattleSystemECS.Core
             scheduler.AI.Necromancer = Necromancer;
             scheduler.AI.LifeLink = LifeLink;
             scheduler.AI.EnemyAffix = null;
+            scheduler.AI.ManaBurn = ManaBurn;
 
             // ── Movement ──
             scheduler.Movement.Wound = null;
