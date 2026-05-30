@@ -19,6 +19,9 @@ namespace BattleSystemECS.Systems
         private float sellRatio = 0.5f;
         private float minSellRatio = 0.3f;
         private float sellRatioDecreasePerLevel = 0.05f;
+        // Tower cost scaling: each additional tower of the same type costs more
+        private float costIncrementPerCopy = 1.15f;
+        private float costIncrementCap = 2.5f;
 
         public TowerPlacementSystem(ComponentStore store, IRenderer logger)
         {
@@ -52,6 +55,8 @@ namespace BattleSystemECS.Systems
                     if (root.TryGetProperty("sellRatio", out var sr)) sellRatio = sr.GetSingle();
                     if (root.TryGetProperty("minSellRatio", out var msr)) minSellRatio = msr.GetSingle();
                     if (root.TryGetProperty("sellRatioDecreasePerLevel", out var srdpl)) sellRatioDecreasePerLevel = srdpl.GetSingle();
+                    if (root.TryGetProperty("costIncrementPerCopy", out var cicp)) costIncrementPerCopy = cicp.GetSingle();
+                    if (root.TryGetProperty("costIncrementCap", out var cic)) costIncrementCap = cic.GetSingle();
                 }
                 catch { /* use defaults */ }
             }
@@ -68,6 +73,23 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// Compute the scaled placement cost for a tower type.
+        /// Formula: baseCost * min(costIncrementCap, costIncrementPerCopy ^ copyCount)
+        /// The count is the number of towers of this type already placed (not including this one).
+        /// </summary>
+        private float ComputeScaledCost(float baseCost, int towerTypeIndex, int playerId)
+        {
+            if (towerTypeIndex < 0 || towerTypeIndex >= store.PlacementCountByType.Length)
+                return baseCost; // unknown type — no scaling
+            int count = store.PlacementCountByType[towerTypeIndex];
+            if (count <= 0) return baseCost;
+
+            float scale = (float)Math.Pow(costIncrementPerCopy, count);
+            if (scale > costIncrementCap) scale = costIncrementCap;
+            return baseCost * scale;
+        }
+
+        /// <summary>
         /// Place a tower at the specified location (legacy overload, no debuff support).
         /// </summary>
         public int PlaceTower(int x, int y, TowerType type, float damage, int range, float speed, float cost)
@@ -79,7 +101,15 @@ namespace BattleSystemECS.Systems
                 return -1;
             }
 
-            // 2. Check if position already has a tower
+            // 2. Compute scaled cost based on how many of this type are already placed
+            int towerTypeIndex = (int)type;
+            float scaledCost = ComputeScaledCost(cost, towerTypeIndex, 1);
+            if (scaledCost != cost)
+            {
+                logger.Log($"[TOWER] {type} cost scaled: {cost:F0} → {scaledCost:F0} (×{scaledCost / cost:F2}, copy #{store.PlacementCountByType[towerTypeIndex] + 1})");
+            }
+
+            // 3. Check if position already has a tower
             foreach (int tid in store.ActiveTowerIds)
             {
                 if (store.PositionX[tid] == x && store.PositionY[tid] == y)
@@ -89,7 +119,7 @@ namespace BattleSystemECS.Systems
                 }
             }
 
-            // 3. Create tower entity
+            // 4. Create tower entity
             int towerId = store.CreateEntity();
             if (towerId == -1)
             {
@@ -235,6 +265,11 @@ namespace BattleSystemECS.Systems
             {
                 store.AddTower(towerId, type, damage, range, speed, 1, cost);
             }
+
+            // Increment placement count for cost scaling (after successful placement)
+            int incType = (int)type;
+            if (incType >= 0 && incType < store.PlacementCountByType.Length)
+                store.PlacementCountByType[incType]++;
 
             logger.Log($"[TOWER] {type} placed at ({x},{y})");
             logger.Log($"[TOWER] Tower placed: {type} at ({x},{y}), damage: {damage}, range: {range}, ID: {towerId}");

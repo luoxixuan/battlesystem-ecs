@@ -87,6 +87,10 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // PlayerInterestRate: interest rate multiplier (0.05f = 5% per wave, capped at InterestRateCap)
         public float[] PlayerInterestRate = new float[MAX_PLAYERS];
 
+        // ==================== Tower Placement Cost Scaling（每类型放置计数） ====================
+        // PlacementCountByType: tracks how many towers of each type this player has placed (for cost scaling)
+        public int[] PlacementCountByType = new int[9]; // index = (int)TowerType, size = 9 (Basic..Firewall)
+
         #endregion
 
         // ==================== 玩家组件访问 ====================

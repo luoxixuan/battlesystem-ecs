@@ -11,5 +11,7 @@
   "allowRelocateInWave": false,
   "defaultConstructionTime": 0,
   "defaultConstructionHP": 0,
-  "isVulnerableDuringConstruction": false
+  "isVulnerableDuringConstruction": false,
+  "costIncrementPerCopy": 1.15,
+  "costIncrementCap": 2.5
 }
