@@ -34,6 +34,12 @@ namespace BattleSystemECS.Systems
         private int[] _projFragmentCount = new int[MAX_PROJ];
         private float[] _projFragmentRange = new float[MAX_PROJ];
         private float[] _projFragmentDmgMult = new float[MAX_PROJ];
+        // Arc projectile physics: height tracks vertical position for arc/mortar trajectories
+        private float[] _projHeight = new float[MAX_PROJ];
+        private float[] _projVerticalVelocity = new float[MAX_PROJ];
+        private float[] _projGravity = new float[MAX_PROJ];
+        private int[] _projArcType = new int[MAX_PROJ]; // 0=straight, 1=homing, 2=arc
+        private float[] _projArcPeakHeight = new float[MAX_PROJ];
         private int _activeProjectileCount;
 
         // Ping-pong damage queue (same pattern as TowerAttackSystem)
@@ -95,6 +101,78 @@ namespace BattleSystemECS.Systems
             _projFragmentDmgMult[projId] = fragmentDmgMult;
             _projVelX[projId] = 0f;
             _projVelY[projId] = 0f;
+            // Arc projectile physics: default to no arc (straight trajectory)
+            _projHeight[projId] = 0f;
+            _projVerticalVelocity[projId] = 0f;
+            _projGravity[projId] = 0f;
+            _projArcType[projId] = 0;
+            _projArcPeakHeight[projId] = 0f;
+            _projActive[projId] = true;
+            _activeProjectileCount++;
+        }
+
+        /// <summary>
+        /// Spawn a projectile from a tower toward a target enemy with arc trajectory.
+        /// </summary>
+        /// <param name="towerId">Source tower ID</param>
+        /// <param name="targetId">Target enemy ID</param>
+        /// <param name="damage">Base damage</param>
+        /// <param name="playerId">Owning player</param>
+        /// <param name="speed">Projectile speed</param>
+        /// <param name="isHoming">Whether projectile tracks target mid-flight</param>
+        /// <param name="arcType">Arc type: 0=straight, 1=homing, 2=arc/mortar</param>
+        /// <param name="arcPeakHeight">Peak height for arc projectiles</param>
+        /// <param name="gravityScale">Gravity scale for arc projectiles</param>
+        /// <param name="pierceCount">Number of enemies to pierce through (0 = no pierce)</param>
+        /// <param name="pierceDmgFalloff">Damage multiplier after each pierce</param>
+        /// <param name="fragmentCount">Number of child projectiles to spawn on impact</param>
+        /// <param name="fragmentRange">Search radius for fragment targets</param>
+        /// <param name="fragmentDmgMult">Damage multiplier for each fragment</param>
+        public void FireWithArc(int towerId, int targetId, float damage, int playerId, float speed, bool isHoming, int arcType, float arcPeakHeight, float gravityScale, int pierceCount = 0, float pierceDmgFalloff = 1f, int fragmentCount = 0, float fragmentRange = 0f, float fragmentDmgMult = 1f)
+        {
+            if (_activeProjectileCount >= MAX_PROJ) return;
+
+            // Find free slot
+            int projId = -1;
+            for (int i = 0; i < MAX_PROJ; i++)
+            {
+                if (!_projActive[i]) { projId = i; break; }
+            }
+            if (projId < 0) return;
+
+            _projX[projId] = store.PositionX[towerId];
+            _projY[projId] = store.PositionY[towerId];
+            _projTargetId[projId] = targetId;
+            _projDamage[projId] = damage;
+            _projPlayerId[projId] = playerId;
+            _projTowerId[projId] = towerId;
+            _projSpeed[projId] = speed;
+            _projIsHoming[projId] = isHoming;
+            _projPierceRemaining[projId] = pierceCount;
+            _projPierceDmgFalloff[projId] = pierceDmgFalloff;
+            _projFragmentCount[projId] = fragmentCount;
+            _projFragmentRange[projId] = fragmentRange;
+            _projFragmentDmgMult[projId] = fragmentDmgMult;
+            _projVelX[projId] = 0f;
+            _projVelY[projId] = 0f;
+            // Arc projectile physics: initialize arc trajectory
+            _projHeight[projId] = 0f;
+            _projArcType[projId] = arcType;
+            _projArcPeakHeight[projId] = arcPeakHeight;
+            // Use gravityScale * 9.8 for arc, 0 for straight/homing
+            _projGravity[projId] = (arcType == 2) ? (gravityScale * 9.8f) : 0f;
+            // Compute initial vertical velocity for arc: v0 = g * timeToApex, where apex height = arcPeakHeight
+            // Approximate timeToApex = horizontalDist / speed, so v0 = arcPeakHeight / timeToApex
+            float dx = store.PositionX[targetId] - _projX[projId];
+            float dy = store.PositionY[targetId] - _projY[projId];
+            float horizDist = MathF.Sqrt(dx * dx + dy * dy);
+            // Guard against zero-distance: use minimum horizontal travel time
+            float timeToTarget = horizDist / MathF.Max(speed, 0.1f);
+            // Minimum time to prevent divide-by-zero in vertical velocity calculation
+            timeToTarget = MathF.Max(timeToTarget, 0.2f);
+            // Aim for apex at arcPeakHeight — use half the flight time for upward velocity
+            float halfTime = timeToTarget * 0.5f;
+            _projVerticalVelocity[projId] = (arcPeakHeight > 0f && halfTime > 0f) ? (arcPeakHeight / halfTime) : 0f;
             _projActive[projId] = true;
             _activeProjectileCount++;
         }
@@ -156,6 +234,25 @@ namespace BattleSystemECS.Systems
                 // Move projectile
                 _projX[i] += _projVelX[i] * deltaTime;
                 _projY[i] += _projVelY[i] * deltaTime;
+
+                // Arc projectile physics: update height for arc-type projectiles
+                int arcType = _projArcType[i];
+                if (arcType == 2) // Arc trajectory (mortar)
+                {
+                    // Apply gravity to vertical velocity
+                    _projVerticalVelocity[i] -= _projGravity[i] * deltaTime;
+                    // Update height position
+                    _projHeight[i] += _projVerticalVelocity[i] * deltaTime;
+                    // Arc projectiles land when height <= 0 (ground level)
+                    if (_projHeight[i] <= 0f)
+                    {
+                        ResolveHit(i);
+                        _projActive[i] = false;
+                        _activeProjectileCount--;
+                        resolvedHits++;
+                        continue;
+                    }
+                }
 
                 // Check proximity to target (hit detection within 0.5 grid units)
                 float tdx = store.PositionX[targetId] - _projX[i];

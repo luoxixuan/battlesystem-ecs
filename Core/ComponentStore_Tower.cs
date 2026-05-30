@@ -297,6 +297,16 @@ namespace BattleSystemECS.Core
         // TowerPatrolAttackSpeedPenalty: attack speed multiplier while moving (e.g. 0.7 = 30% slower)
         public float[] TowerPatrolAttackSpeedPenalty = new float[MAX_ENTITIES];
 
+        // ==================== 迫击炮/弧线弹道 (Mortar / Arc Projectiles) ====================
+        // TowerProjectileArcType: 0=直线（默认）, 1=跟踪, 2=弧线（抛物线）
+        // Affects how the projectile moves through the air — arc uses gravity simulation
+        public int[] TowerProjectileArcType = new int[MAX_ENTITIES];
+        // TowerProjectileArcPeakHeight: peak height for arc-type projectiles (grid units)
+        // Only used when TowerProjectileArcType == 2 (Arc)
+        public float[] TowerProjectileArcPeakHeight = new float[MAX_ENTITIES];
+        // TowerProjectileGravityScale: gravity multiplier for arc projectiles (default 1.0)
+        public float[] TowerProjectileGravityScale = new float[MAX_ENTITIES];
+
         // ==================== 塔组件访问 ====================
 
         /// <summary>
@@ -402,6 +412,10 @@ namespace BattleSystemECS.Core
             TowerTurnRate[entityId] = turnRate;
             // Fog of War: default to no fog restriction (visionRadius=0 means see all)
             TowerVisionRadius[entityId] = 0f;
+            // Arc projectile fields: default to straight trajectory (0=straight, 1=homing, 2=arc)
+            TowerProjectileArcType[entityId] = 0;
+            TowerProjectileArcPeakHeight[entityId] = 0f;
+            TowerProjectileGravityScale[entityId] = 1f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
@@ -477,6 +491,10 @@ namespace BattleSystemECS.Core
             TowerPatrolWaypointIndex[entityId] = 0;
             TowerPatrolDirection[entityId] = 1;
             TowerPatrolAttackSpeedPenalty[entityId] = 1f;
+            // Arc projectile fields reset
+            TowerProjectileArcType[entityId] = 0;
+            TowerProjectileArcPeakHeight[entityId] = 0f;
+            TowerProjectileGravityScale[entityId] = 1f;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
         }
         #endregion

@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-30, commit `52ee5eb`）
+## 性能基准（2026-05-30, commit `7a3f9c1`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~5018 FPS**，400 帧，~0.20 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~12001 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5727 FPS** |
+| **mode 5**（完整一局） | **~5011 FPS**，400 帧，~0.20 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~12116 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5349 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -143,6 +143,7 @@ dotnet test
 
 ### 2026-05-30
 - **工程改进**：ComponentStore 按领域拆分为 5 个 partial 文件（Enemy/Tower/Player/World + 核心生命周期）；伤害公式测试补齐至 120 项
+- 迫击炮/弧线弹道系统（ProjectileSystem + ComponentStore_Tower.cs）；bench2: 12116, bench4: 5349, bench5: 5011
 - 风力/气流推动系统（WindSystem + ComponentStore_World.cs）；bench2: 12001, bench4: 5727, bench5: 5018
 - 敌人克隆/复制（EnemyCloneSystem）；bench2: 12155, bench4: 5701, bench5: 4714
 - 移动/巡逻塔（PatrolTowerSystem）；bench2: 9192, bench4: 4538, bench5: 4227
