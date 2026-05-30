@@ -54,3 +54,6 @@ Thumbs.db
 *.pdb
 *.exe
 *.dll
+
+# 运行时生成（存档/自动保存）
+Data/Saves/checkpoint.json
