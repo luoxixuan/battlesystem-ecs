@@ -324,8 +324,8 @@ namespace BattleSystemECS.Systems
                 int effectiveRange = (int)(range * _weatherRangeMult * _dayNightRangeMult);
                 store.SpatialGrid.GetEnemiesInRange(store, tx, ty, effectiveRange, candidates);
 
-                // Read tower targeting mode (0=Nearest, 1=Furthest, 2=LowestHealth, 3=HighestHealth, 4=FirstSpawned, 5=LastSpawned)
-                int targetingMode = store.TowerTargetingMode[towerId];
+                // Read tower targeting mode
+                TowerTargetingMode targetingMode = store.TowerTargetingMode[towerId];
 
 int bestTarget = -1;
                 float bestScore = 0f;
@@ -333,15 +333,15 @@ int bestTarget = -1;
                 // Initialize bestScore based on targeting mode to ensure first candidate is always evaluated
                 switch (targetingMode)
                 {
-                    case 1: // Furthest — maximize distance
+                    case TowerTargetingMode.Furthest:
                         bestScore = float.MinValue;
                         break;
-                    case 2: // LowestHealth
-                    case 4: // FirstSpawned
+                    case TowerTargetingMode.LowestHealth:
+                    case TowerTargetingMode.FirstSpawned:
                         bestScore = float.MaxValue; // minimize these scores
                         break;
-                    case 3: // HighestHealth
-                    case 5: // LastSpawned
+                    case TowerTargetingMode.HighestHealth:
+                    case TowerTargetingMode.LastSpawned:
                         bestScore = float.MinValue; // maximize these scores
                         break;
                     default: // Nearest — minimize distance
@@ -389,27 +389,27 @@ int bestTarget = -1;
                     bool isBetter;
                     switch (targetingMode)
                     {
-                        case 1: // Furthest — maximize distance
+                        case TowerTargetingMode.Furthest:
                             score = distSq;
                             isBetter = score > bestScore;
                             break;
-                        case 2: // LowestHealth — minimize health
+                        case TowerTargetingMode.LowestHealth:
                             score = store.EnemyHealth[enemyId];
                             isBetter = score < bestScore;
                             break;
-                        case 3: // HighestHealth — maximize health
+                        case TowerTargetingMode.HighestHealth:
                             score = store.EnemyHealth[enemyId];
                             isBetter = score > bestScore;
                             break;
-                        case 4: // FirstSpawned — oldest by spawn frame (smallest frame number)
+                        case TowerTargetingMode.FirstSpawned:
                             score = store.EnemySpawnFrame[enemyId];
                             isBetter = score < bestScore;
                             break;
-                        case 5: // LastSpawned — newest by spawn frame (largest frame number)
+                        case TowerTargetingMode.LastSpawned:
                             score = store.EnemySpawnFrame[enemyId];
                             isBetter = score > bestScore;
                             break;
-                        default: // 0 = Nearest — minimize distance (default)
+                        default: // Nearest — minimize distance
                             score = distSq;
                             isBetter = distSq < bestScore;
                             break;
@@ -477,17 +477,17 @@ int bestTarget = -1;
                     // Physical: reduced by armor (affected by armor penetration + shred)
                     // Magic: reduced by magic resist (no armor interaction)
                     // True: ignores armor and magic resist entirely
-                    int dmgType = store.TowerDamageType[towerId];
-                    if (dmgType == 2)  // True damage — bypasses all defenses
+                    DamageType dmgType = store.TowerDamageType[towerId];
+                    if (dmgType == DamageType.True)
                     {
                         baseDmg *= _damageTakenMult;
                     }
-                    else if (dmgType == 1)  // Magic damage — uses magic resist only
+                    else if (dmgType == DamageType.Magic)
                     {
                         float magicResist = store.EnemyMagicResist[bestTarget];
                         baseDmg *= Math.Max(0.01f, 1f - magicResist) * _damageTakenMult;
                     }
-                    else  // Physical (default, dmgType==0) — uses armor + armor shred + pen
+                    else  // Physical (default) — uses armor + armor shred + pen
                     {
                         // Step 1: apply armor penetration (attacker's penetration ratio)
                         float effectiveArmor = store.EnemyArmor[bestTarget] * (1f - _armorPenetration);

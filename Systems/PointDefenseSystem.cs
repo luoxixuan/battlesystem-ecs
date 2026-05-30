@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 
 namespace BattleSystemECS.Systems
@@ -57,8 +58,8 @@ namespace BattleSystemECS.Systems
             for (int ti = 0; ti < towerIds.Count; ti++)
             {
                 int towerId = towerIds[ti];
-                // Only process PointDefense towers (TargetingMode == 6)
-                if (store.TowerTargetingMode[towerId] != 6) continue;
+                // Only process PointDefense towers (TargetingMode == Intercept)
+                if (store.TowerTargetingMode[towerId] != TowerTargetingMode.Intercept) continue;
 
                 float tx = store.PositionX[towerId];
                 float ty = store.PositionY[towerId];

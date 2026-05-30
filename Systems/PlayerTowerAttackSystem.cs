@@ -175,12 +175,12 @@ public void SetWaveNumber(int waveNumber)
                 }
 
                 // Apply damage type resistance (Physical=armor, Magic=magicResist, True=bypass all)
-                int dmgType = store.PlayerDamageType[playerId];
-                if (dmgType == 2)  // True — bypasses all defenses
+                DamageType dmgType = store.PlayerDamageType[playerId];
+                if (dmgType == DamageType.True)
                 {
                     // no resistance applied — skip to damageTakenMult below
                 }
-                else if (dmgType == 1)  // Magic — uses magic resist only
+                else if (dmgType == DamageType.Magic)
                 {
                     float magicResist = store.EnemyMagicResist[enemyId];
                     finalDamage *= Math.Max(0.01f, 1f - magicResist);

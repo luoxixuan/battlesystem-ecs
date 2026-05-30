@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Systems;
 
@@ -628,11 +629,11 @@ namespace BattleSystemECS.Config
             tower.StunChance = ExtractFloat(json, "StunChance");
             tower.SlowAmount = ExtractFloat(json, "SlowAmount");
             tower.SlowDuration = ExtractFloat(json, "SlowDuration");
-            tower.TargetingMode = ExtractInt(json, "TargetingMode");
+            tower.TargetingMode = (TowerTargetingMode)ExtractInt(json, "TargetingMode");
             tower.SpecialAbility = ParseTowerSpecialAbility(json);
             tower.ProjectileHoming = ExtractBool(json, "ProjectileHoming");
             tower.TurnRate = ExtractFloat(json, "TurnRate");
-            tower.DamageType = ExtractInt(json, "DamageType");
+            tower.DamageType = (DamageType)ExtractInt(json, "DamageType");
             tower.InterceptRate = ExtractFloat(json, "InterceptRate");
             tower.Bounces = ExtractInt(json, "Bounces");
             tower.BounceRange = ExtractFloat(json, "BounceRange");

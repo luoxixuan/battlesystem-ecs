@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Config
 {
@@ -99,8 +100,7 @@ namespace BattleSystemECS.Config
         public float SlowAmount { get; set; } = 0f;   // speed multiplier (e.g. 0.5 = 50% speed)
         public float SlowDuration { get; set; } = 0f; // duration in turns
         // Targeting mode: which enemy the tower prefers to attack
-        // 0=Nearest, 1=Furthest, 2=LowestHealth, 3=HighestHealth, 4=FirstSpawned, 5=LastSpawned
-        public int TargetingMode { get; set; } = 0;
+        public TowerTargetingMode TargetingMode { get; set; } = TowerTargetingMode.Nearest;
         // Tower special ability fields (null = no special ability)
         public TowerSpecialAbility SpecialAbility { get; set; }
         // Tower upgrade path: "standard" (default), "fast", or "tank"
@@ -116,8 +116,8 @@ namespace BattleSystemECS.Config
         // Turn rate: maximum angular change per second in radians (e.g. PI = 180°/sec, 0 = instant/snap to target)
         // Default 0 means instant rotation (existing behavior unchanged)
         public float TurnRate { get; set; } = 0f;
-        // DamageType: 0=Physical (reduced by armor), 1=Magic (reduced by magic resist), 2=True (ignores all defenses)
-        public int DamageType { get; set; } = 0;
+        // Damage type: determines which resistance the target uses for mitigation.
+        public DamageType DamageType { get; set; } = DamageType.Physical;
         // InterceptRate: for PointDefense towers (TargetingMode=6), probability of intercepting enemy projectiles (0.0-1.0)
         public float InterceptRate { get; set; } = 0.5f;
         // Bouncing projectile: number of bounces after initial hit (0 = no bounce)

@@ -1,15 +1,12 @@
-using System;
-
-namespace BattleSystemECS.Core
+namespace BattleSystemECS.Components
 {
     /// <summary>
-    /// Damage type classification — determines which resistance stat the target applies.
-    /// Physical: reduced by EnemyArmor. Magic: reduced by EnemyMagicResist. True: ignores all defenses.
+    /// Damage type determines which enemy resistance is used for mitigation.
     /// </summary>
-    public enum DamageTypeEnum
+    public enum DamageType
     {
-        Physical = 0,
-        Magic = 1,
-        True = 2
+        Physical = 0,  // Reduced by armor (armor penetration + shred applied)
+        Magic    = 1,  // Reduced by magic resist only
+        True     = 2   // Bypasses all defenses
     }
 }

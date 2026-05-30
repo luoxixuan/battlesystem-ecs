@@ -12,9 +12,8 @@ using BattleSystemECS.Systems;
 namespace BattleSystemECS.Core
 {
     /// <summary>
-    /// SOA (Struct of Arrays) 组件存储
-    /// 提供连续的内存布局，优化缓存命中率和支持 SIMD 指令
-    /// 性能提升：10-100 倍
+    /// SOA (Struct of Arrays) component storage.
+    /// Provides cache-friendly continuous memory layout for high-throughput ECS operations.
     /// </summary>
     public class ComponentStore
     {
@@ -22,6 +21,12 @@ namespace BattleSystemECS.Core
         public const int MAX_ENTITIES = 100000;
         internal const int MAX_PLAYERS = 10;
         public int TotalKills = 0;
+
+        // Inline boundary check helpers — replaces 100+ manual checks with zero-overhead guards.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static bool IsValidEntity(int id) => (uint)id < MAX_ENTITIES;
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static bool IsValidPlayer(int id) => (uint)id < MAX_PLAYERS;
 
         // ==================== 位置组件的 SOA 存储 ====================
         public float[] PositionX = new float[MAX_ENTITIES];
@@ -41,8 +46,8 @@ namespace BattleSystemECS.Core
         // Player thorns: reflects a fraction of damage taken back to the attacking enemy.
         public float[] PlayerThornsRatio = new float[MAX_PLAYERS];
 public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
-        // Player damage type: 0=Physical, 1=Magic, 2=True. Drives which resistance enemies use.
-        public int[] PlayerDamageType = new int[MAX_PLAYERS];
+        // Player damage type: determines which resistance enemies use for mitigation.
+        public DamageType[] PlayerDamageType = new DamageType[MAX_PLAYERS];
         public float[] PlayerGold = new float[MAX_PLAYERS];
         public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
         // ==================== 法力/能量池资源系统 (Mana Pool) ====================
@@ -587,15 +592,14 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
 
         // ==================== 塔组件的 SOA 存储 ====================
         // Tower targeting mode: controls which enemy the tower selects as its target.
-        // Maps to TowerTargetingMode enum: Nearest=0, Furthest=1, LowestHealth=2, HighestHealth=3, FirstSpawned=4, LastSpawned=5, Intercept=6
-        public int[] TowerTargetingMode = new int[MAX_ENTITIES];
+        public TowerTargetingMode[] TowerTargetingMode = new TowerTargetingMode[MAX_ENTITIES];
         // Tower projectile homing: if true, this tower's projectiles track targets mid-flight
         public bool[] TowerProjectileHoming = new bool[MAX_ENTITIES];
         // Tower intercept rate: probability of intercepting enemy projectiles (for PointDefense towers)
         // Stored separately from TowerCritChance to keep concerns isolated (reuse CritChance as intercept rate when needed)
         public float[] TowerInterceptRate = new float[MAX_ENTITIES];
-        // Tower damage type: 0=Physical, 1=Magic, 2=True. Determines which resistance the target uses.
-        public int[] TowerDamageType = new int[MAX_ENTITIES];
+        // Tower damage type: determines which resistance the target uses for mitigation.
+        public DamageType[] TowerDamageType = new DamageType[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
         public string[] TowerType = new string[MAX_ENTITIES];
@@ -1079,8 +1083,8 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public void QueueEnemyDeath(int enemyId, int playerId)
         {
             // H-11 fix: validate IDs are within valid range before queueing
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidEntity(enemyId)) return;
+            if (!IsValidPlayer(playerId)) return;
             _deathQueue[_deathQueueIdx].Add((enemyId, playerId));
         }
 
@@ -1090,9 +1094,9 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         /// </summary>
         public void QueueTowerKill(int enemyId, int playerId, int towerId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
+            if (!IsValidPlayer(playerId)) return;
+            if (!IsValidEntity(towerId)) return;
             _towerKillQueue[_towerKillQueueIdx].Add((enemyId, playerId, towerId));
         }
 
@@ -1357,7 +1361,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             {
                 lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
                 TowerActive[entityId] = false;
-                TowerTargetingMode[entityId] = 0;
+                TowerTargetingMode[entityId] = Components.TowerTargetingMode.Nearest;
                 TowerType[entityId] = null;
                 TowerAttackDamage[entityId] = 0f;
                 TowerRange[entityId] = 0;
@@ -1443,7 +1447,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
 
         public void AddPosition(int entityId, float x, float y)
         {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(entityId)) return;
 
             PositionX[entityId] = x;
             PositionY[entityId] = y;
@@ -1452,7 +1456,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
 
         public void SetPosition(int entityId, float x, float y)
         {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(entityId)) return;
 
             PositionX[entityId] = x;
             PositionY[entityId] = y;
@@ -1484,37 +1488,37 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
 
         public float GetPlayerAttackRange(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            if (!IsValidPlayer(playerId)) return 0f;
             return PlayerAttackRange[playerId];
         }
 
         public void SetPlayerAttackRange(int playerId, float range)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             PlayerAttackRange[playerId] = range;
         }
 
         public float GetPlayerAttackSpeed(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            if (!IsValidPlayer(playerId)) return 0f;
             return PlayerAttackSpeed[playerId];
         }
 
         public float GetPlayerAttackDamage(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            if (!IsValidPlayer(playerId)) return 0f;
             return PlayerAttackDamage[playerId];
         }
 
         public void SetPlayerAttackDamage(int playerId, float damage)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             PlayerAttackDamage[playerId] = damage;
         }
 
         public float GetPlayerGold(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            if (!IsValidPlayer(playerId)) return 0f;
             return PlayerGold[playerId];
 }
 
@@ -1525,7 +1529,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
 
         public void SetPlayerGold(int playerId, float gold)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             PlayerGold[playerId] = gold;
         }
 
@@ -1534,7 +1538,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         /// </summary>
         public void LoseGold(int playerId, float amount)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS || amount <= 0f) return;
+            if (!IsValidPlayer(playerId) || amount <= 0f) return;
             float current = PlayerGold[playerId];
             float newGold = Math.Max(0f, current - amount);
             PlayerGold[playerId] = newGold;
@@ -1542,70 +1546,70 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
 
         public int GetPlayerLevel(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            if (!IsValidPlayer(playerId)) return 0;
             return PlayerCurrentLevel[playerId];
         }
 
         public void SetPlayerLevel(int playerId, int level)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             PlayerCurrentLevel[playerId] = level;
         }
 
         public List<string> GetPlayerBuffs(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return new List<string>();
+            if (!IsValidPlayer(playerId)) return new List<string>();
             // ✅ Bug#17 fix: return a defensive copy to prevent external mutation
             return new List<string>(PlayerBuffs[playerId]);
         }
 
         public void AddPlayerBuff(int playerId, string buff)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             PlayerBuffs[playerId].Add(buff);
         }
 
         // ── O(1) buff flag helpers (perf: eliminates per-frame GC) ──────────
         public void AddBuff(int playerId, BuffType buff)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             PlayerBuffFlags[playerId] |= buff;
         }
 
         public bool HasBuff(int playerId, BuffType buff)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
+            if (!IsValidPlayer(playerId)) return false;
             return (PlayerBuffFlags[playerId] & buff) != 0;
         }
 
         public float GetAttackBuffMultiplier(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 1f;
+            if (!IsValidPlayer(playerId)) return 1f;
             return (PlayerBuffFlags[playerId] & BuffType.AttackBoost) != 0 ? 1.1f : 1f;
         }
 
         public bool HasCritRateBuff(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
+            if (!IsValidPlayer(playerId)) return false;
             return (PlayerBuffFlags[playerId] & BuffType.CritRateBoost) != 0;
         }
 
         // ── O(1) enemy affix flag helpers ─────────────────────────────────
         public bool HasAffix(int enemyId, BuffType affix)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return false;
+            if (!IsValidEntity(enemyId)) return false;
             return (EnemyAffixFlags[enemyId] & affix) != 0;
         }
 
         public float GetPlayerUpgradeThreshold(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            if (!IsValidPlayer(playerId)) return 0f;
             return PlayerUpgradeThreshold[playerId];
         }
 
         public void SetPlayerUpgradeThreshold(int playerId, float threshold)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             PlayerUpgradeThreshold[playerId] = threshold;
         }
 
@@ -1615,7 +1619,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         {
             int entityId = CreateEntity();
 
-            if (entityId < 0 || entityId >= MAX_ENTITIES) 
+            if (!IsValidEntity(entityId)) 
             {
                 return -1;
             }
@@ -1697,9 +1701,9 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         /// <summary>
         /// Add a tower with debuff parameters.
         /// </summary>
-        public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost, string upgradePathId, float stunChance, float slowAmount, float slowDuration, int damageType = 0, float turnRate = 0f)
+        public void AddTower(int entityId, string type, float damage, int range, float speed, int level, float cost, string upgradePathId, float stunChance, float slowAmount, float slowDuration, DamageType damageType = DamageType.Physical, float turnRate = 0f)
         {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(entityId)) return;
             TowerType[entityId] = type;
             TowerAttackDamage[entityId] = damage;
             TowerRange[entityId] = range;
@@ -1791,7 +1795,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
 
         public void RemoveTower(int entityId)
         {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(entityId)) return;
             TowerActive[entityId] = false;
             TowerUpgradePathId[entityId] = null;
             TowerFusionTier[entityId] = 0;
@@ -1842,7 +1846,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             TowerProjectileFragmentDmgMult[entityId] = 1f;
             TowerArmorShredBonus[entityId] = 0f;
             TowerShieldBreakBonus[entityId] = 0f;
-            TowerDamageType[entityId] = 0;
+            TowerDamageType[entityId] = DamageType.Physical;
             // Construction fields reset
             TowerIsConstructing[entityId] = false;
             TowerConstructionProgress[entityId] = 1f;
@@ -2052,7 +2056,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Select a tower for build-phase operations.</summary>
         public void SelectTower(int towerId)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(towerId)) return;
             if (!TowerActive[towerId]) return;
             TowerSelected[towerId] = true;
         }
@@ -2060,7 +2064,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Deselect a specific tower.</summary>
         public void DeselectTower(int towerId)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(towerId)) return;
             TowerSelected[towerId] = false;
         }
 
@@ -2097,57 +2101,57 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Gets the synergy ID for a tower (-1 = no synergy).</summary>
         public int GetTowerSynergyId(int towerId)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return -1;
+            if (!IsValidEntity(towerId)) return -1;
             return TowerSynergyId[towerId];
         }
 
         /// <summary>Sets the synergy ID for a tower.</summary>
         public void SetTowerSynergyId(int towerId, int synergyId)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(towerId)) return;
             TowerSynergyId[towerId] = synergyId;
         }
 
         /// <summary>Gets the synergy multiplier for a tower (1.0 = no bonus).</summary>
         public float GetTowerSynergyMultiplier(int towerId)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return 1.0f;
+            if (!IsValidEntity(towerId)) return 1.0f;
             return TowerSynergyMultiplier[towerId];
         }
 
         /// <summary>Sets the synergy multiplier for a tower.</summary>
         public void SetTowerSynergyMultiplier(int towerId, float multiplier)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(towerId)) return;
             TowerSynergyMultiplier[towerId] = multiplier;
         }
 
         // ==================== 塔索敌模式管理 ====================
-        /// <summary>Gets the targeting mode for a tower (0=Nearest, 1=Furthest, 2=LowestHealth, 3=HighestHealth, 4=FirstSpawned, 5=LastSpawned).</summary>
-        public int GetTowerTargetingMode(int towerId)
+        /// <summary>Gets the targeting mode for a tower.</summary>
+        public TowerTargetingMode GetTowerTargetingMode(int towerId)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return 0;
+            if (!IsValidEntity(towerId)) return Components.TowerTargetingMode.Nearest;
             return TowerTargetingMode[towerId];
         }
 
         /// <summary>Sets the targeting mode for a tower.</summary>
-        public void SetTowerTargetingMode(int towerId, int mode)
+        public void SetTowerTargetingMode(int towerId, TowerTargetingMode mode)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(towerId)) return;
             TowerTargetingMode[towerId] = mode;
         }
 
         /// <summary>Sets the projectile homing flag for a tower.</summary>
         public void SetTowerProjectileHoming(int towerId, bool isHoming)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(towerId)) return;
             TowerProjectileHoming[towerId] = isHoming;
         }
 
         /// <summary>Sets the intercept rate for a PointDefense tower.</summary>
         public void SetTowerInterceptRate(int towerId, float rate)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(towerId)) return;
             TowerInterceptRate[towerId] = rate;
         }
 
@@ -2155,72 +2159,72 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Gets the link combo partner tower ID (-1 = no partner).</summary>
         public int GetTowerLinkPartnerId(int towerId)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return -1;
+            if (!IsValidEntity(towerId)) return -1;
             return TowerLinkPartnerId[towerId];
         }
 
         /// <summary>Sets the link combo partner tower ID.</summary>
         public void SetTowerLinkPartnerId(int towerId, int partnerId)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(towerId)) return;
             TowerLinkPartnerId[towerId] = partnerId;
         }
 
         /// <summary>Gets the link combo cooldown in seconds.</summary>
         public float GetTowerLinkCooldown(int towerId)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return 0f;
+            if (!IsValidEntity(towerId)) return 0f;
             return TowerLinkCooldown[towerId];
         }
 
         /// <summary>Sets the link combo cooldown in seconds.</summary>
         public void SetTowerLinkCooldown(int towerId, float cooldown)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(towerId)) return;
             TowerLinkCooldown[towerId] = cooldown;
         }
 
         /// <summary>Gets the link combo damage bonus multiplier.</summary>
         public float GetTowerLinkDamageBonus(int towerId)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return 0f;
+            if (!IsValidEntity(towerId)) return 0f;
             return TowerLinkDamageBonus[towerId];
         }
 
         /// <summary>Sets the link combo damage bonus multiplier.</summary>
         public void SetTowerLinkDamageBonus(int towerId, float bonus)
         {
-            if (towerId < 0 || towerId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(towerId)) return;
             TowerLinkDamageBonus[towerId] = bonus;
         }
 
         public float GetEnemyHealth(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0f;
+            if (!IsValidEntity(enemyId)) return 0f;
             return EnemyHealth[enemyId];
         }
 
         public void SetEnemyHealth(int enemyId, float health)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             EnemyHealth[enemyId] = health;
         }
 
         public float GetEnemyMaxHealth(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0f;
+            if (!IsValidEntity(enemyId)) return 0f;
             return EnemyMaxHealth[enemyId];
         }
 
         public float GetEnemyArmor(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0f;
+            if (!IsValidEntity(enemyId)) return 0f;
             return EnemyArmor[enemyId];
         }
 
         public void SetEnemyArmor(int enemyId, float armor)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             EnemyArmor[enemyId] = armor;
         }
 
@@ -2229,7 +2233,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// </summary>
         public void ApplyEnemyDamage(int enemyId, float damage)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             if (damage <= 0f) return;
 
             float shield = EnemyShield[enemyId];
@@ -2250,7 +2254,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
 
         public float GetEnemyMoveSpeed(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0f;
+            if (!IsValidEntity(enemyId)) return 0f;
             return EnemyMoveSpeed[enemyId];
         }
 
@@ -2258,7 +2262,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Returns true if the enemy is currently stunned.</summary>
         public bool IsEnemyStunned(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return false;
+            if (!IsValidEntity(enemyId)) return false;
             // Primary check: duration-based stun (set by ApplyEnemyStun, decremented by EnemyMovementSystem.Update)
             if (EnemyStunDurationLeft[enemyId] > 0f) return true;
             // Fallback: legacy flag (set by external systems, cleared by EnemyMovementSystem.SetTurn)
@@ -2268,28 +2272,28 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Returns true if the player is currently stunned.</summary>
         public bool IsPlayerStunned(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
+            if (!IsValidPlayer(playerId)) return false;
             return PlayerStunDuration[playerId] > 0;
         }
 
         /// <summary>Returns true if the player is currently slowed.</summary>
         public bool IsPlayerSlowed(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
+            if (!IsValidPlayer(playerId)) return false;
             return PlayerSlowFactor[playerId] > 0f;
         }
 
         /// <summary>Applies a stun to the enemy for the current frame. Stun clears automatically at start of each frame via SetTurnCCFlags.</summary>
         public void ApplyStun(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             EnemyStunFlag[enemyId] = true;
         }
 
         /// <summary>Applies a stun to the player for N turns.</summary>
         public void ApplyPlayerStun(int playerId, int turns)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             if (turns <= 0) return;
             if (PlayerStunDuration[playerId] < turns)
                 PlayerStunDuration[playerId] = turns;
@@ -2298,7 +2302,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Applies a slow to the enemy. factor is a multiplier (e.g. 0.5 = 50% speed). Duration in turns tracked by EnemySlowDurationLeft.</summary>
         public void ApplySlow(int enemyId, float factor, int duration)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             if (factor <= 0f || factor >= 1f) return; // only valid slow factors
 
             float baseSpeed = EnemyMoveSpeedBase[enemyId];
@@ -2312,7 +2316,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Applies slow to the player. factor is a speed multiplier (0.5 = 50% speed).</summary>
         public void ApplyPlayerSlow(int playerId, float factor, int duration)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             if (factor <= 0f || factor >= 1f) return;
             // Take the stronger slow if stacking
             if (factor < PlayerSlowFactor[playerId])
@@ -2330,7 +2334,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Applies a shield to the player. Shield absorbs damage before health.</summary>
         public void ApplyPlayerShield(int playerId, float amount, float duration)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             if (amount <= 0f) return;
             // Stack shields (keep the larger one + add the new amount)
             PlayerShield[playerId] += amount;
@@ -2341,14 +2345,14 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Returns the current shield value for a player.</summary>
         public float GetPlayerShield(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            if (!IsValidPlayer(playerId)) return 0f;
             return PlayerShield[playerId];
         }
 
         /// <summary>Clears slow effect and restores original speed.</summary>
         public void ClearSlow(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             if (EnemySlowFactor[enemyId] <= 0f) return; // no slow active
 
             float baseSpeed = EnemyMoveSpeedBase[enemyId];
@@ -2360,7 +2364,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Applies stun to the enemy for `duration` turns. Stored in EnemyStunDurationLeft (not EnemyStunFlag) so it persists across frames.</summary>
         public void ApplyEnemyStun(int enemyId, int duration)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             // Use duration-based stun so it survives the EnemyMovementSystem.SetTurn() clear
             if (duration > EnemyStunDurationLeft[enemyId])
                 EnemyStunDurationLeft[enemyId] = duration;
@@ -2383,7 +2387,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Applies slow to the enemy. factor is a speed multiplier (e.g. 0.5 = 50% speed). Duration in turns tracked by EnemySlowDurationLeft.</summary>
         public void ApplyEnemySlow(int enemyId, float factor, int duration)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             if (factor <= 0f || factor >= 1f) return;
             // Take the stronger slow if stacking
             if (factor < EnemySlowFactor[enemyId])
@@ -2407,7 +2411,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Clears slow effect on enemy and restores original speed.</summary>
         public void ClearEnemySlow(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             if (EnemySlowFactor[enemyId] <= 0f) return;
             float baseSpeed = EnemyMoveSpeedBase[enemyId];
             if (baseSpeed > 0f)
@@ -2418,7 +2422,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Clears wound slow effect on enemy and restores speed from wound state.</summary>
         public void ClearEnemyWound(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             if (!EnemyIsWounded[enemyId]) return;
             EnemyIsWounded[enemyId] = false;
             // Restore from base speed (wound applied additional multiplier on top of base)
@@ -2430,7 +2434,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
         /// <summary>Applies knockback force to an enemy. Force is applied instantly and consumed in ResolveKnockback.</summary>
         public void ApplyEnemyKnockback(int enemyId, float force)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             if (force <= 0f) return;
             // Add to existing force (in case multiple towers hit simultaneously)
             EnemyKnockbackForceLeft[enemyId] += force;
@@ -2493,13 +2497,13 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
 
         public float GetEnemyDamage(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0f;
+            if (!IsValidEntity(enemyId)) return 0f;
             return EnemyDamage[enemyId];
         }
 
         public int GetEnemyGoldReward(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0;
+            if (!IsValidEntity(enemyId)) return 0;
             return EnemyGoldReward[enemyId];
         }
 
@@ -2507,55 +2511,55 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
 
         public string GetEnemyAIAction(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return "";
+            if (!IsValidEntity(enemyId)) return "";
             return EnemyAIAction[enemyId];
         }
 
         public string GetEnemyTypeName(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return "";
+            if (!IsValidEntity(enemyId)) return "";
             return EnemyTypeName[enemyId] ?? "";
         }
 
         public void SetEnemyAIAction(int enemyId, string action)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             EnemyAIAction[enemyId] = action ?? "";
         }
 
         public int GetEnemyAIChargeCounter(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0;
+            if (!IsValidEntity(enemyId)) return 0;
             return EnemyAIChargeCounter[enemyId];
         }
 
         public void SetEnemyAIChargeCounter(int enemyId, int counter)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             EnemyAIChargeCounter[enemyId] = counter;
         }
 
         public int GetEnemyAILastAttackTurn(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0;
+            if (!IsValidEntity(enemyId)) return 0;
             return EnemyAILastAttackTurn[enemyId];
         }
 
         public void SetEnemyAILastAttackTurn(int enemyId, int turn)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             EnemyAILastAttackTurn[enemyId] = turn;
         }
 
         public EnemyActionType GetEnemyActionEnum(int enemyId)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return EnemyActionType.None;
+            if (!IsValidEntity(enemyId)) return EnemyActionType.None;
             return EnemyActionEnum[enemyId];
         }
 
         public void SetEnemyActionEnum(int enemyId, EnemyActionType action)
         {
-            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(enemyId)) return;
             EnemyActionEnum[enemyId] = action;
         }
 
@@ -2563,85 +2567,85 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
 
         public string GetSkillName(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return "";
+            if (!IsValidPlayer(playerId)) return "";
             return SkillName[playerId];
         }
 
         public void SetSkillName(int playerId, string name)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             SkillName[playerId] = name;
         }
 
         public float GetSkillDamageMultiplier(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 1f;
+            if (!IsValidPlayer(playerId)) return 1f;
             return SkillDamageMultiplier[playerId];
         }
 
         public void SetSkillDamageMultiplier(int playerId, float multiplier)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             SkillDamageMultiplier[playerId] = multiplier;
         }
 
         public int GetSkillAreaWidth(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 1;
+            if (!IsValidPlayer(playerId)) return 1;
             return SkillAreaWidth[playerId];
         }
 
         public void SetSkillAreaWidth(int playerId, int width)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             SkillAreaWidth[playerId] = width;
         }
 
         public int GetSkillAreaHeight(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 1;
+            if (!IsValidPlayer(playerId)) return 1;
             return SkillAreaHeight[playerId];
         }
 
         public void SetSkillAreaHeight(int playerId, int height)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             SkillAreaHeight[playerId] = height;
         }
 
         public int GetSkillAttackRange(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 1;
+            if (!IsValidPlayer(playerId)) return 1;
             return SkillAttackRange[playerId];
         }
 
         public void SetSkillAttackRange(int playerId, int range)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             SkillAttackRange[playerId] = range;
         }
 
         public float GetSkillCooldown(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            if (!IsValidPlayer(playerId)) return 0f;
             return SkillCooldown[playerId];
         }
 
         public void SetSkillCooldown(int playerId, float cooldown)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             SkillCooldown[playerId] = cooldown;
         }
 
         public float GetSkillCurrentCooldown(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            if (!IsValidPlayer(playerId)) return 0f;
             return SkillCurrentCooldown[playerId];
         }
 
         public void SetSkillCurrentCooldown(int playerId, float currentCooldown)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             SkillCurrentCooldown[playerId] = currentCooldown;
         }
 
@@ -2649,7 +2653,7 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
 
         public bool IsEnemyActive(int entityId)
         {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return false;
+            if (!IsValidEntity(entityId)) return false;
             return EnemyActive[entityId];
         }
 
@@ -2702,123 +2706,123 @@ public int AddCorpseEffect(float x, float y, int effectType, float radius, float
 
         public float GetPlayerMaxHealth(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            if (!IsValidPlayer(playerId)) return 0f;
             return PlayerMaxHealth[playerId];
         }
 
         public void SetPlayerMaxHealth(int playerId, float maxHealth)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             PlayerMaxHealth[playerId] = maxHealth;
         }
 
 public float GetPlayerCurrentHealth(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            if (!IsValidPlayer(playerId)) return 0f;
             return PlayerCurrentHealth[playerId];
         }
 
         public int GetPlayerBaseLives(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            if (!IsValidPlayer(playerId)) return 0;
             return PlayerBaseLives[playerId];
         }
 
         public void SetPlayerBaseLives(int playerId, int lives)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             PlayerBaseLives[playerId] = lives;
         }
 
         public void DecrementPlayerBaseLives(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             if (PlayerBaseLives[playerId] > 0)
                 PlayerBaseLives[playerId]--;
         }
 
         public int GetCurrentWeather(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            if (!IsValidPlayer(playerId)) return 0;
             return CurrentWeather[playerId];
         }
 
         public void SetCurrentWeather(int playerId, int weatherType)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             CurrentWeather[playerId] = weatherType;
         }
 
         public float GetWeatherIntensity(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0f;
+            if (!IsValidPlayer(playerId)) return 0f;
             return WeatherIntensity[playerId];
         }
 
         public void SetWeatherIntensity(int playerId, float intensity)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             WeatherIntensity[playerId] = intensity;
         }
 
         public float GetWeatherTimer(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return -1f;
+            if (!IsValidPlayer(playerId)) return -1f;
             return WeatherTimer[playerId];
         }
 
         public void SetWeatherTimer(int playerId, float timer)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             WeatherTimer[playerId] = timer;
         }
 
         // ==================== 昼夜循环系统访问方法 ====================
         public int GetDayNightPhase(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            if (!IsValidPlayer(playerId)) return 0;
             return GlobalDayNightPhase[playerId];
         }
 
         public void SetDayNightPhase(int playerId, int phase)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             GlobalDayNightPhase[playerId] = phase;
         }
 
         public float GetDayNightTimer(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return -1f;
+            if (!IsValidPlayer(playerId)) return -1f;
             return GlobalDayNightTimer[playerId];
         }
 
         public void SetDayNightTimer(int playerId, float timer)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             GlobalDayNightTimer[playerId] = timer;
         }
 
         public int GetDayNightCycleCount(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            if (!IsValidPlayer(playerId)) return 0;
             return GlobalDayNightCycleCount[playerId];
         }
 
         public void IncrementDayNightCycleCount(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             GlobalDayNightCycleCount[playerId]++;
         }
 
         public void SetPlayerCurrentHealth(int playerId, float currentHealth)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             PlayerCurrentHealth[playerId] = currentHealth;
         }
 
         public void DecreasePlayerHealth(int playerId, float damage)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             // Shield absorbs damage before health (independent of armor)
             float shield = PlayerShield[playerId];
             if (shield > 0f)
@@ -2835,62 +2839,62 @@ public float GetPlayerCurrentHealth(int playerId)
 
         public bool IsPlayerAlive(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
+            if (!IsValidPlayer(playerId)) return false;
             return PlayerCurrentHealth[playerId] > 0f;
         }
 
         // ==================== GAS 组件访问方法 ====================
 
         public AbilityInstance GetAbility(int entityId, int slot) {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return default;
+            if (!IsValidEntity(entityId)) return default;
             if (slot < 0 || slot >= MAX_ABILITIES_PER_ENTITY) return default;
             return AbilityInstances[entityId * MAX_ABILITIES_PER_ENTITY + slot];
         }
 
         public void SetAbility(int entityId, int slot, AbilityInstance inst) {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(entityId)) return;
             if (slot < 0 || slot >= MAX_ABILITIES_PER_ENTITY) return;
             AbilityInstances[entityId * MAX_ABILITIES_PER_ENTITY + slot] = inst;
         }
 
         public void AddAbility(int entityId, GameplayAbilityDef def) {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(entityId)) return;
             int slot = AbilityCount[entityId];
             if (slot < MAX_ABILITIES_PER_ENTITY) { SetAbility(entityId, slot, new AbilityInstance(def)); AbilityCount[entityId]++; }
         }
 
         // Bug#9: Reset abilities for entity — clears all slots (used before re-initializing)
         public void ResetPlayerAbilities(int entityId) {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(entityId)) return;
             AbilityCount[entityId] = 0;
             ActiveEffectCount[entityId] = 0;
         }
 
         public AppliedEffect GetEffect(int entityId, int slot) {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return default;
+            if (!IsValidEntity(entityId)) return default;
             if (slot < 0 || slot >= MAX_ACTIVE_EFFECTS_PER_ENTITY) return default;
             return ActiveEffects[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot];
         }
 
         public void SetEffect(int entityId, int slot, AppliedEffect eff) {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(entityId)) return;
             if (slot < 0 || slot >= MAX_ACTIVE_EFFECTS_PER_ENTITY) return;
             ActiveEffects[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot] = eff;
         }
 
         public int GetEffectCount(int entityId) {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return 0;
+            if (!IsValidEntity(entityId)) return 0;
             return ActiveEffectCount[entityId];
         }
 
         public void AddEffect(int entityId, AppliedEffect eff) {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(entityId)) return;
             int slot = ActiveEffectCount[entityId];
             if (slot < MAX_ACTIVE_EFFECTS_PER_ENTITY) { SetEffect(entityId, slot, eff); ActiveEffectCount[entityId]++; }
         }
 
         public void SetEffectCount(int entityId, int count) {
-            if (entityId < 0 || entityId >= MAX_ENTITIES) return;
+            if (!IsValidEntity(entityId)) return;
             if (count < 0) count = 0;
             if (count > MAX_ACTIVE_EFFECTS_PER_ENTITY) count = MAX_ACTIVE_EFFECTS_PER_ENTITY;
             ActiveEffectCount[entityId] = count;
@@ -2900,31 +2904,31 @@ public float GetPlayerCurrentHealth(int playerId)
 
         public int GetResearchPoints(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            if (!IsValidPlayer(playerId)) return 0;
             return PlayerResearchPoints[playerId];
         }
 
         public void AddResearchPoints(int playerId, int amount)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             PlayerResearchPoints[playerId] += amount;
         }
 
         public bool IsTechUnlocked(int playerId, string nodeId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return false;
+            if (!IsValidPlayer(playerId)) return false;
             return PlayerUnlockedTechs[playerId].Contains(nodeId);
         }
 
         public void UnlockTech(int playerId, string nodeId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            if (!IsValidPlayer(playerId)) return;
             PlayerUnlockedTechs[playerId].Add(nodeId);
         }
 
         public HashSet<string> GetUnlockedTechs(int playerId)
         {
-            if (playerId < 0 || playerId >= MAX_PLAYERS) return new HashSet<string>();
+            if (!IsValidPlayer(playerId)) return new HashSet<string>();
             // L-1 fix: return a defensive copy to prevent external mutation
             return new HashSet<string>(PlayerUnlockedTechs[playerId]);
         }
