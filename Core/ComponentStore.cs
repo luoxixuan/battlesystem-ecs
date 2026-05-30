@@ -1560,5 +1560,22 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         {
             return _activeEnemyIds.Count;
         }
+
+        /// <summary>
+        /// Zero-allocation read-only span access to active enemy IDs. Safe — no mutable reference exposed.
+        /// Prefer this over GetCachedActiveEnemyIds() in new code.
+        /// </summary>
+        public ReadOnlySpan<int> GetActiveEnemySpan()
+        {
+            return System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_activeEnemyIds);
+        }
+
+        /// <summary>
+        /// Zero-allocation read-only span access to active tower IDs.
+        /// </summary>
+        public ReadOnlySpan<int> GetActiveTowerSpan()
+        {
+            return System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_activeTowerIds);
+        }
     }
 }
