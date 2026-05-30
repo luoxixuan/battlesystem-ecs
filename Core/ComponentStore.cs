@@ -731,6 +731,8 @@ namespace BattleSystemECS.Core
             EnemyIsInvulnerable = null!; EnemyInvulnerablePhaseName = null!;
             EnemyFissionDefId = null!; EnemyFissionGeneration = null!;
             EnemyMorphDefId = null!; EnemyIsMorphed = null!; EnemyMorphTriggered = null!;
+            EnemyCloneDefId = null!; EnemyCloneCooldown = null!; EnemyCloneTimer = null!;
+            EnemyCloneCount = null!; EnemyIsClone = null!; EnemyCloneMasterId = null!;
             EnemyIsLifeLinker = null!; EnemyLifeLinkDefId = null!; EnemyLinkedEnemyId = null!;
             EnemyLifeLinkRatio = null!; EnemyLifeLinkCooldownLeft = null!; EnemyIsLinked = null!;
             EnemyPathId = null!; EnemyPathNodeIndex = null!;

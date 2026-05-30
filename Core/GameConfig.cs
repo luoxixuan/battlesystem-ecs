@@ -1071,6 +1071,42 @@ namespace BattleSystemECS.Config
             return Array.FindIndex(MorphDefs, m => m.SourceMonsterType == monsterType);
         }
 
+        /// <summary>
+        /// Enemy clone (duplicate mid-wave) definition — loaded from enemy_clones.json.
+        /// When a monster with cloning capability meets its trigger condition, it spawns
+        /// a functional clone that shares its stats and behavior.
+        /// </summary>
+        public class CloneDef
+        {
+            public string CloneId { get; set; } = "";
+            // Source monster type that triggers cloning (e.g., "Doppelganger")
+            public string SourceMonsterType { get; set; } = "";
+            // Maximum number of active clones this enemy can have at once
+            public int MaxClones { get; set; } = 2;
+            // Health multiplier for clones relative to master's current health
+            public float CloneHpMult { get; set; } = 0.6f;
+            // Clone cooldown in seconds between clone attempts
+            public float CloneCooldown { get; set; } = 8f;
+            // Clone duration in seconds (0 = permanent clone, -1 = no duration tracking)
+            // When duration > 0, clone is killed when timer expires
+            public float CloneDuration { get; set; } = 0f;
+            // Trigger type: "HP_THRESHOLD" | "TIME"
+            public string TriggerType { get; set; } = "HP_THRESHOLD";
+            // For HP_THRESHOLD: clone when health drops below this fraction (0.0-1.0)
+            // For TIME: clone after this many seconds since spawn (requires age tracking)
+            public float TriggerValue { get; set; } = 0.3f;
+            public string Description { get; set; } = "";
+        }
+
+        // Enemy clone definitions (loaded from enemy_clones.json)
+        public CloneDef[] CloneDefs { get; set; } = Array.Empty<CloneDef>();
+
+        // GetCloneDefId: returns index into CloneDefs[] for a monster type, -1 if none
+        public int GetCloneDefIdBySourceType(string monsterType)
+        {
+            return Array.FindIndex(CloneDefs, c => c.SourceMonsterType == monsterType);
+        }
+
         // Pickup item definitions (loaded from pickup_defs.json)
         public PickupDef[] PickupDefs { get; set; } = Array.Empty<PickupDef>();
 

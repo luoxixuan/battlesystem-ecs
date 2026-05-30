@@ -224,6 +224,22 @@ namespace BattleSystemECS.Core
         // EnemyMorphTriggered: set to true when trigger condition is met (consumed at morph execution)
         public bool[] EnemyMorphTriggered = new bool[MAX_ENTITIES];
 
+        // ==================== Enemy Clone (Duplicate Mid-Wave, SOA) ====================
+        // EnemyCloneDefId: index into GameConfig.CloneDefs for this enemy's clone definition (-1 = none)
+        public int[] EnemyCloneDefId = new int[MAX_ENTITIES];
+        // EnemyCloneCooldown: remaining cooldown in seconds before this enemy can clone again
+        public float[] EnemyCloneCooldown = new float[MAX_ENTITIES];
+        // EnemyCloneTimer: clone duration in seconds (0 = permanent clone, -1 = no duration tracking)
+        // When CloneDuration > 0 and timer expires, clone is killed (optional mechanic)
+        public float[] EnemyCloneTimer = new float[MAX_ENTITIES];
+        // EnemyCloneCount: number of active clones this enemy has currently spawned
+        // Enforced against CloneDef.MaxClones
+        public int[] EnemyCloneCount = new int[MAX_ENTITIES];
+        // EnemyIsClone: true if this entity is a clone (cannot clone further, lower tower priority)
+        public bool[] EnemyIsClone = new bool[MAX_ENTITIES];
+        // EnemyCloneMasterId: the entity ID of the master that this clone was spawned from (-1 = none)
+        public int[] EnemyCloneMasterId = new int[MAX_ENTITIES];
+
         // ==================== 敌人生命链接 / Life Link (Damage Sharing, SOA) ====================
         // EnemyIsLifeLinker: true if this enemy is a Life Link master (can establish links with others)
         public bool[] EnemyIsLifeLinker = new bool[MAX_ENTITIES];
