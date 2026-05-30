@@ -212,6 +212,18 @@ namespace BattleSystemECS.Systems
                         store.TowerVisionRadius[towerId] = tc.VisionRadius;
                         logger.Log($"[TOWER] {tc.Name} 视野: 半径 {tc.VisionRadius}");
                     }
+                    // Apply patrol tower properties (mobile tower on patrol path)
+                    if (tc.IsMobile)
+                    {
+                        store.TowerIsMobile[towerId] = true;
+                        store.TowerMoveSpeed[towerId] = tc.MoveSpeed > 0f ? tc.MoveSpeed : 3f;
+                        store.TowerPatrolPathId[towerId] = tc.PatrolPathId >= 0 ? tc.PatrolPathId : 0;
+                        store.TowerPatrolWaypointIndex[towerId] = 0;
+                        store.TowerPatrolDirection[towerId] = tc.PatrolDirection >= 0 ? tc.PatrolDirection : 1;
+                        store.TowerPatrolAttackSpeedPenalty[towerId] = tc.PatrolAttackSpeedPenalty > 0f
+                            ? tc.PatrolAttackSpeedPenalty : 0.75f;
+                        logger.Log($"[TOWER] {tc.Name} 巡逻塔: 路径 {store.TowerPatrolPathId[towerId]}, 速度 {store.TowerMoveSpeed[towerId]}, 攻速惩罚 {store.TowerPatrolAttackSpeedPenalty[towerId]}");
+                    }
                 }
                 else
                 {

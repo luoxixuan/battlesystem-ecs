@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-30, commit `4a95194`）
+## 性能基准（2026-05-30, commit `b24c3a1`）
 
-|||     | 指标 | 数值 |
+|     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~4911 FPS**，400 帧，~0.20 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~9806 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5161 FPS** |
+| **mode 5**（完整一局） | **~4227 FPS**，400 帧，~0.24 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~9192 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~4538 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -135,9 +135,9 @@ dotnet test
 ---
 
 ## 更新记录
-
 > 仅记录功能上线和重大修复。日常基准波动见顶部性能基准表。
 
+- **2026-05-30**: 方向八：移动/巡逻塔（PatrolTowerSystem + TowerIsMobile/TowerMoveSpeed/TowerPatrolPathId/PatrolWaypointIndex/PatrolDirection 组件 + FrameScheduler Phase 5.0 注入 + patrol_paths.json 配置 + GameConfig/TowerPlacement 集成）；bench2: 9192, bench4: 4538, bench5: 4227
 - **2026-05-30**: 方向六：战争迷雾/视野系统（FogOfWarSystem + TowerVisionRadius/GlobalFogDensity/TowerVisibilityByTower 组件 + FrameScheduler Phase 5.15 注入 + TowerAttackSystem 索敌过滤）；bench2: 9806, bench4: 5161, bench5: 4911
 - **2026-05-30**: 方向四：塔建造延迟（ConstructionTime/ConstructionHP/IsVulnerableDuringConstruction + TowerConstructionSystem + TowerPlacementSystem 建造初始化 + TowerAttackSystem 跳过建造中塔）；bench2: 9920, bench4: 5344, bench5: 4920
 - **2026-05-30**: 方向五：玩家全局技能/终极技能（GlobalSkillSystem + GlobalSkillDef + PlayerGlobalSkillUnlocked/Cooldown/Pressed 组件 + FrameScheduler BuildPhase/WavePhase 双调用 + GameManager 注入）；bench2: 10049, bench4: 5100, bench5: 4702

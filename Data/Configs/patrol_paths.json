@@ -1,0 +1,45 @@
+{
+  "mapWidth": 10,
+  "mapHeight": 50,
+  "paths": [
+    {
+      "id": 0,
+      "name": "Default Horizontal Sweep",
+      "mode": "pingpong",
+      "waypoints": [
+        { "x": 2, "y": 5 },
+        { "x": 7, "y": 5 },
+        { "x": 2, "y": 15 },
+        { "x": 7, "y": 15 },
+        { "x": 2, "y": 25 },
+        { "x": 7, "y": 25 },
+        { "x": 2, "y": 35 },
+        { "x": 7, "y": 35 },
+        { "x": 2, "y": 45 },
+        { "x": 7, "y": 45 }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "Vertical Corridor",
+      "mode": "pingpong",
+      "waypoints": [
+        { "x": 4, "y": 5 },
+        { "x": 4, "y": 45 }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Wide Sweep",
+      "mode": "pingpong",
+      "waypoints": [
+        { "x": 1, "y": 10 },
+        { "x": 8, "y": 10 },
+        { "x": 8, "y": 30 },
+        { "x": 1, "y": 30 },
+        { "x": 1, "y": 45 },
+        { "x": 8, "y": 45 }
+      ]
+    }
+  ]
+}

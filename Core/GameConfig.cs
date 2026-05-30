@@ -183,6 +183,17 @@ namespace BattleSystemECS.Config
         // VisionRadius: fog of war vision radius in grid units (0 = no fog, can see all enemies)
         // Tower can only target enemies within this radius. Affects FogOfWarSystem.
         public float VisionRadius { get; set; } = 0f;
+        // IsMobile: if true, this tower moves along a patrol path during combat
+        public bool IsMobile { get; set; } = false;
+        // MoveSpeed: movement speed in grid units per second (only meaningful if IsMobile = true)
+        public float MoveSpeed { get; set; } = 0f;
+        // PatrolPathId: ID of the patrol path this tower follows (patrol_paths.json)
+        // -1 or missing = no default path (uses path 0 at runtime)
+        public int PatrolPathId { get; set; } = -1;
+        // PatrolDirection: +1 = forward (ping-pong), -1 = backward, 0 = one-way/stop at end
+        public int PatrolDirection { get; set; } = 1;
+        // PatrolAttackSpeedPenalty: attack speed multiplier while moving (e.g. 0.75 = 25% slower)
+        public float PatrolAttackSpeedPenalty { get; set; } = 0.75f;
     }
 
     /// <summary>

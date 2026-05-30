@@ -86,6 +86,7 @@ namespace BattleSystemECS.Core
         public GlobalSkillSystem? GlobalSkill { get; set; }
         public EnemyLifeLinkSystem? LifeLink { get; set; }
         public FogOfWarSystem? Fog { get; set; }
+        public PatrolTowerSystem? PatrolTower { get; set; }
 
         // Kill notification: fires for each enemy killed during ResolveEnemiesKilledThisFrame
         // Used by ComboSystem to increment combo counters.
@@ -242,6 +243,10 @@ namespace BattleSystemECS.Core
 
             // ── Phase 5: Spatial Rebuild ──────────────────────────────────
             store.RebuildSpatialGrid();
+
+// ── Phase 5.0: Patrol Tower — update mobile tower positions, before Chrono/Fog ─
+            PatrolTower?.SetTurn(turn);
+            PatrolTower?.Update(effectiveDelta);
 
 // ── Phase 5.1: Chrono Tower — time dilation fields, after spatial rebuild ──
             ChronoTower?.SetTurn();

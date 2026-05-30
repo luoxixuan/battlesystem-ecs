@@ -853,6 +853,20 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // TowerKillCount: total enemies killed by this tower (used for mastery tracking)
         public int[] TowerKillCount = new int[MAX_ENTITIES];
 
+        // ==================== 移动/巡逻塔组件 (Mobile / Patrol Tower) ====================
+        // TowerIsMobile: true if this tower moves along a patrol path during combat
+        public bool[] TowerIsMobile = new bool[MAX_ENTITIES];
+        // TowerMoveSpeed: movement speed in grid units per second
+        public float[] TowerMoveSpeed = new float[MAX_ENTITIES];
+        // TowerPatrolPathId: ID of the patrol path this tower follows (-1 = no path)
+        public int[] TowerPatrolPathId = new int[MAX_ENTITIES];
+        // TowerPatrolWaypointIndex: current target waypoint index in the patrol path
+        public int[] TowerPatrolWaypointIndex = new int[MAX_ENTITIES];
+        // TowerPatrolDirection: +1 = forward, -1 = backward (ping-pong), 0 = one-way
+        public int[] TowerPatrolDirection = new int[MAX_ENTITIES];
+        // TowerPatrolAttackSpeedPenalty: attack speed multiplier while moving (e.g. 0.7 = 30% slower)
+        public float[] TowerPatrolAttackSpeedPenalty = new float[MAX_ENTITIES];
+
         // ==================== 路障/墙体组件（Obstacle）====================
         // 路障是可被敌人攻击的放置物（冰墙、地雷等）
         public const int MAX_OBSTACLES = 5000;
@@ -1839,6 +1853,13 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             // Fog of War fields reset
             TowerVisionRadius[entityId] = 0f;
             TowerVisibilityByTower.Remove(entityId); // remove visibility data for this tower
+            // Patrol tower fields reset
+            TowerIsMobile[entityId] = false;
+            TowerMoveSpeed[entityId] = 0f;
+            TowerPatrolPathId[entityId] = -1;
+            TowerPatrolWaypointIndex[entityId] = 0;
+            TowerPatrolDirection[entityId] = 1;
+            TowerPatrolAttackSpeedPenalty[entityId] = 1f;
             lock (activeIdsLock) { _activeTowerIds.Remove(entityId); }
         }
 
