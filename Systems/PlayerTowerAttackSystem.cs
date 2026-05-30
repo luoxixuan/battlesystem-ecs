@@ -186,6 +186,15 @@ public void SetWaveNumber(int waveNumber)
 
                 // Apply damage type resistance (Physical=armor, Magic=magicResist, True=bypass all)
                 DamageType dmgType = store.PlayerDamageType[playerId];
+                // Immunity check: True bypasses immunity; all others check the mask
+                if (dmgType != DamageType.True)
+                {
+                    int immunityMask = store.EnemyDamageImmunityMask[enemyId];
+                    if ((immunityMask & (int)dmgType) != 0)
+                    {
+                        finalDamage = 0f;  // enemy is immune to this damage type
+                    }
+                }
                 if (dmgType == DamageType.True)
                 {
                     // no resistance applied — skip to damageTakenMult below

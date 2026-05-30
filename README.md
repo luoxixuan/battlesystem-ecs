@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-31, commit `9ad041d`）
+## 性能基准（2026-05-31, commit `82b91ac`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~4855 FPS**，400 帧，~0.21 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11970 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5389 FPS** |
+| **mode 5**（完整一局） | **~5026 FPS**，400 帧，~0.20 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~9588 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5712 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -146,6 +146,7 @@ dotnet test
 - 幽灵/相位敌人系统（PhaseSystem + ComponentStore_Enemy.cs + TowerAttackSystem）；bench2: 11643, bench4: 5501, bench5: 5017
 - 敌人塔破坏/EMP 瘫痪系统（TowerSabotageSystem + ComponentStore_Tower.cs + ComponentStore_Enemy.cs）；bench2: 12187, bench4: 5471, bench5: 4847
 - 塔造价递增/成本梯度（PlacementCountByType + TowerPlacementSystem + tower_placement.json）；bench2: 11970, bench4: 5389, bench5: 4855
+- 伤害免疫/属性克制系统（DamageImmunityMask + DamageType扩展 + TowerAttackSystem/PlayerTowerAttackSystem）；bench2: 9588, bench4: 5712, bench5: 5026
 
 ### 2026-05-30
 - **工程改进**：ComponentStore 按领域拆分为 5 个 partial 文件（Enemy/Tower/Player/World + 核心生命周期）；伤害公式测试补齐至 120 项

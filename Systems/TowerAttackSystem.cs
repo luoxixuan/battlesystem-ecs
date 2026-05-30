@@ -538,6 +538,16 @@ int bestTarget = -1;
                     // Magic: reduced by magic resist (no armor interaction)
                     // True: ignores armor and magic resist entirely
                     DamageType dmgType = store.TowerDamageType[towerId];
+                    // ── Damage immunity check ───────────────────────────────────────────
+                    // True damage bypasses immunity entirely. All other types check the mask.
+                    if (dmgType != DamageType.True)
+                    {
+                        int immunityMask = store.EnemyDamageImmunityMask[bestTarget];
+                        if ((immunityMask & (int)dmgType) != 0)
+                        {
+                            baseDmg = 0f;  // enemy is immune to this damage type
+                        }
+                    }
                     if (dmgType == DamageType.True)
                     {
                         baseDmg *= _damageTakenMult;

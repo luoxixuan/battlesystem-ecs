@@ -298,6 +298,11 @@ namespace BattleSystemECS.Core
         public float[] EnemyKnockbackResistance = new float[MAX_ENTITIES];
         // EnemyDamageResistance: 0-1, reduces all damage taken (applied in TowerAttackSystem and SkillSystem)
         public float[] EnemyDamageResistance = new float[MAX_ENTITIES];
+        // EnemyDamageImmunityMask: bit mask of damage types this enemy is immune to.
+        // Computed from DamageImmunities[] in monster JSON. If (damageType &amp; mask) != 0, damage = 0.
+        // True damage (DamageType.True) bypasses immunity entirely and ignores this mask.
+        // Values: Physical=1, Magic=2, Fire=4, Ice=8, Lightning=16. Default 0 = no immunity.
+        public int[] EnemyDamageImmunityMask = new int[MAX_ENTITIES];
 
         // ==================== 敌人移动方向（背刺系统 SOA）====================
         // EnemyMoveDirX: normalized X component of enemy's current movement direction
@@ -456,6 +461,7 @@ namespace BattleSystemECS.Core
             EnemySpawnFrame[entityId] = CurrentFrame;
             EnemyArmor[entityId] = armor;
             EnemyMagicResist[entityId] = magicResist;
+            EnemyDamageImmunityMask[entityId] = 0;  // default: no damage immunities
             EnemyShield[entityId] = shield;  // configurable initial shield
             // Hit Shield: default 0 layers, 0 max, 0 regen timer
             EnemyHitShieldCount[entityId] = 0f;
