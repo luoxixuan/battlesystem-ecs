@@ -19,6 +19,7 @@ namespace BattleSystemECS.Systems
         private readonly IRenderer logger;
         private readonly int playerId;
         private readonly GameConfig gameConfig;
+        private readonly IEventBus _eventBus;
         private readonly Dictionary<string, EnemyAbilityDef> _abilityLookup;
         private TelegraphSystem _telegraphSystem;
 
@@ -29,12 +30,13 @@ namespace BattleSystemECS.Systems
         // Per-ability cooldown tracking — keyed by enemyId * MAX_ABILITIES_PER_ENTITY + slot
         private readonly float[] _abilityCooldownTimers = new float[ComponentStore.MAX_ENTITIES * ComponentStore.MAX_ABILITIES_PER_ENTITY];
 
-        public EnemyAbilitySystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig)
+        public EnemyAbilitySystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, IEventBus eventBus = null)
         {
             this.store = store;
             this.logger = logger;
             this.playerId = playerId;
             this.gameConfig = gameConfig;
+            this._eventBus = eventBus ?? new EventBus();
 
             // Build ability lookup from config
             _abilityLookup = new Dictionary<string, EnemyAbilityDef>();
@@ -207,7 +209,7 @@ namespace BattleSystemECS.Systems
                     store.DecreasePlayerHealth(playerId, aoeDamage);
                     float remaining = store.GetPlayerCurrentHealth(playerId);
 
-                    EventBus.Instance.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
+                    _eventBus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
                     {
                         Damage = aoeDamage,
                         RemainingHealth = remaining,

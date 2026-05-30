@@ -210,8 +210,50 @@ namespace BattleSystemECS.Core
         }
 
         /// <summary>
-        /// 查询范围内所有敌人 ID — O(cells queried)，通常远小于 O(enemies)。
-        /// range 是以塔为中心的正方形半径（单位：cell）。
+        /// Query enemies in range — writes to a pre-allocated array buffer (zero-allocation overload).
+        /// count is incremented for each enemy found. Buffer must be large enough.
+        /// </summary>
+        public void GetEnemiesInRange(ComponentStore store, float towerX, float towerY,
+            int range, int[] buffer, ref int count)
+        {
+            int centerGx = (int)Math.Floor(towerX);
+            int centerGy = (int)Math.Floor(towerY);
+            float rangeSq = range * range;
+
+            for (int dx = -range; dx <= range; dx++)
+            {
+                int gx = centerGx + dx;
+                if (gx < 0 || gx >= _mapWidth) continue;
+
+                for (int dy = -range; dy <= range; dy++)
+                {
+                    int gy = centerGy + dy;
+                    if (gy < 0 || gy >= _mapHeight) continue;
+
+                    int cellIndex = gy * _mapWidth + gx;
+                    int cellCount = _cellCounts[cellIndex];
+                    if (cellCount == 0) continue;
+
+                    int baseOffset = cellIndex * CellCapacity;
+                    for (int i = 0; i < cellCount; i++)
+                    {
+                        int eid = _gridData[baseOffset + i];
+                        float ex = store.PositionX[eid];
+                        float ey = store.PositionY[eid];
+                        float ddx = ex - towerX;
+                        float ddy = ey - towerY;
+                        float distSq = ddx * ddx + ddy * ddy;
+                        if (distSq <= rangeSq)
+                        {
+                            buffer[count++] = eid;
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Query enemies in range — writes to a List (backward-compatible overload).
         /// </summary>
         public void GetEnemiesInRange(ComponentStore store, float towerX, float towerY,
             int range, List<int> output)

@@ -24,6 +24,7 @@ namespace BattleSystemECS.Systems
         private readonly GameConfig gameConfig;
         private readonly EnemyAbilitySystem enemyAbilitySystem;
         private readonly TechTreeSystem techTreeSystem;
+        private readonly IEventBus _eventBus;
 
         private int currentTurn;
         // Per-turn cached fields for cache locality
@@ -46,7 +47,7 @@ namespace BattleSystemECS.Systems
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
         private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
 
-        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem, TechTreeSystem techTreeSystem = null)
+        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem, TechTreeSystem techTreeSystem = null, IEventBus eventBus = null)
         {
             this.store = store;
             this.logger = logger;
@@ -54,6 +55,7 @@ namespace BattleSystemECS.Systems
             this.gameConfig = gameConfig;
             this.enemyAbilitySystem = enemyAbilitySystem;
             this.techTreeSystem = techTreeSystem;
+            this._eventBus = eventBus ?? new EventBus();
             _attackEvents[0] = new ConcurrentBag<AttackEvent>();
             _attackEvents[1] = new ConcurrentBag<AttackEvent>();
         }
@@ -394,7 +396,7 @@ namespace BattleSystemECS.Systems
             store.EnemyStealthMultiplier[enemyId] = 1f;
             store.DecreasePlayerHealth(playerId, damage);
             float remaining = store.GetPlayerCurrentHealth(playerId);
-            EventBus.Instance.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
+            _eventBus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
             {
                 Damage = damage,
                 RemainingHealth = remaining,
@@ -414,13 +416,13 @@ namespace BattleSystemECS.Systems
             store.EnemyStealthMultiplier[enemyId] = 1f;
             store.DecreasePlayerHealth(playerId, damage);
             float remaining = store.GetPlayerCurrentHealth(playerId);
-            EventBus.Instance.Publish(GameEvents.EnemyCharging, new EnemyChargingEvent
+            _eventBus.Publish(GameEvents.EnemyCharging, new EnemyChargingEvent
             {
                 EnemyId = enemyId,
                 Turn = currentTurn,
                 Damage = damage
             });
-            EventBus.Instance.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
+            _eventBus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
             {
                 Damage = damage,
                 RemainingHealth = remaining,
@@ -439,7 +441,7 @@ namespace BattleSystemECS.Systems
             {
                 store.SetEnemyAIChargeCounter(enemyId, counter + 1);
                 store.EnemyChargeParam[enemyId] = param;
-                EventBus.Instance.Publish(GameEvents.EnemyCharging, new EnemyChargingEvent
+                _eventBus.Publish(GameEvents.EnemyCharging, new EnemyChargingEvent
                 {
                     EnemyId = enemyId,
                     Turn = currentTurn,
@@ -458,13 +460,13 @@ namespace BattleSystemECS.Systems
                 float chargedDamage = baseDamage * 3f;
                 store.DecreasePlayerHealth(playerId, chargedDamage);
                 float remaining = store.GetPlayerCurrentHealth(playerId);
-                EventBus.Instance.Publish(GameEvents.EnemyChargeReleased, new EnemyChargeReleasedEvent
+                _eventBus.Publish(GameEvents.EnemyChargeReleased, new EnemyChargeReleasedEvent
                 {
                     EnemyId = enemyId,
                     Turn = currentTurn,
                     Damage = chargedDamage
                 });
-                EventBus.Instance.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
+                _eventBus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
                 {
                     Damage = chargedDamage,
                     RemainingHealth = remaining,

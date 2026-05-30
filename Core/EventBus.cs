@@ -17,11 +17,8 @@ namespace BattleSystemECS.Core
     ///   bus.Publish("enemy_killed", new { enemyId = 5, gold = 10 });
     ///   bus.Reset(); // call at start of each game turn / level
     /// </summary>
-    public class EventBus
+    public class EventBus : IEventBus
     {
-        private static readonly EventBus _instance = new EventBus();
-        public static EventBus Instance => _instance;
-
         private readonly Dictionary<string, List<Action<object>>> _handlers =
             new Dictionary<string, List<Action<object>>>();
 

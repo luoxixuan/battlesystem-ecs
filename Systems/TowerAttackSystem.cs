@@ -24,8 +24,9 @@ namespace BattleSystemECS.Systems
         private DayNightSystem _dayNightSystem; // injected for day/night cycle effects
         private List<int> _activeEnemyList;
 
-        // GC elimination: per-tower reusable candidate lists, pre-allocated in SetTurn
-        private List<int>[] _towerCandidates = Array.Empty<List<int>>();
+        // GC elimination: per-tower reusable candidate arrays (zero-allocation — no List.Clear() version bump)
+        private int[][] _towerCandidateBuffers = Array.Empty<int[]>();
+        private int[] _towerCandidateCounts = Array.Empty<int>();
 
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         private List<(int enemyId, float damage, int playerId, int towerId)>[] _damageQueue = new List<(int, float, int, int)>[2];
@@ -237,15 +238,18 @@ namespace BattleSystemECS.Systems
             // Cache wave-based difficulty multiplier (default wave 1)
             _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(1) : 1f;
 
-            // Ensure _towerCandidates is large enough; each slot is a reusable List<int>
+            // Ensure _towerCandidateBuffers is large enough; each slot is a reusable int[]
             var towerIds = store.ActiveTowerIds;
-            if (_towerCandidates.Length < towerIds.Count)
+            if (_towerCandidateBuffers.Length < towerIds.Count)
             {
-                var newArr = new List<int>[towerIds.Count];
-                Array.Copy(_towerCandidates, newArr, _towerCandidates.Length);
-                for (int i = _towerCandidates.Length; i < newArr.Length; i++)
-                    newArr[i] = new List<int>(128);
-                _towerCandidates = newArr;
+                var newBuffers = new int[towerIds.Count][];
+                var newCounts = new int[towerIds.Count];
+                Array.Copy(_towerCandidateBuffers, newBuffers, _towerCandidateBuffers.Length);
+                Array.Copy(_towerCandidateCounts, newCounts, _towerCandidateCounts.Length);
+                for (int i = _towerCandidateBuffers.Length; i < newBuffers.Length; i++)
+                    newBuffers[i] = new int[ComponentStore.MAX_ENTITIES];
+                _towerCandidateBuffers = newBuffers;
+                _towerCandidateCounts = newCounts;
             }
         }
 
@@ -262,16 +266,17 @@ namespace BattleSystemECS.Systems
         {
             var activeTowerIds = store.ActiveTowerIds;
 
-            // Defensive: ensure _towerCandidates covers all towers before parallel loop.
-            // Safe to call every frame — SetTurn also calls this; extra invocation is a no-op
-            // when length is already sufficient.
-            if (_towerCandidates.Length < activeTowerIds.Count)
+            // Defensive: ensure _towerCandidateBuffers covers all towers before parallel loop.
+            if (_towerCandidateBuffers.Length < activeTowerIds.Count)
             {
-                var newArr = new List<int>[activeTowerIds.Count];
-                Array.Copy(_towerCandidates, newArr, _towerCandidates.Length);
-                for (int i = _towerCandidates.Length; i < newArr.Length; i++)
-                    newArr[i] = new List<int>(128);
-                _towerCandidates = newArr;
+                var newBuffers = new int[activeTowerIds.Count][];
+                var newCounts = new int[activeTowerIds.Count];
+                Array.Copy(_towerCandidateBuffers, newBuffers, _towerCandidateBuffers.Length);
+                Array.Copy(_towerCandidateCounts, newCounts, _towerCandidateCounts.Length);
+                for (int i = _towerCandidateBuffers.Length; i < newBuffers.Length; i++)
+                    newBuffers[i] = new int[ComponentStore.MAX_ENTITIES];
+                _towerCandidateBuffers = newBuffers;
+                _towerCandidateCounts = newCounts;
             }
 
             // Phase 0: Spatial grid already rebuilt by GameManager before system chain.
@@ -318,11 +323,12 @@ namespace BattleSystemECS.Systems
                 float ty = store.PositionY[towerId];
                 int range = store.TowerRange[towerId];
 
-                // Spatial grid: query O(cells) instead of O(enemies) — reuse pre-allocated list
-                var candidates = _towerCandidates[ti];
-                candidates.Clear();
+                // Spatial grid: query O(cells) instead of O(enemies) — reuse pre-allocated array
+                var candidates = _towerCandidateBuffers[ti];
+                int candidateCount = 0;
                 int effectiveRange = (int)(range * _weatherRangeMult * _dayNightRangeMult);
-                store.SpatialGrid.GetEnemiesInRange(store, tx, ty, effectiveRange, candidates);
+                store.SpatialGrid.GetEnemiesInRange(store, tx, ty, effectiveRange, candidates, ref candidateCount);
+                _towerCandidateCounts[ti] = candidateCount;
 
                 // Read tower targeting mode
                 TowerTargetingMode targetingMode = store.TowerTargetingMode[towerId];
@@ -349,7 +355,7 @@ int bestTarget = -1;
                         break;
                 }
 
-                for (int ci = 0; ci < candidates.Count; ci++)
+                for (int ci = 0; ci < candidateCount; ci++)
                 {
                     int enemyId = candidates[ci];
                     if (!store.EnemyActive[enemyId]) continue;
@@ -1079,11 +1085,11 @@ int bestTarget = -1;
                 // Collect nearby enemies via spatial grid
                 if (splashRadius > 0 && splashRadius <= 100)
                 {
-                    var candidates = _towerCandidates[0]; // reuse first slot
-                    candidates.Clear();
-                    store.SpatialGrid.GetEnemiesInRange(store, px, py, splashRadius, candidates);
+                    var candidates = _towerCandidateBuffers[0]; // reuse first slot
+                    int splashCount = 0;
+                    store.SpatialGrid.GetEnemiesInRange(store, px, py, splashRadius, candidates, ref splashCount);
 
-                    for (int ci = 0; ci < candidates.Count; ci++)
+                    for (int ci = 0; ci < splashCount; ci++)
                     {
                         int enemyId = candidates[ci];
                         if (!store.EnemyActive[enemyId] || enemyId == primaryEnemyId) continue;

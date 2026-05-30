@@ -180,12 +180,16 @@ namespace BattleSystemECS.Core
             skillSystem.InitializePlayerSkills();  // 初始化技能系统
             logger.Log("[BOOTSTRAP]      Player Skills initialized successfully!");
 
+            logger.Log("[BOOTSTRAP]    - Creating EventBus...");
+            var eventBus = new EventBus();
+            logger.Log("[BOOTSTRAP]      EventBus created successfully!");
+
             logger.Log("[BOOTSTRAP]    - Creating EnemyAbilitySystem...");
-            enemyAbilitySystem = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
+            enemyAbilitySystem = new EnemyAbilitySystem(store, logger, playerId, gameConfig, eventBus);
             logger.Log("[BOOTSTRAP]      EnemyAbilitySystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating EnemyAISystem...");
-            enemyAISystem = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbilitySystem, techTreeSystem);  // 初始化敌人 AI 系统（行为树驱动）
+            enemyAISystem = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbilitySystem, techTreeSystem, eventBus);  // 初始化敌人 AI 系统（行为树驱动）
             logger.Log("[BOOTSTRAP]      EnemyAISystem created successfully!");
 
             logger.Log("[BOOTSTRAP]    - Creating GoldSystem...");
@@ -258,7 +262,7 @@ logger.Log("      ComboSystem created successfully!");
             towerAttackSystem.SetDayNightSystem(dayNightSystem);
 
             logger.Log("[BOOTSTRAP]    - Creating TelegraphSystem (warning zones for AoE abilities)... ");
-            telegraphSystem = new TelegraphSystem(store, logger, gameConfig);
+            telegraphSystem = new TelegraphSystem(store, logger, gameConfig, eventBus);
             logger.Log("      TelegraphSystem created successfully!");
             // Wire TelegraphSystem into EnemyAbilitySystem for warning zone queuing
             enemyAbilitySystem.SetTelegraphSystem(telegraphSystem);
