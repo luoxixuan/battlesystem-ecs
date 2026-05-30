@@ -59,7 +59,11 @@ dotnet test BattleSystemECS.Tests
 ```
 BattleSystem-ECS/
 ├── Core/                          # ECS 核心与基础设施
-│   ├── ComponentStore.cs          # SOA 数据存储（核心性能点，MAX_ENTITIES=100000）
+│   ├── ComponentStore.cs          # SOA 核心：常量、Position、实体生命周期、死亡队列、查询
+│   ├── ComponentStore_Enemy.cs    # SOA 敌人字段 + 访问方法（AddEnemy、CC、PathModifier 等）
+│   ├── ComponentStore_Tower.cs    # SOA 塔字段 + 访问方法（AddTower、Synergy、Targeting 等）
+│   ├── ComponentStore_Player.cs   # SOA 玩家字段 + 访问方法（Health、Shield、CC、Weather、DayNight）
+│   ├── ComponentStore_World.cs    # SOA 世界/环境字段 + 访问方法（Resource、Hazard、Corpse、Skill、GAS）
 │   ├── Entity.cs                  # 极简实体：仅含 int Id
 │   ├── EntityManager.cs           # 实体创建/销毁/命名
 │   ├── GameManager.cs             # 游戏主循环、系统初始化、关卡循环
@@ -146,12 +150,13 @@ BattleSystem-ECS/
 
 ### 4.1 ECS 存储模型（SOA）
 
-所有组件数据平铺为连续数组，存储在 `Core/ComponentStore.cs` 中：
+`ComponentStore` 使用 `partial class` 按领域拆分为 5 个文件，每个文件拥有自己的字段声明与访问方法：
 
-- **位置组件**: `float[] PositionX`, `float[] PositionY`, `bool[] PositionActive`
-- **玩家组件**: `float[] PlayerAttackDamage`, `float[] PlayerCurrentHealth`, `float[] PlayerGold`, `int[] PlayerResearchPoints`, ...（MAX_PLAYERS=10）
-- **敌人组件**: `float[] EnemyHealth`, `float[] EnemyMoveSpeed`, `bool[] EnemyActive`, `EnemyActionType[] EnemyActionEnum`, `BTCachedTree[] EnemyBehaviorTree`, ...（MAX_ENTITIES=100,000）
-- **塔组件**: `List<int> ActiveTowerIds`, `float[] TowerAttackDamage`, `int[] TowerRange`, ...
+- **ComponentStore.cs**: 核心生命周期——常量（MAX_ENTITIES=100000, MAX_PLAYERS=10）、Position 组件、实体创建/销毁（CreateEntity / DestroyEntity）、活跃 ID 管理（ActiveEnemyIds / ActiveTowerIds / swap-and-pop O(1) 移除）、死亡队列（ping-pong 双缓冲）、构造/析构、实体查询、SpatialGrid 空间网格。
+- **ComponentStore_Enemy.cs**: 所有敌人字段（Health, Armor, CC, Bleed, Burrow, Necromancer, Boss/Fission/Morph, LifeLink, Path/Teleport, Resistance, Vanguard, Healer, Thief, Affix, Element, Nest, AI）+ 访问方法。
+- **ComponentStore_Tower.cs**: 所有塔字段（Damage, Range, Targeting, Projectile, Ammo, Overcharge, Synergy, Chrono, Aura, Curse, Pull, Bleed, Income, Construction, Demolish, Link, Patrol, Fog）+ 访问方法。
+- **ComponentStore_Player.cs**: 所有玩家字段（Attack, Health, Shield, Mana, GlobalSkill, Gold, Buff, CC, TechTree, Combo, Bank）+ 访问方法。
+- **ComponentStore_World.cs**: 所有世界/环境字段（Weather, DayNight, Objective, AdaptiveDifficulty, ResourceNode, TimeDilation, RandomEvent, Fog, Ascension, Pickup, Wave, Obstacle, HazardZone, CorpseEffect, CorpseQueue, Skill, GAS）+ 访问方法。
 
 **关键规则**：
 - 热路径直接数组索引访问，禁止字典查询或 struct 复制。
@@ -260,7 +265,7 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 - **xUnit**（`Xunit`），测试项目 `BattleSystemECS.Tests`（TargetFramework=`net9.0`）。
 - 测试运行器：`xunit.runner.visualstudio`，覆盖率收集：`coverlet.collector`。
-- 当前测试数量：**73 项**（全部通过为门禁要求）。
+- 当前测试数量：**120 项**（全部通过为门禁要求）。
 
 ### 6.2 测试组织
 
@@ -309,7 +314,7 @@ echo 4 | dotnet run   # 或 dotnet run 4
 > 严格按顺序执行，**全部通过后才能 `git commit`**。
 
 1. **`dotnet build`** — 确认 0 warnings, 0 errors。
-2. **`dotnet test BattleSystemECS.Tests`** — 确认全部通过（当前 73/73）。
+2. **`dotnet test BattleSystemECS.Tests`** — 确认全部通过（当前 120/120）。
 3. **`echo 2 | dotnet run`** — mode 2 压测，确认 FPS 无下降（±5% 误差内）。
 4. **`echo 4 | dotnet run`** — mode 4 压测，确认主指标无下降（±5% 误差内）。
 5. **同步文档** — 若修改了架构、Bug 状态或性能数字，更新：
@@ -350,7 +355,7 @@ echo 4 | dotnet run   # 或 dotnet run 4
 
 | 需求 | 文件 |
 |------|------|
-| 添加新组件字段 | `Core/ComponentStore.cs`（SOA 数组声明 + 初始化 + DestroyEntity 清理） |
+| 添加新组件字段 | 对应领域的 `Core/ComponentStore_Xxx.cs`（字段声明 + 构造初始化 + DestroyEntity 清理）；核心生命周期字段在 `ComponentStore.cs` |
 | 添加新系统 | `Systems/XxxSystem.cs` + `Core/GameManager.cs` 初始化 + `Core/FrameScheduler.cs` 注入 |
 | 修改帧顺序 | `Core/FrameScheduler.cs` 的 `Tick()` 方法 |
 | 修改并行策略 | 对应系统的 `Update()`，注意两阶段模式审查 |
@@ -365,4 +370,4 @@ echo 4 | dotnet run   # 或 dotnet run 4
 
 ---
 
-> **最后更新**：2026-05-24（基于当前 HEAD 全面重写）
+> **最后更新**：2026-05-30（ComponentStore 按领域拆分为 5 个 partial 文件 + 120 测试）

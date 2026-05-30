@@ -97,7 +97,15 @@ GameManager.Run() / BenchmarkSystem
 
 ## 4. 组件存储（ComponentStore — SOA）
 
-所有组件以 struct of arrays 形式存储在 `Core/ComponentStore.cs`：
+`ComponentStore` 使用 `partial class` 按领域拆分为 5 个文件，每个自包含其字段声明与访问方法：
+
+| 文件 | 职责 |
+|------|------|
+| `Core/ComponentStore.cs` | 核心生命周期：常量（MAX_ENTITIES=100000）、Position、实体 CRUD、活跃 ID 管理、死亡队列、构造/析构、查询、SpatialGrid |
+| `Core/ComponentStore_Enemy.cs` | 敌人：Health/Armor/CC/Bleed/Burrow/Necromancer/Summon/Boss/Fission/Morph/LifeLink/Path/Teleport/Resistance/Vanguard/Healer/Thief/Affix/Element/Nest/AI + 方法 |
+| `Core/ComponentStore_Tower.cs` | 塔：Damage/Range/Targeting/Projectile/Ammo/Overcharge/Synergy/Chrono/Aura/Curse/Pull/Bleed/Income/Construction/Demolish/Link/Patrol/Fog + 方法 |
+| `Core/ComponentStore_Player.cs` | 玩家：Attack/Health/Shield/Mana/GlobalSkill/Gold/Buff/CC/TechTree/Combo/Bank + 方法 |
+| `Core/ComponentStore_World.cs` | 世界：Weather/DayNight/Objective/Adaptive/Resource/Time/Events/Fog/Ascension/Pickup/Wave/Obstacle/Hazard/Corpse/Skill/GAS + 方法 |
 
 ### 玩家组件（MAX_PLAYERS = 10）
 ```csharp

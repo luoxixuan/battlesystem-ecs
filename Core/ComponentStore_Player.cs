@@ -7,6 +7,85 @@ namespace BattleSystemECS.Core
 {
     public partial class ComponentStore
     {
+        #region Player Components
+        public float[] PlayerAttackRange = new float[MAX_PLAYERS];
+        public float[] PlayerAttackSpeed = new float[MAX_PLAYERS];
+        public float[] PlayerAttackDamage = new float[MAX_PLAYERS];
+        public float[] PlayerMaxHealth = new float[MAX_PLAYERS];  // 玩家最大生命值
+        public float[] PlayerCurrentHealth = new float[MAX_PLAYERS];  // 玩家当前生命值
+        public float[] PlayerArmor = new float[MAX_PLAYERS];  // 玩家护甲：减少受到伤害
+        // Player shield: absorbs damage before health, independent of armor
+        public float[] PlayerShield = new float[MAX_PLAYERS];
+        public float[] PlayerShieldDuration = new float[MAX_PLAYERS]; // seconds remaining
+        // Player thorns: reflects a fraction of damage taken back to the attacking enemy.
+        public float[] PlayerThornsRatio = new float[MAX_PLAYERS];
+public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
+        // Player damage type: determines which resistance enemies use for mitigation.
+        public DamageType[] PlayerDamageType = new DamageType[MAX_PLAYERS];
+        public float[] PlayerGold = new float[MAX_PLAYERS];
+        public float[] PlayerUpgradeThreshold = new float[MAX_PLAYERS];
+        // ==================== 法力/能量池资源系统 (Mana Pool) ====================
+        // PlayerMana: current mana points for each player
+        public float[] PlayerMana = new float[MAX_PLAYERS];
+        // PlayerMaxMana: maximum mana cap
+        public float[] PlayerMaxMana = new float[MAX_PLAYERS];
+        // PlayerManaRegen: mana regeneration rate per second
+        public float[] PlayerManaRegen = new float[MAX_PLAYERS];
+        // PlayerManaCost: cost multiplier for skill mana consumption
+        public float[] PlayerManaCost = new float[MAX_PLAYERS];
+        // ==================== 玩家全局技能/终极技能 (Global Skills / Ultimates) ====================
+        // PlayerGlobalSkillUnlocked: bit-flag of which global skills are unlocked per player (indexed by playerId * MAX_GLOBAL_SKILLS + skillIdx)
+        public bool[] PlayerGlobalSkillUnlocked = new bool[MAX_PLAYERS * 8];
+        // PlayerGlobalSkillCooldown: remaining cooldown in seconds per global skill
+        public float[] PlayerGlobalSkillCooldown = new float[MAX_PLAYERS * 8];
+        // PlayerGlobalSkillPressed: hotkey pressed signal this frame (consumed by GlobalSkillSystem)
+        public bool[] PlayerGlobalSkillPressed = new bool[MAX_PLAYERS];
+        // PlayerGlobalSkillHotkey: hotkey string per skill for UI display
+        public string[] PlayerGlobalSkillHotkey = new string[MAX_PLAYERS * 8];
+        private float _goldKillMultiplier = 1.0f;
+        public float GoldKillMultiplier { get => _goldKillMultiplier; set => _goldKillMultiplier = value; }
+        // all_income_mult: extra multiplier layered on top of gold kill multiplier
+        private float _allIncomeMultKill = 1.0f;
+        public float AllIncomeMultKill { get => _allIncomeMultKill; set => _allIncomeMultKill = value; }
+        // flat bonus awarded once per elite kill
+        private float _goldOnEliteKill = 0f;
+        public float GoldOnEliteKill { get => _goldOnEliteKill; set => _goldOnEliteKill = value; }
+        public List<string>[] PlayerBuffs = new List<string>[MAX_PLAYERS];
+
+        // Perf: bit-flag buff storage — O(1) lookup, no GC allocation per frame
+        public BuffType[] PlayerBuffFlags = new BuffType[MAX_PLAYERS];
+        // Player stun duration counter (turns remaining). 0 = not stunned.
+        public int[] PlayerStunDuration = new int[MAX_PLAYERS];
+        // Player slow: tracks remaining slow turns and factor
+        public float[] PlayerSlowFactor = new float[MAX_PLAYERS];
+        public int[] PlayerSlowDuration = new int[MAX_PLAYERS];
+// Base lives: number of leaks allowed before game over (independent of health)
+        public int[] PlayerBaseLives = new int[MAX_PLAYERS];
+        public int[] PlayerMaxBaseLives = new int[MAX_PLAYERS];
+
+        // ==================== 科技树组件的 SOA 存储 ====================
+        public int[] PlayerResearchPoints = new int[MAX_PLAYERS];
+        public HashSet<string>[] PlayerUnlockedTechs = new HashSet<string>[MAX_PLAYERS];
+        // ==================== Combo Kill 连击组件（SOA） ====================
+        // ComboCount: current consecutive kill streak within combo window
+        public float[] PlayerComboCount = new float[MAX_PLAYERS];
+        // ComboTimer: seconds since last kill (resets combo when > ComboWindowSeconds)
+        public float[] PlayerComboTimer = new float[MAX_PLAYERS];
+        // ComboDamageMult: current damage multiplier = min(1 + ComboCount * ComboDamageBonusPerKill, ComboMaxMultiplier)
+        public float[] PlayerComboDamageMult = new float[MAX_PLAYERS];
+        // ComboKillStreak: max combo achieved this wave (for UI/achievement tracking)
+        public float[] PlayerComboKillStreak = new float[MAX_PLAYERS];
+        // ComboGoldMult: current gold bonus multiplier = min(1 + ComboCount * ComboGoldBonusPerKill, ComboMaxMultiplier)
+        public float[] PlayerComboGoldMult = new float[MAX_PLAYERS];
+
+        // ==================== Bank / Interest System 组件（SOA） ====================
+        // PlayerBankedGold: gold stored in the bank (earns interest each wave)
+        public float[] PlayerBankedGold = new float[MAX_PLAYERS];
+        // PlayerInterestRate: interest rate multiplier (0.05f = 5% per wave, capped at InterestRateCap)
+        public float[] PlayerInterestRate = new float[MAX_PLAYERS];
+
+        #endregion
+
         // ==================== 玩家组件访问 ====================
 
         public void AddPlayer(int entityId, float attackRange, float attackSpeed, float attackDamage, int currentLevel, int baseLives = 10)

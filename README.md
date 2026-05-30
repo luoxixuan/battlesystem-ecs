@@ -45,7 +45,11 @@
 ```
 BattleSystem-ECS/
 ├── Core/
-│   ├── ComponentStore.cs     # SOA 数据存储（核心性能点）
+│   ├── ComponentStore.cs            # SOA 核心：常量、Position、实体生命周期、死亡队列
+│   ├── ComponentStore_Enemy.cs      # SOA 敌人字段 + 访问方法
+│   ├── ComponentStore_Tower.cs      # SOA 塔字段 + 访问方法
+│   ├── ComponentStore_Player.cs     # SOA 玩家字段 + 访问方法
+│   ├── ComponentStore_World.cs      # SOA 世界/环境/资源字段 + 访问方法
 │   ├── GameManager.cs        # 游戏主循环与系统调度
 │   ├── EntityManager.cs
 │   ├── EventBus.cs
@@ -84,10 +88,10 @@ BattleSystem-ECS/
 │   └── TechTreeDef.cs          # 科技树配置结构
 ├── Research/
 │   ├── tower_defense_knowledge.md  # 自动更新的塔防知识库（21 repos）
-│   ├── bug-fix.md              # Bug 追踪（46 项，45 已修复，1 未修复）
+│   ├── bug-fix.md              # Bug 追踪（48 项，全部已修复）
 │   └── findings/               # 爬取原始数据
 ├── BattleSystemECS.Tests/
-│   └── ...                     # 48 单元测试
+│   └── ...                     # 120 单元测试
 └── Program.cs                  # 入口（游戏/压测/微基准）
 ```
 
@@ -135,25 +139,33 @@ dotnet test
 ---
 
 ## 更新记录
-> 仅记录功能上线和重大修复。日常基准波动见顶部性能基准表。
+> 仅记录功能上线和重大修复。
 
-- **2026-05-30**: 方向八：移动/巡逻塔（PatrolTowerSystem + TowerIsMobile/TowerMoveSpeed/TowerPatrolPathId/PatrolWaypointIndex/PatrolDirection 组件 + FrameScheduler Phase 5.0 注入 + patrol_paths.json 配置 + GameConfig/TowerPlacement 集成）；bench2: 9192, bench4: 4538, bench5: 4227
-- **2026-05-30**: 方向六：战争迷雾/视野系统（FogOfWarSystem + TowerVisionRadius/GlobalFogDensity/TowerVisibilityByTower 组件 + FrameScheduler Phase 5.15 注入 + TowerAttackSystem 索敌过滤）；bench2: 9806, bench4: 5161, bench5: 4911
-- **2026-05-30**: 方向四：塔建造延迟（ConstructionTime/ConstructionHP/IsVulnerableDuringConstruction + TowerConstructionSystem + TowerPlacementSystem 建造初始化 + TowerAttackSystem 跳过建造中塔）；bench2: 9920, bench4: 5344, bench5: 4920
-- **2026-05-30**: 方向五：玩家全局技能/终极技能（GlobalSkillSystem + GlobalSkillDef + PlayerGlobalSkillUnlocked/Cooldown/Pressed 组件 + FrameScheduler BuildPhase/WavePhase 双调用 + GameManager 注入）；bench2: 10049, bench4: 5100, bench5: 4702
-- **2026-05-30**: 方向一：塔重定位/重新部署（TowerRelocateSystem + TowerPlacementSystem.RelocateTower + tower_placement.json 配置）；bench2: 9698, bench4: 5286, bench5: 4832
-- **2026-05-30**: 方向三：时间操纵塔/Chrono Tower（ChronoTowerSystem + TowerIsChronoTower/TowerTimeFieldRadius/TowerTimeScale/EnemyTimeScale 组件 + FrameScheduler Phase 5.1 注入 + EnemyMovement 集成）；bench2: 10116, bench4: 5158, bench5: 4767
-- **2026-05-30**: 方向九：敌人受伤减速/瘸腿（EnemyWoundSystem + EnemyWoundThreshold/EnemyWoundSlowRatio/EnemyIsWounded 组件 + FrameScheduler Phase 3 注入 + ClearEnemyWound）；bench2: 9800, bench4: 5116, bench5: 4594
-- **2026-05-29**: 方向五：复活/亡灵法师敌人（NecromancerSystem + EnemyCanResurrect/EnemyIsReanimated + CorpseQueue + WaveSpawning 初始化 + FrameScheduler Phase 2.6 注入）；bench2: 9871, bench4: 5122, bench5: 4882
-- **2026-05-29**: 方向二：昼夜循环系统（DayNightSystem + DayNightConfig + GlobalDayNightPhase/Timer/CycleCount 组件 + TowerAttack/EnemyMovement 集成）；bench2: 10483, bench4: 5135, bench5: 5021
-- **2026-05-29**: 方向一：钻地/潜行敌人（EnemyBurrowSystem + EnemyIsBurrowed/BurrowTimer/BurrowCooldown + Emerge AoE + TowerAttack 索敌跳过）；bench2: 10115, bench4: 5487, bench5: 4878
-- **2026-05-29**: 方向四：流血/撕裂 DoT（BleedSystem + TowerIsBleedTower/EnemyBleedStacks + 流血塔配置）；bench2: 10081, bench4: 5464, bench5: 5087
-- **2026-05-29**: 方向七：路径修改塔（PathModifierSystem + PathModifierDef + ComponentStore.PathModifier 组件）；bench2: 10112, bench4: 5545, bench5: 4826
-- **2026-05-29**: 方向三：牵引/磁力/漩涡塔（PullTowerSystem + TowerIsPullTower/PullStrength/PullRadius + EnemyIsBeingPulled）；bench2: 10128→10214, bench4: 5345→5344, bench5: 5007→4947
-- **2026-05-29**: 8 项业务系统扩展 — 法力消耗系统（150技能ManaCost）、金币窃取敌人（ThiefDef）、敌方治疗者（EnemyHealerSystem）、敌人驱散净化（TowerDispelSystem）、塔牺牲/自毁（TowerDemolishSystem）、敌人产卵巢穴（NestSystem）、塔被动产金（TowerIncomeSystem）、召唤战斗单位修复；方向八：飞行/浮空敌人（EnemyIsFlying + TowerCanHitAir/Ground + 障碍物/地形跳过）；bench2: 10406→10375, bench4: 5638→5216, bench5: 5050→4979
-- **2026-05-30**: 方向九：随机事件 Bug 修复（移除 RandomEventSystem 死字段 `_eventCooldown`；InterestSystem 添加 ResetMerchantDiscount + EndEvent 时重置商人折扣）；bench2: 9947, bench4: 5251, bench5: 5050
-- **2026-05-29**: 方向六：诅咒/削弱光环（CurseAuraSystem + TowerCurse/EnemyCurse 字段 + CurseTowerConfig）；bench2: 10375→10128, bench4: 5216→5345, bench5: 4979→5007
-- **2026-05-28**: mode 5 完整一局压测上线（5关全通，400帧，6520 FPS）
-- **2026-05-28**: 方向八：肉盾/前锋敌人（Vanguard，伤害转移）；bench2: 9265, bench4: 5058, bench5: 4809
-- **2026-05-13**: 科技树系统上线（3分支 × 5节点，研究点数每波产出）
-- **2026-05-12**: BT Cache fix + Merged pipeline（FPS 8334）；GAS 技能系统重构；TowerAttack 并行化（ActiveTowerIds）
+### 2026-05-30
+- **工程改进**：ComponentStore 按领域拆分为 5 个 partial 文件（Enemy/Tower/Player/World + 核心生命周期）；伤害公式测试补齐至 120 项
+- 移动/巡逻塔（PatrolTowerSystem）；bench2: 9192, bench4: 4538, bench5: 4227
+- 战争迷雾/视野系统（FogOfWarSystem）；bench2: 9806, bench4: 5161, bench5: 4911
+- 塔建造延迟（TowerConstructionSystem）；bench2: 9920, bench4: 5344, bench5: 4920
+- 玩家全局技能/终极技能（GlobalSkillSystem）；bench2: 10049, bench4: 5100, bench5: 4702
+- 塔重定位/重新部署（TowerRelocateSystem）；bench2: 9698, bench4: 5286, bench5: 4832
+- 时间操纵塔/Chrono Tower（ChronoTowerSystem）；bench2: 10116, bench4: 5158, bench5: 4767
+- 敌人受伤减速/瘸腿（EnemyWoundSystem）；bench2: 9800, bench4: 5116, bench5: 4594
+- 随机事件 Bug 修复；bench2: 9947, bench4: 5251, bench5: 5050
+
+### 2026-05-29
+- 复活/亡灵法师敌人（NecromancerSystem + CorpseQueue）；bench2: 9871, bench4: 5122, bench5: 4882
+- 昼夜循环系统（DayNightSystem）；bench2: 10483, bench4: 5135, bench5: 5021
+- 钻地/潜行敌人（EnemyBurrowSystem + Emerge AoE）；bench2: 10115, bench4: 5487, bench5: 4878
+- 流血/撕裂 DoT（BleedSystem）；bench2: 10081, bench4: 5464, bench5: 5087
+- 路径修改塔（PathModifierSystem）；bench2: 10112, bench4: 5545, bench5: 4826
+- 牵引/磁力/漩涡塔（PullTowerSystem）；bench2: 10214, bench4: 5344, bench5: 4947
+- 诅咒/削弱光环（CurseAuraSystem）；bench2: 10128, bench4: 5345, bench5: 5007
+- 8 项业务系统扩展（法力消耗/金币窃取/敌方治疗/驱散/塔自毁/产卵/被动产金/召唤修复）+ 飞行/浮空敌人；bench2: 10375, bench4: 5216, bench5: 4979
+
+### 2026-05-28
+- mode 5 完整一局压测上线（5关全通，400帧，6520 FPS）
+- 肉盾/前锋敌人（Vanguard，伤害转移）；bench2: 9265, bench4: 5058, bench5: 4809
+
+### 2026-05-12～13
+- 科技树系统上线（3分支 × 5节点，研究点数每波产出）
+- BT Cache fix + Merged pipeline（FPS 8334）；GAS 技能系统重构；TowerAttack 并行化（ActiveTowerIds）
