@@ -38,6 +38,10 @@ namespace BattleSystemECS.Systems
         private ConcurrentBag<AttackEvent>[] _attackEvents = new ConcurrentBag<AttackEvent>[2];
         private int _attackEventsIdx = 0;
 
+        // Lifesteal event batch — ping-pong double-buffer (parallel collect, serial apply)
+        private ConcurrentBag<LifestealEvent>[] _lifestealEvents = new ConcurrentBag<LifestealEvent>[2];
+        private int _lifestealEventsIdx = 0;
+
         // BT evaluation cache — invalidates when enemy health, charge counter, or stun duration changes.
         private float _cachedPlayerHealth = -1;
         private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
@@ -58,6 +62,8 @@ namespace BattleSystemECS.Systems
             this._eventBus = eventBus ?? new EventBus();
             _attackEvents[0] = new ConcurrentBag<AttackEvent>();
             _attackEvents[1] = new ConcurrentBag<AttackEvent>();
+            _lifestealEvents[0] = new ConcurrentBag<LifestealEvent>();
+            _lifestealEvents[1] = new ConcurrentBag<LifestealEvent>();
         }
 
         /// <summary>
@@ -368,6 +374,20 @@ namespace BattleSystemECS.Systems
             _attackEvents[writeIdx].Clear();
             _attackEventsIdx = writeIdx;
 
+            // Serial lifesteal apply — after all attack actions have been resolved
+            int lsReadIdx = _lifestealEventsIdx;
+            foreach (var evt in _lifestealEvents[lsReadIdx])
+            {
+                if (!store.EnemyActive[evt.EnemyId]) continue;
+                store.EnemyHealth[evt.EnemyId] += evt.HealAmount;
+                if (store.EnemyHealth[evt.EnemyId] > store.EnemyMaxHealth[evt.EnemyId])
+                    store.EnemyHealth[evt.EnemyId] = store.EnemyMaxHealth[evt.EnemyId];
+            }
+            // Ping-pong swap
+            int lsWriteIdx = 1 - _lifestealEventsIdx;
+            _lifestealEvents[lsWriteIdx].Clear();
+            _lifestealEventsIdx = lsWriteIdx;
+
             // Dodge execution
             foreach (var enemyId in activeEnemyIds)
             {
@@ -530,6 +550,25 @@ namespace BattleSystemECS.Systems
             });
             store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
             logger.Log($"[AI] Enemy {enemyId} attacks player for {damage} damage (HP: {remaining})");
+
+            // Lifesteal: collect event for serial apply (two-phase pattern)
+            if (store.EnemyLifestealActive[enemyId])
+            {
+                float ratio = store.EnemyLifestealRatio[enemyId];
+                float cap = store.EnemyLifestealCap[enemyId];
+                if (ratio > 0f)
+                {
+                    float healAmount = Math.Min(damage * ratio, cap);
+                    if (healAmount > 0f)
+                    {
+                        _lifestealEvents[_lifestealEventsIdx].Add(new LifestealEvent
+                        {
+                            EnemyId = enemyId,
+                            HealAmount = healAmount
+                        });
+                    }
+                }
+            }
         }
 
         private void ExecuteRangedAttack(int enemyId)
@@ -556,6 +595,25 @@ namespace BattleSystemECS.Systems
             });
             store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
             logger.Log($"[AI] Enemy {enemyId} ranged attacks player for {damage} damage (HP: {remaining})");
+
+            // Lifesteal: collect event for serial apply (two-phase pattern)
+            if (store.EnemyLifestealActive[enemyId])
+            {
+                float ratio = store.EnemyLifestealRatio[enemyId];
+                float cap = store.EnemyLifestealCap[enemyId];
+                if (ratio > 0f)
+                {
+                    float healAmount = Math.Min(damage * ratio, cap);
+                    if (healAmount > 0f)
+                    {
+                        _lifestealEvents[_lifestealEventsIdx].Add(new LifestealEvent
+                        {
+                            EnemyId = enemyId,
+                            HealAmount = healAmount
+                        });
+                    }
+                }
+            }
         }
 
         private void ExecuteChargeAttack(int enemyId, float param)
@@ -602,6 +660,25 @@ namespace BattleSystemECS.Systems
                 store.EnemyChargeParam[enemyId] = 0f;
                 store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
                 logger.Log($"[AI] Enemy {enemyId} releases CHARGE for {chargedDamage} damage (3x)! HP: {remaining}");
+
+                // Lifesteal: collect event for serial apply (two-phase pattern)
+                if (store.EnemyLifestealActive[enemyId])
+                {
+                    float ratio = store.EnemyLifestealRatio[enemyId];
+                    float cap = store.EnemyLifestealCap[enemyId];
+                    if (ratio > 0f)
+                    {
+                        float healAmount = Math.Min(chargedDamage * ratio, cap);
+                        if (healAmount > 0f)
+                        {
+                            _lifestealEvents[_lifestealEventsIdx].Add(new LifestealEvent
+                            {
+                                EnemyId = enemyId,
+                                HealAmount = healAmount
+                            });
+                        }
+                    }
+                }
             }
         }
 
@@ -624,6 +701,12 @@ namespace BattleSystemECS.Systems
             public int EnemyId;
             public EnemyActionType ActionType;
             public float Param;
+        }
+
+        private struct LifestealEvent
+        {
+            public int EnemyId;
+            public float HealAmount;
         }
     }
 }

@@ -11,6 +11,7 @@ namespace BattleSystemECS.Core
         public Systems.EnemyLifeLinkSystem? LifeLink { get; set; }
         public Systems.EnemyAffixSystem? EnemyAffix { get; set; }
         public Systems.ManaBurnSystem? ManaBurn { get; set; }
+        public Systems.EnemyLifestealSystem? Lifesteal { get; set; }
         public Systems.PhaseSystem? Phase { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
@@ -38,6 +39,9 @@ namespace BattleSystemECS.Core
 
             ManaBurn?.SetTurn(turn);
             ManaBurn?.Update();
+
+            Lifesteal?.SetTurn(turn);
+            Lifesteal?.Update();
 
             Phase?.SetTurn(turn);
             Phase?.Update();

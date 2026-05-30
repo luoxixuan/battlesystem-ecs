@@ -502,6 +502,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
             scheduler.Spawning.WaveSpawning   = waveSpawning;
             scheduler.AI.EnemyAI        = enemyAI;
             scheduler.AI.EnemyAbility   = enemyAbility;
+            scheduler.AI.Lifesteal     = null; // EnemyLifestealSystem (placeholder, lifesteal inline in EnemyAISystem)
             scheduler.Movement.EnemyMovement  = enemyMovement;
             scheduler.Movement.Pathfinding    = pathfinding;
             scheduler.Combat.PlayerTowerAttack = playerAttack;

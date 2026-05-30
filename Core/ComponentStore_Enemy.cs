@@ -377,6 +377,14 @@ namespace BattleSystemECS.Core
         // EnemyManaBurnType: 0=flat, 1=percent_current, 2=percent_max (default 0=flat)
         public int[] EnemyManaBurnType = new int[MAX_ENTITIES];
 
+        // ==================== 敌人吸血组件（SOA）====================
+        // EnemyLifestealRatio: fraction of damage dealt that is healed back (0.3 = 30% lifesteal)
+        public float[] EnemyLifestealRatio = new float[MAX_ENTITIES];
+        // EnemyLifestealCap: maximum heal per attack event (prevents burst healing)
+        public float[] EnemyLifestealCap = new float[MAX_ENTITIES];
+        // EnemyLifestealActive: whether lifesteal is currently active (enemies can toggle it)
+        public bool[] EnemyLifestealActive = new bool[MAX_ENTITIES];
+
         // ==================== 敌人词缀组件（SOA）====================
         // EnemyAffixFlags: bit-mask of active affixes (see BuffType affix bits 16-22)
         // Each enemy spawns with 1-3 random affixes; stored as a flag set for O(1) HasAffix() checks.
@@ -511,6 +519,11 @@ namespace BattleSystemECS.Core
             EnemyManaBurnRadius[entityId] = 0f;
             EnemyManaBurnCooldown[entityId] = 0f;
             EnemyManaBurnType[entityId] = 0;
+
+            // Lifesteal: default 0 (no lifesteal)
+            EnemyLifestealRatio[entityId] = 0f;
+            EnemyLifestealCap[entityId] = 0f;
+            EnemyLifestealActive[entityId] = false;
 
             // H-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeEnemyIds.Add(entityId); _enemyIndexInList[entityId] = _activeEnemyIds.Count - 1; }
