@@ -29,6 +29,7 @@ namespace BattleSystemECS.Core
         public Systems.SuicideBombSystem? SuicideBomb { get; set; }
         public Systems.ReflectTowerSystem? ReflectTower { get; set; }
         public Systems.TowerMorphSystem? TowerMorph { get; set; }
+        public Systems.TowerStealthSystem? TowerStealth { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -39,6 +40,7 @@ namespace BattleSystemECS.Core
             Demolish?.Update();
             HitShield?.Update(deltaTime);
             TowerSabotage?.Update(deltaTime);
+            TowerStealth?.Update(deltaTime);
             TowerAttack?.Update(deltaTime);
             TowerSynergy?.Update();
             TowerLink?.Update();

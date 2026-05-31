@@ -224,6 +224,16 @@ namespace BattleSystemECS.Systems
             _hitShieldSystem = hitShieldSystem;
         }
 
+        private TowerStealthSystem _towerStealthSystem;
+
+        /// <summary>
+        /// Inject TowerStealthSystem reference for stealth targeting filters and decloak-on-fire.
+        /// </summary>
+        public void SetTowerStealthSystem(TowerStealthSystem towerStealthSystem)
+        {
+            _towerStealthSystem = towerStealthSystem;
+        }
+
         private EnemyLifeLinkSystem _lifeLinkSystem;
 
         /// <summary>

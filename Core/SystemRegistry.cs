@@ -74,6 +74,7 @@ namespace BattleSystemECS.Core
         public EnemyStrafeSystem? EnemyStrafe { get; private set; }
         public SuicideBombSystem? SuicideBomb { get; private set; }
         public ReflectTowerSystem? ReflectTower { get; private set; }
+        public TowerStealthSystem? TowerStealth { get; private set; }
 
         // ── Environment ──
         public TerrainSystem? Terrain { get; private set; }
@@ -188,10 +189,13 @@ namespace BattleSystemECS.Core
             EnemyStrafe = new EnemyStrafeSystem(store, logger);
 
             // ── Suicide Bomb ──
-            SuicideBomb = new SuicideBombSystem(store, playerId, ReflectTower);
+            SuicideBomb = new SuicideBombSystem(store, playerId, ReflectTower, TowerStealth);
 
             // ── Reflect Tower ──
             ReflectTower = new ReflectTowerSystem(store, playerId);
+
+            // ── Tower Stealth ──
+            TowerStealth = new TowerStealthSystem(store, playerId);
 
             // ── Burrow, Necromancer, LifeLink ──
             EnemyBurrow = new EnemyBurrowSystem(store, playerId);
@@ -287,6 +291,7 @@ namespace BattleSystemECS.Core
             TowerAttack?.SetProjectileSystem(Projectile);
             TowerAttack?.SetLifeLinkSystem(LifeLink);
             TowerAttack?.SetHitShieldSystem(HitShield);
+            TowerAttack?.SetTowerStealthSystem(TowerStealth);
 
             // ── PlayerTowerAttack wiring ──
             PlayerTowerAttack?.SetLifeLinkSystem(LifeLink);
@@ -432,6 +437,7 @@ namespace BattleSystemECS.Core
             scheduler.Combat.ReflectTower = ReflectTower;
             scheduler.Combat.TowerAttack = TowerAttack;
             scheduler.Combat.TowerMorph = TowerMorph;
+            scheduler.Combat.TowerStealth = TowerStealth;
             scheduler.Combat.TowerSynergy = TowerSynergy;
             scheduler.Combat.TowerLink = null;
             scheduler.Combat.AuraTower = AuraTower;

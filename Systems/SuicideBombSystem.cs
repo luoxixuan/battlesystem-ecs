@@ -23,6 +23,7 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore store;
         private readonly int playerId;
         private readonly ReflectTowerSystem? _reflectTowerSystem;
+        private readonly TowerStealthSystem? _towerStealthSystem;
         
         // Thread-safe collection for explosion events (phase 1 parallel collect → phase 2 serial apply)
         private readonly ConcurrentBag<SuicideExplosionEvent> _explosionEvents = new();
@@ -30,11 +31,12 @@ namespace BattleSystemECS.Systems
         // Cached active enemy list per turn
         private System.Collections.Generic.List<int> _activeEnemyList = null!;
 
-        public SuicideBombSystem(ComponentStore store, int playerId, ReflectTowerSystem? reflectTowerSystem = null)
+        public SuicideBombSystem(ComponentStore store, int playerId, ReflectTowerSystem? reflectTowerSystem = null, TowerStealthSystem? towerStealthSystem = null)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this.playerId = playerId;
             this._reflectTowerSystem = reflectTowerSystem;
+            this._towerStealthSystem = towerStealthSystem;
         }
 
         public void SetTurn(int turn)
@@ -95,6 +97,10 @@ namespace BattleSystemECS.Systems
                 for (int towerId = 0; towerId < ComponentStore.MAX_ENTITIES; towerId++)
                 {
                     if (!store.TowerActive[towerId])
+                        continue;
+
+                    // Stealth filter: skip stealthed towers unless this enemy has True Sight
+                    if (_towerStealthSystem != null && !_towerStealthSystem.CanTargetTower(towerId, enemyId))
                         continue;
 
                     float towerX = store.PositionX[towerId];
@@ -180,7 +186,9 @@ namespace BattleSystemECS.Systems
                 float falloffRatio = dmgRadius > 0f ? dist / dmgRadius : 0f; // 0 at center, 1 at edge
                 float falloffMult = 1f - falloffRatio * 0.5f; // 1.0 at center, 0.5 at edge
                 float finalDamage = evt.DamageAmount * falloffMult;
-
+                // Apply stealth damage reduction for semi-stealth (type 3) towers
+                if (_towerStealthSystem != null)
+                    finalDamage *= _towerStealthSystem.GetStealthDamageMultiplier(towerId);
                 // Apply damage directly to player health
                 store.PlayerCurrentHealth[playerId] -= finalDamage;
 

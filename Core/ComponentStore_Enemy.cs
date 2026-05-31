@@ -260,6 +260,8 @@ namespace BattleSystemECS.Core
         public bool[] EnemyIsClone = new bool[MAX_ENTITIES];
         // EnemyCloneMasterId: the entity ID of the master that this clone was spawned from (-1 = none)
         public int[] EnemyCloneMasterId = new int[MAX_ENTITIES];
+        // EnemyHasTrueSight: true if this enemy can detect and target stealthed towers
+        public bool[] EnemyHasTrueSight = new bool[MAX_ENTITIES];
 
         // ==================== 敌人生命链接 / Life Link (Damage Sharing, SOA) ====================
         // EnemyIsLifeLinker: true if this enemy is a Life Link master (can establish links with others)
