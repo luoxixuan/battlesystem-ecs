@@ -292,6 +292,13 @@ namespace BattleSystemECS.Core
         // TowerLinkDamageBonus: additive damage bonus from link combo (applied as damage mult)
         public float[] TowerLinkDamageBonus = new float[MAX_ENTITIES];
 
+        // ==================== 塔连锁攻击伤害倍率 (Tower Chain / Link Attack) ====================
+        // TowerChainDmgRatio: damage multiplier for chain-attacks from linked partner tower
+        // When this tower attacks, its linked partner (TowerLinkPartnerId) also deals damage
+        // to the same target, multiplied by this ratio (0.5 = 50% of partner's damage)
+        // 0 = no chain attack behavior
+        public float[] TowerChainDmgRatio = new float[MAX_ENTITIES];
+
         // ==================== 塔旋转/瞄准延迟 (Turret Rotation & Turn Rate) ====================
         // TowerFacingAngle: current facing angle in radians (0 = East, PI/2 = North)
         public float[] TowerFacingAngle = new float[MAX_ENTITIES];
@@ -560,6 +567,8 @@ namespace BattleSystemECS.Core
             TowerReflectRatio[entityId] = 0f;
             TowerReflectCap[entityId] = 0f;
             TowerReflectAuraRadius[entityId] = 0f;
+            // Chain attack: default to no chain (0 ratio = inactive)
+            TowerChainDmgRatio[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
@@ -662,6 +671,8 @@ namespace BattleSystemECS.Core
             TowerBeamChainCount[entityId] = 0;
             TowerBeamChainDecay[entityId] = 1f;
             TowerBeamMaxRange[entityId] = 0f;
+            // Chain attack field reset
+            TowerChainDmgRatio[entityId] = 0f;
             // Sabotage/tower disable fields reset
             TowerIsDisabled[entityId] = false;
             TowerDisabledTimer[entityId] = 0f;

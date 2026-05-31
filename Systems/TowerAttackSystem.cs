@@ -297,6 +297,9 @@ namespace BattleSystemECS.Systems
                 _towerCandidateBuffers = newBuffers;
                 _towerCandidateCounts = newCounts;
             }
+
+            // ── Auto-link towers with TowerChainDmgRatio > 0 to nearest neighbor ──
+            AutoLinkChainPartners();
         }
 
         /// <summary>
@@ -750,6 +753,15 @@ int bestTarget = -1;
                             if (stunChance > 0f || slowAmount > 0f)
                                 lock (debuffLock) { debuffBag.Add((bestTarget, towerId)); }
                             break;
+                    }
+
+                    // ── Chain Attack: if this tower has a linked partner, queue partner's damage too ──
+                    int chainPartnerId = store.TowerLinkPartnerId[towerId];
+                    if (chainPartnerId != -1 && chainPartnerId < ComponentStore.MAX_ENTITIES
+                        && store.TowerChainDmgRatio[towerId] > 0f && store.TowerActive[chainPartnerId])
+                    {
+                        float chainDmg = store.TowerAttackDamage[chainPartnerId] * store.TowerChainDmgRatio[towerId];
+                        lock (damageLock) { bag.Add((bestTarget, chainDmg, store.PlayerEntityId, chainPartnerId)); }
                     }
                 }
             });
@@ -1437,6 +1449,67 @@ int bestTarget = -1;
                     lock (_bounceDamageQueueLock) { _bounceDamageQueue[writeIdx].Add((bounceLevel + 1, bestBounce, nextDmg, playerId, tid)); }
                     // Apply bounce damage through _damageQueue (deferred, same pattern as chain/splash)
                     lock (_damageQueueLock) { _damageQueue[_damageQueueIdx].Add((bestBounce, nextDmg, playerId, tid)); }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Auto-link towers with TowerChainDmgRatio > 0 to their nearest active tower.
+        /// Populates TowerLinkPartnerId for chain attack damage sharing.
+        /// Called each SetTurn to stay in sync with tower placements/removals.
+        /// </summary>
+        private void AutoLinkChainPartners()
+        {
+            var towerIds = store.ActiveTowerIds;
+            int count = towerIds.Count;
+            if (count < 2) return;
+
+            // Clear existing chain links
+            for (int i = 0; i < count; i++)
+            {
+                int tid = towerIds[i];
+                if (store.TowerChainDmgRatio[tid] > 0f && store.TowerLinkPartnerId[tid] != -1)
+                {
+                    // Clear partner's back-link
+                    int oldPartner = store.TowerLinkPartnerId[tid];
+                    if (oldPartner >= 0 && oldPartner < ComponentStore.MAX_ENTITIES)
+                        store.SetTowerLinkPartnerId(oldPartner, -1);
+                    store.SetTowerLinkPartnerId(tid, -1);
+                }
+            }
+
+            // Pair towers with TowerChainDmgRatio > 0 to nearest active tower
+            for (int i = 0; i < count; i++)
+            {
+                int tidA = towerIds[i];
+                if (store.TowerChainDmgRatio[tidA] <= 0f) continue;
+                if (store.TowerLinkPartnerId[tidA] != -1) continue; // already linked
+
+                float xA = store.PositionX[tidA];
+                float yA = store.PositionY[tidA];
+                int bestPartner = -1;
+                float bestDistSq = float.MaxValue;
+
+                for (int j = 0; j < count; j++)
+                {
+                    if (i == j) continue;
+                    int tidB = towerIds[j];
+                    if (store.TowerLinkPartnerId[tidB] != -1) continue; // already linked
+
+                    float dx = store.PositionX[tidB] - xA;
+                    float dy = store.PositionY[tidB] - yA;
+                    float distSq = dx * dx + dy * dy;
+                    if (distSq < bestDistSq)
+                    {
+                        bestDistSq = distSq;
+                        bestPartner = tidB;
+                    }
+                }
+
+                if (bestPartner != -1)
+                {
+                    store.SetTowerLinkPartnerId(tidA, bestPartner);
+                    store.SetTowerLinkPartnerId(bestPartner, tidA);
                 }
             }
         }
