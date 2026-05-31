@@ -267,6 +267,16 @@ namespace BattleSystemECS.Systems
                             ? tc.PatrolAttackSpeedPenalty : 0.75f;
                         logger.Log($"[TOWER] {tc.Name} 巡逻塔: 路径 {store.TowerPatrolPathId[towerId]}, 速度 {store.TowerMoveSpeed[towerId]}, 攻速惩罚 {store.TowerPatrolAttackSpeedPenalty[towerId]}");
                     }
+                    // Apply burst fire properties (salvo mode)
+                    if (tc.BurstCount > 0)
+                    {
+                        store.TowerBurstCount[towerId] = tc.BurstCount;
+                        store.TowerBurstInterval[towerId] = tc.BurstInterval > 0f ? tc.BurstInterval : 0.1f;
+                        store.TowerBurstCooldown[towerId] = tc.BurstCooldown > 0f ? tc.BurstCooldown : 1f;
+                        store.TowerBurstTimer[towerId] = 0f;
+                        store.TowerBurstShotsFired[towerId] = 0;
+                        logger.Log($"[TOWER] {tc.Name} 爆发射击: {tc.BurstCount} 发, 间隔 {tc.BurstInterval}s, 冷却 {tc.BurstCooldown}s");
+                    }
                 }
                 else
                 {

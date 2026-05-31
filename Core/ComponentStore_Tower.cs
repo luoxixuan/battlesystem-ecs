@@ -415,7 +415,21 @@ namespace BattleSystemECS.Core
         // TowerBeamMaxRange: maximum range for beam targeting and chaining
         public float[] TowerBeamMaxRange = new float[MAX_ENTITIES];
 
-        // ==================== 塔射程伤害衰减 (Range-Based Damage Falloff) ====================
+        // ==================== 塔爆发射击/齐射模式 (Burst Fire / Salvo Mode) ====================
+        // TowerBurstCount: number of shots fired per burst cycle (0 = no burst fire, standard single-shot)
+        public int[] TowerBurstCount = new int[MAX_ENTITIES];
+        // TowerBurstInterval: time in seconds between shots within a burst (e.g. 0.1 = 10 shots/sec during burst)
+        public float[] TowerBurstInterval = new float[MAX_ENTITIES];
+        // TowerBurstCooldown: total cooldown time in seconds for one full burst cycle
+        // After firing all burst shots, tower enters cooldown before next burst can start
+        public float[] TowerBurstCooldown = new float[MAX_ENTITIES];
+        // TowerBurstTimer: current burst phase timer — tracks interval between burst shots
+        public float[] TowerBurstTimer = new float[MAX_ENTITIES];
+        // TowerBurstShotsFired: how many shots have been fired in the current burst cycle
+        // Resets to 0 when burst cooldown completes
+        public int[] TowerBurstShotsFired = new int[MAX_ENTITIES];
+
+        // ==================== 射程伤害衰减 (Range-Based Damage Falloff) ====================
         // TowerFalloffType: 0=None, 1=Standard (closer=more dmg), 2=Reverse (sniper: farther=more dmg)
         public int[] TowerFalloffType = new int[MAX_ENTITIES];
         // TowerFalloffStartRatio: fraction of max range where falloff begins
@@ -581,6 +595,12 @@ namespace BattleSystemECS.Core
             TowerFalloffMinRatio[entityId] = 1f;
             // Chain attack: default to no chain (0 ratio = inactive)
             TowerChainDmgRatio[entityId] = 0f;
+            // Burst fire: default to no burst (0 count = single-shot)
+            TowerBurstCount[entityId] = 0;
+            TowerBurstInterval[entityId] = 0f;
+            TowerBurstCooldown[entityId] = 0f;
+            TowerBurstTimer[entityId] = 0f;
+            TowerBurstShotsFired[entityId] = 0;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
@@ -685,6 +705,12 @@ namespace BattleSystemECS.Core
             TowerBeamMaxRange[entityId] = 0f;
             // Chain attack field reset
             TowerChainDmgRatio[entityId] = 0f;
+            // Burst fire fields reset
+            TowerBurstCount[entityId] = 0;
+            TowerBurstInterval[entityId] = 0f;
+            TowerBurstCooldown[entityId] = 0f;
+            TowerBurstTimer[entityId] = 0f;
+            TowerBurstShotsFired[entityId] = 0;
             // Falloff fields reset
             TowerFalloffType[entityId] = 0;
             TowerFalloffStartRatio[entityId] = 1f;

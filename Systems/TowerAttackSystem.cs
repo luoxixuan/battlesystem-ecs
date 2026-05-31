@@ -354,7 +354,28 @@ namespace BattleSystemECS.Systems
                 store.TowerLastAttackTime[towerId] += deltaTime;
 
                 float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId]));
-                if (store.TowerLastAttackTime[towerId] < attackInterval) return;
+
+                // ── Burst Fire / Salvo Mode check ─────────────────────────────────────
+                int burstCount = store.TowerBurstCount[towerId];
+                if (burstCount > 0)
+                {
+                    int shotsFired = store.TowerBurstShotsFired[towerId];
+                    if (shotsFired >= burstCount)
+                    {
+                        // In cooldown phase: use burst cooldown (scaled by attack speed)
+                        float burstCooldown = store.TowerBurstCooldown[towerId] / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId]));
+                        if (store.TowerLastAttackTime[towerId] < burstCooldown) return;
+                        // Cooldown complete — reset burst counter
+                        store.TowerBurstShotsFired[towerId] = 0;
+                    }
+                    else if (shotsFired > 0)
+                    {
+                        // In burst phase (not first shot): use burst interval between shots
+                        if (store.TowerLastAttackTime[towerId] < store.TowerBurstInterval[towerId]) return;
+                    }
+                    // First shot of burst (shotsFired == 0): uses normal attackInterval (same as single-shot)
+                }
+                else if (store.TowerLastAttackTime[towerId] < attackInterval) return;
 
                 // Ammo check: skip targeting for towers that are reloading and empty
                 if (store.TowerMaxAmmo[towerId] > 0 && store.TowerCurrentAmmo[towerId] <= 0) return;
@@ -537,6 +558,12 @@ int bestTarget = -1;
                     if (_enemyStrafeSystem != null && _enemyStrafeSystem.TryTriggerDodge(bestTarget, towerId >= 0 ? 1 : -1)) return;
 
                     store.TowerLastAttackTime[towerId] = 0f;
+
+                    // Burst fire: increment shot counter — resets to 0 in the burst cooldown check above
+                    if (store.TowerBurstCount[towerId] > 0)
+                    {
+                        store.TowerBurstShotsFired[towerId]++;
+                    }
 
                     // Consume ammo for towers with limited ammo (MaxAmmo > 0)
                     if (store.TowerMaxAmmo[towerId] > 0)

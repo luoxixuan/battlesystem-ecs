@@ -198,6 +198,13 @@ namespace BattleSystemECS.Config
         public int PatrolDirection { get; set; } = 1;
         // PatrolAttackSpeedPenalty: attack speed multiplier while moving (e.g. 0.75 = 25% slower)
         public float PatrolAttackSpeedPenalty { get; set; } = 0.75f;
+        // ── Burst Fire / Salvo Mode ────────────────────────────────────────────────
+        // BurstCount: number of shots fired per burst cycle (0 = no burst fire, standard single-shot)
+        public int BurstCount { get; set; } = 0;
+        // BurstInterval: time in seconds between shots within a burst (e.g. 0.1 = 10 shots/sec)
+        public float BurstInterval { get; set; } = 0f;
+        // BurstCooldown: total cooldown time in seconds for one full burst cycle
+        public float BurstCooldown { get; set; } = 0f;
         // ── Range-Based Damage Falloff ──────────────────────────────────────────────
         // FalloffType: 0=None (no falloff), 1=Standard (closer=more dmg), 2=Reverse (sniper: farther=more dmg)
         public int FalloffType { get; set; } = 0;
