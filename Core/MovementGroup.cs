@@ -1,7 +1,7 @@
 #nullable enable
 namespace BattleSystemECS.Core
 {
-    /// <summary>Enemy movement, pathfinding, wound, path modifiers, healer, summons, steal gold, pull.</summary>
+    /// <summary>Enemy movement, pathfinding, wound, path modifiers, healer, summons, steal gold, pull, path blocks.</summary>
     public class MovementGroup : ISystemGroup
     {
         public Systems.EnemyWoundSystem? Wound { get; set; }
@@ -12,6 +12,7 @@ namespace BattleSystemECS.Core
         public Systems.EnemyHealerSystem? EnemyHealer { get; set; }
         public Systems.EnemyStealGoldSystem? StealGold { get; set; }
         public Systems.PlayerSummonSystem? Summon { get; set; }
+        public Systems.PathBlockSystem? PathBlock { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -19,6 +20,10 @@ namespace BattleSystemECS.Core
             Wound?.Update();
             Pathfinding?.SetTurn(turn);
             EnemyMovement?.SetTurn(turn);
+
+            // Path blocks: enemies on block cells damage them (runs before movement so frame damage is applied)
+            PathBlock?.Update();
+
             EnemyMovement?.Update();
 
             PathModifier?.SetTurn();

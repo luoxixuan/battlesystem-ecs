@@ -75,6 +75,7 @@ namespace BattleSystemECS.Core
         public SuicideBombSystem? SuicideBomb { get; private set; }
         public ReflectTowerSystem? ReflectTower { get; private set; }
         public TowerStealthSystem? TowerStealth { get; private set; }
+        public PathBlockSystem? PathBlock { get; private set; }
 
         // ── Environment ──
         public TerrainSystem? Terrain { get; private set; }
@@ -268,6 +269,9 @@ namespace BattleSystemECS.Core
             PathModifier = new PathModifierSystem(store);
             Pull = new PullSystem(store, playerId);
 
+            // ── Path block system (dynamic path blocking) ──
+            PathBlock = new PathBlockSystem(store);
+
             // ── Random events ──
             RandomEvent = new RandomEventSystem(store, config);
 
@@ -396,6 +400,7 @@ namespace BattleSystemECS.Core
             scheduler.Movement.EnemyHealer = null;
             scheduler.Movement.StealGold = null;
             scheduler.Movement.Summon = null;
+            scheduler.Movement.PathBlock = PathBlock;
 
             // ── Terrain + Mutators + Morph ──
             scheduler.Terrain.Terrain = Terrain;

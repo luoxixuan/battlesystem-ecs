@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-31, commit `328745d`）
+## 性能基准（2026-05-31, commit `c86bef3`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~4838 FPS**，400 帧，~0.20 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11179 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5399 FPS** |
+| **mode 5**（完整一局） | **~4893 FPS**，400 帧，~0.20 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10110 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5646 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -194,6 +194,7 @@ dotnet test
 - mode 5 完整一局压测上线（5关全通，400帧，6520 FPS）
 - 肉盾/前锋敌人（Vanguard，伤害转移）；bench2: 9265, bench4: 5058, bench5: 4809
 - 塔连锁攻击系统（TowerChainDmgRatio + TowerAttackSystem auto-link + chain partner damage）；bench2: 11179, bench4: 5399, bench5: 4838
+- 动态路径封锁系统（PathBlockSystem + MovementGroup + SystemRegistry）；bench2: 10110, bench4: 5646, bench5: 4893
 
 ### 2026-05-12～13
 - 科技树系统上线（3分支 × 5节点，研究点数每波产出）
