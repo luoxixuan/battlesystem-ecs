@@ -101,7 +101,9 @@ namespace BattleSystemECS.Systems
             foreach (var evt in _lifestealEvents[readIdx])
             {
                 if (!store.EnemyActive[evt.EnemyId]) continue;
-                store.EnemyHealth[evt.EnemyId] += evt.HealAmount;
+                float reduction = store.EnemyHealingReduction[evt.EnemyId];
+                float effectiveHeal = reduction > 0f ? evt.HealAmount * (1f - reduction) : evt.HealAmount;
+                store.EnemyHealth[evt.EnemyId] += effectiveHeal;
                 if (store.EnemyHealth[evt.EnemyId] > store.EnemyMaxHealth[evt.EnemyId])
                     store.EnemyHealth[evt.EnemyId] = store.EnemyMaxHealth[evt.EnemyId];
             }

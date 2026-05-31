@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-01, commit `056a65e`）
+## 性能基准（2026-06-01, commit `abf6e2f`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~4589 FPS**，400 帧，~0.22 ms ⚠️ |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11763 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5324 FPS** |
+| **mode 5**（完整一局） | **~4608 FPS**，400 帧，~0.22 ms ⚠️ |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11919 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5248 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -146,6 +146,7 @@ dotnet test
 - 绝境反击/背水一战（DesperationSystem + TowerAttackSystem + BuildGroup + PreGameGroup + SystemRegistry）；bench2: 12236, bench4: 5396, bench5: 4713
 - 随机伤害范围（TowerAttackSystem + ComponentStore_Tower.cs）；bench2: 12263, bench4: 5385, bench5: 4593
 - 敌人 CC 免疫/不可阻挡（ComponentStore_Enemy.cs + FearSystem.cs）；bench2: 11763, bench4: 5324, bench5: 4589
+- 治疗抑制/重伤减免（TowerAttackSystem + EnemyHealerSystem + EnemyLifestealSystem + ComponentStore_Enemy.cs）；bench2: 11919, bench4: 5248, bench5: 4608
 ### 2026-05-31
 - 光束/激光连续塔基础设施（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094
 - N 击护盾系统（HitShieldSystem + ComponentStore_Enemy.cs + TowerAttackSystem/PlayerTowerAttackSystem）；bench2: 11546, bench4: 5590, bench5: 4824

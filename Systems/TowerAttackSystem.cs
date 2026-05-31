@@ -121,6 +121,9 @@ namespace BattleSystemECS.Systems
 
         // Leech lifesteal rate: 30% of damage dealt is returned as player heal
         private const float LEECH_LIFESTEAL_RATE = 0.30f;
+        // Healing suppression: each tower hit applies 30% healing reduction for 2 turns
+        private const float HEALING_REDUCTION_AMOUNT = 0.30f;
+        private const float HEALING_REDUCTION_DURATION = 2f;
 
         public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem = null, int mapWidth = 10)
         {
@@ -1001,12 +1004,18 @@ int bestTarget = -1;
                             int actualDuration = (int)Math.Max(1, slowDuration * (1f - _enemySlowResistance));
                             store.ApplyEnemySlow(enemyId, slowAmount, actualDuration);
                         }
+                        // Apply healing reduction debuff on every tower hit
+                        store.EnemyHealingReduction[enemyId] = Math.Max(store.EnemyHealingReduction[enemyId], HEALING_REDUCTION_AMOUNT);
+                        store.EnemyHealingReductionDuration[enemyId] = Math.Max(store.EnemyHealingReductionDuration[enemyId], HEALING_REDUCTION_DURATION);
                         break;
                 }
             }
 
             // Phase 3b (serial): decay armor shred duration (1 turn per frame)
             DecayArmorShredStacks();
+
+            // Phase 3b.5 (serial): decay healing reduction duration
+            DecayHealingReduction();
 
             // Phase 3c (serial): apply bleed stacks from bleed towers (Slash/Pierce type)
             if (bleedSystem != null)
@@ -1048,6 +1057,30 @@ int bestTarget = -1;
                     {
                         store.EnemyArmorShredStacks[enemyId] = 0f;
                         store.EnemyArmorShredDuration[enemyId] = 0f;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Decay healing reduction duration by 1 turn per frame. When duration reaches 0, clear reduction.
+        /// Called once per frame in the debuff phase (Phase 3b.5), after armor shred decay.
+        /// </summary>
+        private void DecayHealingReduction()
+        {
+            var enemyIds = store.GetCachedActiveEnemyIds();
+            int count = enemyIds.Count;
+            for (int i = 0; i < count; i++)
+            {
+                int enemyId = enemyIds[i];
+                float duration = store.EnemyHealingReductionDuration[enemyId];
+                if (duration > 0f)
+                {
+                    store.EnemyHealingReductionDuration[enemyId] = duration - 1f;
+                    if (store.EnemyHealingReductionDuration[enemyId] <= 0f)
+                    {
+                        store.EnemyHealingReduction[enemyId] = 0f;
+                        store.EnemyHealingReductionDuration[enemyId] = 0f;
                     }
                 }
             }

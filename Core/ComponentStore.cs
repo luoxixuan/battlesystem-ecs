@@ -433,6 +433,9 @@ namespace BattleSystemECS.Core
                 EnemyCurseSpeedReduction[entityId] = 0f;
                 EnemyCurseArmorReduction[entityId] = 0f;
                 EnemyCurseDmgTakenIncrease[entityId] = 0f;
+                // Healing reduction anti-heal debuffs
+                EnemyHealingReduction[entityId] = 0f;
+                EnemyHealingReductionDuration[entityId] = 0f;
 // Pull debuff field (applied by pull towers)
                 EnemyIsBeingPulled[entityId] = false;
                 // Burrow/underground fields (reset on entity destruction)

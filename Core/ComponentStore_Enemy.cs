@@ -415,6 +415,13 @@ namespace BattleSystemECS.Core
         // EnemyLifestealActive: whether lifesteal is currently active (enemies can toggle it)
         public bool[] EnemyLifestealActive = new bool[MAX_ENTITIES];
 
+        // ==================== 治疗抑制/重伤减免组件（SOA）====================
+        // EnemyHealingReduction: fraction of healing that is suppressed (0-1).
+        // 0 = no reduction, 0.5 = 50% healing blocked. Applied when tower attacks apply anti-heal debuff.
+        public float[] EnemyHealingReduction = new float[MAX_ENTITIES];
+        // EnemyHealingReductionDuration: remaining duration in turns for healing reduction (0 = no active reduction).
+        public float[] EnemyHealingReductionDuration = new float[MAX_ENTITIES];
+
         // ==================== 保护者敌人组件（SOA）====================
         // EnemyIsProtector: true if this enemy is a protector/guardian that shields allies
         public bool[] EnemyIsProtector = new bool[MAX_ENTITIES];
