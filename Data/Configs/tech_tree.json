@@ -180,6 +180,14 @@
           "cost": 4,
           "prerequisites": ["merchant_caravan"],
           "effects": [{ "type": "gold_on_elite_kill", "value": 100 }]
+        },
+        {
+          "id": "fortifications",
+          "name": "筑垒",
+          "description": "塔位上限 +2（可多放置 2 座塔）",
+          "cost": 4,
+          "prerequisites": ["merchant_caravan"],
+          "effects": [{ "type": "tower_slot_bonus", "value": 2 }]
         }
       ]
     }

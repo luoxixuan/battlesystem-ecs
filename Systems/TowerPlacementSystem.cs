@@ -119,6 +119,18 @@ namespace BattleSystemECS.Systems
                 }
             }
 
+            // 3.5. Check tower cap (max towers limit per player)
+            int playerId = 0; // single-player for now, 0 = player 0
+            int currentTowerCount = store.PlayerTowerCount[playerId];
+            int maxTowers = store.PlayerMaxTowers[playerId];
+            // Default to 20 if not configured
+            if (maxTowers <= 0) maxTowers = 20;
+            if (currentTowerCount >= maxTowers)
+            {
+                logger.Log($"[TOWER] PlaceTower failed: tower cap reached ({currentTowerCount}/{maxTowers}). Sell or upgrade a tower first.");
+                return -1;
+            }
+
             // 4. Create tower entity
             int towerId = store.CreateEntity();
             if (towerId == -1)
@@ -273,6 +285,10 @@ namespace BattleSystemECS.Systems
 
             logger.Log($"[TOWER] {type} placed at ({x},{y})");
             logger.Log($"[TOWER] Tower placed: {type} at ({x},{y}), damage: {damage}, range: {range}, ID: {towerId}");
+
+            // Increment tower count for cap enforcement
+            store.PlayerTowerCount[playerId]++;
+
             return towerId;
         }
 
@@ -324,6 +340,9 @@ namespace BattleSystemECS.Systems
             // Refund gold to player
             float currentGold = store.GetPlayerGold(playerId);
             store.SetPlayerGold(playerId, currentGold + sellGold);
+
+            // Decrement tower count for cap enforcement
+            store.PlayerTowerCount[playerId]--;
 
             // Destroy tower entity (handles ActiveTowerIds removal and state cleanup)
             store.DestroyEntity(towerId);

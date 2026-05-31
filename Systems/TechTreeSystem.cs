@@ -55,6 +55,8 @@ namespace BattleSystemECS.Systems
         private float _manaCostMultiplier = 1f;
         // Cooldown reduction bonus (multiplicative, e.g. 0.3 = 30% faster cooldowns)
         private float _cooldownReduction = 0f;
+        // Tower slot bonus: additional tower slots from tech tree (e.g. +2 = can place 2 more towers)
+        private int _towerSlotBonus = 0;
 
         public TechTreeSystem(ComponentStore store, IRenderer renderer, int playerId, TechTreeConfig config, GameConfig gameConfig = null)
         {
@@ -244,6 +246,10 @@ namespace BattleSystemECS.Systems
                         _cooldownReduction += eff.value;
                         store.PlayerCooldownReduction[playerId] = Math.Min(_cooldownReduction, 0.6f);
                         break;
+                    case "tower_slot_bonus":
+                        _towerSlotBonus += (int)eff.value;
+                        store.PlayerMaxTowers[playerId] = 20 + _towerSlotBonus;
+                        break;
                 }
             }
         }
@@ -384,6 +390,11 @@ namespace BattleSystemECS.Systems
         /// Get cooldown reduction bonus from tech tree (multiplicative, e.g. 0.3 = 30% faster cooldowns).
         /// </summary>
         public float GetCooldownReduction() => _cooldownReduction;
+
+        /// <summary>
+        /// Get tower slot bonus from tech tree (additional tower slots beyond the base 20).
+        /// </summary>
+        public int GetTowerSlotBonus() => _towerSlotBonus;
 
         /// <summary>
         /// Check if player has respawn and consume it. Returns true if respawn was used.

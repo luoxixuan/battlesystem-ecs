@@ -66,6 +66,12 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public int[] PlayerBaseLives = new int[MAX_PLAYERS];
         public int[] PlayerMaxBaseLives = new int[MAX_PLAYERS];
 
+        // ==================== 塔部署数量限制 (Tower Placement Cap, SOA) ====================
+        // PlayerMaxTowers: maximum number of towers player can place (configurable, can be expanded via tech tree)
+        public int[] PlayerMaxTowers = new int[MAX_PLAYERS];
+        // PlayerTowerCount: current number of towers placed by this player
+        public int[] PlayerTowerCount = new int[MAX_PLAYERS];
+
         // ==================== 科技树组件的 SOA 存储 ====================
         public int[] PlayerResearchPoints = new int[MAX_PLAYERS];
         public HashSet<string>[] PlayerUnlockedTechs = new HashSet<string>[MAX_PLAYERS];
