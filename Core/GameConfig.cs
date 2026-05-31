@@ -198,6 +198,14 @@ namespace BattleSystemECS.Config
         public int PatrolDirection { get; set; } = 1;
         // PatrolAttackSpeedPenalty: attack speed multiplier while moving (e.g. 0.75 = 25% slower)
         public float PatrolAttackSpeedPenalty { get; set; } = 0.75f;
+        // ── Range-Based Damage Falloff ──────────────────────────────────────────────
+        // FalloffType: 0=None (no falloff), 1=Standard (closer=more dmg), 2=Reverse (sniper: farther=more dmg)
+        public int FalloffType { get; set; } = 0;
+        // FalloffStartRatio: fraction of max range where falloff begins (0 = starts at tower, 1 = never)
+        public float FalloffStartRatio { get; set; } = 1f;
+        // FalloffMinRatio: minimum damage multiplier at max range (only for Standard falloff)
+        // For Reverse falloff, this is the minimum damage at min range
+        public float FalloffMinRatio { get; set; } = 1f;
     }
 
     /// <summary>

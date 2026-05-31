@@ -611,6 +611,32 @@ int bestTarget = -1;
                     float hotZoneDmgBonus = store.TowerHotZoneDamageBonus[towerId];
                     if (hotZoneDmgBonus > 0f) baseDmg *= (1f + hotZoneDmgBonus);
 
+                    // ── Range-based damage falloff ────────────────────────────────────────
+                    int falloffType = store.TowerFalloffType[towerId];
+                    if (falloffType != 0 && effectiveRange > 0)
+                    {
+                        float ex2 = store.PositionX[bestTarget];
+                        float ey2 = store.PositionY[bestTarget];
+                        float dx2 = ex2 - tx;
+                        float dy2 = ey2 - ty;
+                        float dist = (float)Math.Sqrt(dx2 * dx2 + dy2 * dy2);
+                        float distRatio = dist / effectiveRange;
+
+                        float startRatio = store.TowerFalloffStartRatio[towerId];
+                        float minRatio = store.TowerFalloffMinRatio[towerId];
+
+                        if (distRatio > startRatio && startRatio < 1f)
+                        {
+                            float t = (distRatio - startRatio) / Math.Max(0.001f, 1f - startRatio);
+                            t = t > 1f ? 1f : (t < 0f ? 0f : t);
+
+                            if (falloffType == 1) // Standard: closer = more damage
+                                baseDmg *= (1f - t * (1f - minRatio));
+                            else if (falloffType == 2) // Reverse (sniper): farther = more damage
+                                baseDmg *= (minRatio + t * (1f - minRatio));
+                        }
+                    }
+
                     // ── Tower type-specific mechanics ─────────────────────────────────────
                     // ── Tower type-specific mechanics ─────────────────────────────────────
                     TowerType towerType = store.TowerType[towerId];

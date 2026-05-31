@@ -641,6 +641,9 @@ namespace BattleSystemECS.Config
             tower.PierceCount = ExtractInt(json, "PierceCount");
             tower.PierceDmgFalloff = ExtractFloat(json, "PierceDmgFalloff");
             tower.Demolish = ParseTowerDemolishConfig(json);
+            tower.FalloffType = ExtractInt(json, "FalloffType");
+            tower.FalloffStartRatio = ExtractFloat(json, "FalloffStartRatio");
+            tower.FalloffMinRatio = ExtractFloat(json, "FalloffMinRatio");
             return tower;
         }
 

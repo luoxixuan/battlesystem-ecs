@@ -415,6 +415,14 @@ namespace BattleSystemECS.Core
         // TowerBeamMaxRange: maximum range for beam targeting and chaining
         public float[] TowerBeamMaxRange = new float[MAX_ENTITIES];
 
+        // ==================== 塔射程伤害衰减 (Range-Based Damage Falloff) ====================
+        // TowerFalloffType: 0=None, 1=Standard (closer=more dmg), 2=Reverse (sniper: farther=more dmg)
+        public int[] TowerFalloffType = new int[MAX_ENTITIES];
+        // TowerFalloffStartRatio: fraction of max range where falloff begins
+        public float[] TowerFalloffStartRatio = new float[MAX_ENTITIES];
+        // TowerFalloffMinRatio: minimum damage multiplier at max range (Standard) or min range (Reverse)
+        public float[] TowerFalloffMinRatio = new float[MAX_ENTITIES];
+
         // ==================== 塔伤害反弹系统 (Reflect Tower) ====================
         // TowerReflectRatio: fraction of damage received that is reflected back to attacker (e.g. 0.3 = 30% reflect)
         // Applied when this tower is attacked by an enemy — reflects back to the attacking enemy.
@@ -567,6 +575,10 @@ namespace BattleSystemECS.Core
             TowerReflectRatio[entityId] = 0f;
             TowerReflectCap[entityId] = 0f;
             TowerReflectAuraRadius[entityId] = 0f;
+            // Falloff fields: default to no falloff
+            TowerFalloffType[entityId] = 0;
+            TowerFalloffStartRatio[entityId] = 1f;
+            TowerFalloffMinRatio[entityId] = 1f;
             // Chain attack: default to no chain (0 ratio = inactive)
             TowerChainDmgRatio[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
@@ -673,6 +685,10 @@ namespace BattleSystemECS.Core
             TowerBeamMaxRange[entityId] = 0f;
             // Chain attack field reset
             TowerChainDmgRatio[entityId] = 0f;
+            // Falloff fields reset
+            TowerFalloffType[entityId] = 0;
+            TowerFalloffStartRatio[entityId] = 1f;
+            TowerFalloffMinRatio[entityId] = 1f;
             // Sabotage/tower disable fields reset
             TowerIsDisabled[entityId] = false;
             TowerDisabledTimer[entityId] = 0f;
