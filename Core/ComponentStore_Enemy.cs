@@ -301,10 +301,20 @@ namespace BattleSystemECS.Core
         // EnemyDamageResistance: 0-1, reduces all damage taken (applied in TowerAttackSystem and SkillSystem)
         public float[] EnemyDamageResistance = new float[MAX_ENTITIES];
         // EnemyDamageImmunityMask: bit mask of damage types this enemy is immune to.
-        // Computed from DamageImmunities[] in monster JSON. If (damageType &amp; mask) != 0, damage = 0.
+        // Computed from DamageImmunities[] in monster JSON. If (damageType & mask) != 0, damage = 0.
         // True damage (DamageType.True) bypasses immunity entirely and ignores this mask.
         // Values: Physical=1, Magic=2, Fire=4, Ice=8, Lightning=16. Default 0 = no immunity.
         public int[] EnemyDamageImmunityMask = new int[MAX_ENTITIES];
+
+        // ==================== 自爆/殉爆敌人 (Suicide Bomber / Kamikaze, SOA) ====================
+        // EnemyIsSuicide: true if this enemy is a suicide bomber that explodes near towers
+        public bool[] EnemyIsSuicide = new bool[MAX_ENTITIES];
+        // EnemySuicideTriggerRange: radius within which a suicide enemy triggers its explosion (distance to nearest tower)
+        public float[] EnemySuicideTriggerRange = new float[MAX_ENTITIES];
+        // EnemySuicideDmgRadius: AoE explosion radius when the suicide enemy detonates
+        public float[] EnemySuicideDmgRadius = new float[MAX_ENTITIES];
+        // EnemySuicideDmgAmount: raw damage of the suicide explosion (before falloff)
+        public float[] EnemySuicideDmgAmount = new float[MAX_ENTITIES];
 
         // ==================== 敌人移动方向（背刺系统 SOA）====================
         // EnemyMoveDirX: normalized X component of enemy's current movement direction

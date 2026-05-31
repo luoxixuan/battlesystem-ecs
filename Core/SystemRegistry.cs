@@ -68,6 +68,7 @@ namespace BattleSystemECS.Core
         public ManaBurnSystem? ManaBurn { get; private set; }
         public PhaseSystem? Phase { get; private set; }
         public FearSystem? Fear { get; private set; }
+        public SuicideBombSystem? SuicideBomb { get; private set; }
 
         // ── Environment ──
         public TerrainSystem? Terrain { get; private set; }
@@ -171,6 +172,9 @@ namespace BattleSystemECS.Core
 
             // ── Fear ──
             Fear = new FearSystem(store, playerId);
+
+            // ── Suicide Bomb ──
+            SuicideBomb = new SuicideBombSystem(store, playerId);
 
             // ── Burrow, Necromancer, LifeLink ──
             EnemyBurrow = new EnemyBurrowSystem(store, playerId);
@@ -392,6 +396,7 @@ namespace BattleSystemECS.Core
             scheduler.Combat.Demolish = null;
             scheduler.Combat.HitShield = HitShield;
             scheduler.Combat.TowerSabotage = TowerSabotage;
+            scheduler.Combat.SuicideBomb = SuicideBomb;
             scheduler.Combat.TowerAttack = TowerAttack;
             scheduler.Combat.TowerSynergy = TowerSynergy;
             scheduler.Combat.TowerLink = null;

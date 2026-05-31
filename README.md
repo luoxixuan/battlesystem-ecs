@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-31, commit `e4b2a1f`）
+## 性能基准（2026-05-31, commit `0166e59`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~4592 FPS**，400 帧，~0.22 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11895 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5703 FPS** |
+| **mode 5**（完整一局） | **~4567 FPS**，400 帧，~0.22 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11529 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5199 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -145,6 +145,7 @@ dotnet test
 - 法力燃烧/资源剥夺系统（ManaBurnSystem + ComponentStore_Enemy.cs + ComponentStore_Player.cs）；bench2: 11802, bench4: 5663, bench5: 4889
 - 幽灵/相位敌人系统（PhaseSystem + ComponentStore_Enemy.cs + TowerAttackSystem）；bench2: 11643, bench4: 5501, bench5: 5017
 - 敌人塔破坏/EMP 瘫痪系统（TowerSabotageSystem + ComponentStore_Tower.cs + ComponentStore_Enemy.cs）；bench2: 12187, bench4: 5471, bench5: 4847
+- 自爆/殉爆敌人系统（SuicideBombSystem + ComponentStore_Enemy.cs + CombatGroup）；bench2: 11529, bench4: 5199, bench5: 4567
 - 塔造价递增/成本梯度（PlacementCountByType + TowerPlacementSystem + tower_placement.json）；bench2: 11970, bench4: 5389, bench5: 4855
 - 伤害免疫/属性克制系统（DamageImmunityMask + DamageType扩展 + TowerAttackSystem/PlayerTowerAttackSystem）；bench2: 9588, bench4: 5712, bench5: 5026
 - 敌人吸血系统（EnemyLifestealSystem + EnemyLifestealRatio/Cap/Active + EnemyAISystem）；bench2: 12070, bench4: 5685, bench5: 4951

@@ -25,6 +25,7 @@ namespace BattleSystemECS.Core
         public Systems.BeamTowerSystem? BeamTower { get; set; }
         public Systems.HitShieldSystem? HitShield { get; set; }
         public Systems.TowerSabotageSystem? TowerSabotage { get; set; }
+        public Systems.SuicideBombSystem? SuicideBomb { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -49,6 +50,7 @@ namespace BattleSystemECS.Core
             Mana?.Update(deltaTime, isBuildPhase: false);
             GlobalSkill?.Update(deltaTime, isBuildPhase: false);
             BeamTower?.Update(deltaTime);
+            SuicideBomb?.Update();
         }
     }
 }
