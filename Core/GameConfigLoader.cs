@@ -647,6 +647,8 @@ namespace BattleSystemECS.Config
             tower.RampUpRate = ExtractFloat(json, "RampUpRate");
             tower.RampUpMax = ExtractFloat(json, "RampUpMax");
             tower.RampUpResetOnSwitch = ExtractBool(json, "RampUpResetOnSwitch");
+            tower.DamageConversionRatio = ExtractFloat(json, "DamageConversionRatio");
+            tower.ConvertedDamageType = (DamageType)ExtractInt(json, "ConvertedDamageType");
             return tower;
         }
 

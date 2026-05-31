@@ -223,6 +223,12 @@ namespace BattleSystemECS.Config
         // RampUpResetOnSwitch: if true, ramp-up resets when target switches (default: true)
         // If false, ramp-up persists even when switching targets (decays gradually instead)
         public bool RampUpResetOnSwitch { get; set; } = true;
+        // ── Damage Type Conversion (Phys↔Magic) ─────────────────────────────────────────
+        // DamageConversionRatio: fraction of damage converted to ConvertedDamageType (0 = no conversion)
+        // E.g. 0.5 = 50% of the tower's damage is converted to the target type
+        public float DamageConversionRatio { get; set; } = 0f;
+        // ConvertedDamageType: the damage type to convert to (e.g. Magic to bypass Physical immunity)
+        public DamageType ConvertedDamageType { get; set; } = DamageType.Physical;
     }
 
     /// <summary>

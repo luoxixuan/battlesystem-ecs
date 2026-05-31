@@ -659,40 +659,101 @@ int bestTarget = -1;
                         }
                     }
 
-                    // ── Damage type resolution ───────────────────────────────────────────
+                    // ── Damage type resolution with conversion support ─────────────────
                     // Physical: reduced by armor (affected by armor penetration + shred)
                     // Magic: reduced by magic resist (no armor interaction)
                     // True: ignores armor and magic resist entirely
                     DamageType dmgType = store.TowerDamageType[towerId];
-                    // ── Damage immunity check ───────────────────────────────────────────
-                    // True damage bypasses immunity entirely. All other types check the mask.
-                    if (dmgType != DamageType.True)
+                    float conversionRatio = store.TowerDamageConversionRatio[towerId];
+                    if (conversionRatio > 0f)
                     {
-                        int immunityMask = store.EnemyDamageImmunityMask[bestTarget];
-                        if ((immunityMask & (int)dmgType) != 0)
+                        // Damage conversion: split damage into original type + converted type portions.
+                        // This lets towers bypass enemy immunity to their primary damage type.
+                        DamageType convertToType = store.TowerConvertedDamageType[towerId];
+                        float origPortion = baseDmg * (1f - conversionRatio);
+                        float convPortion = baseDmg * conversionRatio;
+                        float finalDmg = 0f;
+
+                        // Process original damage type portion
                         {
-                            baseDmg = 0f;  // enemy is immune to this damage type
+                            float d = origPortion;
+                            if (dmgType != DamageType.True)
+                            {
+                                int mask = store.EnemyDamageImmunityMask[bestTarget];
+                                if ((mask & (int)dmgType) != 0) d = 0f;
+                            }
+                            if (dmgType == DamageType.True)
+                                d *= _damageTakenMult;
+                            else if (dmgType == DamageType.Magic)
+                                d *= Math.Max(0.01f, 1f - store.EnemyMagicResist[bestTarget]) * _damageTakenMult;
+                            else
+                            {
+                                float ea = store.EnemyArmor[bestTarget] * (1f - _armorPenetration);
+                                float shred = store.EnemyArmorShredStacks[bestTarget];
+                                if (shred > 0f && _armorShredPerStack > 0f)
+                                    ea = Math.Max(0f, ea - shred * _armorShredPerStack);
+                                d *= Math.Max(0.01f, 1f - ea) * _damageTakenMult;
+                            }
+                            finalDmg += d;
                         }
+
+                        // Process converted damage type portion
+                        {
+                            float d = convPortion;
+                            if (convertToType != DamageType.True)
+                            {
+                                int mask = store.EnemyDamageImmunityMask[bestTarget];
+                                if ((mask & (int)convertToType) != 0) d = 0f;
+                            }
+                            if (convertToType == DamageType.True)
+                                d *= _damageTakenMult;
+                            else if (convertToType == DamageType.Magic)
+                                d *= Math.Max(0.01f, 1f - store.EnemyMagicResist[bestTarget]) * _damageTakenMult;
+                            else
+                            {
+                                float ea = store.EnemyArmor[bestTarget] * (1f - _armorPenetration);
+                                float shred = store.EnemyArmorShredStacks[bestTarget];
+                                if (shred > 0f && _armorShredPerStack > 0f)
+                                    ea = Math.Max(0f, ea - shred * _armorShredPerStack);
+                                d *= Math.Max(0.01f, 1f - ea) * _damageTakenMult;
+                            }
+                            finalDmg += d;
+                        }
+
+                        baseDmg = finalDmg;
                     }
-                    if (dmgType == DamageType.True)
+                    else
                     {
-                        baseDmg *= _damageTakenMult;
-                    }
-                    else if (dmgType == DamageType.Magic)
-                    {
-                        float magicResist = store.EnemyMagicResist[bestTarget];
-                        baseDmg *= Math.Max(0.01f, 1f - magicResist) * _damageTakenMult;
-                    }
-                    else  // Physical (default) — uses armor + armor shred + pen
-                    {
-                        // Step 1: apply armor penetration (attacker's penetration ratio)
-                        float effectiveArmor = store.EnemyArmor[bestTarget] * (1f - _armorPenetration);
-                        // Step 2: apply flat armor shred stacks (debuff applied by attacker, e.g. AcidTower)
-                        float armorShredStacks = store.EnemyArmorShredStacks[bestTarget];
-                        if (armorShredStacks > 0f && _armorShredPerStack > 0f)
-                            effectiveArmor = Math.Max(0f, effectiveArmor - armorShredStacks * _armorShredPerStack);
-                        // Step 3: apply effective armor to damage
-                        baseDmg *= Math.Max(0.01f, 1f - effectiveArmor) * _damageTakenMult;
+                        // ── Damage immunity check ───────────────────────────────────────────
+                        // True damage bypasses immunity entirely. All other types check the mask.
+                        if (dmgType != DamageType.True)
+                        {
+                            int immunityMask = store.EnemyDamageImmunityMask[bestTarget];
+                            if ((immunityMask & (int)dmgType) != 0)
+                            {
+                                baseDmg = 0f;  // enemy is immune to this damage type
+                            }
+                        }
+                        if (dmgType == DamageType.True)
+                        {
+                            baseDmg *= _damageTakenMult;
+                        }
+                        else if (dmgType == DamageType.Magic)
+                        {
+                            float magicResist = store.EnemyMagicResist[bestTarget];
+                            baseDmg *= Math.Max(0.01f, 1f - magicResist) * _damageTakenMult;
+                        }
+                        else  // Physical (default) — uses armor + armor shred + pen
+                        {
+                            // Step 1: apply armor penetration (attacker's penetration ratio)
+                            float effectiveArmor = store.EnemyArmor[bestTarget] * (1f - _armorPenetration);
+                            // Step 2: apply flat armor shred stacks (debuff applied by attacker, e.g. AcidTower)
+                            float armorShredStacks = store.EnemyArmorShredStacks[bestTarget];
+                            if (armorShredStacks > 0f && _armorShredPerStack > 0f)
+                                effectiveArmor = Math.Max(0f, effectiveArmor - armorShredStacks * _armorShredPerStack);
+                            // Step 3: apply effective armor to damage
+                            baseDmg *= Math.Max(0.01f, 1f - effectiveArmor) * _damageTakenMult;
+                        }
                     }
                     if (_waveDifficultyMult != 1.0f) baseDmg *= _waveDifficultyMult;
 

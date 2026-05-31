@@ -287,6 +287,13 @@ namespace BattleSystemECS.Systems
                         store.TowerRampUpResetOnSwitch[towerId] = tc.RampUpResetOnSwitch;
                         logger.Log($"[TOWER] {tc.Name} 升温伤害: +{tc.RampUpRate * 100:F0}%/击, 上限 ×{tc.RampUpMax:F1}, 切换目标重置={tc.RampUpResetOnSwitch}");
                     }
+                    // Apply damage type conversion properties
+                    if (tc.DamageConversionRatio > 0f)
+                    {
+                        store.TowerDamageConversionRatio[towerId] = tc.DamageConversionRatio;
+                        store.TowerConvertedDamageType[towerId] = tc.ConvertedDamageType;
+                        logger.Log($"[TOWER] {tc.Name} 伤害转换: {tc.DamageConversionRatio * 100:F0}% → {tc.ConvertedDamageType}");
+                    }
                 }
                 else
                 {

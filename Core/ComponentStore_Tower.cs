@@ -26,6 +26,11 @@ namespace BattleSystemECS.Core
         public float[] TowerInterceptRate = new float[MAX_ENTITIES];
         // Tower damage type: determines which resistance the target uses for mitigation.
         public DamageType[] TowerDamageType = new DamageType[MAX_ENTITIES];
+        // Tower damage conversion: fraction of damage converted to ConvertedDamageType (0 = no conversion)
+        // E.g. 0.5 = 50% damage converted, bypassing enemy immunity to primary type
+        public float[] TowerDamageConversionRatio = new float[MAX_ENTITIES];
+        // Tower converted damage type: the target type for damage conversion
+        public DamageType[] TowerConvertedDamageType = new DamageType[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
         // Tower cooldown reduction: per-tower CDR (0 = no reduction, 0.3 = 30% faster cooldowns)
@@ -574,6 +579,8 @@ namespace BattleSystemECS.Core
             TowerIsVulnerableDuringConstruction[entityId] = false;
             // Damage type and turn rate from config
             TowerDamageType[entityId] = damageType;
+            TowerDamageConversionRatio[entityId] = 0f; // default: no conversion
+            TowerConvertedDamageType[entityId] = DamageType.Physical;
             TowerTurnRate[entityId] = turnRate;
             // Fog of War: default to no fog restriction (visionRadius=0 means see all)
             TowerVisionRadius[entityId] = 0f;
@@ -688,6 +695,8 @@ namespace BattleSystemECS.Core
             TowerArmorShredBonus[entityId] = 0f;
             TowerShieldBreakBonus[entityId] = 0f;
             TowerDamageType[entityId] = DamageType.Physical;
+            TowerDamageConversionRatio[entityId] = 0f;
+            TowerConvertedDamageType[entityId] = DamageType.Physical;
             // Construction fields reset
             TowerIsConstructing[entityId] = false;
             TowerConstructionProgress[entityId] = 1f;
