@@ -70,6 +70,7 @@ namespace BattleSystemECS.Core
         public ManaBurnSystem? ManaBurn { get; private set; }
         public PhaseSystem? Phase { get; private set; }
         public FearSystem? Fear { get; private set; }
+        public EnemyStrafeSystem? EnemyStrafe { get; private set; }
         public SuicideBombSystem? SuicideBomb { get; private set; }
 
         // ── Environment ──
@@ -180,6 +181,9 @@ namespace BattleSystemECS.Core
             // ── Fear ──
             Fear = new FearSystem(store, playerId);
 
+            // ── Enemy Strafe/Dodge ──
+            EnemyStrafe = new EnemyStrafeSystem(store, logger);
+
             // ── Suicide Bomb ──
             SuicideBomb = new SuicideBombSystem(store, playerId);
 
@@ -204,6 +208,9 @@ namespace BattleSystemECS.Core
             TowerAttack.SetWeatherSystem(Weather);
             EnemyMovement.SetDayNightSystem(DayNight);
             TowerAttack.SetDayNightSystem(DayNight);
+
+            // ── Enemy Strafe ──
+            TowerAttack.SetEnemyStrafeSystem(EnemyStrafe);
 
             // ── Telegraph ──
             Telegraph = new TelegraphSystem(store, logger, config, eventBus);
@@ -365,6 +372,7 @@ namespace BattleSystemECS.Core
             scheduler.AI.Phase = Phase;
             scheduler.AI.Fear = Fear;
             scheduler.AI.ZoneControl = ZoneControl;
+            scheduler.AI.EnemyStrafe = EnemyStrafe;
 
             // ── Movement ──
             scheduler.Movement.Wound = null;

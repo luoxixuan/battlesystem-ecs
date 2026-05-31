@@ -116,6 +116,17 @@ namespace BattleSystemECS.Core
         public bool[] EnemyIsWounded = new bool[MAX_ENTITIES];
         // EnemyKnockbackForceLeft: remaining knockback force applied this frame (decays to 0)
         public float[] EnemyKnockbackForceLeft = new float[MAX_ENTITIES];
+        // ==================== 敌人侧移/闪避移动 (Enemy Strafe / Dodge) ====================
+        // EnemyDodgeChance: probability that this enemy dodges a tower attack (0.0-1.0, 0.0 = never dodge)
+        // Checked in TowerAttackSystem when rolling accuracy/evasion; if succeeded, attack deals 0 damage
+        public float[] EnemyDodgeChance = new float[MAX_ENTITIES];
+        // EnemyDodgeDistance: how far the enemy strafes laterally when dodging (world units)
+        // Applied as a +/- X offset added to PositionX during dodge movement
+        public float[] EnemyDodgeDistance = new float[MAX_ENTITIES];
+        // EnemyDodgeCooldown: turns remaining before dodge can be triggered again (0 = ready)
+        public float[] EnemyDodgeCooldown = new float[MAX_ENTITIES];
+        // EnemyDodgeTimer: countdown in seconds for periodic/periodic-random dodge behavior (0 = event-driven only)
+        public float[] EnemyDodgeTimer = new float[MAX_ENTITIES];
         // EnemyIsElite: true if this enemy was spawned as an elite ([ELITE] prefix in fullName).
         // Used by ResolveEnemiesKilledThisFrame to correctly award GoldOnEliteKill instead of
         // the broken EnemyTypeName == "Elite" check (EnemyTypeName stores base type names).
@@ -499,6 +510,11 @@ namespace BattleSystemECS.Core
             EnemyHitShieldTimer[entityId] = 0f;
             EnemyHitShieldRegenInterval[entityId] = 0f;
             EnemyEvasion[entityId] = 0f;  // default to no evasion
+            // Dodge/Strafe: default 0 chance, 0 distance, cooldown=0 (ready), timer=0 (event-driven)
+            EnemyDodgeChance[entityId] = 0f;
+            EnemyDodgeDistance[entityId] = 0f;
+            EnemyDodgeCooldown[entityId] = 0f;
+            EnemyDodgeTimer[entityId] = 0f;
             // Vanguard: default not a vanguard (false = not protecting anyone)
             EnemyIsVanguard[entityId] = false;
             EnemyVanguardCoverRange[entityId] = 0f;

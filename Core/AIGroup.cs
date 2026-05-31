@@ -15,11 +15,16 @@ namespace BattleSystemECS.Core
         public Systems.PhaseSystem? Phase { get; set; }
         public Systems.FearSystem? Fear { get; set; }
         public Systems.ZoneControlSystem? ZoneControl { get; set; }
+        public Systems.EnemyStrafeSystem? EnemyStrafe { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
             // Zone control (CC zones: Slow/Stun/Freeze/Root) — runs before AI so CC is applied this turn
             ZoneControl?.Update(deltaTime);
+
+            // Enemy strafe/dodge: decrement timers and cooldowns before AI evaluates
+            EnemyStrafe?.SetTurn();
+            EnemyStrafe?.Update();
 
             EnemyAI?.SetTurn(turn, deltaTime);
             EnemyAI?.Update();

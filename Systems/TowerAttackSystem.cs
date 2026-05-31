@@ -25,6 +25,7 @@ namespace BattleSystemECS.Systems
         private HeatSystem _heatSystem; // injected for heat/overheat effects
         private TowerEnergySystem _energySystem; // injected for energy system effects
         private HitShieldSystem _hitShieldSystem; // injected for N-hit shield blocking
+        private EnemyStrafeSystem _enemyStrafeSystem; // injected for enemy dodge/strafe
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate arrays (zero-allocation — no List.Clear() version bump)
@@ -141,6 +142,14 @@ namespace BattleSystemECS.Systems
             _bounceDamageQueue[1] = new List<(int, int, float, int, int)>(64);
             _fragmentQueue[0] = new List<(int, float, int, int, int, float)>(64);
             _fragmentQueue[1] = new List<(int, float, int, int, int, float)>(64);
+        }
+
+        /// <summary>
+        /// Inject EnemyStrafeSystem for event-driven dodge checks.
+        /// </summary>
+        public void SetEnemyStrafeSystem(EnemyStrafeSystem enemyStrafeSystem)
+        {
+            _enemyStrafeSystem = enemyStrafeSystem;
         }
 
         /// <summary>
@@ -509,6 +518,10 @@ int bestTarget = -1;
                     // Enemy evasion: if enemy has evasion > 0, roll for dodge (after accuracy check passes)
                     float enemyEvasion = store.EnemyEvasion[bestTarget];
                     if (enemyEvasion > 0f && _rand.NextDouble() < enemyEvasion) return;
+
+                    // Enemy strafe/dodge: event-driven dodge triggered by this incoming attack.
+                    // TryTriggerDodge returns true if dodge succeeds → skip this attack entirely.
+                    if (_enemyStrafeSystem != null && _enemyStrafeSystem.TryTriggerDodge(bestTarget, towerId >= 0 ? 1 : -1)) return;
 
                     store.TowerLastAttackTime[towerId] = 0f;
 
