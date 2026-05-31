@@ -91,6 +91,12 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // PlacementCountByType: tracks how many towers of each type this player has placed (for cost scaling)
         public int[] PlacementCountByType = new int[9]; // index = (int)TowerType, size = 9 (Basic..Firewall)
 
+        // ==================== Cooldown Reduction (CDR) 系统 ====================
+        // PlayerCooldownReduction: global CDR multiplier per player (0 = no reduction, 0.3 = 30% faster cooldowns)
+        // Multiplicative diminishing returns: effectiveCooldown = baseCooldown * (1 - cdr)
+        // Capped at 60% (0.6) to avoid zero-duration cooldowns
+        public float[] PlayerCooldownReduction = new float[MAX_PLAYERS];
+
         #endregion
 
         // ==================== 玩家组件访问 ====================

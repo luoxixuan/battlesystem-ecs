@@ -204,7 +204,11 @@ namespace BattleSystemECS.Systems
                 var inst = store.GetAbility(playerId, slot);
                 if (inst.CurrentCooldown > 0f)
                 {
-                    inst.CurrentCooldown = Math.Max(0f, inst.CurrentCooldown - deltaTime);
+                    // Apply cooldown reduction (CDR): 0 = no reduction, 0.3 = 30% faster
+                    // effectiveRate = 1 + cdr, so deltaTime is scaled up by (1 + cdr)
+                    float cdr = store.PlayerCooldownReduction[playerId];
+                    float cdrClamped = Math.Min(cdr, 0.6f); // cap at 60% to avoid near-zero cooldowns
+                    inst.CurrentCooldown = Math.Max(0f, inst.CurrentCooldown - deltaTime * (1f + cdrClamped));
                     store.SetAbility(playerId, slot, inst);
                 }
 

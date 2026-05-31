@@ -28,6 +28,9 @@ namespace BattleSystemECS.Core
         public DamageType[] TowerDamageType = new DamageType[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
+        // Tower cooldown reduction: per-tower CDR (0 = no reduction, 0.3 = 30% faster cooldowns)
+        // Multiplicative: effectiveCooldown = baseCooldown * (1 - cdr), capped at 60% (0.6)
+        public float[] TowerCooldownReduction = new float[MAX_ENTITIES];
         public TowerType[] TowerType = new TowerType[MAX_ENTITIES];
         public float[] TowerAttackDamage = new float[MAX_ENTITIES];
         public int[] TowerRange = new int[MAX_ENTITIES];

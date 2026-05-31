@@ -53,6 +53,8 @@ namespace BattleSystemECS.Systems
         private float _maxManaBonus = 0f;
         private float _manaRegenBonus = 0f;
         private float _manaCostMultiplier = 1f;
+        // Cooldown reduction bonus (multiplicative, e.g. 0.3 = 30% faster cooldowns)
+        private float _cooldownReduction = 0f;
 
         public TechTreeSystem(ComponentStore store, IRenderer renderer, int playerId, TechTreeConfig config, GameConfig gameConfig = null)
         {
@@ -238,6 +240,10 @@ namespace BattleSystemECS.Systems
                         for (int i = 0; i < ComponentStore.MAX_ENTITIES; i++)
                             store.EnemyDamageResistance[i] += eff.value;
                         break;
+                    case "cooldown_reduction":
+                        _cooldownReduction += eff.value;
+                        store.PlayerCooldownReduction[playerId] = Math.Min(_cooldownReduction, 0.6f);
+                        break;
                 }
             }
         }
@@ -373,6 +379,11 @@ namespace BattleSystemECS.Systems
         /// Values less than 1.0 reduce mana costs (discount), greater than 1.0 increase them.
         /// </summary>
         public float GetManaCostMultiplier() => _manaCostMultiplier;
+
+        /// <summary>
+        /// Get cooldown reduction bonus from tech tree (multiplicative, e.g. 0.3 = 30% faster cooldowns).
+        /// </summary>
+        public float GetCooldownReduction() => _cooldownReduction;
 
         /// <summary>
         /// Check if player has respawn and consume it. Returns true if respawn was used.

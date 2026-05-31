@@ -48,6 +48,14 @@
           "cost": 4,
           "prerequisites": ["lethal_strike"],
           "effects": [{ "type": "armor_penetration", "value": 0.30 }]
+        },
+        {
+          "id": "swift_mind",
+          "name": "迅捷思维",
+          "description": "技能冷却加速 20%",
+          "cost": 3,
+          "prerequisites": ["rapid_fire"],
+          "effects": [{ "type": "cooldown_reduction", "value": 0.20 }]
         }
       ]
     },

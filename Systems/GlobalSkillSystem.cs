@@ -70,7 +70,11 @@ namespace BattleSystemECS.Systems
                 float cd = store.PlayerGlobalSkillCooldown[idx];
                 if (cd > 0f)
                 {
-                    store.PlayerGlobalSkillCooldown[idx] = Math.Max(0f, cd - deltaTime);
+                    // Apply cooldown reduction: 0 = no reduction, 0.3 = 30% faster
+                    // effectiveRate = 1 + cdr, capped at 60% (1.6x speed)
+                    float cdr = store.PlayerCooldownReduction[playerId];
+                    float cdrClamped = Math.Min(cdr, 0.6f);
+                    store.PlayerGlobalSkillCooldown[idx] = Math.Max(0f, cd - deltaTime * (1f + cdrClamped));
                 }
             }
 
