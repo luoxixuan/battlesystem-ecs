@@ -7,6 +7,7 @@ namespace BattleSystemECS.Core
         public Systems.BuffSystem? Buff { get; set; }
         public Systems.SkillSystem? Skill { get; set; }
         public Systems.BleedSystem? Bleed { get; set; }
+        public Systems.HealingZoneSystem? HealingZone { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -15,6 +16,7 @@ namespace BattleSystemECS.Core
             Buff?.ResolveDotDamage();
             Bleed?.Update(deltaTime);
             Bleed?.ResolveBleedDamage();
+            HealingZone?.Update(deltaTime);
             Skill?.Update(deltaTime);
         }
     }

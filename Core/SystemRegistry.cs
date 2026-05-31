@@ -84,6 +84,7 @@ namespace BattleSystemECS.Core
         public TelegraphSystem? Telegraph { get; private set; }
         public AdaptiveDifficultySystem? AdaptiveDifficulty { get; private set; }
         public CorpseEffectSystem? CorpseEffect { get; private set; }
+        public HealingZoneSystem? HealingZone { get; private set; }
 
         // ── Objective / Branch / Resources ──
         public ObjectiveSystem? Objective { get; private set; }
@@ -238,6 +239,9 @@ namespace BattleSystemECS.Core
             // ── Corpse effects ──
             CorpseEffect = new CorpseEffectSystem(store, config, Buff, logger);
             CorpseEffect.LoadCorpseEffects();
+
+            // ── Healing zones ──
+            HealingZone = new HealingZoneSystem(store, logger);
 
             // ── Path modifier ──
             PathModifier = new PathModifierSystem(store);
@@ -422,6 +426,7 @@ namespace BattleSystemECS.Core
             scheduler.SkillBuff.Buff = Buff;
             scheduler.SkillBuff.Skill = Skill;
             scheduler.SkillBuff.Bleed = Bleed;
+            scheduler.SkillBuff.HealingZone = HealingZone;
 
             // ── Post-death ──
             scheduler.PostDeath.EnemyFission = EnemyFission;
