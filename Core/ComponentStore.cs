@@ -20,6 +20,7 @@ namespace BattleSystemECS.Core
             #region Constants & Helpers
         public const int MAX_ENTITIES = 100000;
         internal const int MAX_PLAYERS = 10;
+        internal const int MAX_MORPHS = 4; // max morph modes per tower (2 default + 2 alt forms)
         public int TotalKills = 0;
 
         // Inline boundary check helpers — replaces 100+ manual checks with zero-overhead guards.

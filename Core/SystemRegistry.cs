@@ -45,6 +45,7 @@ namespace BattleSystemECS.Core
         public TowerUpgradeSystem? TowerUpgrade { get; private set; }
         public TowerExperienceSystem? TowerExperience { get; private set; }
         public TowerSynergySystem? TowerSynergy { get; private set; }
+        public TowerMorphSystem? TowerMorph { get; private set; }
         public AuraTowerSystem? AuraTower { get; private set; }
         public CurseAuraSystem? Curse { get; private set; }
         public PullTowerSystem? PullTower { get; private set; }
@@ -134,6 +135,7 @@ namespace BattleSystemECS.Core
             TowerExperience = new TowerExperienceSystem(store, config);
             TowerSynergy = new TowerSynergySystem(store, logger);
             TowerSynergy.LoadSynergyConfig();
+            TowerMorph = new TowerMorphSystem(store);
 
             // ── Player attack ──
             PlayerTowerAttack = new PlayerTowerAttackSystem(store, logger, playerId, config, TechTree);
@@ -428,6 +430,7 @@ namespace BattleSystemECS.Core
             scheduler.Combat.SuicideBomb = SuicideBomb;
             scheduler.Combat.ReflectTower = ReflectTower;
             scheduler.Combat.TowerAttack = TowerAttack;
+            scheduler.Combat.TowerMorph = TowerMorph;
             scheduler.Combat.TowerSynergy = TowerSynergy;
             scheduler.Combat.TowerLink = null;
             scheduler.Combat.AuraTower = AuraTower;

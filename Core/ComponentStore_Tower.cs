@@ -41,6 +41,18 @@ namespace BattleSystemECS.Core
         public string[] TowerUpgradePathId = new string[MAX_ENTITIES];
         // Tower fusion tier: incremented each time this tower is merged (0 = never merged)
         public int[] TowerFusionTier = new int[MAX_ENTITIES];
+        // ── Tower Morph / Mode Switch ──────────────────────────────────────
+        // TowerCurrentMorph: index of the currently active morph (0 = first form, 1 = second form, ...)
+        public int[] TowerCurrentMorph = new int[MAX_ENTITIES];
+        // TowerMorphCount: how many morphs this tower has (1 = no morph available, 2+ = morphable)
+        public int[] TowerMorphCount = new int[MAX_ENTITIES];
+        // TowerMorphCooldown: seconds remaining before next morph switch is allowed (0 = ready)
+        public float[] TowerMorphCooldown = new float[MAX_ENTITIES];
+        // TowerMorphDamage/Radius/Speed: stat snapshots per morph index
+        // [morphIndex] -> float[] indexed by towerId — avoids MAX_MORPHS × MAX_ENTITIES flat allocation
+        public float[][] TowerMorphDamage  = new float[MAX_MORPHS][];
+        public float[][] TowerMorphAttackSpeed = new float[MAX_MORPHS][];
+        public int[][]    TowerMorphRange   = new int[MAX_MORPHS][];
         public bool[] TowerActive = new bool[MAX_ENTITIES];
         public float[] TowerLastAttackTime = new float[MAX_ENTITIES];
         // Tower debuff parameters (read from TowerConfig per tower type)

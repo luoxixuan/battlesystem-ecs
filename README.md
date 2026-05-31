@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-31, commit `0b8adc2`）
+## 性能基准（2026-05-31, commit `475d676`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~4779 FPS**，400 帧，~0.21 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11571 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5501 FPS** |
+| **mode 5**（完整一局） | **~4961 FPS**，400 帧，~0.20 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~10628 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5722 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -160,6 +160,7 @@ dotnet test
 - 敌人偏移/闪避系统（EnemyStrafeSystem + ComponentStore_Enemy.cs + AIGroup + SystemRegistry + TowerAttackSystem）；bench2: 11733, bench4: 5680, bench5: 4628
 - 通用冷却缩减系统（PlayerCooldownReduction + TowerCooldownReduction + SkillSystem/GlobalSkillSystem CDR + TechTreeSystem）；bench2: 11600, bench4: 5648, bench5: 4608
 - 塔部署数量限制系统（PlayerMaxTowers + PlayerTowerCount + TowerPlacementSystem + TechTreeSystem）；bench2: 11571, bench4: 5501, bench5: 4779
+- 塔变形/形态切换系统（TowerMorphSystem + TowerCurrentMorph/Count/Cooldown/Damage/Speed/Range + CombatGroup + SystemRegistry）；bench2: 10628, bench4: 5722, bench5: 4961
 
 ### 2026-05-30
 - **工程改进**：ComponentStore 按领域拆分为 5 个 partial 文件（Enemy/Tower/Player/World + 核心生命周期）；伤害公式测试补齐至 120 项

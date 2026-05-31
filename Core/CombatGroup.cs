@@ -28,6 +28,7 @@ namespace BattleSystemECS.Core
         public Systems.HeroSystem? Hero { get; set; }
         public Systems.SuicideBombSystem? SuicideBomb { get; set; }
         public Systems.ReflectTowerSystem? ReflectTower { get; set; }
+        public Systems.TowerMorphSystem? TowerMorph { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -56,6 +57,7 @@ namespace BattleSystemECS.Core
             SuicideBomb?.Update();
             ReflectTower?.ResolveReflect();
             ReflectTower?.ApplyReflectDamage();
+            TowerMorph?.Update(deltaTime);
         }
     }
 }
