@@ -331,7 +331,7 @@ namespace BattleSystemECS.Systems
 
                 store.TowerLastAttackTime[towerId] += deltaTime;
 
-                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId]);
+                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId]));
                 if (store.TowerLastAttackTime[towerId] < attackInterval) return;
 
                 // Ammo check: skip targeting for towers that are reloading and empty
@@ -361,6 +361,10 @@ namespace BattleSystemECS.Systems
                 float tx = store.PositionX[towerId];
                 float ty = store.PositionY[towerId];
                 int range = store.TowerRange[towerId];
+
+                // Hot zone range bonus — added to tower range for attack targeting
+                float hotZoneRangeBonus = store.TowerHotZoneRangeBonus[towerId];
+                if (hotZoneRangeBonus > 0f) range += (int)hotZoneRangeBonus;
 
                 // Spatial grid: query O(cells) instead of O(enemies) — reuse pre-allocated array
                 var candidates = _towerCandidateBuffers[ti];
@@ -576,6 +580,10 @@ int bestTarget = -1;
 
                     // Apply weather damage multiplier (e.g. Storm gives towers +10% damage)
                     if (_weatherDamageMult != 1f) baseDmg *= _weatherDamageMult;
+
+                    // Apply hot zone damage bonus (placement bonus from map terrain)
+                    float hotZoneDmgBonus = store.TowerHotZoneDamageBonus[towerId];
+                    if (hotZoneDmgBonus > 0f) baseDmg *= (1f + hotZoneDmgBonus);
 
                     // ── Tower type-specific mechanics ─────────────────────────────────────
                     // ── Tower type-specific mechanics ─────────────────────────────────────

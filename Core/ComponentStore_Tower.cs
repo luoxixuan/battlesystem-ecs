@@ -305,6 +305,16 @@ namespace BattleSystemECS.Core
         // TowerPatrolAttackSpeedPenalty: attack speed multiplier while moving (e.g. 0.7 = 30% slower)
         public float[] TowerPatrolAttackSpeedPenalty = new float[MAX_ENTITIES];
 
+        // ==================== 地图热区加成 (Hot Zone Terrain Bonus) ====================
+        // TowerHotZoneDamageBonus: cached damage multiplier bonus from hot zone placement (e.g. 0.15 = +15%)
+        // Set once at tower placement via HotZoneSystem.OnTowerPlaced(), read during combat.
+        public float[] TowerHotZoneDamageBonus = new float[MAX_ENTITIES];
+        // TowerHotZoneRangeBonus: cached range bonus (in cells) from hot zone placement.
+        // Added to TowerRange during attack resolution.
+        public float[] TowerHotZoneRangeBonus = new float[MAX_ENTITIES];
+        // TowerHotZoneSpeedBonus: cached attack speed multiplier bonus from hot zone (e.g. 0.1 = +10%).
+        public float[] TowerHotZoneSpeedBonus = new float[MAX_ENTITIES];
+
         // ==================== 迫击炮/弧线弹道 (Mortar / Arc Projectiles) ====================
         // TowerProjectileArcType: 0=直线（默认）, 1=跟踪, 2=弧线（抛物线）
         // Affects how the projectile moves through the air — arc uses gravity simulation

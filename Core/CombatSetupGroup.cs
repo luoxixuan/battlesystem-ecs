@@ -17,6 +17,7 @@ namespace BattleSystemECS.Core
         public Systems.ManaSystem? Mana { get; set; }
         public Systems.GlobalSkillSystem? GlobalSkill { get; set; }
         public Systems.HitShieldSystem? HitShield { get; set; }
+        public Systems.HotZoneSystem? HotZone { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -33,6 +34,7 @@ namespace BattleSystemECS.Core
             Mana?.SetTurn();
             GlobalSkill?.SetTurn(turn);
             HitShield?.SetTurn(turn);
+            HotZone?.SetTurn(turn);
         }
     }
 }

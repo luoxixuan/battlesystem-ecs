@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-31, commit `12eb06f`）
+## 性能基准（2026-05-31, commit `e4b2a1f`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~4934 FPS**，400 帧，~0.20 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11955 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5514 FPS** |
+| **mode 5**（完整一局） | **~4592 FPS**，400 帧，~0.22 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11895 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5703 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -150,6 +150,7 @@ dotnet test
 - 敌人吸血系统（EnemyLifestealSystem + EnemyLifestealRatio/Cap/Active + EnemyAISystem）；bench2: 12070, bench4: 5685, bench5: 4951
 - 拉扯/真空吸引系统（PullSystem + ComponentStore_World.cs + MovementGroup + SystemRegistry）；bench2: 11784, bench4: 5544, bench5: 4879
 - 恐惧/混乱敌人系统（FearSystem + ComponentStore_Enemy.cs + ComponentStore_Tower.cs + AIGroup + SystemRegistry）；bench2: 11955, bench4: 5514, bench5: 4934
+- 地图热区/地形加成系统（HotZoneSystem + ComponentStore_Tower.cs + GameConfig.cs + CombatSetupGroup + SystemRegistry）；bench2: 11895, bench4: 5703, bench5: 4592
 
 ### 2026-05-30
 - **工程改进**：ComponentStore 按领域拆分为 5 个 partial 文件（Enemy/Tower/Player/World + 核心生命周期）；伤害公式测试补齐至 120 项

@@ -87,6 +87,9 @@ namespace BattleSystemECS.Core
         public WaveBranchSystem? WaveBranch { get; private set; }
         public ResourceNodeSystem? ResourceNode { get; private set; }
 
+        // ── Hot Zone / Terrain Bonus ──
+        public HotZoneSystem? HotZone { get; private set; }
+
         // ── Tech & Misc ──
         public TechTreeSystem? TechTree { get; private set; }
         public PickupSystem? Pickup { get; private set; }
@@ -208,6 +211,9 @@ namespace BattleSystemECS.Core
             Objective = new ObjectiveSystem(store, playerId);
             WaveBranch = new WaveBranchSystem(store, logger, config, stateMachine);
             ResourceNode = new ResourceNodeSystem(store, logger, playerId);
+
+            // ── Hot Zone ──
+            HotZone = new HotZoneSystem(store, config, playerId);
 
             // ── Adaptive Difficulty ──
             AdaptiveDifficulty = new AdaptiveDifficultySystem(store, config);
@@ -370,6 +376,7 @@ namespace BattleSystemECS.Core
             scheduler.CombatSetup.Mana = Mana;
             scheduler.CombatSetup.GlobalSkill = GlobalSkill;
             scheduler.CombatSetup.HitShield = HitShield;
+            scheduler.CombatSetup.HotZone = HotZone;
 
             // ── Spatial ──
             scheduler.Spatial.PatrolTower = null;

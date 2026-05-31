@@ -1111,6 +1111,35 @@ namespace BattleSystemECS.Config
             return Array.FindIndex(CloneDefs, c => c.SourceMonsterType == monsterType);
         }
 
+        /// <summary>
+        /// Hot zone definition — a pre-defined map region that grants placement bonuses to towers.
+        /// </summary>
+        public class HotZoneDef
+        {
+            /// <summary>Unique identifier for this hot zone.</summary>
+            public string Id { get; set; } = "";
+            /// <summary>Center X position in grid cells.</summary>
+            public int CenterX { get; set; }
+            /// <summary>Center Y position in grid cells.</summary>
+            public int CenterY { get; set; }
+            /// <summary>Radius in grid cells (circular region).</summary>
+            public int Radius { get; set; }
+            /// <summary>Damage multiplier bonus (e.g. 0.15 = +15% damage).</summary>
+            public float DamageBonus { get; set; }
+            /// <summary>Range bonus in cells (added to TowerRange during attack).</summary>
+            public float RangeBonus { get; set; }
+            /// <summary>Attack speed multiplier bonus (e.g. 0.1 = +10% attack speed).</summary>
+            public float SpeedBonus { get; set; }
+            /// <summary>Description for UI display.</summary>
+            public string Name { get; set; } = "";
+        }
+
+        /// <summary>
+        /// Hot zone definitions for map terrain bonuses.
+        /// Default empty — loaded from Data/Configs/hot_zones.json by HotZoneSystem.
+        /// </summary>
+        public List<HotZoneDef> HotZoneDefs { get; set; } = new List<HotZoneDef>();
+
         // Pickup item definitions (loaded from pickup_defs.json)
         public PickupDef[] PickupDefs { get; set; } = Array.Empty<PickupDef>();
 
