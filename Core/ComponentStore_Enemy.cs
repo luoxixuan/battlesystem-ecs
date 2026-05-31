@@ -397,6 +397,16 @@ namespace BattleSystemECS.Core
         // EnemyLifestealActive: whether lifesteal is currently active (enemies can toggle it)
         public bool[] EnemyLifestealActive = new bool[MAX_ENTITIES];
 
+        // ==================== 保护者敌人组件（SOA）====================
+        // EnemyIsProtector: true if this enemy is a protector/guardian that shields allies
+        public bool[] EnemyIsProtector = new bool[MAX_ENTITIES];
+        // EnemyProtectRadius: range within which this protector shields allies (world units)
+        public float[] EnemyProtectRadius = new float[MAX_ENTITIES];
+        // EnemyProtectDamageTransfer: fraction of damage redirected to the protector (0.5 = 50%)
+        public float[] EnemyProtectDamageTransfer = new float[MAX_ENTITIES];
+        // EnemyProtectMaxTargets: maximum number of allies this protector can shield (0 = unlimited)
+        public int[] EnemyProtectMaxTargets = new int[MAX_ENTITIES];
+
         // ==================== 敌人词缀组件（SOA）====================
         // EnemyAffixFlags: bit-mask of active affixes (see BuffType affix bits 16-22)
         // Each enemy spawns with 1-3 random affixes; stored as a flag set for O(1) HasAffix() checks.
@@ -536,6 +546,12 @@ namespace BattleSystemECS.Core
             EnemyLifestealRatio[entityId] = 0f;
             EnemyLifestealCap[entityId] = 0f;
             EnemyLifestealActive[entityId] = false;
+
+            // Protector: default false (no protector ability)
+            EnemyIsProtector[entityId] = false;
+            EnemyProtectRadius[entityId] = 0f;
+            EnemyProtectDamageTransfer[entityId] = 0f;
+            EnemyProtectMaxTargets[entityId] = 0;
 
             // H-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeEnemyIds.Add(entityId); _enemyIndexInList[entityId] = _activeEnemyIds.Count - 1; }
