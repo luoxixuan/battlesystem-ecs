@@ -24,6 +24,7 @@ namespace BattleSystemECS.Core
 
         // ── Spawning ──
         public WaveSpawningSystem? WaveSpawning { get; private set; }
+        public NestSystem? Nest { get; private set; }
 
         // ── Economy ──
         public GoldSystem? Gold { get; private set; }
@@ -134,6 +135,8 @@ namespace BattleSystemECS.Core
 
             // ── Spawning ──
             WaveSpawning = new WaveSpawningSystem(store, logger, config);
+            Nest = new NestSystem(store, config, logger, playerId);
+            Nest.Initialize();
 
             // ── Economy ──
             Gold = new GoldSystem(store, logger, TechTree);
@@ -339,7 +342,7 @@ namespace BattleSystemECS.Core
 
             // ── Spawning ──
             scheduler.Spawning.WaveSpawning = WaveSpawning;
-            scheduler.Spawning.Nest = null;
+            scheduler.Spawning.Nest = Nest;
 
             // ── AI ──
             scheduler.AI.EnemyAI = EnemyAI;
