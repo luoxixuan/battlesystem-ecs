@@ -72,6 +72,7 @@ namespace BattleSystemECS.Core
         public FearSystem? Fear { get; private set; }
         public EnemyStrafeSystem? EnemyStrafe { get; private set; }
         public SuicideBombSystem? SuicideBomb { get; private set; }
+        public ReflectTowerSystem? ReflectTower { get; private set; }
 
         // ── Environment ──
         public TerrainSystem? Terrain { get; private set; }
@@ -163,7 +164,7 @@ namespace BattleSystemECS.Core
 
             // ── Enemy AI & Abilities ──
             EnemyAbility = new EnemyAbilitySystem(store, logger, playerId, config, eventBus);
-            EnemyAI = new EnemyAISystem(store, logger, playerId, config, EnemyAbility, TechTree, eventBus);
+            EnemyAI = new EnemyAISystem(store, logger, playerId, config, EnemyAbility, TechTree, eventBus, ReflectTower);
 
             // ── Hit Shield ──
             var hitShield = new HitShieldSystem(store, logger);
@@ -185,7 +186,10 @@ namespace BattleSystemECS.Core
             EnemyStrafe = new EnemyStrafeSystem(store, logger);
 
             // ── Suicide Bomb ──
-            SuicideBomb = new SuicideBombSystem(store, playerId);
+            SuicideBomb = new SuicideBombSystem(store, playerId, ReflectTower);
+
+            // ── Reflect Tower ──
+            ReflectTower = new ReflectTowerSystem(store, playerId);
 
             // ── Burrow, Necromancer, LifeLink ──
             EnemyBurrow = new EnemyBurrowSystem(store, playerId);
@@ -373,6 +377,7 @@ namespace BattleSystemECS.Core
             scheduler.AI.Fear = Fear;
             scheduler.AI.ZoneControl = ZoneControl;
             scheduler.AI.EnemyStrafe = EnemyStrafe;
+            scheduler.AI.ReflectTower = ReflectTower;
 
             // ── Movement ──
             scheduler.Movement.Wound = null;
@@ -421,6 +426,7 @@ namespace BattleSystemECS.Core
             scheduler.Combat.TowerSabotage = TowerSabotage;
             scheduler.Combat.Hero = Hero;
             scheduler.Combat.SuicideBomb = SuicideBomb;
+            scheduler.Combat.ReflectTower = ReflectTower;
             scheduler.Combat.TowerAttack = TowerAttack;
             scheduler.Combat.TowerSynergy = TowerSynergy;
             scheduler.Combat.TowerLink = null;

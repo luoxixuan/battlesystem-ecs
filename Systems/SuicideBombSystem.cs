@@ -22,6 +22,7 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore store;
         private readonly int playerId;
+        private readonly ReflectTowerSystem? _reflectTowerSystem;
         
         // Thread-safe collection for explosion events (phase 1 parallel collect → phase 2 serial apply)
         private readonly ConcurrentBag<SuicideExplosionEvent> _explosionEvents = new();
@@ -29,10 +30,11 @@ namespace BattleSystemECS.Systems
         // Cached active enemy list per turn
         private System.Collections.Generic.List<int> _activeEnemyList = null!;
 
-        public SuicideBombSystem(ComponentStore store, int playerId)
+        public SuicideBombSystem(ComponentStore store, int playerId, ReflectTowerSystem? reflectTowerSystem = null)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this.playerId = playerId;
+            this._reflectTowerSystem = reflectTowerSystem;
         }
 
         public void SetTurn(int turn)
@@ -49,7 +51,7 @@ namespace BattleSystemECS.Systems
             // Phase 1: collect explosion events in parallel
             CollectExplosionEvents();
             
-            // Phase 2: apply explosion damage serially
+            // Phase 2: apply explosion damage serially (includes reflect tower damage if towers have reflect)
             ApplyExplosionDamage();
         }
 
@@ -181,6 +183,12 @@ namespace BattleSystemECS.Systems
 
                 // Apply damage directly to player health
                 store.PlayerCurrentHealth[playerId] -= finalDamage;
+
+                // Reflect tower: if this tower has reflect, queue reflect damage back to the suicide bomber
+                if (_reflectTowerSystem != null && store.TowerReflectRatio[towerId] > 0f)
+                {
+                    _reflectTowerSystem.QueueReflect(towerId, evt.EnemyId, finalDamage);
+                }
             }
         }
 

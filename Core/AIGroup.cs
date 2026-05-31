@@ -16,6 +16,7 @@ namespace BattleSystemECS.Core
         public Systems.FearSystem? Fear { get; set; }
         public Systems.ZoneControlSystem? ZoneControl { get; set; }
         public Systems.EnemyStrafeSystem? EnemyStrafe { get; set; }
+        public Systems.ReflectTowerSystem? ReflectTower { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {

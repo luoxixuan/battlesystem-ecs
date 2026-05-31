@@ -25,6 +25,7 @@ namespace BattleSystemECS.Systems
         private readonly EnemyAbilitySystem enemyAbilitySystem;
         private readonly TechTreeSystem techTreeSystem;
         private readonly IEventBus _eventBus;
+        private readonly ReflectTowerSystem? _reflectTowerSystem;
 
         private int currentTurn;
         // Per-turn cached fields for cache locality
@@ -51,7 +52,7 @@ namespace BattleSystemECS.Systems
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
         private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
 
-        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem, TechTreeSystem techTreeSystem = null, IEventBus eventBus = null)
+        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem, TechTreeSystem techTreeSystem = null, IEventBus eventBus = null, ReflectTowerSystem? reflectTowerSystem = null)
         {
             this.store = store;
             this.logger = logger;
@@ -60,6 +61,7 @@ namespace BattleSystemECS.Systems
             this.enemyAbilitySystem = enemyAbilitySystem;
             this.techTreeSystem = techTreeSystem;
             this._eventBus = eventBus ?? new EventBus();
+            this._reflectTowerSystem = reflectTowerSystem;
             _attackEvents[0] = new ConcurrentBag<AttackEvent>();
             _attackEvents[1] = new ConcurrentBag<AttackEvent>();
             _lifestealEvents[0] = new ConcurrentBag<LifestealEvent>();

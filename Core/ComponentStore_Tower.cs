@@ -382,6 +382,18 @@ namespace BattleSystemECS.Core
         // TowerBeamMaxRange: maximum range for beam targeting and chaining
         public float[] TowerBeamMaxRange = new float[MAX_ENTITIES];
 
+        // ==================== 塔伤害反弹系统 (Reflect Tower) ====================
+        // TowerReflectRatio: fraction of damage received that is reflected back to attacker (e.g. 0.3 = 30% reflect)
+        // Applied when this tower is attacked by an enemy — reflects back to the attacking enemy.
+        // Default 0 = no reflect. Max reasonable value ~0.5 (50% — beyond that creates runaway feedback).
+        public float[] TowerReflectRatio = new float[MAX_ENTITIES];
+        // TowerReflectCap: maximum total reflect damage per frame for this tower (prevents oneshot from large hits)
+        // Default 0 = no cap. If > 0, reflects min(TowerReflectRatio * damage, TowerReflectCap).
+        public float[] TowerReflectCap = new float[MAX_ENTITIES];
+        // TowerReflectAuraRadius: if > 0, nearby towers within radius also reflect damage when this tower is hit
+        // Creates a "reflect aura" — group，塔共享反射光环
+        public float[] TowerReflectAuraRadius = new float[MAX_ENTITIES];
+
         // ==================== 塔组件访问 ====================
 
         /// <summary>
@@ -518,6 +530,10 @@ namespace BattleSystemECS.Core
             TowerIsDisabled[entityId] = false;
             TowerDisabledTimer[entityId] = 0f;
             TowerDisabledDuration[entityId] = 0f;
+            // Reflect tower fields: default to no reflect (0 ratio = inactive)
+            TowerReflectRatio[entityId] = 0f;
+            TowerReflectCap[entityId] = 0f;
+            TowerReflectAuraRadius[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }

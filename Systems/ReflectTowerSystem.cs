@@ -1,0 +1,161 @@
+#nullable enable
+using System;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
+using BattleSystemECS.Core;
+
+namespace BattleSystemECS.Systems
+{
+    /// <summary>
+    /// Reflect Tower System — when a tower with TowerReflectRatio > 0 is attacked,
+    /// it reflects a fraction of the damage back to the attacking enemy.
+    /// 
+    /// Design goals:
+    /// - Tower takes damage normally (HP reduced), but a fraction is "returned" to the attacker.
+    /// - Two-phase: parallel collection in EnemyAISystem attack execution, serial apply here.
+    /// - TowerReflectCap prevents runaway from large hits (e.g. Boss charge).
+    /// - TowerReflectAuraRadius: when a reflect tower is hit, nearby towers also reflect.
+    /// 
+    /// Anti-loop: reflected damage goes to enemy HP directly (not through attack flow),
+    /// so it does NOT trigger another reflect. The enemy takes the damage and either
+    /// lives or dies — no second tower is involved so no infinite loop.
+    /// 
+    /// Execution: CombatGroup (after Combat/TowerAttack where towers are hit).
+    /// </summary>
+    public class ReflectTowerSystem
+    {
+        private readonly ComponentStore store;
+        private readonly int playerId;
+
+        // Ping-pong queue: (attackingEnemyId, reflectDamage) — applied serial at frame end
+        private readonly ConcurrentBag<ReflectEvent>[] _reflectQueue = new ConcurrentBag<ReflectEvent>[2];
+        private int _queueIdx = 0;
+
+        public ReflectTowerSystem(ComponentStore store, int playerId)
+        {
+            this.store = store ?? throw new ArgumentNullException(nameof(store));
+            this.playerId = playerId;
+            _reflectQueue[0] = new ConcurrentBag<ReflectEvent>();
+            _reflectQueue[1] = new ConcurrentBag<ReflectEvent>();
+        }
+
+        /// <summary>
+        /// Queue a reflect event when a tower is hit by an enemy.
+        /// Called from EnemyAISystem attack execution (parallel safe via ConcurrentBag).
+        /// </summary>
+        public void QueueReflect(int towerId, int attackingEnemyId, float damageReceived)
+        {
+            if (towerId < 0 || attackingEnemyId < 0 || damageReceived <= 0f) return;
+            if (!store.TowerActive[towerId]) return;
+
+            float ratio = store.TowerReflectRatio[towerId];
+            if (ratio <= 0f) return;
+
+            float reflectDamage = damageReceived * ratio;
+            float cap = store.TowerReflectCap[towerId];
+            if (cap > 0f)
+                reflectDamage = Math.Min(reflectDamage, cap);
+
+            if (reflectDamage <= 0f) return;
+
+            // Add reflect event (ConcurrentBag is thread-safe, parallel write)
+            _reflectQueue[_queueIdx].Add(new ReflectEvent
+            {
+                TowerId = towerId,
+                AttackingEnemyId = attackingEnemyId,
+                ReflectDamage = reflectDamage
+            });
+        }
+
+        /// <summary>
+        /// Apply all queued reflect events serially.
+        /// Called once per frame after Combat/TowerAttack.
+        /// </summary>
+        public void ResolveReflect()
+        {
+            int readIdx = _queueIdx;
+            int writeIdx = 1 - _queueIdx;
+            _queueIdx = writeIdx;
+            _reflectQueue[writeIdx].Clear();
+
+            // Also process aura-propagated reflect events
+            ResolveAuraReflect(readIdx);
+        }
+
+        private void ResolveAuraReflect(int readIdx)
+        {
+            // For each tower that was hit, check if it has a reflect aura
+            // and propagate to nearby towers (they reflect too)
+            foreach (var evt in _reflectQueue[readIdx])
+            {
+                int towerId = evt.TowerId;
+                if (!store.TowerActive[towerId]) continue;
+
+                float auraRadius = store.TowerReflectAuraRadius[towerId];
+                if (auraRadius <= 0f) continue;
+
+                // Find all towers within aura radius that also have reflect
+                float towerX = store.PositionX[towerId];
+                float towerY = store.PositionY[towerId];
+                float auraRadiusSq = auraRadius * auraRadius;
+
+                foreach (int nearbyId in store.ActiveTowerIds)
+                {
+                    if (nearbyId == towerId) continue;
+                    if (!store.TowerActive[nearbyId]) continue;
+                    if (store.TowerReflectRatio[nearbyId] <= 0f) continue;
+
+                    float dx = store.PositionX[nearbyId] - towerX;
+                    float dy = store.PositionY[nearbyId] - towerY;
+                    if (dx * dx + dy * dy > auraRadiusSq) continue;
+
+                    // This nearby tower also reflects the same damage
+                    float ratio = store.TowerReflectRatio[nearbyId];
+                    float reflectDamage = evt.ReflectDamage * ratio;
+                    float cap = store.TowerReflectCap[nearbyId];
+                    if (cap > 0f)
+                        reflectDamage = Math.Min(reflectDamage, cap);
+
+                    if (reflectDamage > 0f)
+                        _reflectQueue[_queueIdx].Add(new ReflectEvent
+                        {
+                            TowerId = nearbyId,
+                            AttackingEnemyId = evt.AttackingEnemyId,
+                            ReflectDamage = reflectDamage
+                        });
+                }
+            }
+        }
+
+        /// <summary>
+        /// Phase 2 (serial): apply all reflect damage from the queue to the attacking enemies.
+        /// Direct HP reduction — no thorns involvement, no infinite loop.
+        /// </summary>
+        public void ApplyReflectDamage()
+        {
+            int readIdx = _queueIdx;
+            int writeIdx = 1 - _queueIdx;
+            _queueIdx = writeIdx;
+            _reflectQueue[writeIdx].Clear();
+
+            foreach (var evt in _reflectQueue[readIdx])
+            {
+                int enemyId = evt.AttackingEnemyId;
+                if (!store.EnemyActive[enemyId]) continue;
+
+                float dmg = evt.ReflectDamage;
+                store.EnemyHealth[enemyId] -= dmg;
+
+                if (store.EnemyHealth[enemyId] <= 0f)
+                    store.QueueEnemyDeath(enemyId, playerId);
+            }
+        }
+
+        private readonly struct ReflectEvent
+        {
+            public int TowerId { get; init; }
+            public int AttackingEnemyId { get; init; }
+            public float ReflectDamage { get; init; }
+        }
+    }
+}
