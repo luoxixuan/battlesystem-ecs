@@ -5,6 +5,7 @@ namespace BattleSystemECS.Core
     public class CombatSetupGroup : ISystemGroup
     {
         public Systems.PlayerTowerAttackSystem? PlayerTowerAttack { get; set; }
+        public Systems.HeroSystem? Hero { get; set; }
         public Systems.TowerAttackSystem? TowerAttack { get; set; }
         public Systems.TowerOverchargeSystem? TowerOvercharge { get; set; }
         public Systems.HeatSystem? Heat { get; set; }
@@ -22,6 +23,7 @@ namespace BattleSystemECS.Core
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
             PlayerTowerAttack?.SetTurn(turn);
+            Hero?.SetTurn(turn);
             TowerAttack?.SetTurn(turn);
             TowerOvercharge?.SetTurn(turn);
             Heat?.SetTurn(turn);

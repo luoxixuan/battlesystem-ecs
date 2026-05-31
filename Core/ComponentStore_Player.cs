@@ -513,5 +513,29 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             if (!IsValidPlayer(playerId)) return;
             GlobalDayNightCycleCount[playerId]++;
         }
+
+        // ==================== Hero / Mercenary System components (SOA) ====================
+        // MAX_HEROES: maximum number of hero units per player (5 heroes max)
+        public const int MAX_HEROES = 5;
+        // HeroIsDeployed: whether hero slot i is currently deployed on the map
+        public bool[] HeroIsDeployed = new bool[MAX_HEROES];
+        // HeroPosX/Y: current world position of hero i
+        public float[] HeroPosX = new float[MAX_HEROES];
+        public float[] HeroPosY = new float[MAX_HEROES];
+        // HeroTargetX/Y: target position hero i is moving toward
+        public float[] HeroTargetX = new float[MAX_HEROES];
+        public float[] HeroTargetY = new float[MAX_HEROES];
+        // HeroMoveSpeed: movement speed (units per frame)
+        public float[] HeroMoveSpeed = new float[MAX_HEROES];
+        // HeroAttackRange: attack range in cells
+        public int[] HeroAttackRange = new int[MAX_HEROES];
+        // HeroDamage: base damage per attack
+        public float[] HeroDamage = new float[MAX_HEROES];
+        // HeroAttackSpeed: attacks per second
+        public float[] HeroAttackSpeed = new float[MAX_HEROES];
+        // HeroCooldown: remaining cooldown in seconds (0 = ready to attack)
+        public float[] HeroCooldown = new float[MAX_HEROES];
+        // HeroTypeId: which hero definition (index into heroes.json config)
+        public int[] HeroTypeId = new int[MAX_HEROES];
     }
 }

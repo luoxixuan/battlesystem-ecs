@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-31, commit `8ebf2d6`）
+## 性能基准（2026-05-31, commit `8cfc3d3`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~4709 FPS**，400 帧，~0.21 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~12066 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5726 FPS** |
+| **mode 5**（完整一局） | **~4733 FPS**，400 帧，~0.21 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~12319 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5648 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -154,6 +154,7 @@ dotnet test
 - 地图热区/地形加成系统（HotZoneSystem + ComponentStore_Tower.cs + GameConfig.cs + CombatSetupGroup + SystemRegistry）；bench2: 11895, bench4: 5703, bench5: 4592
 - 敌人巢穴/生成建筑系统（NestSystem + SystemRegistry + SpawningGroup）；bench2: 11686, bench4: 5669, bench5: 4798
 - 保护者/守卫敌人系统（ProtectorSystem + ComponentStore_Enemy.cs）；bench2: 12066, bench4: 5726, bench5: 4709
+- 英雄/雇佣兵系统（HeroSystem + ComponentStore_Player.cs + CombatGroup + SystemRegistry）；bench2: 12319, bench4: 5648, bench5: 4733
 
 ### 2026-05-30
 - **工程改进**：ComponentStore 按领域拆分为 5 个 partial 文件（Enemy/Tower/Player/World + 核心生命周期）；伤害公式测试补齐至 120 项

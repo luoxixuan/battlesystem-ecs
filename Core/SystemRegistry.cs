@@ -54,6 +54,7 @@ namespace BattleSystemECS.Core
 
         // ── Player ──
         public PlayerTowerAttackSystem? PlayerTowerAttack { get; private set; }
+        public HeroSystem? Hero { get; private set; }
 
         // ── Enemies ──
         public EnemyMovementSystem? EnemyMovement { get; private set; }
@@ -132,6 +133,7 @@ namespace BattleSystemECS.Core
 
             // ── Player attack ──
             PlayerTowerAttack = new PlayerTowerAttackSystem(store, logger, playerId, config, TechTree);
+            Hero = new HeroSystem(store, playerId);
 
             // ── Spawning ──
             WaveSpawning = new WaveSpawningSystem(store, logger, config);
@@ -372,6 +374,7 @@ namespace BattleSystemECS.Core
 
             // ── Combat Setup ──
             scheduler.CombatSetup.PlayerTowerAttack = PlayerTowerAttack;
+            scheduler.CombatSetup.Hero = Hero;
             scheduler.CombatSetup.TowerAttack = TowerAttack;
             scheduler.CombatSetup.TowerOvercharge = null;
             scheduler.CombatSetup.TowerSynergy = TowerSynergy;
@@ -399,6 +402,7 @@ namespace BattleSystemECS.Core
             scheduler.Combat.Demolish = null;
             scheduler.Combat.HitShield = HitShield;
             scheduler.Combat.TowerSabotage = TowerSabotage;
+            scheduler.Combat.Hero = Hero;
             scheduler.Combat.SuicideBomb = SuicideBomb;
             scheduler.Combat.TowerAttack = TowerAttack;
             scheduler.Combat.TowerSynergy = TowerSynergy;
