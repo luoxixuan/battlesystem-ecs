@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-31, commit `334cafb`）
+## 性能基准（2026-05-31, commit `d96491d`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~4608 FPS**，400 帧，~0.22 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11600 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5648 FPS** |
+| **mode 5**（完整一局） | **~4755 FPS**，400 帧，~0.21 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11787 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5606 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -178,7 +178,8 @@ dotnet test
 - 光束/激光连续塔（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094
 - 塔能量/法力资源系统（TowerEnergySystem + ComponentStore_Tower.cs + TowerAttackSystem）；bench2: 10605, bench4: 5672, bench5: 4735
 
-### 2026-05-29
+### 2026-05-31
+- 塔反射/伤害反弹系统（ReflectTowerSystem + ComponentStore_Tower.cs + SuicideBombSystem）；bench2: 11787, bench4: 5606, bench5: 4755
 - 复活/亡灵法师敌人（NecromancerSystem + CorpseQueue）；bench2: 9871, bench4: 5122, bench5: 4882
 - 昼夜循环系统（DayNightSystem）；bench2: 10483, bench4: 5135, bench5: 5021
 - 钻地/潜行敌人（EnemyBurrowSystem + Emerge AoE）；bench2: 10115, bench4: 5487, bench5: 4878
