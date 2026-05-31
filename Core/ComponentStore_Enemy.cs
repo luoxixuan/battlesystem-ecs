@@ -318,6 +318,11 @@ namespace BattleSystemECS.Core
         // True damage (DamageType.True) bypasses immunity entirely and ignores this mask.
         // Values: Physical=1, Magic=2, Fire=4, Ice=8, Lightning=16. Default 0 = no immunity.
         public int[] EnemyDamageImmunityMask = new int[MAX_ENTITIES];
+        // EnemyIsUnstoppable: total CC immunity flag. When true, enemy ignores ALL crowd control
+        // (stun, freeze, slow, fear, knockback, pull, charm, taunt). Boss-level CC immunity.
+        public bool[] EnemyIsUnstoppable = new bool[MAX_ENTITIES];
+        // EnemyFearResistance: 0-1, reduces fear duration fraction (1 = complete fear immunity)
+        public float[] EnemyFearResistance = new float[MAX_ENTITIES];
 
         // ==================== 自爆/殉爆敌人 (Suicide Bomber / Kamikaze, SOA) ====================
         // EnemyIsSuicide: true if this enemy is a suicide bomber that explodes near towers
@@ -672,7 +677,16 @@ namespace BattleSystemECS.Core
         public void ApplySlow(int enemyId, float factor, int duration)
         {
             if (!IsValidEntity(enemyId)) return;
+            // Check total CC immunity (unstoppable enemies ignore all CC)
+            if (EnemyIsUnstoppable[enemyId]) return;
             if (factor <= 0f || factor >= 1f) return; // only valid slow factors
+            // Apply slow resistance: effectiveFactor = factor + (1-factor) * resistance
+            // e.g., 0.5 slow + 0.5 resistance → 0.5 + 0.5*0.5 = 0.75 (less effective slow)
+            if (EnemySlowResistance[enemyId] > 0f)
+            {
+                factor = factor + (1f - factor) * EnemySlowResistance[enemyId];
+                if (factor >= 1f) return; // fully resisted
+            }
 
             float baseSpeed = EnemyMoveSpeedBase[enemyId];
             if (baseSpeed <= 0f) baseSpeed = EnemyMoveSpeed[enemyId];
@@ -698,6 +712,14 @@ namespace BattleSystemECS.Core
         public void ApplyEnemyStun(int enemyId, int duration)
         {
             if (!IsValidEntity(enemyId)) return;
+            // Check total CC immunity (unstoppable enemies ignore all CC)
+            if (EnemyIsUnstoppable[enemyId]) return;
+            // Apply stun resistance: reduce duration by resistance fraction
+            if (EnemyStunResistance[enemyId] > 0f && duration > 0)
+            {
+                duration = (int)(duration * (1f - EnemyStunResistance[enemyId]));
+                if (duration <= 0) return;
+            }
             // Use duration-based stun so it survives the EnemyMovementSystem.SetTurn() clear
             if (duration > EnemyStunDurationLeft[enemyId])
                 EnemyStunDurationLeft[enemyId] = duration;
@@ -705,10 +727,22 @@ namespace BattleSystemECS.Core
             EnemyStunFlag[enemyId] = true;
         }
 
-        /// <summary>Applies freeze to the enemy for `duration` turns. Alias for ApplyEnemyStun — freeze uses the same stun infrastructure.</summary>
+        /// <summary>Applies freeze to the enemy for `duration` turns. Applies freeze resistance directly, then sets stun duration.</summary>
         public void ApplyEnemyFreeze(int enemyId, int duration)
         {
-            ApplyEnemyStun(enemyId, duration);
+            if (!IsValidEntity(enemyId)) return;
+            // Check total CC immunity (unstoppable enemies ignore all CC)
+            if (EnemyIsUnstoppable[enemyId]) return;
+            // Apply freeze resistance: reduce duration by resistance fraction
+            if (EnemyFreezeResistance[enemyId] > 0f && duration > 0)
+            {
+                duration = (int)(duration * (1f - EnemyFreezeResistance[enemyId]));
+                if (duration <= 0) return;
+            }
+            // Direct stun logic (don't call ApplyEnemyStun to avoid double-applying stun resistance)
+            if (duration > EnemyStunDurationLeft[enemyId])
+                EnemyStunDurationLeft[enemyId] = duration;
+            EnemyStunFlag[enemyId] = true;
         }
 
         /// <summary>Returns true if the enemy is currently frozen. Alias for IsEnemyStunned — freeze shares the stun mechanism.</summary>

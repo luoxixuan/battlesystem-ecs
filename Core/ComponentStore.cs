@@ -426,6 +426,8 @@ namespace BattleSystemECS.Core
                 EnemySlowResistance[entityId] = 0f;
                 EnemyKnockbackResistance[entityId] = 0f;
                 EnemyDamageResistance[entityId] = 0f;
+                EnemyIsUnstoppable[entityId] = false;
+                EnemyFearResistance[entityId] = 0f;
                 // Curse debuff fields (applied by curse towers)
                 EnemyCurseDmgReduction[entityId] = 0f;
                 EnemyCurseSpeedReduction[entityId] = 0f;

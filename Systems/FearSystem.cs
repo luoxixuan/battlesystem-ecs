@@ -152,9 +152,20 @@ namespace BattleSystemECS.Systems
 
                     // Apply fear duration (take the max if already feared)
                     float existing = store.EnemyFearDurationLeft[enemyId];
-                    if (fearDuration > existing)
+                    // Check total CC immunity (unstoppable enemies ignore all CC)
+                    if (store.EnemyIsUnstoppable[enemyId])
+                        continue;
+                    // Apply fear resistance: reduce duration by resistance fraction
+                    float effectiveFearDuration = fearDuration;
+                    if (store.EnemyFearResistance[enemyId] > 0f)
                     {
-                        store.EnemyFearDurationLeft[enemyId] = fearDuration;
+                        effectiveFearDuration = fearDuration * (1f - store.EnemyFearResistance[enemyId]);
+                        if (effectiveFearDuration <= 0f)
+                            continue;
+                    }
+                    if (effectiveFearDuration > existing)
+                    {
+                        store.EnemyFearDurationLeft[enemyId] = effectiveFearDuration;
                         store.SetEnemyActionEnum(enemyId, EnemyActionType.Fear);
                     }
                 }
