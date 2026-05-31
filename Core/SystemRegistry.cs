@@ -294,6 +294,7 @@ namespace BattleSystemECS.Core
 
             // ── Skill wiring ──
             Skill?.InjectDotSystem(Buff);
+            Skill?.InjectHealingZoneSystem(HealingZone);
 
             // ── OnEnemyKilled → Combo + Necromancer ──
             store.OnEnemyKilled += (enemyId, pid) => Combo?.HandleComboIncrement(pid);

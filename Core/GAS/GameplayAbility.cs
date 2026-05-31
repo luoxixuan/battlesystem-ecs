@@ -23,6 +23,7 @@ namespace BattleSystemECS.Core.GAS
         public const int Slow = 11;          // Slow: circle AoE that slows enemies in radius (non-freeze, move speed reduction)
         public const int TimeWarp = 12;     // TimeWarp: applies GlobalTimeScale + GlobalTimeScaleDuration to slow/fast game time
         public const int Summon = 13;       // Summon: spawns a player-summoned combat unit at the player's position
+        public const int HealingZone = 14;   // HealingZone: places a ground healing zone that heals allies in radius
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -43,6 +44,7 @@ namespace BattleSystemECS.Core.GAS
                 "slow" => Slow,
                 "time_warp" => TimeWarp,
                 "summon" => Summon,
+                "healingzone" => HealingZone,
                 _ => Single
             };
         }

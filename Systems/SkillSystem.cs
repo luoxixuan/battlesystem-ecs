@@ -25,6 +25,7 @@ namespace BattleSystemECS.Systems
         private BuffSystem dotSystem;
         private ManaSystem manaSystem; // optional — null if mana system not yet initialized
         private PlayerSummonSystem summonSystem; // optional — null if summon system not yet initialized
+        private HealingZoneSystem healingZoneSystem; // optional — null if healing zone system not yet initialized
         private List<int> _activeEnemyList;
         // Cached wave-based difficulty multiplier (updated via SetWaveNumber)
         private float _waveDifficultyMult = 1f;
@@ -98,6 +99,11 @@ namespace BattleSystemECS.Systems
         public void InjectSummonSystem(PlayerSummonSystem summonSystem)
         {
             this.summonSystem = summonSystem;
+        }
+
+        public void InjectHealingZoneSystem(HealingZoneSystem healingZoneSystem)
+        {
+            this.healingZoneSystem = healingZoneSystem;
         }
 
         /// <summary>
@@ -322,6 +328,9 @@ namespace BattleSystemECS.Systems
                 case 13: // Summon — spawn a player-summoned combat unit
                     CastSummon(def);
                     enemiesHit = 0;
+                    break;
+                case 14: // HealingZone — place a ground healing zone that heals allies in radius
+                    enemiesHit = CastHealingZone(def);
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -834,6 +843,40 @@ namespace BattleSystemECS.Systems
             if (unitId >= 0)
             {
                 renderer.Log($"[SUMMON] {def.Name} cast — spawned unit (ID: {unitId})");
+            }
+        }
+
+        /// <summary>
+        /// HealingZone AreaShape: places a ground healing zone at the player's position.
+        /// The zone heals allies (player + summoned units) within its radius over time.
+        /// Duration and heal rate come from def.Cooldown (duration) and def.HealPercent (hps).
+        /// Uses HealingZoneSystem.AddHealingZone() which internally uses CorpseEffect type=4.
+        /// </summary>
+        private int CastHealingZone(GameplayAbilityDef def)
+        {
+            if (healingZoneSystem == null)
+            {
+                renderer.Log($"[HEALZONE] HealingZoneSystem not available — cannot cast '{def.Name}'");
+                return 0;
+            }
+
+            float posX = store.PositionX[playerId];
+            float posY = store.PositionY[playerId];
+            int radius = def.AreaRadius;
+            float duration = def.Cooldown > 0f ? def.Cooldown : 10f; // duration = cooldown field
+            float healPerSec = def.HealPercent; // HealPercent field stores HPS for zone abilities
+
+            int zoneId = healingZoneSystem.AddHealingZone(posX, posY, radius, duration, healPerSec);
+
+            if (zoneId >= 0)
+            {
+                renderer.Log($"[HEALZONE] {def.Name} cast — zone at ({posX:F1},{posY:F1}), radius={radius}, duration={duration}s, hps={healPerSec}");
+                return 1; // zones placed, not enemies hit
+            }
+            else
+            {
+                renderer.Log($"[HEALZONE] {def.Name} failed — healing zone pool full");
+                return 0;
             }
         }
 
