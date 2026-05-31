@@ -615,6 +615,11 @@ int bestTarget = -1;
 
                     float baseDmg = store.TowerAttackDamage[towerId];
 
+                    // ── Random Damage Variance (Gambling / RNG Damage Range) ──────────────
+                    float dmgVariance = store.TowerDamageVariance[towerId];
+                    if (dmgVariance > 0f)
+                        baseDmg *= (float)(1.0 - dmgVariance + _rand.NextDouble() * dmgVariance * 2.0);
+
                     // ── Desperation / Last Stand damage bonus ──────────────────────────
                     if (_desperationDmgBonus > 0f) baseDmg *= (1f + _desperationDmgBonus);
 

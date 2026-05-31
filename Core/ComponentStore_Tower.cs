@@ -437,7 +437,13 @@ namespace BattleSystemECS.Core
         // TowerFalloffMinRatio: minimum damage multiplier at max range (Standard) or min range (Reverse)
         public float[] TowerFalloffMinRatio = new float[MAX_ENTITIES];
 
-        // ==================== 持续升温伤害 (Ramp-Up / Spool-Up Damage) ====================
+        // ==================== 随机伤害范围（Damage Variance / Gambling）====================
+        // TowerDamageVariance: fraction of damage that can randomly vary (0 = no variance, fixed damage)
+        // baseDmg = TowerAttackDamage * (1 ± variance), uniformly distributed
+        // E.g. 0.2 = 80%-120% of base damage per hit
+        public float[] TowerDamageVariance = new float[MAX_ENTITIES];
+
+        // ==================== 塔持续升温伤害 (Ramp-Up / Spool-Up Damage) ====================
         // TowerRampUpRate: damage increase per consecutive hit on same target (0 = no ramp-up)
         // E.g. 0.05 = +5% per hit, stacks up to TowerRampUpMax cap
         public float[] TowerRampUpRate = new float[MAX_ENTITIES];
