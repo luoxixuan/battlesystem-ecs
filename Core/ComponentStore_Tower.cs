@@ -429,13 +429,30 @@ namespace BattleSystemECS.Core
         // Resets to 0 when burst cooldown completes
         public int[] TowerBurstShotsFired = new int[MAX_ENTITIES];
 
-        // ==================== 射程伤害衰减 (Range-Based Damage Falloff) ====================
+        // ── 射程伤害衰减 (Range-Based Damage Falloff) ====================
         // TowerFalloffType: 0=None, 1=Standard (closer=more dmg), 2=Reverse (sniper: farther=more dmg)
         public int[] TowerFalloffType = new int[MAX_ENTITIES];
         // TowerFalloffStartRatio: fraction of max range where falloff begins
         public float[] TowerFalloffStartRatio = new float[MAX_ENTITIES];
         // TowerFalloffMinRatio: minimum damage multiplier at max range (Standard) or min range (Reverse)
         public float[] TowerFalloffMinRatio = new float[MAX_ENTITIES];
+
+        // ==================== 持续升温伤害 (Ramp-Up / Spool-Up Damage) ====================
+        // TowerRampUpRate: damage increase per consecutive hit on same target (0 = no ramp-up)
+        // E.g. 0.05 = +5% per hit, stacks up to TowerRampUpMax cap
+        public float[] TowerRampUpRate = new float[MAX_ENTITIES];
+        // TowerRampUpMax: maximum damage multiplier cap (e.g. 2.0 = 200% max dmg)
+        // Default 1.0 = no ramp-up (no increase)
+        public float[] TowerRampUpMax = new float[MAX_ENTITIES];
+        // TowerRampUpCurrent: current accumulated ramp-up multiplier (starts at 1.0)
+        // Reset to 1.0 on target switch (if RampUpResetOnSwitch is true)
+        public float[] TowerRampUpCurrent = new float[MAX_ENTITIES];
+        // TowerRampUpTargetId: entity ID of the target being tracked for ramp-up (-1 = none)
+        // Used to detect target switches and reset the ramp-up multiplier
+        public int[] TowerRampUpTargetId = new int[MAX_ENTITIES];
+        // TowerRampUpResetOnSwitch: if true (default), ramp-up resets on target switch
+        // If false, ramp-up persists even when switching targets
+        public bool[] TowerRampUpResetOnSwitch = new bool[MAX_ENTITIES];
 
         // ==================== 塔伤害反弹系统 (Reflect Tower) ====================
         // TowerReflectRatio: fraction of damage received that is reflected back to attacker (e.g. 0.3 = 30% reflect)
@@ -601,6 +618,12 @@ namespace BattleSystemECS.Core
             TowerBurstCooldown[entityId] = 0f;
             TowerBurstTimer[entityId] = 0f;
             TowerBurstShotsFired[entityId] = 0;
+            // Ramp-Up / Spool-Up: default to no ramp-up (rate=0, max=1, current=1.0, no target)
+            TowerRampUpRate[entityId] = 0f;
+            TowerRampUpMax[entityId] = 1f;
+            TowerRampUpCurrent[entityId] = 1f;
+            TowerRampUpTargetId[entityId] = -1;
+            TowerRampUpResetOnSwitch[entityId] = true;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
@@ -715,6 +738,12 @@ namespace BattleSystemECS.Core
             TowerFalloffType[entityId] = 0;
             TowerFalloffStartRatio[entityId] = 1f;
             TowerFalloffMinRatio[entityId] = 1f;
+            // Ramp-Up fields reset
+            TowerRampUpRate[entityId] = 0f;
+            TowerRampUpMax[entityId] = 1f;
+            TowerRampUpCurrent[entityId] = 1f;
+            TowerRampUpTargetId[entityId] = -1;
+            TowerRampUpResetOnSwitch[entityId] = true;
             // Sabotage/tower disable fields reset
             TowerIsDisabled[entityId] = false;
             TowerDisabledTimer[entityId] = 0f;

@@ -213,6 +213,16 @@ namespace BattleSystemECS.Config
         // FalloffMinRatio: minimum damage multiplier at max range (only for Standard falloff)
         // For Reverse falloff, this is the minimum damage at min range
         public float FalloffMinRatio { get; set; } = 1f;
+        // ── Ramp-Up / Spool-Up Damage ───────────────────────────────────────────────
+        // RampUpRate: damage increase per consecutive hit on same target (0 = no ramp-up)
+        // E.g. 0.05 = +5% damage per hit, up to RampUpMax cap
+        public float RampUpRate { get; set; } = 0f;
+        // RampUpMax: maximum damage multiplier cap (e.g. 2.0 = 200% max)
+        // Default 1.0 = no ramp-up (no increase)
+        public float RampUpMax { get; set; } = 1f;
+        // RampUpResetOnSwitch: if true, ramp-up resets when target switches (default: true)
+        // If false, ramp-up persists even when switching targets (decays gradually instead)
+        public bool RampUpResetOnSwitch { get; set; } = true;
     }
 
     /// <summary>

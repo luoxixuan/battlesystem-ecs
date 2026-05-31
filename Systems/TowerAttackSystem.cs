@@ -590,6 +590,40 @@ int bestTarget = -1;
                     }
 
                     float baseDmg = store.TowerAttackDamage[towerId];
+
+                    // ── Ramp-Up / Spool-Up Damage ──────────────────────────────────────────
+                    // Each consecutive hit on the same target increases damage by RampUpRate,
+                    // capped at RampUpMax. Target switch resets the multiplier to 1.0.
+                    float rampUpRate = store.TowerRampUpRate[towerId];
+                    if (rampUpRate > 0f)
+                    {
+                        int currentTarget = store.TowerRampUpTargetId[towerId];
+                        if (currentTarget == bestTarget)
+                        {
+                            // Same target: accumulate ramp-up
+                            float currentMult = store.TowerRampUpCurrent[towerId] + rampUpRate;
+                            float maxMult = store.TowerRampUpMax[towerId];
+                            if (currentMult > maxMult) currentMult = maxMult;
+                            store.TowerRampUpCurrent[towerId] = currentMult;
+                            baseDmg *= currentMult;
+                        }
+                        else if (store.TowerRampUpResetOnSwitch[towerId])
+                        {
+                            // Target switch with reset enabled: reset ramp-up
+                            store.TowerRampUpCurrent[towerId] = 1f;
+                            store.TowerRampUpTargetId[towerId] = bestTarget;
+                            // First hit on new target: no multiplier bonus
+                        }
+                        else
+                        {
+                            // Target switch without reset: persist ramp-up, apply current multiplier
+                            store.TowerRampUpTargetId[towerId] = bestTarget;
+                            float currentMult = store.TowerRampUpCurrent[towerId];
+                            if (currentMult > 1f)
+                                baseDmg *= currentMult;
+                        }
+                    }
+
                     // ── Damage type resolution ───────────────────────────────────────────
                     // Physical: reduced by armor (affected by armor penetration + shred)
                     // Magic: reduced by magic resist (no armor interaction)

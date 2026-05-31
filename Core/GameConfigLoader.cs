@@ -644,6 +644,9 @@ namespace BattleSystemECS.Config
             tower.FalloffType = ExtractInt(json, "FalloffType");
             tower.FalloffStartRatio = ExtractFloat(json, "FalloffStartRatio");
             tower.FalloffMinRatio = ExtractFloat(json, "FalloffMinRatio");
+            tower.RampUpRate = ExtractFloat(json, "RampUpRate");
+            tower.RampUpMax = ExtractFloat(json, "RampUpMax");
+            tower.RampUpResetOnSwitch = ExtractBool(json, "RampUpResetOnSwitch");
             return tower;
         }
 

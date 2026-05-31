@@ -277,6 +277,16 @@ namespace BattleSystemECS.Systems
                         store.TowerBurstShotsFired[towerId] = 0;
                         logger.Log($"[TOWER] {tc.Name} 爆发射击: {tc.BurstCount} 发, 间隔 {tc.BurstInterval}s, 冷却 {tc.BurstCooldown}s");
                     }
+                    // Apply ramp-up / spool-up damage properties
+                    if (tc.RampUpRate > 0f)
+                    {
+                        store.TowerRampUpRate[towerId] = tc.RampUpRate;
+                        store.TowerRampUpMax[towerId] = tc.RampUpMax > 1f ? tc.RampUpMax : 1f;
+                        store.TowerRampUpCurrent[towerId] = 1f;
+                        store.TowerRampUpTargetId[towerId] = -1;
+                        store.TowerRampUpResetOnSwitch[towerId] = tc.RampUpResetOnSwitch;
+                        logger.Log($"[TOWER] {tc.Name} 升温伤害: +{tc.RampUpRate * 100:F0}%/击, 上限 ×{tc.RampUpMax:F1}, 切换目标重置={tc.RampUpResetOnSwitch}");
+                    }
                 }
                 else
                 {
