@@ -9,6 +9,7 @@ namespace BattleSystemECS.Core
         public Systems.AdaptiveDifficultySystem? AdaptiveDifficulty { get; set; }
         public Systems.TowerConstructionSystem? Construction { get; set; }
         public Systems.RandomEventSystem? RandomEvent { get; set; }
+        public Systems.DesperationSystem? Desperation { get; set; }
         public Systems.WaveSpawningSystem? WaveSpawning { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
@@ -17,6 +18,7 @@ namespace BattleSystemECS.Core
             DayNight?.Update(deltaTime);
             AdaptiveDifficulty?.Update(deltaTime);
             Construction?.Update(deltaTime);
+            Desperation?.Update();
 
             int waveNum = WaveSpawning?.GetCurrentWave() ?? 1;
             int levelNum = WaveSpawning?.GetCurrentLevel() ?? 1;

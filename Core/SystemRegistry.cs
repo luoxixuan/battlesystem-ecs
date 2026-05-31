@@ -77,6 +77,9 @@ namespace BattleSystemECS.Core
         public TowerStealthSystem? TowerStealth { get; private set; }
         public PathBlockSystem? PathBlock { get; private set; }
 
+        // ── Desperation / Last Stand ──
+        public DesperationSystem? Desperation { get; private set; }
+
         // ── Environment ──
         public TerrainSystem? Terrain { get; private set; }
         public PathfindingSystem? Pathfinding { get; private set; }
@@ -198,6 +201,9 @@ namespace BattleSystemECS.Core
             // ── Tower Stealth ──
             TowerStealth = new TowerStealthSystem(store, playerId);
 
+            // ── Desperation / Last Stand ──
+            Desperation = new DesperationSystem(store);
+
             // ── Burrow, Necromancer, LifeLink ──
             EnemyBurrow = new EnemyBurrowSystem(store, playerId);
             Necromancer = new NecromancerSystem(store, config, logger);
@@ -296,6 +302,7 @@ namespace BattleSystemECS.Core
             TowerAttack?.SetLifeLinkSystem(LifeLink);
             TowerAttack?.SetHitShieldSystem(HitShield);
             TowerAttack?.SetTowerStealthSystem(TowerStealth);
+            TowerAttack?.SetDesperationSystem(Desperation);
 
             // ── PlayerTowerAttack wiring ──
             PlayerTowerAttack?.SetLifeLinkSystem(LifeLink);
@@ -364,6 +371,7 @@ namespace BattleSystemECS.Core
             scheduler.Build.Objective = Objective;
             scheduler.Build.ResourceNode = ResourceNode;
             scheduler.Build.GlobalSkill = GlobalSkill;
+            scheduler.Build.Desperation = Desperation;
 
             // ── PreGame ──
             scheduler.PreGame.WaveSpawning = WaveSpawning;
@@ -372,6 +380,7 @@ namespace BattleSystemECS.Core
             scheduler.PreGame.AdaptiveDifficulty = AdaptiveDifficulty;
             scheduler.PreGame.Construction = null;
             scheduler.PreGame.RandomEvent = RandomEvent;
+            scheduler.PreGame.Desperation = Desperation;
 
             // ── Spawning ──
             scheduler.Spawning.WaveSpawning = WaveSpawning;

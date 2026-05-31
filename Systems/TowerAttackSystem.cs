@@ -26,6 +26,10 @@ namespace BattleSystemECS.Systems
         private TowerEnergySystem _energySystem; // injected for energy system effects
         private HitShieldSystem _hitShieldSystem; // injected for N-hit shield blocking
         private EnemyStrafeSystem _enemyStrafeSystem; // injected for enemy dodge/strafe
+        private DesperationSystem _desperationSystem; // injected for last stand damage/speed bonuses
+        // Cached desperation bonuses (updated each SetTurn from DesperationSystem)
+        private float _desperationDmgBonus = 0f;
+        private float _desperationSpeedBonus = 0f;
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate arrays (zero-allocation — no List.Clear() version bump)
@@ -209,6 +213,14 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// Inject DesperationSystem reference for last stand damage/speed bonuses.
+        /// </summary>
+        public void SetDesperationSystem(DesperationSystem desperationSystem)
+        {
+            _desperationSystem = desperationSystem;
+        }
+
+        /// <summary>
         /// Inject TowerEnergySystem reference for energy consumption effects on tower attacks.
         /// </summary>
         public void SetEnergySystem(TowerEnergySystem energySystem)
@@ -284,6 +296,18 @@ namespace BattleSystemECS.Systems
             // Cache wave-based difficulty multiplier (default wave 1)
             _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(1) : 1f;
 
+            // Cache desperation bonuses from DesperationSystem
+            if (_desperationSystem != null)
+            {
+                _desperationDmgBonus = _desperationSystem.DamageBonus;
+                _desperationSpeedBonus = _desperationSystem.SpeedBonus;
+            }
+            else
+            {
+                _desperationDmgBonus = 0f;
+                _desperationSpeedBonus = 0f;
+            }
+
             // Ensure _towerCandidateBuffers is large enough; each slot is a reusable int[]
             var towerIds = store.ActiveTowerIds;
             if (_towerCandidateBuffers.Length < towerIds.Count)
@@ -353,7 +377,7 @@ namespace BattleSystemECS.Systems
 
                 store.TowerLastAttackTime[towerId] += deltaTime;
 
-                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId]));
+                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus));
 
                 // ── Burst Fire / Salvo Mode check ─────────────────────────────────────
                 int burstCount = store.TowerBurstCount[towerId];
@@ -363,7 +387,7 @@ namespace BattleSystemECS.Systems
                     if (shotsFired >= burstCount)
                     {
                         // In cooldown phase: use burst cooldown (scaled by attack speed)
-                        float burstCooldown = store.TowerBurstCooldown[towerId] / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId]));
+                        float burstCooldown = store.TowerBurstCooldown[towerId] / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus));
                         if (store.TowerLastAttackTime[towerId] < burstCooldown) return;
                         // Cooldown complete — reset burst counter
                         store.TowerBurstShotsFired[towerId] = 0;
@@ -590,6 +614,9 @@ int bestTarget = -1;
                     }
 
                     float baseDmg = store.TowerAttackDamage[towerId];
+
+                    // ── Desperation / Last Stand damage bonus ──────────────────────────
+                    if (_desperationDmgBonus > 0f) baseDmg *= (1f + _desperationDmgBonus);
 
                     // ── Ramp-Up / Spool-Up Damage ──────────────────────────────────────────
                     // Each consecutive hit on the same target increases damage by RampUpRate,

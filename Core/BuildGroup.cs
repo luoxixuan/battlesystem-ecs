@@ -15,6 +15,7 @@ namespace BattleSystemECS.Core
         public Systems.ObjectiveSystem? Objective { get; set; }
         public Systems.ResourceNodeSystem? ResourceNode { get; set; }
         public Systems.GlobalSkillSystem? GlobalSkill { get; set; }
+        public Systems.DesperationSystem? Desperation { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime)
         {
@@ -29,6 +30,7 @@ namespace BattleSystemECS.Core
             ResourceNode?.Update(deltaTime, GameState.BuildPhase);
             Objective?.Update(deltaTime, GameState.BuildPhase);
             GlobalSkill?.Update(deltaTime, isBuildPhase: true);
+            Desperation?.Update();
         }
     }
 }
