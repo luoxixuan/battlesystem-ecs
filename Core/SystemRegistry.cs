@@ -85,6 +85,7 @@ namespace BattleSystemECS.Core
         public AdaptiveDifficultySystem? AdaptiveDifficulty { get; private set; }
         public CorpseEffectSystem? CorpseEffect { get; private set; }
         public HealingZoneSystem? HealingZone { get; private set; }
+        public ZoneControlSystem? ZoneControl { get; private set; }
 
         // ── Objective / Branch / Resources ──
         public ObjectiveSystem? Objective { get; private set; }
@@ -243,6 +244,9 @@ namespace BattleSystemECS.Core
             // ── Healing zones ──
             HealingZone = new HealingZoneSystem(store, logger);
 
+            // ── Zone control (CC zones: Slow/Stun/Freeze/Root) ──
+            ZoneControl = new ZoneControlSystem(store, logger);
+
             // ── Path modifier ──
             PathModifier = new PathModifierSystem(store);
             Pull = new PullSystem(store, playerId);
@@ -360,6 +364,7 @@ namespace BattleSystemECS.Core
             scheduler.AI.ManaBurn = ManaBurn;
             scheduler.AI.Phase = Phase;
             scheduler.AI.Fear = Fear;
+            scheduler.AI.ZoneControl = ZoneControl;
 
             // ── Movement ──
             scheduler.Movement.Wound = null;

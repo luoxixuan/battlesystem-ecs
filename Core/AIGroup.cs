@@ -1,7 +1,7 @@
 #nullable enable
 namespace BattleSystemECS.Core
 {
-    /// <summary>Enemy AI, abilities, burrow, necromancer, life link, affixes, mana burn, fear.</summary>
+    /// <summary>Enemy AI, abilities, burrow, necromancer, life link, affixes, mana burn, fear, zone control.</summary>
     public class AIGroup : ISystemGroup
     {
         public Systems.EnemyAISystem? EnemyAI { get; set; }
@@ -14,9 +14,13 @@ namespace BattleSystemECS.Core
         public Systems.EnemyLifestealSystem? Lifesteal { get; set; }
         public Systems.PhaseSystem? Phase { get; set; }
         public Systems.FearSystem? Fear { get; set; }
+        public Systems.ZoneControlSystem? ZoneControl { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
+            // Zone control (CC zones: Slow/Stun/Freeze/Root) — runs before AI so CC is applied this turn
+            ZoneControl?.Update(deltaTime);
+
             EnemyAI?.SetTurn(turn, deltaTime);
             EnemyAI?.Update();
 

@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-05-31, commit `8bc1f3d`）
+## 性能基准（2026-05-31, commit `af89ffd`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **~4794 FPS**，400 帧，~0.21 ms |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11391 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5688 FPS** |
+| **mode 5**（完整一局） | **~4715 FPS**，400 帧，~0.21 ms |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **~11587 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **~5421 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -155,6 +155,7 @@ dotnet test
 - 敌人巢穴/生成建筑系统（NestSystem + SystemRegistry + SpawningGroup）；bench2: 11686, bench4: 5669, bench5: 4798
 - 保护者/守卫敌人系统（ProtectorSystem + ComponentStore_Enemy.cs）；bench2: 12066, bench4: 5726, bench5: 4709
 - 英雄/雇佣兵系统（HeroSystem + ComponentStore_Player.cs + CombatGroup + SystemRegistry）；bench2: 12319, bench4: 5648, bench5: 4733
+- 范围控制区系统（ZoneControlSystem + ComponentStore_World.cs + AIGroup + SystemRegistry）；bench2: 11587, bench4: 5421, bench5: 4715
 - 范围治疗区系统（HealingZoneSystem + SkillBuffGroup + SystemRegistry）；bench2: 11391, bench4: 5688, bench5: 4794
 
 ### 2026-05-30
