@@ -176,6 +176,20 @@ public void SetWaveNumber(int waveNumber)
                 float enemyHealth = store.EnemyHealth[enemyId];
                 if (enemyHealth <= 0f) return;
 
+                // Death Mark / Execute: auto-mark enemy when HP drops below threshold
+                // Marked enemies take +EnemyMarkedDamageBonus extra damage (e.g. 0.5 = +50%).
+                // Self-balancing: bosses with massive HP get the bonus only in their final
+                // 15% — turns long fights into satisfying executions.
+                float maxHp = store.EnemyMaxHealth[enemyId];
+                if (!store.EnemyMarked[enemyId] && maxHp > 0f)
+                {
+                    float hpFrac = enemyHealth / maxHp;
+                    if (hpFrac <= store.EnemyMarkedThreshold[enemyId])
+                    {
+                        store.EnemyMarked[enemyId] = true;
+                    }
+                }
+
 // H-3 fix: crit rolled per-enemy inside parallel loop, not once per frame globally.
                 // Optimized: merged crit rate threshold (precomputed _critRateThreshold) eliminates branch
                 float finalDamage = baseDamage;
@@ -213,6 +227,13 @@ public void SetWaveNumber(int waveNumber)
 
                 // Apply tech tree damage taken multiplier (e.g. "Iron Wall II" reduces incoming damage)
                 finalDamage *= _damageTakenMult;
+
+                // Death Mark / Execute bonus: marked enemies take +X% extra damage (default +50%).
+                // Applied after all resistances so the bonus is always meaningful.
+                if (store.EnemyMarked[enemyId])
+                {
+                    finalDamage *= (1f + store.EnemyMarkedDamageBonus[enemyId]);
+                }
 
                 lock (_damageQueueLock) { _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage)); }
             });

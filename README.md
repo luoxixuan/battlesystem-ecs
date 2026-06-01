@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-01, commit 提交中）
+## 性能基准（2026-06-01, Round 28）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **4283 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11323 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5087 FPS** |
+| **mode 5**（完整一局） | **4342 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11382 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4995 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -159,6 +159,7 @@ dotnet test
 - 敌人属性吸取/Stat Drain（TowerSabotageSystem + ComponentStore_Enemy.cs + ComponentStore_Tower.cs + GameConfig.cs + WaveSpawningSystem.cs）；bench2: 11608, bench4: 5096, bench5: 4301
 - 回放/录像系统（ReplaySystem + GameConfig.ReplayConfig + SystemRegistry，opt-in JSONL per-frame telemetry，零热路径开销）；bench2: 11079, bench4: 5131, bench5: 4495
 - 可部署陷阱塔（DeployableTrapSystem + MovementGroup + ComponentStore_Tower.cs + ComponentStore_Enemy.cs + GameConfig.cs + TowerPlacementSystem.cs + ComponentStore.cs）；bench2: 11323, bench4: 5087, bench5: 4283
+- 死亡标记/处决阈值（PlayerTowerAttackSystem + ComponentStore_Enemy.cs + ComponentStore.cs，HP<15% 自动标记 +50% 伤害+处决奖励金币）；bench2: 11382, bench4: 4995, bench5: 4342
 
 ### 2026-05-31
 - 光束/激光连续塔基础设施（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094

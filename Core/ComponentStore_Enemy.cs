@@ -541,6 +541,17 @@ namespace BattleSystemECS.Core
         // Ability ID for enemy_cast_* actions — stores the ability id to invoke
         public string[] EnemyCastAbilityId = new string[MAX_ENTITIES];
 
+        // ==================== 死亡标记 / 处决 (Death Mark / Execute Threshold) ====================
+        // EnemyMarked: when true, the enemy is in "death mark" state — incoming damage gets
+        // a bonus (EnemyMarkedDamageBonus) and the killing blow grants bonus gold.
+        // EnemyMarkedThreshold: HP fraction (0-1) below which the enemy auto-marks.
+        //   Default 0.15 = mark when HP < 15% of max (typical Diablo execute threshold).
+        // EnemyMarkedDamageBonus: multiplier added to incoming damage when marked (e.g. 0.5 = +50%).
+        //   Default 0.5 = balanced: punishing but not deleting bosses in one hit.
+        public bool[] EnemyMarked = new bool[MAX_ENTITIES];
+        public float[] EnemyMarkedThreshold = new float[MAX_ENTITIES];
+        public float[] EnemyMarkedDamageBonus = new float[MAX_ENTITIES];
+
         #endregion
 
         // ==================== 敌人组件访问 ====================
@@ -681,6 +692,11 @@ namespace BattleSystemECS.Core
             EnemyProtectRadius[entityId] = 0f;
             EnemyProtectDamageTransfer[entityId] = 0f;
             EnemyProtectMaxTargets[entityId] = 0;
+            // Death Mark / Execute: default unmarked; threshold 15% HP, +50% dmg bonus when marked
+            // Combat systems (PlayerTowerAttackSystem) auto-mark when HP < threshold per-frame.
+            EnemyMarked[entityId] = false;
+            EnemyMarkedThreshold[entityId] = 0.15f;
+            EnemyMarkedDamageBonus[entityId] = 0.5f;
 
             // H-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeEnemyIds.Add(entityId); _enemyIndexInList[entityId] = _activeEnemyIds.Count - 1; }

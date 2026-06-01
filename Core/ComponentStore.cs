@@ -265,6 +265,13 @@ namespace BattleSystemECS.Core
                 PlayerGold[playerId] += goldReward;
                 if (_goldOnEliteKill > 0f && EnemyIsElite[enemyId])
                     PlayerGold[playerId] += _goldOnEliteKill;
+                // Death Mark / Execute bonus gold: +50% extra gold for executing a marked enemy.
+                // Self-balancing — only triggers once per enemy (on death), so no chain exploits.
+                if (EnemyMarked[enemyId])
+                {
+                    float markBonus = goldReward * EnemyMarkedDamageBonus[enemyId];
+                    PlayerGold[playerId] += markBonus;
+                }
                 OnEnemyKilled?.Invoke(enemyId, playerId);
                 // Fire tower kill event (for TowerExperienceSystem XP grant) — serial, safe
                 ResolveTowerKillsThisFrame();
@@ -484,6 +491,10 @@ namespace BattleSystemECS.Core
                 EnemyPhaseDuration[entityId] = 0f;
                 EnemyPhaseTimer[entityId] = 0f;
                 EnemyPhaseCooldown[entityId] = 0f;
+                // Death Mark / Execute fields (reset on entity destruction)
+                EnemyMarked[entityId] = false;
+                EnemyMarkedThreshold[entityId] = 0.15f;
+                EnemyMarkedDamageBonus[entityId] = 0.5f;
             }
 
             if (wasTower)
@@ -767,6 +778,7 @@ namespace BattleSystemECS.Core
             EnemyAIAction = null!; EnemyAIChargeCounter = null!; EnemyAILastAttackTurn = null!;
             EnemyTypeName = null!; EnemyBehaviorTree = null!; EnemyActionEnum = null!;
             EnemyCastAbilityId = null!;
+            EnemyMarked = null!; EnemyMarkedThreshold = null!; EnemyMarkedDamageBonus = null!;
             TowerTargetingMode = null!; TowerProjectileHoming = null!; TowerInterceptRate = null!;
             TowerDamageType = null!; TowerSelected = null!; TowerType = null!;
             TowerAttackDamage = null!; TowerRange = null!; TowerAttackSpeed = null!;
