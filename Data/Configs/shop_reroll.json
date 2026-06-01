@@ -1,0 +1,10 @@
+{
+  "Enabled": true,
+  "OfferSlotCount": 3,
+  "CostCurve": [5, 10, 20, 40],
+  "MaxRerollsPerPhase": 3,
+  "PityEpicThreshold": 10,
+  "PityRareThreshold": 5,
+  "RarityWeights": [70, 25, 5],
+  "Description": "Shop Reroll configuration — Slay-the-Spire / Monster Train style offer pool refresh during BuildPhase. Cost scales by CostCurve, capped at MaxRerollsPerPhase. Pity timers force Rare/Epic if not seen for N consecutive offers."
+}

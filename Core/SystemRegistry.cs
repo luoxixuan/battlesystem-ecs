@@ -81,6 +81,9 @@ namespace BattleSystemECS.Core
         // ── Desperation / Last Stand ──
         public DesperationSystem? Desperation { get; private set; }
 
+        // ── Shop Reroll (BuildPhase offer pool refresh) ──
+        public ShopRerollSystem? ShopReroll { get; private set; }
+
         // ── Environment ──
         public TerrainSystem? Terrain { get; private set; }
         public PathfindingSystem? Pathfinding { get; private set; }
@@ -210,6 +213,9 @@ namespace BattleSystemECS.Core
 
             // ── Desperation / Last Stand ──
             Desperation = new DesperationSystem(store);
+
+            // ── Shop Reroll (BuildPhase offer pool) ──
+            ShopReroll = new ShopRerollSystem(store, logger, config, playerId);
 
             // ── Burrow, Necromancer, LifeLink ──
             EnemyBurrow = new EnemyBurrowSystem(store, playerId);
@@ -389,6 +395,7 @@ namespace BattleSystemECS.Core
             scheduler.Build.ResourceNode = ResourceNode;
             scheduler.Build.GlobalSkill = GlobalSkill;
             scheduler.Build.Desperation = Desperation;
+            scheduler.Build.ShopReroll = ShopReroll;
 
             // ── PreGame ──
             scheduler.PreGame.WaveSpawning = WaveSpawning;

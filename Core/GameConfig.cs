@@ -956,6 +956,29 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Shop Reroll configuration — controls how the BuildPhase offer pool can be refreshed.
+    /// Inspired by Slay-the-Spire / Monster Train: spend gold to re-roll the 3 offer slots,
+    /// with a cost curve and per-phase cap.
+    /// </summary>
+    public class ShopRerollConfig
+    {
+        /// <summary>Master switch for the shop reroll system. Default: true</summary>
+        public bool Enabled { get; set; } = true;
+        /// <summary>Number of offer slots in the shop (Common + Rare + Epic). Default: 3</summary>
+        public int OfferSlotCount { get; set; } = 3;
+        /// <summary>Cost curve per reroll within a single BuildPhase (index 0 = first reroll). Default: [5, 10, 20, 40]</summary>
+        public float[] CostCurve { get; set; } = new float[] { 5f, 10f, 20f, 40f };
+        /// <summary>Hard cap on rerolls per BuildPhase. Default: 3</summary>
+        public int MaxRerollsPerPhase { get; set; } = 3;
+        /// <summary>Pity counter: if no Epic (RarityTier=2) appears in this many consecutive offers, force one in. Default: 10</summary>
+        public int PityEpicThreshold { get; set; } = 10;
+        /// <summary>Pity counter: if no Rare (RarityTier>=1) appears in this many consecutive offers, force one in. Default: 5</summary>
+        public int PityRareThreshold { get; set; } = 5;
+        /// <summary>Probability weights for picking a rarity tier per offer (Common, Rare, Epic). Default: [70, 25, 5]</summary>
+        public float[] RarityWeights { get; set; } = new float[] { 70f, 25f, 5f };
+    }
+
+    /// <summary>
     /// Tower Mastery Level definition — XP threshold and bonuses granted at each level.
     /// </summary>
     public class TowerMasteryLevelConfig
@@ -1108,6 +1131,9 @@ namespace BattleSystemECS.Config
 
         // Auto Skill configuration (BuildPhase auto-casting)
         public AutoSkillConfig AutoSkill { get; set; } = new AutoSkillConfig();
+
+        // Shop Reroll configuration (BuildPhase offer pool refresh)
+        public ShopRerollConfig ShopReroll { get; set; } = new ShopRerollConfig();
 
         // Tower Overcharge configuration
         public TowerOverchargeConfig TowerOvercharge { get; set; } = new TowerOverchargeConfig();

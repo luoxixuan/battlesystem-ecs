@@ -115,6 +115,22 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Capped at 60% (0.6) to avoid zero-duration cooldowns
         public float[] PlayerCooldownReduction = new float[MAX_PLAYERS];
 
+        // ==================== Shop Reroll System (SOA) ====================
+        // PlayerShopRerollCount: number of rerolls performed in the current BuildPhase (resets each phase).
+        public int[] PlayerShopRerollCount = new int[MAX_PLAYERS];
+        // PlayerShopOfferTypeId: 1D-flat offer slot store, indexed by playerId * MAX_OFFER_SLOTS + slotIdx.
+        // Stores the entity type id of the offer (tower type or skill id, both as int).
+        // 0 = empty slot. Default 0f/0 per C# spec — uninitialized slots are inert.
+        public int[] PlayerShopOfferTypeId = new int[MAX_PLAYERS * 8];
+        // PlayerShopOfferIsTower: 0=skill offer, 1=tower offer. 1D-flat parallel array.
+        public int[] PlayerShopOfferIsTower = new int[MAX_PLAYERS * 8];
+        // PlayerShopPityRare: consecutive offer count without a Rare (RarityTier>=1) since last Rare.
+        public int[] PlayerShopPityRare = new int[MAX_PLAYERS];
+        // PlayerShopPityEpic: consecutive offer count without an Epic (RarityTier=2) since last Epic.
+        public int[] PlayerShopPityEpic = new int[MAX_PLAYERS];
+        // ShopRerollMaxSlots: cap for offer slot storage (matches ShopRerollConfig.OfferSlotCount, default 3)
+        public const int MAX_SHOP_OFFER_SLOTS = 8;
+
         #endregion
 
         // ==================== 玩家组件访问 ====================

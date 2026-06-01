@@ -238,6 +238,9 @@ namespace BattleSystemECS.Core
                     Console.WriteLine("  " + msg);
                     Console.WriteLine("═══════════════════════════════════════════");
                     Console.WriteLine();
+
+                    // 商店洗牌：进入 BuildPhase 时初始化 offer 池
+                    registry.ShopReroll?.OnEnterBuildPhase();
                 }
 
                 // 渲染初始地图（SOA）
