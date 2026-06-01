@@ -1,7 +1,7 @@
 # 塔防游戏 ECS + GAS 知识库
-> 自动生成 · 2026-06-01 01:09
+> 自动生成 · 2026-06-02 01:07
 
-已分析 16 个仓库
+已分析 24 个仓库
 
 ## 塔防专项模式
 
@@ -66,6 +66,10 @@ DOTS 模式：chunk data layout + entity query
 ### 缓存友好
 数据连续布局，缓存命中优先
 来源：[sebas77/Svelto.ECS](https://github.com/sebas77/Svelto.ECS)
+
+### ScriptableObject
+数据资产化，配置与代码分离
+来源：[sajad0131/Unity-Gameplay-Ability-System](https://github.com/sajad0131/Unity-Gameplay-Ability-System)
 
 ## 实践洞察
 
