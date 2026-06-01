@@ -504,6 +504,7 @@ namespace BattleSystemECS.Core
                 TowerStunChance[entityId] = 0f;
                 TowerSlowAmount[entityId] = 0f;
                 TowerSlowDuration[entityId] = 0f;
+                TowerPlaceTime[entityId] = 0f;
                 TowerCanHitAir[entityId] = false;
                 TowerCanHitGround[entityId] = false;
                 // Aura tower fields

@@ -22,6 +22,13 @@ namespace BattleSystemECS.Systems
         // Tower cost scaling: each additional tower of the same type costs more
         private float costIncrementPerCopy = 1.15f;
         private float costIncrementCap = 2.5f;
+        // Sell-back value decay: refund ratio shrinks the longer a tower lives.
+        // 0 disables decay; e.g. 0.005 = 0.5% of remaining ratio shaved per second.
+        // 0 = no decay (legacy behavior), final ratio clamped to [minSellRatioDecayed, sellRatio].
+        private float sellDecayPerSecond = 0.005f;
+        private float minSellRatioDecayed = 0.2f;
+        // Short grace period: towers sold within this many seconds of placement refund at full sellRatio.
+        private float sellDecayGracePeriod = 2f;
 
         public TowerPlacementSystem(ComponentStore store, IRenderer logger)
         {
@@ -57,6 +64,10 @@ namespace BattleSystemECS.Systems
                     if (root.TryGetProperty("sellRatioDecreasePerLevel", out var srdpl)) sellRatioDecreasePerLevel = srdpl.GetSingle();
                     if (root.TryGetProperty("costIncrementPerCopy", out var cicp)) costIncrementPerCopy = cicp.GetSingle();
                     if (root.TryGetProperty("costIncrementCap", out var cic)) costIncrementCap = cic.GetSingle();
+                    // Sell-back value decay: optional, defaults preserve legacy behavior when omitted
+                    if (root.TryGetProperty("sellDecayPerSecond", out var sdps)) sellDecayPerSecond = sdps.GetSingle();
+                    if (root.TryGetProperty("minSellRatioDecayed", out var msrd)) minSellRatioDecayed = msrd.GetSingle();
+                    if (root.TryGetProperty("sellDecayGracePeriod", out var sdgp)) sellDecayGracePeriod = sdgp.GetSingle();
                 }
                 catch { /* use defaults */ }
             }
@@ -70,6 +81,25 @@ namespace BattleSystemECS.Systems
         {
             float ratio = sellRatio - (towerLevel - 1) * sellRatioDecreasePerLevel;
             return Math.Max(ratio, minSellRatio);
+        }
+
+        /// <summary>
+        /// Apply sell-back value decay based on how long the tower has been placed.
+        /// Linear decay: ratio shrinks by sellDecayPerSecond per second of age,
+        /// after a short grace period. Clamped to [minSellRatioDecayed, sellRatio].
+        /// sellDecayPerSecond = 0 disables decay (legacy behavior).
+        /// </summary>
+        private float GetDecayedSellRatio(float placeTime, float baseRatio)
+        {
+            if (sellDecayPerSecond <= 0f) return baseRatio;
+            float age = Time.TotalTime - placeTime;
+            if (age <= sellDecayGracePeriod) return baseRatio;
+            float effectiveAge = age - sellDecayGracePeriod;
+            float decayed = baseRatio - sellDecayPerSecond * effectiveAge;
+            // Clamp to [minSellRatioDecayed, baseRatio]
+            if (decayed < minSellRatioDecayed) decayed = minSellRatioDecayed;
+            if (decayed > baseRatio) decayed = baseRatio;
+            return decayed;
         }
 
         /// <summary>
@@ -305,6 +335,10 @@ namespace BattleSystemECS.Systems
                 store.AddTower(towerId, type, damage, range, speed, 1, cost);
             }
 
+            // Record placement timestamp for sell-back value decay (sellDecayPerSecond > 0).
+            // Defaults to 0 when sellDecay is disabled, so GetDecayedSellRatio early-outs.
+            store.TowerPlaceTime[towerId] = sellDecayPerSecond > 0f ? Time.TotalTime : 0f;
+
             // Increment placement count for cost scaling (after successful placement)
             int incType = (int)type;
             if (incType >= 0 && incType < store.PlacementCountByType.Length)
@@ -361,7 +395,10 @@ namespace BattleSystemECS.Systems
             }
 
             int level = store.TowerLevel[towerId];
-            float sellGold = store.TowerUpgradeCost[towerId] * GetEffectiveSellRatio(level);
+            float baseRatio = GetEffectiveSellRatio(level);
+            float placeTime = store.TowerPlaceTime[towerId];
+            float effectiveRatio = GetDecayedSellRatio(placeTime, baseRatio);
+            float sellGold = store.TowerUpgradeCost[towerId] * effectiveRatio;
             int goldInt = (int)sellGold;
 
             // Refund gold to player
@@ -374,7 +411,8 @@ namespace BattleSystemECS.Systems
             // Destroy tower entity (handles ActiveTowerIds removal and state cleanup)
             store.DestroyEntity(towerId);
 
-            logger.Log($"[TOWER] 出售塔 #{towerId} (Lv.{level})，返还 {goldInt} 金币");
+            float age = Time.TotalTime - placeTime;
+            logger.Log($"[TOWER] 出售塔 #{towerId} (Lv.{level})，已放置 {age:F1}s，退款率 {effectiveRatio:F2}（基础 {baseRatio:F2}），返还 {goldInt} 金币");
             return sellGold;
         }
 

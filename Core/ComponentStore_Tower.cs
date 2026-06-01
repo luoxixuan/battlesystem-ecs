@@ -88,6 +88,8 @@ namespace BattleSystemECS.Core
         // Both can be true (multi-type tower) or false (invalid — will skip all targets)
         public bool[] TowerCanHitAir = new bool[MAX_ENTITIES];
         public bool[] TowerCanHitGround = new bool[MAX_ENTITIES];
+        // Tower placement timestamp (Time.TotalTime at AddTower) — used by sell-back value decay
+        public float[] TowerPlaceTime = new float[MAX_ENTITIES];
         // Tower special ability parameters from TowerSpecialAbility config
         public float[] TowerSpecialAbilityRadius = new float[MAX_ENTITIES];
         public float[] TowerSpecialAbilityDamageMult = new float[MAX_ENTITIES];

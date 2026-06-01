@@ -13,5 +13,8 @@
   "defaultConstructionHP": 0,
   "isVulnerableDuringConstruction": false,
   "costIncrementPerCopy": 1.15,
-  "costIncrementCap": 2.5
+  "costIncrementCap": 2.5,
+  "sellDecayPerSecond": 0.005,
+  "minSellRatioDecayed": 0.2,
+  "sellDecayGracePeriod": 2
 }
