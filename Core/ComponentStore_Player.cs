@@ -45,6 +45,13 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public bool[] PlayerGlobalSkillPressed = new bool[MAX_PLAYERS];
         // PlayerGlobalSkillHotkey: hotkey string per skill for UI display
         public string[] PlayerGlobalSkillHotkey = new string[MAX_PLAYERS * 8];
+        // ── Kill-Triggered Skill Cooldown Reset ───────────────────────────────
+        // PlayerSkillResetOnKill: 0=None, 1=Full (reset all skill cooldowns to 0), 2=Partial (reduce by PlayerSkillResetAmount seconds).
+        // Default 0 = disabled (backward compatible).
+        public int[] PlayerSkillResetOnKill = new int[MAX_PLAYERS];
+        // PlayerSkillResetAmount: for Partial mode, seconds to subtract from each skill's cooldown (clamped at 0).
+        // For Full mode, value is ignored. Default 0.
+        public float[] PlayerSkillResetAmount = new float[MAX_PLAYERS];
         private float _goldKillMultiplier = 1.0f;
         public float GoldKillMultiplier { get => _goldKillMultiplier; set => _goldKillMultiplier = value; }
         // all_income_mult: extra multiplier layered on top of gold kill multiplier
@@ -125,6 +132,9 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             CurrentWeather[entityId] = 0;
             WeatherIntensity[entityId] = 0f;
             WeatherTimer[entityId] = -1f;
+            // Kill-triggered skill cooldown reset: default to disabled (0/0)
+            PlayerSkillResetOnKill[entityId] = 0;
+            PlayerSkillResetAmount[entityId] = 0f;
 
             PlayerEntityId = entityId;
         }

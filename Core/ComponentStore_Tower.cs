@@ -92,6 +92,13 @@ namespace BattleSystemECS.Core
         // TowerOverkillRadius: search radius in tiles for finding overkill splash targets
         // 0 = no radius (effect disabled, even if type is non-zero)
         public float[] TowerOverkillRadius = new float[MAX_ENTITIES];
+        // ── Kill-Triggered Cooldown Reset (ARPG/Roguelike mechanic) ────────────
+        // TowerResetOnKill: 0=None (no reset on kill), 1=Full (resets attack timer to ready state immediately),
+        // 2=Partial (reduces attack timer by TowerResetAmount seconds). Default 0 = disabled.
+        public int[] TowerResetOnKill = new int[MAX_ENTITIES];
+        // TowerResetAmount: for Partial mode, seconds to subtract from TowerLastAttackTime (clamped at 0).
+        // For Full mode, value is ignored (reset is unconditional). Default 0.
+        public float[] TowerResetAmount = new float[MAX_ENTITIES];
         // Tower anti-air flags: controls which height layers a tower can attack
         // TowerCanHitAir=true: tower can attack flying enemies (anti-air tower)
         // TowerCanHitGround=true: tower can attack ground enemies
@@ -641,6 +648,9 @@ namespace BattleSystemECS.Core
             TowerOverkillType[entityId] = 0;
             TowerOverkillRatio[entityId] = 0f;
             TowerOverkillRadius[entityId] = 0f;
+            // Kill-triggered cooldown reset: default to no reset (type=0, amount=0)
+            TowerResetOnKill[entityId] = 0;
+            TowerResetAmount[entityId] = 0f;
             // Burst fire: default to no burst (0 count = single-shot)
             TowerBurstCount[entityId] = 0;
             TowerBurstInterval[entityId] = 0f;
@@ -763,6 +773,9 @@ namespace BattleSystemECS.Core
             TowerOverkillType[entityId] = 0;
             TowerOverkillRatio[entityId] = 0f;
             TowerOverkillRadius[entityId] = 0f;
+            // Kill-triggered cooldown reset field reset
+            TowerResetOnKill[entityId] = 0;
+            TowerResetAmount[entityId] = 0f;
             // Burst fire fields reset
             TowerBurstCount[entityId] = 0;
             TowerBurstInterval[entityId] = 0f;

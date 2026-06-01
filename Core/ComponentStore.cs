@@ -679,6 +679,7 @@ namespace BattleSystemECS.Core
             PlayerMana = null!; PlayerMaxMana = null!; PlayerManaRegen = null!; PlayerManaCost = null!;
             PlayerGlobalSkillUnlocked = null!; PlayerGlobalSkillCooldown = null!;
             PlayerGlobalSkillPressed = null!; PlayerGlobalSkillHotkey = null!;
+            PlayerSkillResetOnKill = null!; PlayerSkillResetAmount = null!;
             PlayerBuffFlags = null!; PlayerStunDuration = null!;
             PlayerSlowFactor = null!; PlayerSlowDuration = null!;
             PlayerBaseLives = null!; PlayerMaxBaseLives = null!;
