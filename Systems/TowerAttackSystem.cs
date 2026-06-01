@@ -978,6 +978,18 @@ int bestTarget = -1;
                     (finalDmg, linkedDamage, linkedEnemyId) = _lifeLinkSystem.ComputeLinkedDamage(enemyId, finalDmg);
                 }
                 store.EnemyHealth[enemyId] -= finalDmg;
+                // Stagger / Posture: heavy hits accumulate posture damage on the enemy.
+                // Heuristic: damage >= 20% of max HP is a "heavy hit" worth 1 stagger point.
+                // This works in the serial apply phase where we don't know if it was a crit.
+                // (Crits naturally produce heavier damage and are caught by the same threshold.)
+                if (finalDmg > 0f && store.EnemyStaggerMax[enemyId] > 0f)
+                {
+                    float maxHp = store.EnemyMaxHealth[enemyId];
+                    if (maxHp > 0f && finalDmg >= 0.20f * maxHp)
+                    {
+                        store.AddStaggerDamage(enemyId, 1f, staggerDuration: 180, immuneSeconds: 10f);
+                    }
+                }
                 // Life Link: apply shared damage to linked enemy
                 if (linkedEnemyId >= 0 && linkedDamage > 0f)
                 {

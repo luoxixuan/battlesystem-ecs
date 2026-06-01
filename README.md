@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-01, Round 32）
+## 性能基准（2026-06-02, Round 33）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **4303 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11125 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5141 FPS** |
+| **mode 5**（完整一局） | **4346 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11224 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5072 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -139,6 +139,8 @@ dotnet test
 ---
 
 ## 更新记录
+### 2026-06-02
+- 失衡条/破防 Stagger（ComponentStore_Enemy.cs + EnemyMovementSystem + TowerAttackSystem + ComponentStore.cs + EnemyActionType.cs，Staggered=24 状态 + 5 字段 + AddStaggerDamage/TickStagger/ClearStagger + 重击累加 meter + 10s 免疫期）；bench2: 11224, bench4: 5072, bench5: 4346
 ### 2026-06-01
 - 射程伤害衰减（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs）；bench2: 12026, bench4: 5531, bench5: 4696
 - 爆发射击/齐射模式（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + TowerPlacementSystem.cs）；bench2: 11928, bench4: 5364, bench5: 4618

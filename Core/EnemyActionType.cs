@@ -30,6 +30,7 @@ namespace BattleSystemECS.Components
         Resurrect = 20,  // 复活：亡灵法师复活附近尸体为次级亡灵
         EstablishLink = 21,  // 建立生命链接：与附近敌人建立生命链接
         Clone = 22,          // 克隆：生成自身功能性克隆体
-        Banished = 23        // 放逐：敌人被移出战场，冻结在原位置/不可行动/不可被攻击
+        Banished = 23,       // 放逐：敌人被移出战场，冻结在原位置/不可行动/不可被攻击
+        Staggered = 24       // 失衡/破防：敌人姿态条满后强制硬直，暂停所有动作/可被处决
     }
 }

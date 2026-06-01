@@ -582,6 +582,21 @@ namespace BattleSystemECS.Core
         public float[] EnemyBanishOriginalX = new float[MAX_ENTITIES];
         public float[] EnemyBanishOriginalY = new float[MAX_ENTITIES];
 
+        // ==================== 失衡条 / 破防 (Stagger / Posture) ====================
+        // EnemyStaggerMeter: 失衡值累加器。受到重击/暴击/特定伤害类型时按权重增加；
+        //   达到 EnemyStaggerMax 时触发 N 帧硬直（EnemyIsStaggered = true）后清零。
+        //   与 Stun 的区别：Stun 是概率性触发，Stagger 是确定性累计值。
+        //   0 = 不受失衡影响（默认小怪）。Boss 等大型敌人按配置累加。
+        // EnemyStaggerMax: 满失衡阈值。0 = 永不失衡（默认小怪）。Boss 典型 100。
+        // EnemyStaggerDurationLeft: 硬直剩余帧数（>= 1 表示正在硬直）。
+        // EnemyStaggerImmuneTimer: 硬直结束后免疫期剩余秒数（防无限失衡连击，默认 10 秒）。
+        // EnemyIsStaggered: 失衡状态标志。为 true 时 AI/Movement 跳过敌人。
+        public float[] EnemyStaggerMeter = new float[MAX_ENTITIES];
+        public float[] EnemyStaggerMax = new float[MAX_ENTITIES];
+        public float[] EnemyStaggerDurationLeft = new float[MAX_ENTITIES];
+        public float[] EnemyStaggerImmuneTimer = new float[MAX_ENTITIES];
+        public bool[] EnemyIsStaggered = new bool[MAX_ENTITIES];
+
         #endregion
 
         // ==================== 敌人组件访问 ====================
@@ -929,6 +944,87 @@ namespace BattleSystemECS.Core
             EnemySlowFactor[enemyId] = factor;
             EnemyMoveSpeed[enemyId] = baseSpeed * factor;
             EnemySlowDurationLeft[enemyId] = duration;
+        }
+
+        /// <summary>
+        /// Adds stagger (posture) damage to an enemy. When the meter reaches EnemyStaggerMax
+        /// the enemy enters the Staggered state for `staggerDuration` frames (forced hard CC).
+        /// After the stagger ends, EnemyStaggerImmuneTimer runs for `immuneSeconds` (default 10s)
+        /// and prevents immediate re-stagger. Returns true if the meter just crossed the threshold
+        /// and the enemy was knocked into Staggered this call.
+        ///
+        /// Enemies with EnemyStaggerMax <= 0 are immune to stagger (default small enemies).
+        /// Enemies in Unstoppable state also ignore stagger.
+        /// </summary>
+        public bool AddStaggerDamage(int enemyId, float amount, int staggerDuration, float immuneSeconds = 10f)
+        {
+            if (!IsValidEntity(enemyId)) return false;
+            if (amount <= 0f) return false;
+            if (EnemyStaggerMax[enemyId] <= 0f) return false;     // 永不失衡（普通小怪）
+            if (EnemyIsUnstoppable[enemyId]) return false;        // 霸体免疫
+            if (EnemyIsStaggered[enemyId]) return false;          // 已在硬直中
+            if (EnemyStaggerImmuneTimer[enemyId] > 0f) return false; // 刚硬直过，免疫期
+
+            EnemyStaggerMeter[enemyId] += amount;
+            if (EnemyStaggerMeter[enemyId] >= EnemyStaggerMax[enemyId])
+            {
+                // 触发硬直：清零 + 设置硬直状态 + 启动免疫期
+                EnemyStaggerMeter[enemyId] = 0f;
+                EnemyIsStaggered[enemyId] = true;
+                EnemyStaggerDurationLeft[enemyId] = staggerDuration > 0 ? staggerDuration : 180;
+                EnemyStaggerImmuneTimer[enemyId] = immuneSeconds;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Per-frame stagger tick called by EnemyMovementSystem: decrements the active stagger
+        /// duration timer (clears EnemyIsStaggered when it hits 0) and the post-stagger
+        /// immunity timer. The two timers are decoupled — the stagger ends first, then
+        /// the immunity period runs.
+        /// </summary>
+        public void TickStagger(int enemyId, float deltaTime = 1f)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            if (EnemyIsStaggered[enemyId])
+            {
+                if (EnemyStaggerDurationLeft[enemyId] > 0f)
+                {
+                    EnemyStaggerDurationLeft[enemyId] -= 1f;
+                    if (EnemyStaggerDurationLeft[enemyId] <= 0f)
+                    {
+                        EnemyStaggerDurationLeft[enemyId] = 0f;
+                        EnemyIsStaggered[enemyId] = false; // 硬直结束
+                    }
+                }
+                else
+                {
+                    // 防御：若 IsStaggered 为 true 但 duration 漏设为 0，立即清除
+                    EnemyIsStaggered[enemyId] = false;
+                }
+                return; // 硬直期间不递减 immune
+            }
+            // 非硬直状态：递减免疫期
+            if (EnemyStaggerImmuneTimer[enemyId] > 0f)
+            {
+                EnemyStaggerImmuneTimer[enemyId] -= deltaTime;
+                if (EnemyStaggerImmuneTimer[enemyId] <= 0f)
+                {
+                    EnemyStaggerImmuneTimer[enemyId] = 0f;
+                }
+            }
+        }
+
+        /// <summary>Clears stagger and restores the enemy to normal state. Used on entity destroy / wave end.</summary>
+        public void ClearStagger(int enemyId)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyStaggerMeter[enemyId] = 0f;
+            EnemyStaggerMax[enemyId] = 0f;
+            EnemyStaggerDurationLeft[enemyId] = 0f;
+            EnemyStaggerImmuneTimer[enemyId] = 0f;
+            EnemyIsStaggered[enemyId] = false;
         }
 
         /// <summary>Clears slow effect and restores original speed.</summary>

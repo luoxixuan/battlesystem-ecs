@@ -130,6 +130,21 @@ namespace BattleSystemECS.Systems
                     return;  // banished enemies skip movement
                 }
 
+                // Stagger / Posture check: enemy in forced hard-CC from a full posture bar.
+                // Staggered enemies skip ALL movement and AI this frame. Tick the stagger
+                // timer (clears the flag when duration elapses) and the post-stagger immunity
+                // timer in the helper. The two timers are decoupled: stagger ends first,
+                // then the immunity period runs.
+                if (store.EnemyIsStaggered[enemyId] || store.EnemyStaggerImmuneTimer[enemyId] > 0f)
+                {
+                    store.TickStagger(enemyId, 1f);
+                    if (store.EnemyIsStaggered[enemyId])
+                    {
+                        return;  // staggered enemies skip movement
+                    }
+                    // not staggered but in immunity — fall through to normal movement
+                }
+
                 // Decrement slow duration and restore base speed when expired (tower-slow tracking)
                 float dur = store.EnemySlowDurationLeft[enemyId];
                 if (dur > 0f)

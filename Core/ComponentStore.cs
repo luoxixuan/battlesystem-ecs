@@ -500,6 +500,12 @@ namespace BattleSystemECS.Core
                 EnemyBanishDurationLeft[entityId] = 0f;
                 EnemyBanishOriginalX[entityId] = 0f;
                 EnemyBanishOriginalY[entityId] = 0f;
+                // Stagger / Posture fields (reset on entity destruction)
+                EnemyStaggerMeter[entityId] = 0f;
+                EnemyStaggerMax[entityId] = 0f;
+                EnemyStaggerDurationLeft[entityId] = 0f;
+                EnemyStaggerImmuneTimer[entityId] = 0f;
+                EnemyIsStaggered[entityId] = false;
             }
 
             if (wasTower)
