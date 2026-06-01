@@ -29,6 +29,7 @@ namespace BattleSystemECS.Components
         Emerge = 19,    // 出土：敌人从地下钻出，可造成 AoE 伤害
         Resurrect = 20,  // 复活：亡灵法师复活附近尸体为次级亡灵
         EstablishLink = 21,  // 建立生命链接：与附近敌人建立生命链接
-        Clone = 22           // 克隆：生成自身功能性克隆体
+        Clone = 22,          // 克隆：生成自身功能性克隆体
+        Banished = 23        // 放逐：敌人被移出战场，冻结在原位置/不可行动/不可被攻击
     }
 }

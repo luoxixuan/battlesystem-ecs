@@ -495,6 +495,11 @@ namespace BattleSystemECS.Core
                 EnemyMarked[entityId] = false;
                 EnemyMarkedThreshold[entityId] = 0.15f;
                 EnemyMarkedDamageBonus[entityId] = 0.5f;
+                // Banish fields (reset on entity destruction)
+                EnemyIsBanished[entityId] = false;
+                EnemyBanishDurationLeft[entityId] = 0f;
+                EnemyBanishOriginalX[entityId] = 0f;
+                EnemyBanishOriginalY[entityId] = 0f;
             }
 
             if (wasTower)

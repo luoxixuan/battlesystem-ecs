@@ -116,6 +116,20 @@ namespace BattleSystemECS.Systems
                     return;  // stunned enemies skip movement
                 }
 
+                // Banish check: enemy is removed from the battlefield for N frames.
+                // Decrement timer first (same pattern as Stun), then clear flag if expired.
+                // Banished enemies skip ALL movement logic this frame.
+                if (store.EnemyIsBanished[enemyId])
+                {
+                    store.EnemyBanishDurationLeft[enemyId] -= 1f;
+                    if (store.EnemyBanishDurationLeft[enemyId] <= 0f)
+                    {
+                        store.EnemyBanishDurationLeft[enemyId] = 0f;
+                        store.EnemyIsBanished[enemyId] = false;
+                    }
+                    return;  // banished enemies skip movement
+                }
+
                 // Decrement slow duration and restore base speed when expired (tower-slow tracking)
                 float dur = store.EnemySlowDurationLeft[enemyId];
                 if (dur > 0f)

@@ -567,6 +567,21 @@ namespace BattleSystemECS.Core
         public float[] EnemyLeashReturnX = new float[MAX_ENTITIES];
         public float[] EnemyLeashReturnY = new float[MAX_ENTITIES];
 
+        // ==================== 放逐 (Banish) ====================
+        // EnemyIsBanished: when true, the enemy is removed from the active battlefield for
+        //   `EnemyBanishDurationLeft` frames. During banish, the enemy cannot move, cannot
+        //   act, and (by design) remains in place at its current position. When the timer
+        //   expires, the enemy resumes its previous AI/movement.
+        //   0 = disabled (default). Towers/skills that apply banish set this to true and
+        //   the duration to N frames. MovementSystem decrements the timer and clears the flag.
+        // EnemyBanishDurationLeft: remaining banish frames. Default 0 = not banished.
+        // EnemyBanishOriginalX/Y: the position captured at the moment banish was applied
+        //   (frozen position; reserved for future "return-to-origin" semantics).
+        public bool[] EnemyIsBanished = new bool[MAX_ENTITIES];
+        public float[] EnemyBanishDurationLeft = new float[MAX_ENTITIES];
+        public float[] EnemyBanishOriginalX = new float[MAX_ENTITIES];
+        public float[] EnemyBanishOriginalY = new float[MAX_ENTITIES];
+
         #endregion
 
         // ==================== 敌人组件访问 ====================
@@ -720,6 +735,11 @@ namespace BattleSystemECS.Core
             EnemyIsLeashed[entityId] = false;
             EnemyLeashReturnX[entityId] = 0f;
             EnemyLeashReturnY[entityId] = 0f;
+            // Banish fields (default: not banished)
+            EnemyIsBanished[entityId] = false;
+            EnemyBanishDurationLeft[entityId] = 0f;
+            EnemyBanishOriginalX[entityId] = 0f;
+            EnemyBanishOriginalY[entityId] = 0f;
 
             // H-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeEnemyIds.Add(entityId); _enemyIndexInList[entityId] = _activeEnemyIds.Count - 1; }
