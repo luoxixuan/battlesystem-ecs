@@ -456,6 +456,20 @@ namespace BattleSystemECS.Core
         // EnemyLifestealActive: whether lifesteal is currently active (enemies can toggle it)
         public bool[] EnemyLifestealActive = new bool[MAX_ENTITIES];
 
+        // ==================== 敌人属性吸取组件（SOA）====================
+        // EnemyDrainRatio: max fraction of tower damage that can be drained (0-1). 0 = no drain.
+        // Example: 0.5 = tower damage can be reduced by up to 50% (cap).
+        public float[] EnemyDrainRatio = new float[MAX_ENTITIES];
+        // EnemyDrainRadius: world-unit radius within which the enemy can drain a nearby tower.
+        public float[] EnemyDrainRadius = new float[MAX_ENTITIES];
+        // EnemyDrainRate: fraction of base tower damage drained per second (0-1).
+        // Example: 0.1 = 10% of base damage stolen per second until cap is reached.
+        public float[] EnemyDrainRate = new float[MAX_ENTITIES];
+        // EnemyDrainClaimedTower: tower id currently being drained by this enemy, or -1 if idle.
+        // Per-enemy slot so the enemy can track "I am draining tower X" independently of the
+        // tower-side TowerDrainedByEnemy[]. Initialize in AddEnemy to -1.
+        public int[] EnemyDrainClaimedTower = new int[MAX_ENTITIES];
+
         // ==================== 治疗抑制/重伤减免组件（SOA）====================
         // EnemyHealingReduction: fraction of healing that is suppressed (0-1).
         // 0 = no reduction, 0.5 = 50% healing blocked. Applied when tower attacks apply anti-heal debuff.
@@ -601,6 +615,18 @@ namespace BattleSystemECS.Core
             EnemyPathDeviationAmplitude[entityId] = 0f;
             EnemyPathDeviationPhase[entityId] = 0f;
             EnemyPathDeviationSeed[entityId] = 0;
+            // Stat drain: default 0/0/0 = no drain ability. WaveSpawningSystem overrides
+            // per archetype if the monster config specifies drain ratio/radius/rate.
+            // DrainRatio = max fraction of tower damage that can be drained (0-1, e.g. 0.5 = 50% cap).
+            // DrainRadius = world-unit radius within which the enemy can drain a tower.
+            // DrainRate = fraction of base tower damage drained per second (e.g. 0.1 = 10%/sec).
+            EnemyDrainRatio[entityId] = 0f;
+            EnemyDrainRadius[entityId] = 0f;
+            EnemyDrainRate[entityId] = 0f;
+            // EnemyDrainClaimedTower: -1 = no active drain claim. WaveSpawningSystem leaves
+            // this at -1; the stat-drain system sets it to a tower id when the enemy acquires
+            // a target and clears it when releasing (out of range, target destroyed, etc).
+            EnemyDrainClaimedTower[entityId] = -1;
 
             // 缓存怪物类型名（如 "NormalL1W1E0" -> "Normal"），避免每帧解析
             // 同时检测 [ELITE]/[BOSS] 前缀来正确标记精英/首领

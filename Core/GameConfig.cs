@@ -98,6 +98,14 @@ namespace BattleSystemECS.Config
         public float PathDeviationAmplitude { get; set; } = 0f;
         // GoldOnReturn: bonus gold awarded when player kills thief after it escapes
         public float GoldOnReturn { get; set; } = 0f;
+        // DrainRatio: max fraction of tower damage this enemy can drain (0-1, 0 = no drain).
+        // Example: 0.5 = can reduce a nearby tower's damage by up to 50%.
+        public float DrainRatio { get; set; } = 0f;
+        // DrainRadius: world-unit radius within which this enemy can drain a tower.
+        public float DrainRadius { get; set; } = 0f;
+        // DrainRate: fraction of base tower damage drained per second until DrainRatio cap is reached.
+        // Example: 0.1 = 10% of base damage stolen per second.
+        public float DrainRate { get; set; } = 0f;
         // Phases: ordered list of boss phase definitions (by threshold, descending).
         // Example: [{\"threshold\": 0.75, \"abilityId\": \"phase2_buff\"}, {\"threshold\": 0.50, \"abilityId\": \"enrage\"}]
         public List<BossPhaseDef> Phases { get; set; } = new List<BossPhaseDef>();
@@ -1464,6 +1472,27 @@ namespace BattleSystemECS.Config
                 AttackInterval = 1.2f,
                 GoldReward = 25,
                 Skills = new List<string> { "Normal Attack", "Ranged Shot" }
+            });
+
+            // Stat Drainer: a specialist that drains nearby tower damage up to 50% cap,
+            // at 10% per second within 3.5 tiles radius. When the drainer dies, the
+            // tower's full damage is restored. This forces the player to kill or push
+            // back the drainer before its presence permanently cripples a tower.
+            MonsterTypes.Add(new MonsterConfig
+            {
+                Name = "Stat Drainer",
+                Type = "Drainer",
+                Health = 40f,
+                MaxHealth = 40f,
+                Damage = 2f,
+                MoveSpeed = 0.6f,
+                AttackRange = 1f,
+                AttackInterval = 1.5f,
+                GoldReward = 30,
+                Skills = new List<string> { "Normal Attack", "Stat Drain" },
+                DrainRatio = 0.5f,
+                DrainRadius = 3.5f,
+                DrainRate = 0.1f
             });
 
             // Default levels

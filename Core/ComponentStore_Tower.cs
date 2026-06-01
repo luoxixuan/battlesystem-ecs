@@ -436,6 +436,27 @@ namespace BattleSystemECS.Core
         // TowerDisabledDuration: total duration of disable effect in seconds
         public float[] TowerDisabledDuration = new float[MAX_ENTITIES];
 
+        // ==================== 塔属性被吸取组件（Stat Drain）====================
+        // TowerBaseDamage: original tower damage captured at placement — used to restore
+        // TowerAttackDamage when a drainer enemy dies or leaves range. Cached so upgrades
+        // applied to TowerAttackDamage don't permanently lower the "base" reference.
+        public float[] TowerBaseDamage = new float[MAX_ENTITIES];
+        // TowerDrainedByEnemy: ID of the enemy currently draining this tower, or -1 if not drained.
+        // Single attribution per tower (one drainer at a time) to avoid split-stacking.
+        public int[] TowerDrainedByEnemy = new int[MAX_ENTITIES];
+        // TowerCurrentDrain: current fraction of base damage drained (0 = undrained, DrainRatio = capped).
+        // TowerAttackDamage is dynamically recomputed as TowerBaseDamage * (1 - TowerCurrentDrain).
+        public float[] TowerCurrentDrain = new float[MAX_ENTITIES];
+        // TowerDamageAtDrainStart: snapshot of TowerAttackDamage when the drainer claimed this
+        // tower. On release we restore TowerAttackDamage to this value (not to TowerBaseDamage)
+        // so that upgrades applied DURING the drain window persist. Caveat: upgrades applied
+        // AFTER the drain starts but BEFORE the drain ends are preserved; upgrades applied
+        // while a drain is in progress and whose multiplier was rolled into the "drained"
+        // TowerAttackDamage will need to be re-applied at release if we want exact fidelity.
+        // For this implementation, we accept "drain is a multiplicative penalty on the value
+        // at the moment of release" — upgrades during drain are kept in the snapshot.
+        public float[] TowerDamageAtDrainStart = new float[MAX_ENTITIES];
+
         // TowerBeamMaxRange: maximum range for beam targeting and chaining
         public float[] TowerBeamMaxRange = new float[MAX_ENTITIES];
 
@@ -518,6 +539,7 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(entityId)) return;
             TowerType[entityId] = type;
             TowerAttackDamage[entityId] = damage;
+            TowerBaseDamage[entityId] = damage;  // cache original damage for stat-drain restoration
             TowerRange[entityId] = range;
             TowerAttackSpeed[entityId] = speed;
             TowerLevel[entityId] = level;
@@ -634,6 +656,15 @@ namespace BattleSystemECS.Core
             TowerIsDisabled[entityId] = false;
             TowerDisabledTimer[entityId] = 0f;
             TowerDisabledDuration[entityId] = 0f;
+            // Stat drain fields: default to no drainer (-1), 0% drained
+            TowerDrainedByEnemy[entityId] = -1;
+            TowerCurrentDrain[entityId] = 0f;
+            // Snapshot used by the drain system to restore post-drain damage without losing
+            // upgrades that happened between drain start and drain end.
+            TowerDamageAtDrainStart[entityId] = 0f;
+            // Cached base damage — reset to 0 so a recycled tower slot doesn't carry
+            // over a stale base value before AddTower reinitializes it.
+            TowerBaseDamage[entityId] = 0f;
             // Reflect tower fields: default to no reflect (0 ratio = inactive)
             TowerReflectRatio[entityId] = 0f;
             TowerReflectCap[entityId] = 0f;
@@ -796,6 +827,11 @@ namespace BattleSystemECS.Core
             TowerIsDisabled[entityId] = false;
             TowerDisabledTimer[entityId] = 0f;
             TowerDisabledDuration[entityId] = 0f;
+            // Stat drain fields reset
+            TowerDrainedByEnemy[entityId] = -1;
+            TowerCurrentDrain[entityId] = 0f;
+            TowerDamageAtDrainStart[entityId] = 0f;
+            TowerBaseDamage[entityId] = 0f;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
         }
         #endregion

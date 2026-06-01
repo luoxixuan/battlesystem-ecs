@@ -515,6 +515,16 @@ namespace BattleSystemECS.Systems
                         store.EnemyPathDeviationSeed[enemyId] = rng.Next(1, int.MaxValue);
                     }
 
+                    // Initialize stat-drain fields from monster config. Drains are gated on
+                    // DrainRatio > 0 (otherwise the enemy has no drain ability and stays at 0).
+                    // All three fields are zero-initialized in AddEnemy() for default case.
+                    if (monsterConfig.DrainRatio > 0f && monsterConfig.DrainRadius > 0f)
+                    {
+                        store.EnemyDrainRatio[enemyId] = monsterConfig.DrainRatio;
+                        store.EnemyDrainRadius[enemyId] = monsterConfig.DrainRadius;
+                        store.EnemyDrainRate[enemyId] = monsterConfig.DrainRate;
+                    }
+
                     // Initialize elemental shield from monster config (only meaningful if Shield > 0 and ShieldElement is set)
                     if (monsterConfig.Shield > 0f && !string.IsNullOrEmpty(monsterConfig.ShieldElement))
                     {
