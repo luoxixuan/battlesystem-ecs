@@ -82,6 +82,16 @@ namespace BattleSystemECS.Core
         public float[] TowerCritMultiplier = new float[MAX_ENTITIES];
         public bool[] TowerHasChainLightning = new bool[MAX_ENTITIES];
         public bool[] TowerHasFreezeAoe = new bool[MAX_ENTITIES];
+        // ── Overkill / Excess Damage ─────────────────────────────────────────────
+        // TowerOverkillType: 0=None (no overkill effect), 1=Splash (excess damage splashes to nearby enemies)
+        // Default 0 = no overkill effect (backward compatible)
+        public int[] TowerOverkillType = new int[MAX_ENTITIES];
+        // TowerOverkillRatio: fraction of excess damage that becomes splash/secondary effect (0-1)
+        // E.g. 0.6 = 60% of overkill is distributed to nearby enemies, 40% is wasted
+        public float[] TowerOverkillRatio = new float[MAX_ENTITIES];
+        // TowerOverkillRadius: search radius in tiles for finding overkill splash targets
+        // 0 = no radius (effect disabled, even if type is non-zero)
+        public float[] TowerOverkillRadius = new float[MAX_ENTITIES];
         // Tower anti-air flags: controls which height layers a tower can attack
         // TowerCanHitAir=true: tower can attack flying enemies (anti-air tower)
         // TowerCanHitGround=true: tower can attack ground enemies
@@ -627,6 +637,10 @@ namespace BattleSystemECS.Core
             TowerFalloffMinRatio[entityId] = 1f;
             // Chain attack: default to no chain (0 ratio = inactive)
             TowerChainDmgRatio[entityId] = 0f;
+            // Overkill / excess damage: default to no overkill effect (type=0, ratio=0, radius=0)
+            TowerOverkillType[entityId] = 0;
+            TowerOverkillRatio[entityId] = 0f;
+            TowerOverkillRadius[entityId] = 0f;
             // Burst fire: default to no burst (0 count = single-shot)
             TowerBurstCount[entityId] = 0;
             TowerBurstInterval[entityId] = 0f;
@@ -745,6 +759,10 @@ namespace BattleSystemECS.Core
             TowerBeamMaxRange[entityId] = 0f;
             // Chain attack field reset
             TowerChainDmgRatio[entityId] = 0f;
+            // Overkill / excess damage field reset
+            TowerOverkillType[entityId] = 0;
+            TowerOverkillRatio[entityId] = 0f;
+            TowerOverkillRadius[entityId] = 0f;
             // Burst fire fields reset
             TowerBurstCount[entityId] = 0;
             TowerBurstInterval[entityId] = 0f;

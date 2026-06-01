@@ -649,6 +649,10 @@ namespace BattleSystemECS.Config
             tower.RampUpResetOnSwitch = ExtractBool(json, "RampUpResetOnSwitch");
             tower.DamageConversionRatio = ExtractFloat(json, "DamageConversionRatio");
             tower.ConvertedDamageType = (DamageType)ExtractInt(json, "ConvertedDamageType");
+            // Overkill / excess damage config (defaults preserve backward compat)
+            tower.OverkillType = ExtractInt(json, "OverkillType");
+            tower.OverkillRatio = ExtractFloat(json, "OverkillRatio");
+            tower.OverkillRadius = ExtractFloat(json, "OverkillRadius");
             return tower;
         }
 

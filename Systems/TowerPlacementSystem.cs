@@ -324,6 +324,14 @@ namespace BattleSystemECS.Systems
                         store.TowerConvertedDamageType[towerId] = tc.ConvertedDamageType;
                         logger.Log($"[TOWER] {tc.Name} 伤害转换: {tc.DamageConversionRatio * 100:F0}% → {tc.ConvertedDamageType}");
                     }
+                    // Apply overkill / excess damage properties
+                    if (tc.OverkillType > 0 && tc.OverkillRatio > 0f && tc.OverkillRadius > 0f)
+                    {
+                        store.TowerOverkillType[towerId] = tc.OverkillType;
+                        store.TowerOverkillRatio[towerId] = tc.OverkillRatio;
+                        store.TowerOverkillRadius[towerId] = tc.OverkillRadius;
+                        logger.Log($"[TOWER] {tc.Name} 过量伤害: 类型 {tc.OverkillType}, 比例 {tc.OverkillRatio * 100:F0}%, 半径 {tc.OverkillRadius}");
+                    }
                 }
                 else
                 {

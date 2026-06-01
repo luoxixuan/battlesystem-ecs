@@ -240,6 +240,16 @@ namespace BattleSystemECS.Config
         public float DamageConversionRatio { get; set; } = 0f;
         // ConvertedDamageType: the damage type to convert to (e.g. Magic to bypass Physical immunity)
         public DamageType ConvertedDamageType { get; set; } = DamageType.Physical;
+        // ── Overkill / Excess Damage ─────────────────────────────────────────────
+        // OverkillType: 0=None (no effect), 1=Splash (excess damage splashes to nearby enemies in radius)
+        // Default 0 = no overkill effect (backward compatible)
+        public int OverkillType { get; set; } = 0;
+        // OverkillRatio: fraction of excess damage that becomes splash/secondary effect (0-1)
+        // E.g. 0.6 = 60% of overkill distributed to nearby enemies, 40% is wasted
+        public float OverkillRatio { get; set; } = 0f;
+        // OverkillRadius: search radius in tiles for finding overkill splash targets
+        // 0 = no radius (effect disabled, even if type is non-zero)
+        public float OverkillRadius { get; set; } = 0f;
     }
 
     /// <summary>

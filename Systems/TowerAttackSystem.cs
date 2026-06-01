@@ -992,6 +992,25 @@ int bestTarget = -1;
                 }
                 if (store.EnemyHealth[enemyId] <= 0f)
                 {
+                    // Overkill: if tower's damage exceeded enemy's pre-hit health, convert excess to splash
+                    // excess = finalDmg - preDmgHealth (where preDmgHealth = EnemyHealth + finalDmg)
+                    // Only apply if this is the killing blow (vanguard/lifelink may have been applied)
+                    int okType = store.TowerOverkillType[towerId];
+                    float okRatio = store.TowerOverkillRatio[towerId];
+                    float okRadius = store.TowerOverkillRadius[towerId];
+                    if (okType == 1 && okRatio > 0f && okRadius > 0f)
+                    {
+                        float preHitHealth = store.EnemyHealth[enemyId] + finalDmg; // health BEFORE subtraction we just did
+                        float excess = finalDmg - preHitHealth;
+                        if (excess > 0f)
+                        {
+                            float splashDmg = excess * okRatio;
+                            // Queue as splash event; ResolveSplashDamage uses the killed enemy's
+                            // position as the AoE center and skips the primary target via
+                            // enemyId == primaryEnemyId check, so killed enemy is safely excluded.
+                            lock (_splashDamageQueueLock) { _splashDamageQueue[_splashDamageQueueIdx].Add((enemyId, splashDmg, playerId, towerId)); }
+                        }
+                    }
                     // Queue both the enemy death and the tower kill for XP
                     store.QueueEnemyDeath(enemyId, playerId);
                     store.QueueTowerKill(enemyId, playerId, towerId);
@@ -1398,11 +1417,16 @@ int bestTarget = -1;
             {
                 if (!store.EnemyActive[primaryEnemyId]) continue;
                 if (store.EnemyIsInvulnerable[primaryEnemyId]) continue;
-                if (store.TowerSplashRadius[towerId] <= 0f) continue;
+                // Effective splash radius: use TowerSplashRadius if set, else fall back to
+                // TowerOverkillRadius (lets overkill-triggered splash work even on non-splash towers)
+                float effectiveRadius = store.TowerSplashRadius[towerId] > 0f
+                    ? store.TowerSplashRadius[towerId]
+                    : store.TowerOverkillRadius[towerId];
+                if (effectiveRadius <= 0f) continue;
 
                 float px = store.PositionX[primaryEnemyId];
                 float py = store.PositionY[primaryEnemyId];
-                int splashRadius = (int)store.TowerSplashRadius[towerId];
+                int splashRadius = (int)effectiveRadius;
 
                 // Collect nearby enemies via spatial grid
                 if (splashRadius > 0 && splashRadius <= 100)

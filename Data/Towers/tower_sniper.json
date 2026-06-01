@@ -5,5 +5,8 @@
   "Range": 8,
   "AttackSpeed": 0.5,
   "Cost": 100,
-  "UpgradeCost": 60
+  "UpgradeCost": 60,
+  "OverkillType": 1,
+  "OverkillRatio": 0.6,
+  "OverkillRadius": 2
 }
