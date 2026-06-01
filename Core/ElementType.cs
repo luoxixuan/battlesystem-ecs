@@ -1,9 +1,13 @@
+using System;
+
 namespace BattleSystemECS.Components
 {
     /// <summary>
     /// Element types for the Elemental Reaction System.
     /// Each element can be applied to an enemy and triggers reactions when combined.
+    /// Bitwise combinable (e.g. Fire | Poison = both elements present).
     /// </summary>
+    [Flags]
     public enum ElementType
     {
         None = 0,

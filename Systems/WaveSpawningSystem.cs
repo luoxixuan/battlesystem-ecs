@@ -503,6 +503,18 @@ namespace BattleSystemECS.Systems
                             ? monsterConfig.HitShieldRegenInterval : 0f;
                     }
 
+                    // Initialize elemental shield from monster config (only meaningful if Shield > 0 and ShieldElement is set)
+                    if (monsterConfig.Shield > 0f && !string.IsNullOrEmpty(monsterConfig.ShieldElement))
+                    {
+                        store.EnemyShieldType[enemyId] = ParseElementType(monsterConfig.ShieldElement);
+                        store.EnemyShieldWeakMult[enemyId] = monsterConfig.ShieldWeakMult;
+                        store.EnemyShieldResistMult[enemyId] = monsterConfig.ShieldResistMult;
+                        store.EnemyShieldBreakReaction[enemyId] = string.IsNullOrEmpty(monsterConfig.ShieldBreakReaction)
+                            ? ElementType.None
+                            : ParseElementType(monsterConfig.ShieldBreakReaction);
+                        store.EnemyShieldBreakElementDuration[enemyId] = monsterConfig.ShieldBreakElementDuration;
+                    }
+
                     _multiSpawnedForType++;
                     enemiesSpawnedInWave++;
                     totalEnemiesSpawned++;
@@ -575,6 +587,19 @@ namespace BattleSystemECS.Systems
             }
             _multiTypeIndex = 0;
             _multiSpawnedForType = 0;
+        }
+
+        /// <summary>
+        /// Parse a string (from JSON config) into an ElementType enum value.
+        /// Returns ElementType.None for null/empty/unknown strings (safe default).
+        /// </summary>
+        private static ElementType ParseElementType(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return ElementType.None;
+            // Case-insensitive match against enum names
+            if (Enum.TryParse<ElementType>(s, ignoreCase: true, out var result))
+                return result;
+            return ElementType.None;
         }
     }
 }

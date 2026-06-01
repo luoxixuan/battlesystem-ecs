@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-01, commit `d230e08`）
+## 性能基准（2026-06-01, commit `TBD`）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **4463 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11630 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5416 FPS** |
+| **mode 5**（完整一局） | **4573 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11423 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5151 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -150,6 +150,7 @@ dotnet test
 - 伤害类型转换（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + GameConfigLoader.cs + TowerPlacementSystem.cs）；bench2: 11869, bench4: 5326, bench5: 4647
 - 塔出售价值衰减（sellDecayPerSecond + TowerPlaceTime + TowerPlacementSystem + tower_placement.json）；bench2: 11936, bench4: 5448, bench5: 4636
 - 塔位幽灵预览/放置确认（PreviewPlacement/ConfirmPlacement/CancelPreview + IRenderer.RenderGhostTower + ConsoleLogger）；bench2: 11630, bench4: 5416, bench5: 4463
+- 元素护盾类型（ApplyEnemyDamage + ComponentStore_Enemy.cs + ElementalReactionSystem + monster_shield.json/monster_enforcer.json + WaveSpawningSystem + GameConfig.cs）；bench2: 11423, bench4: 5151, bench5: 4573
 
 ### 2026-05-31
 - 光束/激光连续塔基础设施（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094

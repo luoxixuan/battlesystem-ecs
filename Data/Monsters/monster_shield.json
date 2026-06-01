@@ -1,1 +1,1 @@
-{"Name":"Shield Bearer","Type":"Tank","Health":120,"MaxHealth":120,"Damage":6,"MoveSpeed":0.5,"AttackRange":1,"AttackInterval":2,"GoldReward":35,"Skills":["Normal Attack","Shield Block"],"Armor":10}
+{"Name":"Shield Bearer","Type":"Tank","Health":120,"MaxHealth":120,"Damage":6,"MoveSpeed":0.5,"AttackRange":1,"AttackInterval":2,"GoldReward":35,"Skills":["Normal Attack","Shield Block"],"Armor":10,"Shield":50,"ShieldElement":"Fire","ShieldWeakMult":2.0,"ShieldResistMult":0.5,"ShieldBreakReaction":"Ice","ShieldBreakElementDuration":2.0}

@@ -41,6 +41,17 @@ namespace BattleSystemECS.Config
         public float MagicResist { get; set; } = 0f;
         // Shield: absorbs incoming damage before health. Boss/Elite types can have shield.
         public float Shield { get; set; } = 0f;
+        // ShieldElement: which element this shield is weak to ("Fire"/"Ice"/"Lightning"/"Poison"/"" or null).
+        // Empty/null = no elemental interaction (plain numeric shield, same as Shield field).
+        public string ShieldElement { get; set; }
+        // ShieldWeakMult: damage multiplier to shield when hit by matching element (default 2.0).
+        public float ShieldWeakMult { get; set; } = 0f; // 0 = use default 2x
+        // ShieldResistMult: damage multiplier to shield when hit by non-matching element (default 0.5).
+        public float ShieldResistMult { get; set; } = 0f; // 0 = use default 0.5x
+        // ShieldBreakReaction: which element is applied to the enemy on shield break.
+        public string ShieldBreakReaction { get; set; }
+        // ShieldBreakElementDuration: how long the break-reaction element lasts in seconds.
+        public float ShieldBreakElementDuration { get; set; } = 0f; // 0 = use default 2s
         // HitShieldCount: number of N-hit shield layers (0 = none). Blocks that many attacks completely.
         public float HitShieldCount { get; set; } = 0f;
         // HitShieldRegenInterval: seconds between layer regen ticks (0 = no regen).

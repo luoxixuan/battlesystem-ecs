@@ -207,9 +207,21 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Tick element timers — called each frame in WavePhase.
         /// Decrements all element timers, expires elements with no remaining time.
+        /// Also drains the pending-shield-break queue to trigger reactions between
+        /// the shield's break-element and any existing elements on the target.
         /// </summary>
         public void Update(float deltaTime)
         {
+            // Process pending shield breaks first (serial phase — safe to read/write)
+            if (store.PendingShieldBreaks != null && store.PendingShieldBreaks.Count > 0)
+            {
+                for (int i = 0; i < store.PendingShieldBreaks.Count; i++)
+                {
+                    OnShieldBroken(store.PendingShieldBreaks[i]);
+                }
+                store.PendingShieldBreaks.Clear();
+            }
+
             var activeEnemyIds = store.GetCachedActiveEnemyIds();
             foreach (int enemyId in activeEnemyIds)
             {
@@ -288,6 +300,29 @@ namespace BattleSystemECS.Systems
         private void TriggerReaction(int enemyId, ElementalReactionType reactionType)
         {
             logger?.Log($"[ELEMENT] Reaction triggered on enemy {enemyId}: {reactionType}");
+        }
+
+        /// <summary>
+        /// Called when an enemy's elemental shield is broken (in serial phase from
+        /// ApplyEnemyDamage). Applies the configured break-reaction element and checks
+        /// for any further reactions against existing elements on the target.
+        /// </summary>
+        public void OnShieldBroken(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) return;
+            ElementType breakElement = store.EnemyShieldBreakReaction[enemyId];
+            if (breakElement == ElementType.None) return;
+
+            // Get current element mask (after the shield-break timer was set in ApplyEnemyDamage)
+            ElementType existing = store.EnemyElementStatus[enemyId] & ~breakElement;
+            if (existing == ElementType.None) return;
+
+            // Check for reactions with already-applied elements
+            var reaction = ComputeReaction(breakElement, existing, enemyId);
+            if (reaction != ElementalReactionType.None)
+            {
+                logger?.Log($"[ELEMENT] Shield break triggered {reaction} on enemy {enemyId}");
+            }
         }
     }
 }

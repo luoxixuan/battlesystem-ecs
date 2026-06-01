@@ -50,6 +50,27 @@ namespace BattleSystemECS.Core
         // Enemy shield: absorbs incoming damage before it reaches EnemyHealth.
         // Shield is consumed first; remaining damage penetrates to health.
         public float[] EnemyShield = new float[MAX_ENTITIES];
+        // ==================== 元素护盾 (Elemental Shield — shield type with elemental weakness/resistance) ====================
+        // EnemyShieldType: which element this shield is weak to (ElementType). None = no elemental interaction.
+        // When damage of matching element hits this shield, damage is amplified (EnemyShieldWeakMult).
+        // Damage of opposing element (next ordinal) is reduced (EnemyShieldResistMult).
+        public ElementType[] EnemyShieldType = new ElementType[MAX_ENTITIES];
+        // EnemyShieldWeakMult: damage multiplier applied to shield when hit by EnemyShieldType damage
+        // (e.g. 2.0 = shield takes 2x damage, breaks much faster — "shield is weak to this element")
+        public float[] EnemyShieldWeakMult = new float[MAX_ENTITIES];
+        // EnemyShieldResistMult: damage multiplier applied to shield when hit by an element NOT matching EnemyShieldType
+        // (e.g. 0.5 = shield takes half damage from off-type attacks — "shield resists other elements")
+        public float[] EnemyShieldResistMult = new float[MAX_ENTITIES];
+        // EnemyShieldBreakReaction: which element is applied to the enemy on shield break (ElementType).
+        // None = no element applied. The reaction uses the existing ElementalReactionSystem pathway.
+        public ElementType[] EnemyShieldBreakReaction = new ElementType[MAX_ENTITIES];
+        // EnemyShieldBreakElementDuration: how long the break-reaction element lasts in seconds.
+        public float[] EnemyShieldBreakElementDuration = new float[MAX_ENTITIES];
+        // _pendingShieldBreaks: queue of enemy IDs whose elemental shield just broke this frame.
+        // Consumed by ElementalReactionSystem.Update() to trigger break-element reactions
+        // against any existing elements on the target (parallel-safe in serial phase).
+        private readonly System.Collections.Generic.List<int> _pendingShieldBreaks = new System.Collections.Generic.List<int>(32);
+        public System.Collections.Generic.List<int> PendingShieldBreaks => _pendingShieldBreaks;
         // ==================== N 击护盾 (Hit Shield — blocks N hits regardless of damage) ====================
         // EnemyHitShieldCount: current number of hit-shield layers (0 = no hit shield, attack passes through)
         // Each incoming tower/player attack removes exactly 1 layer — damage is fully blocked
@@ -524,6 +545,12 @@ namespace BattleSystemECS.Core
             EnemyHitShieldTimer[entityId] = 0f;
             EnemyHitShieldRegenInterval[entityId] = 0f;
             EnemyEvasion[entityId] = 0f;  // default to no evasion
+            // Elemental Shield: default None, no weakness/resistance, no break reaction
+            EnemyShieldType[entityId] = ElementType.None;
+            EnemyShieldWeakMult[entityId] = 0f;   // 0 = use default 2x when triggered
+            EnemyShieldResistMult[entityId] = 0f; // 0 = use default 0.5x when triggered
+            EnemyShieldBreakReaction[entityId] = ElementType.None;
+            EnemyShieldBreakElementDuration[entityId] = 0f;
             // Dodge/Strafe: default 0 chance, 0 distance, cooldown=0 (ready), timer=0 (event-driven)
             EnemyDodgeChance[entityId] = 0f;
             EnemyDodgeDistance[entityId] = 0f;
@@ -625,6 +652,19 @@ namespace BattleSystemECS.Core
         /// </summary>
         public void ApplyEnemyDamage(int enemyId, float damage)
         {
+            ApplyEnemyDamage(enemyId, damage, ElementType.None);
+        }
+
+        /// <summary>
+        /// Applies damage to an enemy with an optional element tag, applying elemental shield rules.
+        /// If the enemy has an EnemyShieldType that matches the incoming element, the shield takes
+        /// EnemyShieldWeakMult damage (default 2.0 = breaks twice as fast). If the element is
+        /// non-matching and the shield has EnemyShieldResistMult set, shield takes reduced damage.
+        /// On shield break, the configured EnemyShieldBreakReaction element is applied to the enemy
+        /// via the ElementalReactionSystem pathway.
+        /// </summary>
+        public void ApplyEnemyDamage(int enemyId, float damage, ElementType attackElement)
+        {
             if (!IsValidEntity(enemyId)) return;
             if (damage <= 0f) return;
 
@@ -634,6 +674,27 @@ namespace BattleSystemECS.Core
                 EnemyHealth[enemyId] -= damage;
                 return;
             }
+
+            // Apply elemental shield modifier if the enemy has a configured shield type
+            // and the incoming attack carries an element tag.
+            float shieldMult = 1f;
+            bool shieldHasElement = EnemyShieldType[enemyId] != ElementType.None;
+            if (shieldHasElement && attackElement != ElementType.None)
+            {
+                if (attackElement == EnemyShieldType[enemyId])
+                {
+                    // Weak element: amplify damage to shield (default 2x)
+                    shieldMult = EnemyShieldWeakMult[enemyId] > 0f ? EnemyShieldWeakMult[enemyId] : 2f;
+                }
+                else
+                {
+                    // Off-element: resist (default 0.5x)
+                    float resist = EnemyShieldResistMult[enemyId];
+                    shieldMult = resist > 0f ? resist : 0.5f;
+                }
+                damage *= shieldMult;
+            }
+
             if (shield >= damage)
             {
                 EnemyShield[enemyId] = shield - damage;
@@ -642,6 +703,42 @@ namespace BattleSystemECS.Core
             float remaining = damage - shield;
             EnemyShield[enemyId] = 0f;
             EnemyHealth[enemyId] -= remaining;
+
+            // Shield broke — apply break-reaction element to the enemy
+            if (shieldHasElement)
+            {
+                ElementType breakElement = EnemyShieldBreakReaction[enemyId];
+                if (breakElement != ElementType.None)
+                {
+                    float breakDur = EnemyShieldBreakElementDuration[enemyId] > 0f
+                        ? EnemyShieldBreakElementDuration[enemyId]
+                        : 2f;
+                    // Apply element status mask and timer directly (parallel-safe in serial phase)
+                    int elemIdx = ElementOrdinalForShield(breakElement);
+                    if (elemIdx >= 0)
+                    {
+                        EnemyElementStatus[enemyId] |= breakElement;
+                        // Refresh the break-element timer (use the longer of current vs. break duration)
+                        float existing = EnemyElementTimer[enemyId * 4 + elemIdx];
+                        if (existing < breakDur) EnemyElementTimer[enemyId * 4 + elemIdx] = breakDur;
+                        // Enqueue for ElementalReactionSystem to process (check for further reactions)
+                        _pendingShieldBreaks.Add(enemyId);
+                    }
+                }
+            }
+        }
+
+        private static int ElementOrdinalForShield(ElementType element)
+        {
+            // Mirrors ElementalReactionSystem ordinal mapping (Fire=0, Ice=1, Lightning=2, Poison=3)
+            switch (element)
+            {
+                case ElementType.Fire: return 0;
+                case ElementType.Ice: return 1;
+                case ElementType.Lightning: return 2;
+                case ElementType.Poison: return 3;
+                default: return -1;
+            }
         }
 
         public float GetEnemyMoveSpeed(int enemyId)
