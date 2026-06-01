@@ -112,6 +112,15 @@ namespace BattleSystemECS.Core
         public float[] EnemyBleedResistance = new float[MAX_ENTITIES];
         // EnemyBleedDurationLeft: total duration remaining for the bleed effect in seconds
         public float[] EnemyBleedDurationLeft = new float[MAX_ENTITIES];
+        // ==================== 敌人堆叠惩罚 (Enemy Tile Stacking Penalty) ====================
+        // EnemyStackCount: number of other enemies sharing the same cell this frame.
+        // 0 = no stacking (alone in cell), 1 = one other enemy in same cell, etc.
+        // Computed by EnemyMovementSystem after movement update using SpatialGrid data.
+        public int[] EnemyStackCount = new int[MAX_ENTITIES];
+        // EnemyStackSlowRatio: current slow multiplier from crowding (1.0 = no slow, 0.7 = 30% slow).
+        // Stacking penalty (StackingConfig.PenaltyPerStack) is applied per stack and clamped to
+        // [StackingConfig.MaxStackSlow, 1.0]. Reset to 1.0 each frame and recomputed serially.
+        public float[] EnemyStackSlowRatio = new float[MAX_ENTITIES];
         // ==================== 敌人 CC (Crowd Control) 字段 ====================
         // Grouped together after all enemy hot-path fields to preserve cache locality
         // EnemyStunFlag: legacy bool, kept for backward compat; use EnemyStunDurationLeft for correctness
@@ -556,6 +565,9 @@ namespace BattleSystemECS.Core
             EnemyHitShieldTimer[entityId] = 0f;
             EnemyHitShieldRegenInterval[entityId] = 0f;
             EnemyEvasion[entityId] = 0f;  // default to no evasion
+            // Tile-stacking penalty: default 0 stack, 1.0 slow ratio (no penalty until first frame of crowding)
+            EnemyStackCount[entityId] = 0;
+            EnemyStackSlowRatio[entityId] = 1f;
             // Elemental Shield: default None, no weakness/resistance, no break reaction
             EnemyShieldType[entityId] = ElementType.None;
             EnemyShieldWeakMult[entityId] = 0f;   // 0 = use default 2x when triggered

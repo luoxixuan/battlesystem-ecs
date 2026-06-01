@@ -889,6 +889,22 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Enemy Tile Stacking Penalty configuration — when N enemies occupy the same cell,
+    /// each enemy gets a move-speed slow proportional to its stack count.
+    /// PenaltyPerStack is applied per additional enemy (so 3 enemies in one cell ⇒
+    /// each has 2 × PenaltyPerStack slow, clamped to [MaxStackSlow, 1.0]).
+    /// 0 = no penalty (default). Players must use knockback/displacement towers to break up
+    /// clumps, otherwise stacked enemies become a slow but dense "wall" for AoE towers.
+    /// </summary>
+    public class StackingConfig
+    {
+        /// <summary>Move-speed slow per stacked enemy (0.02 = -2% per stack). Default: 0.02f</summary>
+        public float PenaltyPerStack { get; set; } = 0.02f;
+        /// <summary>Maximum cumulative slow from stacking (0.5 = at most 50% slow). Default: 0.5f</summary>
+        public float MaxStackSlow { get; set; } = 0.5f;
+    }
+
+    /// <summary>
     /// Auto Skill System configuration — controls which strategy is used to auto-cast skills
     /// during BuildPhase, how many skills can fire per phase, and cooldown protection.
     /// </summary>
@@ -1048,6 +1064,9 @@ namespace BattleSystemECS.Config
 
         // Combo Kill configuration
         public ComboConfig Combo { get; set; } = new ComboConfig();
+
+        // Enemy tile-stacking penalty configuration (move-speed slow when N enemies share a cell)
+        public StackingConfig Stacking { get; set; } = new StackingConfig();
 
         // Auto Skill configuration (BuildPhase auto-casting)
         public AutoSkillConfig AutoSkill { get; set; } = new AutoSkillConfig();

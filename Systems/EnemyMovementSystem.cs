@@ -34,12 +34,18 @@ namespace BattleSystemECS.Systems
         private WeatherSystem _weather;
         // DayNightSystem reference for day/night cycle effects
         private DayNightSystem _dayNight;
+        // Optional GameConfig (injected for tile-stacking penalty). Null = stacking disabled.
+        private readonly Config.GameConfig _gameConfig;
+        // Reused dictionary for stack counting — allocated once, cleared per frame.
+        // Key = packed (gx * 1000 + gy), value = count. Serial pass, no allocation.
+        private readonly Dictionary<long, int> _stackCountDict = new Dictionary<long, int>(1024);
 
-        public EnemyMovementSystem(Core.ComponentStore store, int playerId, int mapWidth = 10)
+        public EnemyMovementSystem(Core.ComponentStore store, int playerId, int mapWidth = 10, Config.GameConfig gameConfig = null)
         {
             this.store = store;
             this.playerId = playerId;
             this.mapWidthMinusOne = mapWidth - 1f;
+            _gameConfig = gameConfig;
         }
 
         /// <summary>
@@ -133,6 +139,10 @@ namespace BattleSystemECS.Systems
                 // Apply day/night cycle speed modifier
                 if (_dayNight != null)
                     moveSpeed *= _dayNight.GetEnemySpeedMultiplier(playerId);
+                // Apply tile-stacking penalty (crowding slow from previous frame's stack count).
+                // 1.0 = no slow. < 1.0 = penalized. Defaults to 1.0 (no penalty) for first frame after spawn.
+                moveSpeed *= store.EnemyStackSlowRatio[enemyId];
+                if (moveSpeed < 0f) moveSpeed = 0f; // safety clamp
 
                 // Enum-based action dispatch — O(1) per enemy, no string comparison
                 EnemyActionType actionEnum = store.GetEnemyActionEnum(enemyId);
@@ -250,6 +260,68 @@ switch (actionEnum)
                     store.EnemyMoveDirY[enemyId] = (float)-dirEnum; // -1 when moving toward player, +1 when retreating
                 }
             });
+
+            // ── Serial pass: tile-stacking penalty ──
+            // Count how many enemies share each cell using the *just-moved* positions.
+            // Apply per-enemy slow ratio = clamp(1 - stack * PenaltyPerStack, MaxStackSlow, 1.0).
+            // This slow ratio will be applied to next frame's movement.
+            // O(N) pass, no allocation (dictionary is reused and cleared at end).
+            UpdateStackingPenalty();
+        }
+
+        /// <summary>
+        /// Serial pass: compute per-enemy tile-stacking slow ratio based on current cell occupancy.
+        /// </summary>
+        private void UpdateStackingPenalty()
+        {
+            if (_gameConfig == null || _activeEnemyList == null) return;
+            var stacking = _gameConfig.Stacking;
+            if (stacking == null || stacking.PenaltyPerStack <= 0f) return;
+
+            _stackCountDict.Clear();
+
+            // Phase 1: count enemies per cell (gx, gy) using fresh post-move positions.
+            int count = _activeEnemyList.Count;
+            for (int i = 0; i < count; i++)
+            {
+                int eid = _activeEnemyList[i];
+                if (!store.EnemyActive[eid]) continue;
+                // Pack gx*1000 + gy into a long key (map is small, 1000 is safe headroom).
+                int gx = (int)store.PositionX[eid];
+                int gy = (int)store.PositionY[eid];
+                long key = (long)gx * 1000L + (long)gy;
+                if (_stackCountDict.TryGetValue(key, out int c))
+                    _stackCountDict[key] = c + 1;
+                else
+                    _stackCountDict[key] = 1;
+            }
+
+            // Phase 2: write per-enemy slow ratio and stack count.
+            float penalty = stacking.PenaltyPerStack;
+            float maxSlow = stacking.MaxStackSlow > 0f ? stacking.MaxStackSlow : 0.5f;
+            for (int i = 0; i < count; i++)
+            {
+                int eid = _activeEnemyList[i];
+                if (!store.EnemyActive[eid]) continue;
+                int gx = (int)store.PositionX[eid];
+                int gy = (int)store.PositionY[eid];
+                long key = (long)gx * 1000L + (long)gy;
+                int stackCount = _stackCountDict[key];
+                // stackCount-1 = number of OTHER enemies in same cell (0 if alone).
+                int effectiveStack = stackCount - 1;
+                store.EnemyStackCount[eid] = effectiveStack;
+                if (effectiveStack > 0)
+                {
+                    float slow = 1f - effectiveStack * penalty;
+                    if (slow < maxSlow) slow = maxSlow;
+                    if (slow > 1f) slow = 1f;
+                    store.EnemyStackSlowRatio[eid] = slow;
+                }
+                else
+                {
+                    store.EnemyStackSlowRatio[eid] = 1f;
+                }
+            }
         }
 
         /// <summary>

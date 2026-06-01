@@ -130,7 +130,7 @@ namespace BattleSystemECS.Core
 
             // ── Pathfinding & Movement ──
             Pathfinding = new PathfindingSystem(store);
-            EnemyMovement = new EnemyMovementSystem(store, playerId, config.MapWidth);
+            EnemyMovement = new EnemyMovementSystem(store, playerId, config.MapWidth, config);
             EnemyMovement.SetPathfindingSystem(Pathfinding);
 
             // ── Tower core systems ──

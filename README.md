@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-01, commit `0897839`）
+## 性能基准（2026-06-01, commit TBD）
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **4521 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11364 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5339 FPS** |
+| **mode 5**（完整一局） | **4387 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10233 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5191 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -153,6 +153,7 @@ dotnet test
 - 元素护盾类型（ApplyEnemyDamage + ComponentStore_Enemy.cs + ElementalReactionSystem + monster_shield.json/monster_enforcer.json + WaveSpawningSystem + GameConfig.cs）；bench2: 11423, bench4: 5151, bench5: 4573
 - 过量伤害/溢出机制（OverkillType=1: Splash + TowerAttackSystem.ResolveSplashDamage + ComponentStore_Tower.cs + GameConfig.cs + GameConfigLoader.cs + TowerPlacementSystem.cs + tower_sniper.json）；bench2: 11703, bench4: 5171, bench5: 4352
 - 敌人随机路径偏移（EnemyMovementSystem + ComponentStore_Enemy.cs + WaveSpawningSystem + GameConfig.cs）；bench2: 11364, bench4: 5339, bench5: 4521
+- 敌人同格堆叠惩罚（StackingConfig + EnemyMovementSystem.UpdateStackingPenalty + ComponentStore_Enemy.cs + SystemRegistry）；bench2: 10233, bench4: 5191, bench5: 4387
 
 ### 2026-05-31
 - 光束/激光连续塔基础设施（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094
