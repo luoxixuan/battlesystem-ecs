@@ -552,6 +552,21 @@ namespace BattleSystemECS.Core
         public float[] EnemyMarkedThreshold = new float[MAX_ENTITIES];
         public float[] EnemyMarkedDamageBonus = new float[MAX_ENTITIES];
 
+        // ==================== 仇恨脱战范围 (Aggro Leash / Disengage Range) ====================
+        // EnemyAggroRange: world-units radius around the player base within which this enemy
+        //   will switch from path-following to "aggro chase" (leashed) state. 0 = disabled
+        //   (default; only monsters with explicit aggro config opt in).
+        // EnemyLeashRange: world-units distance from player base beyond which the enemy
+        //   breaks aggro and returns to its captured return point. Typically > AggroRange.
+        // EnemyIsLeashed: true while the enemy is in active aggro-chase state.
+        // EnemyLeashReturnX/Y: world position captured at the moment aggro triggered — the
+        //   enemy path-resumes toward this point once it leaves LeashRange.
+        public float[] EnemyAggroRange = new float[MAX_ENTITIES];
+        public float[] EnemyLeashRange = new float[MAX_ENTITIES];
+        public bool[] EnemyIsLeashed = new bool[MAX_ENTITIES];
+        public float[] EnemyLeashReturnX = new float[MAX_ENTITIES];
+        public float[] EnemyLeashReturnY = new float[MAX_ENTITIES];
+
         #endregion
 
         // ==================== 敌人组件访问 ====================
@@ -697,6 +712,14 @@ namespace BattleSystemECS.Core
             EnemyMarked[entityId] = false;
             EnemyMarkedThreshold[entityId] = 0.15f;
             EnemyMarkedDamageBonus[entityId] = 0.5f;
+
+            // Aggro Leash: default 0 range = opt-out. Monster configs that want aggro behavior
+            // set EnemyAggroRange (e.g. 4f) and EnemyLeashRange (e.g. 10f) via WaveSpawningSystem.
+            EnemyAggroRange[entityId] = 0f;
+            EnemyLeashRange[entityId] = 0f;
+            EnemyIsLeashed[entityId] = false;
+            EnemyLeashReturnX[entityId] = 0f;
+            EnemyLeashReturnY[entityId] = 0f;
 
             // H-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeEnemyIds.Add(entityId); _enemyIndexInList[entityId] = _activeEnemyIds.Count - 1; }

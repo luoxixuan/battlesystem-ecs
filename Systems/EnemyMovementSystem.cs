@@ -179,8 +179,45 @@ namespace BattleSystemECS.Systems
                 // Default: move toward player (direction = -1, toward y=0)
                 int dirEnum = -1;
 
-// Simplified switch: only Retreat needs special handling.
-                // MoveToTarget, None, and default all fall through to direction = -1.
+// Aggro Leash: if this enemy has BOTH AggroRange and LeashRange configured, switch into
+                // leashed chase when within AggroRange of the player base. While leashed, hold
+                // position (early return) instead of advancing. If the player moves beyond
+                // LeashRange, disengage and resume normal path-follow.
+                // Both ranges must be > 0 — partial config (only AggroRange set) is treated as
+                // "opt-out" to avoid oscillation: without a LeashRange the enemy would re-leash
+                // every frame after the same-frame auto-disengage, halving forward progress.
+                float aggroRange = store.EnemyAggroRange[enemyId];
+                float leashRange = store.EnemyLeashRange[enemyId];
+                if (aggroRange > 0f && leashRange > 0f && store.EnemyActive[playerId])
+                {
+                    float dpx = store.PositionX[playerId];
+                    float dpy = store.PositionY[playerId];
+                    float distSq = (x - dpx) * (x - dpx) + (y - dpy) * (y - dpy);
+                    if (!store.EnemyIsLeashed[enemyId])
+                    {
+                        // Outside aggro range: normal path-follow behavior (default -1 Y).
+                        // Within aggro range: capture return point and enter leashed state.
+                        if (distSq <= aggroRange * aggroRange)
+                        {
+                            store.EnemyLeashReturnX[enemyId] = x;
+                            store.EnemyLeashReturnY[enemyId] = y;
+                            store.EnemyIsLeashed[enemyId] = true;
+                        }
+                    }
+                    else if (distSq > leashRange * leashRange)
+                    {
+                        // Already leashed and player moved beyond LeashRange: disengage,
+                        // resume normal path-follow from current position next frame.
+                        store.EnemyIsLeashed[enemyId] = false;
+                    }
+                    if (store.EnemyIsLeashed[enemyId])
+                    {
+                        // Leashed: hold position (no forward Y movement toward player).
+                        // Towers can still target/attack the enemy; only path advance is paused.
+                        return;
+                    }
+                }
+
 switch (actionEnum)
                 {
                     case EnemyActionType.Retreat:
