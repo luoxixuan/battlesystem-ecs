@@ -503,6 +503,18 @@ namespace BattleSystemECS.Systems
                             ? monsterConfig.HitShieldRegenInterval : 0f;
                     }
 
+                    // Initialize path deviation (lateral X drift) from monster config.
+                    // Type 0 = no deviation (default). Type 1 = sine wave. Type 2 = random per turn.
+                    if (monsterConfig.PathDeviationType != 0 && monsterConfig.PathDeviationAmplitude > 0f)
+                    {
+                        store.EnemyPathDeviationType[enemyId] = monsterConfig.PathDeviationType;
+                        store.EnemyPathDeviationAmplitude[enemyId] = monsterConfig.PathDeviationAmplitude;
+                        // Per-enemy random phase/seed to de-synchronize the wave (no synchronised bobbing)
+                        var rng = new System.Random(enemyId * 7919 + currentWave * 31);
+                        store.EnemyPathDeviationPhase[enemyId] = (float)(rng.NextDouble() * Math.PI * 2.0);
+                        store.EnemyPathDeviationSeed[enemyId] = rng.Next(1, int.MaxValue);
+                    }
+
                     // Initialize elemental shield from monster config (only meaningful if Shield > 0 and ShieldElement is set)
                     if (monsterConfig.Shield > 0f && !string.IsNullOrEmpty(monsterConfig.ShieldElement))
                     {

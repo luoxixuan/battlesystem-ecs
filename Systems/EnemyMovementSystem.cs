@@ -23,6 +23,10 @@ namespace BattleSystemECS.Systems
         // Cached per-turn to avoid per-frame store lookups
         private List<int> _activeEnemyList;
         private float _playerX;
+        // Current turn counter — cached in SetTurn, used by Update for path-deviation phase.
+        private int _turn;
+        // Tunable sine-wave frequency (radians per turn) for type=1 path deviation.
+        private const float PATH_DEV_SINE_FREQ = 0.3f;
 
         // PathfindingSystem reference for waypoint-based movement
         private PathfindingSystem _pathfinding;
@@ -66,6 +70,7 @@ namespace BattleSystemECS.Systems
         {
             _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
             _playerX = store.PositionX[playerId];
+            _turn = turn;
             // NOTE: Do NOT clear EnemyStunFlag here.
             // Stun is now managed by EnemyStunDurationLeft (duration-based),
             // decremented in Update(). Clearing flags here broke tower stun
@@ -199,7 +204,43 @@ switch (actionEnum)
                         break;
                 }
 
+                // Path-deviation (lateral X drift): per-enemy sine or random offset.
+                // Type 0 = none (default, deterministic Y-axis). Type 1 = sine (smooth wave).
+                // Type 2 = random per turn. Amplitude = max |X offset| in world units.
+                int devType = store.EnemyPathDeviationType[enemyId];
+                float devOffsetX = 0f;
+                if (devType == 1)
+                {
+                    // Sine: amplitude * sin(turn * freq + phase)
+                    float devAmp = store.EnemyPathDeviationAmplitude[enemyId];
+                    float devPhase = store.EnemyPathDeviationPhase[enemyId];
+                    if (devAmp > 0f)
+                        devOffsetX = devAmp * (float)Math.Sin(_turn * PATH_DEV_SINE_FREQ + devPhase);
+                }
+                else if (devType == 2)
+                {
+                    // Random: deterministic per-turn jitter using (seed XOR turn) hash.
+                    float devAmp = store.EnemyPathDeviationAmplitude[enemyId];
+                    int devSeed = store.EnemyPathDeviationSeed[enemyId];
+                    if (devAmp > 0f)
+                    {
+                        // Cheap xorshift-like hash, maps to [-1, 1].
+                        int h = (devSeed * 1103515245 + _turn * 12345 + 1013904223) | 0;
+                        h ^= h << 13; h ^= h >> 17; h ^= h << 5;
+                        float unit = ((h & 0x7FFFFFFF) / (float)0x7FFFFFFF) * 2f - 1f;
+                        devOffsetX = devAmp * unit;
+                    }
+                }
+
                 store.PositionY[enemyId] = y + dirEnum * moveSpeed;
+                // Apply lateral X deviation (clamp to map bounds, never overflow)
+                if (devOffsetX != 0f)
+                {
+                    float newX = x + devOffsetX;
+                    if (newX < 0f) newX = 0f;
+                    if (newX > mapWidthMinusOne) newX = mapWidthMinusOne;
+                    store.PositionX[enemyId] = newX;
+                }
                 // Update move direction for backstab calculation (default Y-axis movement)
                 // Direction: -1 = toward player (y decreases), +1 = away (y increases)
                 // Store normalized direction based on Y-axis movement

@@ -92,6 +92,10 @@ namespace BattleSystemECS.Config
         public bool IsThief { get; set; } = false;
         // StealAmount: gold stolen when thief reaches player base
         public float StealAmount { get; set; } = 0f;
+        // PathDeviationType: 0=none (default deterministic Y-axis), 1=sine, 2=random per turn
+        public int PathDeviationType { get; set; } = 0;
+        // PathDeviationAmplitude: max lateral X offset in world units (e.g. 0.3 = ±0.3 cells)
+        public float PathDeviationAmplitude { get; set; } = 0f;
         // GoldOnReturn: bonus gold awarded when player kills thief after it escapes
         public float GoldOnReturn { get; set; } = 0f;
         // Phases: ordered list of boss phase definitions (by threshold, descending).
@@ -1409,7 +1413,10 @@ namespace BattleSystemECS.Config
                 AttackRange = 1f,
                 AttackInterval = 1f,
                 GoldReward = 15,
-                Skills = new List<string> { "Normal Attack", "Quick Dash" }
+                Skills = new List<string> { "Normal Attack", "Quick Dash" },
+                // Path deviation: sine wave lateral drift (Fast Slime skitters sideways).
+                PathDeviationType = 1,
+                PathDeviationAmplitude = 0.4f
             });
 
             MonsterTypes.Add(new MonsterConfig

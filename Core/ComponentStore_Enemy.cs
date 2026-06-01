@@ -127,6 +127,17 @@ namespace BattleSystemECS.Core
         public float[] EnemyMoveSpeedBase = new float[MAX_ENTITIES];
         // EnemySlowDurationLeft: tower-slow duration in turns. Separate from EnemyBuffDurationLeft
         public float[] EnemySlowDurationLeft = new float[MAX_ENTITIES];
+        // ==================== Enemy Path Deviation (Lateral X-axis Drift) ====================
+        // EnemyPathDeviationType: 0=none (deterministic Y-axis only), 1=sine, 2=random
+        // Default 0 keeps existing behavior. Sine produces a smooth wave lateral offset
+        // (amplitude × sin(turn * frequency)). Random adds per-turn ±amplitude jitter.
+        public int[] EnemyPathDeviationType = new int[MAX_ENTITIES];
+        // EnemyPathDeviationAmplitude: max lateral X offset in world units (e.g. 0.5 = ±0.5 cells)
+        public float[] EnemyPathDeviationAmplitude = new float[MAX_ENTITIES];
+        // EnemyPathDeviationPhase: per-enemy phase offset (radians) for sine — de-synchronizes waves
+        public float[] EnemyPathDeviationPhase = new float[MAX_ENTITIES];
+        // EnemyPathDeviationSeed: per-enemy random-seed base for type=2 (deterministic per turn)
+        public int[] EnemyPathDeviationSeed = new int[MAX_ENTITIES];
         // ==================== Enemy Wound / Cripple (HP-Threshold Slow) ====================
         // EnemyWoundThreshold: HP fraction threshold that triggers wound slow (e.g. 0.3 = 30% HP)
         // Default 0f = no wound mechanic. When HP drops below this ratio, wound slow activates.
@@ -572,6 +583,12 @@ namespace BattleSystemECS.Core
             EnemyTeleportDestinationX[entityId] = 0f;
             EnemyTeleportDestinationY[entityId] = 0f;
             EnemyTeleportType[entityId] = 0;
+            // Path deviation: default 0/0/0/0 = no lateral drift. WaveSpawningSystem overrides
+            // per archetype if the monster config specifies deviation type/amplitude.
+            EnemyPathDeviationType[entityId] = 0;
+            EnemyPathDeviationAmplitude[entityId] = 0f;
+            EnemyPathDeviationPhase[entityId] = 0f;
+            EnemyPathDeviationSeed[entityId] = 0;
 
             // 缓存怪物类型名（如 "NormalL1W1E0" -> "Normal"），避免每帧解析
             // 同时检测 [ELITE]/[BOSS] 前缀来正确标记精英/首领
