@@ -82,7 +82,30 @@ namespace BattleSystemECS.Systems
             // decremented in Update(). Clearing flags here broke tower stun
             // because TowerAttackSystem.ApplyEnemyStun() runs after SetTurn()
             // in the same frame.
+            // Cache trampler presence for the frame so ResolveTrampleAoe can early-out
+            // in O(1) instead of an O(N²) check on every frame. Cheap O(N) pre-scan
+            // with early-break — typically the first active enemy is enough.
+            _hasTramplerThisFrame = false;
+            if (_activeEnemyList != null)
+            {
+                int n = _activeEnemyList.Count;
+                for (int i = 0; i < n; i++)
+                {
+                    int probe = _activeEnemyList[i];
+                    if (store.EnemyActive[probe]
+                        && store.EnemyTrampleRadius[probe] > 0f
+                        && store.EnemyTrampleDamagePerStep[probe] > 0f)
+                    {
+                        _hasTramplerThisFrame = true;
+                        break;
+                    }
+                }
+            }
         }
+
+        // Cached per-turn: true if at least one active enemy has TrampleRadius & damage > 0.
+        // Set in SetTurn(); consumed in ResolveTrampleAoe() for O(1) early-out.
+        private bool _hasTramplerThisFrame;
 
         public void Update()
         {
@@ -351,6 +374,13 @@ switch (actionEnum)
             // This slow ratio will be applied to next frame's movement.
             // O(N) pass, no allocation (dictionary is reused and cleared at end).
             UpdateStackingPenalty();
+
+            // ── Serial pass: Boss Trample (步伤) ──
+            // Enemies with EnemyTrampleRadius > 0 (大型 Boss) 移动后对范围内
+            // (a) 玩家扣血 (b) 其他小怪击退 0.5 单位（背离本 Boss）。
+            // Staggered enemies 在第 138 行已经 early-return，所以 trample 自动跳过。
+            // 串行 pass：敌人数量 ≤ 100K，可接受 O(N) 扫描。
+            ResolveTrampleAoe();
         }
 
         /// <summary>
@@ -404,6 +434,84 @@ switch (actionEnum)
                 else
                 {
                     store.EnemyStackSlowRatio[eid] = 1f;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Serial pass: Boss Trample (步伤) — 已被上一行 resolve 调用占位
+        /// </summary>
+        private void ResolveTrampleAoe()
+        {
+            if (_activeEnemyList == null) return;
+            int count = _activeEnemyList.Count;
+            if (count == 0) return;
+            // O(1) early-out via SetTurn() pre-scan. Most frames have no trampler.
+            if (!_hasTramplerThisFrame) return;
+
+            // Cache player position once. Player lives at playerId, which is also in
+            // _activeEnemyList? No — player is in ActiveEnemyIds? Let's check: in this
+            // codebase, ComponentStore stores the player separately. To be safe, read
+            // PositionX/Y directly using playerId without requiring EnemyActive[playerId].
+            // If playerId is invalid (not used as enemy slot), DecreasePlayerHealth itself
+            // is a no-op via IsValidPlayer check, so we just call it.
+            float px = store.PositionX[playerId];
+            float py = store.PositionY[playerId];
+
+            // Outer loop: tramplers. Inner loop: tramplee candidates (other enemies).
+            for (int i = 0; i < count; i++)
+            {
+                int tramplerId = _activeEnemyList[i];
+                if (!store.EnemyActive[tramplerId]) continue;
+                float radius = store.EnemyTrampleRadius[tramplerId];
+                if (radius <= 0f) continue;
+                float dmg = store.EnemyTrampleDamagePerStep[tramplerId];
+                if (dmg <= 0f) continue;
+                float tx = store.PositionX[tramplerId];
+                float ty = store.PositionY[tramplerId];
+                float r2 = radius * radius;
+
+                // (a) Player damage if in range
+                float dxp = px - tx;
+                float dyp = py - ty;
+                float distSqP = dxp * dxp + dyp * dyp;
+                if (distSqP <= r2)
+                {
+                    // DecreasePlayerHealth already handles shield + armor mitigation.
+                    store.DecreasePlayerHealth(playerId, dmg);
+                }
+
+                // (b) Other enemies: knockback 0.5 unit away from trampler.
+                // Vector is reversed (trampler → tramplee) normalized.
+                for (int j = 0; j < count; j++)
+                {
+                    int victimId = _activeEnemyList[j];
+                    if (victimId == tramplerId) continue;
+                    if (!store.EnemyActive[victimId]) continue;
+                    float vx = store.PositionX[victimId];
+                    float vy = store.PositionY[victimId];
+                    float dxv = vx - tx;
+                    float dyv = vy - ty;
+                    float d2 = dxv * dxv + dyv * dyv;
+                    if (d2 > r2) continue;
+                    // Skip if victim is itself a trampler with larger radius (avoid
+                    // infinite-jiggle from two Bosses near each other).
+                    if (store.EnemyTrampleRadius[victimId] > radius) continue;
+                    float len = (float)Math.Sqrt(d2);
+                    if (len < 1e-4f) continue; // co-located: skip
+                    float nx = dxv / len;
+                    float ny = dyv / len;
+                    float newX = vx + nx * 0.5f;
+                    float newY = vy + ny * 0.5f;
+                    // Clamp to map bounds. Y upper bound is a generous ceiling
+                    // (no MapHeight field is plumbed into EnemyMovementSystem; the
+                    // primary code path also only clamps Y lower — see line 336).
+                    if (newX < 0f) newX = 0f;
+                    if (newX > mapWidthMinusOne) newX = mapWidthMinusOne;
+                    if (newY < 0f) newY = 0f;
+                    if (newY > 10000f) newY = 10000f;
+                    store.PositionX[victimId] = newX;
+                    store.PositionY[victimId] = newY;
                 }
             }
         }

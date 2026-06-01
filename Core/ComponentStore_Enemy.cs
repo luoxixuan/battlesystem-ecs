@@ -597,6 +597,18 @@ namespace BattleSystemECS.Core
         public float[] EnemyStaggerImmuneTimer = new float[MAX_ENTITIES];
         public bool[] EnemyIsStaggered = new bool[MAX_ENTITIES];
 
+        // ==================== 踩踏 / Boss 步伤 (Trample) ====================
+        // EnemyTrampleRadius: 每帧移动后对周围该半径（世界单位）内的塔造成步伤。
+        //   0 = 不踩踏（默认小怪）。大型 Boss 典型 2.5-4。
+        // EnemyTrampleDamagePerStep: 每帧移动对范围内塔造成的伤害。
+        //   0 = 不开 Trample。反相关：走得越慢踩得越重。
+        // EnemyTrampleKnockback: 步伤是否附带击退。true = 目标塔被推 0.5 格（仅做位移标志，
+        //   实际塔位置不变以便不让其下墙；表示为施加一个 -1HP "knockback event" 给塔）。
+        //   简化：本轮只对塔造成伤害，knockback 留扩展位。
+        public float[] EnemyTrampleRadius = new float[MAX_ENTITIES];
+        public float[] EnemyTrampleDamagePerStep = new float[MAX_ENTITIES];
+        public bool[] EnemyTrampleKnockback = new bool[MAX_ENTITIES];
+
         // ==================== 敌人施法可打断 (Interruptible Channeling) ====================
         // EnemyIsChanneling: 敌人正在施法中（cast time > 0）。施法期间敌人无法移动/换技能。
         //   与 Stun/Banish 等价的行为：Movement 跳过，但占用"槽位"，可被外部打断。

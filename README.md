@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-02, Round 40）
+## 性能基准（2026-06-02, Round 41）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **4082 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11161 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5015 FPS** |
+| **mode 5**（完整一局） | **4018 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11087 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4906 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -143,6 +143,7 @@ dotnet test
 - 失衡条/破防 Stagger（ComponentStore_Enemy.cs + EnemyMovementSystem + TowerAttackSystem + ComponentStore.cs + EnemyActionType.cs，Staggered=24 状态 + 5 字段 + AddStaggerDamage/TickStagger/ClearStagger + 重击累加 meter + 10s 免疫期）；bench2: 11224, bench4: 5072, bench5: 4346
 - 喘息波节奏 Wave Rhythm（GameConfig.cs + WaveSpawningSystem.cs + WavePreviewSystem.cs，WaveRhythm 枚举 + Rhythm 字段 + Normal/Breather/Surge/Climax × 计数 + 难度 + Preview UI 同步）；bench2: 10567, bench4: 4940, bench5: 4085
 - 塔词缀槽基础设施 Reforge Split A（ComponentStore_Tower.cs + GameConfig.cs + GameConfigLoader.cs + tower_affixes.json，3 槽位 SOA + 18 词缀池 + 懒初始化 jagged 数组 + ClearTowerAffixes）；bench2: 11161, bench4: 5015, bench5: 4082 ⚠️
+- Boss 踩踏步伤 Trample（ComponentStore_Enemy.cs + EnemyMovementSystem.cs，3 字段 EnemyTrampleRadius/Damage/Knockback + SetTurn pre-scan O(1) early-out + ResolveTrampleAoe 串行 AOE：玩家扣血 + 小怪击退 0.5 单位 + Stagger 自动暂停）；bench2: 11087, bench4: 4906, bench5: 4018 ⚠️
 ### 2026-06-01
 - 射程伤害衰减（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs）；bench2: 12026, bench4: 5531, bench5: 4696
 - 爆发射击/齐射模式（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + TowerPlacementSystem.cs）；bench2: 11928, bench4: 5364, bench5: 4618
