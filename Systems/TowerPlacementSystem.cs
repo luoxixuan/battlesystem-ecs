@@ -353,6 +353,121 @@ namespace BattleSystemECS.Systems
             return towerId;
         }
 
+        // ─── Ghost placement (preview before commit) ──────────────────────────
+        // Tracks the last preview state so ConfirmPlacement() can re-validate
+        // and reuse the cached tower stats. The preview is purely a UI helper
+        // — it never mutates the entity pool or spends gold.
+        private int _previewX = -1;
+        private int _previewY = -1;
+        private TowerType _previewType;
+        private float _previewDamage;
+        private int _previewRange;
+        private float _previewSpeed;
+        private float _previewCost;
+        private bool _previewValid;
+
+        /// <summary>
+        /// Tracks whether PreviewPlacement has been called and the preview is still
+        /// live (i.e. ConfirmPlacement/CancelPreview have not yet cleared it).
+        /// Distinct from _previewValid: a preview can be active but invalid (e.g. out of bounds),
+        /// letting the caller decide whether to re-call PreviewPlacement or to Confirm.
+        /// </summary>
+        private bool _previewActive;
+
+        /// <summary>
+        /// Validate a candidate (x, y) for placing `type` without actually placing it.
+        /// Checks map bounds, occupancy, and tower cap. Reused by both Preview and Confirm paths.
+        /// </summary>
+        private bool ValidatePlacementPosition(int x, int y)
+        {
+            if (x < 0 || x >= 10 || y < 0 || y >= 20) return false;
+            foreach (int tid in store.ActiveTowerIds)
+            {
+                if ((int)store.PositionX[tid] == x && (int)store.PositionY[tid] == y) return false;
+            }
+            int playerId = 0;
+            int maxTowers = store.PlayerMaxTowers[playerId] <= 0 ? 20 : store.PlayerMaxTowers[playerId];
+            if (store.PlayerTowerCount[playerId] >= maxTowers)
+                return false;
+            return true;
+        }
+
+        /// <summary>
+        /// Begin a ghost-placement preview at (x, y) for the given tower type.
+        /// No entity is created, no gold is spent. Renders a ghost via IRenderer.
+        /// </summary>
+        /// <returns>True if the position is valid for placement, false otherwise.</returns>
+        public bool PreviewPlacement(int x, int y, TowerType type, float damage, int range, float speed, float cost)
+        {
+            _previewX = x;
+            _previewY = y;
+            _previewType = type;
+            _previewDamage = damage;
+            _previewRange = range;
+            _previewSpeed = speed;
+            _previewCost = cost;
+            _previewValid = ValidatePlacementPosition(x, y);
+            _previewActive = true;
+            logger.RenderGhostTower(x, y, range, _previewValid, type.ToString());
+            return _previewValid;
+        }
+
+        /// <summary>
+        /// Clear any in-progress ghost preview. Safe to call when no preview is active.
+        /// </summary>
+        public void CancelPreview()
+        {
+            _previewX = -1;
+            _previewY = -1;
+            _previewValid = false;
+            _previewActive = false;
+        }
+
+        /// <summary>
+        /// Commit the most recent PreviewPlacement() call. Re-validates the
+        /// position (in case state changed between preview and confirm) and
+        /// delegates to PlaceTower() for the actual creation. Returns -1 if
+        /// no preview is active or the position is no longer valid.
+        /// </summary>
+        public int ConfirmPlacement()
+        {
+            if (!_previewActive)
+            {
+                logger.Log("[TOWER] ConfirmPlacement failed: no active preview");
+                return -1;
+            }
+            if (!ValidatePlacementPosition(_previewX, _previewY))
+            {
+                logger.Log($"[TOWER] ConfirmPlacement failed: position ({_previewX},{_previewY}) is no longer valid");
+                return -1;
+            }
+            int id = PlaceTower(_previewX, _previewY, _previewType, _previewDamage, _previewRange, _previewSpeed, _previewCost);
+            // Clear preview state after commit (success or failure) — the caller is expected
+            // to start a fresh preview for any subsequent placement.
+            int committedX = _previewX;
+            int committedY = _previewY;
+            CancelPreview();
+            if (id != -1)
+            {
+                logger.Log($"[TOWER] 幽灵预览已确认: 塔 #{id} 已建于 ({committedX},{committedY})");
+            }
+            return id;
+        }
+
+        /// <summary>
+        /// Whether a ghost preview is currently active (i.e. PreviewPlacement
+        /// has been called and neither ConfirmPlacement nor CancelPreview has cleared it).
+        /// Returns true even for invalid previews — the user still has a live ghost
+        /// to confirm or cancel. Only the validity flag is gated by position checks.
+        /// </summary>
+        public bool HasActivePreview => _previewActive;
+
+        /// <summary>
+        /// Read-only access to the cached preview's validity. Useful for UI binding
+        /// (e.g., changing the cursor color) without re-running validation.
+        /// </summary>
+        public bool LastPreviewValid => _previewValid;
+
         private void ApplyTowerSpecialAbility(ComponentStore store, int towerId, TowerSpecialAbility ability)
         {
             if (ability == null || string.IsNullOrEmpty(ability.AbilityType)) return;

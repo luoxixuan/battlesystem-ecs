@@ -60,5 +60,13 @@ namespace BattleSystemECS.Core
             if (EnableLog)
                 Console.WriteLine($"[BATTLE] --- 第 {turn} 回合 ---");
         }
+
+        public void RenderGhostTower(int x, int y, int range, bool valid, string towerType)
+        {
+            if (!EnableLog) return;
+            string status = valid ? "合法" : "非法";
+            string marker = valid ? "[预览 ✓]" : "[预览 ✗]";
+            Console.WriteLine($"{marker} 塔种={towerType} 位置=({x},{y}) 射程={range} 状态={status}");
+        }
     }
 }
