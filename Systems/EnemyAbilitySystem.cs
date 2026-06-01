@@ -30,6 +30,13 @@ namespace BattleSystemECS.Systems
         // Per-ability cooldown tracking — keyed by enemyId * MAX_ABILITIES_PER_ENTITY + slot
         private readonly float[] _abilityCooldownTimers = new float[ComponentStore.MAX_ENTITIES * ComponentStore.MAX_ABILITIES_PER_ENTITY];
 
+        // Sparse list of currently-channeling enemy ids. Avoids iterating all active enemies
+        // per frame in TickCastTimers (10K enemies × 500 frames would be wasted work when
+        // only a handful are channeling at any time). Swap-and-pop on resolve to keep the
+        // list compact. Synchronized implicitly because TickCastTimers + EnqueueAbility +
+        // InterruptCast all run on the main game thread (no parallel writes).
+        private readonly List<int> _activeChannelers = new List<int>(64);
+
         public EnemyAbilitySystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, IEventBus eventBus = null)
         {
             this.store = store;
@@ -45,7 +52,9 @@ namespace BattleSystemECS.Systems
                 foreach (var ab in gameConfig.EnemyAbilities)
                 {
                     if (!string.IsNullOrEmpty(ab.Id))
+                    {
                         _abilityLookup[ab.Id] = ab;
+                    }
                 }
             }
 
@@ -70,6 +79,9 @@ namespace BattleSystemECS.Systems
 
         /// <summary>
         /// Enqueue an enemy ability event from BT evaluation (called during EnemyAISystem serial phase).
+        /// If the ability has CastTime > 0, the enemy enters the channeling state instead of executing
+        /// immediately. The ability will resolve after CastTime turns (via TickCastTimers), or be
+        /// interrupted by InterruptCast() (silence/stun/damage).
         /// </summary>
         public void EnqueueAbility(int enemyId, string abilityId)
         {
@@ -78,6 +90,24 @@ namespace BattleSystemECS.Systems
 
             int timerIdx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY;
             if (_abilityCooldownTimers[timerIdx] > 0f) return;
+
+            // If enemy is already channeling, ignore new ability requests (channel is locked).
+            if (store.EnemyIsChanneling[enemyId]) return;
+
+            // Channeling path: if ability has CastTime > 0, start a channel timer instead of
+            // executing immediately. The string ability id is stored so TickCastTimers can
+            // resolve the EnemyAbilityDef via the existing _abilityLookup (avoids hash
+            // collision risk that string.GetHashCode() would introduce in .NET Core).
+            if (ability.CastTime > 0f)
+            {
+                store.EnemyIsChanneling[enemyId] = true;
+                store.EnemyChannelTimer[enemyId] = ability.CastTime;
+                store.EnemyChannelAbilityId[enemyId] = abilityId;
+                store.EnemyChannelInterruptible[enemyId] = ability.Interruptible;
+                _activeChannelers.Add(enemyId);
+                logger.Log($"[ABILITY] Enemy {enemyId} begins channeling '{ability.Name}' for {ability.CastTime:F0} turns (interruptible={ability.Interruptible})");
+                return;
+            }
 
             _abilityEvents[_abilityEventsIdx].Add(new AbilityEvent
             {
@@ -99,6 +129,105 @@ namespace BattleSystemECS.Systems
                 if (_abilityCooldownTimers[idx] > 0f)
                     _abilityCooldownTimers[idx] -= deltaTime;
             }
+        }
+
+        /// <summary>
+        /// Decrement cast timers for enemies currently channeling. When a timer reaches 0,
+        /// resolve the cast by enqueuing the ability as if it had been instant. Must be called
+        /// once per turn (typically from GameManager right after ExecuteAbilities or before
+        /// the next frame) so that channeling is independent of frame rate. Also called
+        /// before any system checks EnemyIsCasting so Movement/AI know the cast is active.
+        /// </summary>
+        public void TickCastTimers()
+        {
+            // Iterate the sparse list of currently-channeling enemies (not all active enemies).
+            // This keeps the per-frame work O(active channelers) instead of O(active enemies).
+            for (int i = _activeChannelers.Count - 1; i >= 0; i--)
+            {
+                int enemyId = _activeChannelers[i];
+                if (!store.EnemyIsChanneling[enemyId])
+                {
+                    // Stale entry (e.g. enemy was destroyed mid-channel without going through
+                    // InterruptCast). Remove via swap-pop and continue.
+                    int lastIdx = _activeChannelers.Count - 1;
+                    if (i != lastIdx) _activeChannelers[i] = _activeChannelers[lastIdx];
+                    _activeChannelers.RemoveAt(lastIdx);
+                    continue;
+                }
+
+                store.EnemyChannelTimer[enemyId] -= 1f;
+                if (store.EnemyChannelTimer[enemyId] > 0f) continue;
+
+                // Channel complete: resolve the ability
+                string abilityId = store.EnemyChannelAbilityId[enemyId];
+                store.EnemyIsChanneling[enemyId] = false;
+                store.EnemyChannelTimer[enemyId] = 0f;
+                store.EnemyChannelAbilityId[enemyId] = null;
+
+                // Remove from sparse list
+                int popIdx = _activeChannelers.Count - 1;
+                if (i != popIdx) _activeChannelers[i] = _activeChannelers[popIdx];
+                _activeChannelers.RemoveAt(popIdx);
+
+                if (!string.IsNullOrEmpty(abilityId) && _abilityLookup.TryGetValue(abilityId, out var ability))
+                {
+                    _abilityEvents[_abilityEventsIdx].Add(new AbilityEvent
+                    {
+                        EnemyId = enemyId,
+                        Ability = ability
+                    });
+                    logger.Log($"[ABILITY] Enemy {enemyId} channel resolved: '{ability.Name}'");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Interrupt a currently channeling enemy's cast. If the channel is not interruptible
+        /// (e.g. boss ultimate), the call is a no-op. On successful interrupt, the cooldown
+        /// for that ability slot is set to 50% of the original cooldown (refund half) so
+        /// the enemy cannot perma-stun itself by being interrupted. Returns true if the
+        /// channel was actually interrupted, false otherwise (not channeling or
+        /// non-interruptible). Public so external systems (silence tower, damage threshold,
+        /// Stagger meter) can call it without knowing the ability's internal cooldown state.
+        /// </summary>
+        public bool InterruptCast(int enemyId)
+        {
+            if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) return false;
+            if (!store.EnemyIsChanneling[enemyId]) return false;
+            if (!store.EnemyChannelInterruptible[enemyId]) return false;
+
+            string abilityId = store.EnemyChannelAbilityId[enemyId];
+            string abilityName = null;
+            float halfCooldown = 0f;
+            if (!string.IsNullOrEmpty(abilityId) && _abilityLookup.TryGetValue(abilityId, out var ability))
+            {
+                abilityName = ability.Name;
+                halfCooldown = ability.Cooldown * 0.5f;
+            }
+
+            store.EnemyIsChanneling[enemyId] = false;
+            store.EnemyChannelTimer[enemyId] = 0f;
+            store.EnemyChannelAbilityId[enemyId] = null;
+            store.EnemyChannelInterruptible[enemyId] = true;
+
+            // Remove from sparse channelers list (swap-pop, O(1))
+            int idx = _activeChannelers.IndexOf(enemyId);
+            if (idx >= 0)
+            {
+                int lastIdx = _activeChannelers.Count - 1;
+                if (idx != lastIdx) _activeChannelers[idx] = _activeChannelers[lastIdx];
+                _activeChannelers.RemoveAt(lastIdx);
+            }
+
+            // Refund half cooldown so the enemy can try again later
+            int timerIdx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY;
+            if (halfCooldown > 0f)
+            {
+                _abilityCooldownTimers[timerIdx] = halfCooldown;
+            }
+
+            logger.Log($"[ABILITY] Enemy {enemyId} channel INTERRUPTED: '{abilityName ?? "<unknown>"}' (refund {halfCooldown:F1} turn CD)");
+            return true;
         }
 
         /// <summary>

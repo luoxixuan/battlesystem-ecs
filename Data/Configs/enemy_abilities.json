@@ -15,7 +15,7 @@
   {
     "Id": "aoe_damage_1",
     "Name": "AOE Burst",
-    "Description": "Deals 50% of attack damage to player in 3-cell radius",
+    "Description": "Deals 50% of attack damage to player in 3-cell radius (2-turn channel, interruptible)",
     "AbilityType": "aoe_damage",
     "BuffStat": "",
     "Cooldown": 8,
@@ -23,7 +23,9 @@
     "AoeRadius": 3,
     "DamageMultiplier": 0.5,
     "HealAmount": 0,
-    "BuffDuration": 0
+    "BuffDuration": 0,
+    "CastTime": 2,
+    "Interruptible": true
   },
   {
     "Id": "buff_allies_1",

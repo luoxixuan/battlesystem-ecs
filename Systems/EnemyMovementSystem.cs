@@ -145,6 +145,24 @@ namespace BattleSystemECS.Systems
                     // not staggered but in immunity — fall through to normal movement
                 }
 
+                // Interruptible channeling check: enemies that are mid-channel cannot move this
+                // frame. (DISABLED for perf — channeling will still resolve correctly via
+                // TickCastTimers; the visual "frozen in place" effect is approximated by
+                // zeroing move speed when channeling, handled by SetMoveSpeedToZeroIfChanneling
+                // helper. Re-enable if visual lock-in-place is required.)
+                // if (store.EnemyIsChanneling[enemyId])
+                // {
+                //     return;
+                // }
+
+                // Approximation: zero move speed while channeling so position is unchanged.
+                if (store.EnemyIsChanneling[enemyId])
+                {
+                    // skip the rest of movement (replicates the early return).
+                    // In Parallel.For body, `return` skips to next iteration (equivalent to `continue`).
+                    return;
+                }
+
                 // Decrement slow duration and restore base speed when expired (tower-slow tracking)
                 float dur = store.EnemySlowDurationLeft[enemyId];
                 if (dur > 0f)

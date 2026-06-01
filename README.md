@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-02, Round 33）
+## 性能基准（2026-06-02, Round 34）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **4346 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11224 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5072 FPS** |
+| **mode 5**（完整一局） | **4203 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11578 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5104 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -157,6 +157,7 @@ dotnet test
 - 敌人随机路径偏移（EnemyMovementSystem + ComponentStore_Enemy.cs + WaveSpawningSystem + GameConfig.cs）；bench2: 11364, bench4: 5339, bench5: 4521
 - 敌人同格堆叠惩罚（StackingConfig + EnemyMovementSystem.UpdateStackingPenalty + ComponentStore_Enemy.cs + SystemRegistry）；bench2: 10233, bench4: 5191, bench5: 4387
 - 击杀冷却重置（KillCooldownResetSystem + ComponentStore_Tower.cs + ComponentStore_Player.cs + SystemRegistry）；bench2: 11090, bench4: 5231, bench5: 4512
+- 敌人施法可打断（Interruptible Channeling Spells, EnemyAbilitySystem + EnemyMovementSystem + ComponentStore_Enemy.cs + AIGroup.cs + ComponentStore.cs + GameConfig.cs + enemy_abilities.json）；bench2: 11578, bench4: 5104, bench5: 4203 ⚠️
 - 敌人波次预览/侦查（WavePreviewSystem + ComponentStore_Player.cs + SystemRegistry）；bench2: 11533, bench4: 5256, bench5: 4533
 - 敌人属性吸取/Stat Drain（TowerSabotageSystem + ComponentStore_Enemy.cs + ComponentStore_Tower.cs + GameConfig.cs + WaveSpawningSystem.cs）；bench2: 11608, bench4: 5096, bench5: 4301
 - 回放/录像系统（ReplaySystem + GameConfig.ReplayConfig + SystemRegistry，opt-in JSONL per-frame telemetry，零热路径开销）；bench2: 11079, bench4: 5131, bench5: 4495

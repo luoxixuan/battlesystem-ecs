@@ -33,6 +33,11 @@ namespace BattleSystemECS.Core
             EnemyAbility?.SetTurn(turn);
             EnemyAbility?.UpdateCooldowns(deltaTime);
             EnemyAbility?.ExecuteAbilities();
+            // Tick cast timers right after ExecuteAbilities so any newly-started casts in this
+            // frame (via EnqueueAbility) are visible to Movement and TowerAttack in the same
+            // frame. Casts that resolve this frame will be enqueued above and executed next
+            // turn (we don't re-enter ExecuteAbilities to keep the frame's resolve order stable).
+            EnemyAbility?.TickCastTimers();
             EnemyAbility?.Update();
 
             Burrow?.SetTurn(turn);

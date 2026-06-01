@@ -597,6 +597,21 @@ namespace BattleSystemECS.Core
         public float[] EnemyStaggerImmuneTimer = new float[MAX_ENTITIES];
         public bool[] EnemyIsStaggered = new bool[MAX_ENTITIES];
 
+        // ==================== 敌人施法可打断 (Interruptible Channeling) ====================
+        // EnemyIsChanneling: 敌人正在施法中（cast time > 0）。施法期间敌人无法移动/换技能。
+        //   与 Stun/Banish 等价的行为：Movement 跳过，但占用"槽位"，可被外部打断。
+        //   满 Stagger 时（Stagger 联动）自动打断 channel。
+        // EnemyChannelTimer: 施法剩余帧数（>0 表示正在施法）。每帧 -1，到 0 时 ExecuteAbility 入队。
+        // EnemyChannelAbilityId: 正在施法的 ability id（string）。当 channel 完成时通过 lookup
+        //   还原 EnemyAbilityDef 并入队到 AbilityEvent。
+        //   （注：另有一个独立的 channel 状态字段组；本字段是已开始 channel 的 ability id。）
+        // EnemyChannelInterruptible: 该 cast 是否可被外部打断（true = 可被 silence/stun 打断）。
+        //   false 表示 channel 必须完成（最终 BOSS 终极技能）。默认 true。
+        public bool[] EnemyIsChanneling = new bool[MAX_ENTITIES];
+        public float[] EnemyChannelTimer = new float[MAX_ENTITIES];
+        public string[] EnemyChannelAbilityId = new string[MAX_ENTITIES];
+        public bool[] EnemyChannelInterruptible = new bool[MAX_ENTITIES];
+
         #endregion
 
         // ==================== 敌人组件访问 ====================
@@ -755,6 +770,11 @@ namespace BattleSystemECS.Core
             EnemyBanishDurationLeft[entityId] = 0f;
             EnemyBanishOriginalX[entityId] = 0f;
             EnemyBanishOriginalY[entityId] = 0f;
+            // Channeling fields (default: not channeling, 0 timer, no ability, interruptible=true)
+            EnemyIsChanneling[entityId] = false;
+            EnemyChannelTimer[entityId] = 0f;
+            EnemyChannelAbilityId[entityId] = null;
+            EnemyChannelInterruptible[entityId] = true;
 
             // H-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeEnemyIds.Add(entityId); _enemyIndexInList[entityId] = _activeEnemyIds.Count - 1; }
@@ -973,6 +993,14 @@ namespace BattleSystemECS.Core
                 EnemyIsStaggered[enemyId] = true;
                 EnemyStaggerDurationLeft[enemyId] = staggerDuration > 0 ? staggerDuration : 180;
                 EnemyStaggerImmuneTimer[enemyId] = immuneSeconds;
+                // Stagger联动：满失衡条强制打断当前 channel（无论 Interruptible 标志）。
+                // The hard CC of stagger overrides Interruptible since stagger is a complete
+                // state replacement, not a silence/stun. No cooldown refund here because the
+                // 10s post-stagger immune period already prevents immediate re-cast.
+                EnemyIsChanneling[enemyId] = false;
+                EnemyChannelTimer[enemyId] = 0f;
+                EnemyChannelAbilityId[enemyId] = null;
+                EnemyChannelInterruptible[enemyId] = true;
                 return true;
             }
             return false;

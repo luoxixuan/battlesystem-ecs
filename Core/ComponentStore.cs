@@ -506,6 +506,11 @@ namespace BattleSystemECS.Core
                 EnemyStaggerDurationLeft[entityId] = 0f;
                 EnemyStaggerImmuneTimer[entityId] = 0f;
                 EnemyIsStaggered[entityId] = false;
+                // Channeling fields (reset on entity destruction — kills interrupt channel)
+                EnemyIsChanneling[entityId] = false;
+                EnemyChannelTimer[entityId] = 0f;
+                EnemyChannelAbilityId[entityId] = null;
+                EnemyChannelInterruptible[entityId] = true;
             }
 
             if (wasTower)

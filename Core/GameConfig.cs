@@ -495,6 +495,16 @@ namespace BattleSystemECS.Config
         public float DispelDuration { get; set; }
         // DispelImmunityDuration: turns of immunity after dispel expires
         public float DispelImmunityDuration { get; set; }
+
+        // Interruptible Channeling fields (for high-threat enemy abilities).
+        // CastTime: turns the enemy spends channeling the ability before it resolves (0 = instant).
+        //   While casting, the enemy is frozen in place (skip Movement/AI) and is interruptible by
+        //   silence/stun/damage. When the cast completes, ExecuteAbility fires normally.
+        //   On interrupt, 50% of Cooldown is refunded (prevents perma-stun exploit).
+        // Interruptible: whether the cast can be cancelled externally (true = default for most,
+        //   false = must complete, used for boss ultimate abilities).
+        public float CastTime { get; set; }
+        public bool Interruptible { get; set; } = true;
     }
 
     /// <summary>
