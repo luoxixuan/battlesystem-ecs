@@ -306,7 +306,7 @@ namespace BattleSystemECS.Systems
                 OnWaveStart?.Invoke();
             }
 
-            if (enemiesSpawnedInWave < waveConfig.EnemyCount)
+            if (enemiesSpawnedInWave < waveConfig.GetTotalEnemyCount())
             {
                 Random random = GetSpawnRandom();
 
@@ -371,6 +371,17 @@ namespace BattleSystemECS.Systems
                     float speedGrowth = spawnConfig.DifficultyConfig.SpeedGrowthPerWave;
                     float armorMult = 1.0f + (currentWave - 1) * armorGrowth;
                     float speedMult = 1.0f + (currentWave - 1) * speedGrowth;
+
+                    // 4. Wave rhythm — Breather eases the wave, Surge/Climax push it
+                    // (Count is already scaled via WaveConfig.GetEnemyCountForType; here we scale stats.)
+                    float rhythmStatMult = waveConfig.GetRhythmStatMult();
+                    if (rhythmStatMult != 1.0f)
+                    {
+                        healthMult *= rhythmStatMult;
+                        damageMult *= rhythmStatMult;
+                        armorMult *= rhythmStatMult;
+                        speedMult *= rhythmStatMult;
+                    }
 
                     float scaledHealth = monsterConfig.Health * healthMult;
                     float scaledMaxHealth = monsterConfig.MaxHealth * healthMult;
@@ -598,14 +609,16 @@ namespace BattleSystemECS.Systems
                 {
                     var entry = waveConfig.EnemyTypes[i];
                     _multiTypes[i] = entry.MonsterType ?? "";
-                    _multiCounts[i] = entry.Count;
+                    // Apply rhythm scaling to per-type counts (Breather ×0.6, Surge ×1.3, Climax ×1.5).
+                    // GetEnemyCountForType returns the scaled count with a floor of 1.
+                    _multiCounts[i] = waveConfig.GetEnemyCountForType(entry.MonsterType ?? "");
                 }
             }
             else
             {
                 // Fallback: single type from MonsterType field
                 _multiTypes = new string[] { waveConfig.MonsterType ?? "Normal" };
-                _multiCounts = new int[] { waveConfig.EnemyCount };
+                _multiCounts = new int[] { waveConfig.GetEnemyCountForType(waveConfig.MonsterType ?? "Normal") };
             }
             _multiTypeIndex = 0;
             _multiSpawnedForType = 0;

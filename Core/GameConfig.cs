@@ -344,6 +344,18 @@ namespace BattleSystemECS.Config
         public int Count { get; set; } = 0;
     }
 
+    /// <summary>
+    /// Wave rhythm tag — controls how the wave is paced within a level.
+    /// Affects enemy count and stat scaling at spawn time (see WaveSpawningSystem).
+    /// </summary>
+    public enum WaveRhythm
+    {
+        Normal = 0,    // Default — no scaling modifier (×1.0)
+        Breather = 1,  // "Rest" wave — fewer and weaker enemies, gives player breathing room
+        Surge = 2,     // "Push" wave — more and stronger enemies, compensation after a Breather
+        Climax = 3     // "Finale" wave — last wave of a level, harder than Surge
+    }
+
     public class WaveConfig
     {
         public int WaveNumber { get; set; }
@@ -351,23 +363,37 @@ namespace BattleSystemECS.Config
         public int EnemyCount { get; set; }
         // Multi-type support: if EnemyTypes is non-empty, use it instead of MonsterType
         public List<EnemyTypeEntry> EnemyTypes { get; set; } = new List<EnemyTypeEntry>();
+        // Wave rhythm tag — controls spawn-time scaling (count + stats). Defaults to Normal.
+        // Normalized to enum in WaveSpawningSystem at spawn time; missing/invalid values are treated as Normal.
+        public string Rhythm { get; set; } = "Normal";
 
         /// <summary>
         /// Returns how many enemies of a given monster type should spawn this wave.
         /// Uses EnemyTypes[] if populated, otherwise falls back to MonsterType + EnemyCount.
+        /// Applies rhythm modifiers: Breather ×0.6, Surge ×1.3, Climax ×1.5, Normal ×1.0.
+        /// Floor of 1 to avoid zero-count waves.
         /// </summary>
         public int GetEnemyCountForType(string monsterType)
         {
+            int baseCount;
             if (EnemyTypes != null && EnemyTypes.Count > 0)
             {
+                int found = 0;
                 foreach (var entry in EnemyTypes)
                 {
                     if (!string.IsNullOrEmpty(entry.MonsterType) && entry.MonsterType == monsterType)
-                        return entry.Count;
+                    {
+                        found = entry.Count;
+                        break;
+                    }
                 }
-                return 0;
+                baseCount = found;
             }
-            return !string.IsNullOrEmpty(MonsterType) ? EnemyCount : 0;
+            else
+            {
+                baseCount = !string.IsNullOrEmpty(MonsterType) ? EnemyCount : 0;
+            }
+            return ApplyRhythmCountScale(baseCount);
         }
 
         /// <summary>
@@ -389,7 +415,9 @@ namespace BattleSystemECS.Config
         }
 
         /// <summary>
-        /// Returns total enemy count for this wave.
+        /// Returns total enemy count for this wave (rhythm-scaled).
+        /// For multi-type waves, this is the sum of per-type scaled counts so the
+        /// total always matches <see cref="GetEnemyCountForType"/>'s per-type math.
         /// </summary>
         public int GetTotalEnemyCount()
         {
@@ -397,10 +425,54 @@ namespace BattleSystemECS.Config
             {
                 int total = 0;
                 foreach (var entry in EnemyTypes)
-                    total += entry.Count;
+                    total += ApplyRhythmCountScale(entry.Count);
                 return total;
             }
-            return EnemyCount;
+            return ApplyRhythmCountScale(EnemyCount);
+        }
+
+        /// <summary>
+        /// Normalized enum form of <see cref="Rhythm"/>. Falls back to Normal on missing/invalid input.
+        /// </summary>
+        public WaveRhythm GetRhythmEnum()
+        {
+            if (string.IsNullOrEmpty(Rhythm)) return WaveRhythm.Normal;
+            if (Enum.TryParse<WaveRhythm>(Rhythm, ignoreCase: true, out var parsed))
+                return parsed;
+            return WaveRhythm.Normal;
+        }
+
+        /// <summary>
+        /// Apply rhythm-scaled count multiplier with a minimum of 1 enemy.
+        /// Breather ×0.6, Surge ×1.3, Climax ×1.5, Normal ×1.0.
+        /// </summary>
+        private int ApplyRhythmCountScale(int baseCount)
+        {
+            if (baseCount <= 0) return 0;
+            float mult = GetRhythmEnum() switch
+            {
+                WaveRhythm.Breather => 0.6f,
+                WaveRhythm.Surge => 1.3f,
+                WaveRhythm.Climax => 1.5f,
+                _ => 1.0f
+            };
+            int scaled = (int)(baseCount * mult);
+            return scaled < 1 ? 1 : scaled;
+        }
+
+        /// <summary>
+        /// Apply rhythm-scaled stat multiplier (health / damage / armor / speed).
+        /// Breather ×0.7, Surge ×1.2, Climax ×1.4, Normal ×1.0.
+        /// </summary>
+        public float GetRhythmStatMult()
+        {
+            return GetRhythmEnum() switch
+            {
+                WaveRhythm.Breather => 0.7f,
+                WaveRhythm.Surge => 1.2f,
+                WaveRhythm.Climax => 1.4f,
+                _ => 1.0f
+            };
         }
 
         // ── Wave Branching: if non-empty, player chooses which path to take next ──

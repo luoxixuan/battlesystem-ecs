@@ -115,10 +115,12 @@ namespace BattleSystemECS.Systems
                 {
                     if (entry == null || entry.Count <= 0) continue;
                     var monster = gameConfig.GetMonsterConfig(entry.MonsterType);
+                    // Apply rhythm scaling to preview count so the UI matches what will actually spawn
+                    int scaledCount = wave.GetEnemyCountForType(entry.MonsterType);
                     _cachedEntries.Add(new WavePreviewEntry
                     {
                         MonsterType = entry.MonsterType,
-                        Count = entry.Count,
+                        Count = scaledCount,
                         Name = monster?.Name ?? entry.MonsterType,
                         Health = monster?.Health ?? 0f,
                         Damage = monster?.Damage ?? 0f,
@@ -127,16 +129,17 @@ namespace BattleSystemECS.Systems
                         IsFlying = monster?.IsFlying ?? false,
                         HasShield = (monster?.Shield ?? 0f) > 0f
                     });
-                    _cachedTotalCount += entry.Count;
+                    _cachedTotalCount += scaledCount;
                 }
             }
             else if (!string.IsNullOrEmpty(wave.MonsterType))
             {
                 var monster = gameConfig.GetMonsterConfig(wave.MonsterType);
+                int scaledCount = wave.GetEnemyCountForType(wave.MonsterType);
                 _cachedEntries.Add(new WavePreviewEntry
                 {
                     MonsterType = wave.MonsterType,
-                    Count = wave.EnemyCount,
+                    Count = scaledCount,
                     Name = monster?.Name ?? wave.MonsterType,
                     Health = monster?.Health ?? 0f,
                     Damage = monster?.Damage ?? 0f,
@@ -145,7 +148,7 @@ namespace BattleSystemECS.Systems
                     IsFlying = monster?.IsFlying ?? false,
                     HasShield = (monster?.Shield ?? 0f) > 0f
                 });
-                _cachedTotalCount += wave.EnemyCount;
+                _cachedTotalCount += scaledCount;
             }
 
             OnPreviewUpdated?.Invoke(new WavePreviewData
