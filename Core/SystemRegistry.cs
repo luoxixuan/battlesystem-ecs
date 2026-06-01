@@ -100,6 +100,7 @@ namespace BattleSystemECS.Core
         public ObjectiveSystem? Objective { get; private set; }
         public WaveBranchSystem? WaveBranch { get; private set; }
         public ResourceNodeSystem? ResourceNode { get; private set; }
+        public WavePreviewSystem? WavePreview { get; private set; }
 
         // ── Hot Zone / Terrain Bonus ──
         public HotZoneSystem? HotZone { get; private set; }
@@ -249,6 +250,7 @@ namespace BattleSystemECS.Core
             Objective = new ObjectiveSystem(store, playerId);
             WaveBranch = new WaveBranchSystem(store, logger, config, stateMachine);
             ResourceNode = new ResourceNodeSystem(store, logger, playerId);
+            WavePreview = new WavePreviewSystem(store, config, playerId);
 
             // ── Hot Zone ──
             HotZone = new HotZoneSystem(store, config, playerId);
@@ -356,6 +358,9 @@ namespace BattleSystemECS.Core
                     Combo?.ResetCombo(playerId);
                     WaveMutator?.OnWaveStart(wave);
                 };
+                // WavePreview handles its own wave-start recompute inside HandleWaveStart
+                // (queries GetCurrentLevel/GetCurrentWave directly from the spawner).
+                WavePreview?.Subscribe(WaveSpawning);
             }
         }
 

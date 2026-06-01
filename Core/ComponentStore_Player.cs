@@ -79,6 +79,11 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // PlayerTowerCount: current number of towers placed by this player
         public int[] PlayerTowerCount = new int[MAX_PLAYERS];
 
+        // ==================== 波次预览/侦查等级 (Wave Preview / Scouting Level) ====================
+        // PlayerWavePreviewLevel: 0=None, 1=Vague (only count + type names, no stats), 2=Precise (full stats + skills).
+        // Set externally by tech tree unlocks (e.g. "scouting_i" / "scouting_ii"). Default 0 = no preview.
+        public int[] PlayerWavePreviewLevel = new int[MAX_PLAYERS];
+
         // ==================== 科技树组件的 SOA 存储 ====================
         public int[] PlayerResearchPoints = new int[MAX_PLAYERS];
         public HashSet<string>[] PlayerUnlockedTechs = new HashSet<string>[MAX_PLAYERS];

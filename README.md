@@ -8,9 +8,9 @@
 
 |     | 指标 | 数值 |
 |-----|------|------|
-| **mode 5**（完整一局） | **4512 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11090 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5231 FPS** |
+| **mode 5**（完整一局） | **4533 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11533 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5256 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -155,6 +155,7 @@ dotnet test
 - 敌人随机路径偏移（EnemyMovementSystem + ComponentStore_Enemy.cs + WaveSpawningSystem + GameConfig.cs）；bench2: 11364, bench4: 5339, bench5: 4521
 - 敌人同格堆叠惩罚（StackingConfig + EnemyMovementSystem.UpdateStackingPenalty + ComponentStore_Enemy.cs + SystemRegistry）；bench2: 10233, bench4: 5191, bench5: 4387
 - 击杀冷却重置（KillCooldownResetSystem + ComponentStore_Tower.cs + ComponentStore_Player.cs + SystemRegistry）；bench2: 11090, bench4: 5231, bench5: 4512
+- 敌人波次预览/侦查（WavePreviewSystem + ComponentStore_Player.cs + SystemRegistry）；bench2: 11533, bench4: 5256, bench5: 4533
 
 ### 2026-05-31
 - 光束/激光连续塔基础设施（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094
