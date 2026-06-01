@@ -15,12 +15,14 @@ namespace BattleSystemECS.Core
         private readonly ComponentStore _store;
         private readonly int _playerId;
         private readonly string _savePath;
+        private readonly string _metaPath;
 
         public SaveSystem(ComponentStore store, int playerId, string saveDir = "Data/Saves")
         {
             _store = store;
             _playerId = playerId;
             _savePath = Path.Combine(saveDir, "checkpoint.json");
+            _metaPath = Path.Combine(saveDir, "meta_progression.json");
 
             string dir = Path.GetDirectoryName(_savePath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
@@ -131,6 +133,69 @@ namespace BattleSystemECS.Core
         /// </summary>
         public bool HasCheckpoint() => File.Exists(_savePath);
 
+        // ── Meta Progression persistence ──────────────────────────────
+        // These methods coexist with PrestigeSystem.Save() but are exposed here
+        // so the central SaveSystem can save both checkpoint AND meta data in one call.
+
+        /// <summary>
+        /// Save meta-progression (stardust + unlocked node ranks) to a separate file.
+        /// </summary>
+        public void SaveMetaProgression(int stardust, Dictionary<string, int> unlockedRanks)
+        {
+            try
+            {
+                var data = new MetaSaveData
+                {
+                    Stardust = stardust,
+                    UnlockedNodes = new List<MetaUnlockedNode>()
+                };
+                if (unlockedRanks != null)
+                {
+                    foreach (var kvp in unlockedRanks)
+                    {
+                        if (kvp.Value > 0)
+                            data.UnlockedNodes.Add(new MetaUnlockedNode { Id = kvp.Key, Rank = kvp.Value });
+                    }
+                }
+                string json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(_metaPath, json);
+            }
+            catch
+            {
+                // Swallow IO errors silently — meta save is best-effort
+            }
+        }
+
+        /// <summary>
+        /// Load meta-progression from disk. Returns true and populates out-params if found.
+        /// </summary>
+        public bool LoadMetaProgression(out int stardust, out Dictionary<string, int> unlockedRanks)
+        {
+            stardust = 0;
+            unlockedRanks = new Dictionary<string, int>();
+            if (!File.Exists(_metaPath)) return false;
+            try
+            {
+                string json = File.ReadAllText(_metaPath);
+                var data = JsonSerializer.Deserialize<MetaSaveData>(json);
+                if (data == null) return false;
+                stardust = data.Stardust;
+                if (data.UnlockedNodes != null)
+                {
+                    foreach (var n in data.UnlockedNodes)
+                    {
+                        if (!string.IsNullOrEmpty(n.Id) && n.Rank > 0)
+                            unlockedRanks[n.Id] = n.Rank;
+                    }
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         // ── Serialization models ────────────────────────────────────────
 
         private class SaveData
@@ -175,6 +240,18 @@ namespace BattleSystemECS.Core
             public float Y { get; set; }
             public float Health { get; set; }
             public float MaxHealth { get; set; }
+        }
+
+        // ── Meta progression serialization models ────────────────────────
+        private class MetaSaveData
+        {
+            public int Stardust { get; set; }
+            public List<MetaUnlockedNode> UnlockedNodes { get; set; } = new List<MetaUnlockedNode>();
+        }
+        private class MetaUnlockedNode
+        {
+            public string Id { get; set; } = "";
+            public int Rank { get; set; } = 1;
         }
     }
 }

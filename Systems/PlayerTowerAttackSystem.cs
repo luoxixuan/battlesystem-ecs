@@ -19,6 +19,7 @@ namespace BattleSystemECS.Systems
         private IRenderer renderer;
         private int playerId;
         private TechTreeSystem techTreeSystem;
+        private GameConfig gameConfig;
 
         // BUG-1 fix: deterministic hash-based RNG — no shared state, fully reproducible per (frame, enemyId, attackerId)
         // Replaces Random.Shared which caused non-determinism across runs.
@@ -41,6 +42,9 @@ namespace BattleSystemECS.Systems
 
         // Cached tech tree attack damage multiplier (updated on SetTurn)
         private float _attackDamageMult = 1f;
+
+        // Cached meta-progression damage multiplier (read once per SetTurn, applied in hot path)
+        private float _metaDamageMult = 1f;
 
         // Cached crit stats (updated on SetTurn to avoid per-enemy tech tree calls)
         private float _critRateBonus;
@@ -81,6 +85,7 @@ namespace BattleSystemECS.Systems
             this.renderer = renderer;
             this.playerId = playerId;
             this.techTreeSystem = techTreeSystem;
+            this.gameConfig = gameConfig;
             _damageQueue[0] = new List<(int, float)>(256);
             _damageQueue[1] = new List<(int, float)>(256);
             _thornsQueue[0] = new List<float>(64);
@@ -104,6 +109,10 @@ namespace BattleSystemECS.Systems
 
             // Cache tech tree attack damage multiplier
             _attackDamageMult = techTreeSystem != null ? techTreeSystem.GetAttackDamageMult() : 1f;
+
+            // Cache meta-progression damage multiplier (resolved once at boot by PrestigeSystem.ApplyToConfig)
+            // Read once per turn to honor any in-game prestige unlocks during a single run.
+            _metaDamageMult = gameConfig != null ? gameConfig.MetaDamageMult : 1f;
 
             // Cache armor stats from tech tree
             _armorPenetration = techTreeSystem != null ? techTreeSystem.GetArmorPenetration() : 0f;
@@ -153,6 +162,7 @@ public void SetWaveNumber(int waveNumber)
 
             // O(1) field access — no method calls, no boundary checks
             float baseDamage = _attackDamage * _attackBuffMult * _attackDamageMult;
+            baseDamage *= _metaDamageMult;       // meta-progression: persistent cross-run bonus
             baseDamage *= _waveDifficultyMult;  // wave scaling, always applied (1.0f when wave=1)
 
             // Apply combo kill damage multiplier (min(1 + ComboCount * bonus, maxMult))

@@ -1308,6 +1308,33 @@ namespace BattleSystemECS.Config
         // Random mid-wave event system configuration (direction 9)
         public RandomEventConfig RandomEvents { get; set; } = new RandomEventConfig();
 
+        // ── Meta Progression / Prestige (cross-run unlocks) ───────────────
+        // Definitions of all available prestige nodes (loaded from Data/Configs/meta_progression.json)
+        public List<MetaProgressionNode> PrestigeNodes { get; set; } = new List<MetaProgressionNode>();
+        // Resolved multipliers from active prestige nodes (computed once at boot).
+        // All default to 1.0f / 0f so that systems without any prestige reads work normally.
+        public float MetaDamageMult { get; set; } = 1.0f;        // applied to player base damage
+        public float MetaGoldEarnedMult { get; set; } = 1.0f;    // applied to gold earned
+        public float MetaStartingGoldBonus { get; set; } = 0f;   // additive bonus to starting gold
+        public int MetaStartingLivesBonus { get; set; } = 0;     // additive bonus to starting lives
+        public float MetaCritRateBonus { get; set; } = 0f;       // additive bonus to crit rate (0-1)
+        public float MetaAttackSpeedMult { get; set; } = 1.0f;   // applied to attack speed
+        public int MetaFreeTechLevels { get; set; } = 0;         // number of free tech-tree levels
+        public int MetaBonusStartingGold { get; set; } = 0;      // flat starting gold bonus (alternative to bonus above)
+
+        /// <summary>
+        /// Look up a prestige node by its id. Returns null if not found.
+        /// </summary>
+        public MetaProgressionNode GetPrestigeNode(string nodeId)
+        {
+            if (string.IsNullOrEmpty(nodeId) || PrestigeNodes == null) return null;
+            for (int i = 0; i < PrestigeNodes.Count; i++)
+            {
+                if (PrestigeNodes[i].Id == nodeId) return PrestigeNodes[i];
+            }
+            return null;
+        }
+
         // Bank / Interest system configuration (direction 2)
         public BankConfig Bank { get; set; } = new BankConfig();
         // Mana/Energy pool system (direction 5)
@@ -2171,5 +2198,40 @@ namespace BattleSystemECS.Config
         Fire = 3,
         Healing = 4,
         DamageBoost = 5
+    }
+
+    // ── Meta Progression / Prestige Node Definition ─────────────────────
+    /// <summary>
+    /// One upgradeable node in the meta-progression (prestige) tree.
+    /// Persistent across runs: once unlocked with "Stardust" currency, the bonuses
+    /// stack on every subsequent run.
+    ///
+    /// Effect fields default to 1.0f (multiplicative) or 0f (additive) so that
+    /// "unspent" nodes contribute nothing. Systems read resolved multipliers from
+    /// GameConfig.Meta*Mult (precomputed at boot from all unlocked nodes).
+    /// </summary>
+    public class MetaProgressionNode
+    {
+        /// <summary>Unique node id (e.g. "damage_1", "starting_gold_1").</summary>
+        public string Id { get; set; } = "";
+        /// <summary>Display name shown in the prestige UI.</summary>
+        public string Name { get; set; } = "";
+        /// <summary>Human-readable description.</summary>
+        public string Description { get; set; } = "";
+        /// <summary>Stardust cost to unlock this node.</summary>
+        public int Cost { get; set; } = 10;
+        /// <summary>Maximum number of times this node can be unlocked (0 = unlimited).</summary>
+        public int MaxRank { get; set; } = 1;
+        /// <summary>Optional prerequisite node id (must be unlocked first).</summary>
+        public string PrerequisiteId { get; set; } = "";
+
+        // Effect fields (defaults are no-op: mult=1.0, bonus=0)
+        public float DamageMult { get; set; } = 1.0f;           // multiplicative
+        public float GoldEarnedMult { get; set; } = 1.0f;       // multiplicative
+        public float AttackSpeedMult { get; set; } = 1.0f;     // multiplicative
+        public float StartingGoldBonus { get; set; } = 0f;      // additive
+        public int StartingLivesBonus { get; set; } = 0;        // additive
+        public float CritRateBonus { get; set; } = 0f;          // additive (0-1)
+        public int FreeTechLevels { get; set; } = 0;            // additive
     }
 }

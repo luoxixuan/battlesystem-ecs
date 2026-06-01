@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-01, Round 31）
+## 性能基准（2026-06-01, Round 32）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **4315 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11848 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5212 FPS** |
+| **mode 5**（完整一局） | **4303 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11125 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **5141 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -163,6 +163,7 @@ dotnet test
 - 仇恨脱战范围/Aggro Leash（EnemyMovementSystem + ComponentStore_Enemy.cs，可选范围配置，近基地暂停推进/远离后回归）；bench2: 11519, bench4: 5137, bench5: 4186
 - 商店洗牌/Shop Reroll（ShopRerollSystem + ComponentStore_Player.cs + GameConfig + BuildGroup + SystemRegistry，BuildPhase 洗牌 offer 池 + 成本阶梯 + 保底稀有度）；bench2: 10225, bench4: 4839, bench5: 4147
 - 放逐机制/Banish（EnemyMovementSystem + ComponentStore_Enemy.cs + ComponentStore.cs + EnemyActionType.cs，Banished 状态冻结敌人 N 帧，可被塔/技能触发）；bench2: 11848, bench4: 5212, bench5: 4315
+- 玩家元进度/跨局声望 Prestige（PrestigeSystem + GameConfig + GameManager + SaveSystem + PlayerTowerAttackSystem，Stardust 货币解锁跨局永久节点，GameConfig.MetaDamageMult 注入到玩家伤害计算）；bench2: 11125, bench4: 5141, bench5: 4303
 
 ### 2026-05-31
 - 光束/激光连续塔基础设施（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094

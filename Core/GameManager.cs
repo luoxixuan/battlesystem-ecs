@@ -20,6 +20,9 @@ namespace BattleSystemECS.Core
         // 系统注册中心（集中创建/依赖注入/分组赋值）
         private SystemRegistry registry;
 
+        // Prestige / Meta Progression (cross-run unlocks, persistent)
+        private PrestigeSystem prestigeSystem;
+
         // 游戏系统（从 registry 暴露，Run() 中直接访问）
         private WaveSpawningSystem waveSpawningSystem => registry.WaveSpawning!;
         private TowerPlacementSystem towerPlacementSystem => registry.TowerPlacement!;
@@ -78,6 +81,14 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP]    - Monster Types: " + gameConfig.MonsterTypes.Count);
             logger.Log("[BOOTSTRAP]    - Levels: " + gameConfig.Levels.Count);
             logger.Log("[BOOTSTRAP]    - Skills: " + gameConfig.Skills.Count);
+
+            Console.WriteLine();
+            logger.Log("[BOOTSTRAP] 1b. Loading Meta Progression (prestige saves)...");
+
+            // ── Prestige: load cross-run unlocks and resolve to GameConfig multipliers ──
+            prestigeSystem = new PrestigeSystem(logger, gameConfig);
+            prestigeSystem.Load();
+            prestigeSystem.ApplyToConfig();
 
             Console.WriteLine();
             logger.Log("[BOOTSTRAP] 2. Initializing Player & Map...");
