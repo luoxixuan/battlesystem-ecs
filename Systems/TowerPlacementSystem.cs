@@ -268,6 +268,16 @@ namespace BattleSystemECS.Systems
                         store.TowerTimeScale[towerId] = tc.TimeScale;
                         logger.Log($"[TOWER] {tc.Name} 时间塔: 半径 {tc.TimeFieldRadius}, 时间缩放 {tc.TimeScale:F1}x");
                     }
+                    // Apply deployable trap properties (passive trigger on enemy walk-in)
+                    if (tc.IsTrap)
+                    {
+                        store.TowerIsTrap[towerId] = true;
+                        store.TowerTrapTriggerRadius[towerId] = tc.TrapTriggerRadius;
+                        store.TowerTrapCharges[towerId] = tc.TrapCharges;
+                        store.TowerTrapEffectType[towerId] = tc.TrapEffectType;
+                        store.TowerTrapEffectValue[towerId] = tc.TrapEffectValue;
+                        logger.Log($"[TOWER] {tc.Name} 陷阱塔: 触发半径 {tc.TrapTriggerRadius}, 充能 {tc.TrapCharges}, 效果 {tc.TrapEffectType} 值 {tc.TrapEffectValue}");
+                    }
                     // Apply construction delay if configured (tower starts building, cannot attack)
                     if (tc.ConstructionTime > 0f)
                     {

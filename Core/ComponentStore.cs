@@ -804,7 +804,6 @@ namespace BattleSystemECS.Core
             TowerCurseDmgReduction = null!; TowerCurseSpeedReduction = null!;
             TowerCurseArmorReduction = null!; TowerCurseDmgTakenIncrease = null!;
             TowerIsPullTower = null!; TowerPullStrength = null!; TowerPullRadius = null!;
-            TowerPullCooldown = null!; TowerPullTimer = null!; EnemyIsBeingPulled = null!;
             TowerIsBleedTower = null!; TowerBleedStacksPerHit = null!; TowerBleedDmgPct = null!;
             TowerBleedTickInterval = null!; TowerBleedMaxStacks = null!; TowerBleedDuration = null!;
             TowerIsIncomeTower = null!; TowerGoldPerSecond = null!;

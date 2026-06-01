@@ -474,6 +474,24 @@ namespace BattleSystemECS.Core
         // Resets to 0 when burst cooldown completes
         public int[] TowerBurstShotsFired = new int[MAX_ENTITIES];
 
+        // ==================== 可部署陷阱塔 (Deployable Trap Tower) ====================
+        // Passive "tower" type — does not actively attack, instead triggers an effect
+        // on enemies that walk into its trigger radius. Each trigger consumes 1 charge.
+        // When charges hit 0, the trap is destroyed (auto-removed from active tower list).
+        // Conceptually similar to a stationary, one-shot tower.
+        // TowerIsTrap: true if this tower is a passive trap (no active attacks, only triggers)
+        public bool[] TowerIsTrap = new bool[MAX_ENTITIES];
+        // TowerTrapTriggerRadius: in grid units, the radius within which enemies trigger the trap
+        // 0 = disabled / passive (no trigger check)
+        public float[] TowerTrapTriggerRadius = new float[MAX_ENTITIES];
+        // TowerTrapCharges: remaining trigger count. Decremented per enemy trigger.
+        // 0 = inactive (trap cannot trigger), -1 = unlimited charges.
+        public int[] TowerTrapCharges = new int[MAX_ENTITIES];
+        // TowerTrapEffectType: 0=none (no trap configured), 1=stun, 2=damage, 3=slow
+        public int[] TowerTrapEffectType = new int[MAX_ENTITIES];
+        // TowerTrapEffectValue: stun duration (sec) / damage (flat HP) / slow amount (0-1) per trigger
+        public float[] TowerTrapEffectValue = new float[MAX_ENTITIES];
+
         // ── 射程伤害衰减 (Range-Based Damage Falloff) ====================
         // TowerFalloffType: 0=None, 1=Standard (closer=more dmg), 2=Reverse (sniper: farther=more dmg)
         public int[] TowerFalloffType = new int[MAX_ENTITIES];
@@ -688,6 +706,15 @@ namespace BattleSystemECS.Core
             TowerBurstCooldown[entityId] = 0f;
             TowerBurstTimer[entityId] = 0f;
             TowerBurstShotsFired[entityId] = 0;
+            // Deployable trap fields: default to non-trap (false, radius=0, charges=0, no effect)
+            // Trap towers are passive — they do not actively attack, instead they trigger
+            // effects (stun / damage / slow) on enemies that walk into their trigger radius,
+            // consuming one charge per trigger. When charges hit 0 the trap is destroyed.
+            TowerIsTrap[entityId] = false;
+            TowerTrapTriggerRadius[entityId] = 0f;
+            TowerTrapCharges[entityId] = 0;
+            TowerTrapEffectType[entityId] = 0;  // 0=none, 1=stun, 2=damage, 3=slow
+            TowerTrapEffectValue[entityId] = 0f;
             // Ramp-Up / Spool-Up: default to no ramp-up (rate=0, max=1, current=1.0, no target)
             TowerRampUpRate[entityId] = 0f;
             TowerRampUpMax[entityId] = 1f;
@@ -813,6 +840,12 @@ namespace BattleSystemECS.Core
             TowerBurstCooldown[entityId] = 0f;
             TowerBurstTimer[entityId] = 0f;
             TowerBurstShotsFired[entityId] = 0;
+            // Deployable trap fields reset
+            TowerIsTrap[entityId] = false;
+            TowerTrapTriggerRadius[entityId] = 0f;
+            TowerTrapCharges[entityId] = 0;
+            TowerTrapEffectType[entityId] = 0;
+            TowerTrapEffectValue[entityId] = 0f;
             // Falloff fields reset
             TowerFalloffType[entityId] = 0;
             TowerFalloffStartRatio[entityId] = 1f;

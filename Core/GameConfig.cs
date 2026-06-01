@@ -221,6 +221,19 @@ namespace BattleSystemECS.Config
         public int PatrolDirection { get; set; } = 1;
         // PatrolAttackSpeedPenalty: attack speed multiplier while moving (e.g. 0.75 = 25% slower)
         public float PatrolAttackSpeedPenalty { get; set; } = 0.75f;
+        // ── Deployable Trap Tower ───────────────────────────────────────────────
+        // IsTrap: if true, this tower is a passive trap (does not actively attack).
+        // Triggers an effect (stun/damage/slow) on enemies that walk into its trigger
+        // radius. Each trigger consumes 1 charge. Charges = 0 = trap destroyed.
+        public bool IsTrap { get; set; } = false;
+        // TrapTriggerRadius: in grid units, the radius within which enemies trigger the trap
+        public float TrapTriggerRadius { get; set; } = 0f;
+        // TrapCharges: total trigger count before the trap is destroyed (-1 = unlimited)
+        public int TrapCharges { get; set; } = 0;
+        // TrapEffectType: 1=stun (duration in sec), 2=damage (flat HP), 3=slow (factor 0-1)
+        public int TrapEffectType { get; set; } = 0;
+        // TrapEffectValue: magnitude of the effect (stun seconds / damage HP / slow factor)
+        public float TrapEffectValue { get; set; } = 0f;
         // ── Burst Fire / Salvo Mode ────────────────────────────────────────────────
         // BurstCount: number of shots fired per burst cycle (0 = no burst fire, standard single-shot)
         public int BurstCount { get; set; } = 0;

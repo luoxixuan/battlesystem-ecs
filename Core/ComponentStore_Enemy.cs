@@ -147,6 +147,14 @@ namespace BattleSystemECS.Core
         public float[] EnemyPathDeviationPhase = new float[MAX_ENTITIES];
         // EnemyPathDeviationSeed: per-enemy random-seed base for type=2 (deterministic per turn)
         public int[] EnemyPathDeviationSeed = new int[MAX_ENTITIES];
+        // ==================== Deployable Trap Cooldown (per-enemy, per-trap) ====================
+        // Tracks how many frames are left before a given trap tower can trigger on this enemy again.
+        // Outer key = enemyId, inner array indexed by trap towerId (sparse — only enemies
+        // that have actually stepped on a trap carry an entry). Decremented each frame.
+        // Cooldown prevents a single trap from re-triggering on the same enemy every turn
+        // (e.g. a stun-trap applied every frame would be unfair). 0 = ready to trigger.
+        // Default null = no entries (no cooldowns active). Allocated on first trigger.
+        public System.Collections.Generic.Dictionary<int, int[]> EnemyTrapCooldownTick = new System.Collections.Generic.Dictionary<int, int[]>(64);
         // ==================== Enemy Wound / Cripple (HP-Threshold Slow) ====================
         // EnemyWoundThreshold: HP fraction threshold that triggers wound slow (e.g. 0.3 = 30% HP)
         // Default 0f = no wound mechanic. When HP drops below this ratio, wound slow activates.
@@ -615,6 +623,15 @@ namespace BattleSystemECS.Core
             EnemyPathDeviationAmplitude[entityId] = 0f;
             EnemyPathDeviationPhase[entityId] = 0f;
             EnemyPathDeviationSeed[entityId] = 0;
+            // Deployable trap cooldown: per-tower cooldown tracking which trap towers have
+            // already triggered on this enemy. Prevents the same trap from triggering
+            // multiple times on the same enemy in a single frame / N frames.
+            // Format: Dictionary<enemyId, int[trapId]>. We use a flat int[] approach keyed
+            // by trap tower id — bit index = trap entity id. 0 = no cooldown, >0 = frames
+            // remaining before this trap can trigger again on this enemy.
+            // Stored sparsely to keep memory bounded for 10K enemies × MAX_ENTITIES.
+            // Dictionary<int, int[]> reused from existing pattern (e.g. EnemyIsBeingPulled).
+            EnemyTrapCooldownTick = null; // lazily allocated by DeployableTrapSystem on first use
             // Stat drain: default 0/0/0 = no drain ability. WaveSpawningSystem overrides
             // per archetype if the monster config specifies drain ratio/radius/rate.
             // DrainRatio = max fraction of tower damage that can be drained (0-1, e.g. 0.5 = 50% cap).
