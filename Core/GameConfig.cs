@@ -1263,6 +1263,50 @@ namespace BattleSystemECS.Config
             return HealerDefs.FirstOrDefault(h => h.Id == healerId);
         }
 
+        // ==================== 塔词缀系统 (Tower Affix — Reforge Split A) ====================
+        // Defines a single tower affix (prefix/suffix mod) usable in the Reforge system.
+        // Each affix modifies a single stat by a multiplier (Multiplicative) or flat add (Additive).
+        // Loaded from Data/Configs/tower_affixes.json; the Reforge system will pick from this pool
+        // (Round 35, Reforge — Split B).
+        public class TowerAffixDef
+        {
+            // Unique affix identifier (e.g., "damage_pct", "crit_chance", "chain_targets").
+            public string AffixId { get; set; } = "";
+            // Human-readable name for UI display (e.g., "Sharpened", "Piercing", "Vampiric").
+            public string Name { get; set; } = "";
+            // Stat this affix modifies: "Damage" | "Range" | "AttackSpeed" | "CritChance" |
+            // "CritMultiplier" | "ChainTargets" | "PierceCount" | "ArmorPenetration" |
+            // "KnockbackChance" | "ExecuteThreshold" | "LifeOnKill" | "ManaOnHit" | "GoldOnHit" |
+            // "CooldownReduction" | "MultishotCount" | "SplashRadius" | "Accuracy".
+            public string Stat { get; set; } = "";
+            // Magnitude: percent (0.15 = +15%) for multiplicative stats, or flat add for additive stats.
+            // Sign convention: positive = buff, negative = debuff (e.g., "-0.1" CooldownReduction is invalid).
+            public float Magnitude { get; set; } = 0f;
+            // Rarity tier: 0=Common, 1=Uncommon, 2=Rare, 3=Epic, 4=Legendary. Drives weighted random in Reforge.
+            public int Rarity { get; set; } = 0;
+            // Min tower level required for this affix to roll (0 = any level).
+            public int MinLevel { get; set; } = 0;
+            // Max stack count on a single slot (1 = no stacking, N = up to N of this affix on one slot).
+            public int MaxStack { get; set; } = 1;
+            // Optional description for tooltips/UI.
+            public string Description { get; set; } = "";
+        }
+
+        // Tower affix pool (loaded from Data/Configs/tower_affixes.json).
+        public TowerAffixDef[] TowerAffixes { get; set; } = Array.Empty<TowerAffixDef>();
+
+        // Look up a tower affix def by its AffixId (returns null if not found).
+        public TowerAffixDef GetTowerAffixDef(string affixId)
+        {
+            return Array.Find(TowerAffixes, a => a.AffixId == affixId);
+        }
+
+        // Get the index of a tower affix in TowerAffixes[] by AffixId (returns -1 if not found).
+        public int GetTowerAffixIndex(string affixId)
+        {
+            return Array.FindIndex(TowerAffixes, a => a.AffixId == affixId);
+        }
+
         // Look up a fission def by its FissionId
         public FissionDef GetFissionDef(string fissionId)
         {

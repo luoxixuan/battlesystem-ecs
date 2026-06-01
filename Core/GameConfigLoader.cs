@@ -63,6 +63,9 @@ namespace BattleSystemECS.Config
                 // Load corpse ground effect definitions (direction 9)
                 LoadCorpseEffectDefs(gameConfig, renderer);
 
+                // Load tower affix (reforge) definitions (Round 34, Reforge — Split A)
+                LoadTowerAffixDefs(gameConfig, renderer);
+
                 // Load summon definitions (direction 1: player-summoned combat units)
                 LoadSummonDefs(gameConfig, renderer);
 
@@ -1409,6 +1412,56 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[CORPSE] Failed to load corpse effect defs: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Load tower affix (Reforge) definitions from Data/Configs/tower_affixes.json.
+        /// Reforge — Split A: data layer + affix slot infrastructure. The actual reroll
+        /// API is implemented in Split B.
+        /// </summary>
+        private static void LoadTowerAffixDefs(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string affixFile = "Data/Configs/tower_affixes.json";
+            try
+            {
+                if (!File.Exists(affixFile))
+                {
+                    renderer.Log("[AFFIX] Tower affix defs file not found: " + affixFile + ", reforge pool empty");
+                    return;
+                }
+                string json = File.ReadAllText(affixFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[AFFIX] Tower affix defs file is empty: " + affixFile);
+                    return;
+                }
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    var defs = new List<GameConfig.TowerAffixDef>();
+                    foreach (var elem in root.EnumerateArray())
+                    {
+                        var a = new GameConfig.TowerAffixDef();
+                        a.AffixId = elem.TryGetProperty("affixId", out var aid) ? aid.GetString() ?? "" : "";
+                        a.Name = elem.TryGetProperty("name", out var name) ? name.GetString() ?? "" : "";
+                        a.Stat = elem.TryGetProperty("stat", out var stat) ? stat.GetString() ?? "" : "";
+                        a.Magnitude = elem.TryGetProperty("magnitude", out var mag) ? (float)mag.GetDouble() : 0f;
+                        a.Rarity = elem.TryGetProperty("rarity", out var rar) ? rar.GetInt32() : 0;
+                        a.MinLevel = elem.TryGetProperty("minLevel", out var ml) ? ml.GetInt32() : 0;
+                        a.MaxStack = elem.TryGetProperty("maxStack", out var ms) ? ms.GetInt32() : 1;
+                        a.Description = elem.TryGetProperty("description", out var desc) ? desc.GetString() ?? "" : "";
+                        defs.Add(a);
+                    }
+                    gameConfig.TowerAffixes = defs.ToArray();
+                    renderer.Log("[AFFIX] Loaded " + defs.Count + " tower affix defs from " + affixFile);
+                }
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[AFFIX] Failed to load tower affix defs: " + ex.Message);
             }
         }
 

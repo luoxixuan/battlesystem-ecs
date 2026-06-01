@@ -113,6 +113,18 @@ namespace BattleSystemECS.Core
         public float[] TowerSpecialAbilityDotDamage = new float[MAX_ENTITIES];
         public float[] TowerSpecialAbilityDotInterval = new float[MAX_ENTITIES];
 
+        // ==================== 塔词缀槽位 (Tower Affix Slots — Reforge Split A) ====================
+        // TowerAffixSlotCount: how many affix slots this tower has (0 = no affixes, 1-3 = enabled)
+        // Default 0 keeps backward compatibility for existing towers that haven't been reforged.
+        public int[] TowerAffixSlotCount = new int[MAX_ENTITIES];
+        // TowerAffixIds: [slotIndex][towerId] = index into GameConfig.TowerAffixes[] (-1 = empty slot)
+        // Jagged array pattern matches TowerMorphDamage etc. — avoids MAX_AFFIX_SLOTS × MAX_ENTITIES
+        // flat allocation (100K × 3 = 300K ints but only towers with slots pay the per-slot cost).
+        public int[][] TowerAffixIds = new int[3][];
+        // TowerAffixStackCount: [slotIndex][towerId] = number of times this slot's affix is stacked
+        // (1 = single, N = up to TowerAffixDef.MaxStack). Default 0 = no affix assigned.
+        public int[][] TowerAffixStackCount = new int[3][];
+
         // ==================== 塔击退/位移效果 (Knockback) ====================
         // TowerKnockbackForce: strength of knockback applied to enemies on hit (0 = no knockback)
         // Positive values push enemies backward along the path direction
@@ -1013,6 +1025,90 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(towerId)) return;
             TowerLinkDamageBonus[towerId] = bonus;
+        }
+
+        // ==================== 塔词缀槽位 (Tower Affix Slots — Reforge Split A) ====================
+        // Lazy-initializes the jagged slot arrays on first use. Called from accessor methods below.
+        private const int TOWER_AFFIX_SLOT_COUNT = 3;
+
+        private void EnsureAffixArrays(int slotIndex)
+        {
+            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return;
+            if (TowerAffixIds[slotIndex] == null)
+                TowerAffixIds[slotIndex] = new int[MAX_ENTITIES];
+            if (TowerAffixStackCount[slotIndex] == null)
+                TowerAffixStackCount[slotIndex] = new int[MAX_ENTITIES];
+        }
+
+        /// <summary>Gets the number of affix slots this tower has (0 = no affixes).</summary>
+        public int GetTowerAffixSlotCount(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0;
+            return TowerAffixSlotCount[towerId];
+        }
+
+        /// <summary>Sets the number of affix slots for a tower (1-3, 0 to disable).</summary>
+        public void SetTowerAffixSlotCount(int towerId, int slotCount)
+        {
+            if (!IsValidEntity(towerId)) return;
+            if (slotCount < 0) slotCount = 0;
+            if (slotCount > TOWER_AFFIX_SLOT_COUNT) slotCount = TOWER_AFFIX_SLOT_COUNT;
+            // Pre-warm all slot arrays up to slotCount so reads are safe
+            for (int s = 0; s < slotCount; s++)
+                EnsureAffixArrays(s);
+            TowerAffixSlotCount[towerId] = slotCount;
+        }
+
+        /// <summary>Gets the affix def index assigned to a given slot (returns -1 if empty).</summary>
+        public int GetTowerAffixId(int towerId, int slotIndex)
+        {
+            if (!IsValidEntity(towerId)) return -1;
+            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return -1;
+            if (TowerAffixIds[slotIndex] == null) return -1;
+            return TowerAffixIds[slotIndex][towerId];
+        }
+
+        /// <summary>Assigns an affix def index to a slot. Pass -1 to clear.</summary>
+        public void SetTowerAffixId(int towerId, int slotIndex, int affixIndex)
+        {
+            if (!IsValidEntity(towerId)) return;
+            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return;
+            EnsureAffixArrays(slotIndex);
+            TowerAffixIds[slotIndex][towerId] = affixIndex;
+        }
+
+        /// <summary>Gets the stack count for a slot (0 = no affix, 1+ = stacked).</summary>
+        public int GetTowerAffixStackCount(int towerId, int slotIndex)
+        {
+            if (!IsValidEntity(towerId)) return 0;
+            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return 0;
+            if (TowerAffixStackCount[slotIndex] == null) return 0;
+            return TowerAffixStackCount[slotIndex][towerId];
+        }
+
+        /// <summary>Sets the stack count for a slot (1 = single, 2+ = stacked up to MaxStack).</summary>
+        public void SetTowerAffixStackCount(int towerId, int slotIndex, int stackCount)
+        {
+            if (!IsValidEntity(towerId)) return;
+            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return;
+            if (stackCount < 0) stackCount = 0;
+            EnsureAffixArrays(slotIndex);
+            TowerAffixStackCount[slotIndex][towerId] = stackCount;
+        }
+
+        /// <summary>
+        /// Clears all affix data for a tower (used in DestroyEntity and when resetting a slot).
+        /// Resets slot count to 0 and all 3 slot assignments to -1/0.
+        /// </summary>
+        public void ClearTowerAffixes(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return;
+            TowerAffixSlotCount[towerId] = 0;
+            for (int s = 0; s < TOWER_AFFIX_SLOT_COUNT; s++)
+            {
+                if (TowerAffixIds[s] != null) TowerAffixIds[s][towerId] = -1;
+                if (TowerAffixStackCount[s] != null) TowerAffixStackCount[s][towerId] = 0;
+            }
         }
     }
 }

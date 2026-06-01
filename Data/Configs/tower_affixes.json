@@ -1,0 +1,182 @@
+[
+  {
+    "affixId": "damage_pct_small",
+    "name": "Sharpened",
+    "stat": "Damage",
+    "magnitude": 0.10,
+    "rarity": 0,
+    "minLevel": 0,
+    "maxStack": 5,
+    "description": "+10% damage. Stacks up to 5 times."
+  },
+  {
+    "affixId": "damage_pct_medium",
+    "name": "Tempered",
+    "stat": "Damage",
+    "magnitude": 0.20,
+    "rarity": 2,
+    "minLevel": 2,
+    "maxStack": 3,
+    "description": "+20% damage. Stacks up to 3 times. Requires tower level >= 2."
+  },
+  {
+    "affixId": "damage_pct_large",
+    "name": "Annihilating",
+    "stat": "Damage",
+    "magnitude": 0.35,
+    "rarity": 3,
+    "minLevel": 3,
+    "maxStack": 2,
+    "description": "+35% damage. Stacks up to 2 times. Requires tower level >= 3."
+  },
+  {
+    "affixId": "range_flat",
+    "name": "Far-seeing",
+    "stat": "Range",
+    "magnitude": 1.0,
+    "rarity": 0,
+    "minLevel": 0,
+    "maxStack": 3,
+    "description": "+1 cell range (flat). Stacks up to 3 times."
+  },
+  {
+    "affixId": "attackspeed_pct",
+    "name": "Hastened",
+    "stat": "AttackSpeed",
+    "magnitude": 0.15,
+    "rarity": 1,
+    "minLevel": 0,
+    "maxStack": 4,
+    "description": "+15% attack speed. Stacks up to 4 times."
+  },
+  {
+    "affixId": "crit_chance_pct",
+    "name": "Precise",
+    "stat": "CritChance",
+    "magnitude": 0.05,
+    "rarity": 1,
+    "minLevel": 0,
+    "maxStack": 4,
+    "description": "+5% critical strike chance. Stacks up to 4 times."
+  },
+  {
+    "affixId": "crit_mult_pct",
+    "name": "Devastating",
+    "stat": "CritMultiplier",
+    "magnitude": 0.25,
+    "rarity": 2,
+    "minLevel": 1,
+    "maxStack": 3,
+    "description": "+25% critical strike damage multiplier. Stacks up to 3 times."
+  },
+  {
+    "affixId": "chain_targets",
+    "name": "Arcing",
+    "stat": "ChainTargets",
+    "magnitude": 1.0,
+    "rarity": 2,
+    "minLevel": 2,
+    "maxStack": 2,
+    "description": "+1 chain-lightning target. Stacks up to 2 times. Requires tower level >= 2."
+  },
+  {
+    "affixId": "pierce_count",
+    "name": "Piercing",
+    "stat": "PierceCount",
+    "magnitude": 1.0,
+    "rarity": 2,
+    "minLevel": 1,
+    "maxStack": 2,
+    "description": "+1 pierce target. Stacks up to 2 times. Requires tower level >= 1."
+  },
+  {
+    "affixId": "armor_pen_pct",
+    "name": "Penetrating",
+    "stat": "ArmorPenetration",
+    "magnitude": 0.10,
+    "rarity": 1,
+    "minLevel": 0,
+    "maxStack": 4,
+    "description": "+10% armor penetration. Stacks up to 4 times."
+  },
+  {
+    "affixId": "knockback_chance",
+    "name": "Forceful",
+    "stat": "KnockbackChance",
+    "magnitude": 0.15,
+    "rarity": 1,
+    "minLevel": 0,
+    "maxStack": 3,
+    "description": "+15% knockback chance on hit. Stacks up to 3 times."
+  },
+  {
+    "affixId": "execute_threshold",
+    "name": "Executioner",
+    "stat": "ExecuteThreshold",
+    "magnitude": 0.05,
+    "rarity": 3,
+    "minLevel": 3,
+    "maxStack": 1,
+    "description": "Instantly kill enemies below 5% max HP. Single instance. Requires tower level >= 3."
+  },
+  {
+    "affixId": "life_on_kill",
+    "name": "Vampiric",
+    "stat": "LifeOnKill",
+    "magnitude": 1.0,
+    "rarity": 2,
+    "minLevel": 1,
+    "maxStack": 3,
+    "description": "Restore 1 player HP on each kill. Stacks up to 3 times."
+  },
+  {
+    "affixId": "mana_on_hit",
+    "name": "Energizing",
+    "stat": "ManaOnHit",
+    "magnitude": 1.0,
+    "rarity": 1,
+    "minLevel": 0,
+    "maxStack": 5,
+    "description": "+1 mana on each hit. Stacks up to 5 times."
+  },
+  {
+    "affixId": "gold_on_hit",
+    "name": "Midas",
+    "stat": "GoldOnHit",
+    "magnitude": 1.0,
+    "rarity": 1,
+    "minLevel": 0,
+    "maxStack": 5,
+    "description": "+1 gold on each hit. Stacks up to 5 times."
+  },
+  {
+    "affixId": "cooldown_reduction",
+    "name": "Eager",
+    "stat": "CooldownReduction",
+    "magnitude": 0.05,
+    "rarity": 1,
+    "minLevel": 0,
+    "maxStack": 4,
+    "description": "-5% cooldown duration on this tower's abilities. Stacks up to 4 times."
+  },
+  {
+    "affixId": "multishot_count",
+    "name": "Scattering",
+    "stat": "MultishotCount",
+    "magnitude": 1.0,
+    "rarity": 2,
+    "minLevel": 2,
+    "maxStack": 3,
+    "description": "+1 projectile per attack. Stacks up to 3 times. Requires tower level >= 2."
+  },
+  {
+    "affixId": "splash_radius",
+    "name": "Explosive",
+    "stat": "SplashRadius",
+    "magnitude": 0.5,
+    "rarity": 2,
+    "minLevel": 1,
+    "maxStack": 2,
+    "description": "+0.5 splash radius. Stacks up to 2 times. Requires tower level >= 1."
+  }
+]
