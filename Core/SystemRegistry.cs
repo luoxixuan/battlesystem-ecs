@@ -102,6 +102,9 @@ namespace BattleSystemECS.Core
         public ResourceNodeSystem? ResourceNode { get; private set; }
         public WavePreviewSystem? WavePreview { get; private set; }
 
+        // ── Replay / Recording ──
+        public ReplaySystem? Replay { get; private set; }
+
         // ── Hot Zone / Terrain Bonus ──
         public HotZoneSystem? HotZone { get; private set; }
 
@@ -251,6 +254,9 @@ namespace BattleSystemECS.Core
             WaveBranch = new WaveBranchSystem(store, logger, config, stateMachine);
             ResourceNode = new ResourceNodeSystem(store, logger, playerId);
             WavePreview = new WavePreviewSystem(store, config, playerId);
+
+            // ── Replay / Recording (per-frame telemetry, opt-in via GameConfig.Replay.Enabled) ──
+            Replay = new ReplaySystem(store, config, playerId);
 
             // ── Hot Zone ──
             HotZone = new HotZoneSystem(store, config, playerId);

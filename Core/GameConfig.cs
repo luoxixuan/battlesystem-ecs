@@ -913,6 +913,20 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Replay / Recording System configuration — controls per-frame telemetry capture.
+    /// When Enabled=false, ReplaySystem is constructed but no I/O occurs (zero hot-path cost).
+    /// </summary>
+    public class ReplayConfig
+    {
+        /// <summary>Master switch for recording. Default: false (no recording, zero overhead)</summary>
+        public bool Enabled { get; set; } = false;
+        /// <summary>Flush to disk every N frames to bound data loss on crash. Default: 60</summary>
+        public int FlushInterval { get; set; } = 60;
+        /// <summary>Maximum frames to record per session (0 = unlimited). Default: 0</summary>
+        public int MaxFrames { get; set; } = 0;
+    }
+
+    /// <summary>
     /// Auto Skill System configuration — controls which strategy is used to auto-cast skills
     /// during BuildPhase, how many skills can fire per phase, and cooldown protection.
     /// </summary>
@@ -1075,6 +1089,9 @@ namespace BattleSystemECS.Config
 
         // Enemy tile-stacking penalty configuration (move-speed slow when N enemies share a cell)
         public StackingConfig Stacking { get; set; } = new StackingConfig();
+
+        // Replay / Recording configuration (per-frame telemetry capture)
+        public ReplayConfig Replay { get; set; } = new ReplayConfig();
 
         // Auto Skill configuration (BuildPhase auto-casting)
         public AutoSkillConfig AutoSkill { get; set; } = new AutoSkillConfig();
