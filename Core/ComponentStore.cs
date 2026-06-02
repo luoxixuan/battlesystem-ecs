@@ -23,6 +23,17 @@ namespace BattleSystemECS.Core
         internal const int MAX_MORPHS = 4; // max morph modes per tower (2 default + 2 alt forms)
         public int TotalKills = 0;
 
+        // ── Performance counters (O(1) instead of O(N) per-frame pre-scans) ──
+        /// <summary>Count of active enemies with TrampleRadius > 0 && TrampleDamagePerStep > 0.
+        /// Maintained by AddEnemy/DestroyEntity. Read by EnemyMovementSystem to skip ResolveTrampleAoe.</summary>
+        public int ActiveTramplerCount = 0;
+        /// <summary>Count of active enemies with TetherMaxLength > 0.
+        /// Maintained by AddEnemy/DestroyEntity. Read by EnemyMovementSystem/TowerAttackSystem.</summary>
+        public int ActiveTetheredCount = 0;
+        /// <summary>Count of active wisps across all players (PlayerWispType != None).
+        /// Maintained by SpawnWisp/RemoveWisp. Read by WispSystem to skip Update.</summary>
+        public int ActiveWispCount = 0;
+
         // Inline boundary check helpers — replaces 100+ manual checks with zero-overhead guards.
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public static bool IsValidEntity(int id) => (uint)id < MAX_ENTITIES;
@@ -511,6 +522,12 @@ namespace BattleSystemECS.Core
                 EnemyChannelTimer[entityId] = 0f;
                 EnemyChannelAbilityId[entityId] = null;
                 EnemyChannelInterruptible[entityId] = true;
+
+                // ── Performance counter maintenance ──
+                if (EnemyTrampleRadius[entityId] > 0f && EnemyTrampleDamagePerStep[entityId] > 0f)
+                    ActiveTramplerCount = Math.Max(0, ActiveTramplerCount - 1);
+                if (EnemyTetherMaxLength[entityId] > 0f)
+                    ActiveTetheredCount = Math.Max(0, ActiveTetheredCount - 1);
             }
 
             if (wasTower)

@@ -83,41 +83,13 @@ namespace BattleSystemECS.Systems
             // because TowerAttackSystem.ApplyEnemyStun() runs after SetTurn()
             // in the same frame.
             // Cache trampler presence for the frame so ResolveTrampleAoe can early-out
-            // in O(1) instead of an O(N²) check on every frame. Cheap O(N) pre-scan
-            // with early-break — typically the first active enemy is enough.
-            _hasTramplerThisFrame = false;
-            if (_activeEnemyList != null)
-            {
-                int n = _activeEnemyList.Count;
-                for (int i = 0; i < n; i++)
-                {
-                    int probe = _activeEnemyList[i];
-                    if (store.EnemyActive[probe]
-                        && store.EnemyTrampleRadius[probe] > 0f
-                        && store.EnemyTrampleDamagePerStep[probe] > 0f)
-                    {
-                        _hasTramplerThisFrame = true;
-                        break;
-                    }
-                }
-            }
+            // in O(1) instead of an O(N²) check on every frame.
+            // Uses ComponentStore.ActiveTramplerCount (O(1)) instead of per-frame O(N) scan.
+            _hasTramplerThisFrame = store.ActiveTramplerCount > 0;
             // Cache tether presence for the frame so ResolveTetherEnforcement can early-out
-            // in O(1) instead of an O(N²) check on every frame. Cheap O(N) pre-scan
-            // with early-break.
-            _hasTetheredThisFrame = false;
-            if (_activeEnemyList != null)
-            {
-                int n = _activeEnemyList.Count;
-                for (int i = 0; i < n; i++)
-                {
-                    int probe = _activeEnemyList[i];
-                    if (store.EnemyActive[probe] && store.EnemyTetherMaxLength[probe] > 0f)
-                    {
-                        _hasTetheredThisFrame = true;
-                        break;
-                    }
-                }
-            }
+            // in O(1) instead of an O(N²) check on every frame.
+            // Uses ComponentStore.ActiveTetheredCount (O(1)) instead of per-frame O(N) scan.
+            _hasTetheredThisFrame = store.ActiveTetheredCount > 0;
         }
 
         // Cached per-turn: true if at least one active enemy has TrampleRadius & damage > 0.

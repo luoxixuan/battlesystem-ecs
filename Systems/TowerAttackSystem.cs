@@ -1051,7 +1051,9 @@ int bestTarget = -1;
                 // Tether damage share: if enemy is in a lock-chain, transfer a fraction of damage to partner.
                 // Runs in the same serial pass as LifeLink (which only writes EnemyHealth directly).
                 // Important: tether damage can also trigger a kill on the partner (stacks on top of primary).
-                ApplyTetherDamageShare(enemyId, finalDmg, playerId);
+                // O(1) guard: skip the call entirely when no tethered enemies exist (avoids per-enemy call overhead).
+                if (store.ActiveTetheredCount > 0)
+                    ApplyTetherDamageShare(enemyId, finalDmg, playerId);
                 // Thorns: enemy reflects damage back to the player (tower attacker)
                 float thornsRatio = store.EnemyThornsRatio[enemyId];
                 if (thornsRatio > 0f && finalDmg > 0f)

@@ -94,9 +94,12 @@ namespace BattleSystemECS.Systems
             }
 
             // Replace existing wisp (mutually exclusive — no stacking)
+            int oldType = _store.PlayerWispType[playerId];
             _store.PlayerWispType[playerId] = wispType;
             _store.PlayerWispDurationLeft[playerId] = duration;
             _store.PlayerWispCooldown[playerId] = 0f;
+            if (oldType == TypeNone)
+                _store.ActiveWispCount++;
             string typeName = wispType switch
             {
                 TypeHeal  => "Heal",
@@ -132,6 +135,9 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void Update(float deltaTime)
         {
+            // O(1) early-out: skip all per-player loops when no wisps are active anywhere
+            if (_store.ActiveWispCount <= 0) return;
+
             int n = _store.PlayerWispType.Length;
             for (int pid = 0; pid < n; pid++)
             {
@@ -146,6 +152,7 @@ namespace BattleSystemECS.Systems
                     _store.PlayerWispType[pid] = TypeNone;
                     _store.PlayerWispDurationLeft[pid] = 0f;
                     _store.PlayerWispCooldown[pid] = DEFAULT_COOLDOWN_AFTER_EXPIRE;
+                    _store.ActiveWispCount = Math.Max(0, _store.ActiveWispCount - 1);
                     _logger?.Log($"[WISP] Player {pid}'s wisp expired — cooldown {DEFAULT_COOLDOWN_AFTER_EXPIRE:F0}s");
                     continue;
                 }
