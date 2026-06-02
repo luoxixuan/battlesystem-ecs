@@ -115,6 +115,17 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Capped at 60% (0.6) to avoid zero-duration cooldowns
         public float[] PlayerCooldownReduction = new float[MAX_PLAYERS];
 
+        // ==================== Breather Wave Reward (SOA) ====================
+        // PlayerHealOnBreatherWave: percentage of max HP restored when a Breather-rhythm wave completes.
+        // Default 0 = no heal. Example: 0.3f = heal 30% of max HP. Applied via SetPlayerCurrentHealth with clamp to max.
+        public float[] PlayerHealOnBreatherWave = new float[MAX_PLAYERS];
+        // PlayerCooldownReduceOnBreather: seconds subtracted from each global skill cooldown when a Breather wave completes.
+        // Default 0 = no CDR. Example: 5f = -5s on every active skill cooldown (clamped at 0).
+        public float[] PlayerCooldownReduceOnBreather = new float[MAX_PLAYERS];
+        // PlayerBreatherGoldBonus: flat gold awarded on top of any per-wave gold when a Breather wave completes.
+        // Default 0 = no extra gold. The Breather x2 effect in GoldSystem multiplies this by 2.
+        public float[] PlayerBreatherGoldBonus = new float[MAX_PLAYERS];
+
         // ==================== Shop Reroll System (SOA) ====================
         // PlayerShopRerollCount: number of rerolls performed in the current BuildPhase (resets each phase).
         public int[] PlayerShopRerollCount = new int[MAX_PLAYERS];

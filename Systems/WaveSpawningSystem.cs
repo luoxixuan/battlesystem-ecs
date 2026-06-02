@@ -73,6 +73,12 @@ namespace BattleSystemECS.Systems
         public event System.Action OnWaveComplete;
 
         /// <summary>
+        /// Fired when a Breather-rhythm wave completes (fires alongside OnWaveComplete).
+        /// Subscribers (GoldSystem, heal handler, CDR handler) apply the post-wave bonus.
+        /// </summary>
+        public event System.Action<int> OnBreatherWaveComplete;
+
+        /// <summary>
         /// Fired when a new wave starts (before enemies spawn that wave).
         /// </summary>
         public event System.Action OnWaveStart;
@@ -578,6 +584,17 @@ namespace BattleSystemECS.Systems
             }
             else
             {
+                // Capture the rhythm of the wave that is completing right now (BEFORE currentWave++).
+                // The wave index is currentWave - 1 because currentWave is 1-based and was set when this wave started.
+                // Guard with `>= 0` to defend against any future code path where currentWave could be 0.
+                var completedLevelConfig = gameConfig.GetLevelConfig(currentLevel);
+                int completedIdx = currentWave - 1;
+                WaveConfig completedWaveConfig = (completedLevelConfig != null && completedIdx >= 0 && completedIdx < completedLevelConfig.Waves.Count)
+                    ? completedLevelConfig.Waves[completedIdx]
+                    : null;
+                bool wasBreather = completedWaveConfig != null && completedWaveConfig.GetRhythmEnum() == WaveRhythm.Breather;
+                int completedWaveNumber = currentWave;
+
                 renderer.Log($"[SPAWN] Wave {currentWave} complete! Spawned {enemiesSpawnedInWave} enemies (batch 100 per wave)");
                 ClearMultiTypeState();
                 enemiesSpawnedInWave = 0;
@@ -585,6 +602,13 @@ namespace BattleSystemECS.Systems
 
                 // Trigger adaptive difficulty evaluation (before OnWaveComplete so new difficulty is ready for next wave)
                 _adaptiveDifficulty?.OnWaveComplete(0); // player 0
+
+                // Fire Breather event before the generic event so subscribers (gold/heal/CDR) run first
+                // and are observable in logs before the next-wave hooks. Always non-null when rhythm == Breather.
+                if (wasBreather)
+                {
+                    OnBreatherWaveComplete?.Invoke(completedWaveNumber);
+                }
 
                 OnWaveComplete?.Invoke();
 

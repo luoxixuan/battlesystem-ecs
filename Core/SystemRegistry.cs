@@ -356,6 +356,8 @@ namespace BattleSystemECS.Core
                             WaveSpawning.GetCurrentLevel()
                         );
                 };
+                // Breather-wave reward hook: GoldSystem applies heal + CDR + gold x2 when a Breather wave ends.
+                Gold?.SubscribeToBreatherWave(WaveSpawning);
             }
 
             // ── OnWaveStart hooks ──
