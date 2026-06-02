@@ -1,0 +1,46 @@
+[
+  {
+    "totemId": "totem_healing",
+    "name": "Healing Totem",
+    "totemType": 1,
+    "effectPerTick": 5.0,
+    "radius": 2.5,
+    "duration": 15.0,
+    "charges": 0,
+    "triggerInterval": 1.0,
+    "description": "Heals the player for 5 HP every 1 second within 2.5 tiles, lasts 15s."
+  },
+  {
+    "totemId": "totem_mana_spring",
+    "name": "Mana Spring Totem",
+    "totemType": 2,
+    "effectPerTick": 8.0,
+    "radius": 2.5,
+    "duration": 15.0,
+    "charges": 0,
+    "triggerInterval": 1.0,
+    "description": "Restores 8 mana every 1 second within 2.5 tiles, lasts 15s."
+  },
+  {
+    "totemId": "totem_searing",
+    "name": "Searing Totem",
+    "totemType": 3,
+    "effectPerTick": 12.0,
+    "radius": 2.0,
+    "duration": 12.0,
+    "charges": 8,
+    "triggerInterval": 0.5,
+    "description": "Deals 12 damage to enemies within 2.0 tiles, every 0.5s. Up to 8 triggers, 12s cap."
+  },
+  {
+    "totemId": "totem_tremor",
+    "name": "Tremor Totem",
+    "totemType": 4,
+    "effectPerTick": 0.0,
+    "radius": 2.5,
+    "duration": 10.0,
+    "charges": 3,
+    "triggerInterval": 3.0,
+    "description": "Stuns enemies within 2.5 tiles for 1 turn. Up to 3 triggers, 10s cap."
+  }
+]

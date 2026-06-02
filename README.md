@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-02, Round 46）
+## 性能基准（2026-06-02, Round 47）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3976 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10588 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4712 FPS** |
+| **mode 5**（完整一局） | **4010 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10782 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4581 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -149,6 +149,7 @@ dotnet test
 - 磁吸立场 Magnetize（MagnetizeSystem.cs + ComponentStore_World.cs + AIGroup.cs + SystemRegistry.cs，3 类型 Pull/Repel/PullDeflect + 64 zone 池 + 线性 falloff 拉扯力 + AIGroup pre-step 早退 + ProjectileSystem IsInDeflectZone 查询接口 + POSITION_CLAMP 越界保护）；bench2: 10930, bench4: 4759, bench5: 4089 ⚠️
 - 幽光宠物/被动光环 Wisp（WispSystem.cs + ComponentStore_Player.cs + SkillBuffGroup.cs + SystemRegistry.cs + summons.json，3 类型 Heal/Slow/Curse 互斥 + SOA PlayerWispType/DurationLeft/Cooldown + 6-tile 半径 + SkillBuffGroup phase-9 执行 + touched-set 状态清理防 stale 慢速）；bench2: 10637, bench4: 4797, bench5: 3380 ⚠️
 - 霰弹塔/锥形多弹丸 Shotgun Tower（ComponentStore_Tower.cs + ComponentStore.cs + TowerAttackSystem.cs，2 字段 TowerPelletDamageMult/ConeRadius + 现有 TowerProjectileCount/ScatterAngle 升级 + scatter 段每颗 pellet 找独立最近目标（taken-scratch 标记去重）+ 16-pellet 上限 + projectileSystem 多 Projectile 同帧兼容）；bench2: 10588, bench4: 4712, bench5: 3976 ⚠️
+- 站桩图腾 Totem（TotemSystem.cs + ComponentStore_Player.cs + totems.json，独立 4 类型 Healing/ManaSpring/Searing/Tremor + 32 池 + 7 SOA 字段 TotemActive/OwnerId/Type/PosX/PosY/DurationLeft/ChargesLeft/Cooldown + PlayerTotemCooldown 节流 + AddTotem/RemoveTotem 池分配 + 4 效果分支 Heal-self/Mana-self/Searing-AoE/Tremor-stun + JSON 自加载 + POSITION_CLAMP 越界保护 + 默认 cooldown 2s）；bench2: 10782, bench4: 4581, bench5: 4010
 ### 2026-06-01
 - 射程伤害衰减（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs）；bench2: 12026, bench4: 5531, bench5: 4696
 - 爆发射击/齐射模式（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + TowerPlacementSystem.cs）；bench2: 11928, bench4: 5364, bench5: 4618

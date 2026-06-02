@@ -604,5 +604,60 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float[] HeroCooldown = new float[MAX_HEROES];
         // HeroTypeId: which hero definition (index into heroes.json config)
         public int[] HeroTypeId = new int[MAX_HEROES];
+
+        // ==================== Totem System (SOA, pool-based) ====================
+        // MAX_TOTEMS: global pool size shared across all players. A totem is a
+        // placed stationary object (healing/mana/fire/stun) — small pool because
+        // they're expensive and short-lived (10-15s).
+        public const int MAX_TOTEMS = 32;
+        // TotemActive: whether this pool slot currently has a live totem.
+        public bool[] TotemActive = new bool[MAX_TOTEMS];
+        // TotemOwnerId: which player placed this totem (-1 = none).
+        public int[] TotemOwnerId = new int[MAX_TOTEMS];
+        // TotemType: 0=None, 1=Healing, 2=Mana, 3=Searing (fire DoT), 4=Tremor (stun).
+        public int[] TotemType = new int[MAX_TOTEMS];
+        // TotemPosX/Y: world position the totem was placed at.
+        public float[] TotemPosX = new float[MAX_TOTEMS];
+        public float[] TotemPosY = new float[MAX_TOTEMS];
+        // TotemDurationLeft: seconds remaining before auto-expire.
+        public float[] TotemDurationLeft = new float[MAX_TOTEMS];
+        // TotemChargesLeft: remaining trigger count (0 = unlimited time-based only).
+        public int[] TotemChargesLeft = new int[MAX_TOTEMS];
+        // TotemCooldown: seconds until next trigger (per-totem tick interval).
+        public float[] TotemCooldown = new float[MAX_TOTEMS];
+        // TotemPlayerCooldown: per-player cooldown after placing a totem (throttles spam).
+        public float[] PlayerTotemCooldown = new float[MAX_PLAYERS];
+
+        // ── Totem accessors (called by TotemSystem) ───────────────────────
+        /// <summary>Allocate a totem slot from the pool. Returns -1 if full.</summary>
+        public int AddTotem(int ownerId, int totemType, float x, float y, float duration, int charges, float triggerInterval)
+        {
+            for (int i = 0; i < MAX_TOTEMS; i++)
+            {
+                if (TotemActive[i]) continue;
+                TotemActive[i] = true;
+                TotemOwnerId[i] = ownerId;
+                TotemType[i] = totemType;
+                TotemPosX[i] = x;
+                TotemPosY[i] = y;
+                TotemDurationLeft[i] = duration;
+                TotemChargesLeft[i] = charges;
+                TotemCooldown[i] = triggerInterval; // first trigger after this many seconds
+                return i;
+            }
+            return -1; // pool full
+        }
+
+        /// <summary>Remove a totem by slot id. No-op if already inactive.</summary>
+        public void RemoveTotem(int totemId)
+        {
+            if (totemId < 0 || totemId >= MAX_TOTEMS) return;
+            TotemActive[totemId] = false;
+            TotemOwnerId[totemId] = -1;
+            TotemType[totemId] = 0;
+            TotemDurationLeft[totemId] = 0f;
+            TotemChargesLeft[totemId] = 0;
+            TotemCooldown[totemId] = 0f;
+        }
     }
 }
