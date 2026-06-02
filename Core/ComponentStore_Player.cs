@@ -25,6 +25,14 @@ namespace BattleSystemECS.Core
         // PlayerHasReincarnated: per-game flag. True after one reincarnation is used.
         // Prevents multiple revives within a single game. Reset on game start (AddPlayer).
         public bool[] PlayerHasReincarnated = new bool[MAX_PLAYERS];
+        // ==================== Bullet Time / Slow Motion 组件 (SOA) ====================
+        // PlayerBulletTimeTurnsLeft: remaining turns the bullet-time effect is active. 0 = inactive (default).
+        // While > 0, FrameScheduler passes dt * PlayerBulletTimeScale to enemy/AI/Movement/Spatial phases
+        // and the FULL dt to Combat/SkillBuff/PostDeath — i.e. enemies + projectiles run slow, towers don't.
+        public float[] PlayerBulletTimeTurnsLeft = new float[MAX_PLAYERS];
+        // PlayerBulletTimeScale: per-player slow-mo multiplier (0.3 = 30% enemy speed, 1.0 = normal). Default 1.0f.
+        // Clamped to (0, 1] by setter so we never accidentally speed enemies up via this path.
+        public float[] PlayerBulletTimeScale = new float[MAX_PLAYERS];
         public float[] PlayerArmor = new float[MAX_PLAYERS];  // 玩家护甲：减少受到伤害
         // Player shield: absorbs damage before health, independent of armor
         public float[] PlayerShield = new float[MAX_PLAYERS];
@@ -192,6 +200,10 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             // Kill-triggered skill cooldown reset: default to disabled (0/0)
             PlayerSkillResetOnKill[entityId] = 0;
             PlayerSkillResetAmount[entityId] = 0f;
+            // Bullet-time: default to inactive (turns=0 → never enters SplitDeltaForBulletTime branch).
+            // Reset both fields to avoid leaking prior slot occupant's active bullet-time into a new game.
+            PlayerBulletTimeTurnsLeft[entityId] = 0f;
+            PlayerBulletTimeScale[entityId] = 1f;
 
             PlayerEntityId = entityId;
         }
@@ -478,6 +490,21 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             PlayerReincarnationCharges[playerId] = System.Math.Max(0, charges);
             PlayerReincarnationHealFraction[playerId] = System.Math.Clamp(healFraction, 0f, 1f);
             PlayerHasReincarnated[playerId] = false;
+        }
+
+        // ==================== Bullet Time setter (direction 10) ====================
+        // Activates bullet-time for the given player.
+        // - turns: number of remaining turns (clamped to >= 0; 0 = no-op / immediate clear).
+        // - scale: enemy/physics slow-mo factor (clamped to (0, 1] — 0.3 = enemies at 30% speed).
+        //          The player's tower/attack systems still receive full dt; only enemy/AI/movement/spatial
+        //          phases consume the scaled dt (see FrameScheduler.RunWavePhase).
+        // Refreshing an active bullet-time with a new (turns, scale) overwrites both fields (no max).
+        public void ActivateBulletTime(int playerId, float turns, float scale)
+        {
+            if (!IsValidPlayer(playerId)) return;
+            PlayerBulletTimeTurnsLeft[playerId] = System.Math.Max(0f, turns);
+            // Clamp scale to (0, 1] — never speed up enemies via this path; small epsilon avoids 0/divide issues.
+            PlayerBulletTimeScale[playerId] = System.Math.Clamp(scale, 0.01f, 1.0f);
         }
 
         public int GetPlayerReincarnationCharges(int playerId)
