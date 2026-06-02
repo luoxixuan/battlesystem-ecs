@@ -1,0 +1,118 @@
+# 更新记录 (Changelog)
+
+### 2026-06-03
+- 变形术 Polymorph（ComponentStore_Enemy.cs + ComponentStore.cs + EnemyActionType.cs + GameplayAbility.cs + GameConfig.cs + EnemyAISystem.cs + SkillSystem.cs，3 SOA 字段 EnemyIsPolymorphed/PolymorphDurationLeft/PolymorphDamageTakenMultiplier + ApplyPolymorph 访问器 + DestroyEntity 重置 + Polymorphed=26 动作枚举 + GameplayAbilityDef.PolymorphDuration/DamageTakenMultiplier 字段 + SkillConfig 桥接 + EnemyAISystem BT 评估短路 + SkillSystem CastPolymorphArea circle AoE：duration 计时到期自动清除 + 1.5x 受伤放大）；bench2: 10457, bench4: 4659, bench5: 3932 ⚠️
+- 穿透抗性 JSON 路径 Pierce Resistance Loader（GameConfigLoader.cs + game_config.json + Data/Monsters/monster_plated_warrior.json，monster JSON 解析 PierceResist/PierceImmune/DamageImmunities 字段 + null guard 保留默认 + Plated Warrior 怪物原型：HP350/护甲12/PierceResist 0.5 + Plated Carapace 技能）；bench2: 9230, bench4: 4690, bench5: 3885 ⚠️
+- 子弹时间 Bullet Time / Slow Motion（ComponentStore_Player.cs + FrameScheduler.cs，2 SOA 字段 PlayerBulletTimeTurnsLeft/PlayerBulletTimeScale + ActivateBulletTime(playerId, turns, scale) setter + AddPlayer 重置防 slot 复用泄漏 + SplitDeltaForBulletTime 拆 dt：前 7 phase 用 enemyDt = dt×scale，后 4 phase 用 combatDt = dt 原速 + 末尾 tick 1→0 时 read-scale-before-reset 避免 off-by-one + 默认 0f 永远不进 active 分支零开销）；bench2: 9589, bench4: 4454, bench5: 3724 ⚠️
+- 塔受击反击 Retaliate（ComponentStore_Tower.cs + ReflectTowerSystem.cs + SuicideBombSystem.cs，2 SOA 字段 TowerRetaliateChance/RetaliateDamageMult + AddTower 初始化 0f/0f + ResetTower/RemoveTower 重置 + QueueRetaliate 复用 _reflectQueue 共用 apply 路径 + 共享 Random.Shared 线程安全掷骰 + 默认 0% 概率零开销热路径）；bench2: 10472, bench4: 4598, bench5: 3961 ⚠️
+- 塔诱饵 / 路径偏向 Lure（Bait）（ComponentStore_Tower.cs + EnemyMovementSystem.cs，2 SOA 字段 TowerLureRadius/TowerLureStrength 默认 0f/0f 零开销热路径 + AddTower 初始化 + ResetTower/RemoveTower 防 slot 复用泄漏 + waypoint 段内 inline 扫描 ActiveTowerIds：每个 enemy 对每个 active 塔检测半径并应用线性比例 (1 - d/R) × strength 的朝塔速度偏移 + 0 半径早退 + 距离 0 容错）；bench2: 10045, bench4: 4407, bench5: 3858 ⚠️
+
+### 2026-06-02
+- 失衡条/破防 Stagger（ComponentStore_Enemy.cs + EnemyMovementSystem + TowerAttackSystem + ComponentStore.cs + EnemyActionType.cs，Staggered=24 状态 + 5 字段 + AddStaggerDamage/TickStagger/ClearStagger + 重击累加 meter + 10s 免疫期）；bench2: 11224, bench4: 5072, bench5: 4346
+- 喘息波节奏 Wave Rhythm（GameConfig.cs + WaveSpawningSystem.cs + WavePreviewSystem.cs，WaveRhythm 枚举 + Rhythm 字段 + Normal/Breather/Surge/Climax × 计数 + 难度 + Preview UI 同步）；bench2: 10567, bench4: 4940, bench5: 4085
+- 塔词缀槽基础设施 Reforge Split A（ComponentStore_Tower.cs + GameConfig.cs + GameConfigLoader.cs + tower_affixes.json，3 槽位 SOA + 18 词缀池 + 懒初始化 jagged 数组 + ClearTowerAffixes）；bench2: 11161, bench4: 5015, bench5: 4082 ⚠️
+- Boss 踩踏步伤 Trample（ComponentStore_Enemy.cs + EnemyMovementSystem.cs，3 字段 EnemyTrampleRadius/Damage/Knockback + SetTurn pre-scan O(1) early-out + ResolveTrampleAoe 串行 AOE：玩家扣血 + 小怪击退 0.5 单位 + Stagger 自动暂停）；bench2: 11087, bench4: 4906, bench5: 4018 ⚠️
+- 词缀重铸 API Reforge Split B（ReforgeSystem + ComponentStore_Tower.cs + GameConfig.cs，2 字段 TowerAffixLockMask/TowerReforgeCount + 7 访问器 + ReforgeConfig 成本/锁槽/稀有度权重 + RerollAffix 塔级/锁槽感知 + SetSlotLocked + RerollAllUnlocked 跳过锁槽 + 池采样 rarity tier）；bench2: 11082, bench4: 4494, bench5: 4074 ⚠️
+- 喘息波运行时收益 Breather Split B（WaveSpawningSystem.cs + GoldSystem.cs + ComponentStore_Player.cs + SystemRegistry.cs，OnBreatherWaveComplete 事件 + 3 SOA 字段 PlayerHealOnBreatherWave/PlayerCooldownReduceOnBreather/PlayerBreatherGoldBonus + GoldSystem.SubscribeToBreatherWave：Breather 波完成时回血 %/技能 CDR/金币 ×2）；bench2: 11314, bench4: 4896, bench5: 4075 ⚠️
+- 磁吸立场 Magnetize（MagnetizeSystem.cs + ComponentStore_World.cs + AIGroup.cs + SystemRegistry.cs，3 类型 Pull/Repel/PullDeflect + 64 zone 池 + 线性 falloff 拉扯力 + AIGroup pre-step 早退 + ProjectileSystem IsInDeflectZone 查询接口 + POSITION_CLAMP 越界保护）；bench2: 10930, bench4: 4759, bench5: 4089 ⚠️
+- 幽光宠物/被动光环 Wisp（WispSystem.cs + ComponentStore_Player.cs + SkillBuffGroup.cs + SystemRegistry.cs + summons.json，3 类型 Heal/Slow/Curse 互斥 + SOA PlayerWispType/DurationLeft/Cooldown + 6-tile 半径 + SkillBuffGroup phase-9 执行 + touched-set 状态清理防 stale 慢速）；bench2: 10637, bench4: 4797, bench5: 3380 ⚠️
+- 霰弹塔/锥形多弹丸 Shotgun Tower（ComponentStore_Tower.cs + ComponentStore.cs + TowerAttackSystem.cs，2 字段 TowerPelletDamageMult/ConeRadius + 现有 TowerProjectileCount/ScatterAngle 升级 + scatter 段每颗 pellet 找独立最近目标（taken-scratch 标记去重）+ 16-pellet 上限 + projectileSystem 多 Projectile 同帧兼容）；bench2: 10588, bench4: 4712, bench5: 3976 ⚠️
+- 站桩图腾 Totem（TotemSystem.cs + ComponentStore_Player.cs + totems.json，独立 4 类型 Healing/ManaSpring/Searing/Tremor + 32 池 + 7 SOA 字段 TotemActive/OwnerId/Type/PosX/PosY/DurationLeft/ChargesLeft/Cooldown + PlayerTotemCooldown 节流 + AddTotem/RemoveTotem 池分配 + 4 效果分支 Heal-self/Mana-self/Searing-AoE/Tremor-stun + JSON 自加载 + POSITION_CLAMP 越界保护 + 默认 cooldown 2s）；bench2: 10782, bench4: 4581, bench5: 4010
+- 锁链/连接 Tether（ComponentStore_Enemy.cs + EnemyMovementSystem.cs + TowerAttackSystem.cs + EnemyActionType.cs，5 字段 EnemyTetherPartnerId/MaxLength/DamageSharePct/StunSharePct/SlowFactor + SlowFactor 1f 初始化防冻 + SetTurn pre-scan O(1) early-out + ResolveTetherEnforcement 串行 AOE：超距拉回 0.5 单位 + 50% 减速 + 双向 + Tethered=25 动作枚举 + ApplyTetherDamageShare 串行串 damage 比例传染 + partner 抵抗/无敌/死亡检查）；bench2: 9570, bench4: 4619, bench5: 3865 ⚠️
+- 🔧 性能优化：O(N)→O(1) counter（ComponentStore.cs + EnemyMovementSystem.cs + TowerAttackSystem.cs + WispSystem.cs，ActiveTramplerCount/ActiveTetheredCount/ActiveWispCount 计数器 + SetTurn pre-scan 改为 O(1) 读 counter + ApplyTetherDamageShare guard + WispSystem.Update 早退）；bench2: 10341, bench4: 4418, bench5: 4080
+- 一击必杀保护 One-shot Protection（ComponentStore_Player.cs + TechTreeSystem.cs + tech_tree.json，1 SOA 字段 PlayerMinHealthFloor + Get/SetPlayerMinHealthFloor 访问器 + DecreasePlayerHealth floor 钳制 + TechTreeSystem min_health_floor effect 累加 + last_stand 节点 cost=3 后置 iron_skin_2）；bench2: 11093, bench4: 4574, bench5: 3844 ⚠️
+- 视线系统 Line of Sight（SpatialGrid.cs + ComponentStore_Tower.cs + TowerAttackSystem.cs，HasLineOfSight + IsCellOnRay 整数格点射线 + TowerRequiresLOS/TowerBlocksLOS 2 SOA 字段 + AddTower 初始化 false + TowerAttackSystem 候选过滤 opt-in + IsCellOnRay 同名变量去重）；bench2: 10791, bench4: 4775, bench5: 3986 ⚠️
+- 诱饵实体 Decoy（ComponentStore_Enemy.cs + ComponentStore.cs + EnemyAISystem.cs，3 SOA 字段 EnemyIsDecoy/DecoyLifetime/DecoyLifetimeLeft + AddEnemy 初始化 false/0f/0f + DestroyEntity 重置 + AISystem 倒计时自动 QueueEnemyDeath + 跳过 BT 评估置 EnemyActionType.None）；bench2: 10787, bench4: 4884, bench5: 4063
+- 击杀回血/回蓝 HealOnKill（HealOnKillSystem.cs + ComponentStore_Tower.cs + GameConfig.cs + SystemRegistry.cs + TowerPlacementSystem.cs，2 SOA 字段 TowerHealOnKillAmount/ManaOnKillAmount + TowerConfig.HealOnKillAmount/ManaOnKillAmount + OnTowerKill 订阅 + SetPlayerCurrentHealth maxHP 钳制 + AddPlayerMana maxMP 钳制 + JSON 桥接 placement）；bench2: 10635, bench4: 4703, bench5: 3996 ⚠️
+- 纯伤害类型免疫 Magic/Physical Immune（ComponentStore_Enemy.cs + GameConfig.cs + WaveSpawningSystem.cs + game_config.json，SetDamageImmunityMask 访问器 + MonsterConfig.DamageImmunities[] 列表字段 + ComputeDamageImmunityMask 字符串→位掩码 switch + AddEnemy 路径三处统一初始化 + Magic Immune Specter/Black Dragon 两个 Boss 原型）；bench2: 10741, bench4: 4776, bench5: 4015
+- 末段狂暴 LastStand / DeathRattle（ComponentStore_Enemy.cs + ComponentStore.cs + GameConfig.cs + EnemyAISystem.cs + WaveSpawningSystem.cs + game_config.json，4 SOA 字段 EnemyLastStandHpFraction/LastStandActive/LastStandSpeedMult/LastStandDamageMult + BossLastStandConfig 配置类 + SetLastStandConfig 4 访问器 + DestroyEntity 重置 + EnemyAISystem 双路径 HP 阈值检测（parallel + serial 段）+ 一性次 Multiply EnemyMoveSpeed/EnemyDamage + AddEnemy 路径三处统一初始化 + Skeletal King Boss 原型）；bench2: 10258, bench4: 4584, bench5: 3997
+- 穿透抗性 Pierce Resistance（ComponentStore_Enemy.cs + GameConfig.cs + ProjectileSystem.cs + WaveSpawningSystem.cs + game_config.json，2 SOA 字段 EnemyPierceResist/EnemyIsPierceImmune + MonsterConfig.PierceResist/PierceImmune + SetPierceResist 2 访问器 + AddEnemy 路径三处统一初始化 + _projIsPiercing 弹道标志 + ResolveHit pierce-抗性+免疫应用 + FireAtPoint fragment 不继承 pierce + Armored Core/Plated Behemoth 两个 Boss 原型）；bench2: 10623, bench4: 4641, bench5: 3987
+- 死后复活一次 Reincarnation（ComponentStore_Player.cs + GameConfig.cs + GameManager.cs + game_config.json，3 SOA 字段 PlayerReincarnationCharges/ReincarnationHealFraction/HasReincarnated + PlayerConfig.ReincarnationCharges/HealFraction + SetPlayerReincarnationConfig 访问器 + DecreasePlayerHealth HP<=0 一次性复活：max(1, MaxHP×HealFraction) + Charges-- + HasReincarnated 锁定 + SetPlayerReincarnationConfig 重置 flag 避免持久化漏到下局）；bench2: 10541, bench4: 4555, bench5: 3962
+
+### 2026-06-01
+- 射程伤害衰减（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs）；bench2: 12026, bench4: 5531, bench5: 4696
+- 爆发射击/齐射模式（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + TowerPlacementSystem.cs）；bench2: 11928, bench4: 5364, bench5: 4618
+- 持续升温伤害（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + TowerPlacementSystem.cs）；bench2: 11733, bench4: 5437, bench5: 4635
+- 绝境反击/背水一战（DesperationSystem + TowerAttackSystem + BuildGroup + PreGameGroup + SystemRegistry）；bench2: 12236, bench4: 5396, bench5: 4713
+- 随机伤害范围（TowerAttackSystem + ComponentStore_Tower.cs）；bench2: 12263, bench4: 5385, bench5: 4593
+- 敌人 CC 免疫/不可阻挡（ComponentStore_Enemy.cs + FearSystem.cs）；bench2: 11763, bench4: 5324, bench5: 4589
+- 治疗抑制/重伤减免（TowerAttackSystem + EnemyHealerSystem + EnemyLifestealSystem + ComponentStore_Enemy.cs）；bench2: 11919, bench4: 5248, bench5: 4608
+- 伤害类型转换（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + GameConfigLoader.cs + TowerPlacementSystem.cs）；bench2: 11869, bench4: 5326, bench5: 4647
+- 塔出售价值衰减（sellDecayPerSecond + TowerPlaceTime + TowerPlacementSystem + tower_placement.json）；bench2: 11936, bench4: 5448, bench5: 4636
+- 塔位幽灵预览/放置确认（PreviewPlacement/ConfirmPlacement/CancelPreview + IRenderer.RenderGhostTower + ConsoleLogger）；bench2: 11630, bench4: 5416, bench5: 4463
+- 元素护盾类型（ApplyEnemyDamage + ComponentStore_Enemy.cs + ElementalReactionSystem + monster_shield.json/monster_enforcer.json + WaveSpawningSystem + GameConfig.cs）；bench2: 11423, bench4: 5151, bench5: 4573
+- 过量伤害/溢出机制（OverkillType=1: Splash + TowerAttackSystem.ResolveSplashDamage + ComponentStore_Tower.cs + GameConfig.cs + GameConfigLoader.cs + TowerPlacementSystem.cs + tower_sniper.json）；bench2: 11703, bench4: 5171, bench5: 4352
+- 敌人随机路径偏移（EnemyMovementSystem + ComponentStore_Enemy.cs + WaveSpawningSystem + GameConfig.cs）；bench2: 11364, bench4: 5339, bench5: 4521
+- 敌人同格堆叠惩罚（StackingConfig + EnemyMovementSystem.UpdateStackingPenalty + ComponentStore_Enemy.cs + SystemRegistry）；bench2: 10233, bench4: 5191, bench5: 4387
+- 击杀冷却重置（KillCooldownResetSystem + ComponentStore_Tower.cs + ComponentStore_Player.cs + SystemRegistry）；bench2: 11090, bench4: 5231, bench5: 4512
+- 敌人施法可打断（Interruptible Channeling Spells, EnemyAbilitySystem + EnemyMovementSystem + ComponentStore_Enemy.cs + AIGroup.cs + ComponentStore.cs + GameConfig.cs + enemy_abilities.json）；bench2: 11578, bench4: 5104, bench5: 4203 ⚠️
+- 敌人波次预览/侦查（WavePreviewSystem + ComponentStore_Player.cs + SystemRegistry）；bench2: 11533, bench4: 5256, bench5: 4533
+- 敌人属性吸取/Stat Drain（TowerSabotageSystem + ComponentStore_Enemy.cs + ComponentStore_Tower.cs + GameConfig.cs + WaveSpawningSystem.cs）；bench2: 11608, bench4: 5096, bench5: 4301
+- 回放/录像系统（ReplaySystem + GameConfig.ReplayConfig + SystemRegistry，opt-in JSONL per-frame telemetry，零热路径开销）；bench2: 11079, bench4: 5131, bench5: 4495
+- 可部署陷阱塔（DeployableTrapSystem + MovementGroup + ComponentStore_Tower.cs + ComponentStore_Enemy.cs + GameConfig.cs + TowerPlacementSystem.cs + ComponentStore.cs）；bench2: 11323, bench4: 5087, bench5: 4283
+- 死亡标记/处决阈值（PlayerTowerAttackSystem + ComponentStore_Enemy.cs + ComponentStore.cs，HP<15% 自动标记 +50% 伤害+处决奖励金币）；bench2: 11382, bench4: 4995, bench5: 4342
+- 仇恨脱战范围/Aggro Leash（EnemyMovementSystem + ComponentStore_Enemy.cs，可选范围配置，近基地暂停推进/远离后回归）；bench2: 11519, bench4: 5137, bench5: 4186
+- 商店洗牌/Shop Reroll（ShopRerollSystem + ComponentStore_Player.cs + GameConfig + BuildGroup + SystemRegistry，BuildPhase 洗牌 offer 池 + 成本阶梯 + 保底稀有度）；bench2: 10225, bench4: 4839, bench5: 4147
+- 放逐机制/Banish（EnemyMovementSystem + ComponentStore_Enemy.cs + ComponentStore.cs + EnemyActionType.cs，Banished 状态冻结敌人 N 帧，可被塔/技能触发）；bench2: 11848, bench4: 5212, bench5: 4315
+- 玩家元进度/跨局声望 Prestige（PrestigeSystem + GameConfig + GameManager + SaveSystem + PlayerTowerAttackSystem，Stardust 货币解锁跨局永久节点，GameConfig.MetaDamageMult 注入到玩家伤害计算）；bench2: 11125, bench4: 5141, bench5: 4303
+
+### 2026-05-31
+- 光束/激光连续塔基础设施（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094
+- N 击护盾系统（HitShieldSystem + ComponentStore_Enemy.cs + TowerAttackSystem/PlayerTowerAttackSystem）；bench2: 11546, bench4: 5590, bench5: 4824
+- 法力燃烧/资源剥夺系统（ManaBurnSystem + ComponentStore_Enemy.cs + ComponentStore_Player.cs）；bench2: 11802, bench4: 5663, bench5: 4889
+- 幽灵/相位敌人系统（PhaseSystem + ComponentStore_Enemy.cs + TowerAttackSystem）；bench2: 11643, bench4: 5501, bench5: 5017
+- 敌人塔破坏/EMP 瘫痪系统（TowerSabotageSystem + ComponentStore_Tower.cs + ComponentStore_Enemy.cs）；bench2: 12187, bench4: 5471, bench5: 4847
+- 自爆/殉爆敌人系统（SuicideBombSystem + ComponentStore_Enemy.cs + CombatGroup）；bench2: 11529, bench4: 5199, bench5: 4567
+- 塔造价递增/成本梯度（PlacementCountByType + TowerPlacementSystem + tower_placement.json）；bench2: 11970, bench4: 5389, bench5: 4855
+- 伤害免疫/属性克制系统（DamageImmunityMask + DamageType扩展 + TowerAttackSystem/PlayerTowerAttackSystem）；bench2: 9588, bench4: 5712, bench5: 5026
+- 敌人吸血系统（EnemyLifestealSystem + EnemyLifestealRatio/Cap/Active + EnemyAISystem）；bench2: 12070, bench4: 5685, bench5: 4951
+- 拉扯/真空吸引系统（PullSystem + ComponentStore_World.cs + MovementGroup + SystemRegistry）；bench2: 11784, bench4: 5544, bench5: 4879
+- 恐惧/混乱敌人系统（FearSystem + ComponentStore_Enemy.cs + ComponentStore_Tower.cs + AIGroup + SystemRegistry）；bench2: 11955, bench4: 5514, bench5: 4934
+- 地图热区/地形加成系统（HotZoneSystem + ComponentStore_Tower.cs + GameConfig.cs + CombatSetupGroup + SystemRegistry）；bench2: 11895, bench4: 5703, bench5: 4592
+- 敌人巢穴/生成建筑系统（NestSystem + SystemRegistry + SpawningGroup）；bench2: 11686, bench4: 5669, bench5: 4798
+- 保护者/守卫敌人系统（ProtectorSystem + ComponentStore_Enemy.cs）；bench2: 12066, bench4: 5726, bench5: 4709
+- 英雄/雇佣兵系统（HeroSystem + ComponentStore_Player.cs + CombatGroup + SystemRegistry）；bench2: 12319, bench4: 5648, bench5: 4733
+- 范围控制区系统（ZoneControlSystem + ComponentStore_World.cs + AIGroup + SystemRegistry）；bench2: 11587, bench4: 5421, bench5: 4715
+- 敌人偏移/闪避系统（EnemyStrafeSystem + ComponentStore_Enemy.cs + AIGroup + SystemRegistry + TowerAttackSystem）；bench2: 11733, bench4: 5680, bench5: 4628
+- 通用冷却缩减系统（PlayerCooldownReduction + TowerCooldownReduction + SkillSystem/GlobalSkillSystem CDR + TechTreeSystem）；bench2: 11600, bench4: 5648, bench5: 4608
+- 塔部署数量限制系统（PlayerMaxTowers + PlayerTowerCount + TowerPlacementSystem + TechTreeSystem）；bench2: 11571, bench4: 5501, bench5: 4779
+- 塔变形/形态切换系统（TowerMorphSystem + TowerCurrentMorph/Count/Cooldown/Damage/Speed/Range + CombatGroup + SystemRegistry）；bench2: 10628, bench4: 5722, bench5: 4961
+- 范围治疗区技能集成（AreaShapeType.HealingZone + SkillSystem.InjectHealingZoneSystem + SystemRegistry wiring）；bench2: 11576, bench4: 5630, bench5: 4964
+- 塔隐形/伪装系统（StealthSystem + ComponentStore_Tower.cs + ComponentStore_Enemy.cs + EnemyAISystem）；bench2: 11525, bench4: 5694, bench5: 4988
+
+### 2026-05-31（续）
+- 塔反射/伤害反弹系统（ReflectTowerSystem + ComponentStore_Tower.cs + SuicideBombSystem）；bench2: 11787, bench4: 5606, bench5: 4755
+- 复活/亡灵法师敌人（NecromancerSystem + CorpseQueue）；bench2: 9871, bench4: 5122, bench5: 4882
+- 昼夜循环系统（DayNightSystem）；bench2: 10483, bench4: 5135, bench5: 5021
+- 钻地/潜行敌人（EnemyBurrowSystem + Emerge AoE）；bench2: 10115, bench4: 5487, bench5: 4878
+- 流血/撕裂 DoT（BleedSystem）；bench2: 10081, bench4: 5464, bench5: 5087
+- 路径修改塔（PathModifierSystem）；bench2: 10112, bench4: 5545, bench5: 4826
+- 牵引/磁力/漩涡塔（PullTowerSystem）；bench2: 10214, bench4: 5344, bench5: 4947
+- 诅咒/削弱光环（CurseAuraSystem）；bench2: 10128, bench4: 5345, bench5: 5007
+- 8 项业务系统扩展（法力消耗/金币窃取/敌方治疗/驱散/塔自毁/产卵/被动产金/召唤修复）+ 飞行/浮空敌人；bench2: 10375, bench4: 5216, bench5: 4979
+- mode 5 完整一局压测上线（5关全通，400帧，6520 FPS）
+- 肉盾/前锋敌人（Vanguard，伤害转移）；bench2: 9265, bench4: 5058, bench5: 4809
+- 塔连锁攻击系统（TowerChainDmgRatio + TowerAttackSystem auto-link + chain partner damage）；bench2: 11179, bench4: 5399, bench5: 4838
+- 动态路径封锁系统（PathBlockSystem + MovementGroup + SystemRegistry）；bench2: 10110, bench4: 5646, bench5: 4893
+
+### 2026-05-30
+- **工程改进**：ComponentStore 按领域拆分为 5 个 partial 文件（Enemy/Tower/Player/World + 核心生命周期）；伤害公式测试补齐至 120 项
+- 迫击炮/弧线弹道系统（ProjectileSystem + ComponentStore_Tower.cs）；bench2: 12116, bench4: 5349, bench5: 5011
+- 风力/气流推动系统（WindSystem + ComponentStore_World.cs）；bench2: 12001, bench4: 5727, bench5: 5018
+- 敌人克隆/复制（EnemyCloneSystem）；bench2: 12155, bench4: 5701, bench5: 4714
+- 移动/巡逻塔（PatrolTowerSystem）；bench2: 9192, bench4: 4538, bench5: 4227
+- 战争迷雾/视野系统（FogOfWarSystem）；bench2: 9806, bench4: 5161, bench5: 4911
+- 塔建造延迟（TowerConstructionSystem）；bench2: 9920, bench4: 5344, bench5: 4920
+- 玩家全局技能/终极技能（GlobalSkillSystem）；bench2: 10049, bench4: 5100, bench5: 4702
+- 塔重定位/重新部署（TowerRelocateSystem）；bench2: 9698, bench4: 5286, bench5: 4832
+- 时间操纵塔/Chrono Tower（ChronoTowerSystem）；bench2: 10116, bench4: 5158, bench5: 4767
+- 敌人受伤减速/瘸腿（EnemyWoundSystem）；bench2: 9800, bench4: 5116, bench5: 4594
+- 随机事件 Bug 修复；bench2: 9947, bench4: 5251, bench5: 5050
+- 塔过热/热量系统（HeatSystem + ComponentStore_Tower.cs）；bench2: 11643, bench4: 5655, bench5: 5049
+- 塔能量/法力资源系统（TowerEnergySystem + ComponentStore_Tower.cs）；bench2: 10605, bench4: 5672, bench5: 4735
+- 光束/激光连续塔（BeamTowerSystem + ComponentStore_Tower.cs）；bench2: 11369, bench4: 5587, bench5: 5094
+- 塔能量/法力资源系统（TowerEnergySystem + ComponentStore_Tower.cs + TowerAttackSystem）；bench2: 10605, bench4: 5672, bench5: 4735
+
+### 2026-05-12～13
+- 科技树系统上线（3分支 × 5节点，研究点数每波产出）
+- BT Cache fix + Merged pipeline（FPS 8334）；GAS 技能系统重构；TowerAttack 并行化（ActiveTowerIds）
