@@ -20,6 +20,9 @@ namespace BattleSystemECS.Systems
         private int playerId;
         private TechTreeSystem techTreeSystem;
         private GameConfig gameConfig;
+        // Round 67: EventBus for On-Hit / On-Crit trigger event publication.
+        // Always non-null after construction (ctor falls back to a fresh EventBus instance).
+        private readonly IEventBus _eventBus;
 
         // BUG-1 fix: deterministic hash-based RNG — no shared state, fully reproducible per (frame, enemyId, attackerId)
         // Replaces Random.Shared which caused non-determinism across runs.
@@ -64,7 +67,11 @@ namespace BattleSystemECS.Systems
         private int _currentTurn;
 
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
-        private List<(int enemyId, float damage)>[] _damageQueue = new List<(int, float)>[2];
+        // Ping-pong double-buffer for damage (enemyId, raw damage, wasCrit).
+        // wasCrit is set in the parallel phase (where the crit roll happens) and
+        // drained in the serial phase to publish EnemyHit / EnemyCrit events.
+        // Default-initialized to false; both bools and the 3-tuple are stack-friendly.
+        private List<(int enemyId, float damage, bool wasCrit)>[] _damageQueue = new List<(int, float, bool)>[2];
         private readonly object _damageQueueLock = new object();
         private int _damageQueueIdx = 0;
 
@@ -75,19 +82,27 @@ namespace BattleSystemECS.Systems
         private HitShieldSystem _hitShieldSystem;
 
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
-            : this(store, renderer, playerId, gameConfig, null)
+            : this(store, renderer, playerId, gameConfig, null, null)
         {
         }
 
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem)
+            : this(store, renderer, playerId, gameConfig, techTreeSystem, null)
+        {
+        }
+
+        // Round 67: IEventBus injection for On-Hit / On-Crit trigger event publication.
+        // Optional parameter keeps existing call-sites (tests, partial ctor) compiling.
+        public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem, IEventBus eventBus)
         {
             this.store = store;
             this.renderer = renderer;
             this.playerId = playerId;
             this.techTreeSystem = techTreeSystem;
             this.gameConfig = gameConfig;
-            _damageQueue[0] = new List<(int, float)>(256);
-            _damageQueue[1] = new List<(int, float)>(256);
+            this._eventBus = eventBus ?? new EventBus();
+            _damageQueue[0] = new List<(int, float, bool)>(256);
+            _damageQueue[1] = new List<(int, float, bool)>(256);
             _thornsQueue[0] = new List<float>(64);
             _thornsQueue[1] = new List<float>(64);
         }
@@ -202,10 +217,13 @@ public void SetWaveNumber(int waveNumber)
 
 // H-3 fix: crit rolled per-enemy inside parallel loop, not once per frame globally.
                 // Optimized: merged crit rate threshold (precomputed _critRateThreshold) eliminates branch
+                // Round 67: capture wasCrit bool so the serial phase can publish EnemyHit / EnemyCrit events.
                 float finalDamage = baseDamage;
+                bool wasCrit = false;
                 if (GetDeterministicRandom(_currentTurn, enemyId, playerId) < (int)(_critRateThreshold * 0x7FFFFFFF))
                 {
                     finalDamage *= (1f + _critDamageBonus);
+                    wasCrit = true;
                 }
 
                 // Apply damage type resistance (Physical=armor, Magic=magicResist, True=bypass all)
@@ -245,7 +263,7 @@ public void SetWaveNumber(int waveNumber)
                     finalDamage *= (1f + store.EnemyMarkedDamageBonus[enemyId]);
                 }
 
-                lock (_damageQueueLock) { _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage)); }
+                lock (_damageQueueLock) { _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage, wasCrit)); }
             });
 
 // Phase 2 (serial): ping-pong swap — read from current bag, clear alternate for next frame
@@ -253,7 +271,7 @@ public void SetWaveNumber(int waveNumber)
             int writeIdx = 1 - _damageQueueIdx;
             _damageQueueIdx = writeIdx;
             _damageQueue[writeIdx].Clear(); // clear the bag threads will write to next frame
-            foreach (var (enemyId, damage) in _damageQueue[readIdx])
+            foreach (var (enemyId, damage, wasCrit) in _damageQueue[readIdx])
             {
                 if (!store.EnemyActive[enemyId]) continue;
                 // Invulnerability check: skip damage if enemy is invulnerable
@@ -285,6 +303,15 @@ public void SetWaveNumber(int waveNumber)
                 {
                     float thornsDamage = finalDamage * thornsRatio;
                     _thornsQueue[_thornsQueueIdx].Add(thornsDamage);
+                }
+                // Round 67: On-Hit / On-Crit trigger event publication.
+                // EnemyHit fires for every applied hit; EnemyCrit only fires on crits (companion event).
+                // Publish BEFORE the death-queue check so affix subscribers see the enemy still alive
+                // (death is queued for frame-end resolution; the enemy is still in EnemyActive).
+                // Skip publishing when finalDamage is 0 (immunity / shield) to avoid spurious triggers.
+                if (finalDamage > 0f)
+                {
+                    PublishHitEvent(enemyId, playerId, finalDamage, wasCrit);
                 }
                 if (store.EnemyHealth[enemyId] <= 0f && prevHealth > 0f)
                     store.QueueEnemyDeath(enemyId, playerId);
@@ -328,6 +355,36 @@ public void SetWaveNumber(int waveNumber)
             if (store.EnemyHealth[linkedEnemyId] <= 0f)
             {
                 store.QueueEnemyDeath(linkedEnemyId, playerId);
+            }
+        }
+
+        /// <summary>
+        /// Round 67: Publish an On-Hit / On-Crit trigger event pair.
+        /// EnemyHit always fires (for affix code that subscribes to "on hit" mechanics).
+        /// EnemyCrit only fires when the hit rolled as a critical strike — handlers
+        /// don't need to re-check the IsCrit flag.
+        ///
+        /// AttackerKind=0 (player attack) is the only kind this system ever publishes.
+        /// Both events are dispatched serially (we're in the post-Parallel.For apply
+        /// phase), so subscribers see a stable snapshot of the world.
+        /// </summary>
+        private void PublishHitEvent(int enemyId, int attackerId, float damage, bool isCrit)
+        {
+            // Defensive: if the event bus has no subscribers at all, EventBus.Publish is
+            // a single lock + early-return. Still cheap, but we avoid the lock entirely
+            // when both events are empty subscriptions (bench hot path).
+            var hitPayload = new EnemyHitEvent
+            {
+                EnemyId = enemyId,
+                AttackerId = attackerId,
+                AttackerKind = 0, // player attack
+                Damage = damage,
+                IsCrit = isCrit
+            };
+            _eventBus.Publish(GameEvents.EnemyHit, hitPayload);
+            if (isCrit)
+            {
+                _eventBus.Publish(GameEvents.EnemyCrit, hitPayload);
             }
         }
     }

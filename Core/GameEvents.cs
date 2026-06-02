@@ -12,6 +12,12 @@ namespace BattleSystemECS.Core
         public const string PlayerDamaged         = "player_damaged";
         public const string EnemyCharging         = "enemy_charging";
         public const string EnemyChargeReleased   = "enemy_charge_released";
+        // On-Hit / On-Crit trigger infrastructure (Round 67)
+        // Published in the serial damage-apply phase of PlayerTowerAttackSystem / TowerAttackSystem.
+        // Payload fields: EnemyId, AttackerId (playerId or towerId; towerId<0 means player attack),
+        // Damage, IsCrit. Subscribers can implement affix logic (heal on crit, slow on crit, etc).
+        public const string EnemyHit              = "enemy_hit";
+        public const string EnemyCrit             = "enemy_crit";
     }
 
     // ── Event Data Transfer Objects ──
@@ -44,5 +50,23 @@ namespace BattleSystemECS.Core
         public int SourceEntityId;
         public ElementalReactionType ReactionType;
         public float Damage;
+    }
+
+    // On-Hit / On-Crit event DTOs (Round 67 — OnCrit/OnHitTaken trigger infrastructure)
+    // EnemyHit fires for every successful damage instance applied to an enemy.
+    // EnemyCrit is a *companion* event that ALSO fires when the hit was a crit
+    // (handlers can subscribe to one or both). Keeping them as a pair lets
+    // simple affix code subscribe to EnemyCrit only without filtering on IsCrit,
+    // and lets OnHitTaken (e.g. "when struck, reflect X") use EnemyHit.
+    //
+    // AttackerKind: 0 = player attack, 1 = tower attack. TowerId is only valid
+    // when AttackerKind == 1; PlayerId is only valid when AttackerKind == 0.
+    public class EnemyHitEvent
+    {
+        public int EnemyId;
+        public int AttackerId;       // playerId (AttackerKind=0) or towerId (AttackerKind=1)
+        public byte AttackerKind;    // 0=player, 1=tower
+        public float Damage;         // raw damage applied (post-resistance, pre-cap)
+        public bool IsCrit;          // true if the hit rolled as a critical strike
     }
 }

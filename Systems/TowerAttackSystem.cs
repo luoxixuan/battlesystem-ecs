@@ -41,6 +41,15 @@ namespace BattleSystemECS.Systems
         private readonly object _damageQueueLock = new object();
         private int _damageQueueIdx = 0;
 
+        // Round 67: On-Crit side-channel for the tower attack path.
+        // The parallel phase marks tower+enemy pairs when a crit is rolled (line 902 area).
+        // The serial apply phase looks up (enemyId, towerId) in this set to know whether
+        // to publish EnemyCrit. Set is per-frame and cleared at end of Update().
+        // Default size 32 covers all active towers in typical benches; Set grows on demand.
+        private readonly HashSet<long> _critFiredThisFrame = new HashSet<long>(32);
+        // Round 67: EventBus for On-Hit / On-Crit trigger publication.
+        private readonly IEventBus _eventBus;
+
         // Ping-pong double-buffer for tower debuff events (collected parallel, applied serial)
         private List<(int enemyId, int towerId)>[] _debuffQueue = new List<(int, int)>[2];
         private readonly object _debuffQueueLock = new object();
@@ -126,11 +135,18 @@ namespace BattleSystemECS.Systems
         private const float HEALING_REDUCTION_DURATION = 2f;
 
         public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem = null, int mapWidth = 10)
+            : this(store, logger, techTreeSystem, mapWidth, null)
+        {
+        }
+
+        // Round 67: IEventBus optional injection for On-Hit / On-Crit publication.
+        public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem, int mapWidth, IEventBus eventBus)
         {
             this.store = store;
             this.logger = logger;
             this.techTreeSystem = techTreeSystem;
             this._mapWidthMinusOne = mapWidth - 1f;
+            this._eventBus = eventBus ?? new EventBus();
             _damageQueue[0] = new List<(int, float, int, int)>(256);
             _damageQueue[1] = new List<(int, float, int, int)>(256);
             _debuffQueue[0] = new List<(int, int)>(256);
@@ -899,7 +915,21 @@ int bestTarget = -1;
                             {
                                 float critBonus = baseDmg * (store.TowerCritMultiplier[towerId] * _critDamageBonus - 1f);
                                 if (critBonus > 0f)
-                                    lock (damageLock) { bag.Add((bestTarget, critBonus, store.PlayerEntityId, towerId)); }
+                                {
+                                    // Round 67: mark (enemyId, towerId) in the On-Crit side-channel so the
+                                    // serial apply phase can publish EnemyCrit exactly once for this attack.
+                                    // Pack (enemyId, towerId) into a single long to avoid a struct-keyed HashSet alloc.
+                                    // CRITICAL: HashSet<T>.Add is NOT thread-safe — must be guarded by damageLock
+                                    // (the same lock guarding bag.Add). Without this, parallel threads can corrupt
+                                    // the HashSet's internal buckets, throw IndexOutOfRangeException, or silently
+                                    // drop crits so EnemyCrit never fires.
+                                    long critKey = ((long)bestTarget << 32) | (uint)towerId;
+                                    lock (damageLock)
+                                    {
+                                        _critFiredThisFrame.Add(critKey);
+                                        bag.Add((bestTarget, critBonus, store.PlayerEntityId, towerId));
+                                    }
+                                }
                             }
                             // Scatter/multicast: if ProjectileCount > 1, fire additional projectiles at the target
                             int projCount = store.TowerProjectileCount[towerId];
@@ -1071,6 +1101,18 @@ int bestTarget = -1;
                     float thornsDamage = finalDmg * thornsRatio;
                     lock (_thornsQueueLock) { _thornsQueue[_thornsQueueIdx].Add((playerId, thornsDamage)); }
                 }
+                // Round 67: On-Hit / On-Crit trigger event publication (tower attack path).
+                // EnemyHit fires for every applied hit. EnemyCrit fires only for damage entries
+                // that match a (enemyId, towerId) pair the parallel phase flagged via _critFiredThisFrame.
+                // We use a per-pair fire-once guard so a single crit attack doesn't publish EnemyCrit
+                // multiple times (the same tower/enemy can have baseDmg + critBonus both flowing through).
+                // We REMOVE the key from the set on first fire to avoid re-firing on later entries.
+                if (finalDmg > 0f)
+                {
+                    long critKey = ((long)enemyId << 32) | (uint)towerId;
+                    bool wasCrit = _critFiredThisFrame.Remove(critKey);
+                    PublishTowerHitEvent(enemyId, towerId, finalDmg, wasCrit);
+                }
                 if (store.EnemyHealth[enemyId] <= 0f)
                 {
                     // Overkill: if tower's damage exceeded enemy's pre-hit health, convert excess to splash
@@ -1195,6 +1237,12 @@ int bestTarget = -1;
             {
                 store.TowerBounceHitsRemaining[tid] = 0;
             }
+
+            // Round 67: clear On-Crit side-channel for next frame. Any unmatched crits
+            // (e.g. crit was rolled but target was invulnerable and skipped) are dropped —
+            // their affix triggers are intentionally not delivered, matching the
+            // "no EnemyHit when finalDamage=0" rule for the primary hit path.
+            _critFiredThisFrame.Clear();
 
             System.Threading.Thread.MemoryBarrier();
         }
@@ -1885,6 +1933,33 @@ int bestTarget = -1;
                     store.SetTowerLinkPartnerId(tidA, bestPartner);
                     store.SetTowerLinkPartnerId(bestPartner, tidA);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Round 67: Publish an On-Hit / On-Crit trigger event pair for tower attacks.
+        /// EnemyHit always fires (one per applied damage instance).
+        /// EnemyCrit only fires when the parallel phase flagged this (enemyId, towerId) pair
+        /// as a crit — the Remove() in the caller ensures we fire EnemyCrit exactly once
+        /// per crit attack (not once per damage entry from the same attack).
+        ///
+        /// AttackerKind=1 (tower attack). Both events dispatched serially after Parallel.For
+        /// completes, so subscribers see a stable snapshot of the world.
+        /// </summary>
+        private void PublishTowerHitEvent(int enemyId, int towerId, float damage, bool isCrit)
+        {
+            var hitPayload = new EnemyHitEvent
+            {
+                EnemyId = enemyId,
+                AttackerId = towerId,
+                AttackerKind = 1, // tower attack
+                Damage = damage,
+                IsCrit = isCrit
+            };
+            _eventBus.Publish(GameEvents.EnemyHit, hitPayload);
+            if (isCrit)
+            {
+                _eventBus.Publish(GameEvents.EnemyCrit, hitPayload);
             }
         }
     }
