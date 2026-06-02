@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-03, Round 61）
+## 性能基准（2026-06-03, Round 63）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3932 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10457 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4659 FPS** |
+| **mode 5**（完整一局） | **3885 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9230 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4690 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -162,6 +162,7 @@ dotnet test
 - 死后复活一次 Reincarnation（ComponentStore_Player.cs + GameConfig.cs + GameManager.cs + game_config.json，3 SOA 字段 PlayerReincarnationCharges/ReincarnationHealFraction/HasReincarnated + PlayerConfig.ReincarnationCharges/HealFraction + SetPlayerReincarnationConfig 访问器 + DecreasePlayerHealth HP<=0 一次性复活：max(1, MaxHP×HealFraction) + Charges-- + HasReincarnated 锁定 + SetPlayerReincarnationConfig 重置 flag 避免持久化漏到下局）；bench2: 10541, bench4: 4555, bench5: 3962
 ### 2026-06-03
 - 变形术 Polymorph（ComponentStore_Enemy.cs + ComponentStore.cs + EnemyActionType.cs + GameplayAbility.cs + GameConfig.cs + EnemyAISystem.cs + SkillSystem.cs，3 SOA 字段 EnemyIsPolymorphed/PolymorphDurationLeft/PolymorphDamageTakenMultiplier + ApplyPolymorph 访问器 + DestroyEntity 重置 + Polymorphed=26 动作枚举 + GameplayAbilityDef.PolymorphDuration/DamageTakenMultiplier 字段 + SkillConfig 桥接 + EnemyAISystem BT 评估短路 + SkillSystem CastPolymorphArea circle AoE：duration 计时到期自动清除 + 1.5x 受伤放大）；bench2: 10457, bench4: 4659, bench5: 3932 ⚠️
+- 穿透抗性 JSON 路径 Pierce Resistance Loader（GameConfigLoader.cs + game_config.json + Data/Monsters/monster_plated_warrior.json，monster JSON 解析 PierceResist/PierceImmune/DamageImmunities 字段 + null guard 保留默认 + Plated Warrior 怪物原型：HP350/护甲12/PierceResist 0.5 + Plated Carapace 技能）；bench2: 9230, bench4: 4690, bench5: 3885 ⚠️
 ### 2026-06-01
 - 射程伤害衰减（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs）；bench2: 12026, bench4: 5531, bench5: 4696
 - 爆发射击/齐射模式（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + TowerPlacementSystem.cs）；bench2: 11928, bench4: 5364, bench5: 4618

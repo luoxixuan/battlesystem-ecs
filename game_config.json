@@ -2893,6 +2893,24 @@
                             "Armor":  20,
                             "PierceResist":  0.0,
                             "PierceImmune":  true
+                        },
+                        {
+                            "MoveSpeed":  0.5,
+                            "AttackInterval":  2.0,
+                            "Type":  "Heavy",
+                            "AttackRange":  1,
+                            "MaxHealth":  350,
+                            "Damage":  14,
+                            "Name":  "Plated Warrior",
+                            "Health":  350,
+                            "GoldReward":  75,
+                            "Skills":  [
+                                           "Normal Attack",
+                                           "Plated Carapace"
+                                       ],
+                            "Armor":  12,
+                            "PierceResist":  0.5,
+                            "PierceImmune":  false
                         }
                     ],
     "Towers":  [

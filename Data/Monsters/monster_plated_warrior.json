@@ -1,0 +1,1 @@
+{"Name":"Plated Warrior","Type":"Heavy","Health":350,"MaxHealth":350,"Damage":14,"MoveSpeed":0.4,"AttackRange":1,"AttackInterval":2.2,"GoldReward":75,"Skills":["Normal Attack","Plated Carapace"],"Armor":12,"PierceResist":0.5,"PierceImmune":false}

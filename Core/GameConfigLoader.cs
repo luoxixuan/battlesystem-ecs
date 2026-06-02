@@ -772,6 +772,15 @@ namespace BattleSystemECS.Config
             monster.Skills = ParseStringArray(json, "Skills");
             monster.Armor = ExtractFloat(json, "Armor");
             monster.MagicResist = ExtractFloat(json, "MagicResist");
+            // Damage-type immunities: "Physical", "Magic", "Fire", "Ice", "Lightning".
+            // Empty/null list = no immunities. Used by ComponentStore.SetDamageImmunityMask.
+            var immunities = ParseStringArray(json, "DamageImmunities");
+            if (immunities != null) monster.DamageImmunities = immunities;
+            // Pierce resistance: 0-1 fraction ignored, 1.0 = full immunity.
+            // PierceImmune: binary flag, true = piercing projectiles deal 0 damage.
+            // Both are wired to EnemyPierceResist / EnemyIsPierceImmune via SetPierceResist.
+            monster.PierceResist = ExtractFloat(json, "PierceResist");
+            monster.PierceImmune = ExtractBool(json, "PierceImmune");
 
             return monster;
         }
