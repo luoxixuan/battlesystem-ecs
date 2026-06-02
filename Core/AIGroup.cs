@@ -17,11 +17,17 @@ namespace BattleSystemECS.Core
         public Systems.ZoneControlSystem? ZoneControl { get; set; }
         public Systems.EnemyStrafeSystem? EnemyStrafe { get; set; }
         public Systems.ReflectTowerSystem? ReflectTower { get; set; }
+        public Systems.MagnetizeSystem? Magnetize { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
             // Zone control (CC zones: Slow/Stun/Freeze/Root) — runs before AI so CC is applied this turn
             ZoneControl?.Update(deltaTime);
+
+            // Magnetize zones (displacement fields) — apply pull/repel force BEFORE
+            // enemy AI/movement so the force is layered into the same frame's motion
+            // as a pre-step (no double-iteration over enemy positions).
+            Magnetize?.Update(deltaTime);
 
             // Enemy strafe/dodge: decrement timers and cooldowns before AI evaluates
             EnemyStrafe?.SetTurn();

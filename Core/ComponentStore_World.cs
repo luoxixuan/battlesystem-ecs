@@ -414,6 +414,73 @@ namespace BattleSystemECS.Core
             return _activeCorpseEffectIds;
         }
 
+        // ==================== 磁吸立场（MagnetizeZone）====================
+        // 持续 N 秒的地面磁吸圈：圈内敌人每帧被朝中心点拉扯 pullStrength 单位
+        // 与 HazardZone/CorpseEffect 不同：MagnetizeZone 不造成伤害，只做位移控制
+        // MagnetizeType: 0=Pull(朝中心), 1=Repel(背离中心), 2=Pull+Deflect(拉 + 弹丸偏转)
+        // 默认 0f/0/0f 不开启（与现有 trample/cleave 一致的"按需启用"约定）
+        public const int MAX_MAGNETIZE_ZONES = 64;
+        public bool[] MagnetizeZoneActive = new bool[MAX_MAGNETIZE_ZONES];
+        public float[] MagnetizeZoneX = new float[MAX_MAGNETIZE_ZONES];
+        public float[] MagnetizeZoneY = new float[MAX_MAGNETIZE_ZONES];
+        public float[] MagnetizeZoneRadius = new float[MAX_MAGNETIZE_ZONES];
+        public float[] MagnetizeZoneDuration = new float[MAX_MAGNETIZE_ZONES];
+        public float[] MagnetizeZonePullStrength = new float[MAX_MAGNETIZE_ZONES];
+        public int[] MagnetizeZoneType = new int[MAX_MAGNETIZE_ZONES];  // 0=Pull, 1=Repel, 2=Pull+Deflect
+        private List<int> _activeMagnetizeZoneIds = new List<int>();
+        private int _nextMagnetizeZoneId = 0;
+
+        /// <summary>Add a magnetize zone at the given position. Returns zone ID, or -1 if pool full.</summary>
+        public int AddMagnetizeZone(float x, float y, float radius, float duration, float pullStrength, int zoneType = 0)
+        {
+            int zoneId = -1;
+            lock (activeIdsLock)
+            {
+                for (int i = 0; i < MAX_MAGNETIZE_ZONES; i++)
+                {
+                    int candidateId = (_nextMagnetizeZoneId + i) % MAX_MAGNETIZE_ZONES;
+                    if (!MagnetizeZoneActive[candidateId])
+                    {
+                        zoneId = candidateId;
+                        _nextMagnetizeZoneId = (candidateId + 1) % MAX_MAGNETIZE_ZONES;
+                        break;
+                    }
+                }
+            }
+            if (zoneId < 0) return -1;
+
+            MagnetizeZoneActive[zoneId] = true;
+            MagnetizeZoneX[zoneId] = x;
+            MagnetizeZoneY[zoneId] = y;
+            MagnetizeZoneRadius[zoneId] = radius;
+            MagnetizeZoneDuration[zoneId] = duration;
+            MagnetizeZonePullStrength[zoneId] = pullStrength;
+            MagnetizeZoneType[zoneId] = zoneType;
+            _activeMagnetizeZoneIds.Add(zoneId);
+            return zoneId;
+        }
+
+        /// <summary>Remove a magnetize zone by ID. Safe to call on inactive slots.</summary>
+        public void RemoveMagnetizeZone(int zoneId)
+        {
+            if (zoneId < 0 || zoneId >= MAX_MAGNETIZE_ZONES) return;
+            if (!MagnetizeZoneActive[zoneId]) return;
+            MagnetizeZoneActive[zoneId] = false;
+            MagnetizeZoneX[zoneId] = 0f;
+            MagnetizeZoneY[zoneId] = 0f;
+            MagnetizeZoneRadius[zoneId] = 0f;
+            MagnetizeZoneDuration[zoneId] = 0f;
+            MagnetizeZonePullStrength[zoneId] = 0f;
+            MagnetizeZoneType[zoneId] = 0;
+            _activeMagnetizeZoneIds.Remove(zoneId);
+        }
+
+        /// <summary>Get cached list of active magnetize zone IDs. O(1) — returns internal list reference.</summary>
+        public List<int> GetCachedActiveMagnetizeZoneIds()
+        {
+            return _activeMagnetizeZoneIds;
+        }
+
         // ==================== 亡灵法师尸体队列 API ====================
         /// <summary>
         /// Queue a killed enemy as a corpse for potential necromancer resurrection.

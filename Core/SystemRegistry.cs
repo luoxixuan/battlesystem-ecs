@@ -111,6 +111,9 @@ namespace BattleSystemECS.Core
         // ── Hot Zone / Terrain Bonus ──
         public HotZoneSystem? HotZone { get; private set; }
 
+        // ── Magnetize zones (displacement fields, no damage) ──
+        public MagnetizeSystem? Magnetize { get; private set; }
+
         // ── Tech & Misc ──
         public TechTreeSystem? TechTree { get; private set; }
         public PickupSystem? Pickup { get; private set; }
@@ -266,6 +269,9 @@ namespace BattleSystemECS.Core
 
             // ── Hot Zone ──
             HotZone = new HotZoneSystem(store, config, playerId);
+
+            // ── Magnetize (displacement fields) ──
+            Magnetize = new MagnetizeSystem(store, logger);
 
             // ── Adaptive Difficulty ──
             AdaptiveDifficulty = new AdaptiveDifficultySystem(store, config);
@@ -425,6 +431,7 @@ namespace BattleSystemECS.Core
             scheduler.AI.ZoneControl = ZoneControl;
             scheduler.AI.EnemyStrafe = EnemyStrafe;
             scheduler.AI.ReflectTower = ReflectTower;
+            scheduler.AI.Magnetize = Magnetize;
 
             // ── Movement ──
             scheduler.Movement.Wound = null;

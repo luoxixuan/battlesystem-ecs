@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-02, Round 43）
+## 性能基准（2026-06-02, Round 44）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **4075 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11314 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4896 FPS** |
+| **mode 5**（完整一局） | **4089 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10930 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4759 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -146,6 +146,7 @@ dotnet test
 - Boss 踩踏步伤 Trample（ComponentStore_Enemy.cs + EnemyMovementSystem.cs，3 字段 EnemyTrampleRadius/Damage/Knockback + SetTurn pre-scan O(1) early-out + ResolveTrampleAoe 串行 AOE：玩家扣血 + 小怪击退 0.5 单位 + Stagger 自动暂停）；bench2: 11087, bench4: 4906, bench5: 4018 ⚠️
 - 词缀重铸 API Reforge Split B（ReforgeSystem + ComponentStore_Tower.cs + GameConfig.cs，2 字段 TowerAffixLockMask/TowerReforgeCount + 7 访问器 + ReforgeConfig 成本/锁槽/稀有度权重 + RerollAffix 塔级/锁槽感知 + SetSlotLocked + RerollAllUnlocked 跳过锁槽 + 池采样 rarity tier）；bench2: 11082, bench4: 4494, bench5: 4074 ⚠️
 - 喘息波运行时收益 Breather Split B（WaveSpawningSystem.cs + GoldSystem.cs + ComponentStore_Player.cs + SystemRegistry.cs，OnBreatherWaveComplete 事件 + 3 SOA 字段 PlayerHealOnBreatherWave/PlayerCooldownReduceOnBreather/PlayerBreatherGoldBonus + GoldSystem.SubscribeToBreatherWave：Breather 波完成时回血 %/技能 CDR/金币 ×2）；bench2: 11314, bench4: 4896, bench5: 4075 ⚠️
+- 磁吸立场 Magnetize（MagnetizeSystem.cs + ComponentStore_World.cs + AIGroup.cs + SystemRegistry.cs，3 类型 Pull/Repel/PullDeflect + 64 zone 池 + 线性 falloff 拉扯力 + AIGroup pre-step 早退 + ProjectileSystem IsInDeflectZone 查询接口 + POSITION_CLAMP 越界保护）；bench2: 10930, bench4: 4759, bench5: 4089 ⚠️
 ### 2026-06-01
 - 射程伤害衰减（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs）；bench2: 12026, bench4: 5531, bench5: 4696
 - 爆发射击/齐射模式（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + TowerPlacementSystem.cs）；bench2: 11928, bench4: 5364, bench5: 4618
