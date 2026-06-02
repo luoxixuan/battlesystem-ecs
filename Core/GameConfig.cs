@@ -275,6 +275,13 @@ namespace BattleSystemECS.Config
         // OverkillRadius: search radius in tiles for finding overkill splash targets
         // 0 = no radius (effect disabled, even if type is non-zero)
         public float OverkillRadius { get; set; } = 0f;
+        // ── Kill-Triggered Player Sustain (HealOnKill / ManaOnKill) ───────────
+        // HealOnKillAmount: HP restored to the owning player whenever this tower scores a kill.
+        // 0 = no heal (backward compatible). Recommended range: 0.5 – 5.0 HP per kill.
+        public float HealOnKillAmount { get; set; } = 0f;
+        // ManaOnKillAmount: mana restored to the owning player whenever this tower scores a kill.
+        // 0 = no mana restore. Capped at PlayerMaxMana inside AddPlayerMana.
+        public float ManaOnKillAmount { get; set; } = 0f;
     }
 
     /// <summary>

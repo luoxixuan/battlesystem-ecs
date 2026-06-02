@@ -199,6 +199,10 @@ namespace BattleSystemECS.Systems
                     store.TowerBouncesRemaining[towerId] = tc.Bounces;
                     store.TowerBounceRange[towerId] = tc.BounceRange;
                     store.TowerBounceDamageFalloff[towerId] = tc.BounceDamageFalloff;
+                    // Apply kill-triggered player sustain (Leech/Vampiric/Soul-Drain tower family)
+                    // Both default to 0 in TowerConfig, so non-leech towers are unaffected.
+                    store.TowerHealOnKillAmount[towerId] = tc.HealOnKillAmount;
+                    store.TowerManaOnKillAmount[towerId] = tc.ManaOnKillAmount;
                     // Apply turn rate for turret rotation delay (already set via AddTower params)
                     // Initialize facing angle to point at nearest enemy (or 0 if none)
                     store.TowerFacingAngle[towerId] = 0f;

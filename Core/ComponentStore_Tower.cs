@@ -99,6 +99,15 @@ namespace BattleSystemECS.Core
         // TowerResetAmount: for Partial mode, seconds to subtract from TowerLastAttackTime (clamped at 0).
         // For Full mode, value is ignored (reset is unconditional). Default 0.
         public float[] TowerResetAmount = new float[MAX_ENTITIES];
+        // ── Kill-Triggered Player Sustain (Leech/Vampiric/Soul-Drain towers) ────
+        // TowerHealOnKillAmount: HP restored to the owning player whenever this tower scores a kill.
+        // Applied serially during ResolveEnemiesKilledThisFrame via OnTowerKill subscription.
+        // Capped at PlayerMaxHealth by store.SetPlayerCurrentHealth's natural ceiling.
+        // Default 0 = disabled (backward compatible).
+        public float[] TowerHealOnKillAmount = new float[MAX_ENTITIES];
+        // TowerManaOnKillAmount: mana restored to the owning player whenever this tower scores a kill.
+        // Capped at PlayerMaxMana inside AddPlayerMana. Default 0 = disabled.
+        public float[] TowerManaOnKillAmount = new float[MAX_ENTITIES];
         // Tower anti-air flags: controls which height layers a tower can attack
         // TowerCanHitAir=true: tower can attack flying enemies (anti-air tower)
         // TowerCanHitGround=true: tower can attack ground enemies
@@ -740,6 +749,9 @@ namespace BattleSystemECS.Core
             // Kill-triggered cooldown reset: default to no reset (type=0, amount=0)
             TowerResetOnKill[entityId] = 0;
             TowerResetAmount[entityId] = 0f;
+            // Kill-triggered player sustain: default to no heal / no mana restore
+            TowerHealOnKillAmount[entityId] = 0f;
+            TowerManaOnKillAmount[entityId] = 0f;
             // Burst fire: default to no burst (0 count = single-shot)
             TowerBurstCount[entityId] = 0;
             TowerBurstInterval[entityId] = 0f;
@@ -874,6 +886,9 @@ namespace BattleSystemECS.Core
             // Kill-triggered cooldown reset field reset
             TowerResetOnKill[entityId] = 0;
             TowerResetAmount[entityId] = 0f;
+            // Kill-triggered player sustain field reset
+            TowerHealOnKillAmount[entityId] = 0f;
+            TowerManaOnKillAmount[entityId] = 0f;
             // Burst fire fields reset
             TowerBurstCount[entityId] = 0;
             TowerBurstInterval[entityId] = 0f;

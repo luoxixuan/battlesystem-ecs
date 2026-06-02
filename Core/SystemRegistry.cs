@@ -46,6 +46,8 @@ namespace BattleSystemECS.Core
         public TowerExperienceSystem? TowerExperience { get; private set; }
         public TowerSynergySystem? TowerSynergy { get; private set; }
         public KillCooldownResetSystem? KillCooldownReset { get; private set; }
+        // ── Kill-Triggered Player Sustain (HealOnKill / ManaOnKill) ───────────
+        public HealOnKillSystem? HealOnKill { get; private set; }
         public TowerMorphSystem? TowerMorph { get; private set; }
         public AuraTowerSystem? AuraTower { get; private set; }
         public CurseAuraSystem? Curse { get; private set; }
@@ -156,6 +158,8 @@ namespace BattleSystemECS.Core
             TowerSynergy.LoadSynergyConfig();
             // Kill-triggered cooldown reset (ARPG/Roguelike mechanic)
             KillCooldownReset = new KillCooldownResetSystem(store, config, playerId);
+            // Kill-triggered player sustain (heal / mana on tower kill)
+            HealOnKill = new HealOnKillSystem(store);
             TowerMorph = new TowerMorphSystem(store);
 
             // ── Player attack ──
@@ -350,6 +354,9 @@ namespace BattleSystemECS.Core
 
             // ── OnTowerKill + OnEnemyKilled → KillCooldownReset (cooldown reset on kill) ──
             KillCooldownReset?.SubscribeToEvents();
+
+            // ── OnTowerKill → HealOnKill (player heal / mana restore on tower kill) ──
+            HealOnKill?.SubscribeToEvents();
 
             // ── CorpseEffect subscribes to OnEnemyKilled ──
             CorpseEffect?.SubscribeToOnEnemyKilled();
