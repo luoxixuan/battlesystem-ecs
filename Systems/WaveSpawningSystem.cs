@@ -213,6 +213,7 @@ namespace BattleSystemECS.Systems
                     monsterConfig.LastStand?.HpFraction ?? 0f,
                     monsterConfig.LastStand?.SpeedMult ?? 1f,
                     monsterConfig.LastStand?.DamageMult ?? 1f);
+                store.SetPierceResist(enemyId, monsterConfig.PierceResist, monsterConfig.PierceImmune);
                 store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree("Normal");
                 totalEnemiesSpawned++;
             }
@@ -245,6 +246,7 @@ namespace BattleSystemECS.Systems
                 monsterConfig.LastStand?.HpFraction ?? 0f,
                 monsterConfig.LastStand?.SpeedMult ?? 1f,
                 monsterConfig.LastStand?.DamageMult ?? 1f);
+            store.SetPierceResist(enemyId, monsterConfig.PierceResist, monsterConfig.PierceImmune);
             store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree("Normal");
             store.EnemyIsElite[enemyId] = true;
             totalEnemiesSpawned++;
@@ -444,6 +446,7 @@ namespace BattleSystemECS.Systems
                         monsterConfig.LastStand?.HpFraction ?? 0f,
                         monsterConfig.LastStand?.SpeedMult ?? 1f,
                         monsterConfig.LastStand?.DamageMult ?? 1f);
+                    store.SetPierceResist(enemyId, monsterConfig.PierceResist, monsterConfig.PierceImmune);
                     store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(monsterType);
 
                     // Initialize flying enemy properties from monster config

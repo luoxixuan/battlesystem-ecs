@@ -2858,6 +2858,41 @@
                                 "SpeedMult":  1.5,
                                 "DamageMult":  2.0
                             }
+                        },
+                        {
+                            "MoveSpeed":  0.4,
+                            "AttackInterval":  2.2,
+                            "Type":  "Boss",
+                            "AttackRange":  1,
+                            "MaxHealth":  1200,
+                            "Damage":  12,
+                            "Name":  "Armored Core (Pierce Immune)",
+                            "Health":  1200,
+                            "GoldReward":  280,
+                            "Skills":  [
+                                           "Normal Attack"
+                                       ],
+                            "Armor":  15,
+                            "PierceResist":  0.75,
+                            "PierceImmune":  false
+                        },
+                        {
+                            "MoveSpeed":  0.3,
+                            "AttackInterval":  3.0,
+                            "Type":  "Boss",
+                            "AttackRange":  1,
+                            "MaxHealth":  2000,
+                            "Damage":  25,
+                            "Name":  "Plated Behemoth (Total Pierce Immune)",
+                            "Health":  2000,
+                            "GoldReward":  400,
+                            "Skills":  [
+                                           "Normal Attack",
+                                           "Phase Shift"
+                                       ],
+                            "Armor":  20,
+                            "PierceResist":  0.0,
+                            "PierceImmune":  true
                         }
                     ],
     "Towers":  [

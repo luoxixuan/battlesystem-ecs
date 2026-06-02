@@ -142,6 +142,10 @@ namespace BattleSystemECS.Config
         // LastStand: HP-threshold-based death rattle. Null = no LastStand.
         // Typical use: boss below 10% HP goes into dramatic enrage (faster + harder hitting).
         public BossLastStandConfig LastStand { get; set; }
+        // PierceResistance: 0-1, fraction of piercing damage ignored (0 = full damage, 0.75 = 75% blocked).
+        // PierceImmune: binary flag, true = piercing projectiles deal 0 damage.
+        public float PierceResist { get; set; } = 0f;
+        public bool PierceImmune { get; set; } = false;
     }
 
     public class TowerConfig

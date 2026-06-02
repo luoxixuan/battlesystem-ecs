@@ -389,6 +389,14 @@ namespace BattleSystemECS.Core
         // EnemyFearResistance: 0-1, reduces fear duration fraction (1 = complete fear immunity)
         public float[] EnemyFearResistance = new float[MAX_ENTITIES];
 
+        // ==================== 穿透抗性 (Pierce Resistance — anti-pierce-tower) ====================
+        // EnemyPierceResist: 0-1, fraction of piercing damage that is ignored (0 = no resist, 0.75 = 75% pierce damage blocked).
+        // Applied in ProjectileSystem.ResolveHit() to projectiles with pierceRemaining > 0.
+        public float[] EnemyPierceResist = new float[MAX_ENTITIES];
+        // EnemyIsPierceImmune: binary pierce immunity flag. When true, piercing projectiles deal 0 damage to this enemy.
+        // Used for boss-type "armored core" enemies that completely shut down pierce tower strategies.
+        public bool[] EnemyIsPierceImmune = new bool[MAX_ENTITIES];
+
         // ==================== 自爆/殉爆敌人 (Suicide Bomber / Kamikaze, SOA) ====================
         // EnemyIsSuicide: true if this enemy is a suicide bomber that explodes near towers
         public bool[] EnemyIsSuicide = new bool[MAX_ENTITIES];
@@ -715,6 +723,9 @@ namespace BattleSystemECS.Core
             EnemyArmor[entityId] = armor;
             EnemyMagicResist[entityId] = magicResist;
             EnemyDamageImmunityMask[entityId] = 0;  // default: no damage immunities
+            // Pierce Resistance: default 0 resist, false immune (no pierce mitigation)
+            EnemyPierceResist[entityId] = 0f;
+            EnemyIsPierceImmune[entityId] = false;
             EnemyShield[entityId] = shield;  // configurable initial shield
             // Hit Shield: default 0 layers, 0 max, 0 regen timer
             EnemyHitShieldCount[entityId] = 0f;
@@ -909,6 +920,20 @@ namespace BattleSystemECS.Core
             EnemyLastStandDamageMult[enemyId] = damageMult;
             // Active starts false; transitions to true on HP threshold crossing in EnemyAISystem
             EnemyLastStandActive[enemyId] = false;
+        }
+
+        /// <summary>
+        /// Configures piercing-damage resistance for an enemy. Pierce-resist reduces (or nullifies) damage
+        /// from projectiles that have pierceCount > 0 in ProjectileSystem.
+        /// </summary>
+        /// <param name="enemyId">Target enemy entity ID</param>
+        /// <param name="pierceResist">0-1, fraction of piercing damage ignored (0 = full damage, 0.75 = 75% blocked)</param>
+        /// <param name="pierceImmune">If true, piercing projectiles deal zero damage to this enemy</param>
+        public void SetPierceResist(int enemyId, float pierceResist, bool pierceImmune)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyPierceResist[enemyId] = pierceResist;
+            EnemyIsPierceImmune[enemyId] = pierceImmune;
         }
 
         /// <summary>

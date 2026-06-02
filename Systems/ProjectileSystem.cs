@@ -30,6 +30,9 @@ namespace BattleSystemECS.Systems
         // Piercing: number of additional enemies this projectile can pierce through after the initial hit
         private int[] _projPierceRemaining = new int[MAX_PROJ];
         private float[] _projPierceDmgFalloff = new float[MAX_PROJ];
+        // _projIsPiercing: true if projectile was fired with pierceCount > 0 (set at Fire, used by ResolveHit
+        // to know whether pierce-resistance on the target applies to this hit).
+        private bool[] _projIsPiercing = new bool[MAX_PROJ];
         // Fragmentation: number of child projectiles to spawn on impact (0 = no fragmentation)
         private int[] _projFragmentCount = new int[MAX_PROJ];
         private float[] _projFragmentRange = new float[MAX_PROJ];
@@ -96,6 +99,8 @@ namespace BattleSystemECS.Systems
             _projIsHoming[projId] = isHoming;
             _projPierceRemaining[projId] = pierceCount;
             _projPierceDmgFalloff[projId] = pierceDmgFalloff;
+            // Track whether this projectile is piercing — used by ResolveHit to apply pierce-resistance
+            _projIsPiercing[projId] = pierceCount > 0;
             _projFragmentCount[projId] = fragmentCount;
             _projFragmentRange[projId] = fragmentRange;
             _projFragmentDmgMult[projId] = fragmentDmgMult;
@@ -150,6 +155,8 @@ namespace BattleSystemECS.Systems
             _projIsHoming[projId] = isHoming;
             _projPierceRemaining[projId] = pierceCount;
             _projPierceDmgFalloff[projId] = pierceDmgFalloff;
+            // Track whether this projectile is piercing — used by ResolveHit to apply pierce-resistance
+            _projIsPiercing[projId] = pierceCount > 0;
             _projFragmentCount[projId] = fragmentCount;
             _projFragmentRange[projId] = fragmentRange;
             _projFragmentDmgMult[projId] = fragmentDmgMult;
@@ -357,6 +364,26 @@ namespace BattleSystemECS.Systems
             int playerId = _projPlayerId[projId];
             int towerId = _projTowerId[projId];
 
+            // Pierce Resistance: only applies to piercing projectiles (Fire() sets _projIsPiercing=true when pierceCount>0).
+            // For non-piercing projectiles, damage is unaffected. Fragments from FireAtPoint are always non-piercing.
+            if (_projIsPiercing[projId])
+            {
+                // Piercing projectile — apply target's pierce resist
+                if (store.EnemyIsPierceImmune[targetId])
+                {
+                    // Binary immunity: piercing damage completely nullified
+                    damage = 0f;
+                }
+                else
+                {
+                    float resist = store.EnemyPierceResist[targetId];
+                    if (resist > 0f)
+                    {
+                        damage *= (1f - resist);
+                    }
+                }
+            }
+
             // Thorns reflect: enemy reflects a fraction of projectile damage
             float thornsRatio = store.EnemyThornsRatio[targetId];
             if (thornsRatio > 0f && damage > 0f)
@@ -454,8 +481,10 @@ namespace BattleSystemECS.Systems
             _projTowerId[projId] = towerId;
             _projSpeed[projId] = speed;
             _projIsHoming[projId] = isHoming;
+            // Fragments from FireAtPoint do NOT inherit pierce — they are non-piercing
             _projPierceRemaining[projId] = 0;
             _projPierceDmgFalloff[projId] = 1f;
+            _projIsPiercing[projId] = false;
             _projFragmentCount[projId] = 0;
             _projFragmentRange[projId] = 0f;
             _projFragmentDmgMult[projId] = 1f;
