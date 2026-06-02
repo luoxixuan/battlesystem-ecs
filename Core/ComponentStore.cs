@@ -406,6 +406,10 @@ namespace BattleSystemECS.Core
                 EnemyTerrainMoveSpeedMult[entityId] = 1f;
                 EnemyMoveSpeedBase[entityId] = 0f;
                 EnemySlowDurationLeft[entityId] = 0f;
+                // Polymorph CC fields (reset on entity destruction)
+                EnemyIsPolymorphed[entityId] = false;
+                EnemyPolymorphDurationLeft[entityId] = 0f;
+                EnemyPolymorphDamageTakenMultiplier[entityId] = 1f;
                 EnemyKnockbackForceLeft[entityId] = 0f;
                 EnemyIsElite[entityId] = false;
                 EnemyIsFlying[entityId] = false;
@@ -780,6 +784,7 @@ namespace BattleSystemECS.Core
             EnemyBleedMaxStacks = null!; EnemyBleedResistance = null!; EnemyBleedDurationLeft = null!;
             EnemyStunFlag = null!; EnemyStunDurationLeft = null!; EnemySlowFactor = null!;
             EnemyTerrainMoveSpeedMult = null!; EnemyMoveSpeedBase = null!; EnemySlowDurationLeft = null!;
+            EnemyIsPolymorphed = null!; EnemyPolymorphDurationLeft = null!; EnemyPolymorphDamageTakenMultiplier = null!;
             EnemyWoundThreshold = null!; EnemyWoundSlowRatio = null!; EnemyIsWounded = null!;
             EnemyKnockbackForceLeft = null!; EnemyIsElite = null!; EnemyIsFlying = null!;
             EnemyFlightHeight = null!; EnemyCanLand = null!; EnemyStealthMultiplier = null!;

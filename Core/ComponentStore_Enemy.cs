@@ -137,6 +137,18 @@ namespace BattleSystemECS.Core
         public float[] EnemyMoveSpeedBase = new float[MAX_ENTITIES];
         // EnemySlowDurationLeft: tower-slow duration in turns. Separate from EnemyBuffDurationLeft
         public float[] EnemySlowDurationLeft = new float[MAX_ENTITIES];
+        // ==================== Polymorph CC (变羊/变小鸡 — 强制转阵营 + 失去攻击) ====================
+        // EnemyIsPolymorphed: per-enemy bool flag. When true, enemy cannot attack or move
+        // and is treated as a harmless target. Decays when EnemyPolymorphDurationLeft hits 0.
+        // Default false — fully backward compatible (no enemy polymorphed by default).
+        public bool[] EnemyIsPolymorphed = new bool[MAX_ENTITIES];
+        // EnemyPolymorphDurationLeft: remaining polymorph duration in turns. Decremented each
+        // frame by EnemyAISystem. When <= 0 and IsPolymorphed, flag is cleared.
+        public float[] EnemyPolymorphDurationLeft = new float[MAX_ENTITIES];
+        // EnemyPolymorphDamageTakenMultiplier: damage multiplier while polymorphed.
+        // e.g. 1.5 = polymorphed enemies take 50% more damage (1.0 = no change).
+        // Default 1.0f — no damage modifier unless explicitly set.
+        public float[] EnemyPolymorphDamageTakenMultiplier = new float[MAX_ENTITIES];
         // ==================== Enemy Path Deviation (Lateral X-axis Drift) ====================
         // EnemyPathDeviationType: 0=none (deterministic Y-axis only), 1=sine, 2=random
         // Default 0 keeps existing behavior. Sine produces a smooth wave lateral offset
@@ -1087,6 +1099,33 @@ namespace BattleSystemECS.Core
             EnemySlowFactor[enemyId] = factor;
             EnemyMoveSpeed[enemyId] = baseSpeed * factor;
             EnemySlowDurationLeft[enemyId] = duration;
+        }
+
+        /// <summary>
+        /// Polymorph CC: turns the enemy into a harmless form (变羊/变小鸡) for `duration` turns.
+        /// Mirrors ApplySlow's safety: respects EnemyIsUnstoppable, applies damage-taken multiplier
+        /// (default 1.0x → caller can pass 1.5 for 50% extra damage taken while polymorphed).
+        /// While polymorphed, the enemy cannot attack (BT short-circuited in EnemyAISystem) and
+        /// becomes a sitting duck — defensive, fully reversible, fully stack-friendly.
+        /// </summary>
+        public void ApplyPolymorph(int enemyId, int duration, float damageTakenMultiplier = 1f)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            if (duration <= 0) return;
+            // Check total CC immunity (unstoppable enemies ignore polymorph too)
+            if (EnemyIsUnstoppable[enemyId]) return;
+            // Clamp multiplier to a sane band (0.5x..3x) — protects against config typos
+            if (damageTakenMultiplier < 0.5f) damageTakenMultiplier = 0.5f;
+            if (damageTakenMultiplier > 3f) damageTakenMultiplier = 3f;
+
+            // Refresh-or-set semantics: take the longer remaining duration (no double-dipping)
+            if (duration > EnemyPolymorphDurationLeft[enemyId])
+                EnemyPolymorphDurationLeft[enemyId] = duration;
+            // Only overwrite the multiplier if the new one is stronger (stacking friendly)
+            if (damageTakenMultiplier > EnemyPolymorphDamageTakenMultiplier[enemyId])
+                EnemyPolymorphDamageTakenMultiplier[enemyId] = damageTakenMultiplier;
+            // Flip the flag last (idempotent: setting true on already-true is a no-op semantically)
+            EnemyIsPolymorphed[enemyId] = true;
         }
 
         /// <summary>

@@ -171,6 +171,10 @@ namespace BattleSystemECS.Systems
                     sc.SlowDuration        // Slow Nova duration in seconds (0 = no slow)
                 );
                 def.SummonDefId = sc.SummonDefId;  // carry summon def id through to runtime def
+                // Polymorph fields are not part of the positional constructor — set them after.
+                // 0 = no polymorph applied; safe to leave at default for non-polymorph skills.
+                def.PolymorphDuration = sc.PolymorphDuration;
+                def.PolymorphDamageTakenMultiplier = sc.PolymorphDamageTakenMultiplier;
                 store.AddAbility(playerId, def);
                 renderer.Log($"[SKILL] {sc.Name} registered (shape: {sc.AreaShape}, radius: {sc.AreaRadius}, DoT: {sc.DotDuration}s/{sc.DotTickInterval}s×{sc.DotDamagePerTick})");
             }
@@ -331,6 +335,9 @@ namespace BattleSystemECS.Systems
                     break;
                 case 14: // HealingZone — place a ground healing zone that heals allies in radius
                     enemiesHit = CastHealingZone(def);
+                    break;
+                case 15: // Polymorph — circle AoE that turns enemies into a harmless form (sheep/chicken)
+                    enemiesHit = CastPolymorphArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def);
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -772,6 +779,58 @@ namespace BattleSystemECS.Systems
                     int slowTurns = Math.Max(1, (int)Math.Ceiling(def.SlowDuration * (1f - _enemySlowResistance)));
                     store.ApplySlow(enemyId, def.SlowAmount, slowTurns);
                     renderer.Log($"[SKILL] {name} slowed enemy {enemyId} by {def.SlowAmount:F2}x for {slowTurns} turns");
+                }
+                hitCount++;
+            }
+            return hitCount;
+        }
+
+        /// <summary>
+        /// Polymorph AreaShape: circle AoE that turns enemies into a harmless form (sheep/chicken).
+        /// Reuses the same parallel-collect / serial-apply pattern as CastSlowArea. After the
+        /// parallel hit-list is finalized, applies damage and ApplyPolymorph serially. While
+        /// polymorphed, enemies cannot attack (BT short-circuited in EnemyAISystem) and can take
+        /// extra damage per def.PolymorphDamageTakenMultiplier (e.g. 1.5 = +50% damage taken).
+        /// </summary>
+        private int CastPolymorphArea(float finalDamage, float playerX, float playerY,
+            int radius, string name, GameplayAbilityDef def)
+        {
+            if (_activeEnemyList == null) return 0;
+            var activeEnemyIds = _activeEnemyList;
+
+            int radiusSq = radius * radius;
+            _slowAreaHits.Clear();  // reuse the same hit-list — same shape, same lifetime
+
+            Parallel.ForEach(activeEnemyIds, enemyId =>
+            {
+                if (enemyId == playerId) return;
+                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyHealth <= 0f) return;
+
+                float enemyX = store.PositionX[enemyId];
+                float enemyY = store.PositionY[enemyId];
+
+                float dx = enemyX - playerX;
+                float dy = enemyY - playerY;
+                float distSq = dx * dx + dy * dy;
+
+                if (distSq <= radiusSq)
+                {
+                    lock (_slowAreaHitsLock) { _slowAreaHits.Add(enemyId); }
+                }
+            });
+
+            // Serial phase: apply damage and polymorph effect
+            int hitCount = 0;
+            foreach (int enemyId in _slowAreaHits)
+            {
+                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+
+                if (def.PolymorphDuration > 0f)
+                {
+                    int polyTurns = Math.Max(1, (int)Math.Ceiling(def.PolymorphDuration));
+                    store.ApplyPolymorph(enemyId, polyTurns, def.PolymorphDamageTakenMultiplier);
+                    renderer.Log($"[SKILL] {name} polymorphed enemy {enemyId} for {polyTurns} turns (×{def.PolymorphDamageTakenMultiplier:F2} dmg taken)");
                 }
                 hitCount++;
             }

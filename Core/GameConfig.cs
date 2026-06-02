@@ -950,6 +950,10 @@ namespace BattleSystemECS.Config
         // Slow fields (Slow Nova — move speed reduction AoE)
         public float SlowAmount { get; set; }
         public float SlowDuration { get; set; }
+        // Polymorph fields (变羊/变小鸡 — turns enemies into a harmless form)
+        // 0 / 0f = no polymorph applied. Duration in turns; multiplier increases damage taken.
+        public float PolymorphDuration { get; set; }
+        public float PolymorphDamageTakenMultiplier { get; set; } = 1f;
         // Mana cost for casting this skill (0 = free)
         public float ManaCost { get; set; }
         // Summon definition ID (for summon_unit ability type) — null/empty = not a summon skill

@@ -196,6 +196,33 @@ namespace BattleSystemECS.Systems
                         continue;
                     }
 
+                    // Polymorph CC: enemy is transformed into a harmless form (变羊/变小鸡).
+                    // Short-circuit BT evaluation to None — enemy cannot attack or use abilities
+                    // while polymorphed. Decay the duration each frame; clear flag when it expires.
+                    // This guard runs in both the sequential and parallel paths below.
+                    if (store.EnemyIsPolymorphed[enemyId])
+                    {
+                        float polyLeft = store.EnemyPolymorphDurationLeft[enemyId] - _currentDeltaTime;
+                        if (polyLeft <= 0f)
+                        {
+                            // Polymorph expired: clear flag, reset damage-taken multiplier to neutral
+                            store.EnemyPolymorphDurationLeft[enemyId] = 0f;
+                            store.EnemyIsPolymorphed[enemyId] = false;
+                            store.EnemyPolymorphDamageTakenMultiplier[enemyId] = 1f;
+                            // Fall through to normal BT evaluation this frame (no skip)
+                        }
+                        else
+                        {
+                            store.EnemyPolymorphDurationLeft[enemyId] = polyLeft;
+                            action = "none";
+                            actionEnum = EnemyActionType.Polymorphed;
+                            store.SetEnemyActionEnum(enemyId, actionEnum);
+                            _lastActionCache[enemyId] = actionEnum;
+                            _lastActionStringCache[enemyId] = action;
+                            continue; // polymorphed this frame — skip BT, can't attack/cast
+                        }
+                    }
+
                     if (cachedBt != null)
                     {
                         action = BTCachedTreeEvaluator.EvaluateWithEnumAndAbility(

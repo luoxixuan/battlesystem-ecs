@@ -24,6 +24,7 @@ namespace BattleSystemECS.Core.GAS
         public const int TimeWarp = 12;     // TimeWarp: applies GlobalTimeScale + GlobalTimeScaleDuration to slow/fast game time
         public const int Summon = 13;       // Summon: spawns a player-summoned combat unit at the player's position
         public const int HealingZone = 14;   // HealingZone: places a ground healing zone that heals allies in radius
+        public const int Polymorph = 15;     // Polymorph: circle AoE that transforms enemies into a harmless form (sheep/chicken)
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -45,6 +46,7 @@ namespace BattleSystemECS.Core.GAS
                 "time_warp" => TimeWarp,
                 "summon" => Summon,
                 "healingzone" => HealingZone,
+                "polymorph" => Polymorph,
                 _ => Single
             };
         }
@@ -88,6 +90,9 @@ namespace BattleSystemECS.Core.GAS
         // Slow fields (Slow Nova — non-freeze move speed reduction)
         public float SlowAmount;         // speed multiplier (e.g. 0.5 = 50% speed); 0 = no slow
         public float SlowDuration;       // seconds of slow effect; 0 = no slow
+        // Polymorph fields (变羊/变小鸡 — circle AoE that turns enemies harmless for `PolymorphDuration` turns)
+        public float PolymorphDuration;                    // turns enemy stays polymorphed; 0 = no polymorph
+        public float PolymorphDamageTakenMultiplier;       // multiplier on damage taken while polymorphed (1.0 = neutral)
         /// <summary>Cone angle in degrees for AreaShape.Cone. Fan spread. Default: 60.</summary>
         public float ConeAngleDegrees;   // degrees, used only when AreaShape == Cone
 
@@ -112,6 +117,10 @@ namespace BattleSystemECS.Core.GAS
             ConeAngleDegrees = coneAngleDegrees;
             RequiredBuffs = requiredBuffs;
             SummonDefId = null;
+            // Polymorph fields default to neutral (0 / 1.0). SkillSystem overrides these
+            // immediately after construction from the JSON config (def.PolymorphDuration = sc.PolymorphDuration).
+            PolymorphDuration = 0f;
+            PolymorphDamageTakenMultiplier = 1f;
         }
 
         /// <summary>True if this ability applies a periodic DoT effect.</summary>

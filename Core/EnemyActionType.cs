@@ -32,6 +32,7 @@ namespace BattleSystemECS.Components
         Clone = 22,          // 克隆：生成自身功能性克隆体
         Banished = 23,       // 放逐：敌人被移出战场，冻结在原位置/不可行动/不可被攻击
         Staggered = 24,      // 失衡/破防：敌人姿态条满后强制硬直，暂停所有动作/可被处决
-        Tethered = 25        // 锁链/连接：与另一敌人被链子绑定，超距时减速 + 互拉；partner 受 DoT 伤害按比例传染
+        Tethered = 25,        // 锁链/连接：与另一敌人被链子绑定，超距时减速 + 互拉；partner 受 DoT 伤害按比例传染
+        Polymorphed = 26      // 变形：变羊/变小鸡，强制 NoneAction + 1.5x 受伤（终极硬控，无害化）
     }
 }
