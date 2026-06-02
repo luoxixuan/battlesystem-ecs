@@ -4273,7 +4273,9 @@
                    "Name":  "Player",
                    "AttackDamage":  10,
                    "UpgradeThreshold":  1000,
-                   "CurrentLevel":  1
+                   "CurrentLevel":  1,
+                   "ReincarnationCharges":  1,
+                   "ReincarnationHealFraction":  0.5
                },
     "Skills":  [
                    {

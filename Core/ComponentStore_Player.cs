@@ -14,8 +14,17 @@ namespace BattleSystemECS.Core
         public float[] PlayerMaxHealth = new float[MAX_PLAYERS];  // 玩家最大生命值
         public float[] PlayerCurrentHealth = new float[MAX_PLAYERS];  // 玩家当前生命值
         // PlayerMinHealthFloor: minimum HP floor for one-shot protection. Health won't drop below this value
-        // (any excess damage is absorbed). Default 0 = no protection (backward compatible).
+        // (only when floor > 0). One-shot protection is the "floor" model: HP never drops below floor.
         public float[] PlayerMinHealthFloor = new float[MAX_PLAYERS];
+        // PlayerReincarnationCharges: number of times this player can auto-revive on death.
+        // 0 = no reincarnation (default). Set to 1 in config for "one-time save".
+        public int[] PlayerReincarnationCharges = new int[MAX_PLAYERS];
+        // PlayerReincarnationHealFraction: HP fraction restored on reincarnation (0-1).
+        // 0.5 = revive at 50% MaxHP. Default 0.5f. Clamped to [0, 1] in setter.
+        public float[] PlayerReincarnationHealFraction = new float[MAX_PLAYERS];
+        // PlayerHasReincarnated: per-game flag. True after one reincarnation is used.
+        // Prevents multiple revives within a single game. Reset on game start (AddPlayer).
+        public bool[] PlayerHasReincarnated = new bool[MAX_PLAYERS];
         public float[] PlayerArmor = new float[MAX_PLAYERS];  // 玩家护甲：减少受到伤害
         // Player shield: absorbs damage before health, independent of armor
         public float[] PlayerShield = new float[MAX_PLAYERS];
@@ -457,6 +466,32 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             PlayerMinHealthFloor[playerId] = System.Math.Max(0f, floor);
         }
 
+        // ==================== Reincarnation (Player 死后复活一次) ====================
+        // Reincarnation is an "event" model (vs. one-shot protection's "floor" model):
+        //   - Charges > 0 + not yet reincarnated → on HP<=0, restore HP to HealFraction * MaxHP, decrement charges, mark flag.
+        //   - HealFraction clamped to [0, 1]. Charges clamped to >= 0.
+        //   - HasReincarnated is reset on every call so SetPlayerReincarnationConfig (called on
+        //     game start in GameManager.InitializePlayer) restores the "fresh save" state.
+        public void SetPlayerReincarnationConfig(int playerId, int charges, float healFraction)
+        {
+            if (!IsValidPlayer(playerId)) return;
+            PlayerReincarnationCharges[playerId] = System.Math.Max(0, charges);
+            PlayerReincarnationHealFraction[playerId] = System.Math.Clamp(healFraction, 0f, 1f);
+            PlayerHasReincarnated[playerId] = false;
+        }
+
+        public int GetPlayerReincarnationCharges(int playerId)
+        {
+            if (!IsValidPlayer(playerId)) return 0;
+            return PlayerReincarnationCharges[playerId];
+        }
+
+        public bool GetPlayerHasReincarnated(int playerId)
+        {
+            if (!IsValidPlayer(playerId)) return false;
+            return PlayerHasReincarnated[playerId];
+        }
+
         public void DecreasePlayerHealth(int playerId, float damage)
         {
             if (!IsValidPlayer(playerId)) return;
@@ -476,7 +511,20 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             float newHealth = PlayerCurrentHealth[playerId] - mitigatedDamage;
             float floor = PlayerMinHealthFloor[playerId];
             if (floor > 0f && newHealth < floor) newHealth = floor;
-            PlayerCurrentHealth[playerId] = System.Math.Max(0f, newHealth);
+            float finalHealth = System.Math.Max(0f, newHealth);
+            // Reincarnation: if HP would drop to 0 and we have unused charges, revive at HealFraction*MaxHP
+            // instead. Charges decrement and HasReincarnated latches true. Modeled as an "event"
+            // (vs. one-shot's "floor") — one revive per game per configured charge count.
+            if (finalHealth <= 0f
+                && PlayerReincarnationCharges[playerId] > 0
+                && !PlayerHasReincarnated[playerId])
+            {
+                float maxHp = PlayerMaxHealth[playerId];
+                finalHealth = System.Math.Max(1f, maxHp * PlayerReincarnationHealFraction[playerId]);
+                PlayerReincarnationCharges[playerId]--;
+                PlayerHasReincarnated[playerId] = true;
+            }
+            PlayerCurrentHealth[playerId] = finalHealth;
         }
 
         public bool IsPlayerAlive(int playerId)

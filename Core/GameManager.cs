@@ -163,6 +163,8 @@ namespace BattleSystemECS.Core
             store.SetPlayerCurrentHealth(id, maxHealth);
             store.SetPlayerUpgradeThreshold(id, upgradeThreshold);
             store.SetPlayerGold(id, 200f);
+            // Reincarnation: opt-in one-time save (config-driven; default 0 = disabled).
+            store.SetPlayerReincarnationConfig(id, gameConfig.Player.ReincarnationCharges, gameConfig.Player.ReincarnationHealFraction);
 
             playerId = id;
 
