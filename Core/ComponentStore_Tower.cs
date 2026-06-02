@@ -578,6 +578,18 @@ namespace BattleSystemECS.Core
         // Creates a "reflect aura" — group，塔共享反射光环
         public float[] TowerReflectAuraRadius = new float[MAX_ENTITIES];
 
+        // ==================== 塔受击反击 (Tower Retaliate) ====================
+        // TowerRetaliateChance: per-hit probability (0..1) of triggering a retaliation strike back at the
+        // attacking enemy when this tower takes damage. Retaliate is independent of Reflect:
+        //   Reflect = "return a fraction of the damage received" (scales with the incoming hit)
+        //   Retaliate = "fire a fixed-percentage-of-base-damage strike on a chance" (scales with this tower)
+        // Default 0 = no retaliate (zero-cost path — branch is skipped on hot path).
+        public float[] TowerRetaliateChance = new float[MAX_ENTITIES];
+        // TowerRetaliateDamageMult: damage multiplier on a successful retaliate hit, applied to
+        // TowerBaseDamage (NOT to the incoming damage). E.g. 0.5 = retaliate deals 50% of base damage
+        // as a single independent strike to the attacker. Default 0 = no effect.
+        public float[] TowerRetaliateDamageMult = new float[MAX_ENTITIES];
+
         // ==================== 塔组件访问 ====================
 
         /// <summary>
@@ -752,6 +764,9 @@ namespace BattleSystemECS.Core
             // Kill-triggered player sustain: default to no heal / no mana restore
             TowerHealOnKillAmount[entityId] = 0f;
             TowerManaOnKillAmount[entityId] = 0f;
+            // Retaliate fields: default to no retaliate (0% chance, 0% damage mult → branch skipped on hot path)
+            TowerRetaliateChance[entityId] = 0f;
+            TowerRetaliateDamageMult[entityId] = 0f;
             // Burst fire: default to no burst (0 count = single-shot)
             TowerBurstCount[entityId] = 0;
             TowerBurstInterval[entityId] = 0f;
@@ -920,6 +935,9 @@ namespace BattleSystemECS.Core
             TowerCurrentDrain[entityId] = 0f;
             TowerDamageAtDrainStart[entityId] = 0f;
             TowerBaseDamage[entityId] = 0f;
+            // Retaliate fields reset (chance=0 disables trigger, mult=0 disables damage — both defaults)
+            TowerRetaliateChance[entityId] = 0f;
+            TowerRetaliateDamageMult[entityId] = 0f;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
         }
         #endregion

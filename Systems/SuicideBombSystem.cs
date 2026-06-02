@@ -24,6 +24,7 @@ namespace BattleSystemECS.Systems
         private readonly int playerId;
         private readonly ReflectTowerSystem? _reflectTowerSystem;
         private readonly TowerStealthSystem? _towerStealthSystem;
+        private readonly Random _retaliateRng = Random.Shared;
         
         // Thread-safe collection for explosion events (phase 1 parallel collect → phase 2 serial apply)
         private readonly ConcurrentBag<SuicideExplosionEvent> _explosionEvents = new();
@@ -196,6 +197,33 @@ namespace BattleSystemECS.Systems
                 if (_reflectTowerSystem != null && store.TowerReflectRatio[towerId] > 0f)
                 {
                     _reflectTowerSystem.QueueReflect(towerId, evt.EnemyId, finalDamage);
+                }
+
+                // Retaliate: if this tower has retaliate chance > 0, roll the dice. Retaliate
+                // is independent of Reflect — both can fire on the same hit. Retaliate deals
+                // a single independent strike based on the tower's base damage, not the
+                // incoming hit size, so it's a frequency-based counter to high-attack-speed enemies.
+                if (_reflectTowerSystem != null)
+                {
+                    float retaliateChance = store.TowerRetaliateChance[towerId];
+                    if (retaliateChance > 0f)
+                    {
+                        if (_retaliateRng.NextDouble() < retaliateChance)
+                        {
+                            float retaliateMult = store.TowerRetaliateDamageMult[towerId];
+                            if (retaliateMult > 0f)
+                            {
+                                float baseDmg = store.TowerBaseDamage[towerId];
+                                if (baseDmg > 0f)
+                                {
+                                    _reflectTowerSystem.QueueRetaliate(
+                                        towerId,
+                                        evt.EnemyId,
+                                        baseDmg * retaliateMult);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

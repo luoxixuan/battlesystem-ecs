@@ -20,6 +20,12 @@ namespace BattleSystemECS.Systems
     /// so it does NOT trigger another reflect. The enemy takes the damage and either
     /// lives or dies — no second tower is involved so no infinite loop.
     /// 
+    /// Retaliate (co-tenant of the same queue): a tower with TowerRetaliateChance > 0 rolls
+    /// a per-hit probability and queues a single independent strike back at the attacker
+    /// scaled by TowerBaseDamage × TowerRetaliateDamageMult. Retaliate and Reflect can both
+    /// fire on the same hit — they're orthogonal (Reflect scales with the incoming hit,
+    /// Retaliate scales with the tower's base damage).
+    /// 
     /// Execution: CombatGroup (after Combat/TowerAttack where towers are hit).
     /// </summary>
     public class ReflectTowerSystem
@@ -27,7 +33,10 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore store;
         private readonly int playerId;
 
-        // Ping-pong queue: (attackingEnemyId, reflectDamage) — applied serial at frame end
+        // Ping-pong queue: (attackingEnemyId, reflectDamage) — applied serial at frame end.
+        // Both Reflect and Retaliate events share this queue — they are unified at the apply
+        // stage, since the semantic is "damage to attacking enemy". Differentiating them at
+        // the queue stage would require duplicating the apply pass for no behavioral gain.
         private readonly ConcurrentBag<ReflectEvent>[] _reflectQueue = new ConcurrentBag<ReflectEvent>[2];
         private int _queueIdx = 0;
 
@@ -64,6 +73,34 @@ namespace BattleSystemECS.Systems
                 TowerId = towerId,
                 AttackingEnemyId = attackingEnemyId,
                 ReflectDamage = reflectDamage
+            });
+        }
+
+        /// <summary>
+        /// Queue a retaliate event when a tower is hit. Retaliate fires a single independent
+        /// strike back at the attacker based on the tower's base damage, independent of the
+        /// incoming hit size. Caller is expected to have rolled the chance already (e.g.
+        /// `if (rng.NextDouble() < store.TowerRetaliateChance[towerId])`).
+        ///
+        /// Skipped when:
+        /// - any id is invalid
+        /// - tower inactive
+        /// - damage ≤ 0
+        /// - tower has no base damage (e.g. support tower) — nothing to retaliate with
+        /// </summary>
+        public void QueueRetaliate(int towerId, int attackingEnemyId, float damage)
+        {
+            if (towerId < 0 || attackingEnemyId < 0 || damage <= 0f) return;
+            if (!store.TowerActive[towerId]) return;
+            if (!store.EnemyActive[attackingEnemyId]) return;
+            float baseDmg = store.TowerBaseDamage[towerId];
+            if (baseDmg <= 0f) return;
+
+            _reflectQueue[_queueIdx].Add(new ReflectEvent
+            {
+                TowerId = towerId,
+                AttackingEnemyId = attackingEnemyId,
+                ReflectDamage = damage
             });
         }
 
