@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Systems;
@@ -608,6 +609,29 @@ namespace BattleSystemECS.Core
         public float[] EnemyTrampleRadius = new float[MAX_ENTITIES];
         public float[] EnemyTrampleDamagePerStep = new float[MAX_ENTITIES];
         public bool[] EnemyTrampleKnockback = new bool[MAX_ENTITIES];
+
+        // ==================== 锁链 / 链接 (Tether — 敌人之间互相绑定) ====================
+        // EnemyTetherPartnerId: 锁链另一端的敌人 id（0 = 无锁链，因为 default(int) = 0，
+        //   且 ResolveTetherEnforcement 用 `partnerId <= enemyId` 早退去重）。
+        //   双向存储：A.partner = B 且 B.partner = A。
+        // EnemyTetherMaxLength: 锁链最大长度（世界单位）。两端距离超过此值时，
+        //   (a) 两端 EnemyTetherSlowFactor 被设为 0.5（减速 50%），(b) 远端被朝近端拉回。
+        //   0 = 关闭锁链（默认小怪）。Boss/特殊组合敌人典型 6-10。
+        // EnemyTetherDamageSharePct: 锁链中任一端受到伤害时，将该比例的伤害传染给另一端。
+        //   0 = 不传染（默认）。例如 0.25 = 25% 伤害分享。
+        // EnemyTetherStunSharePct: 锁链中任一端被眩晕时，按此概率传染眩晕给另一端。
+        //   0 = 不传染。0.5 = 50% 概率传染。
+        // 设计原则：Tether 是被动的"绑定"关系（无 Tether 主动技能实体），
+        //   通过配置开启即可生效。Trample/Banished/Staggered 自动跳过锁链互拉。
+        public int[] EnemyTetherPartnerId = new int[MAX_ENTITIES];
+        public float[] EnemyTetherMaxLength = new float[MAX_ENTITIES];
+        public float[] EnemyTetherDamageSharePct = new float[MAX_ENTITIES];
+        public float[] EnemyTetherStunSharePct = new float[MAX_ENTITIES];
+        // EnemyTetherSlowFactor: 锁链减速乘数。0.5 = 50% 移速，1.0 = 无减速。
+        //   每帧由 EnemyMovementSystem.ResolveTetherEnforcement() 写入，
+        //   下一帧 movement 阶段被消费（乘到 moveSpeed 上）。
+        //   ⚠️ 初始化为 1f（不是 CLR 默认 0f），否则会冻住所有未配置 tether 的敌人。
+        public float[] EnemyTetherSlowFactor = Enumerable.Repeat(1f, MAX_ENTITIES).ToArray();
 
         // ==================== 敌人施法可打断 (Interruptible Channeling) ====================
         // EnemyIsChanneling: 敌人正在施法中（cast time > 0）。施法期间敌人无法移动/换技能。

@@ -1048,6 +1048,10 @@ int bestTarget = -1;
                 {
                     ApplyLinkedDamage(linkedEnemyId, linkedDamage, playerId);
                 }
+                // Tether damage share: if enemy is in a lock-chain, transfer a fraction of damage to partner.
+                // Runs in the same serial pass as LifeLink (which only writes EnemyHealth directly).
+                // Important: tether damage can also trigger a kill on the partner (stacks on top of primary).
+                ApplyTetherDamageShare(enemyId, finalDmg, playerId);
                 // Thorns: enemy reflects damage back to the player (tower attacker)
                 float thornsRatio = store.EnemyThornsRatio[enemyId];
                 if (thornsRatio > 0f && finalDmg > 0f)
@@ -1342,6 +1346,62 @@ int bestTarget = -1;
             {
                 store.QueueEnemyDeath(linkedEnemyId, playerId);
                 store.QueueTowerKill(linkedEnemyId, playerId, -1); // towerId=-1 (shared damage has no tower)
+            }
+        }
+
+        /// <summary>
+        /// Apply Tether lock-chain damage sharing: if `enemyId` is in a tether with
+        /// `EnemyTetherDamageSharePct > 0`, transfer that fraction of `finalDmg`
+        /// to the partner. The partner is also subject to its own damage resistance.
+        /// Stun sharing is NOT done here (would require a separate stun queue + GameManager integration
+        /// that crosses the 5-file limit); left as a future extension via EnemyTetherStunSharePct.
+        ///
+        /// Note: Tether damage share is NOT recursive — the partner takes the full share
+        /// (not its own TetherDamageSharePct × share). This avoids infinite chains.
+        /// </summary>
+        private void ApplyTetherDamageShare(int enemyId, float finalDmg, int playerId)
+        {
+            if (enemyId < 0 || finalDmg <= 0f) return;
+            // Bounds check on the array
+            if (enemyId >= ComponentStore.MAX_ENTITIES) return;
+
+            float sharePct = store.EnemyTetherDamageSharePct[enemyId];
+            if (sharePct <= 0f) return;
+
+            int partnerId = store.EnemyTetherPartnerId[enemyId];
+            // partnerId == 0 is the default-int sentinel for "no partner configured".
+            // We use `> 0` so we don't accidentally treat entity 0 as a valid partner
+            // (and to avoid self-damage if entity 0 is configured to point at itself).
+            if (partnerId <= 0 || partnerId == enemyId) return;
+            if (partnerId >= ComponentStore.MAX_ENTITIES) return;
+            if (!store.EnemyActive[partnerId]) return;
+            // Partner must also be in a tether (defensive: ensure both sides are configured)
+            if (store.EnemyTetherMaxLength[partnerId] <= 0f) return;
+
+            float sharedDmg = finalDmg * sharePct;
+            // Apply partner's damage resistance
+            float partnerResist = store.EnemyDamageResistance[partnerId];
+            float finalShared = partnerResist >= 1f ? 0f : sharedDmg * (1f - partnerResist);
+            if (finalShared <= 0f) return;
+
+            // Tether: avoid self-damage to invulnerable partner (e.g. immune to physical)
+            if (store.EnemyIsInvulnerable[partnerId]) return;
+
+            store.EnemyHealth[partnerId] -= finalShared;
+
+            // Thorns on partner (if any)
+            float partnerThorns = store.EnemyThornsRatio[partnerId];
+            if (partnerThorns > 0f && finalShared > 0f)
+            {
+                float thornsDamage = finalShared * partnerThorns;
+                lock (_thornsQueueLock) { _thornsQueue[_thornsQueueIdx].Add((playerId, thornsDamage)); }
+            }
+
+            // Tether shared damage can also kill the partner — queue death + kill
+            if (store.EnemyHealth[partnerId] <= 0f)
+            {
+                store.QueueEnemyDeath(partnerId, playerId);
+                store.QueueTowerKill(partnerId, playerId, -1); // towerId=-1 (tether has no source tower)
             }
         }
 

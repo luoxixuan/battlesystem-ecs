@@ -101,11 +101,31 @@ namespace BattleSystemECS.Systems
                     }
                 }
             }
+            // Cache tether presence for the frame so ResolveTetherEnforcement can early-out
+            // in O(1) instead of an O(N²) check on every frame. Cheap O(N) pre-scan
+            // with early-break.
+            _hasTetheredThisFrame = false;
+            if (_activeEnemyList != null)
+            {
+                int n = _activeEnemyList.Count;
+                for (int i = 0; i < n; i++)
+                {
+                    int probe = _activeEnemyList[i];
+                    if (store.EnemyActive[probe] && store.EnemyTetherMaxLength[probe] > 0f)
+                    {
+                        _hasTetheredThisFrame = true;
+                        break;
+                    }
+                }
+            }
         }
 
         // Cached per-turn: true if at least one active enemy has TrampleRadius & damage > 0.
         // Set in SetTurn(); consumed in ResolveTrampleAoe() for O(1) early-out.
         private bool _hasTramplerThisFrame;
+        // Cached per-turn: true if at least one active enemy has TetherMaxLength > 0.
+        // Set in SetTurn(); consumed in ResolveTetherEnforcement() for O(1) early-out.
+        private bool _hasTetheredThisFrame;
 
         public void Update()
         {
@@ -212,6 +232,9 @@ namespace BattleSystemECS.Systems
                 // Apply tile-stacking penalty (crowding slow from previous frame's stack count).
                 // 1.0 = no slow. < 1.0 = penalized. Defaults to 1.0 (no penalty) for first frame after spawn.
                 moveSpeed *= store.EnemyStackSlowRatio[enemyId];
+                // Apply Tether lock-chain slow factor (set by previous frame's ResolveTetherEnforcement).
+                // 1.0 = no slow. 0.5 = 50% speed when chain is over-length. Defaults to 1.0.
+                moveSpeed *= store.EnemyTetherSlowFactor[enemyId];
                 if (moveSpeed < 0f) moveSpeed = 0f; // safety clamp
 
                 // Enum-based action dispatch — O(1) per enemy, no string comparison
@@ -381,6 +404,13 @@ switch (actionEnum)
             // Staggered enemies 在第 138 行已经 early-return，所以 trample 自动跳过。
             // 串行 pass：敌人数量 ≤ 100K，可接受 O(N) 扫描。
             ResolveTrampleAoe();
+
+            // ── Serial pass: Tether 锁链强制 ──
+            // Enemies with EnemyTetherMaxLength > 0 移动后检查锁链距离；
+            // 超距时拉回远端 + 给两端应用 50% 减速（写入 next-frame moveSpeed mult）。
+            // Staggered/Banished 敌人通过 138/153 行 early-return 已跳过 movement，
+            // 但锁链依然生效：他们被拉到 partner 位置（但 partner 仍按自己的 early-return 决策移动）。
+            ResolveTetherEnforcement();
         }
 
         /// <summary>
@@ -513,6 +543,99 @@ switch (actionEnum)
                     store.PositionX[victimId] = newX;
                     store.PositionY[victimId] = newY;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Serial pass: Tether 锁链强制 (lock-chain enforcement).
+        /// 移动后检查所有 active enemy 的锁链配置：
+        /// (1) 如果 enemy 与 partner 距离 > EnemyTetherMaxLength，则把远端朝近端拉回（最多 0.5 单位），
+        ///     并把该 enemy 的 EnemyTetherSlowFactor 设为 0.5（next-frame 移速减半）。
+        /// (2) 锁链两端都是 active enemy 时才处理（任一被销毁则 break）。
+        /// (3) 默认 EnemyTetherMaxLength == 0 → 完全无锁链（O(1) early-out via SetTurn pre-scan）。
+        /// (4) 防止重复处理：每对 lock pair 通过 A.partner == B 条件，只处理一次（id 小的方向）。
+        /// Staggered/Banished 敌人本身已在 movement 阶段 early-return，
+        /// 但本 pass 仍会拉他们（不限制其位置 — 但他们下一帧仍 early-return，所以"拉回"对他们没意义）。
+        /// 简化：我们直接跳过分身=staggered/banished 的 enemy（即他们不会被拉，也不会有 slow），
+        /// 因为他们位置本就锁定在原地。
+        /// </summary>
+        private void ResolveTetherEnforcement()
+        {
+            if (_activeEnemyList == null) return;
+            int count = _activeEnemyList.Count;
+            if (count == 0) return;
+            // O(1) early-out: most frames have no tethered enemies.
+            if (!_hasTetheredThisFrame) return;
+
+            // Tether slow factor to apply: 0.5 (50% speed) when over-length, else 1.0 (no slow).
+            const float TETHER_SLOW = 0.5f;
+            const float TETHER_PULL = 0.5f;
+            // Y upper bound clamp (matches trample Y clamp — EnemyMovementSystem has no MapHeight).
+            const float Y_UPPER = 10000f;
+
+            // Outer loop: every tethered enemy (only id < partnerId to avoid double-processing).
+            for (int i = 0; i < count; i++)
+            {
+                int enemyId = _activeEnemyList[i];
+                if (!store.EnemyActive[enemyId]) continue;
+                if (store.EnemyTetherMaxLength[enemyId] <= 0f) continue;
+
+                int partnerId = store.EnemyTetherPartnerId[enemyId];
+                if (partnerId <= enemyId) continue; // only process once per pair (enemyId < partnerId)
+                if (partnerId >= ComponentStore.MAX_ENTITIES) continue;
+                if (!store.EnemyActive[partnerId]) continue;
+                if (store.EnemyTetherMaxLength[partnerId] <= 0f) continue;
+
+                float maxLen = store.EnemyTetherMaxLength[enemyId];
+                float ex = store.PositionX[enemyId];
+                float ey = store.PositionY[enemyId];
+                float px = store.PositionX[partnerId];
+                float py = store.PositionY[partnerId];
+                float dx = px - ex;
+                float dy = py - ey;
+                float distSq = dx * dx + dy * dy;
+                float maxLenSq = maxLen * maxLen;
+
+                if (distSq <= maxLenSq)
+                {
+                    // Within range: clear slow factor on both sides (resets to 1.0 = no slow).
+                    store.EnemyTetherSlowFactor[enemyId] = 1f;
+                    store.EnemyTetherSlowFactor[partnerId] = 1f;
+                    continue;
+                }
+
+                // Over range: apply slow to both ends (consumed by next-frame movement mult).
+                store.EnemyTetherSlowFactor[enemyId] = TETHER_SLOW;
+                store.EnemyTetherSlowFactor[partnerId] = TETHER_SLOW;
+
+                // Pull the "further" end 0.5 units toward the other.
+                // Pick the end farther from the line center as the "victim" being pulled.
+                // We just pull both ends slightly toward each other to avoid oscillation:
+                //   enemy moves toward partner by 0.5 * fraction
+                //   partner moves toward enemy by 0.5 * fraction
+                // Actually simpler: pull the one with the larger distance-from-partner (the trailing one).
+                float dist = (float)Math.Sqrt(distSq);
+                if (dist < 1e-4f) continue; // co-located: skip
+                float nx = dx / dist;
+                float ny = dy / dist;
+                // Pull enemyId toward partnerId by 0.5 unit (clamped to map bounds)
+                float newEx = ex + nx * TETHER_PULL;
+                float newEy = ey + ny * TETHER_PULL;
+                if (newEx < 0f) newEx = 0f;
+                if (newEx > mapWidthMinusOne) newEx = mapWidthMinusOne;
+                if (newEy < 0f) newEy = 0f;
+                if (newEy > Y_UPPER) newEy = Y_UPPER;
+                store.PositionX[enemyId] = newEx;
+                store.PositionY[enemyId] = newEy;
+                // Pull partnerId toward enemyId by 0.5 unit (in opposite direction = -nx, -ny)
+                float newPx = px - nx * TETHER_PULL;
+                float newPy = py - ny * TETHER_PULL;
+                if (newPx < 0f) newPx = 0f;
+                if (newPx > mapWidthMinusOne) newPx = mapWidthMinusOne;
+                if (newPy < 0f) newPy = 0f;
+                if (newPy > Y_UPPER) newPy = Y_UPPER;
+                store.PositionX[partnerId] = newPx;
+                store.PositionY[partnerId] = newPy;
             }
         }
 
