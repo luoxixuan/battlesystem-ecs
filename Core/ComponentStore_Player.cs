@@ -13,6 +13,9 @@ namespace BattleSystemECS.Core
         public float[] PlayerAttackDamage = new float[MAX_PLAYERS];
         public float[] PlayerMaxHealth = new float[MAX_PLAYERS];  // 玩家最大生命值
         public float[] PlayerCurrentHealth = new float[MAX_PLAYERS];  // 玩家当前生命值
+        // PlayerMinHealthFloor: minimum HP floor for one-shot protection. Health won't drop below this value
+        // (any excess damage is absorbed). Default 0 = no protection (backward compatible).
+        public float[] PlayerMinHealthFloor = new float[MAX_PLAYERS];
         public float[] PlayerArmor = new float[MAX_PLAYERS];  // 玩家护甲：减少受到伤害
         // Player shield: absorbs damage before health, independent of armor
         public float[] PlayerShield = new float[MAX_PLAYERS];
@@ -441,6 +444,19 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             PlayerCurrentHealth[playerId] = currentHealth;
         }
 
+        // ==================== 一击必杀保护 (One-shot Protection) ====================
+        public float GetPlayerMinHealthFloor(int playerId)
+        {
+            if (!IsValidPlayer(playerId)) return 0f;
+            return PlayerMinHealthFloor[playerId];
+        }
+
+        public void SetPlayerMinHealthFloor(int playerId, float floor)
+        {
+            if (!IsValidPlayer(playerId)) return;
+            PlayerMinHealthFloor[playerId] = System.Math.Max(0f, floor);
+        }
+
         public void DecreasePlayerHealth(int playerId, float damage)
         {
             if (!IsValidPlayer(playerId)) return;
@@ -455,7 +471,12 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             }
             float armor = PlayerArmor[playerId];
             float mitigatedDamage = damage * (1f - armor);
-            PlayerCurrentHealth[playerId] = System.Math.Max(0f, PlayerCurrentHealth[playerId] - mitigatedDamage);
+            // One-shot protection: clamp current health so it never drops below PlayerMinHealthFloor.
+            // Excess damage is absorbed (HP stays at floor). Floor=0 disables protection (backward compatible).
+            float newHealth = PlayerCurrentHealth[playerId] - mitigatedDamage;
+            float floor = PlayerMinHealthFloor[playerId];
+            if (floor > 0f && newHealth < floor) newHealth = floor;
+            PlayerCurrentHealth[playerId] = System.Math.Max(0f, newHealth);
         }
 
         public bool IsPlayerAlive(int playerId)

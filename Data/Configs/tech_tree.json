@@ -89,6 +89,14 @@
           "effects": [{ "type": "low_hp_regen", "value": 0.15 }]
         },
         {
+          "id": "last_stand",
+          "name": "最后底线",
+          "description": "一击必杀保护：生命值不会低于 1 点",
+          "cost": 3,
+          "prerequisites": ["iron_skin_2"],
+          "effects": [{ "type": "min_health_floor", "value": 1.0 }]
+        },
+        {
           "id": "fortress",
           "name": "堡垒",
           "description": "护甲 +5，免疫击退",

@@ -250,6 +250,11 @@ namespace BattleSystemECS.Systems
                         _towerSlotBonus += (int)eff.value;
                         store.PlayerMaxTowers[playerId] = 20 + _towerSlotBonus;
                         break;
+                    case "min_health_floor":
+                        // One-shot protection: HP will not drop below this value.
+                        // Stacks additively (multiple nodes increase the floor).
+                        store.PlayerMinHealthFloor[playerId] += eff.value;
+                        break;
                 }
             }
         }
