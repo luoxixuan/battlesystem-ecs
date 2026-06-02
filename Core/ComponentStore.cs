@@ -560,6 +560,9 @@ namespace BattleSystemECS.Core
                 // Scatter/multicast fields
                 TowerProjectileCount[entityId] = 0;
                 TowerScatterAngle[entityId] = 0f;
+                // Shotgun pellet fields (reset on recycle so stale values don't leak)
+                TowerPelletDamageMult[entityId] = 1f;
+                TowerPelletConeRadius[entityId] = 0f;
                 // Overcharge fields
                 TowerIsOvercharged[entityId] = false;
                 TowerOverchargeDuration[entityId] = 0f;

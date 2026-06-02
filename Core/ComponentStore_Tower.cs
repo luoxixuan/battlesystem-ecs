@@ -143,6 +143,12 @@ namespace BattleSystemECS.Core
         public int[] TowerProjectileCount = new int[MAX_ENTITIES];
         // TowerScatterAngle: angular spread in radians for multi-shot (0 = all projectiles aimed at target)
         public float[] TowerScatterAngle = new float[MAX_ENTITIES];
+        // TowerPelletDamageMult: per-pellet damage multiplier (1.0 = full damage each; 0.4 = classic shotgun where 5 pellets each deal 40%)
+        // Default 1.0 to keep existing scatter behavior intact when this field is not configured
+        public float[] TowerPelletDamageMult = new float[MAX_ENTITIES];
+        // TowerPelletConeRadius: search radius in tiles around primary target for finding unique pellet targets
+        // (0 = use TowerRange for search; >0 = use explicit cone radius for shotgun-style fan)
+        public float[] TowerPelletConeRadius = new float[MAX_ENTITIES];
 
         // ==================== 塔弹跳/弹射 (Bouncing Projectiles) ====================
         // TowerBouncesRemaining: number of bounces left after initial hit (0 = no bounce, like scatter)
@@ -626,6 +632,9 @@ namespace BattleSystemECS.Core
             // Scatter/multicast fields: default to single shot (1 projectile, 0 spread)
             TowerProjectileCount[entityId] = 1;
             TowerScatterAngle[entityId] = 0f;
+            // Shotgun pellet fields: default to full damage per pellet + 0 cone radius (auto fallback to TowerRange)
+            TowerPelletDamageMult[entityId] = 1f;
+            TowerPelletConeRadius[entityId] = 0f;
             // Bouncing projectile fields: default to no bounce
             TowerBouncesRemaining[entityId] = 0;
             TowerBounceRange[entityId] = 0f;

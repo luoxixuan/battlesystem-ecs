@@ -895,13 +895,66 @@ int bestTarget = -1;
                             int projCount = store.TowerProjectileCount[towerId];
                             if (projCount > 1)
                             {
-                                float scatterAngle = store.TowerScatterAngle[towerId];
-                                // Fire extra projectiles at same target (spread angle distributes them)
-                                for (int sc = 1; sc < projCount; sc++)
+                                // Shotgun mode: each pellet seeks its OWN target within a cone radius,
+                                // simulating a cone-shaped spread of N independent projectiles.
+                                // If no extra targets exist near primary, fall back to hitting primary.
+                                float pelletMult = store.TowerPelletDamageMult[towerId];
+                                if (pelletMult <= 0f) pelletMult = 1f;
+                                float coneRadius = store.TowerPelletConeRadius[towerId];
+                                if (coneRadius <= 0f) coneRadius = store.TowerRange[towerId];
+                                if (coneRadius < 1f) coneRadius = 1f;
+
+                                // For pellets 1..N-1, pick a unique nearby target within cone radius.
+                                // We avoid the primary by tracking which enemyIds we already hit this attack.
+                                // Cap pellets at 16 to bound per-frame cost (shotgun towers typically fire 5-8).
+                                int pelletsToFire = projCount - 1;
+                                if (pelletsToFire > 16) pelletsToFire = 16;
+
+                                // Snapshot nearby enemy IDs once (reused per pellet)
+                                // Use the existing per-tower candidate buffer populated earlier in Update()
+                                // (size = range, but we filter to coneRadius since shotgun is short-range).
+                                // Copy into a local scratch buffer so we can mark pellets-as-taken in place
+                                // without mutating the shared per-tower candidate buffer.
+                                // Allocation is fine here: shotgun path (projCount > 1) is rare in benchmarks.
+                                int[] localBuf = _towerCandidateBuffers[ti];
+                                int localCount = _towerCandidateCounts[ti];
+                                int[] takenScratch = new int[localCount];
+                                for (int k = 0; k < localCount; k++) takenScratch[k] = localBuf[k];
+                                int scratchCount = localCount;
+
+                                for (int sc = 0; sc < pelletsToFire; sc++)
                                 {
-                                    // Each extra projectile adds the same damage to the target
-                                    // The visual spread is cosmetic — all hit the same target
-                                    lock (damageLock) { bag.Add((bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
+                                    int pelletTarget = bestTarget; // default: same target
+                                    // Pick the nearest UNUSED enemy in scratch that is not the primary and is alive
+                                    int found = -1;
+                                    float bestDist2 = float.MaxValue;
+                                    float primaryX = store.PositionX[bestTarget];
+                                    float primaryY = store.PositionY[bestTarget];
+                                    for (int k = 0; k < scratchCount; k++)
+                                    {
+                                        int eid = takenScratch[k];
+                                        if (eid < 0) continue; // already taken by an earlier pellet
+                                        if (eid == bestTarget) continue; // skip primary
+                                        if (!store.EnemyActive[eid]) continue;
+                                        if (store.EnemyHealth[eid] <= 0f) continue;
+                                        float ddx = store.PositionX[eid] - primaryX;
+                                        float ddy = store.PositionY[eid] - primaryY;
+                                        float d2 = ddx * ddx + ddy * ddy;
+                                        if (d2 > coneRadius * coneRadius) continue;
+                                        if (d2 < bestDist2) { bestDist2 = d2; found = eid; }
+                                    }
+                                    if (found >= 0)
+                                    {
+                                        // Mark this enemy as taken so the next pellet picks a different one
+                                        for (int k = 0; k < scratchCount; k++)
+                                        {
+                                            if (takenScratch[k] == found) { takenScratch[k] = -1; break; }
+                                        }
+                                        pelletTarget = found;
+                                    }
+                                    float pelletDmg = baseDmg * pelletMult;
+                                    if (pelletDmg > 0f)
+                                        lock (damageLock) { bag.Add((pelletTarget, pelletDmg, store.PlayerEntityId, towerId)); }
                                 }
                             }
                             // Special ability: chain lightning (from upgrade, not Tesla tower type)
