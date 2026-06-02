@@ -138,6 +138,16 @@ namespace BattleSystemECS.Core
         // TowerKnockbackRadius: radius within which knockback force is fully applied (beyond it, no effect)
         public float[] TowerKnockbackRadius = new float[MAX_ENTITIES];
 
+        // ==================== 视线系统 (Line of Sight / LoS Blocker) ====================
+        // TowerRequiresLOS: when true, the tower can only target enemies with an unobstructed
+        // line-of-sight raycast (no other LoS-blocking tower in any grid cell between the tower
+        // and the enemy). When false (default), the tower ignores LoS — backward compatible.
+        // Stealth/sniper towers set this true; standard towers leave it false.
+        public bool[] TowerRequiresLOS = new bool[MAX_ENTITIES];
+        // TowerBlocksLOS: when true, the tower itself blocks other towers' line-of-sight rays.
+        // Wall / obstacle / shroud towers set this true; standard towers leave it false.
+        public bool[] TowerBlocksLOS = new bool[MAX_ENTITIES];
+
         // ==================== 塔散射/多重射击（Scatter / Multi-shot）====================
         // TowerProjectileCount: number of projectiles fired per attack (1 = single shot, >1 = scatter/multicast)
         public int[] TowerProjectileCount = new int[MAX_ENTITIES];
@@ -656,6 +666,9 @@ namespace BattleSystemECS.Core
             // Knockback fields: default to no knockback (0 force = no effect)
             TowerKnockbackForce[entityId] = 0f;
             TowerKnockbackRadius[entityId] = 0f;
+            // LoS fields: default to no LoS requirement, no LoS blocking (backward compatible)
+            TowerRequiresLOS[entityId] = false;
+            TowerBlocksLOS[entityId] = false;
             // Construction fields: default to not in construction (active immediately)
             TowerIsConstructing[entityId] = false;
             TowerConstructionProgress[entityId] = 1f; // start at 100% (complete)

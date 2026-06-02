@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-02, Round 50）
+## 性能基准（2026-06-02, Round 51）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3844 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11093 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4574 FPS** |
+| **mode 5**（完整一局） | **3986 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10791 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4775 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -153,6 +153,7 @@ dotnet test
 - 锁链/连接 Tether（ComponentStore_Enemy.cs + EnemyMovementSystem.cs + TowerAttackSystem.cs + EnemyActionType.cs，5 字段 EnemyTetherPartnerId/MaxLength/DamageSharePct/StunSharePct/SlowFactor + SlowFactor 1f 初始化防冻 + SetTurn pre-scan O(1) early-out + ResolveTetherEnforcement 串行 AOE：超距拉回 0.5 单位 + 50% 减速 + 双向 + Tethered=25 动作枚举 + ApplyTetherDamageShare 串行串 damage 比例传染 + partner 抵抗/无敌/死亡检查）；bench2: 9570, bench4: 4619, bench5: 3865 ⚠️
 - 🔧 性能优化：O(N)→O(1) counter（ComponentStore.cs + EnemyMovementSystem.cs + TowerAttackSystem.cs + WispSystem.cs，ActiveTramplerCount/ActiveTetheredCount/ActiveWispCount 计数器 + SetTurn pre-scan 改为 O(1) 读 counter + ApplyTetherDamageShare guard + WispSystem.Update 早退）；bench2: 10341, bench4: 4418, bench5: 4080
 - 一击必杀保护 One-shot Protection（ComponentStore_Player.cs + TechTreeSystem.cs + tech_tree.json，1 SOA 字段 PlayerMinHealthFloor + Get/SetPlayerMinHealthFloor 访问器 + DecreasePlayerHealth floor 钳制 + TechTreeSystem min_health_floor effect 累加 + last_stand 节点 cost=3 后置 iron_skin_2）；bench2: 11093, bench4: 4574, bench5: 3844 ⚠️
+- 视线系统 Line of Sight（SpatialGrid.cs + ComponentStore_Tower.cs + TowerAttackSystem.cs，HasLineOfSight + IsCellOnRay 整数格点射线 + TowerRequiresLOS/TowerBlocksLOS 2 SOA 字段 + AddTower 初始化 false + TowerAttackSystem 候选过滤 opt-in + IsCellOnRay 同名变量去重）；bench2: 10791, bench4: 4775, bench5: 3986 ⚠️
 ### 2026-06-01
 - 射程伤害衰减（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs）；bench2: 12026, bench4: 5531, bench5: 4696
 - 爆发射击/齐射模式（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + TowerPlacementSystem.cs）；bench2: 11928, bench4: 5364, bench5: 4618

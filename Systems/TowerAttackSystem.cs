@@ -499,6 +499,16 @@ int bestTarget = -1;
                     if (enemyFlying && !canHitAir) continue;
                     if (!enemyFlying && !canHitGround) continue;
 
+                    // LoS filter: opt-in towers (stealth/sniper) require unobstructed sight line.
+                    // Default: TowerRequiresLOS[towerId] = false → LoS check skipped (backward compat).
+                    if (store.TowerRequiresLOS[towerId])
+                    {
+                        float losTx = store.PositionX[enemyId];
+                        float losTy = store.PositionY[enemyId];
+                        if (!store.SpatialGrid.HasLineOfSight(store, towerId, tx, ty, losTx, losTy))
+                            continue;
+                    }
+
                     float ex = store.PositionX[enemyId];
                     float ey = store.PositionY[enemyId];
 

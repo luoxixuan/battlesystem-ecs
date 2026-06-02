@@ -293,5 +293,85 @@ namespace BattleSystemECS.Core
                 }
             }
         }
+
+        /// <summary>
+        /// Line of sight raycast from a tower to an enemy. Returns false (LoS blocked) if any
+        /// active LoS-blocking tower (store.TowerBlocksLOS[towerId] == true) lies in a grid
+        /// cell intersected by the integer ray from (fromX, fromY) to (toX, toY). Endpoints
+        /// are exempt: the source tower's own cell and the target's cell never block.
+        ///
+        /// Performance: O(activeTowerCount) per call (simple per-tower cell-on-ray test).
+        /// LoS is only invoked for towers that opted-in via TowerRequiresLOS — all default
+        /// towers skip this check entirely (backward compatible).
+        /// </summary>
+        public bool HasLineOfSight(ComponentStore store, int fromTowerId,
+            float fromX, float fromY, float toX, float toY)
+        {
+            int gx0 = (int)Math.Floor(fromX);
+            int gy0 = (int)Math.Floor(fromY);
+            int gx1 = (int)Math.Floor(toX);
+            int gy1 = (int)Math.Floor(toY);
+
+            // Same cell: trivial LoS
+            if (gx0 == gx1 && gy0 == gy1) return true;
+
+            // Scan active towers for blockers on the ray. _gridData is enemy-only, so we
+            // must iterate ActiveTowerIds directly. The check uses IsCellOnRay which is
+            // O(1) per tower; the total cost is proportional to the number of active towers
+            // and is only incurred when TowerRequiresLOS is true.
+            var towerIds = store.ActiveTowerIds;
+            for (int i = 0; i < towerIds.Count; i++)
+            {
+                int tid = towerIds[i];
+                if (tid == fromTowerId) continue;
+                if (!store.TowerBlocksLOS[tid]) continue;
+                float tx = store.PositionX[tid];
+                float ty = store.PositionY[tid];
+                int tgx = (int)Math.Floor(tx);
+                int tgy = (int)Math.Floor(ty);
+                if (IsCellOnRay(gx0, gy0, gx1, gy1, tgx, tgy)) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Returns true if cell (cx, cy) lies on the integer ray from (x0, y0) to (x1, y1)
+        /// (endpoints inclusive). Used by HasLineOfSight to test whether a LoS-blocking
+        /// tower's cell is intersected by the line.
+        /// </summary>
+        private static bool IsCellOnRay(int x0, int y0, int x1, int y1, int cx, int cy)
+        {
+            int minAxis1, maxAxis1, minAxis2, maxAxis2;
+            if (x0 == x1)
+            {
+                // Vertical line: same column
+                if (cx != x0) return false;
+                minAxis1 = Math.Min(y0, y1);
+                maxAxis1 = Math.Max(y0, y1);
+                return cy >= minAxis1 && cy <= maxAxis1;
+            }
+            if (y0 == y1)
+            {
+                // Horizontal line: same row
+                if (cy != y0) return false;
+                minAxis1 = Math.Min(x0, x1);
+                maxAxis1 = Math.Max(x0, x1);
+                return cx >= minAxis1 && cx <= maxAxis1;
+            }
+            // Diagonal: use parametric t = (cx - x0) / (x1 - x0), check y matches
+            int dx = x1 - x0;
+            int dy = y1 - y0;
+            // Bresenham-style "cell on line" check: |dy*(cx - x0) - dx*(cy - y0)| <= max(|dx|,|dy|)
+            long lhs = (long)dy * (cx - x0);
+            long rhs = (long)dx * (cy - y0);
+            long diff = lhs - rhs;
+            long tol = Math.Max(Math.Abs(dx), Math.Abs(dy));
+            if (Math.Abs(diff) > tol) return false;
+            minAxis1 = Math.Min(x0, x1);
+            maxAxis1 = Math.Max(x0, x1);
+            minAxis2 = Math.Min(y0, y1);
+            maxAxis2 = Math.Max(y0, y1);
+            return cx >= minAxis1 && cx <= maxAxis1 && cy >= minAxis2 && cy <= maxAxis2;
+        }
     }
 }
