@@ -1061,6 +1061,28 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Reforge configuration — controls tower affix reroll cost, lock-slot cost, and rarity weights.
+    /// Inspired by Diablo / ARPG Reforge: spend gold to re-roll a tower's affix slot, with
+    /// escalating cost and an optional per-slot lock (paying extra gold to preserve the current affix).
+    /// Hot-path impact: zero (BuildPhase only).
+    /// </summary>
+    public class ReforgeConfig
+    {
+        /// <summary>Master switch for the Reforge system. Default: true</summary>
+        public bool Enabled { get; set; } = true;
+        /// <summary>Base gold cost of the first reroll on a tower. Default: 50</summary>
+        public float BaseCost { get; set; } = 50f;
+        /// <summary>Cost increment per subsequent reroll on the same tower (cost = base + count * increment). Default: 50</summary>
+        public float IncrementPerReroll { get; set; } = 50f;
+        /// <summary>Hard cap on rerolls per tower. Default: 10</summary>
+        public int MaxRerollsPerTower { get; set; } = 10;
+        /// <summary>Flat gold cost to lock (or unlock) a single slot. Default: 25</summary>
+        public float LockSlotCost { get; set; } = 25f;
+        /// <summary>Rarity weights for affix picks (Common, Uncommon, Rare, Epic, Legendary). Default: [60, 25, 10, 4, 1]</summary>
+        public float[] RarityWeights { get; set; } = new float[] { 60f, 25f, 10f, 4f, 1f };
+    }
+
+    /// <summary>
     /// Tower Mastery Level definition — XP threshold and bonuses granted at each level.
     /// </summary>
     public class TowerMasteryLevelConfig
@@ -1216,6 +1238,9 @@ namespace BattleSystemECS.Config
 
         // Shop Reroll configuration (BuildPhase offer pool refresh)
         public ShopRerollConfig ShopReroll { get; set; } = new ShopRerollConfig();
+
+        // Reforge configuration (tower affix reroll — Split B)
+        public ReforgeConfig Reforge { get; set; } = new ReforgeConfig();
 
         // Tower Overcharge configuration
         public TowerOverchargeConfig TowerOvercharge { get; set; } = new TowerOverchargeConfig();

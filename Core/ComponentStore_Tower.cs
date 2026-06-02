@@ -124,6 +124,12 @@ namespace BattleSystemECS.Core
         // TowerAffixStackCount: [slotIndex][towerId] = number of times this slot's affix is stacked
         // (1 = single, N = up to TowerAffixDef.MaxStack). Default 0 = no affix assigned.
         public int[][] TowerAffixStackCount = new int[3][];
+        // TowerAffixLockMask: bitmask of which slots are locked against reroll (bit 0 = slot 0, bit 1 = slot 1, bit 2 = slot 2)
+        // 0 = no locks. Reforge Split B: locked slots retain their affix during RerollAffix. Default 0.
+        public int[] TowerAffixLockMask = new int[MAX_ENTITIES];
+        // TowerReforgeCount: how many times this tower has been reforged (RerollAffix calls). Drives cost curve.
+        // Used by Reforge Split B to compute RerollCost(base + count * increment). Default 0.
+        public int[] TowerReforgeCount = new int[MAX_ENTITIES];
 
         // ==================== 塔击退/位移效果 (Knockback) ====================
         // TowerKnockbackForce: strength of knockback applied to enemies on hit (0 = no knockback)
@@ -1099,6 +1105,7 @@ namespace BattleSystemECS.Core
         /// <summary>
         /// Clears all affix data for a tower (used in DestroyEntity and when resetting a slot).
         /// Resets slot count to 0 and all 3 slot assignments to -1/0.
+        /// Also resets the lock mask and reforge count (Reforge Split B).
         /// </summary>
         public void ClearTowerAffixes(int towerId)
         {
@@ -1109,6 +1116,67 @@ namespace BattleSystemECS.Core
                 if (TowerAffixIds[s] != null) TowerAffixIds[s][towerId] = -1;
                 if (TowerAffixStackCount[s] != null) TowerAffixStackCount[s][towerId] = 0;
             }
+            // Reforge Split B: clear lock mask + reforge count too so reset is total
+            TowerAffixLockMask[towerId] = 0;
+            TowerReforgeCount[towerId] = 0;
+        }
+
+        // ==================== 词缀锁定/重洗 (Affix Lock + Reforge Count — Reforge Split B) ====================
+
+        /// <summary>Gets the affix lock bitmask for a tower (bit s = slot s locked).</summary>
+        public int GetTowerAffixLockMask(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0;
+            return TowerAffixLockMask[towerId];
+        }
+
+        /// <summary>Sets the affix lock bitmask for a tower. Out-of-range bits are masked off (bits 0-2 only).</summary>
+        public void SetTowerAffixLockMask(int towerId, int mask)
+        {
+            if (!IsValidEntity(towerId)) return;
+            // Only the low 3 bits are valid (we have TOWER_AFFIX_SLOT_COUNT=3 slots)
+            TowerAffixLockMask[towerId] = mask & 0b0111;
+        }
+
+        /// <summary>Returns true if the given slot is locked against reroll.</summary>
+        public bool IsTowerAffixSlotLocked(int towerId, int slotIndex)
+        {
+            if (!IsValidEntity(towerId)) return false;
+            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return false;
+            return (TowerAffixLockMask[towerId] & (1 << slotIndex)) != 0;
+        }
+
+        /// <summary>Sets whether a single slot is locked. Returns true on success.</summary>
+        public bool SetTowerAffixSlotLocked(int towerId, int slotIndex, bool locked)
+        {
+            if (!IsValidEntity(towerId)) return false;
+            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return false;
+            if (locked) TowerAffixLockMask[towerId] |= (1 << slotIndex);
+            else TowerAffixLockMask[towerId] &= ~(1 << slotIndex);
+            return true;
+        }
+
+        /// <summary>Gets the number of reforges performed on this tower.</summary>
+        public int GetTowerReforgeCount(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0;
+            return TowerReforgeCount[towerId];
+        }
+
+        /// <summary>Sets the reforge count (used by tests and by ReforgeSystem to increment).</summary>
+        public void SetTowerReforgeCount(int towerId, int count)
+        {
+            if (!IsValidEntity(towerId)) return;
+            if (count < 0) count = 0;
+            TowerReforgeCount[towerId] = count;
+        }
+
+        /// <summary>Increments the reforge count by 1 (returns the new value).</summary>
+        public int IncrementTowerReforgeCount(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0;
+            TowerReforgeCount[towerId]++;
+            return TowerReforgeCount[towerId];
         }
     }
 }

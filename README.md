@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-02, Round 41）
+## 性能基准（2026-06-02, Round 42）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **4018 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11087 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4906 FPS** |
+| **mode 5**（完整一局） | **4074 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **11082 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4494 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -144,6 +144,7 @@ dotnet test
 - 喘息波节奏 Wave Rhythm（GameConfig.cs + WaveSpawningSystem.cs + WavePreviewSystem.cs，WaveRhythm 枚举 + Rhythm 字段 + Normal/Breather/Surge/Climax × 计数 + 难度 + Preview UI 同步）；bench2: 10567, bench4: 4940, bench5: 4085
 - 塔词缀槽基础设施 Reforge Split A（ComponentStore_Tower.cs + GameConfig.cs + GameConfigLoader.cs + tower_affixes.json，3 槽位 SOA + 18 词缀池 + 懒初始化 jagged 数组 + ClearTowerAffixes）；bench2: 11161, bench4: 5015, bench5: 4082 ⚠️
 - Boss 踩踏步伤 Trample（ComponentStore_Enemy.cs + EnemyMovementSystem.cs，3 字段 EnemyTrampleRadius/Damage/Knockback + SetTurn pre-scan O(1) early-out + ResolveTrampleAoe 串行 AOE：玩家扣血 + 小怪击退 0.5 单位 + Stagger 自动暂停）；bench2: 11087, bench4: 4906, bench5: 4018 ⚠️
+- 词缀重铸 API Reforge Split B（ReforgeSystem + ComponentStore_Tower.cs + GameConfig.cs，2 字段 TowerAffixLockMask/TowerReforgeCount + 7 访问器 + ReforgeConfig 成本/锁槽/稀有度权重 + RerollAffix 塔级/锁槽感知 + SetSlotLocked + RerollAllUnlocked 跳过锁槽 + 池采样 rarity tier）；bench2: 11082, bench4: 4494, bench5: 4074 ⚠️
 ### 2026-06-01
 - 射程伤害衰减（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs）；bench2: 12026, bench4: 5531, bench5: 4696
 - 爆发射击/齐射模式（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + TowerPlacementSystem.cs）；bench2: 11928, bench4: 5364, bench5: 4618
