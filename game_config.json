@@ -2819,26 +2819,47 @@
                                                        "Magic"
                                                    ]
                          },
-                         {
-                             "MoveSpeed":  0.6,
-                             "AttackInterval":  2.5,
-                             "Type":  "Boss",
-                             "AttackRange":  3,
-                             "MaxHealth":  800,
-                             "Damage":  15,
-                             "Name":  "Black Dragon (Physical Immune)",
-                             "Health":  800,
-                             "GoldReward":  200,
-                             "Skills":  [
-                                            "Normal Attack",
-                                            "Fire Breath"
-                                        ],
-                             "Armor":  10,
-                             "DamageImmunities":  [
-                                                       "Physical"
-                                                   ]
-                         }
-                     ],
+                        {
+                            "MoveSpeed":  0.6,
+                            "AttackInterval":  2.5,
+                            "Type":  "Boss",
+                            "AttackRange":  3,
+                            "MaxHealth":  800,
+                            "Damage":  15,
+                            "Name":  "Black Dragon (Physical Immune)",
+                            "Health":  800,
+                            "GoldReward":  200,
+                            "Skills":  [
+                                           "Normal Attack",
+                                           "Fire Breath"
+                                       ],
+                            "Armor":  10,
+                            "DamageImmunities":  [
+                                                      "Physical"
+                                                  ]
+                        },
+                        {
+                            "MoveSpeed":  0.7,
+                            "AttackInterval":  1.8,
+                            "Type":  "Boss",
+                            "AttackRange":  2,
+                            "MaxHealth":  1000,
+                            "Damage":  20,
+                            "Name":  "Skeletal King (LastStand)",
+                            "Health":  1000,
+                            "GoldReward":  250,
+                            "Skills":  [
+                                           "Normal Attack",
+                                           "Death Rattle"
+                                       ],
+                            "Armor":  6,
+                            "LastStand":  {
+                                "HpFraction":  0.15,
+                                "SpeedMult":  1.5,
+                                "DamageMult":  2.0
+                            }
+                        }
+                    ],
     "Towers":  [
                    {
                        "UpgradeCost":  12,

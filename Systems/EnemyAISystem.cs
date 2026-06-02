@@ -151,6 +151,27 @@ namespace BattleSystemECS.Systems
                         }
                     }
 
+                    // LastStand / DeathRattle — HP-threshold trigger (independent from BossPhase)
+                    // When HP drops below EnemyLastStandHpFraction * maxHP, activate permanently.
+                    // One-shot transition: speed/damage are applied exactly once when Active flips false→true.
+                    if (!store.EnemyLastStandActive[enemyId] &&
+                        store.EnemyLastStandHpFraction[enemyId] > 0f &&
+                        enemyMaxHealth > 0f &&
+                        enemyHealth / enemyMaxHealth < store.EnemyLastStandHpFraction[enemyId])
+                    {
+                        store.EnemyLastStandActive[enemyId] = true;
+                        // Apply speed multiplier on top of base speed (idempotent via base reference)
+                        float baseSpeed = store.EnemyMoveSpeedBase[enemyId];
+                        if (baseSpeed <= 0f) baseSpeed = store.EnemyMoveSpeed[enemyId];
+                        float lsSpeedMult = store.EnemyLastStandSpeedMult[enemyId];
+                        if (lsSpeedMult > 0f)
+                            store.EnemyMoveSpeed[enemyId] = baseSpeed * lsSpeedMult;
+                        // Apply damage multiplier — one-shot multiplication on the current damage value
+                        float lsDmgMult = store.EnemyLastStandDamageMult[enemyId];
+                        if (lsDmgMult > 0f && lsDmgMult != 1f)
+                            store.EnemyDamage[enemyId] = store.EnemyDamage[enemyId] * lsDmgMult;
+                    }
+
                     if (_enemyHealthCache[enemyId] == enemyHealth &&
                         _cachedPlayerHealth == playerHealth &&
                         _enemyChargeCounterCache[enemyId] == chargeCounter &&
@@ -303,6 +324,23 @@ namespace BattleSystemECS.Systems
                                     }
                                 }
                             }
+                        }
+
+                        // LastStand / DeathRattle — HP-threshold trigger (parallel batch path)
+                        if (!store.EnemyLastStandActive[enemyId] &&
+                            store.EnemyLastStandHpFraction[enemyId] > 0f &&
+                            enemyMaxHealth > 0f &&
+                            enemyHealth / enemyMaxHealth < store.EnemyLastStandHpFraction[enemyId])
+                        {
+                            store.EnemyLastStandActive[enemyId] = true;
+                            float baseSpeed = store.EnemyMoveSpeedBase[enemyId];
+                            if (baseSpeed <= 0f) baseSpeed = store.EnemyMoveSpeed[enemyId];
+                            float lsSpeedMult = store.EnemyLastStandSpeedMult[enemyId];
+                            if (lsSpeedMult > 0f)
+                                store.EnemyMoveSpeed[enemyId] = baseSpeed * lsSpeedMult;
+                            float lsDmgMult = store.EnemyLastStandDamageMult[enemyId];
+                            if (lsDmgMult > 0f && lsDmgMult != 1f)
+                                store.EnemyDamage[enemyId] = store.EnemyDamage[enemyId] * lsDmgMult;
                         }
 
                         if (_enemyHealthCache[enemyId] == enemyHealth &&

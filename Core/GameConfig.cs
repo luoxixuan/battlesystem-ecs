@@ -139,6 +139,9 @@ namespace BattleSystemECS.Config
         public List<BossPhaseDef> Phases { get; set; } = new List<BossPhaseDef>();
         // Enrage: enrage configuration (timer-based). Null = no enrage.
         public BossEnrageConfig Enrage { get; set; }
+        // LastStand: HP-threshold-based death rattle. Null = no LastStand.
+        // Typical use: boss below 10% HP goes into dramatic enrage (faster + harder hitting).
+        public BossLastStandConfig LastStand { get; set; }
     }
 
     public class TowerConfig
@@ -644,6 +647,22 @@ namespace BattleSystemECS.Config
         // Speed multiplier when enrage activates (1.0 = no change).
         public float SpeedMult { get; set; } = 1.0f;
         // Damage multiplier when enrage activates (1.0 = no change).
+        public float DamageMult { get; set; } = 1.0f;
+    }
+
+    /// <summary>
+    /// Boss LastStand / DeathRattle configuration — loaded from monster JSON (lastStand{} field).
+    /// HP-threshold trigger (in contrast to Enrage's timer-based trigger): activates when
+    /// currentHP < hpFraction * maxHP. Typical use: boss enters enrage below 10% HP for dramatic finale.
+    /// </summary>
+    public class BossLastStandConfig
+    {
+        // HP fraction (0-1) below which LastStand activates. 0 = disabled.
+        // Example: 0.1 = activate when HP drops below 10% of max.
+        public float HpFraction { get; set; } = 0f;
+        // Speed multiplier when LastStand activates (1.0 = no change, 1.5 = +50% speed).
+        public float SpeedMult { get; set; } = 1.0f;
+        // Damage multiplier when LastStand activates (1.0 = no change, 2.0 = double damage).
         public float DamageMult { get; set; } = 1.0f;
     }
 

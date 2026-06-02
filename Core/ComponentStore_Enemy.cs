@@ -272,6 +272,21 @@ namespace BattleSystemECS.Core
         // When true, the enemy's base stats are boosted per enrage config.
         public bool[] EnemyIsEnraged = new bool[MAX_ENTITIES];
 
+        // ==================== LastStand / DeathRattle (HP-Threshold Trigger) ====================
+        // EnemyLastStandHpFraction: HP fraction (0-1) at which the enemy enters LastStand mode.
+        // Default 0 = disabled (no LastStand trigger for this enemy).
+        // Example: 0.1 = activate LastStand when HP drops below 10% of max.
+        public float[] EnemyLastStandHpFraction = new float[MAX_ENTITIES];
+        // EnemyLastStandActive: true once LastStand has been triggered (permanent flag, like Enrage).
+        // When true, the enemy's speed is boosted by EnemyLastStandSpeedMult and damage by EnemyLastStandDamageMult.
+        public bool[] EnemyLastStandActive = new bool[MAX_ENTITIES];
+        // EnemyLastStandSpeedMult: speed multiplier applied when LastStand activates.
+        // Example: 1.5 = +50% move speed during LastStand.
+        public float[] EnemyLastStandSpeedMult = new float[MAX_ENTITIES];
+        // EnemyLastStandDamageMult: damage multiplier applied when LastStand activates.
+        // Example: 2.0 = double damage during LastStand.
+        public float[] EnemyLastStandDamageMult = new float[MAX_ENTITIES];
+
         // ==================== Boss Invulnerable Phase（无敌阶段） ====================
         // EnemyIsInvulnerable: true when the enemy is in an invulnerable phase (e.g. Boss skill animation).
         // When true, the enemy takes 0 damage from all sources.
@@ -877,6 +892,23 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(enemyId)) return;
             EnemyDamageImmunityMask[enemyId] = mask;
+        }
+
+        /// <summary>
+        /// Sets the LastStand / DeathRattle configuration for an enemy. When HP drops below
+        /// hpFraction * maxHP, the enemy enters LastStand mode (EnemyLastStandActive=true)
+        /// and its speed/damage are boosted by speedMult and damageMult respectively.
+        /// Pass hpFraction=0 to disable LastStand for this enemy.
+        /// Used by WaveSpawningSystem to apply monster JSON LastStand config.
+        /// </summary>
+        public void SetLastStandConfig(int enemyId, float hpFraction, float speedMult, float damageMult)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyLastStandHpFraction[enemyId] = hpFraction;
+            EnemyLastStandSpeedMult[enemyId] = speedMult;
+            EnemyLastStandDamageMult[enemyId] = damageMult;
+            // Active starts false; transitions to true on HP threshold crossing in EnemyAISystem
+            EnemyLastStandActive[enemyId] = false;
         }
 
         /// <summary>

@@ -486,6 +486,11 @@ namespace BattleSystemECS.Core
                 EnemyPhaseThresholds[entityId] = null;
                 EnemyEnrageTimer[entityId] = 0f;
                 EnemyIsEnraged[entityId] = false;
+                // LastStand / DeathRattle fields
+                EnemyLastStandHpFraction[entityId] = 0f;
+                EnemyLastStandActive[entityId] = false;
+                EnemyLastStandSpeedMult[entityId] = 1f;
+                EnemyLastStandDamageMult[entityId] = 1f;
                 // Invulnerable phase fields
                 EnemyIsInvulnerable[entityId] = false;
                 EnemyInvulnerablePhaseName[entityId] = null;

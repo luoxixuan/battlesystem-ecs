@@ -209,6 +209,10 @@ namespace BattleSystemECS.Systems
                 if (enemyId < 0) continue;
                 store.SetEntityName(enemyId, enemyName);
                 store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
+                store.SetLastStandConfig(enemyId,
+                    monsterConfig.LastStand?.HpFraction ?? 0f,
+                    monsterConfig.LastStand?.SpeedMult ?? 1f,
+                    monsterConfig.LastStand?.DamageMult ?? 1f);
                 store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree("Normal");
                 totalEnemiesSpawned++;
             }
@@ -237,6 +241,10 @@ namespace BattleSystemECS.Systems
             if (enemyId < 0) return;
             store.SetEntityName(enemyId, enemyName);
             store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
+            store.SetLastStandConfig(enemyId,
+                monsterConfig.LastStand?.HpFraction ?? 0f,
+                monsterConfig.LastStand?.SpeedMult ?? 1f,
+                monsterConfig.LastStand?.DamageMult ?? 1f);
             store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree("Normal");
             store.EnemyIsElite[enemyId] = true;
             totalEnemiesSpawned++;
@@ -432,6 +440,10 @@ namespace BattleSystemECS.Systems
                     }
                     store.SetEntityName(enemyId, enemyName);
                     store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
+                    store.SetLastStandConfig(enemyId,
+                        monsterConfig.LastStand?.HpFraction ?? 0f,
+                        monsterConfig.LastStand?.SpeedMult ?? 1f,
+                        monsterConfig.LastStand?.DamageMult ?? 1f);
                     store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(monsterType);
 
                     // Initialize flying enemy properties from monster config
@@ -580,6 +592,10 @@ namespace BattleSystemECS.Systems
                         {
                             store.EnemyEnrageTimer[enemyId] = monsterConfig.Enrage.EnrageAfterSeconds;
                         }
+                        // Initialize LastStand / DeathRattle config (HP-threshold trigger).
+                        // Note: SetLastStandConfig was already called above (along with SetDamageImmunityMask),
+                        // so values from monsterConfig.LastStand are already wired into the SOA fields.
+                        // The HP-threshold check is performed each frame in EnemyAISystem.
                     }
                 }
 
