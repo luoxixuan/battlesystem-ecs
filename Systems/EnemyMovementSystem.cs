@@ -224,6 +224,45 @@ namespace BattleSystemECS.Systems
                     x += dx * moveSpeed;
                     y += dy * moveSpeed;
 
+                    // Lure / bait: scan active towers and apply a soft steering offset toward
+                    // any tower whose Lure zone encloses this enemy. Differs from Pull (which
+                    // is positional force) — Lure adds a velocity bias, allowing the enemy to
+                    // escape if the lure weakens (e.g. tower destroyed, radius=0). Linear
+                    // proximity: full strength at center, 0 at rim. Default 0/0 = no-op
+                    // (loop body's first branch is skipped on hot path).
+                    var towerIds = store.ActiveTowerIds;
+                    int tCount = towerIds.Count;
+                    for (int t = 0; t < tCount; t++)
+                    {
+                        int tid = towerIds[t];
+                        if (!store.TowerActive[tid]) continue;
+                        float lureR = store.TowerLureRadius[tid];
+                        if (lureR <= 0f) continue;
+                        float lureS = store.TowerLureStrength[tid];
+                        if (lureS <= 0f) continue;
+                        float tx = store.PositionX[tid];
+                        float ty = store.PositionY[tid];
+                        float ddx = tx - x;
+                        float ddy = ty - y;
+                        float dSq = ddx * ddx + ddy * ddy;
+                        if (dSq > lureR * lureR) continue;
+                        // Inside zone: apply linear proximity-scaled bias toward tower.
+                        // dist near 0 → full strength; dist near radius → near 0.
+                        float d = (float)Math.Sqrt(dSq);
+                        float scale = (d > 0.001f) ? (1f - d / lureR) : 1f;
+                        if (d > 0.001f)
+                        {
+                            x += (ddx / d) * lureS * scale;
+                            y += (ddy / d) * lureS * scale;
+                        }
+                        else
+                        {
+                            // At exact center: nudge by fixed bias in default direction (+x)
+                            // — small enough to not break waypoint logic but visible.
+                            x += lureS * scale;
+                        }
+                    }
+
                     // Clamp to map bounds
                     if (x < 0f) x = 0f;
                     if (x > mapWidthMinusOne) x = mapWidthMinusOne;

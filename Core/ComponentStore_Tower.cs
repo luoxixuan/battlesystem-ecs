@@ -590,6 +590,19 @@ namespace BattleSystemECS.Core
         // as a single independent strike to the attacker. Default 0 = no effect.
         public float[] TowerRetaliateDamageMult = new float[MAX_ENTITIES];
 
+        // ==================== 塔诱饵 / 路径偏向 (Tower Lure / Bait) ====================
+        // TowerLureRadius: radius (in tiles) within which this tower exerts a soft "pull" on enemies
+        // — their movement is biased toward the tower. Differs from Pull (which is hard force):
+        //   Pull = "physics displacement" (immediate positional offset each frame, hard control)
+        //   Lure = "steering bias" (additive weight to enemy velocity toward this tower, soft control)
+        // Default 0 = no lure (zero-cost path — branch is skipped on hot path).
+        public float[] TowerLureRadius = new float[MAX_ENTITIES];
+        // TowerLureStrength: max additional speed (tiles/frame) that the lure adds toward the tower
+        // when an enemy is within TowerLureRadius. Applied as: dx = (tx - ex) / dist * TowerLureStrength.
+        // E.g. 0.3 = enemy gains 0.3 tiles/frame of inward bias when fully inside the zone, scaling
+        // linearly with proximity (max at center, 0 at the rim). Default 0 = no effect.
+        public float[] TowerLureStrength = new float[MAX_ENTITIES];
+
         // ==================== 塔组件访问 ====================
 
         /// <summary>
@@ -767,6 +780,9 @@ namespace BattleSystemECS.Core
             // Retaliate fields: default to no retaliate (0% chance, 0% damage mult → branch skipped on hot path)
             TowerRetaliateChance[entityId] = 0f;
             TowerRetaliateDamageMult[entityId] = 0f;
+            // Lure / bait fields: default to no lure (0 radius → branch skipped on hot path)
+            TowerLureRadius[entityId] = 0f;
+            TowerLureStrength[entityId] = 0f;
             // Burst fire: default to no burst (0 count = single-shot)
             TowerBurstCount[entityId] = 0;
             TowerBurstInterval[entityId] = 0f;
@@ -938,6 +954,9 @@ namespace BattleSystemECS.Core
             // Retaliate fields reset (chance=0 disables trigger, mult=0 disables damage — both defaults)
             TowerRetaliateChance[entityId] = 0f;
             TowerRetaliateDamageMult[entityId] = 0f;
+            // Lure / bait fields reset (radius=0 disables lure, strength=0 disables bias)
+            TowerLureRadius[entityId] = 0f;
+            TowerLureStrength[entityId] = 0f;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
         }
         #endregion

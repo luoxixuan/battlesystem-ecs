@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-03, Round 65）
+## 性能基准（2026-06-03, Round 66）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3961 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10472 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4598 FPS** |
+| **mode 5**（完整一局） | **3858 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10045 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4407 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -165,6 +165,7 @@ dotnet test
 - 穿透抗性 JSON 路径 Pierce Resistance Loader（GameConfigLoader.cs + game_config.json + Data/Monsters/monster_plated_warrior.json，monster JSON 解析 PierceResist/PierceImmune/DamageImmunities 字段 + null guard 保留默认 + Plated Warrior 怪物原型：HP350/护甲12/PierceResist 0.5 + Plated Carapace 技能）；bench2: 9230, bench4: 4690, bench5: 3885 ⚠️
 - 子弹时间 Bullet Time / Slow Motion（ComponentStore_Player.cs + FrameScheduler.cs，2 SOA 字段 PlayerBulletTimeTurnsLeft/PlayerBulletTimeScale + ActivateBulletTime(playerId, turns, scale) setter + AddPlayer 重置防 slot 复用泄漏 + SplitDeltaForBulletTime 拆 dt：前 7 phase 用 enemyDt = dt×scale，后 4 phase 用 combatDt = dt 原速 + 末尾 tick 1→0 时 read-scale-before-reset 避免 off-by-one + 默认 0f 永远不进 active 分支零开销）；bench2: 9589, bench4: 4454, bench5: 3724 ⚠️
 - 塔受击反击 Retaliate（ComponentStore_Tower.cs + ReflectTowerSystem.cs + SuicideBombSystem.cs，2 SOA 字段 TowerRetaliateChance/RetaliateDamageMult + AddTower 初始化 0f/0f + ResetTower/RemoveTower 重置 + QueueRetaliate 复用 _reflectQueue 共用 apply 路径 + 共享 Random.Shared 线程安全掷骰 + 默认 0% 概率零开销热路径）；bench2: 10472, bench4: 4598, bench5: 3961 ⚠️
+- 塔诱饵 / 路径偏向 Lure（Bait）（ComponentStore_Tower.cs + EnemyMovementSystem.cs，2 SOA 字段 TowerLureRadius/TowerLureStrength 默认 0f/0f 零开销热路径 + AddTower 初始化 + ResetTower/RemoveTower 防 slot 复用泄漏 + waypoint 段内 inline 扫描 ActiveTowerIds：每个 enemy 对每个 active 塔检测半径并应用线性比例 (1 - d/R) × strength 的朝塔速度偏移 + 0 半径早退 + 距离 0 容错）；bench2: 10045, bench4: 4407, bench5: 3858 ⚠️
 ### 2026-06-01
 - 射程伤害衰减（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs）；bench2: 12026, bench4: 5531, bench5: 4696
 - 爆发射击/齐射模式（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + TowerPlacementSystem.cs）；bench2: 11928, bench4: 5364, bench5: 4618
