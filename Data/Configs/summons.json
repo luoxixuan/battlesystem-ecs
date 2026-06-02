@@ -43,5 +43,44 @@
     "ManaCost": 35.0,
     "Duration": 10.0,
     "Cooldown": 12.0
+  },
+  {
+    "Id": "wisp_heal",
+    "Name": "Healing Wisp",
+    "Description": "A passive aura pet that orbits the player and restores 3% max HP per second for the wisp's duration. Mutually exclusive with other wisps.",
+    "UnitType": -1,
+    "WispType": 1,
+    "WispRadius": 6.0,
+    "WispDuration": 30.0,
+    "Cost": 80.0,
+    "ManaCost": 60.0,
+    "Duration": 0.0,
+    "Cooldown": 0.0
+  },
+  {
+    "Id": "wisp_slow",
+    "Name": "Slowing Wisp",
+    "Description": "A passive aura pet that slows all enemies within 6 tiles of the player by 30% while active. Mutually exclusive with other wisps.",
+    "UnitType": -1,
+    "WispType": 2,
+    "WispRadius": 6.0,
+    "WispDuration": 25.0,
+    "Cost": 70.0,
+    "ManaCost": 50.0,
+    "Duration": 0.0,
+    "Cooldown": 0.0
+  },
+  {
+    "Id": "wisp_curse",
+    "Name": "Curse Wisp",
+    "Description": "A passive aura pet that applies 15 armor shred to all enemies within 6 tiles of the player (refreshed each frame) while active. Mutually exclusive with other wisps.",
+    "UnitType": -1,
+    "WispType": 3,
+    "WispRadius": 6.0,
+    "WispDuration": 20.0,
+    "Cost": 90.0,
+    "ManaCost": 70.0,
+    "Duration": 0.0,
+    "Cooldown": 0.0
   }
 ]

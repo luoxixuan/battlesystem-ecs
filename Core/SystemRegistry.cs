@@ -114,6 +114,9 @@ namespace BattleSystemECS.Core
         // ── Magnetize zones (displacement fields, no damage) ──
         public MagnetizeSystem? Magnetize { get; private set; }
 
+        // ── Wisp aura pets (passive support pets: heal/slow/curse) ──
+        public WispSystem? Wisp { get; private set; }
+
         // ── Tech & Misc ──
         public TechTreeSystem? TechTree { get; private set; }
         public PickupSystem? Pickup { get; private set; }
@@ -272,6 +275,9 @@ namespace BattleSystemECS.Core
 
             // ── Magnetize (displacement fields) ──
             Magnetize = new MagnetizeSystem(store, logger);
+
+            // ── Wisp aura pets (Heal / Slow / Curse) ──
+            Wisp = new WispSystem(store, logger);
 
             // ── Adaptive Difficulty ──
             AdaptiveDifficulty = new AdaptiveDifficultySystem(store, config);
@@ -503,6 +509,7 @@ namespace BattleSystemECS.Core
             scheduler.SkillBuff.Skill = Skill;
             scheduler.SkillBuff.Bleed = Bleed;
             scheduler.SkillBuff.HealingZone = HealingZone;
+            scheduler.SkillBuff.Wisp = Wisp;
 
             // ── Post-death ──
             scheduler.PostDeath.EnemyFission = EnemyFission;

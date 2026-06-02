@@ -8,6 +8,9 @@ namespace BattleSystemECS.Core
         public Systems.SkillSystem? Skill { get; set; }
         public Systems.BleedSystem? Bleed { get; set; }
         public Systems.HealingZoneSystem? HealingZone { get; set; }
+        // Wisp aura pets — runs after HealingZone so wisp heal/slow/curse are layered
+        // on top of any healing-zone heals in the same frame.
+        public Systems.WispSystem? Wisp { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -18,6 +21,7 @@ namespace BattleSystemECS.Core
             Bleed?.ResolveBleedDamage();
             HealingZone?.Update(deltaTime);
             Skill?.Update(deltaTime);
+            Wisp?.Update(deltaTime);
         }
     }
 }

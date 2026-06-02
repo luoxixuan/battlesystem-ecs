@@ -126,6 +126,19 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Default 0 = no extra gold. The Breather x2 effect in GoldSystem multiplies this by 2.
         public float[] PlayerBreatherGoldBonus = new float[MAX_PLAYERS];
 
+        // ==================== Wisp System (SOA) ====================
+        // PlayerWispType: which wisp is currently active for each player.
+        // 0 = None, 1 = Heal Wisp (passive HP regen), 2 = Slow Wisp (AoE slow on nearby enemies),
+        // 3 = Curse Wisp (AoE armor shred on nearby enemies). Default 0 = no wisp active.
+        // Only ONE wisp can be active per player (mutually exclusive — see WispSystem.SpawnWisp).
+        public int[] PlayerWispType = new int[MAX_PLAYERS];
+        // PlayerWispDurationLeft: seconds remaining for the active wisp. 0 = wisp expired/inactive.
+        // Decremented each frame in WispSystem.Update; when it reaches 0, the wisp auto-expires.
+        public float[] PlayerWispDurationLeft = new float[MAX_PLAYERS];
+        // PlayerWispCooldown: seconds until the next wisp can be summoned (after expiration).
+        // Default 0 = no cooldown (off-cooldown, can summon immediately). Used to throttle re-summon.
+        public float[] PlayerWispCooldown = new float[MAX_PLAYERS];
+
         // ==================== Shop Reroll System (SOA) ====================
         // PlayerShopRerollCount: number of rerolls performed in the current BuildPhase (resets each phase).
         public int[] PlayerShopRerollCount = new int[MAX_PLAYERS];
