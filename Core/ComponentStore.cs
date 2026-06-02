@@ -506,6 +506,10 @@ namespace BattleSystemECS.Core
                 EnemyMarked[entityId] = false;
                 EnemyMarkedThreshold[entityId] = 0.15f;
                 EnemyMarkedDamageBonus[entityId] = 0.5f;
+                // Decoy fields (reset on entity destruction)
+                EnemyIsDecoy[entityId] = false;
+                EnemyDecoyLifetime[entityId] = 0f;
+                EnemyDecoyLifetimeLeft[entityId] = 0f;
                 // Banish fields (reset on entity destruction)
                 EnemyIsBanished[entityId] = false;
                 EnemyBanishDurationLeft[entityId] = 0f;
@@ -815,6 +819,7 @@ namespace BattleSystemECS.Core
             EnemyTypeName = null!; EnemyBehaviorTree = null!; EnemyActionEnum = null!;
             EnemyCastAbilityId = null!;
             EnemyMarked = null!; EnemyMarkedThreshold = null!; EnemyMarkedDamageBonus = null!;
+            EnemyIsDecoy = null!; EnemyDecoyLifetime = null!; EnemyDecoyLifetimeLeft = null!;
             TowerTargetingMode = null!; TowerProjectileHoming = null!; TowerInterceptRate = null!;
             TowerDamageType = null!; TowerSelected = null!; TowerType = null!;
             TowerAttackDamage = null!; TowerRange = null!; TowerAttackSpeed = null!;

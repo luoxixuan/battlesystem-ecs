@@ -553,6 +553,19 @@ namespace BattleSystemECS.Core
         public float[] EnemyMarkedThreshold = new float[MAX_ENTITIES];
         public float[] EnemyMarkedDamageBonus = new float[MAX_ENTITIES];
 
+        // ==================== 诱饵 (Decoy) ====================
+        // EnemyIsDecoy: when true, this enemy is a non-aggressive target dummy spawned by the player
+        //   (e.g. a Hologram Decoy tower). Decoys do not move, do not attack, and cannot use abilities.
+        //   They exist solely to draw enemy aggro and absorb damage. Lifetime is finite
+        //   (EnemyDecoyLifetime) so the field doesn't stay forever.
+        // EnemyDecoyLifetime: configured maximum lifetime in seconds when this enemy is a decoy.
+        //   0 = no decoy (default; normal enemy). WaveSpawningSystem / Hologram-tower spawn sets this.
+        // EnemyDecoyLifetimeLeft: remaining lifetime in seconds. Decremented each frame in
+        //   EnemyAISystem; when <= 0 the enemy is auto-queued for death (no gold reward).
+        public bool[] EnemyIsDecoy = new bool[MAX_ENTITIES];
+        public float[] EnemyDecoyLifetime = new float[MAX_ENTITIES];
+        public float[] EnemyDecoyLifetimeLeft = new float[MAX_ENTITIES];
+
         // ==================== 仇恨脱战范围 (Aggro Leash / Disengage Range) ====================
         // EnemyAggroRange: world-units radius around the player base within which this enemy
         //   will switch from path-following to "aggro chase" (leashed) state. 0 = disabled
@@ -793,6 +806,11 @@ namespace BattleSystemECS.Core
             EnemyMarked[entityId] = false;
             EnemyMarkedThreshold[entityId] = 0.15f;
             EnemyMarkedDamageBonus[entityId] = 0.5f;
+            // Decoy: default not a decoy. WaveSpawningSystem / Hologram-tower spawn opts in by
+            // setting EnemyIsDecoy = true and EnemyDecoyLifetime = N (seconds).
+            EnemyIsDecoy[entityId] = false;
+            EnemyDecoyLifetime[entityId] = 0f;
+            EnemyDecoyLifetimeLeft[entityId] = 0f;
 
             // Aggro Leash: default 0 range = opt-out. Monster configs that want aggro behavior
             // set EnemyAggroRange (e.g. 4f) and EnemyLeashRange (e.g. 10f) via WaveSpawningSystem.

@@ -263,6 +263,23 @@ namespace BattleSystemECS.Systems
                             store.EnemyEnrageTimer[enemyId] = enrageTimer;
                         }
 
+                        // Decoy lifetime countdown — auto-expire finite-lived player-spawned dummies.
+                        // Decremented each frame; when <= 0 the decoy is queued for death (no gold).
+                        // Done before BT evaluation so the rest of the system skips expired decoys.
+                        if (store.EnemyIsDecoy[enemyId])
+                        {
+                            float decoyLeft = store.EnemyDecoyLifetimeLeft[enemyId] - _currentDeltaTime;
+                            if (decoyLeft <= 0f)
+                            {
+                                store.EnemyDecoyLifetimeLeft[enemyId] = 0f;
+                                // Queue death; ResolveEnemiesKilledThisFrame() at frame end will destroy it.
+                                // Uses playerId as the killer (consistency with other death paths).
+                                store.QueueEnemyDeath(enemyId, playerId);
+                                continue; // skip the rest of AI evaluation for this decoy this frame
+                            }
+                            store.EnemyDecoyLifetimeLeft[enemyId] = decoyLeft;
+                        }
+
                         // Health-based phase transition
                         string thresholdsStr = store.EnemyPhaseThresholds[enemyId];
                         if (!string.IsNullOrEmpty(thresholdsStr))
@@ -306,6 +323,17 @@ namespace BattleSystemECS.Systems
                         if (store.EnemyStunFlag[enemyId])
                         {
                             action = "none";
+                            actionEnum = EnemyActionType.None;
+                            store.SetEnemyActionEnum(enemyId, actionEnum);
+                            _lastActionCache[enemyId] = actionEnum;
+                            continue;
+                        }
+
+                        // Decoys are passive: no movement, no attacks, no abilities.
+                        // They exist solely to draw enemy aggro and absorb damage until they expire
+                        // (handled above) or are killed. Set action to None and skip BT evaluation.
+                        if (store.EnemyIsDecoy[enemyId])
+                        {
                             actionEnum = EnemyActionType.None;
                             store.SetEnemyActionEnum(enemyId, actionEnum);
                             _lastActionCache[enemyId] = actionEnum;
