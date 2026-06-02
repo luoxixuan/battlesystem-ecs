@@ -39,6 +39,34 @@ namespace BattleSystemECS.Config
         // MagicResist: reduces incoming Magic damage (0.0-1.0 fraction reduction).
         // Separate from armor. Physical ignores magic resist, Magic ignores armor.
         public float MagicResist { get; set; } = 0f;
+        // DamageImmunities: list of damage type names this enemy is fully immune to
+        // (binary, not percentage). Valid entries: "Physical", "Magic", "Fire", "Ice", "Lightning".
+        // True damage bypasses immunity. Empty/null = no immunities.
+        public List<string> DamageImmunities { get; set; } = new List<string>();
+        /// <summary>
+        /// Computes the bit mask of damage immunities from the DamageImmunities list.
+        /// Returns 0 if list is null/empty. Unknown names are silently ignored.
+        /// </summary>
+        public int ComputeDamageImmunityMask()
+        {
+            if (DamageImmunities == null || DamageImmunities.Count == 0) return 0;
+            int mask = 0;
+            for (int i = 0; i < DamageImmunities.Count; i++)
+            {
+                string name = DamageImmunities[i];
+                if (string.IsNullOrEmpty(name)) continue;
+                switch (name)
+                {
+                    case "Physical":  mask |= (int)DamageType.Physical;  break;
+                    case "Magic":     mask |= (int)DamageType.Magic;     break;
+                    case "Fire":      mask |= (int)DamageType.Fire;      break;
+                    case "Ice":       mask |= (int)DamageType.Ice;       break;
+                    case "Lightning": mask |= (int)DamageType.Lightning; break;
+                    // True damage is never immuned — intentionally omitted.
+                }
+            }
+            return mask;
+        }
         // Shield: absorbs incoming damage before health. Boss/Elite types can have shield.
         public float Shield { get; set; } = 0f;
         // ShieldElement: which element this shield is weak to ("Fire"/"Ice"/"Lightning"/"Poison"/"" or null).

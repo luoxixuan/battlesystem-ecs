@@ -868,6 +868,18 @@ namespace BattleSystemECS.Core
         }
 
         /// <summary>
+        /// Sets the damage immunity bit mask for an enemy. Bits correspond to DamageType
+        /// (Physical=1, Magic=2, Fire=4, Ice=8, Lightning=16). When set, the enemy takes
+        /// 0 damage from that type. True damage (DamageType.True) bypasses this mask.
+        /// Used by WaveSpawningSystem to apply monster JSON DamageImmunities config.
+        /// </summary>
+        public void SetDamageImmunityMask(int enemyId, int mask)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyDamageImmunityMask[enemyId] = mask;
+        }
+
+        /// <summary>
         /// Applies damage to an enemy, with shield absorbing damage before it reaches health.
         /// </summary>
         public void ApplyEnemyDamage(int enemyId, float damage)

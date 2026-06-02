@@ -208,6 +208,7 @@ namespace BattleSystemECS.Systems
                 int enemyId = store.AddEnemy(startX, startY, scaledSpeed, scaledHealth, scaledMaxHealth, scaledDamage, monsterConfig.GoldReward, currentWave, enemyName, scaledArmor, monsterConfig.Shield, monsterConfig.MagicResist);
                 if (enemyId < 0) continue;
                 store.SetEntityName(enemyId, enemyName);
+                store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
                 store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree("Normal");
                 totalEnemiesSpawned++;
             }
@@ -235,6 +236,7 @@ namespace BattleSystemECS.Systems
             int enemyId = store.AddEnemy(startX, startY, scaledSpeed, scaledHealth, scaledMaxHealth, scaledDamage, monsterConfig.GoldReward * 3, currentWave, enemyName, scaledArmor, monsterConfig.Shield, monsterConfig.MagicResist);
             if (enemyId < 0) return;
             store.SetEntityName(enemyId, enemyName);
+            store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
             store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree("Normal");
             store.EnemyIsElite[enemyId] = true;
             totalEnemiesSpawned++;
@@ -429,6 +431,7 @@ namespace BattleSystemECS.Systems
                         continue;
                     }
                     store.SetEntityName(enemyId, enemyName);
+                    store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
                     store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(monsterType);
 
                     // Initialize flying enemy properties from monster config

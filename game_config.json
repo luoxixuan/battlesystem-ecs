@@ -2799,6 +2799,44 @@
                              "Skills":  [
                                             "Normal Attack"
                                         ]
+                         },
+                         {
+                             "MoveSpeed":  0.5,
+                             "AttackInterval":  2.0,
+                             "Type":  "Boss",
+                             "AttackRange":  2,
+                             "MaxHealth":  500,
+                             "Damage":  8,
+                             "Name":  "Magic Immune Specter",
+                             "Health":  500,
+                             "GoldReward":  120,
+                             "Skills":  [
+                                            "Normal Attack",
+                                            "Phase Shift"
+                                        ],
+                             "Armor":  3,
+                             "DamageImmunities":  [
+                                                       "Magic"
+                                                   ]
+                         },
+                         {
+                             "MoveSpeed":  0.6,
+                             "AttackInterval":  2.5,
+                             "Type":  "Boss",
+                             "AttackRange":  3,
+                             "MaxHealth":  800,
+                             "Damage":  15,
+                             "Name":  "Black Dragon (Physical Immune)",
+                             "Health":  800,
+                             "GoldReward":  200,
+                             "Skills":  [
+                                            "Normal Attack",
+                                            "Fire Breath"
+                                        ],
+                             "Armor":  10,
+                             "DamageImmunities":  [
+                                                       "Physical"
+                                                   ]
                          }
                      ],
     "Towers":  [

@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-02, Round 57）
+## 性能基准（2026-06-02, Round 58）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3996 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10635 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4703 FPS** |
+| **mode 5**（完整一局） | **4015 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10741 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4776 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
@@ -156,6 +156,7 @@ dotnet test
 - 视线系统 Line of Sight（SpatialGrid.cs + ComponentStore_Tower.cs + TowerAttackSystem.cs，HasLineOfSight + IsCellOnRay 整数格点射线 + TowerRequiresLOS/TowerBlocksLOS 2 SOA 字段 + AddTower 初始化 false + TowerAttackSystem 候选过滤 opt-in + IsCellOnRay 同名变量去重）；bench2: 10791, bench4: 4775, bench5: 3986 ⚠️
 - 诱饵实体 Decoy（ComponentStore_Enemy.cs + ComponentStore.cs + EnemyAISystem.cs，3 SOA 字段 EnemyIsDecoy/DecoyLifetime/DecoyLifetimeLeft + AddEnemy 初始化 false/0f/0f + DestroyEntity 重置 + AISystem 倒计时自动 QueueEnemyDeath + 跳过 BT 评估置 EnemyActionType.None）；bench2: 10787, bench4: 4884, bench5: 4063
 - 击杀回血/回蓝 HealOnKill（HealOnKillSystem.cs + ComponentStore_Tower.cs + GameConfig.cs + SystemRegistry.cs + TowerPlacementSystem.cs，2 SOA 字段 TowerHealOnKillAmount/ManaOnKillAmount + TowerConfig.HealOnKillAmount/ManaOnKillAmount + OnTowerKill 订阅 + SetPlayerCurrentHealth maxHP 钳制 + AddPlayerMana maxMP 钳制 + JSON 桥接 placement）；bench2: 10635, bench4: 4703, bench5: 3996 ⚠️
+- 纯伤害类型免疫 Magic/Physical Immune（ComponentStore_Enemy.cs + GameConfig.cs + WaveSpawningSystem.cs + game_config.json，SetDamageImmunityMask 访问器 + MonsterConfig.DamageImmunities[] 列表字段 + ComputeDamageImmunityMask 字符串→位掩码 switch + AddEnemy 路径三处统一初始化 + Magic Immune Specter/Black Dragon 两个 Boss 原型）；bench2: 10741, bench4: 4776, bench5: 4015
 ### 2026-06-01
 - 射程伤害衰减（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs）；bench2: 12026, bench4: 5531, bench5: 4696
 - 爆发射击/齐射模式（TowerAttackSystem + ComponentStore_Tower.cs + GameConfig.cs + TowerPlacementSystem.cs）；bench2: 11928, bench4: 5364, bench5: 4618
