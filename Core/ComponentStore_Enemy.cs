@@ -581,6 +581,16 @@ namespace BattleSystemECS.Core
         // EnemyElementTimer: remaining duration (in seconds) for each element bit flag
         // Indexed by element ordinal (0-3), matches ElementType bit positions
         public float[] EnemyElementTimer = new float[MAX_ENTITIES * 4];
+        // ── Round 83: Elemental Exposure (Direction 5) ──
+        // EnemyExposureMask: bit-mask of elements that "tagged" the enemy most recently.
+        // When an enemy is hit by an element of a DIFFERENT bit (or by a non-element attack)
+        // while this mask is set and EnemyExposureTimer > 0, the incoming damage is multiplied
+        // by (1 + ExposureBonusPct). Default ElementType.None = no exposure active.
+        public ElementType[] EnemyExposureMask = new ElementType[MAX_ENTITIES];
+        // EnemyExposureTimer: remaining seconds of the exposure vulnerability window.
+        // Default 0f = no window active. Refreshed to ExposureDuration when EnemyElementStatus
+        // gains a new bit; ticked down each frame by ElementalReactionSystem.Update.
+        public float[] EnemyExposureTimer = new float[MAX_ENTITIES];
 
         // ==================== 敌人产卵/巢穴组件（SOA）====================
         // NestDefId: index into GameConfig.NestDefs for this entity (-1 = not a nest)

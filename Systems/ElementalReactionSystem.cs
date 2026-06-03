@@ -40,6 +40,15 @@ namespace BattleSystemECS.Systems
         private const float FROZEN_DURATION_FACTOR = 1f; // ice_timer in seconds
         private const float SHATTER_STUN_DURATION = 0.5f;
 
+        // ── Round 83: Elemental Exposure (Direction 5) ──
+        // When the enemy has active elements and gains a new bit, the exposure window
+        // refreshes to EXPOSURE_DURATION seconds. While the window is active and
+        // EnemyExposureTimer > 0, incoming damage from any element NOT already in the
+        // exposure mask (or from a non-element attack) is multiplied by EXPOSURE_BONUS_PCT.
+        // This is the "marked by element A, vulnerable to element B" anti-synergy loop.
+        private const float EXPOSURE_DURATION = 3.0f;
+        private const float EXPOSURE_BONUS_PCT = 0.30f; // +30% damage to "off-element" hits
+
         // Element index constants matching EnemyElementTimer array layout
         // Timer for element at bit (1 << ordinal) is stored at timer[entityId * 4 + ordinal]
         private const int FIRE_IDX = 0;
@@ -260,6 +269,65 @@ namespace BattleSystemECS.Systems
 
                 if (changed) store.EnemyElementStatus[enemyId] = status;
             }
+
+            // ── Round 83: Elemental Exposure window maintenance (Direction 5) ──
+            // Two-phase: if status has any active element AND mask differs from current
+            // status, refresh the exposure window to EXPOSURE_DURATION seconds. If status
+            // is None but the exposure timer is still ticking, decay it; when it hits zero
+            // clear the mask so future status changes re-arm the window. O(active enemies).
+            for (int k = 0; k < activeEnemyIds.Count; k++)
+            {
+                int enemyId = activeEnemyIds[k];
+                ElementType status = store.EnemyElementStatus[enemyId];
+                ElementType exposure = store.EnemyExposureMask[enemyId];
+
+                if (status != ElementType.None)
+                {
+                    // Elemental activity present: refresh the exposure window only if the
+                    // current element mask differs from the recorded exposure (a new bit
+                    // has been added or a bit has been removed since we last sampled).
+                    if (status != exposure)
+                    {
+                        store.EnemyExposureMask[enemyId] = status;
+                        store.EnemyExposureTimer[enemyId] = EXPOSURE_DURATION;
+                    }
+                }
+                else if (store.EnemyExposureTimer[enemyId] > 0f)
+                {
+                    // No active element but exposure window still alive: decay the timer.
+                    float timer = store.EnemyExposureTimer[enemyId] - deltaTime;
+                    if (timer <= 0f)
+                    {
+                        store.EnemyExposureTimer[enemyId] = 0f;
+                        store.EnemyExposureMask[enemyId] = ElementType.None;
+                    }
+                    else
+                    {
+                        store.EnemyExposureTimer[enemyId] = timer;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Returns the damage multiplier applied to incoming damage against this enemy
+        /// from a source element. Elemental Exposure (Round 83) makes the enemy take
+        /// +EXPOSURE_BONUS_PCT damage when hit by an element not in the exposure mask
+        /// (or by a non-element attack). The function is O(1) and allocates nothing —
+        /// it is a pure bitwise test on the already-cached exposure mask.
+        /// </summary>
+        public float GetExposureDamageMultiplier(int enemyId, ElementType sourceElement)
+        {
+            if (store.EnemyExposureTimer[enemyId] <= 0f) return 1f;
+            ElementType mask = store.EnemyExposureMask[enemyId];
+            if (mask == ElementType.None) return 1f;
+            // Source is None OR source bits are entirely disjoint from mask → off-element
+            // hit. Apply the exposure vulnerability bonus.
+            if (sourceElement == ElementType.None || (sourceElement & mask) == 0)
+            {
+                return 1f + EXPOSURE_BONUS_PCT;
+            }
+            return 1f;
         }
 
         /// <summary>

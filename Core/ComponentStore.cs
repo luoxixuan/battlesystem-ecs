@@ -467,6 +467,9 @@ namespace BattleSystemECS.Core
                 EnemyFearResistance[entityId] = 0f;
                 // Curse debuff fields (applied by curse towers)
                 EnemyCurseDmgReduction[entityId] = 0f;
+                // Round 83: Elemental Exposure — reset to default (no exposure, no timer)
+                EnemyExposureMask[entityId] = ElementType.None;
+                EnemyExposureTimer[entityId] = 0f;
                 EnemyCurseSpeedReduction[entityId] = 0f;
                 EnemyCurseArmorReduction[entityId] = 0f;
                 EnemyCurseDmgTakenIncrease[entityId] = 0f;
@@ -846,6 +849,7 @@ namespace BattleSystemECS.Core
             EnemyCanStealGold = null!; EnemyStealAmount = null!; EnemyStolenGold = null!;
             EnemyGoldOnReturn = null!; EnemyHasStolenGold = null!;
             EnemyAffixFlags = null!; EnemyElementStatus = null!; EnemyElementTimer = null!;
+            EnemyExposureMask = null!; EnemyExposureTimer = null!;
             NestDefId = null!; NestHealth = null!; NestMaxHealth = null!;
             NestSpawnTimer = null!; NestSpawnInterval = null!; NestMonsterTypeStr = null!;
             NestMaxAlive = null!; NestActiveCount = null!; NestOriginId = null!;

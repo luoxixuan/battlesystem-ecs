@@ -263,6 +263,17 @@ public void SetWaveNumber(int waveNumber)
                     finalDamage *= (1f + store.EnemyMarkedDamageBonus[enemyId]);
                 }
 
+                // ── Elemental Exposure bonus (Round 83 Direction 5) ──
+                // Player attacks have no element tag, so any active exposure window
+                // (EnemyExposureMask != None) counts as "off-element" and triggers
+                // the +30% bonus. The O(1) guard skips the common case where the
+                // enemy has no active exposure (timer <= 0 OR mask == None).
+                if (store.EnemyExposureTimer[enemyId] > 0f
+                    && store.EnemyExposureMask[enemyId] != ElementType.None)
+                {
+                    finalDamage *= 1.30f; // 1 + EXPOSURE_BONUS_PCT (hardcoded in ElementalReactionSystem)
+                }
+
                 lock (_damageQueueLock) { _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage, wasCrit)); }
             });
 

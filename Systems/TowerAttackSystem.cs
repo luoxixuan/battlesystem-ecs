@@ -1133,6 +1133,20 @@ namespace BattleSystemECS.Systems
                         }
                     }
                 }
+                // ── Elemental Exposure bonus (Round 83 Direction 5) ──
+                // O(1) guard: skip when exposure window is inactive (timer <= 0). Active towers
+                // (towerAff > 0) with affinity bits disjoint from the enemy's current exposure
+                // mask take the +30% off-element bonus. Physical-only towers (towerAff == 0) are
+                // unaffected — this is a deliberate design choice to keep non-elemental towers
+                // baseline-balanced and reserve the bonus for elemental-flux strategies.
+                if (towerAff > 0 && store.EnemyExposureTimer[enemyId] > 0f)
+                {
+                    ElementType exposureMask = store.EnemyExposureMask[enemyId];
+                    if (exposureMask != ElementType.None && (((ElementType)towerAff) & exposureMask) == 0)
+                    {
+                        finalDmg *= 1.30f; // 1 + EXPOSURE_BONUS_PCT (hardcoded in ElementalReactionSystem)
+                    }
+                }
                 // Vanguard damage transfer: if this enemy is protected by a vanguard, transfer a fraction to the vanguard
                 float vanguardTransfer = store.EnemyVanguardDmgTransfer[enemyId];
                 if (vanguardTransfer > 0f && finalDmg > 0f)
