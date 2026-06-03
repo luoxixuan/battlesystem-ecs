@@ -1092,6 +1092,55 @@ namespace BattleSystemECS.Systems
                         lock (damageLock) { bag.Add((bestTarget, chainDmg, store.PlayerEntityId, chainPartnerId)); }
                     }
                 }
+                else
+                {
+                    // ── Destructible targeting (Round 95 Direction 5) ─────────────────────
+                    // No enemy in range → fall back to attacking the nearest destructible in range.
+                    // Lower priority than enemies (fires only when bestTarget == -1). Zero overhead
+                    // when ActiveObstacleIds is empty (the common case). Effect is resolved serially
+                    // after the Parallel.For in the ResolveDestructibleDamage() pass below.
+                    int dstrCount = store.ActiveObstacleIds.Count;
+                    if (dstrCount > 0)
+                    {
+                        int bestDstr = -1;
+                        float bestDstrDistSq = float.MaxValue;
+                        for (int di = 0; di < dstrCount; di++)
+                        {
+                            int oid = store.ActiveObstacleIds[di];
+                            if (!store.ObstacleActive[oid]) continue;
+                            // Only attack obstacles with HP > 0 (i.e. destructibles that can be destroyed)
+                            if (store.ObstacleHealth[oid] <= 0f) continue;
+                            // Tower must be in range
+                            float odx = store.ObstacleX[oid] - tx;
+                            float ody = store.ObstacleY[oid] - ty;
+                            float distSq = odx * odx + ody * ody;
+                            float rangeSq = (float)effectiveRange * effectiveRange;
+                            if (distSq > rangeSq) continue;
+                            if (distSq < bestDstrDistSq)
+                            {
+                                bestDstrDistSq = distSq;
+                                bestDstr = oid;
+                            }
+                        }
+                        if (bestDstr != -1)
+                        {
+                            // Reset attack cooldown so this counts as a fired shot
+                            store.TowerLastAttackTime[towerId] = 0f;
+                            // Compute base damage to apply (use same TowerAttackDamage)
+                            float dstrDmg = store.TowerAttackDamage[towerId];
+                            if (dstrDmg < 0f) dstrDmg = 0f;
+                            // Queue for serial resolution (same damage-lock pattern as enemy damage)
+                            lock (damageLock)
+                            {
+                                // Reuse the same _damageQueue[readIdx] by encoding the destructible
+                                // as a sentinel: enemyId < 0 means destructible. The serial phase
+                                // checks enemyId < 0 and routes to the destructible handler instead.
+                                // We use bitwise: enemyId = -(obstacleId + 1) to keep the int range.
+                                bag.Add((-(bestDstr + 1), dstrDmg, store.PlayerEntityId, towerId));
+                            }
+                        }
+                    }
+                }
             });
 
             // Phase 2 (serial): apply damage
@@ -1101,6 +1150,75 @@ namespace BattleSystemECS.Systems
             _damageQueue[writeIdx].Clear();
             foreach (var (enemyId, damage, playerId, towerId) in _damageQueue[readIdx])
             {
+                // ── Destructible routing (Round 95 Direction 5) ──
+                // Sentinel: enemyId < 0 means the queued damage is for an obstacle, not an enemy.
+                // The obstacle id is encoded as -(enemyId + 1) to keep both signs valid in the int.
+                // Handle destructible damage + on-destroy effect inline before falling into the
+                // enemy damage path. This is opt-in: when no destructibles spawn, ActiveObstacleIds
+                // is empty and the bag contains no negative enemyId → the check is a single int
+                // comparison per queued entry and the destructible branch never runs.
+                if (enemyId < 0)
+                {
+                    int obstacleId = -(enemyId + 1);
+                    if (obstacleId >= 0 && obstacleId < ComponentStore.MAX_OBSTACLES
+                        && store.ObstacleActive[obstacleId]
+                        && store.ObstacleHealth[obstacleId] > 0f)
+                    {
+                        store.ObstacleHealth[obstacleId] -= damage;
+                        if (store.ObstacleHealth[obstacleId] <= 0f)
+                        {
+                            // Destructible destroyed → trigger on-destroy effect before removal
+                            int effect = store.ObstacleOnDestroyEffect[obstacleId];
+                            float effectValue = store.ObstacleOnDestroyValue[obstacleId];
+                            float ox = store.ObstacleX[obstacleId];
+                            float oy = store.ObstacleY[obstacleId];
+                            if (effect == 1)
+                            {
+                                // Gold: grant player gold (single-player game → PlayerEntityId).
+                                // Uses the same single-player routing as the rest of the codebase —
+                                // see ComponentStore.PlayerEntityId (default 1).
+                                if (store.PlayerEntityId >= 0 && store.PlayerEntityId < ComponentStore.MAX_PLAYERS)
+                                {
+                                    store.PlayerGold[store.PlayerEntityId] += effectValue;
+                                }
+                            }
+                            else if (effect == 2)
+                            {
+                                // Explosion: deal % of enemy max HP as damage to all enemies in radius
+                                // Radius is hard-coded to 5f (documented default in DestructibleDef)
+                                // to avoid an extra per-obstacle SOA field — see Direction 5 design.
+                                const float radius = 5f;
+                                float radiusSq = radius * radius;
+                                var activeEnemies = store.GetCachedActiveEnemyIds();
+                                float dmgRatio = effectValue; // 0-1, fraction of max HP
+                                for (int ei = 0; ei < activeEnemies.Count; ei++)
+                                {
+                                    int eid = activeEnemies[ei];
+                                    if (!store.EnemyActive[eid]) continue;
+                                    float edx = store.PositionX[eid] - ox;
+                                    float edy = store.PositionY[eid] - oy;
+                                    if (edx * edx + edy * edy > radiusSq) continue;
+                                    float maxHp = store.EnemyMaxHealth[eid];
+                                    float explosionDmg = maxHp * dmgRatio;
+                                    if (explosionDmg > 0f)
+                                    {
+                                        // Re-enter the enemy damage path via direct health application
+                                        // (skipping damage queue to keep explosion atomic with the
+                                        // destructible destruction and avoid recursion in the queue).
+                                        store.EnemyHealth[eid] -= explosionDmg;
+                                        if (store.EnemyHealth[eid] <= 0f)
+                                        {
+                                            store.QueueEnemyDeath(eid, store.PlayerEntityId);
+                                        }
+                                    }
+                                }
+                            }
+                            // Remove the destroyed destructible from the active list
+                            store.RemoveObstacle(obstacleId);
+                        }
+                    }
+                    continue; // Destructible entry fully handled — skip the enemy damage path
+                }
                 if (!store.EnemyActive[enemyId]) continue;
                 // Invulnerability check: if enemy is invulnerable, skip damage
                 if (store.EnemyIsInvulnerable[enemyId]) continue;

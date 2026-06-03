@@ -1,0 +1,23 @@
+{
+  "Destructibles": [
+    {
+      "Id": "wooden_crate",
+      "Name": "Wooden Crate",
+      "Description": "A weak wooden box. Towers can break it open for bonus gold.",
+      "MaxHealth": 30.0,
+      "OnDestroyEffect": 1,
+      "OnDestroyValue": 15.0,
+      "ExplosionRadius": 0.0
+    },
+    {
+      "Id": "oil_barrel",
+      "Name": "Oil Barrel",
+      "Description": "Highly volatile. A single hit is enough to detonate the whole barrel.",
+      "MaxHealth": 25.0,
+      "OnDestroyEffect": 2,
+      "OnDestroyValue": 0.5,
+      "ExplosionRadius": 5.0
+    }
+  ],
+  "Description": "Destructible obstacle prototypes (Round 95 Direction 5). Crate drops gold on destroy; Oil Barrel explodes for 50% of enemy max HP in a 5-tile radius. Towers auto-target destructibles when no enemy is in range, so leaving destructibles in your fire lane gives you free secondary economy/utility. Set MaxHealth=0 to disable a prototype."
+}

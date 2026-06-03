@@ -33,5 +33,11 @@
       "InitialOwner": 0,
       "CaptureRadius": 2.0
     }
+  ],
+  "Destructibles": [
+    { "DefId": "wooden_crate", "X": 3.0, "Y": 8.0 },
+    { "DefId": "wooden_crate", "X": 7.0, "Y": 6.0 },
+    { "DefId": "wooden_crate", "X": 4.0, "Y": 14.0 },
+    { "DefId": "oil_barrel", "X": 6.0, "Y": 11.0 }
   ]
 }

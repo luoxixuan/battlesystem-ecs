@@ -77,6 +77,10 @@ namespace BattleSystemECS.Config
                 // missing fields fall back to the safe defaults in DamageSaturationConfig.
                 LoadDamageSaturationConfig(gameConfig, renderer);
 
+                // Load destructible object definitions (Round 95 Direction 5: tower-attackable objects
+                // with on-destroy effects like gold drop or AoE explosion).
+                LoadDestructibleDefs(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -836,8 +840,57 @@ namespace BattleSystemECS.Config
             level.LevelNumber = ExtractInt(json, "LevelNumber");
             level.WaveCount = ExtractInt(json, "WaveCount");
             level.Waves = ParseWaveArray(json, "Waves");
+            // Round 95 Direction 5: destructible placements on this level (crates/oil barrels).
+            // Empty list = no destructibles spawn, zero hot-path overhead.
+            level.Destructibles = ParseDestructiblePlacements(json, "Destructibles");
 
             return level;
+        }
+
+        /// <summary>
+        /// Parse a flat array of destructible placement entries from a JSON object string.
+        /// Round 95 Direction 5. Each entry is expected to have {DefId, X, Y}. DefId is a
+        /// string referencing a DestructibleDef.Id; X and Y are floats for grid coordinates.
+        /// Missing or malformed entries are silently skipped (an opt-in feature with no
+        /// required fields — a level without this array simply has no destructibles).
+        /// </summary>
+        private static List<DestructiblePlacement> ParseDestructiblePlacements(string json, string key)
+        {
+            var placements = new List<DestructiblePlacement>();
+            string keyPattern = "\"" + key + "\":";
+            int keyIndex = json.IndexOf(keyPattern);
+            if (keyIndex == -1) return placements;
+            int arrayStart = json.IndexOf("[", keyIndex);
+            if (arrayStart == -1) return placements;
+            int arrayEnd = FindMatchingBrace(json, arrayStart);
+            if (arrayEnd == -1) return placements;
+            string arrayContent = json.Substring(arrayStart + 1, arrayEnd - arrayStart - 1);
+            int pos = 0;
+            while (pos < arrayContent.Length)
+            {
+                while (pos < arrayContent.Length && (char.IsWhiteSpace(arrayContent[pos]) || arrayContent[pos] == ',')) pos++;
+                if (pos >= arrayContent.Length) break;
+                if (arrayContent[pos] == '{')
+                {
+                    int objEnd = FindMatchingBrace(arrayContent, pos);
+                    if (objEnd == -1) break;
+                    string objJson = arrayContent.Substring(pos, objEnd - pos + 1);
+                    var placement = new DestructiblePlacement
+                    {
+                        DefId = ExtractString(objJson, "DefId"),
+                        X = ExtractFloat(objJson, "X"),
+                        Y = ExtractFloat(objJson, "Y")
+                    };
+                    if (!string.IsNullOrEmpty(placement.DefId))
+                        placements.Add(placement);
+                    pos = objEnd + 1;
+                }
+                else
+                {
+                    pos++;
+                }
+            }
+            return placements;
         }
 
         private static List<WaveConfig> ParseWaveArray(string json, string key)
@@ -1661,6 +1714,65 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[SATURATION] Failed to load damage saturation config: " + ex.Message + " — using defaults");
+            }
+        }
+
+        /// <summary>
+        /// Load destructible object prototypes from <c>Data/Configs/destructibles.json</c>.
+        /// Round 95 Direction 5. Missing or malformed entries are silently skipped — the
+        /// destructible system is opt-in (empty DestructibleDefs → no destructibles spawned
+        /// → no hot-path overhead). Per-entry fields fall back to safe defaults when absent.
+        /// </summary>
+        private static void LoadDestructibleDefs(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string file = "Data/Configs/destructibles.json";
+            try
+            {
+                if (!File.Exists(file))
+                {
+                    renderer.Log("[DESTRUCTIBLE] Destructible config not found: " + file + " — no destructibles will spawn (opt-in)");
+                    return;
+                }
+                string json = File.ReadAllText(file);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[DESTRUCTIBLE] Destructible config is empty: " + file);
+                    return;
+                }
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("Destructibles", out var arr) || arr.ValueKind != System.Text.Json.JsonValueKind.Array)
+                {
+                    renderer.Log("[DESTRUCTIBLE] No 'Destructibles' array in " + file + " — opt-in, no destructibles");
+                    return;
+                }
+                var defs = new List<DestructibleDef>();
+                int idx = 0;
+                foreach (var entry in arr.EnumerateArray())
+                {
+                    var def = new DestructibleDef
+                    {
+                        Id = entry.TryGetProperty("Id", out var idEl) ? idEl.GetString() : ("destructible_" + idx),
+                        Name = entry.TryGetProperty("Name", out var nEl) ? nEl.GetString() : "Destructible",
+                        Description = entry.TryGetProperty("Description", out var dEl) ? dEl.GetString() : "",
+                        MaxHealth = entry.TryGetProperty("MaxHealth", out var mhEl) && mhEl.ValueKind == System.Text.Json.JsonValueKind.Number
+                            ? (float)mhEl.GetDouble() : 0f,
+                        OnDestroyEffect = entry.TryGetProperty("OnDestroyEffect", out var effEl) && effEl.ValueKind == System.Text.Json.JsonValueKind.Number
+                            ? effEl.GetInt32() : 0,
+                        OnDestroyValue = entry.TryGetProperty("OnDestroyValue", out var vEl) && vEl.ValueKind == System.Text.Json.JsonValueKind.Number
+                            ? (float)vEl.GetDouble() : 0f,
+                        ExplosionRadius = entry.TryGetProperty("ExplosionRadius", out var rEl) && rEl.ValueKind == System.Text.Json.JsonValueKind.Number
+                            ? (float)rEl.GetDouble() : 5f
+                    };
+                    defs.Add(def);
+                    idx++;
+                }
+                gameConfig.DestructibleDefs = defs.ToArray();
+                renderer.Log($"[DESTRUCTIBLE] Loaded {gameConfig.DestructibleDefs.Length} destructible prototypes from {file}");
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[DESTRUCTIBLE] Failed to load destructible config: " + ex.Message + " — no destructibles will spawn");
             }
         }
     }

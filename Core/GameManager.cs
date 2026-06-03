@@ -241,6 +241,9 @@ namespace BattleSystemECS.Core
                 // 初始化资源节点系统（地图资源节点：金矿/法力泉/科技遗迹）
                 resourceNodeSystem.InitializeFromLevel(levelConfig);
 
+                // 初始化关卡可破坏物（Round 95 Direction 5：路径上的木箱/油桶，可被塔攻击打爆触发效果）
+                SpawnDestructiblesForLevel(levelConfig);
+
                 // ── Phase: BuildPhase ──────────────────────────────────────────
                 if (stateMachine.TransitionTo(GameState.BuildPhase))
                 {
@@ -376,6 +379,88 @@ namespace BattleSystemECS.Core
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Spawn destructible objects (crates, oil barrels) for the given level.
+        /// Round 95 Direction 5. Reads the `Destructibles` array from the level JSON
+        /// (each entry: {DefId, X, Y}), looks up the matching DestructibleDef by Id,
+        /// and registers it with the ComponentStore via AddObstacle. Each destructible
+        /// occupies one ObstacleActive slot and gets an OnDestroyEffect + OnDestroyValue
+        /// attached so TowerAttackSystem can apply the right effect on destruction.
+        /// Opt-in: levels without a Destructibles array spawn zero destructibles,
+        /// which means zero hot-path overhead (ActiveObstacleIds is empty).
+        /// </summary>
+        private void SpawnDestructiblesForLevel(LevelConfig levelConfig)
+        {
+            if (levelConfig == null) return;
+            if (gameConfig.DestructibleDefs == null || gameConfig.DestructibleDefs.Length == 0)
+            {
+                // No destructible prototypes loaded — skip silently (opt-in)
+                return;
+            }
+            if (levelConfig.Destructibles == null || levelConfig.Destructibles.Count == 0)
+            {
+                // Level doesn't place any destructibles
+                return;
+            }
+
+            int spawned = 0;
+            for (int i = 0; i < levelConfig.Destructibles.Count; i++)
+            {
+                var entry = levelConfig.Destructibles[i];
+                if (entry == null) continue;
+
+                // Find the DestructibleDef by Id
+                int typeId = -1;
+                for (int t = 0; t < gameConfig.DestructibleDefs.Length; t++)
+                {
+                    if (gameConfig.DestructibleDefs[t].Id == entry.DefId)
+                    {
+                        typeId = t;
+                        break;
+                    }
+                }
+                if (typeId < 0)
+                {
+                    logger.Log("[DESTRUCTIBLE] Unknown destructible DefId: " + entry.DefId + " — skipping");
+                    continue;
+                }
+
+                var def = gameConfig.DestructibleDefs[typeId];
+                if (def.MaxHealth <= 0f)
+                {
+                    // Disabled prototype (MaxHealth=0) — skip
+                    continue;
+                }
+
+                // Find a free obstacle slot (linear scan from the last-used id)
+                int oid = -1;
+                int attempts = 0;
+                int startScan = 0;
+                while (attempts < ComponentStore.MAX_OBSTACLES)
+                {
+                    int candidate = (startScan + attempts) % ComponentStore.MAX_OBSTACLES;
+                    if (!store.ObstacleActive[candidate])
+                    {
+                        oid = candidate;
+                        break;
+                    }
+                    attempts++;
+                }
+                if (oid < 0)
+                {
+                    logger.Log("[DESTRUCTIBLE] No free obstacle slot for destructible " + entry.DefId);
+                    continue;
+                }
+
+                store.AddObstacle(oid, typeId, entry.X, entry.Y, def.MaxHealth, def.OnDestroyEffect, def.OnDestroyValue);
+                spawned++;
+            }
+            if (spawned > 0)
+            {
+                logger.Log("[DESTRUCTIBLE] Spawned " + spawned + " destructibles for level " + levelConfig.LevelNumber);
+            }
         }
 
         /// <summary>

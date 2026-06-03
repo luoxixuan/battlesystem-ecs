@@ -604,6 +604,20 @@ namespace BattleSystemECS.Config
         public int SurvivalWaveCount { get; set; } = 10;
         // Resource nodes on this map — populated from level JSON or resource_nodes.json
         public List<ResourceNodeDef> ResourceNodes { get; set; } = new List<ResourceNodeDef>();
+        // Destructible objects (crates, oil barrels) on this level. Round 95 Direction 5.
+        // Each entry references a DestructibleDef by DefId and is placed at (X, Y).
+        public List<DestructiblePlacement> Destructibles { get; set; } = new List<DestructiblePlacement>();
+    }
+
+    /// <summary>
+    /// Placement entry for a destructible object on a level map. Round 95 Direction 5.
+    /// The DefId references a DestructibleDef.Id in the destructibles.json config.
+    /// </summary>
+    public class DestructiblePlacement
+    {
+        public string DefId { get; set; }
+        public float X { get; set; }
+        public float Y { get; set; }
     }
 
     /// <summary>
@@ -921,6 +935,26 @@ namespace BattleSystemECS.Config
         public bool CanBeAttacked { get; set; } = true;
         // Damage dealt to enemies when they walk over (spike trap)
         public float TrapDamage { get; set; } = 0f;
+    }
+
+    /// <summary>
+    /// Defines a destructible object type (wooden crate, oil barrel, altar). Round 95 Direction 5.
+    /// Unlike ObstacleDef, destructibles are static loot/utility objects placed on the level
+    /// map at level load time (not built by players) and can be destroyed by tower attacks.
+    /// </summary>
+    public class DestructibleDef
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        // Max health of the destructible
+        public float MaxHealth { get; set; }
+        // On-destroy effect: 0=None, 1=Gold (drop gold to player), 2=Explosion (AoE damage)
+        public int OnDestroyEffect { get; set; } = 0;
+        // Magnitude: Gold=gold amount, Explosion=% of enemy max HP as damage (0.0-1.0)
+        public float OnDestroyValue { get; set; } = 0f;
+        // Explosion radius in tiles (only used when OnDestroyEffect=2)
+        public float ExplosionRadius { get; set; } = 5f;
     }
 
     /// <summary>
@@ -1542,6 +1576,11 @@ namespace BattleSystemECS.Config
 
         // Obstacle definitions (loaded from obstacles.json)
         public ObstacleDef[] ObstacleDefs { get; set; } = Array.Empty<ObstacleDef>();
+
+        // Destructible object definitions (loaded from destructibles.json). Round 95 Direction 5.
+        // Indexed by type id; level JSON references destructible defs by their Id string and
+        // is converted to a type id by GameManager at level-load time.
+        public DestructibleDef[] DestructibleDefs { get; set; } = Array.Empty<DestructibleDef>();
 
         // Map dimensions (Bug#30 fix: magic numbers 10 and 20 in GameManager/EnemyMovementSystem)
         public int MapWidth { get; set; } = 10;

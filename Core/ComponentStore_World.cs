@@ -207,6 +207,10 @@ namespace BattleSystemECS.Core
         public float[] ObstacleX = new float[MAX_OBSTACLES];
         public float[] ObstacleY = new float[MAX_OBSTACLES];
         public int[] ObstacleType = new int[MAX_OBSTACLES];  // index into ObstacleDefs[]
+        // Destructible on-destroy hook (Round 95 Direction 5): 0=None, 1=Gold, 2=Explosion
+        public int[] ObstacleOnDestroyEffect = new int[MAX_OBSTACLES];
+        // Magnitude of the on-destroy effect: Gold=gold amount, Explosion=% maxHp as damage
+        public float[] ObstacleOnDestroyValue = new float[MAX_OBSTACLES];
 
         // ==================== 持久性地面 hazard 区域组件（HazardZone）====================
         // 地面上的持久性区域效果（油沼减速、电网麻痹、火墙DoT等）
@@ -286,7 +290,7 @@ namespace BattleSystemECS.Core
         #endregion
 
         // ==================== 路障管理 ====================
-        public void AddObstacle(int obstacleId, int typeId, float x, float y, float maxHealth)
+        public void AddObstacle(int obstacleId, int typeId, float x, float y, float maxHealth, int onDestroyEffect = 0, float onDestroyValue = 0f)
         {
             if (obstacleId < 0 || obstacleId >= MAX_OBSTACLES) return;
             ObstacleActive[obstacleId] = true;
@@ -295,6 +299,9 @@ namespace BattleSystemECS.Core
             ObstacleY[obstacleId] = y;
             ObstacleHealth[obstacleId] = maxHealth;
             ObstacleMaxHealth[obstacleId] = maxHealth;
+            // Destructible on-destroy effect (Round 95 Direction 5): 0=None, 1=Gold, 2=Explosion
+            ObstacleOnDestroyEffect[obstacleId] = onDestroyEffect;
+            ObstacleOnDestroyValue[obstacleId] = onDestroyValue;
             _activeObstacleIds.Add(obstacleId);
         }
 
@@ -307,6 +314,8 @@ namespace BattleSystemECS.Core
             ObstacleX[obstacleId] = 0f;
             ObstacleY[obstacleId] = 0f;
             ObstacleType[obstacleId] = -1;
+            ObstacleOnDestroyEffect[obstacleId] = 0;
+            ObstacleOnDestroyValue[obstacleId] = 0f;
             _activeObstacleIds.Remove(obstacleId);
         }
 
