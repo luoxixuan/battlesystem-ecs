@@ -175,6 +175,17 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // ShopRerollMaxSlots: cap for offer slot storage (matches ShopRerollConfig.OfferSlotCount, default 3)
         public const int MAX_SHOP_OFFER_SLOTS = 8;
 
+        // ==================== Wave Skip Reward System (SOA) ====================
+        // PlayerWaveSkipsUsed: number of times this player has used a "skip wave" reward
+        // option in the current level. Capped at WaveSkipConfig.MaxSkipsPerLevel (default 3).
+        // Default 0 = no skips used yet. Reset on AddPlayer (fresh game).
+        public int[] PlayerWaveSkipsUsed = new int[MAX_PLAYERS];
+        // PlayerSkipBonusDamagePct: additive damage multiplier bonus accumulated from all
+        // wave-skip purchases this level (e.g. 0.30f = +30% damage for the rest of the level).
+        // Stacks additively: 3 skips @ 0.10 each = 0.30. Default 0 = no bonus.
+        // Applied multiplicatively at damage apply time via GetPlayerAttackDamage().
+        public float[] PlayerSkipBonusDamagePct = new float[MAX_PLAYERS];
+
         #endregion
 
         // ==================== 玩家组件访问 ====================
@@ -204,6 +215,9 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             // Reset both fields to avoid leaking prior slot occupant's active bullet-time into a new game.
             PlayerBulletTimeTurnsLeft[entityId] = 0f;
             PlayerBulletTimeScale[entityId] = 1f;
+            // Wave Skip Reward: reset both counters to 0 so each new game starts fresh.
+            PlayerWaveSkipsUsed[entityId] = 0;
+            PlayerSkipBonusDamagePct[entityId] = 0f;
 
             PlayerEntityId = entityId;
         }
@@ -229,13 +243,46 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public float GetPlayerAttackDamage(int playerId)
         {
             if (!IsValidPlayer(playerId)) return 0f;
-            return PlayerAttackDamage[playerId];
+            // Wave-skip reward: apply additive bonus (default 0 = no-op, backward compatible).
+            // Skip-purchased bonus stacks additively so 3 skips @ 0.10 each = 0.30 (i.e. +30% dmg).
+            float baseDmg = PlayerAttackDamage[playerId];
+            float bonus = PlayerSkipBonusDamagePct[playerId];
+            return bonus > 0f ? baseDmg * (1f + bonus) : baseDmg;
         }
 
         public void SetPlayerAttackDamage(int playerId, float damage)
         {
             if (!IsValidPlayer(playerId)) return;
             PlayerAttackDamage[playerId] = damage;
+        }
+
+        // ==================== Wave Skip Reward accessors ====================
+        /// <summary>Returns how many wave-skip rewards this player has purchased this level.</summary>
+        public int GetPlayerWaveSkipsUsed(int playerId)
+        {
+            if (!IsValidPlayer(playerId)) return 0;
+            return PlayerWaveSkipsUsed[playerId];
+        }
+
+        /// <summary>Sets the wave-skip purchase count (used by WaveSkipSystem at purchase time).</summary>
+        public void SetPlayerWaveSkipsUsed(int playerId, int count)
+        {
+            if (!IsValidPlayer(playerId)) return;
+            PlayerWaveSkipsUsed[playerId] = Math.Max(0, count);
+        }
+
+        /// <summary>Returns the cumulative additive damage bonus from wave-skip purchases (0 = none).</summary>
+        public float GetPlayerSkipBonusDamagePct(int playerId)
+        {
+            if (!IsValidPlayer(playerId)) return 0f;
+            return PlayerSkipBonusDamagePct[playerId];
+        }
+
+        /// <summary>Sets the cumulative skip damage bonus (used by WaveSkipSystem at purchase time).</summary>
+        public void SetPlayerSkipBonusDamagePct(int playerId, float pct)
+        {
+            if (!IsValidPlayer(playerId)) return;
+            PlayerSkipBonusDamagePct[playerId] = Math.Max(0f, pct);
         }
 
         public float GetPlayerGold(int playerId)

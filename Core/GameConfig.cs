@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using BattleSystemECS.Components;
+using BattleSystemECS.Systems;
 
 namespace BattleSystemECS.Config
 {
@@ -1331,6 +1332,9 @@ namespace BattleSystemECS.Config
 
         // Reforge configuration (tower affix reroll — Split B)
         public ReforgeConfig Reforge { get; set; } = new ReforgeConfig();
+
+        // Wave Skip Reward configuration (BuildPhase "skip wave → gain dmg bonus" option)
+        public WaveSkipConfig WaveSkip { get; set; } = new WaveSkipConfig();
 
         // Tower Overcharge configuration
         public TowerOverchargeConfig TowerOvercharge { get; set; } = new TowerOverchargeConfig();

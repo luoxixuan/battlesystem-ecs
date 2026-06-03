@@ -1,0 +1,7 @@
+{
+  "Enabled": true,
+  "SkipCost": 50,
+  "SkipDamageBonusPct": 0.10,
+  "MaxSkipsPerLevel": 3,
+  "Description": "Wave Skip Reward configuration — BuildPhase option to spend gold and skip a wave in exchange for a permanent additive damage bonus for the rest of the level. Inspired by Arknights commissary and Brotato rush rewards."
+}
