@@ -243,6 +243,9 @@ namespace BattleSystemECS.Core
         public int[] TowerSynergyId = new int[MAX_ENTITIES];
         // 协同增益倍率（从 JSON config 读取并应用，如 bonusChainCount, dotDamageBonus）
         public float[] TowerSynergyMultiplier = new float[MAX_ENTITIES];
+        // Round 91 同类塔聚集 tier：0=无 tier / 1=tier1 (3 塔聚集) / 2=tier2 (5 塔) / 3=tier3 (8 塔)
+        // 越高 tier = 越高的 damage mult 叠加。零开销（默认 0）
+        public int[] TowerSynergyTier = new int[MAX_ENTITIES];
 
         // ==================== 时间操纵塔（Chrono Tower）字段（SOA）====================
         // TowerIsChronoTower: true if this tower is a Chrono Tower that slows enemies in a time field

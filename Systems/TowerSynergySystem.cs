@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Linq;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
@@ -106,9 +107,17 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Update — 检查塔组合，触发协同效果
         /// 在 TowerAttackSystem.Update 之后调用（配合 GameManager 帧调度）
+        ///
+        /// Round 91 Synergy Tiering 阶段 1：按同类塔数量设 TowerSynergyTier (0/1/2/3)
+        /// 阶段 2：应用 tier mult（与既有二元协同 multiplier 串行叠加）
+        /// 阶段 3：执行既有 JSON 协同
         /// </summary>
         public void Update()
         {
+            // 阶段 1+2: Synergy Tiering — 零开销早退
+            ResolveSynergyTiers();
+
+            // 阶段 3: 既有 JSON 协同
             if (_synergies.Count == 0) return;
 
             foreach (var synergy in _synergies)
@@ -119,6 +128,72 @@ namespace BattleSystemECS.Systems
 
                 // 应用协同效果
                 ApplySynergyEffect(synergy, towers);
+            }
+        }
+
+        /// <summary>
+        /// Round 91: 按同类塔聚集度设 TowerSynergyTier (0/1/2/3)
+        /// 最低阈值时整段跳过（零开销）；tier 决定 damage mult 叠加
+        ///
+        /// 重要：每帧先清零所有活跃塔的 TowerSynergyMultiplier 字段（避免 tier bonus 跨帧累加），
+        /// 然后按 tier 重新写入。阶段 3 的 ApplySynergyEffect 用 Max() 在此基础上再叠加 binary synergy bonus。
+        /// </summary>
+        private void ResolveSynergyTiers()
+        {
+            // 零开销：当前活跃塔总数低于 tier1 阈值直接跳过
+            int totalActive = store.ActiveTowerIds.Count;
+            if (totalActive < SynergyTierConfig.SynergyTier1Count)
+            {
+                // 同时清零所有活跃塔的 tier + multiplier（避免 tier bonus 跨帧累加）
+                ResetAllTiers();
+                return;
+            }
+
+            // 先清零所有活跃塔的 tier + tier-derived multiplier
+            // （注：阶段 3 的 binary synergy 也会用 Max() 写入 mult，所以这里先清零是安全的）
+            ResetAllTiers();
+
+            // 按类型计算 tier
+            foreach (var kv in _towersByType)
+            {
+                var group = kv.Value;
+                int count = group.Count;
+                int tier = 0;
+                if (count >= SynergyTierConfig.SynergyTier3Count) tier = 3;
+                else if (count >= SynergyTierConfig.SynergyTier2Count) tier = 2;
+                else if (count >= SynergyTierConfig.SynergyTier1Count) tier = 1;
+
+                if (tier == 0) continue;
+
+                // 取 tier 对应的 damage mult
+                float tierBonus = tier == 3
+                    ? SynergyTierConfig.SynergyTier3Bonus
+                    : tier == 2
+                        ? SynergyTierConfig.SynergyTier2Bonus
+                        : SynergyTierConfig.SynergyTier1Bonus;
+
+                foreach (var towerId in group)
+                {
+                    if (store.TowerIsDispelled[towerId]) continue;
+                    // 写入 tier 字段（用于 UI / debug / 后续扩展）
+                    store.TowerSynergyTier[towerId] = tier;
+                    // 绝对写入 mult（每帧覆盖，避免累加 bug）
+                    // mult = 1.0 + tierBonus；阶段 3 的 binary synergy 会用 Max() 再次写入
+                    store.SetTowerSynergyMultiplier(towerId, 1.0f + tierBonus);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 清零所有活跃塔的 tier 字段和 tier-derived multiplier。
+        /// 阶段 3 的 ApplySynergyEffect 用 Max() 写入 binary synergy 的 mult 不会被覆盖。
+        /// </summary>
+        private void ResetAllTiers()
+        {
+            foreach (var towerId in store.ActiveTowerIds)
+            {
+                store.TowerSynergyTier[towerId] = 0;
+                store.TowerSynergyMultiplier[towerId] = 0f;
             }
         }
 

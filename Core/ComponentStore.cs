@@ -926,6 +926,7 @@ namespace BattleSystemECS.Core
             TowerIsOvercharged = null!; TowerOverchargeDuration = null!;
             TowerOverchargeCooldown = null!; TowerCanOvercharge = null!;
             TowerSynergyId = null!; TowerSynergyMultiplier = null!;
+            TowerSynergyTier = null!;
             TowerIsChronoTower = null!; TowerTimeFieldRadius = null!; TowerTimeScale = null!;
             EnemyTimeScale = null!;
             TowerIsAuraTower = null!; TowerAuraRadius = null!;

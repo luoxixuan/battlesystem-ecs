@@ -2510,4 +2510,22 @@ namespace BattleSystemECS.Config
         public float CritRateBonus { get; set; } = 0f;          // additive (0-1)
         public int FreeTechLevels { get; set; } = 0;            // additive
     }
+
+    /// <summary>
+    /// Round 91 Synergy Tiering (同类塔聚集 tier) — 同一类塔聚集 N 个时触发 tier 1/2/3 协同
+    /// 配置：聚集阈值 + 每 tier 的 damage mult 叠加（与既有 TowerSynergyMultiplier 串行叠加）
+    /// 零开销：当前活跃塔数 < SynergyTier1Count 时直接跳过整个 tier 路径
+    /// </summary>
+    public static class SynergyTierConfig
+    {
+        /// <summary>聚集 3 个同类塔时触发 tier 1（damage mult 叠加 +10%）</summary>
+        public const int SynergyTier1Count = 3;
+        public const float SynergyTier1Bonus = 0.10f;
+        /// <summary>聚集 5 个同类塔时触发 tier 2（damage mult 叠加 +20%）</summary>
+        public const int SynergyTier2Count = 5;
+        public const float SynergyTier2Bonus = 0.20f;
+        /// <summary>聚集 8 个同类塔时触发 tier 3（damage mult 叠加 +35%）</summary>
+        public const int SynergyTier3Count = 8;
+        public const float SynergyTier3Bonus = 0.35f;
+    }
 }
