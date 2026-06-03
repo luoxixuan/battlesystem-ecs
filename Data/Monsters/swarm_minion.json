@@ -1,0 +1,1 @@
+{"Name":"Swarm Minion","Type":"Swarm","Health":8,"MaxHealth":8,"Damage":2,"MoveSpeed":0.7,"AttackRange":1,"AttackInterval":1,"GoldReward":4,"Skills":["Normal Attack"],"Armor":0,"FactionId":1}

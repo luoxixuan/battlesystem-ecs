@@ -787,6 +787,10 @@ namespace BattleSystemECS.Config
             // Deflect chance: 0-1, probability of deflecting an incoming projectile.
             // Used by Boss/Elite monsters to add visual punch and force reliable follow-up towers. Default 0.
             monster.DeflectChance = ExtractFloat(json, "DeflectChance");
+            // FactionId: 0 = no faction (immune to infighting), >0 = "挤死小怪" mechanic.
+            // Used by swarm archetypes to make them damage each other in close proximity.
+            // Default 0; opt-in via monster JSON's "FactionId" field.
+            monster.FactionId = ExtractInt(json, "FactionId");
 
             return monster;
         }

@@ -513,6 +513,114 @@ namespace BattleSystemECS.Systems
                     store.PositionX[enemyId] = enemyX + dodgeDir * store.EnemyMoveSpeed[enemyId];
                 }
             }
+
+            // Faction / Infighting (Round 90): pairwise check on same-faction enemies.
+            // Opt-in via EnemyFactionId > 0; pairs in close proximity deal 5% maxHp each + 0.5s cooldown.
+            // Gated by FactionInfightEnabled (set by WaveSpawningSystem) so the O(N) early-out scan
+            // and O(N) cooldown-decrement loop only run when at least one enemy has a faction. This
+            // is the lazy-disable optimization: when no monster config opts in, the gate stays 0
+            // and the entire infight pass is a single int comparison, restoring pre-feature perf.
+            if (store.FactionInfightEnabled != 0)
+            {
+                ResolveFactionInfighting(activeEnemyIds);
+            }
+        }
+
+        /// <summary>
+        /// Round 90 Faction / Infighting — same-faction enemies in close proximity damage each
+        /// other. Damage = 5% of maxHp per side per trigger; cooldown 0.5s prevents spam.
+        /// Skips pairs where either side has FactionId == 0 (opt-out) or has a cooldown > 0.
+        /// </summary>
+        private void ResolveFactionInfighting(List<int> activeEnemyIds)
+        {
+            int count = activeEnemyIds.Count;
+            if (count < 2) return;
+            // Cheap early-out: if no enemy in this batch has FactionId > 0, skip the O(N²) work.
+            // Walk once to detect presence, then walk again for the pairwise check. Both passes
+            // are tight loops over ~10K entries with random early-termination for non-faction.
+            // Note: must NOT short-circuit on cooldown here, because the cooldown-decrement
+            // loop at the bottom of this method still needs to run every frame to decay
+            // existing cooldowns. Skipping it would freeze cooldowns permanently.
+            bool hasAnyFaction = false;
+            for (int i = 0; i < count; i++)
+            {
+                int eid = activeEnemyIds[i];
+                if (!store.EnemyActive[eid]) continue;
+                if (store.EnemyFactionId[eid] != 0)
+                {
+                    hasAnyFaction = true;
+                    break;
+                }
+            }
+            if (!hasAnyFaction) return;
+
+            // Pairwise O(N²) check — for each eligible enemy A, look for eligible enemy B with
+            // matching FactionId and (dx² + dy²) < InfightRadius².
+            // Use squared distance to avoid sqrt. InfightRadius = 0.5 world units.
+            const float InfightRadius = 0.5f;
+            const float InfightRadiusSq = InfightRadius * InfightRadius;
+            const float InfightDmgFrac = 0.05f;  // 5% of maxHp per side
+            const float InfightCooldownSec = 0.5f;
+
+            // Outer loop: A. Inner loop: B > A to dedupe.
+            // IMPORTANT: re-read store.EnemyInfightCooldown[aId] at the top of each j iteration
+            // so that after A's first hit sets the cooldown, subsequent j iterations correctly
+            // skip A and don't let A damage every nearby B in a single frame.
+            for (int i = 0; i < count; i++)
+            {
+                int aId = activeEnemyIds[i];
+                if (!store.EnemyActive[aId]) continue;
+                int aFaction = store.EnemyFactionId[aId];
+                if (aFaction == 0) continue;
+                if (store.EnemyInfightCooldown[aId] > 0f) continue;
+                float aX = store.PositionX[aId];
+                float aY = store.PositionY[aId];
+                float aMaxHp = store.EnemyMaxHealth[aId];
+                if (aMaxHp <= 0f) continue;
+
+                for (int j = i + 1; j < count; j++)
+                {
+                    // Re-check A's cooldown every iteration — A's first successful hit sets
+                    // its cooldown to InfightCooldownSec, and we must not let A hit another
+                    // B in the same frame.
+                    if (store.EnemyInfightCooldown[aId] > 0f) break;
+                    int bId = activeEnemyIds[j];
+                    if (!store.EnemyActive[bId]) continue;
+                    if (store.EnemyFactionId[bId] != aFaction) continue;
+                    if (store.EnemyInfightCooldown[bId] > 0f) continue;
+                    float dx = aX - store.PositionX[bId];
+                    float dy = aY - store.PositionY[bId];
+                    if (dx * dx + dy * dy > InfightRadiusSq) continue;
+
+                    // Apply 5% maxHp damage to both sides. Damage goes through ApplyEnemyDamage
+                    // so shield (round 22) and other damage modifiers apply consistently.
+                    float dmgA = aMaxHp * InfightDmgFrac;
+                    float dmgB = store.EnemyMaxHealth[bId] * InfightDmgFrac;
+                    store.ApplyEnemyDamage(aId, dmgA);
+                    store.ApplyEnemyDamage(bId, dmgB);
+
+                    // Set cooldowns on both sides so we don't double-trigger the same pair
+                    // in the same frame or the next InfightCooldownSec.
+                    store.SetInfightCooldown(aId, InfightCooldownSec);
+                    store.SetInfightCooldown(bId, InfightCooldownSec);
+                }
+            }
+
+            // Decrement all faction cooldowns by _currentDeltaTime. Wrap to 0 if past expiry.
+            // Done at the end of the same frame so cooldowns set in this iteration are NOT
+            // decremented until next frame (prevents 0-frame double-trigger).
+            for (int i = 0; i < count; i++)
+            {
+                int eid = activeEnemyIds[i];
+                if (!store.EnemyActive[eid]) continue;
+                float cd = store.EnemyInfightCooldown[eid];
+                if (cd > 0f)
+                {
+                    cd -= _currentDeltaTime;
+                    if (cd < 0f) cd = 0f;
+                    store.EnemyInfightCooldown[eid] = cd;
+                }
+            }
         }
 
         private string GetFallbackAction(int enemyId)

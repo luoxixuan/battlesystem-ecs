@@ -790,6 +790,25 @@ namespace BattleSystemECS.Core
         public string[] EnemyChannelAbilityId = new string[MAX_ENTITIES];
         public bool[] EnemyChannelInterruptible = new bool[MAX_ENTITIES];
 
+        // ==================== 敌怪阵营 / 内斗 (Faction / Infighting) ====================
+        // EnemyFactionId: identifier of the enemy's faction. 0 = no faction (immune to infighting).
+        //   Enemies sharing a non-zero FactionId AND in close proximity will damage each other
+        //   ("挤死小怪" effect). WaveSpawningSystem opts in by calling SetFactionId(id, N).
+        //   Per WaveSpawningSystem convention, FactionId=1 typically means "Swarm" archetype.
+        // EnemyInfightCooldown: per-enemy cooldown in seconds. Decrements every frame by deltaTime.
+        //   When > 0, the enemy cannot trigger or be triggered for new infight damage.
+        //   Reset to InfightCooldownSec (default 0.5s) after each successful infight trigger.
+        //   Default 0f = ready to fight on first eligible frame.
+        public int[] EnemyFactionId = new int[MAX_ENTITIES];
+        public float[] EnemyInfightCooldown = new float[MAX_ENTITIES];
+
+        // FactionInfightEnabled: single int gate for the O(N) scan + O(N) cooldown-decrement
+        // loop in EnemyAISystem.ResolveFactionInfighting. Default 0 = disabled (zero overhead).
+        // WaveSpawningSystem flips to 1 the first time it spawns an enemy with FactionId > 0,
+        // and never reverts. Using a single int (not bool[]) so the check is 1 cache-line read
+        // rather than 100K, and there's no per-frame O(N) early-out scan needed.
+        public int FactionInfightEnabled = 0;
+
         #endregion
 
         // ==================== 敌人组件访问 ====================
@@ -998,6 +1017,12 @@ namespace BattleSystemECS.Core
             EnemyChannelTimer[entityId] = 0f;
             EnemyChannelAbilityId[entityId] = null;
             EnemyChannelInterruptible[entityId] = true;
+            // Faction / Infighting (Round 90): default 0 = no faction (immune to infighting).
+            // WaveSpawningSystem opts in by calling SetFactionId(id, N) where N > 0.
+            // EnemyInfightCooldown: per-enemy cooldown timer (seconds) that prevents re-triggering
+            // infight damage within InfightCooldownSec after the last trigger. Default 0f = ready.
+            EnemyFactionId[entityId] = 0;
+            EnemyInfightCooldown[entityId] = 0f;
 
             // H-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeEnemyIds.Add(entityId); _enemyIndexInList[entityId] = _activeEnemyIds.Count - 1; }
@@ -1105,6 +1130,31 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(enemyId)) return;
             // Clamp to [0,1] for safety; >1 would imply damage block probability > 1 (nonsense).
             EnemyDeflectChance[enemyId] = System.Math.Clamp(deflectChance, 0f, 1f);
+        }
+
+        /// <summary>
+        /// Configures the enemy's faction identifier for infighting ("挤死小怪").
+        /// Enemies sharing a non-zero FactionId will damage each other when in close proximity.
+        /// 0 (default) means "no faction" — the enemy is immune to infighting.
+        /// </summary>
+        /// <param name="enemyId">Target enemy entity ID</param>
+        /// <param name="factionId">0 = opt out, >0 = share this faction with allies</param>
+        public void SetFactionId(int enemyId, int factionId)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            // Clamp negative to 0 (opt-out semantics)
+            EnemyFactionId[enemyId] = System.Math.Max(0, factionId);
+        }
+
+        /// <summary>
+        /// Sets the infight cooldown timer. 0 = ready; >0 = in cooldown (seconds remaining).
+        /// Called by EnemyAISystem.InfightCheck() after triggering damage to both ends.
+        /// </summary>
+        public void SetInfightCooldown(int enemyId, float cooldown)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            // Clamp negative to 0
+            EnemyInfightCooldown[enemyId] = System.Math.Max(0f, cooldown);
         }
 
         /// <summary>

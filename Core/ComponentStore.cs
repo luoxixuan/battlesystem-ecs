@@ -575,6 +575,9 @@ namespace BattleSystemECS.Core
                 EnemyChannelTimer[entityId] = 0f;
                 EnemyChannelAbilityId[entityId] = null;
                 EnemyChannelInterruptible[entityId] = true;
+                // Faction / Infighting (Round 90): reset on destruction (no leaked faction/cooldown)
+                EnemyFactionId[entityId] = 0;
+                EnemyInfightCooldown[entityId] = 0f;
 
                 // ── Performance counter maintenance ──
                 if (EnemyTrampleRadius[entityId] > 0f && EnemyTrampleDamagePerStep[entityId] > 0f)
@@ -885,6 +888,13 @@ namespace BattleSystemECS.Core
             // Round 84 Direction 6: Free-Roam Enemies — opt-in via monsterConfig.Type == "FreeRoam"
             EnemyIsFreeRoam = null!; EnemyWanderTargetX = null!; EnemyWanderTargetY = null!;
             EnemyWanderRerollTimer = null!;
+            // Faction / Infighting (Round 90): default opt-out (no faction)
+            EnemyFactionId = null!; EnemyInfightCooldown = null!;
+            // FactionInfightEnabled: lazy gate for the O(N) scan + O(N) cooldown-decrement loop
+            // in EnemyAISystem.ResolveFactionInfighting. Default 0 = disabled (zero overhead).
+            // WaveSpawningSystem flips to 1 when any spawned enemy has FactionId > 0.
+            // We use a single int (not bool[]) so it's a 1-byte check, not 100K cache-line read.
+            FactionInfightEnabled = 0;
             TowerTargetingMode = null!; TowerProjectileHoming = null!; TowerInterceptRate = null!;
             TowerDamageType = null!; TowerSelected = null!; TowerType = null!;
             TowerAttackDamage = null!; TowerRange = null!; TowerAttackSpeed = null!;

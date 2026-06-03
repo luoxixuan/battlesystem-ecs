@@ -158,6 +158,10 @@ namespace BattleSystemECS.Config
         // DeflectChance: 0-1, probability that the enemy deflects an incoming projectile (0 = never, 0.2 = boss-tier).
         // Wired to EnemyDeflectChance via SetDeflectChance() in WaveSpawningSystem. Default 0.
         public float DeflectChance { get; set; } = 0f;
+        // FactionId: 0 = no faction (immune to infighting), >0 = opt-in to "挤死小怪" mechanic.
+        // Enemies sharing a non-zero FactionId will damage each other in close proximity
+        // (configured via infight_cooldown.json). Default 0 for non-swarm archetypes.
+        public int FactionId { get; set; } = 0;
     }
 
     public class TowerConfig
