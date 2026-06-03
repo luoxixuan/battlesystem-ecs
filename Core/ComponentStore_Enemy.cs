@@ -466,6 +466,14 @@ namespace BattleSystemECS.Core
         // Default 0 for normal enemies; Boss-tier / fast elites typically 0.15-0.30 to add visual punch
         // and force players to combine high-damage hits (sniper / mortar) with reliable follow-up towers.
         public float[] EnemyDeflectChance = new float[MAX_ENTITIES];
+        // EnemyRecentDamageSum: rolling sum of damage taken within the saturation window. Reset to 0 when
+        // (currentFrame - EnemyRecentDamageFrame) > windowFrames. Read+updated on every damage event
+        // (TowerAttackSystem hot path + PlayerTowerAttackSystem hot path). Default 0 for all entities
+        // (lazy use — most enemies will never exceed the threshold; Boss/Elite benefit most from saturation).
+        public float[] EnemyRecentDamageSum = new float[MAX_ENTITIES];
+        // EnemyRecentDamageFrame: last frame at which EnemyRecentDamageSum was touched (set/added). Combined
+        // with CurrentFrame, used to lazily expire the rolling window. 0 = uninitialized (no recent damage).
+        public int[] EnemyRecentDamageFrame = new int[MAX_ENTITIES];
 
         // ==================== 自爆/殉爆敌人 (Suicide Bomber / Kamikaze, SOA) ====================
         // EnemyIsSuicide: true if this enemy is a suicide bomber that explodes near towers
@@ -855,6 +863,13 @@ namespace BattleSystemECS.Core
             EnemyCritResistance[entityId] = 0f;
             // Deflect Chance: default 0 (projectiles always hit) — only Boss/Elite monsters get a non-zero value via SetDeflectChance()
             EnemyDeflectChance[entityId] = 0f;
+            // Damage Saturation (Round 92): default 0 rolling sum + 0 last-touched frame. Lazily used by
+            // TowerAttackSystem and PlayerTowerAttackSystem — the (currentFrame - lastFrame) > window
+            // check naturally expires the rolling window for any enemy that hasn't been hit recently.
+            // Initialized explicitly so subsequent reads on freshly-spawned entities never see stale
+            // data left over from prior spawns of the same slot (e.g. swap-and-pop reuse).
+            EnemyRecentDamageSum[entityId] = 0f;
+            EnemyRecentDamageFrame[entityId] = 0;
             EnemyShield[entityId] = shield;  // configurable initial shield
             // Hit Shield: default 0 layers, 0 max, 0 regen timer
             EnemyHitShieldCount[entityId] = 0f;

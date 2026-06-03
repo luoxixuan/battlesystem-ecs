@@ -1,0 +1,7 @@
+{
+  "Enabled": true,
+  "WindowFrames": 30,
+  "ThresholdMultipleOfMaxHp": 2.0,
+  "ScaleMultiplier": 0.1,
+  "Description": "Damage Saturation (Round 92 Direction 1) — per-enemy diminishing returns on incoming damage when cumulative damage within a short rolling window exceeds a multiple of the enemy's max HP. Forces players to mix high-DPS and slow-DPS towers against Boss/Elite enemies, preventing single-tower-type builds from trivializing high-HP threats via over-DPS 'wasted' damage. WindowFrames=30 (≈0.5s at 60 FPS). Threshold=2.0 means: once an enemy has taken more than 2× its max HP in damage within the window, further damage is multiplied by ScaleMultiplier=0.1 (10% of pre-saturation value). Set Enabled=false to disable (sentinel: window=-1)."
+}

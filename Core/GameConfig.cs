@@ -2528,4 +2528,29 @@ namespace BattleSystemECS.Config
         public const int SynergyTier3Count = 8;
         public const float SynergyTier3Bonus = 0.35f;
     }
+
+    /// <summary>
+    /// Damage Saturation (Round 92 Direction 1): per-enemy diminishing returns on incoming damage
+    /// when cumulative damage within a short window exceeds a multiple of the enemy's max HP.
+    /// Forces players to mix high-DPS and slow-DPS towers against Boss/Elite enemies, preventing
+    /// single-tower-type builds from trivializing high-HP threats via over-DPS "wasted" damage.
+    /// All three tunables are loaded from <c>Data/Configs/damage_saturation.json</c>; the constants
+    /// below are safe defaults used when the JSON is absent or fails to load.
+    /// </summary>
+    public static class DamageSaturationConfig
+    {
+        /// <summary>Number of frames over which incoming damage is accumulated for saturation checks.
+        /// At 60 FPS, 30 frames ≈ 0.5s — a typical "burst" window for high-DPS towers.</summary>
+        public static int SaturationWindowFrames = 30;
+        /// <summary>Damage-taken ratio threshold (multiple of EnemyMaxHealth) above which saturation kicks in.
+        /// E.g. 2.0f means: once an enemy has taken more than 2× its max HP in damage within the window,
+        /// further damage starts to be reduced. Built-in cushion: a single tower dealing 1.5× max HP in
+        /// one window is fine; only "sustained overkill" triggers reduction.</summary>
+        public static float SaturationThresholdMult = 2.0f;
+        /// <summary>Final-damage multiplier applied when the saturation threshold is exceeded.
+        /// Hard cap at 0.1f inside the apply code (configurable floor to allow future tuning to 0.3 etc.).
+        /// 0.1f means: once saturated, further damage is reduced to 10% of its pre-saturation value,
+        /// strongly discouraging "wasted DPS" against the same target.</summary>
+        public static float SaturationScaleMult = 0.1f;
+    }
 }

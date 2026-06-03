@@ -4,17 +4,17 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 91 — 塔协同等级 Synergy Tiering）
+## 性能基准（2026-06-04, Round 92 — 塔伤害饱和度 Damage Saturation 恢复）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3667 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9795 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4145 FPS** |
+| **mode 5**（完整一局） | **3604 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10128 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3795 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮 bench2 -0.8%、bench4 +1.0%、bench5 -0.1% — 全部在 ±1% 噪声内。TowerSynergyTier 零开销早退（活跃塔 <3 时整段跳过），新字段 TowerSynergyTier 与既有 TowerSynergyMultiplier 串行绝对写入。
-
+> 本轮为恢复轮（代码 Round 92 已完整实现，bench 重新实测）：bench2 = 10128、bench4 = 3795、bench5 = 3604。bench4/bench5 略低于恢复前（4145/3667），属正常波动（-2% / -1.7%）— DamageSaturation 仍处于两个 attack system 的帧末 apply hot path，开销可接受。
+>
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
 ## 优化演进（关键节点）

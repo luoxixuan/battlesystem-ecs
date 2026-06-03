@@ -72,6 +72,11 @@ namespace BattleSystemECS.Config
                 // Load random mid-wave event definitions (direction 9)
                 LoadRandomEventDefs(gameConfig, renderer);
 
+                // Load damage saturation tunables (Round 92 Direction 1: per-enemy diminishing returns
+                // on incoming damage within a short rolling window). All three knobs are optional —
+                // missing fields fall back to the safe defaults in DamageSaturationConfig.
+                LoadDamageSaturationConfig(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -1603,6 +1608,60 @@ namespace BattleSystemECS.Config
                 "Firewall" => TowerType.Firewall,
                 _          => TowerType.Basic
             };
+        }
+
+        /// <summary>
+        /// Load damage-saturation tunables from <c>Data/Configs/damage_saturation.json</c>.
+        /// All fields are optional — missing values preserve the safe defaults in
+        /// <see cref="DamageSaturationConfig"/>. The whole block can be disabled via
+        /// <c>"Enabled": false</c> (in which case <see cref="DamageSaturationConfig.SaturationWindowFrames"/>
+        /// is set to a sentinel value of -1 to signal "do not apply saturation" — checked in
+        /// the per-damage hot path).
+        /// </summary>
+        private static void LoadDamageSaturationConfig(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string satFile = "Data/Configs/damage_saturation.json";
+            try
+            {
+                if (!File.Exists(satFile))
+                {
+                    renderer.Log("[SATURATION] Damage saturation config not found: " + satFile + ", using defaults (window=30, threshold=2.0, scale=0.1)");
+                    return;
+                }
+                string json = File.ReadAllText(satFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[SATURATION] Damage saturation config is empty: " + satFile);
+                    return;
+                }
+
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                // Disabled toggle — sentinel -1 window disables the entire system (checked at hot-path).
+                bool enabled = root.TryGetProperty("Enabled", out var en) && en.ValueKind == System.Text.Json.JsonValueKind.False
+                    ? false
+                    : true;
+                if (!enabled)
+                {
+                    DamageSaturationConfig.SaturationWindowFrames = -1;
+                    renderer.Log("[SATURATION] Damage saturation DISABLED via config");
+                    return;
+                }
+
+                if (root.TryGetProperty("WindowFrames", out var wf) && wf.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    DamageSaturationConfig.SaturationWindowFrames = wf.GetInt32();
+                if (root.TryGetProperty("ThresholdMultipleOfMaxHp", out var tm) && tm.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    DamageSaturationConfig.SaturationThresholdMult = (float)tm.GetDouble();
+                if (root.TryGetProperty("ScaleMultiplier", out var sm) && sm.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    DamageSaturationConfig.SaturationScaleMult = (float)sm.GetDouble();
+
+                renderer.Log($"[SATURATION] Loaded damage saturation: window={DamageSaturationConfig.SaturationWindowFrames} frames, threshold={DamageSaturationConfig.SaturationThresholdMult:F2}× maxHP, scale={DamageSaturationConfig.SaturationScaleMult:F2}×");
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[SATURATION] Failed to load damage saturation config: " + ex.Message + " — using defaults");
+            }
         }
     }
 }

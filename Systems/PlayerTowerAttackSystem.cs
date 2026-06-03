@@ -298,9 +298,38 @@ public void SetWaveNumber(int waveNumber)
                 float linkedDamage = 0f;
                 int linkedEnemyId = -1;
                 float finalDamage = damage;
+                // ── Damage Saturation (Round 92 Direction 1) ──
+                // Mirrors the TowerAttackSystem hot path: O(1) early-exit on disabled sentinel
+                // (WindowFrames == -1) and on trivial sub-0.01f hits. Lazily expires the rolling
+                // window (currentFrame - lastFrame > window), accumulates finalDamage, and applies
+                // the scale multiplier if the rolling sum crosses (maxHp × threshold). Applied
+                // BEFORE the LifeLink split so that the partner-share downstream also reflects
+                // the saturated value (consistent behavior across both attack systems).
+                int satWindow = DamageSaturationConfig.SaturationWindowFrames;
+                if (satWindow >= 0 && finalDamage > 0.01f)
+                {
+                    int currentFrame = store.CurrentFrame;
+                    int lastFrame = store.EnemyRecentDamageFrame[enemyId];
+                    if (currentFrame - lastFrame > satWindow)
+                    {
+                        store.EnemyRecentDamageSum[enemyId] = 0f;
+                    }
+                    float newSum = store.EnemyRecentDamageSum[enemyId] + finalDamage;
+                    store.EnemyRecentDamageSum[enemyId] = newSum;
+                    store.EnemyRecentDamageFrame[enemyId] = currentFrame;
+                    float maxHp = store.EnemyMaxHealth[enemyId];
+                    if (maxHp > 0f)
+                    {
+                        float threshold = maxHp * DamageSaturationConfig.SaturationThresholdMult;
+                        if (newSum > threshold)
+                        {
+                            finalDamage *= DamageSaturationConfig.SaturationScaleMult;
+                        }
+                    }
+                }
                 if (_lifeLinkSystem != null && store.EnemyIsLinked[enemyId])
                 {
-                    (finalDamage, linkedDamage, linkedEnemyId) = _lifeLinkSystem.ComputeLinkedDamage(enemyId, damage);
+                    (finalDamage, linkedDamage, linkedEnemyId) = _lifeLinkSystem.ComputeLinkedDamage(enemyId, finalDamage);
                 }
 
                 store.ApplyEnemyDamage(enemyId, finalDamage);

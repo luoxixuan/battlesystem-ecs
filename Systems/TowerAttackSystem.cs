@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
@@ -1108,6 +1109,37 @@ namespace BattleSystemECS.Systems
                 // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
                 float resist = store.EnemyDamageResistance[enemyId];
                 float finalDmg = resist >= 1f ? 0f : damage * (1f - resist);
+                // ── Damage Saturation (Round 92 Direction 1) ──
+                // O(1) guard: skip entirely when saturation is disabled (WindowFrames == -1 sentinel)
+                // or when the per-hit damage is too small to ever matter (< 0.01f). When enabled,
+                // lazily expire the rolling window (currentFrame - lastFrame > window), accumulate
+                // finalDmg into the rolling sum, then apply the scale multiplier if the sum has
+                // exceeded (maxHp × threshold). Saturated hits still register the sum update so
+                // the window keeps expiring/resetting normally (no special-cased reset). The static
+                // config fields are cached in local ints/floats before the inner block so the JIT
+                // doesn't reload them on each iteration of the hot loop.
+                int satWindow = DamageSaturationConfig.SaturationWindowFrames;
+                if (satWindow >= 0 && finalDmg > 0.01f)
+                {
+                    int currentFrame = store.CurrentFrame;
+                    int lastFrame = store.EnemyRecentDamageFrame[enemyId];
+                    if (currentFrame - lastFrame > satWindow)
+                    {
+                        store.EnemyRecentDamageSum[enemyId] = 0f;
+                    }
+                    float newSum = store.EnemyRecentDamageSum[enemyId] + finalDmg;
+                    store.EnemyRecentDamageSum[enemyId] = newSum;
+                    store.EnemyRecentDamageFrame[enemyId] = currentFrame;
+                    float maxHp = store.EnemyMaxHealth[enemyId];
+                    if (maxHp > 0f)
+                    {
+                        float satThreshold = DamageSaturationConfig.SaturationThresholdMult;
+                        if (newSum > maxHp * satThreshold)
+                        {
+                            finalDmg *= DamageSaturationConfig.SaturationScaleMult;
+                        }
+                    }
+                }
                 // ── Combo Chain bonus (Round 81) ──
                 // O(1) guard: read playerId's chain buff timer; if > 0, multiply by (1 + bonus).
                 // The check itself is one float read; the multiplier is applied only when the
