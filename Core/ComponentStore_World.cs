@@ -9,6 +9,16 @@ namespace BattleSystemECS.Core
     public partial class ComponentStore
     {
         #region World / Environment Components
+        // ── Path Tile Cost (Round 89) ──
+        // PathNodeTerrain: per-waypoint terrain tag, indexed by the waypoint's position
+        // within its path. 0=neutral (no effect). 1=Slow (-25% speed). 2=Boost (+25% speed).
+        // 3=Snow (+15% damage taken). 4=Heal (+2% maxHp/s). 5=Wall (enemies block here).
+        // One global array — all 4 players share the same default path tables, so the
+        // per-path terrain config applies identically to every player. Set once at
+        // game start (or per-level) and read every frame by EnemyMovementSystem.
+        // All values default to 0 (neutral) → zero behavioral change unless the config
+        // loader populates non-zero tags.
+        public int[] PathNodeTerrain = new int[MAX_PATH_NODES];
         // WeatherType: current weather condition. 0=Clear, 1=Rain, 2=Fog, 3=Storm
         public int[] CurrentWeather = new int[MAX_PLAYERS];
         // WeatherIntensity: 0-1 strength of current weather effect (slows enemies, affects towers)
@@ -870,6 +880,23 @@ namespace BattleSystemECS.Core
             if (!IsValidPlayer(playerId)) return new HashSet<string>();
             // L-1 fix: return a defensive copy to prevent external mutation
             return new HashSet<string>(PlayerUnlockedTechs[playerId]);
+        }
+
+        // ── Path Tile Cost (Round 89) accessors ──
+        // SetPathNodeTerrain: writes a terrain tag for a given waypoint index. Bounds-checked
+        // against MAX_PATH_NODES so JSON loaders can pass arbitrary index 0..31 without
+        // risking an index out of range. Out-of-range indices are silently dropped.
+        public void SetPathNodeTerrain(int nodeIdx, int terrainTag)
+        {
+            if ((uint)nodeIdx >= (uint)MAX_PATH_NODES) return;
+            PathNodeTerrain[nodeIdx] = terrainTag;
+        }
+        // GetPathNodeTerrain: read-only access. Out-of-range returns 0 (neutral) so a
+        // misconfigured path can't accidentally crash the movement loop.
+        public int GetPathNodeTerrain(int nodeIdx)
+        {
+            if ((uint)nodeIdx >= (uint)MAX_PATH_NODES) return 0;
+            return PathNodeTerrain[nodeIdx];
         }
     }
 }

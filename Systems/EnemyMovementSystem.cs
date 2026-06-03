@@ -116,6 +116,29 @@ namespace BattleSystemECS.Systems
                 if (!store.EnemyActive[enemyId])
                     return;
 
+                // ── Path Tile Cost (Round 89) — derive per-enemy terrain mults from current node ──
+                // Read the enemy's current target waypoint and look up that node's terrain tag.
+                // If the enemy has no path (EnemyPathId < 0) or no valid node index, mults
+                // default to 1.0f (neutral). This block runs unconditionally for live enemies
+                // so that even stunned/CC'd enemies carry the current path-terrain state for
+                // the ApplyEnemyDamage() site (otherwise damage applied mid-stun would miss
+                // the Snow bonus).
+                int pathNodeIdx = store.EnemyPathNodeIndex[enemyId];
+                int pathTerrain = store.GetPathNodeTerrain(pathNodeIdx);
+                float speedMult = 1f;
+                float dmgMult = 1f;
+                switch (pathTerrain)
+                {
+                    case 1: speedMult = 0.75f; break;        // Slow: -25% speed
+                    case 2: speedMult = 1.25f; break;        // Boost: +25% speed
+                    case 3: dmgMult   = 1.15f; break;        // Snow: +15% dmg taken
+                    case 4: dmgMult   = 1.0f; break;         // Heal tile: handled at kill site (no HP regen mid-path); reserved
+                    case 5: speedMult = 0f; break;           // Wall: stop in place (speed = 0)
+                    default: break;                          // 0 = neutral; other = unknown → no effect
+                }
+                store.EnemyPathTerrainSpeedMult[enemyId] = speedMult;
+                store.EnemyPathTerrainDmgMult[enemyId] = dmgMult;
+
                 // Check stun BEFORE decrement so duration=1 blocks exactly 1 frame (current frame),
                 // then decrements to 0 for next frame.
                 if (store.EnemyStunDurationLeft[enemyId] > 0f)
@@ -212,6 +235,10 @@ namespace BattleSystemECS.Systems
                 // Apply Tether lock-chain slow factor (set by previous frame's ResolveTetherEnforcement).
                 // 1.0 = no slow. 0.5 = 50% speed when chain is over-length. Defaults to 1.0.
                 moveSpeed *= store.EnemyTetherSlowFactor[enemyId];
+                // Apply Path Tile Cost (Round 89) — waypoint-segment terrain mult. Default 1.0
+                // for neutral nodes and off-path enemies. Stacks multiplicatively with the
+                // other slow/boost factors so e.g. Snow+Slow = -25% from both channels.
+                moveSpeed *= store.EnemyPathTerrainSpeedMult[enemyId];
                 if (moveSpeed < 0f) moveSpeed = 0f; // safety clamp
 
                 // ── Free-Roam / Wandering branch (Round 84 Direction 6) ─────────────────

@@ -21,6 +21,10 @@ namespace BattleSystemECS.Core
         public const int MAX_ENTITIES = 100000;
         internal const int MAX_PLAYERS = 10;
         internal const int MAX_MORPHS = 4; // max morph modes per tower (2 default + 2 alt forms)
+        // MAX_PATH_NODES: max waypoints supported per path. Largest default path has 5
+        // waypoints; 32 leaves headroom for custom levels without breaking the SOA lookup.
+        // Used by PathNodeTerrain[] and per-enemy path-terrain mult computation.
+        internal const int MAX_PATH_NODES = 32;
         public int TotalKills = 0;
 
         // ── Performance counters (O(1) instead of O(N) per-frame pre-scans) ──

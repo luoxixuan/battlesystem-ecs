@@ -138,6 +138,17 @@ namespace BattleSystemECS.Core
         // FrostZoneSystem as the MIN over all active frost towers whose radius covers the enemy.
         // Default 1.0 = neutral (no slow); falls back to 1.0 automatically on enemy death.
         public float[] EnemyFrostZoneSlowMultiplier = new float[MAX_ENTITIES];
+        // ── Path Tile Cost (Round 89) — per-enemy precomputed terrain mults ──
+        // EnemyPathTerrainSpeedMult: derived at the start of each EnemyMovementSystem.Update
+        // from PathNodeTerrain[EnemyPathNodeIndex[enemyId]]. 1.0 = no speed change. <1.0 = slow
+        // (Slow tiles), >1.0 = boost (Boost tiles). Default 1.0f (no path or neutral node).
+        // Read by EnemyMovementSystem AFTER the existing EnemyTerrainMoveSpeedMult factor so
+        // path terrain stacks multiplicatively with world-position terrain (Mud/Ice/Lava).
+        public float[] EnemyPathTerrainSpeedMult = new float[MAX_ENTITIES];
+        // EnemyPathTerrainDmgMult: derived from PathNodeTerrain[EnemyPathNodeIndex[enemyId]].
+        // 1.0 = no change to damage taken. >1.0 = take more damage (Snow tiles). Default 1.0f.
+        // Applied at ApplyEnemyDamage() entry so all shield/health damage routes respect it.
+        public float[] EnemyPathTerrainDmgMult = new float[MAX_ENTITIES];
         // EnemyMoveSpeedBase: stores original speed for slow recovery
         public float[] EnemyMoveSpeedBase = new float[MAX_ENTITIES];
         // EnemySlowDurationLeft: tower-slow duration in turns. Separate from EnemyBuffDurationLeft
@@ -839,6 +850,11 @@ namespace BattleSystemECS.Core
             // because float[] default is 0f and 0f multiplied into moveSpeed would freeze the
             // enemy on spawn. FrostZoneSystem rewrites this every frame from a fresh 1.0.
             EnemyFrostZoneSlowMultiplier[entityId] = 1f;
+            // Path Tile Cost (Round 89): default 1.0f (no path or neutral node = no effect).
+            // Initialized explicitly because float[] default is 0f and 0f multiplied into
+            // moveSpeed would freeze the enemy. Recomputed every frame in EnemyMovementSystem.
+            EnemyPathTerrainSpeedMult[entityId] = 1f;
+            EnemyPathTerrainDmgMult[entityId] = 1f;
             // Elemental Shield: default None, no weakness/resistance, no break reaction
             EnemyShieldType[entityId] = ElementType.None;
             EnemyShieldWeakMult[entityId] = 0f;   // 0 = use default 2x when triggered
@@ -1111,6 +1127,17 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(enemyId)) return;
             if (damage <= 0f) return;
+
+            // ── Path Tile Cost (Round 89) — apply waypoint terrain dmg-taken mult (Snow) ──
+            // Default 1.0f (no effect). Only >1.0 (Snow) is expected; the call is cheap
+            // (single array index + multiply) and runs on every damage event including
+            // shield and DoT routes. Skips below 0.01f to avoid amplifying near-zero edge
+            // cases (e.g. absorb ticks).
+            float pathDmgMult = EnemyPathTerrainDmgMult[enemyId];
+            if (pathDmgMult > 1.0001f)
+            {
+                damage *= pathDmgMult;
+            }
 
             float shield = EnemyShield[enemyId];
             if (shield <= 0f)

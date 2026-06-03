@@ -1,0 +1,13 @@
+{
+  "Enabled": true,
+  "Description": "Path Tile Cost (Round 89) — per-waypoint terrain tags for enemy navigation paths. Each waypoint index 0..N has a terrain tag (0=neutral, 1=Slow -25% speed, 2=Boost +25% speed, 3=Snow +15% damage taken, 4=Heal reserved, 5=Wall stop). Defaults are all 0 (neutral) so the system has zero behavioral impact unless a level/game config populates non-zero tags. To opt in for a level, set the relevant node indices to non-zero values from the game config loader.",
+  "DefaultNodeTerrains": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "TagReference": {
+    "0": "Neutral (no effect)",
+    "1": "Slow (-25% speed)",
+    "2": "Boost (+25% speed)",
+    "3": "Snow (+15% damage taken)",
+    "4": "Heal (reserved for future per-frame HP regen)",
+    "5": "Wall (enemies stop at this waypoint)"
+  }
+}
