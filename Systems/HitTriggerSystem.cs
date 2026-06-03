@@ -7,6 +7,7 @@ namespace BattleSystemECS.Systems
 {
     /// <summary>
     /// Round 67 — On-Hit / On-Crit Trigger System.
+    /// Round 71 — extended with On-Hit Lifesteal handler.
     ///
     /// Subscribes to GameEvents.EnemyHit and GameEvents.EnemyCrit and acts as the
     /// central fan-out for affix code that wants to react to "X happened when an
@@ -16,6 +17,12 @@ namespace BattleSystemECS.Systems
     /// This system itself is intentionally minimal — it tracks a per-frame
     /// hit-count and crit-count so we can expose cheap stats for benchmarks
     /// and (later) drive per-tower / per-enemy affix reactions.
+    ///
+    /// Round 71 adds lifesteal: every EnemyHit from a tower (AttackerKind=1) whose
+    /// TowerLifestealFraction>0 contributes heal = damage × fraction to the
+    /// single owning player, capped by the tower's TowerLifestealMaxPerFrame so
+    /// a 10K-enemy burst can't overheal. Heals are clamped at PlayerMaxHealth.
+    /// Zero-overhead when no tower has lifesteal configured (default 0f).
     ///
     /// Design notes:
     /// - Subscription is idempotent (WireDependencies may be called multiple times
@@ -89,6 +96,35 @@ namespace BattleSystemECS.Systems
                 _hitsPerEnemyThisFrame[e.EnemyId] = n + 1;
             else
                 _hitsPerEnemyThisFrame[e.EnemyId] = 1;
+            // Round 71 — On-Hit Lifesteal handler.
+            // Only tower attacks (AttackerKind=1) can lifesteal. Player attacks don't vamp.
+            // Zero-overhead fast path: when LifestealFraction==0f the inner block is skipped
+            // and we still pay one branch + one indirect player lookup. For the common
+            // benchmark case (no vampiric towers), this is the entire cost.
+            if (e.AttackerKind == 1 && e.Damage > 0f)
+            {
+                int towerId = e.AttackerId;
+                if ((uint)towerId < (uint)ComponentStore.MAX_ENTITIES && store.TowerActive[towerId])
+                {
+                    float frac = store.TowerLifestealFraction[towerId];
+                    if (frac > 0f)
+                    {
+                        float heal = e.Damage * frac;
+                        float cap = store.TowerLifestealMaxPerFrame[towerId];
+                        // Per-frame cap: 0f means uncapped, otherwise clamp this single hit.
+                        if (cap > 0f && heal > cap) heal = cap;
+                        int playerId = store.PlayerEntityId;
+                        if (ComponentStore.IsValidEntity(playerId))
+                        {
+                            float cur = store.PlayerCurrentHealth[playerId];
+                            float max = store.PlayerMaxHealth[playerId];
+                            float next = cur + heal;
+                            if (max > 0f && next > max) next = max;
+                            store.PlayerCurrentHealth[playerId] = next;
+                        }
+                    }
+                }
+            }
         }
 
         private void OnEnemyCrit(object payload)

@@ -206,6 +206,10 @@ namespace BattleSystemECS.Systems
                     // Apply elemental affinity (same-element bonus damage)
                     store.TowerElementalAffinity[towerId] = tc.ElementalAffinity;
                     store.TowerElementalAffinityBonus[towerId] = tc.ElementalAffinityBonus;
+                    // Apply on-hit lifesteal (Vampire tower family). Both default 0 in
+                    // TowerConfig, so non-vampire towers never enter the active path.
+                    store.TowerLifestealFraction[towerId] = tc.LifestealFraction;
+                    store.TowerLifestealMaxPerFrame[towerId] = tc.LifestealMaxPerFrame;
                     // Apply turn rate for turret rotation delay (already set via AddTower params)
                     // Initialize facing angle to point at nearest enemy (or 0 if none)
                     store.TowerFacingAngle[towerId] = 0f;

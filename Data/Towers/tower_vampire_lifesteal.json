@@ -1,0 +1,11 @@
+{
+  "Name": "Vampire Tower",
+  "Type": "PulseCannon",
+  "Damage": 18,
+  "Range": 5,
+  "AttackSpeed": 1.2,
+  "Cost": 130,
+  "UpgradeCost": 65,
+  "LifestealFraction": 0.20,
+  "LifestealMaxPerFrame": 0
+}

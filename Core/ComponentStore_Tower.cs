@@ -106,10 +106,18 @@ namespace BattleSystemECS.Core
         public float[] TowerResetAmount = new float[MAX_ENTITIES];
         // ── Kill-Triggered Player Sustain (Leech/Vampiric/Soul-Drain towers) ────
         // TowerHealOnKillAmount: HP restored to the owning player whenever this tower scores a kill.
-        // Applied serially during ResolveEnemiesKilledThisFrame via OnTowerKill subscription.
+        // TowerHealOnKillAmount: HP restored to the owning player whenever this tower scores a kill.
         // Capped at PlayerMaxHealth by store.SetPlayerCurrentHealth's natural ceiling.
         // Default 0 = disabled (backward compatible).
         public float[] TowerHealOnKillAmount = new float[MAX_ENTITIES];
+        // Round 71 — On-Hit Lifesteal: HP restored to the owning player for every damage
+        // instance this tower lands on an enemy (proportional to raw damage). Works on
+        // multi-projectile and AoE hits; final heal is capped per-frame so a 10K-enemy
+        // burst can't overheal. Default 0f = inactive (zero-overhead hot path).
+        // - LifestealFraction: ratio of raw damage converted to heal (e.g. 0.20 = 20% vamp)
+        // - LifestealMaxPerFrame: hard ceiling on per-frame heal sum (e.g. 50f = no overheal)
+        public float[] TowerLifestealFraction = new float[MAX_ENTITIES];
+        public float[] TowerLifestealMaxPerFrame = new float[MAX_ENTITIES];
         // TowerManaOnKillAmount: mana restored to the owning player whenever this tower scores a kill.
         // Capped at PlayerMaxMana inside AddPlayerMana. Default 0 = disabled.
         public float[] TowerManaOnKillAmount = new float[MAX_ENTITIES];
@@ -800,6 +808,9 @@ namespace BattleSystemECS.Core
             // Kill-triggered player sustain: default to no heal / no mana restore
             TowerHealOnKillAmount[entityId] = 0f;
             TowerManaOnKillAmount[entityId] = 0f;
+            // Round 71 — On-Hit Lifesteal: default to no vampiric heal
+            TowerLifestealFraction[entityId] = 0f;
+            TowerLifestealMaxPerFrame[entityId] = 0f;
             // Retaliate fields: default to no retaliate (0% chance, 0% damage mult → branch skipped on hot path)
             TowerRetaliateChance[entityId] = 0f;
             TowerRetaliateDamageMult[entityId] = 0f;
@@ -950,6 +961,9 @@ namespace BattleSystemECS.Core
             // Kill-triggered player sustain field reset
             TowerHealOnKillAmount[entityId] = 0f;
             TowerManaOnKillAmount[entityId] = 0f;
+            // Round 71 — On-Hit Lifesteal field reset
+            TowerLifestealFraction[entityId] = 0f;
+            TowerLifestealMaxPerFrame[entityId] = 0f;
             // Burst fire fields reset
             TowerBurstCount[entityId] = 0;
             TowerBurstInterval[entityId] = 0f;

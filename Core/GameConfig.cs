@@ -331,6 +331,14 @@ namespace BattleSystemECS.Config
         // ElementalAffinityBonus: damage multiplier added when affinity matches enemy element.
         // 0.30 = +30% damage. 0 = inactive even if ElementalAffinity >= 0.
         public float ElementalAffinityBonus { get; set; } = 0f;
+        // ── On-Hit Lifesteal (Vampire / Spell-Vamp style tower) ──────────────────
+        // LifestealFraction: fraction of raw damage converted to player HP per hit.
+        // 0.20 = 20% vamp. 0 = inactive (zero-overhead path). Recommended: 0.10 – 0.40.
+        public float LifestealFraction { get; set; } = 0f;
+        // LifestealMaxPerFrame: hard ceiling on per-frame heal per single hit (NOT per-frame
+        // sum — that would need a per-tower accumulator). 0 = uncapped. Use this to prevent
+        // a 10K-enemy burst from overhealing past PlayerMaxHealth in a single frame.
+        public float LifestealMaxPerFrame { get; set; } = 0f;
     }
 
     /// <summary>
