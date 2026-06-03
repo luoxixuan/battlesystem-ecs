@@ -47,6 +47,9 @@ namespace BattleSystemECS.Core
         public float[] TowerAttackSpeed = new float[MAX_ENTITIES];
         public int[] TowerLevel = new int[MAX_ENTITIES];
         public float[] TowerUpgradeCost = new float[MAX_ENTITIES];
+        // Total gold spent upgrading this tower (cumulative across all levels + path switches).
+        // Used by TowerPlacementSystem.SellTower to compute the salvage refund (TowerTotalUpgradeSpent × salvageUpgradeRate).
+        public float[] TowerTotalUpgradeSpent = new float[MAX_ENTITIES];
         // Upgrade path ID per tower (e.g., "standard", "fast", "tank") — drives config-driven upgrade curves
         public string[] TowerUpgradePathId = new string[MAX_ENTITIES];
         // Tower fusion tier: incremented each time this tower is merged (0 = never merged)

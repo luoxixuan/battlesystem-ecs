@@ -16,5 +16,6 @@
   "costIncrementCap": 2.5,
   "sellDecayPerSecond": 0.005,
   "minSellRatioDecayed": 0.2,
-  "sellDecayGracePeriod": 2
+  "sellDecayGracePeriod": 2,
+  "salvageUpgradeRate": 0.3
 }

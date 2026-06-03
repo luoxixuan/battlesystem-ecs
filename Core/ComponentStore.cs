@@ -578,6 +578,7 @@ namespace BattleSystemECS.Core
                 TowerAttackSpeed[entityId] = 0f;
                 TowerLevel[entityId] = 0;
                 TowerUpgradeCost[entityId] = 0f;
+                TowerTotalUpgradeSpent[entityId] = 0f;
                 TowerUpgradePathId[entityId] = null;
                 TowerFusionTier[entityId] = 0;
                 TowerLastAttackTime[entityId] = 0f;
@@ -869,7 +870,7 @@ namespace BattleSystemECS.Core
             TowerTargetingMode = null!; TowerProjectileHoming = null!; TowerInterceptRate = null!;
             TowerDamageType = null!; TowerSelected = null!; TowerType = null!;
             TowerAttackDamage = null!; TowerRange = null!; TowerAttackSpeed = null!;
-            TowerLevel = null!; TowerUpgradeCost = null!; TowerUpgradePathId = null!;
+            TowerLevel = null!; TowerUpgradeCost = null!; TowerTotalUpgradeSpent = null!; TowerUpgradePathId = null!;
             TowerFusionTier = null!; TowerActive = null!; TowerLastAttackTime = null!;
             TowerStunChance = null!; TowerSlowAmount = null!; TowerSlowDuration = null!;
             TowerArmorPierceRatio = null!; TowerSplashRadius = null!;

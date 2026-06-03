@@ -29,6 +29,10 @@ namespace BattleSystemECS.Systems
         private float minSellRatioDecayed = 0.2f;
         // Short grace period: towers sold within this many seconds of placement refund at full sellRatio.
         private float sellDecayGracePeriod = 2f;
+        // Salvage upgrade rate: fraction of cumulative upgrade spend refunded on top of base sell ratio.
+        // 0.3 = 30% of TowerTotalUpgradeSpent is returned, encouraging players to experiment with upgrades
+        // knowing their gold investment is partially recoverable.
+        private float salvageUpgradeRate = 0.3f;
 
         public TowerPlacementSystem(ComponentStore store, IRenderer logger)
         {
@@ -68,6 +72,8 @@ namespace BattleSystemECS.Systems
                     if (root.TryGetProperty("sellDecayPerSecond", out var sdps)) sellDecayPerSecond = sdps.GetSingle();
                     if (root.TryGetProperty("minSellRatioDecayed", out var msrd)) minSellRatioDecayed = msrd.GetSingle();
                     if (root.TryGetProperty("sellDecayGracePeriod", out var sdgp)) sellDecayGracePeriod = sdgp.GetSingle();
+                    // Salvage upgrade rate: optional, defaults to 0.3 (Round 85 direction 4)
+                    if (root.TryGetProperty("salvageUpgradeRate", out var sur)) salvageUpgradeRate = sur.GetSingle();
                 }
                 catch { /* use defaults */ }
             }
@@ -547,6 +553,11 @@ namespace BattleSystemECS.Systems
             float placeTime = store.TowerPlaceTime[towerId];
             float effectiveRatio = GetDecayedSellRatio(placeTime, baseRatio);
             float sellGold = store.TowerUpgradeCost[towerId] * effectiveRatio;
+            // Salvage refund: recover a fraction of cumulative upgrade spend (Round 85 direction 4).
+            // Encourages players to experiment with upgrades — gold isn't fully lost on sell.
+            float spentBeforeDestroy = store.TowerTotalUpgradeSpent[towerId];
+            float salvageRefund = spentBeforeDestroy * salvageUpgradeRate;
+            sellGold += salvageRefund;
             int goldInt = (int)sellGold;
 
             // Refund gold to player
@@ -560,7 +571,7 @@ namespace BattleSystemECS.Systems
             store.DestroyEntity(towerId);
 
             float age = Time.TotalTime - placeTime;
-            logger.Log($"[TOWER] 出售塔 #{towerId} (Lv.{level})，已放置 {age:F1}s，退款率 {effectiveRatio:F2}（基础 {baseRatio:F2}），返还 {goldInt} 金币");
+            logger.Log($"[TOWER] 出售塔 #{towerId} (Lv.{level})，已放置 {age:F1}s，退款率 {effectiveRatio:F2}（基础 {baseRatio:F2}），基础返还 {goldInt - (int)salvageRefund} 金币，残值返还 {(int)salvageRefund} 金币（升级累计 {spentBeforeDestroy:F0} × {salvageUpgradeRate:F2}），共 {goldInt} 金币");
             return sellGold;
         }
 

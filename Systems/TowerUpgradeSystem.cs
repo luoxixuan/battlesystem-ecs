@@ -47,6 +47,9 @@ namespace BattleSystemECS.Systems
             // 2. Deduct gold
             store.SetPlayerGold(playerId, currentGold - upgradeCost);
 
+            // 2b. Track total upgrade spend for salvage refund (Round 85 direction 4)
+            store.TowerTotalUpgradeSpent[towerId] += upgradeCost;
+
             // 3. Apply upgrade curve
             int oldLevel = store.TowerLevel[towerId];
             int newLevel = oldLevel + 1;
@@ -130,6 +133,9 @@ namespace BattleSystemECS.Systems
 
             // Deduct cost
             store.SetPlayerGold(playerId, currentGold - switchCost);
+
+            // Track switch cost for salvage refund (Round 85 direction 4)
+            store.TowerTotalUpgradeSpent[towerId] += switchCost;
 
             // Record current level
             int level = store.TowerLevel[towerId];
