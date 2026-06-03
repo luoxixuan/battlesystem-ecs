@@ -1,7 +1,7 @@
 # 塔防游戏 ECS + GAS 知识库
-> 自动生成 · 2026-06-03 08:14 · v3
+> 自动生成 · 2026-06-04 01:04 · v3
 
-已分析 52 个仓库
+已分析 62 个仓库
 
 ## 塔防专项模式
 
@@ -17,6 +17,18 @@
 > 需N次命中击破的护盾，或伤害阈值盾
 来源：[FlameskyDexive/Legends-Of-Heroes](https://github.com/FlameskyDexive/Legends-Of-Heroes), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity)
 
+### 锁链/连接
+> 两个敌人生命/伤害共享，强制绑定
+来源：[prabdhal/Tower-Defence-3D](https://github.com/prabdhal/Tower-Defence-3D), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity)
+
+### 分裂/克隆
+> 敌人死后分裂为多个小怪，或主动克隆
+来源：[MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [pshenok/server-survival](https://github.com/pshenok/server-survival), [ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template)
+
+### 弧线弹道
+> 迫击炮/抛射弹道，无视地形障碍
+来源：[PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity), [chromealex/ecs](https://github.com/chromealex/ecs), [Antoshidza/NSprites](https://github.com/Antoshidza/NSprites)
+
 ### Unity DOTS Archetype
 > DOTS 模式：chunk data layout + entity query
 来源：[sebas77/Svelto.ECS](https://github.com/sebas77/Svelto.ECS), [killop/anything_about_game](https://github.com/killop/anything_about_game), [zulfajuniadi/unity-ecs-navmesh](https://github.com/zulfajuniadi/unity-ecs-navmesh)
@@ -29,17 +41,17 @@
 > A*/BFS/网格寻路，敌人沿路径移动
 来源：[killop/anything_about_game](https://github.com/killop/anything_about_game), [zulfajuniadi/unity-ecs-navmesh](https://github.com/zulfajuniadi/unity-ecs-navmesh), [chromealex/ecs](https://github.com/chromealex/ecs)
 
-### 锁链/连接
-> 两个敌人生命/伤害共享，强制绑定
-来源：[prabdhal/Tower-Defence-3D](https://github.com/prabdhal/Tower-Defence-3D), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity)
-
-### 分裂/克隆
-> 敌人死后分裂为多个小怪，或主动克隆
-来源：[MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [pshenok/server-survival](https://github.com/pshenok/server-survival), [ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template)
-
 ### 恐惧/混乱
 > 敌人反向逃跑或随机移动，CC 状态
 来源：[MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity), [pshenok/server-survival](https://github.com/pshenok/server-survival)
+
+### 处决/死亡标记
+> 目标血量低于阈值自动处决，额外金币
+来源：[PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity), [Antoshidza/NSprites](https://github.com/Antoshidza/NSprites), [v1vendi/minimal_ue5_GAS_demo](https://github.com/v1vendi/minimal_ue5_GAS_demo)
+
+### 范围溅射
+> 命中目标后对周围敌人造成范围伤害
+来源：[prabdhal/Tower-Defence-3D](https://github.com/prabdhal/Tower-Defence-3D), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [maciej-trebacz/tower-of-time-game](https://github.com/maciej-trebacz/tower-of-time-game)
 
 ### Unity 桥接
 > 纯 ECS 逻辑与 GameObject 渲染层桥接方案
@@ -57,13 +69,17 @@
 > Burst 编译、NativeArray、JobSystem
 来源：[keijiro/Voxelman](https://github.com/keijiro/Voxelman), [reeseschultz/ReeseUnityDemos](https://github.com/reeseschultz/ReeseUnityDemos), [killop/anything_about_game](https://github.com/killop/anything_about_game)
 
-### 范围溅射
-> 命中目标后对周围敌人造成范围伤害
-来源：[prabdhal/Tower-Defence-3D](https://github.com/prabdhal/Tower-Defence-3D), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [maciej-trebacz/tower-of-time-game](https://github.com/maciej-trebacz/tower-of-time-game)
+### 踩踏/冲锋
+> Boss 直线冲锋伤害路径上的单位
+来源：[zulfajuniadi/unity-ecs-navmesh](https://github.com/zulfajuniadi/unity-ecs-navmesh), [pshenok/server-survival](https://github.com/pshenok/server-survival), [danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
 
-### 弧线弹道
-> 迫击炮/抛射弹道，无视地形障碍
-来源：[PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity), [chromealex/ecs](https://github.com/chromealex/ecs), [Antoshidza/NSprites](https://github.com/Antoshidza/NSprites)
+### 拉扯/吸引
+> 将敌人拉向塔或特定位置
+来源：[Antoshidza/NSprites](https://github.com/Antoshidza/NSprites), [ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template), [danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
+
+### 失衡/破防/击退
+> 累积伤害触发硬直/击退/打断施法
+来源：[pshenok/server-survival](https://github.com/pshenok/server-survival), [techwithtim/Tower-Defense-Game](https://github.com/techwithtim/Tower-Defense-Game), [danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
 
 ### 攻击间隔
 > 攻速属性、独立冷却管理
@@ -89,25 +105,13 @@
 > 吸引敌人偏离路径或攻击诱饵而非基地
 来源：[zulfajuniadi/unity-ecs-navmesh](https://github.com/zulfajuniadi/unity-ecs-navmesh), [pshenok/server-survival](https://github.com/pshenok/server-survival)
 
-### 踩踏/冲锋
-> Boss 直线冲锋伤害路径上的单位
-来源：[zulfajuniadi/unity-ecs-navmesh](https://github.com/zulfajuniadi/unity-ecs-navmesh), [pshenok/server-survival](https://github.com/pshenok/server-survival)
-
 ### 施法可打断
 > 敌人施法有前摇，可被CC打断
 来源：[MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [chromealex/ecs](https://github.com/chromealex/ecs)
 
-### 处决/死亡标记
-> 目标血量低于阈值自动处决，额外金币
-来源：[PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity), [Antoshidza/NSprites](https://github.com/Antoshidza/NSprites)
-
-### 拉扯/吸引
-> 将敌人拉向塔或特定位置
-来源：[Antoshidza/NSprites](https://github.com/Antoshidza/NSprites), [ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template)
-
-### 失衡/破防/击退
-> 累积伤害触发硬直/击退/打断施法
-来源：[pshenok/server-survival](https://github.com/pshenok/server-survival), [techwithtim/Tower-Defense-Game](https://github.com/techwithtim/Tower-Defense-Game)
+### 相位/幽灵敌人
+> 敌人可穿越塔/障碍，免疫物理伤害
+来源：[maciej-trebacz/tower-of-time-game](https://github.com/maciej-trebacz/tower-of-time-game), [v1vendi/minimal_ue5_GAS_demo](https://github.com/v1vendi/minimal_ue5_GAS_demo)
 
 ### 敌怪 AI
 > AI 决策：追踪/逃跑/施法/躲避
@@ -137,9 +141,33 @@
 > 塔消耗法力攻击，法力恢复/消耗管理
 来源：[maciej-trebacz/tower-of-time-game](https://github.com/maciej-trebacz/tower-of-time-game)
 
-### 相位/幽灵敌人
-> 敌人可穿越塔/障碍，免疫物理伤害
-来源：[maciej-trebacz/tower-of-time-game](https://github.com/maciej-trebacz/tower-of-time-game)
+### 弹跳弹道
+> 子弹碰到目标后弹向下一目标
+来源：[danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
+
+### 光束/激光塔
+> 持续照射敌人，每帧 tick 伤害。预热/过热机制
+来源：[danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
+
+### 巡逻/移动塔
+> 塔可沿路径移动，动态调整防守位置
+来源：[danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
+
+### 钻地/潜行
+> 敌人钻入地下躲避攻击，然后冒出
+来源：[danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
+
+### 伤害反弹/反击
+> 受到攻击时反弹百分比伤害给攻击者
+来源：[danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
+
+### 过量伤害/溢出
+> 伤害超过目标血量时溢出给周围敌人
+来源：[danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
+
+### 子弹时间
+> 全局/局部时间减速，仅敌人受影响
+来源：[danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
 
 ## 项目架构线索
 
@@ -148,6 +176,9 @@
 
 ### 敌怪系统
 来源：[ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template), [quiver-dev/tower-defense-tutorial](https://github.com/quiver-dev/tower-defense-tutorial), [techwithtim/Tower-Defense-Game](https://github.com/techwithtim/Tower-Defense-Game)
+
+### 塔系统
+来源：[quiver-dev/tower-defense-tutorial](https://github.com/quiver-dev/tower-defense-tutorial), [techwithtim/Tower-Defense-Game](https://github.com/techwithtim/Tower-Defense-Game), [SanderMertens/tower_defense](https://github.com/SanderMertens/tower_defense)
 
 ### 系统/组件分离
 来源：[maciej-trebacz/tower-of-time-game](https://github.com/maciej-trebacz/tower-of-time-game), [maciej-trebacz/tower-of-time-game](https://github.com/maciej-trebacz/tower-of-time-game), [Daivuk/tddod](https://github.com/Daivuk/tddod)
@@ -161,14 +192,17 @@
 ### ECS 架构
 来源：[sebas77/Svelto.ECS](https://github.com/sebas77/Svelto.ECS), [Gornhoth/Unity-Smoothed-Particle-Hydrodynamics](https://github.com/Gornhoth/Unity-Smoothed-Particle-Hydrodynamics)
 
-### 塔系统
-来源：[quiver-dev/tower-defense-tutorial](https://github.com/quiver-dev/tower-defense-tutorial), [techwithtim/Tower-Defense-Game](https://github.com/techwithtim/Tower-Defense-Game)
-
 ### 性能优化
 来源：[needle-mirror/com.unity.entities.graphics](https://github.com/needle-mirror/com.unity.entities.graphics)
 
 ### 波次系统
 来源：[quiver-dev/tower-defense-tutorial](https://github.com/quiver-dev/tower-defense-tutorial)
+
+### GAS 技能系统
+来源：[v1vendi/minimal_ue5_GAS_demo](https://github.com/v1vendi/minimal_ue5_GAS_demo)
+
+### 技能/能力系统
+来源：[LordWake/Unreal-2021-GameplayAbilitySystem](https://github.com/LordWake/Unreal-2021-GameplayAbilitySystem)
 
 ## 通用工程模式
 
@@ -211,3 +245,4 @@
 - "The reason is simple: a game should avoid rubber-banding death." — [Narxim/Narxim-GAS-Example](https://github.com/Narxim/Narxim-GAS-Example) (2026-06-01)
 - "It allows you to avoid using third-party services such as Playful, PAN, or Smartfox server." — [killop/anything_about_game](https://github.com/killop/anything_about_game) (2026-06-03)
 - "This is a very powerful concept and I don't recommend to use it until you really understand what are you doing." — [PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity) (2026-06-03)
+- "Recommend to have experienced programming skill." — [PhysaliaStudio/Flexi](https://github.com/PhysaliaStudio/Flexi) (2026-06-04)
