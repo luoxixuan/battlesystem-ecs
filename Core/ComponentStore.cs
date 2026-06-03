@@ -442,6 +442,20 @@ namespace BattleSystemECS.Core
                 EnemyTeleportDestinationX[entityId] = 0f;
                 EnemyTeleportDestinationY[entityId] = 0f;
                 EnemyTeleportType[entityId] = 0;
+                // Leap / Jump Attack fields (0/-1 = no leap ability, zero-overhead default)
+                EnemyLeaperArchetype[entityId] = 0;
+                EnemyLeapDistance[entityId] = 0f;
+                EnemyLeapCooldown[entityId] = -1f;
+                EnemyLeapCooldownRef[entityId] = -1f;
+                EnemyLeapDuration[entityId] = 0f;
+                EnemyLeapStartX[entityId] = 0f;
+                EnemyLeapStartY[entityId] = 0f;
+                EnemyLeapTargetX[entityId] = 0f;
+                EnemyLeapTargetY[entityId] = 0f;
+                EnemyLeapElapsed[entityId] = 0f;
+                EnemyLeapDamage[entityId] = 0f;
+                EnemyLeapRadius[entityId] = 0f;
+                EnemyLeapStunDuration[entityId] = 0f;
                 // Resistance fields
                 EnemyStunResistance[entityId] = 0f;
                 EnemyFreezeResistance[entityId] = 0f;
@@ -816,6 +830,11 @@ namespace BattleSystemECS.Core
             EnemyPathId = null!; EnemyPathNodeIndex = null!;
             EnemyTeleportCooldown = null!; EnemyTeleportDestinationX = null!;
             EnemyTeleportDestinationY = null!; EnemyTeleportType = null!;
+            EnemyLeaperArchetype = null!; EnemyLeapDistance = null!;
+            EnemyLeapCooldown = null!; EnemyLeapCooldownRef = null!;
+            EnemyLeapDuration = null!; EnemyLeapStartX = null!; EnemyLeapStartY = null!;
+            EnemyLeapTargetX = null!; EnemyLeapTargetY = null!; EnemyLeapElapsed = null!;
+            EnemyLeapDamage = null!; EnemyLeapRadius = null!; EnemyLeapStunDuration = null!;
             EnemyFearDurationLeft = null!; EnemyTauntTargetId = null!; EnemyCharmDurationLeft = null!;
             EnemyStunResistance = null!; EnemyFreezeResistance = null!; EnemySlowResistance = null!;
             EnemyKnockbackResistance = null!; EnemyDamageResistance = null!;

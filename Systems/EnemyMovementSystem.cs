@@ -350,6 +350,14 @@ switch (actionEnum)
                         dirEnum = 0;
                         break;
 
+                    case EnemyActionType.Leaping:
+                        // Leap / Jump Attack: skip normal pathing. MovementSystem has a
+                        // dedicated ResolveLeapLanding() serial pass that ticks the parabola
+                        // and applies landing AoE. We mark dirEnum=0 and let the dedicated
+                        // branch below handle position interpolation.
+                        dirEnum = 0;
+                        break;
+
                     default:
                         // Default: move toward player (direction = -1, toward y=0)
                         break;
@@ -380,6 +388,111 @@ switch (actionEnum)
                         h ^= h << 13; h ^= h >> 17; h ^= h << 5;
                         float unit = ((h & 0x7FFFFFFF) / (float)0x7FFFFFFF) * 2f - 1f;
                         devOffsetX = devAmp * unit;
+                    }
+                }
+
+                // ── Leap / Jump Attack inline handling ────────────────────────────
+                // Three sub-states:
+                //   (A) NOT a leaper (EnemyLeapCooldown < 0): zero-overhead early return below
+                //   (B) Mid-leap (EnemyLeapElapsed > 0): parabolic interpolation, increment
+                //   (C) Ready to leap (cooldown==0, archetype>0, player within range): trigger
+                // Mid-leap is interruptible by stun (handled by the early-return above) — when
+                // an enemy is stunned mid-leap, the parabola resumes the next non-stun frame,
+                // preserving cast-time CC behavior.
+                int leaperArch = store.EnemyLeaperArchetype[enemyId];
+                if (leaperArch > 0)
+                {
+                    float leapElapsed = store.EnemyLeapElapsed[enemyId];
+                    if (leapElapsed > 0f)
+                    {
+                        // (B) Mid-leap: parabolic interpolation between StartX/Y and TargetX/Y.
+                        // height offset = 4 * peakHeight * (1-t) * t — peaks at t=0.5.
+                        // Y is the "world-up" axis in our coord system (enemies move -Y to advance).
+                        // We treat the parabola as a visual-only height bump that does NOT change
+                        // collision/world Y; only the lerp on (X, Y) advances the body. This
+                        // keeps AoE trigger semantics tied to EnemyLeapTargetX/Y on landing.
+                        float leapDur = store.EnemyLeapDuration[enemyId];
+                        if (leapDur <= 0f) leapDur = 1f; // safety: avoid div-by-zero
+                        float t = leapElapsed / leapDur;
+                        if (t > 1f) t = 1f;
+                        float sx = store.EnemyLeapStartX[enemyId];
+                        float sy = store.EnemyLeapStartY[enemyId];
+                        float tx = store.EnemyLeapTargetX[enemyId];
+                        float ty = store.EnemyLeapTargetY[enemyId];
+                        float newX = sx + (tx - sx) * t;
+                        float newY = sy + (ty - sy) * t;
+                        // Clamp to map bounds
+                        if (newX < 0f) newX = 0f;
+                        if (newX > mapWidthMinusOne) newX = mapWidthMinusOne;
+                        if (newY < 0f) newY = 0f;
+                        store.PositionX[enemyId] = newX;
+                        store.PositionY[enemyId] = newY;
+                        // Increment elapsed. ResolveLeapLanding (serial pass) detects the frame
+                        // where elapsed == duration and applies AoE damage + stun.
+                        store.EnemyLeapElapsed[enemyId] = leapElapsed + 1f;
+                        // Skip normal Y-movement below — we're airborne.
+                        return;
+                    }
+                    else if (store.EnemyLeapCooldown[enemyId] == 0f)
+                    {
+                        // (C) Ready to leap: check trigger condition. We leap if the player is
+                        // within EnemyLeapDistance world units AND the leaper is not too close
+                        // (must be at least half the distance away, so the leap is a "long jump"
+                        // not a body-slam from melee range). This avoids trivial short-range leaps.
+                        if (store.EnemyActive[playerId])
+                        {
+                            float px = _playerX;
+                            float py = store.PositionY[playerId];
+                            float dx = px - x;
+                            float dy = py - y;
+                            float distSq = dx * dx + dy * dy;
+                            float leapDist = store.EnemyLeapDistance[enemyId];
+                            float minDist = leapDist * 0.5f;
+                            if (distSq >= minDist * minDist && distSq <= leapDist * leapDist)
+                            {
+                                // Trigger leap: capture start, compute target, switch action.
+                                store.EnemyLeapStartX[enemyId] = x;
+                                store.EnemyLeapStartY[enemyId] = y;
+                                // Target = direction from current pos toward player at leapDist.
+                                // If distSq < leapDist*leapDist, use player position as target
+                                // (we already passed the min-distance check).
+                                float d = (float)Math.Sqrt(distSq);
+                                if (d > 0.001f)
+                                {
+                                    store.EnemyLeapTargetX[enemyId] = x + (dx / d) * leapDist;
+                                    store.EnemyLeapTargetY[enemyId] = y + (dy / d) * leapDist;
+                                }
+                                else
+                                {
+                                    // Edge case: exactly at player. Land 1 unit behind (toward y+).
+                                    store.EnemyLeapTargetX[enemyId] = x;
+                                    store.EnemyLeapTargetY[enemyId] = y + 1f;
+                                }
+                                // Clamp target to map bounds
+                                float ttx = store.EnemyLeapTargetX[enemyId];
+                                float tty = store.EnemyLeapTargetY[enemyId];
+                                if (ttx < 0f) ttx = 0f;
+                                if (ttx > mapWidthMinusOne) ttx = mapWidthMinusOne;
+                                if (tty < 0f) tty = 0f;
+                                store.EnemyLeapTargetX[enemyId] = ttx;
+                                store.EnemyLeapTargetY[enemyId] = tty;
+                                store.EnemyLeapElapsed[enemyId] = 1f; // start parabola next frame
+                                // Action enum -> Leaping so the next frame's switch takes the
+                                // leap branch (and skips the trigger condition again).
+                                store.EnemyActionEnum[enemyId] = EnemyActionType.Leaping;
+                                // Skip normal Y-movement on the trigger frame (we just initiated).
+                                return;
+                            }
+                        }
+                        // Cooldown==0 but trigger condition not met: fall through to normal
+                        // movement this frame. EnemyLeapCooldown stays at 0 — we'll retry the
+                        // trigger check next frame until player is in range.
+                    }
+                    else if (store.EnemyLeapCooldown[enemyId] > 0f)
+                    {
+                        // (A) Leaper cooling down. Decrement cooldown; no movement override.
+                        // Standard movement below will still advance the leaper normally.
+                        store.EnemyLeapCooldown[enemyId] -= 1f;
                     }
                 }
 
@@ -422,6 +535,16 @@ switch (actionEnum)
             // Staggered/Banished 敌人通过 138/153 行 early-return 已跳过 movement，
             // 但锁链依然生效：他们被拉到 partner 位置（但 partner 仍按自己的 early-return 决策移动）。
             ResolveTetherEnforcement();
+
+            // ── Serial pass: Leap landing AoE ──
+            // Detect enemies whose leap just completed (EnemyLeapElapsed == EnemyLeapDuration+1
+            // because the parallel pass incremented to dur+1 last frame). Apply AoE damage to
+            // the player if in range, and stun nearby enemies if EnemyLeapStunDuration > 0.
+            // Then reset the leaper to cooldown state so they can attack again after a delay.
+            // O(1) early-out when no leaper is mid-flight (ActiveLeaperCount maintained at
+            // AddEnemy/DestroyEntity time would be ideal, but a single linear scan over
+            // _activeEnemyList is fine for ≤100K enemies on the rare landing frame).
+            ResolveLeapLanding();
         }
 
         /// <summary>
@@ -647,6 +770,99 @@ switch (actionEnum)
                 if (newPy > Y_UPPER) newPy = Y_UPPER;
                 store.PositionX[partnerId] = newPx;
                 store.PositionY[partnerId] = newPy;
+            }
+        }
+
+        /// <summary>
+        /// Resolve Leap / Jump Attack landing AoE. Runs after the parallel movement pass.
+        /// Detects enemies whose leap animation just completed this frame (EnemyLeapElapsed
+        /// crossed past EnemyLeapDuration during the parallel pass). For each such leaper:
+        ///   1. If player is within EnemyLeapRadius, apply AoE damage via DecreasePlayerHealth.
+        ///   2. If EnemyLeapStunDuration > 0, stun all enemies within EnemyLeapRadius (excluding
+        ///      the leaper itself and any dead/inactive enemies).
+        ///   3. Reset: EnemyLeapElapsed = 0, EnemyLeapCooldown = EnemyLeapCooldownRef, action enum
+        ///      back to MoveToTarget so the leaper resumes normal forward movement.
+        /// O(N) scan, but only actually does work on frames where a leap lands. A frame cache
+        /// (_hasLeapLandingThisFrame) would be optimal but the linear scan is O(activeEnemies)
+        /// and at most a handful land per frame in practice.
+        /// </summary>
+        private void ResolveLeapLanding()
+        {
+            if (_activeEnemyList == null) return;
+            int count = _activeEnemyList.Count;
+            if (count == 0) return;
+
+            // Cache player position once for all leapers this frame.
+            float px = store.PositionX[playerId];
+            float py = store.PositionY[playerId];
+
+            for (int i = 0; i < count; i++)
+            {
+                int leaperId = _activeEnemyList[i];
+                if (!store.EnemyActive[leaperId]) continue;
+                // Skip non-leapers (zero-overhead short-circuit on the common case).
+                if (store.EnemyLeaperArchetype[leaperId] == 0) continue;
+                float elapsed = store.EnemyLeapElapsed[leaperId];
+                if (elapsed <= 0f) continue;
+                // We declared the leap complete when elapsed >= duration in the parallel pass.
+                // On the frame where elapsed == duration, t == 1.0, so the leaper is AT the
+                // target position. We treat the landing as "elapsed >= duration" (post-increment
+                // can equal duration+1 on the very last frame — both are valid landings).
+                float dur = store.EnemyLeapDuration[leaperId];
+                if (elapsed < dur) continue;
+
+                // ── Landing AoE ──
+                float radius = store.EnemyLeapRadius[leaperId];
+                float dmg = store.EnemyLeapDamage[leaperId];
+                float stunDur = store.EnemyLeapStunDuration[leaperId];
+                float lx = store.PositionX[leaperId];
+                float ly = store.PositionY[leaperId];
+                float r2 = radius * radius;
+
+                // (a) Player damage if in range.
+                if (dmg > 0f)
+                {
+                    float dxp = px - lx;
+                    float dyp = py - ly;
+                    float distSqP = dxp * dxp + dyp * dyp;
+                    if (distSqP <= r2)
+                    {
+                        // DecreasePlayerHealth handles shield + armor mitigation.
+                        store.DecreasePlayerHealth(playerId, dmg);
+                    }
+                }
+
+                // (b) Stun nearby enemies if stun duration > 0. Iterates active enemy list.
+                // The leaper itself is excluded; dead/inactive enemies are skipped via EnemyActive.
+                if (stunDur > 0f)
+                {
+                    for (int j = 0; j < count; j++)
+                    {
+                        int victimId = _activeEnemyList[j];
+                        if (victimId == leaperId) continue;
+                        if (!store.EnemyActive[victimId]) continue;
+                        float vx = store.PositionX[victimId];
+                        float vy = store.PositionY[victimId];
+                        float dxv = vx - lx;
+                        float dyv = vy - ly;
+                        float distSqV = dxv * dxv + dyv * dyv;
+                        if (distSqV <= r2)
+                        {
+                            // Apply stun. Set both the bool flag and the duration counter so
+                            // the early-return at the top of the movement loop blocks them
+                            // for the configured number of frames. Decrement is handled by
+                            // the standard stun-tick logic above.
+                            store.EnemyStunFlag[victimId] = true;
+                            store.EnemyStunDurationLeft[victimId] = stunDur;
+                        }
+                    }
+                }
+
+                // ── Reset leaper state ──
+                store.EnemyLeapElapsed[leaperId] = 0f;
+                store.EnemyLeapCooldown[leaperId] = store.EnemyLeapCooldownRef[leaperId];
+                // Switch action back to default movement so the leaper advances normally.
+                store.EnemyActionEnum[leaperId] = EnemyActionType.MoveToTarget;
             }
         }
 

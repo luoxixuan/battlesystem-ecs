@@ -220,6 +220,37 @@ namespace BattleSystemECS.Core
         // EnemyBurrowRadius: AoE radius for emerge damage
         public float[] EnemyBurrowRadius = new float[MAX_ENTITIES];
 
+        // ==================== 跳斩/冲锋敌人组件 (Leap / Jump Attack, SOA) ====================
+        // EnemyLeaperArchetype: 0 = no leap ability. >0 = leaper variant (1=Leaping Spider short,
+        //   2=Mountain Troll long). Determines default leap distance/damage/radius when 0.
+        //   Decoupled from MonsterConfig class so a single bool/int flag can be set from any
+        //   system (WaveSpawningSystem reads monsterConfig.Type and writes this int).
+        public int[] EnemyLeaperArchetype = new int[MAX_ENTITIES];
+        // EnemyLeapDistance: max world-unit distance the leaper will travel in one leap.
+        //   0 = not a leaper (zero-overhead default).
+        public float[] EnemyLeapDistance = new float[MAX_ENTITIES];
+        // EnemyLeapCooldown: turns until next leap is available (0 = ready, >0 = cooling down).
+        //   -1 = no leap ability. Decremented each frame in EnemyMovementSystem; reset to ref after leap.
+        public float[] EnemyLeapCooldown = new float[MAX_ENTITIES];
+        // EnemyLeapCooldownRef: reference cooldown value (used to reset cooldown after a leap completes)
+        public float[] EnemyLeapCooldownRef = new float[MAX_ENTITIES];
+        // EnemyLeapDuration: total frames the leap animation takes (parabolic interpolation window)
+        public float[] EnemyLeapDuration = new float[MAX_ENTITIES];
+        // EnemyLeapStartX/Y: position captured at leap trigger (lerp from)
+        public float[] EnemyLeapStartX = new float[MAX_ENTITIES];
+        public float[] EnemyLeapStartY = new float[MAX_ENTITIES];
+        // EnemyLeapTargetX/Y: landing position (lerp to)
+        public float[] EnemyLeapTargetX = new float[MAX_ENTITIES];
+        public float[] EnemyLeapTargetY = new float[MAX_ENTITIES];
+        // EnemyLeapElapsed: frames since leap started (0..EnemyLeapDuration)
+        public float[] EnemyLeapElapsed = new float[MAX_ENTITIES];
+        // EnemyLeapDamage: AoE damage dealt on landing
+        public float[] EnemyLeapDamage = new float[MAX_ENTITIES];
+        // EnemyLeapRadius: AoE radius for landing damage
+        public float[] EnemyLeapRadius = new float[MAX_ENTITIES];
+        // EnemyLeapStunDuration: turns of stun applied to targets hit by landing AoE (0 = no stun)
+        public float[] EnemyLeapStunDuration = new float[MAX_ENTITIES];
+
         // ==================== 亡灵法师组件 (Necromancer, SOA) ====================
         // EnemyCanResurrect: true if this enemy is a necromancer
         public bool[] EnemyCanResurrect = new bool[MAX_ENTITIES];
@@ -806,6 +837,22 @@ namespace BattleSystemECS.Core
             EnemyDrainRatio[entityId] = 0f;
             EnemyDrainRadius[entityId] = 0f;
             EnemyDrainRate[entityId] = 0f;
+            // Leap / Jump Attack: default 0/-1 = no leap ability. WaveSpawningSystem overrides
+            // per archetype if the monster config Type indicates a leaper ("Leaper", "Troll").
+            // All other leap fields default to 0f so the no-leaper hot path is branch-free.
+            EnemyLeaperArchetype[entityId] = 0;
+            EnemyLeapDistance[entityId] = 0f;
+            EnemyLeapCooldown[entityId] = -1f;
+            EnemyLeapCooldownRef[entityId] = -1f;
+            EnemyLeapDuration[entityId] = 0f;
+            EnemyLeapStartX[entityId] = 0f;
+            EnemyLeapStartY[entityId] = 0f;
+            EnemyLeapTargetX[entityId] = 0f;
+            EnemyLeapTargetY[entityId] = 0f;
+            EnemyLeapElapsed[entityId] = 0f;
+            EnemyLeapDamage[entityId] = 0f;
+            EnemyLeapRadius[entityId] = 0f;
+            EnemyLeapStunDuration[entityId] = 0f;
             // EnemyDrainClaimedTower: -1 = no active drain claim. WaveSpawningSystem leaves
             // this at -1; the stat-drain system sets it to a tower id when the enemy acquires
             // a target and clears it when releasing (out of range, target destroyed, etc).

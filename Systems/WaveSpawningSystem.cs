@@ -494,6 +494,41 @@ namespace BattleSystemECS.Systems
                         store.EnemyBurrowCooldownRef[enemyId] = -1f;
                     }
 
+                    // Initialize leap / jump-attack capability (driven by monsterConfig.Type
+                    // archetype, NOT by a dedicated MonsterConfig class field — keeps the
+                    // schema additive-free so existing JSON files are unaffected). Default
+                    // archetype 0 = no leap ability (zero overhead on the hot path).
+                    // Recognized types: "Leaper" -> archetype 1 (short, fast, low damage)
+                    //                   "Troll"  -> archetype 2 (long, slow, high damage + stun)
+                    // Leap parameters are derived from the monster's base stats (MoveSpeed
+                    // scales duration, Damage scales landing AoE, etc.) so per-archetype tuning
+                    // is encapsulated here without requiring GameConfig.cs changes.
+                    string leaperType = monsterConfig.Type ?? "";
+                    if (leaperType == "Leaper")
+                    {
+                        // Leaping Spider: short 4-cell jump, fast 0.6s flight, modest AoE
+                        store.EnemyLeaperArchetype[enemyId] = 1;
+                        store.EnemyLeapDistance[enemyId] = 4f;
+                        store.EnemyLeapCooldown[enemyId] = 0f; // ready immediately
+                        store.EnemyLeapCooldownRef[enemyId] = 6f; // 6-frame cooldown between leaps
+                        store.EnemyLeapDuration[enemyId] = 6f; // 6-frame parabola
+                        store.EnemyLeapDamage[enemyId] = monsterConfig.Damage * 1.5f;
+                        store.EnemyLeapRadius[enemyId] = 1.5f;
+                        store.EnemyLeapStunDuration[enemyId] = 0f;
+                    }
+                    else if (leaperType == "Troll")
+                    {
+                        // Mountain Troll: long 8-cell jump, slow 1.5s flight, big AoE + stun
+                        store.EnemyLeaperArchetype[enemyId] = 2;
+                        store.EnemyLeapDistance[enemyId] = 8f;
+                        store.EnemyLeapCooldown[enemyId] = 0f; // ready immediately
+                        store.EnemyLeapCooldownRef[enemyId] = 12f; // 12-frame cooldown
+                        store.EnemyLeapDuration[enemyId] = 15f; // 15-frame parabola (1.5s at 10fps-ish)
+                        store.EnemyLeapDamage[enemyId] = monsterConfig.Damage * 3f;
+                        store.EnemyLeapRadius[enemyId] = 2.5f;
+                        store.EnemyLeapStunDuration[enemyId] = 3f; // 3-frame stun on landing
+                    }
+
                     // Initialize necromancer enemy properties
                     if (monsterConfig.IsNecromancer)
                     {
