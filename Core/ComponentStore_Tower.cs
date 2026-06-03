@@ -448,6 +448,13 @@ namespace BattleSystemECS.Core
         // TowerCanOverheat: true if this tower type supports overheat (from config)
         public bool[] TowerCanOverheat = new bool[MAX_ENTITIES];
 
+        // ==================== 塔幸运/掉落稀有度加成 (Tower Luck) ====================
+        // TowerLuck: flat bonus added to Rare/Epic/Legendary pickup tier weight (per tower).
+        // 0 = no luck contribution (default, zero-overhead path).
+        // Each tower with luck > 0 nudges the global pickup tier roll toward rarer drops
+        // for the owning player, capped by PickupRarityConfig.MaxLuckBonus.
+        public float[] TowerLuck = new float[MAX_ENTITIES];
+
         // ==================== 塔能量/法力资源系统 (Tower Energy) ====================
         // TowerEnergy: current energy level for each tower (0 = depleted, cannot fire if below TowerEnergyPerShot)
         public float[] TowerEnergy = new float[MAX_ENTITIES];
@@ -731,6 +738,8 @@ namespace BattleSystemECS.Core
             TowerOverheatBonus[entityId] = 1f;
             TowerOverheatPenalty[entityId] = 0f;
             TowerCanOverheat[entityId] = false;
+            // Tower Luck field: default to 0 (no luck contribution, zero-overhead)
+            TowerLuck[entityId] = 0f;
             // Tower energy fields: default to no energy (0 capacity = no energy system)
             TowerEnergy[entityId] = 0f;
             TowerMaxEnergy[entityId] = 0f;
@@ -895,6 +904,8 @@ namespace BattleSystemECS.Core
             TowerOverheatBonus[entityId] = 1f;
             TowerOverheatPenalty[entityId] = 0f;
             TowerCanOverheat[entityId] = false;
+            // Tower Luck field reset
+            TowerLuck[entityId] = 0f;
             // Tower energy fields reset
             TowerEnergy[entityId] = 0f;
             TowerMaxEnergy[entityId] = 0f;

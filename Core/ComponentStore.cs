@@ -765,7 +765,7 @@ namespace BattleSystemECS.Core
             AscensionModifierStacks = null!;
             PlayerResearchPoints = null!;
             PickupX = null!; PickupY = null!; PickupType = null!; PickupValue = null!;
-            PickupOwnerId = null!; PickupActive = null!; PickupLifetime = null!;
+            PickupOwnerId = null!; PickupActive = null!; PickupLifetime = null!; PickupRarity = null!;
             PlayerWaveIndex = null!; PlayerEnemiesRemaining = null!; PlayerIsWaveActive = null!;
             PlayerWaveTimer = null!; PlayerWaveCompleteGold = null!;
             CurrentWaveMutatorId = null!;

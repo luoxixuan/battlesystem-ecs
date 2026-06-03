@@ -1500,6 +1500,9 @@ namespace BattleSystemECS.Config
         // Pickup item definitions (loaded from pickup_defs.json)
         public PickupDef[] PickupDefs { get; set; } = Array.Empty<PickupDef>();
 
+        // Pickup rarity roll configuration (loaded from pickup_defs.json → "PickupRarity" object)
+        public PickupRarityConfig PickupRarity { get; set; } = new PickupRarityConfig();
+
         // Obstacle definitions (loaded from obstacles.json)
         public ObstacleDef[] ObstacleDefs { get; set; } = Array.Empty<ObstacleDef>();
 
@@ -2238,6 +2241,24 @@ namespace BattleSystemECS.Config
         public float LifetimeSeconds { get; set; } = 30f;
         public string Color { get; set; } = "White";
         public string Fx { get; set; } = "None";
+        // Rarity tier for this pickup: 0=Common, 1=Uncommon, 2=Rare, 3=Epic, 4=Legendary.
+        // Default 0 (Common) for backward compat. PickupSystem uses this to filter weighted random rolls.
+        public int Rarity { get; set; } = 0;
+    }
+
+    /// <summary>
+    /// Pickup rarity config — controls the weighted random roll for tier distribution
+    /// when spawning pickups on enemy death. Luck from towers (TowerLuck > 0) shifts
+    /// probability mass from Common→Rare+ tier weights.
+    /// </summary>
+    public class PickupRarityConfig
+    {
+        // Base weights (must sum to 1.0) for tiers 0..4 (Common..Legendary).
+        public float[] TierWeights { get; set; } = new float[] { 0.50f, 0.30f, 0.15f, 0.04f, 0.01f };
+        // Per-point luck shift: how much of Common's weight migrates to Rare per luck unit.
+        // Capped by MaxLuckBonus so high-luck towers don't unbalance the system.
+        public float LuckShiftPerPoint { get; set; } = 0.02f;
+        public float MaxLuckBonus { get; set; } = 0.20f;
     }
 
     /// <summary>

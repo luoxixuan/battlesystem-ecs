@@ -167,6 +167,9 @@ namespace BattleSystemECS.Core
         public bool[] PickupActive = new bool[MAX_ENTITIES];
         // PickupLifetime: seconds remaining before auto-expire; 0 = inactive
         public float[] PickupLifetime = new float[MAX_ENTITIES];
+        // PickupRarity: rarity tier (0=Common, 1=Uncommon, 2=Rare, 3=Epic, 4=Legendary). Default 0 = Common.
+        // Used for visual filtering and future per-rarity bonus logic. Slot recycled → default 0 (Common).
+        public byte[] PickupRarity = new byte[MAX_ENTITIES];
         private int _pickupCount = 0;
         public int PickupCount => _pickupCount;
 
