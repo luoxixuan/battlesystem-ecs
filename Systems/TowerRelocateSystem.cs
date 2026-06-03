@@ -76,7 +76,14 @@ namespace BattleSystemECS.Systems
                 return false;
             }
 
-            // Check if position is occupied by another tower
+            // Round 95: O(1) tile cache check. Falls through to a defensive
+            // ActiveTowerIds scan so any future code path that writes positions
+            // without touching the cache still gets blocked.
+            if (store.IsTileOccupied(x, y))
+            {
+                logger.Log($"[RELOCATE] Position ({x},{y}) is already occupied (cache)");
+                return false;
+            }
             foreach (int tid in store.ActiveTowerIds)
             {
                 if ((int)store.PositionX[tid] == x && (int)store.PositionY[tid] == y)
@@ -131,6 +138,10 @@ namespace BattleSystemECS.Systems
 
             // Update position (reuse existing SetPosition which already validates bounds)
             store.SetPosition(towerId, newX, newY);
+            // Round 95: keep the O(1) tile cache in sync with the move. Free the
+            // old tile and claim the new one.
+            store.SetTileOccupied(oldX, oldY, false);
+            store.SetTileOccupied(newX, newY, true);
 
             logger.Log($"[RELOCATE] 塔 #{towerId} ({store.TowerType[towerId]}, Lv.{level}) 从 ({oldX},{oldY}) 移动到 ({newX},{newY})，花费 {cost} 金币");
             return true;

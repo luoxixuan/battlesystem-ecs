@@ -51,6 +51,57 @@ namespace BattleSystemECS.Core
         public float[] PositionY = new float[MAX_ENTITIES];
         public bool[] PositionActive = new bool[MAX_ENTITIES];
 
+        // ── Tile Occupancy Cache (Round 95 Direction 4) ─────────────────────
+        // O(1) per-tile tower occupancy check. Backs PlaceTower / PreviewPlacement /
+        // RelocateTower so they no longer scan ActiveTowerIds. Bounds default to 10×20
+        // matching GameConfig.MapWidth/MapHeight; can be grown via ResizeTileOccupancy.
+        // false = empty tile, true = tower present at (x, y).
+        public const int TILE_GRID_DEFAULT_WIDTH = 10;
+        public const int TILE_GRID_DEFAULT_HEIGHT = 20;
+        public bool[,] TileOccupied = new bool[TILE_GRID_DEFAULT_WIDTH, TILE_GRID_DEFAULT_HEIGHT];
+        public int TileOccupiedWidth = TILE_GRID_DEFAULT_WIDTH;
+        public int TileOccupiedHeight = TILE_GRID_DEFAULT_HEIGHT;
+
+        /// <summary>
+        /// O(1) check whether the (x, y) tile currently holds a tower.
+        /// Returns false for out-of-bounds coordinates (treat as unoccupied for
+        /// callers that already pre-filter bounds; the placement path enforces
+        /// bounds separately and returns -1 before reaching here).
+        /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        public bool IsTileOccupied(int x, int y)
+        {
+            if ((uint)x >= (uint)TileOccupiedWidth) return false;
+            if ((uint)y >= (uint)TileOccupiedHeight) return false;
+            return TileOccupied[x, y];
+        }
+
+        /// <summary>
+        /// O(1) write to the tile occupancy cache. Used by PlaceTower (mark true
+        /// on success) and DestroyEntity / RelocateTower (mark false on remove).
+        /// Silently no-ops on out-of-bounds so callers don't have to guard twice.
+        /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        public void SetTileOccupied(int x, int y, bool occupied)
+        {
+            if ((uint)x >= (uint)TileOccupiedWidth) return;
+            if ((uint)y >= (uint)TileOccupiedHeight) return;
+            TileOccupied[x, y] = occupied;
+        }
+
+        /// <summary>
+        /// Resize the occupancy grid to match a new map size. Clears all slots.
+        /// Call once during game initialization after the map size is known
+        /// (mirrors the SetMapSize pattern on the spatial grid).
+        /// </summary>
+        public void ResizeTileOccupancy(int width, int height)
+        {
+            if (width <= 0 || height <= 0) return;
+            TileOccupied = new bool[width, height];
+            TileOccupiedWidth = width;
+            TileOccupiedHeight = height;
+        }
+
         #endregion
 
         // ==================== 实体管理 ====================
@@ -589,6 +640,12 @@ namespace BattleSystemECS.Core
             if (wasTower)
             {
                 lock (activeIdsLock) { RemoveTowerFromList(entityId); }
+                // Round 95: release the tile this tower occupied so future
+                // PlaceTower / RelocateTower can claim it again. Read position
+                // BEFORE zeroing the position fields below.
+                int tileX = (int)PositionX[entityId];
+                int tileY = (int)PositionY[entityId];
+                SetTileOccupied(tileX, tileY, false);
                 TowerActive[entityId] = false;
                 TowerIsAntiPhase[entityId] = false;
                 TowerTargetingMode[entityId] = Components.TowerTargetingMode.Nearest;

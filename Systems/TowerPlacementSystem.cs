@@ -145,12 +145,19 @@ namespace BattleSystemECS.Systems
                 logger.Log($"[TOWER] {type} cost scaled: {cost:F0} → {scaledCost:F0} (×{scaledCost / cost:F2}, copy #{store.PlacementCountByType[towerTypeIndex] + 1})");
             }
 
-            // 3. Check if position already has a tower
+            // 3. Check if position already has a tower — Round 95: O(1) via TileOccupied cache.
+            // The cache is the source of truth; the legacy ActiveTowerIds scan is kept as a
+            // defensive fallback in case a future code path skips the cache write.
+            if (store.IsTileOccupied(x, y))
+            {
+                logger.Log($"[TOWER] PlaceTower failed: position ({x},{y}) already has a tower");
+                return -1;
+            }
             foreach (int tid in store.ActiveTowerIds)
             {
                 if (store.PositionX[tid] == x && store.PositionY[tid] == y)
                 {
-                    logger.Log($"[TOWER] PlaceTower failed: position ({x},{y}) already has a tower");
+                    logger.Log($"[TOWER] PlaceTower failed: position ({x},{y}) already has a tower (defensive scan)");
                     return -1;
                 }
             }
@@ -176,6 +183,9 @@ namespace BattleSystemECS.Systems
             }
 
             store.AddPosition(towerId, x, y);
+            // Round 95: O(1) tile occupancy cache write. Must run AFTER AddPosition so
+            // DestroyEntity can read PositionX/Y and release the same tile.
+            store.SetTileOccupied(x, y, true);
             // Try to look up debuff params from gameConfig if available
             if (gameConfig != null)
             {
@@ -420,6 +430,9 @@ namespace BattleSystemECS.Systems
         private bool ValidatePlacementPosition(int x, int y)
         {
             if (x < 0 || x >= 10 || y < 0 || y >= 20) return false;
+            // Round 95: O(1) cache lookup. Defensive fallback mirrors PlaceTower so a
+            // mismatch between cache and ActiveTowerIds still blocks invalid placement.
+            if (store.IsTileOccupied(x, y)) return false;
             foreach (int tid in store.ActiveTowerIds)
             {
                 if ((int)store.PositionX[tid] == x && (int)store.PositionY[tid] == y) return false;
@@ -807,7 +820,12 @@ namespace BattleSystemECS.Systems
                 return 0f;
             }
 
-            // Check if new position is already occupied
+            // Check if new position is already occupied — Round 95: O(1) cache first.
+            if (store.IsTileOccupied(newX, newY))
+            {
+                logger.Log($"[TOWER] 重定位失败: 位置 ({newX},{newY}) 已被占用 (cache)");
+                return 0f;
+            }
             foreach (int tid in store.ActiveTowerIds)
             {
                 if (tid != towerId && (int)store.PositionX[tid] == newX && (int)store.PositionY[tid] == newY)
@@ -840,6 +858,12 @@ namespace BattleSystemECS.Systems
 
             // Update tower position
             store.SetPosition(towerId, newX, newY);
+            // Round 95: keep the O(1) tile cache in sync with the actual position.
+            // Free the old tile and claim the new one. Order matters: clear old first
+            // so an in-flight ValidatePlacementPosition reading the new tile during
+            // a concurrent sweep still sees the cache match the ActiveTowerIds scan.
+            store.SetTileOccupied(oldX, oldY, false);
+            store.SetTileOccupied(newX, newY, true);
 
             logger.Log($"[TOWER] 塔 #{towerId} ({store.TowerType[towerId]}, Lv.{level}) 从 ({oldX},{oldY}) 移动到 ({newX},{newY})，花费 {cost} 金币");
             return cost;

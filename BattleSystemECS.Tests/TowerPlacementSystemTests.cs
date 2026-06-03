@@ -233,5 +233,117 @@ namespace BattleSystemECS.Tests
             Assert.Equal(1, above);
             Assert.Equal(0, sys.GetBuildQueueCount(0));
         }
+
+        // ─── Tile Occupancy Cache (Round 95 Direction 4) ────────────────────────
+        // O(1) per-tile tower occupancy check. The cache should mirror the
+        // active tower set: marked on PlaceTower, cleared on Sell/Destroy,
+        // updated on RelocateTower.
+
+        [Fact] public void TileCache_DefaultsToEmpty()
+        {
+            var store = new ComponentStore();
+            for (int x = 0; x < ComponentStore.TILE_GRID_DEFAULT_WIDTH; x++)
+            for (int y = 0; y < ComponentStore.TILE_GRID_DEFAULT_HEIGHT; y++)
+                Assert.False(store.IsTileOccupied(x, y));
+        }
+
+        [Fact] public void TileCache_OutOfBoundsReturnsFalse()
+        {
+            var store = new ComponentStore();
+            Assert.False(store.IsTileOccupied(-1, 5));
+            Assert.False(store.IsTileOccupied(5, -1));
+            Assert.False(store.IsTileOccupied(ComponentStore.TILE_GRID_DEFAULT_WIDTH, 5));
+            Assert.False(store.IsTileOccupied(5, ComponentStore.TILE_GRID_DEFAULT_HEIGHT));
+        }
+
+        [Fact] public void PlaceTower_MarksTileOccupied()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            Assert.False(store.IsTileOccupied(3, 4));
+            int id = sys.PlaceTower(3, 4, TowerType.Basic, 50f, 3, 1f, 50f);
+            Assert.True(id >= 0);
+            Assert.True(store.IsTileOccupied(3, 4));
+        }
+
+        [Fact] public void PlaceTower_RejectsAlreadyOccupiedTile()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            int first = sys.PlaceTower(2, 5, TowerType.Basic, 50f, 3, 1f, 50f);
+            Assert.True(first >= 0);
+            // Second attempt at the same tile should fail via the cache
+            int second = sys.PlaceTower(2, 5, TowerType.Basic, 50f, 3, 1f, 50f);
+            Assert.Equal(-1, second);
+            Assert.Equal(1, store.ActiveTowerIds.Count);
+        }
+
+        [Fact] public void SellTower_ReleasesTile()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            int id = sys.PlaceTower(5, 6, TowerType.Basic, 50f, 3, 1f, 50f);
+            Assert.True(id >= 0);
+            Assert.True(store.IsTileOccupied(5, 6));
+            // Give player 0 enough gold for the sell refund (no gold needed for sell)
+            sys.SellTower(id, 0);
+            Assert.False(store.IsTileOccupied(5, 6));
+            // The tile can now accept a new tower
+            int replacement = sys.PlaceTower(5, 6, TowerType.Basic, 50f, 3, 1f, 50f);
+            Assert.True(replacement >= 0);
+            Assert.True(store.IsTileOccupied(5, 6));
+        }
+
+        [Fact] public void RelocateTower_UpdatesTileCache()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            store.SetPlayerGold(0, 1000f);
+            int id = sys.PlaceTower(1, 1, TowerType.Basic, 50f, 3, 1f, 50f);
+            Assert.True(id >= 0);
+            Assert.True(store.IsTileOccupied(1, 1));
+            Assert.False(store.IsTileOccupied(7, 8));
+            float cost = sys.RelocateTower(id, 7, 8, 0);
+            Assert.True(cost > 0f);
+            // Old tile freed, new tile claimed
+            Assert.False(store.IsTileOccupied(1, 1));
+            Assert.True(store.IsTileOccupied(7, 8));
+        }
+
+        [Fact] public void RelocateTower_RejectsOccupiedDestination()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            store.SetPlayerGold(0, 1000f);
+            int a = sys.PlaceTower(0, 0, TowerType.Basic, 50f, 3, 1f, 50f);
+            int b = sys.PlaceTower(3, 3, TowerType.Basic, 50f, 3, 1f, 50f);
+            Assert.True(a >= 0 && b >= 0);
+            // Try to move tower b onto tower a's tile — should fail
+            float cost = sys.RelocateTower(b, 0, 0, 0);
+            Assert.Equal(0f, cost);
+            // Both tiles still occupied at their original spots
+            Assert.True(store.IsTileOccupied(0, 0));
+            Assert.True(store.IsTileOccupied(3, 3));
+        }
+
+        [Fact] public void ResizeTileOccupancy_ResizesAndClears()
+        {
+            var store = new ComponentStore();
+            // Mark a tile in the default 10x20 grid
+            store.SetTileOccupied(2, 3, true);
+            Assert.True(store.IsTileOccupied(2, 3));
+            // Resize to 5x5 — old tile (2,3) is still inside, but the cache was cleared
+            store.ResizeTileOccupancy(5, 5);
+            Assert.Equal(5, store.TileOccupiedWidth);
+            Assert.Equal(5, store.TileOccupiedHeight);
+            Assert.False(store.IsTileOccupied(2, 3));
+            // Out-of-bounds now returns false (cache shrank)
+            Assert.False(store.IsTileOccupied(7, 7));
+        }
     }
 }

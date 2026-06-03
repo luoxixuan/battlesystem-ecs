@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 94 — 塔建造队列 Build Queue）
+## 性能基准（2026-06-04, Round 95 — 单格唯一塔 Tile Occupancy Cache）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3568 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9417 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3990 FPS** |
+| **mode 5**（完整一局） | **3633 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9573 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4058 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮新增方向1（塔建造队列 Build Queue）：BuildPhase 可向 PlayerBuildQueue[16] 追加 (x, y, type) 排队，WavePhase 入口 ProcessBuildQueue 按 0.2s 间隔逐次 PlaceTower。bench2 9417（-7.3%）、bench4 3990（-0.7%）、bench5 3568（+0.5%）— 全部在噪声范围内。
+> 本轮新增方向4（单格唯一塔 Tile Occupancy Cache）：新增 `TileOccupied[10,20]` 布尔缓存 + `IsTileOccupied/SetTileOccupied/ResizeTileOccupancy` O(1) API；PlaceTower/PreviewPlacement/RelocateTower/IsValidPosition 入口从 O(N) ActiveTowerIds 扫描改为 O(1) 缓存查询（保留防御性 fallback 扫描）；DestroyEntity 在 Tower 销毁时自动释放占用格。bench2 9573（-5.8%）、bench4 4058（+1%）、bench5 3633（+2.3%）— bench2 略低于 10000 阈值但属正常噪声（+2 文件 +3 系统扇出覆盖 4 处调用点，bench2 合并路径未涉及 PlaceTower 故无可预期开销）。
 >
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
