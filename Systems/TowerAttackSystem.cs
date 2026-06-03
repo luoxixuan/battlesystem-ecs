@@ -489,6 +489,10 @@ int bestTarget = -1;
                     int enemyId = candidates[ci];
                     if (!store.EnemyActive[enemyId]) continue;
 
+                    // Path-Hug filter: skip enemies that are off-path (no PathId assigned).
+                    // Zero-overhead when TowerPathHugOnly[towerId] is false (the default).
+                    if (store.TowerPathHugOnly[towerId] && store.EnemyPathId[enemyId] < 0) continue;
+
                     // Burrow filter: skip enemies that are underground (cannot be targeted)
                     if (store.EnemyIsBurrowed[enemyId]) continue;
 

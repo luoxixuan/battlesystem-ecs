@@ -460,6 +460,13 @@ namespace BattleSystemECS.Core
         // for the owning player, capped by PickupRarityConfig.MaxLuckBonus.
         public float[] TowerLuck = new float[MAX_ENTITIES];
 
+        // ==================== 路径吸附塔（Path-Hug Tower）====================
+        // TowerPathHugOnly: when true, the tower can only target enemies currently on a path
+        // (EnemyPathId[enemyId] >= 0). Designed for "Roadblock" / "Path Sentry" style towers
+        // whose semantics are "attack enemies traversing the path" — avoids wasting shots on
+        // off-path stealth / decoy enemies. Default false = no filter (backward compatible).
+        public bool[] TowerPathHugOnly = new bool[MAX_ENTITIES];
+
         // ==================== 塔能量/法力资源系统 (Tower Energy) ====================
         // TowerEnergy: current energy level for each tower (0 = depleted, cannot fire if below TowerEnergyPerShot)
         public float[] TowerEnergy = new float[MAX_ENTITIES];
@@ -745,6 +752,8 @@ namespace BattleSystemECS.Core
             TowerCanOverheat[entityId] = false;
             // Tower Luck field: default to 0 (no luck contribution, zero-overhead)
             TowerLuck[entityId] = 0f;
+            // Path-Hug filter: default to false (no path restriction, backward compatible)
+            TowerPathHugOnly[entityId] = false;
             // Tower energy fields: default to no energy (0 capacity = no energy system)
             TowerEnergy[entityId] = 0f;
             TowerMaxEnergy[entityId] = 0f;
@@ -914,6 +923,8 @@ namespace BattleSystemECS.Core
             TowerCanOverheat[entityId] = false;
             // Tower Luck field reset
             TowerLuck[entityId] = 0f;
+            // Path-Hug filter reset
+            TowerPathHugOnly[entityId] = false;
             // Tower energy fields reset
             TowerEnergy[entityId] = 0f;
             TowerMaxEnergy[entityId] = 0f;
