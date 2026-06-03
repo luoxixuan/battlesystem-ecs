@@ -847,6 +847,7 @@ namespace BattleSystemECS.Core
             TowerKnockbackForce = null!; TowerKnockbackRadius = null!;
             TowerPathHugOnly = null!;
             TowerRequiresLOS = null!; TowerBlocksLOS = null!;
+            TowerIsPhasing = null!;
             TowerProjectileCount = null!; TowerScatterAngle = null!;
             TowerBouncesRemaining = null!; TowerBounceRange = null!;
             TowerBounceDamageFalloff = null!; TowerBounceHitsRemaining = null!;

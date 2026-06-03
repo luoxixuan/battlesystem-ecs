@@ -169,6 +169,11 @@ namespace BattleSystemECS.Core
         // TowerBlocksLOS: when true, the tower itself blocks other towers' line-of-sight rays.
         // Wall / obstacle / shroud towers set this true; standard towers leave it false.
         public bool[] TowerBlocksLOS = new bool[MAX_ENTITIES];
+        // TowerIsPhasing: when true, the tower's targeting ignores LoS-blocking towers entirely
+        // (its shots phase through obstacles, regardless of TowerRequiresLOS). Dual of the LoS
+        // system: LoS = sniper requires clear sight; Phasing = ghost ignores blockers. Default
+        // false — backward compatible (no overhead when no phasing tower is on the field).
+        public bool[] TowerIsPhasing = new bool[MAX_ENTITIES];
 
         // ==================== 塔散射/多重射击（Scatter / Multi-shot）====================
         // TowerProjectileCount: number of projectiles fired per attack (1 = single shot, >1 = scatter/multicast)
@@ -730,6 +735,8 @@ namespace BattleSystemECS.Core
             // LoS fields: default to no LoS requirement, no LoS blocking (backward compatible)
             TowerRequiresLOS[entityId] = false;
             TowerBlocksLOS[entityId] = false;
+            // Phasing field: default to no phasing (regular tower, zero-overhead path)
+            TowerIsPhasing[entityId] = false;
             // Construction fields: default to not in construction (active immediately)
             TowerIsConstructing[entityId] = false;
             TowerConstructionProgress[entityId] = 1f; // start at 100% (complete)
@@ -1004,6 +1011,8 @@ namespace BattleSystemECS.Core
             // Elemental affinity fields reset (-1 = no affinity, 0 = no bonus)
             TowerElementalAffinity[entityId] = -1;
             TowerElementalAffinityBonus[entityId] = 0f;
+            // Phasing field reset (false = no phasing, zero-overhead)
+            TowerIsPhasing[entityId] = false;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
         }
         #endregion

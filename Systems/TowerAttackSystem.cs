@@ -521,7 +521,9 @@ int bestTarget = -1;
 
                     // LoS filter: opt-in towers (stealth/sniper) require unobstructed sight line.
                     // Default: TowerRequiresLOS[towerId] = false → LoS check skipped (backward compat).
-                    if (store.TowerRequiresLOS[towerId])
+                    // Phasing towers (TowerIsPhasing) ignore LoS — their shots phase through any
+                    // TowerBlocksLOS obstacles, regardless of TowerRequiresLOS state.
+                    if (store.TowerRequiresLOS[towerId] && !store.TowerIsPhasing[towerId])
                     {
                         float losTx = store.PositionX[enemyId];
                         float losTy = store.PositionY[enemyId];

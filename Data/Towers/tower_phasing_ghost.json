@@ -1,0 +1,9 @@
+{
+  "Name": "Ghost Tower",
+  "Type": "PulseCannon",
+  "Damage": 12,
+  "Range": 6,
+  "AttackSpeed": 0.9,
+  "Cost": 110,
+  "UpgradeCost": 55
+}
