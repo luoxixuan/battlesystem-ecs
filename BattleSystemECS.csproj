@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <None Update="game_config.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Data\Configs\wave_gold_decay.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

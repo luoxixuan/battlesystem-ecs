@@ -54,6 +54,35 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// Wire Decaying-Wave-Bounty: subscribe to WaveSpawningSystem.OnWaveStart.
+        /// When a new wave begins, reset PlayerWaveKillCount[pid] = 0 for all players so the decay
+        /// multiplier restarts at 1.0. Idempotent — safe to call more than once.
+        /// </summary>
+        public void SubscribeToWaveStart(WaveSpawningSystem waveSpawning)
+        {
+            if (waveSpawning == null) return;
+            waveSpawning.OnWaveStart += HandleWaveStart;
+        }
+
+        /// <summary>
+        /// OnWaveStart handler — zero out the per-player wave kill counter.
+        /// Uses array length (not a hardcoded constant) so this stays in sync if MAX_PLAYERS ever changes.
+        /// </summary>
+        private void HandleWaveStart()
+        {
+            if (store == null) return;
+            int maxPlayers = store.PlayerWaveKillCount.Length;
+            for (int pid = 0; pid < maxPlayers; pid++)
+            {
+                store.PlayerWaveKillCount[pid] = 0;
+            }
+            // Read current decay tunables from the store (configured via JSON / setter).
+            float rate = store.WaveGoldDecayRate;
+            float floor = store.WaveGoldDecayFloor;
+            renderer?.Log($"[GOLD][DECAY] New wave started. Per-kill gold multiplier resets to 1.0× (decay={rate:F3}/kill, floor={floor:F2}×).");
+        }
+
+        /// <summary>
         /// Apply the three Breather-wave bonuses. Idempotent against missing arrays.
         /// </summary>
         private void HandleBreatherWaveComplete(int waveNumber)

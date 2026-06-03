@@ -392,6 +392,8 @@ namespace BattleSystemECS.Core
                 };
                 // Breather-wave reward hook: GoldSystem applies heal + CDR + gold x2 when a Breather wave ends.
                 Gold?.SubscribeToBreatherWave(WaveSpawning);
+                // Decaying-Wave-Bounty hook: GoldSystem resets PlayerWaveKillCount when each new wave starts.
+                Gold?.SubscribeToWaveStart(WaveSpawning);
             }
 
             // ── OnWaveStart hooks ──

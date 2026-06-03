@@ -273,7 +273,20 @@ namespace BattleSystemECS.Core
                     goldReward = EnemyGoldReward[enemyId] * _goldKillMultiplier * _allIncomeMultKill;
                 }
                 goldReward *= PlayerComboGoldMult[playerId];
+                // ── Decaying Wave Bounty: subsequent kills in the same wave pay less. ──
+                // Formula: mult = max(DecayFloor, 1.0 - kills * DecayRate)
+                // DecayRate=0.02 → 5 kills = 90%, 10 = 80%, 20 = 60%, floor at 0.3 (30%) after 35 kills.
+                // Counts kill BEFORE the decay is applied so the first kill pays 100% gold.
+                int killsThisWave = PlayerWaveKillCount[playerId];
+                float decayMult = Math.Max(_waveGoldDecayFloor, 1.0f - killsThisWave * _waveGoldDecayRate);
+                goldReward *= decayMult;
                 PlayerGold[playerId] += goldReward;
+                // Bump per-player kill counter AFTER the gold has been calculated and awarded.
+                // Capped at int.MaxValue-1 to avoid overflow on absurd kill counts (e.g. long benchmarks).
+                if (PlayerWaveKillCount[playerId] < int.MaxValue - 1)
+                {
+                    PlayerWaveKillCount[playerId]++;
+                }
                 if (_goldOnEliteKill > 0f && EnemyIsElite[enemyId])
                     PlayerGold[playerId] += _goldOnEliteKill;
                 // Death Mark / Execute bonus gold: +50% extra gold for executing a marked enemy.

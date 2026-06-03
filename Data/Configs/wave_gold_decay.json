@@ -1,0 +1,6 @@
+{
+  "Enabled": true,
+  "DecayRate": 0.02,
+  "DecayFloor": 0.3,
+  "Description": "Decaying Wave Bounty — each kill in a wave reduces the gold multiplier for subsequent kills in the same wave. finalGold = baseGold * max(DecayFloor, 1.0 - killsThisWave * DecayRate). DecayRate=0.02 means the multiplier drops 2% per kill (5 kills = 90%, 10 = 80%, 20 = 60%, floor 30% reached at 35 kills). Encourages fast wave clear; discourages slow trickle where the player lets one or two stragglers linger for minutes."
+}

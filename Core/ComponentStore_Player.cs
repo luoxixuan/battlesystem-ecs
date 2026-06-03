@@ -80,6 +80,16 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // flat bonus awarded once per elite kill
         private float _goldOnEliteKill = 0f;
         public float GoldOnEliteKill { get => _goldOnEliteKill; set => _goldOnEliteKill = value; }
+
+        // ── Decaying Wave Bounty tunables (Round 86) ──
+        // _waveGoldDecayRate: linear decay per kill. 0.02 means each kill reduces the multiplier by 2%.
+        // _waveGoldDecayFloor: lower bound for the multiplier. 0.3 = even at 100 kills, gold never drops below 30%.
+        // Both default to the documented "DecayRate=0.02f / DecayFloor=0.3f" values from the design spec.
+        // GoldSystem mutates these via WaveGoldDecayRate/WaveGoldDecayFloor setters (config-driven).
+        private float _waveGoldDecayRate = 0.02f;
+        private float _waveGoldDecayFloor = 0.3f;
+        public float WaveGoldDecayRate { get => _waveGoldDecayRate; set => _waveGoldDecayRate = value; }
+        public float WaveGoldDecayFloor { get => _waveGoldDecayFloor; set => _waveGoldDecayFloor = value; }
         public List<string>[] PlayerBuffs = new List<string>[MAX_PLAYERS];
 
         // Perf: bit-flag buff storage — O(1) lookup, no GC allocation per frame
@@ -145,6 +155,14 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // PlayerBreatherGoldBonus: flat gold awarded on top of any per-wave gold when a Breather wave completes.
         // Default 0 = no extra gold. The Breather x2 effect in GoldSystem multiplies this by 2.
         public float[] PlayerBreatherGoldBonus = new float[MAX_PLAYERS];
+
+        // ==================== Decaying Wave Bounty (SOA) ====================
+        // PlayerWaveKillCount: number of enemies THIS player has killed in the current wave.
+        // Resets to 0 when OnWaveStart fires (see GoldSystem.SubscribeToWaveStart).
+        // Used by ResolveEnemiesKilledThisFrame to apply a diminishing-returns multiplier
+        // to gold rewards: finalGold = baseGold * max(DecayFloor, 1.0 - PlayerWaveKillCount[pid] * DecayRate).
+        // This rewards fast wave clear (first kills pay full) and discourages slow trickle.
+        public int[] PlayerWaveKillCount = new int[MAX_PLAYERS];
 
         // ==================== Wisp System (SOA) ====================
         // PlayerWispType: which wisp is currently active for each player.
