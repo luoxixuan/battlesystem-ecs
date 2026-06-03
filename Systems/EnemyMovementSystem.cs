@@ -214,6 +214,57 @@ namespace BattleSystemECS.Systems
                 moveSpeed *= store.EnemyTetherSlowFactor[enemyId];
                 if (moveSpeed < 0f) moveSpeed = 0f; // safety clamp
 
+                // ── Free-Roam / Wandering branch (Round 84 Direction 6) ─────────────────
+                // Off-path enemies (EnemyIsFreeRoam = true) ignore both the waypoint system
+                // and the player-direction (dirEnum) branch. Their target is set by
+                // WanderRoamSystem each frame, so here we just normalize the (target - pos)
+                // vector, scale by moveSpeed, and update position. Zero path-movement cost
+                // (no Lure/Pull/Tower scans, no Leap trigger check, no path-deviation
+                // sine/random), keeping the per-frame cost for free-roam enemies at O(1).
+                if (store.EnemyIsFreeRoam[enemyId])
+                {
+                    float wx = store.EnemyWanderTargetX[enemyId];
+                    float wy = store.EnemyWanderTargetY[enemyId];
+                    float curX = store.PositionX[enemyId];
+                    float curY = store.PositionY[enemyId];
+                    float wdx = wx - curX;
+                    float wdy = wy - curY;
+                    float wlen = (float)Math.Sqrt(wdx * wdx + wdy * wdy);
+                    if (wlen > 0.001f)
+                    {
+                        // Normalize then scale by moveSpeed (already has all slow multipliers).
+                        // If we're already within (moveSpeed) of the target, snap to it so we
+                        // don't oscillate around the destination cell.
+                        if (wlen <= moveSpeed)
+                        {
+                            store.PositionX[enemyId] = wx;
+                            store.PositionY[enemyId] = wy;
+                        }
+                        else
+                        {
+                            float invLen = 1f / wlen;
+                            store.PositionX[enemyId] = curX + wdx * invLen * moveSpeed;
+                            store.PositionY[enemyId] = curY + wdy * invLen * moveSpeed;
+                            // Update move-direction so backstab/stealth-aware systems
+                            // (which read EnemyMoveDirX/Y) see a sensible direction.
+                            store.EnemyMoveDirX[enemyId] = wdx * invLen;
+                            store.EnemyMoveDirY[enemyId] = wdy * invLen;
+                        }
+                    }
+                    // Clamp position to map bounds (defensive — WanderRoamSystem clamps
+                    // the *target* but the *current* position can drift if a slow brought
+                    // it within range of the edge in a previous frame).
+                    float clampedX = store.PositionX[enemyId];
+                    if (clampedX < 0f) clampedX = 0f;
+                    if (clampedX > mapWidthMinusOne) clampedX = mapWidthMinusOne;
+                    float clampedY = store.PositionY[enemyId];
+                    if (clampedY < 0f) clampedY = 0f;
+                    if (clampedY > 19f) clampedY = 19f; // map height = 20
+                    store.PositionX[enemyId] = clampedX;
+                    store.PositionY[enemyId] = clampedY;
+                    return; // skip path-following / enum-switch branches below
+                }
+
                 // Enum-based action dispatch — O(1) per enemy, no string comparison
                 EnemyActionType actionEnum = store.GetEnemyActionEnum(enemyId);
 

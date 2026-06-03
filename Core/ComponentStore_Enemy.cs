@@ -670,6 +670,24 @@ namespace BattleSystemECS.Core
         //   range. Default -1 (no taunt = zero overhead — Movement/AITargeting skip the field).
         public int[] EnemyTauntedByTowerId = new int[MAX_ENTITIES];
 
+        // ==================== 自由游荡敌人 (Free-Roam Enemies, Round 84 Direction 6) ====================
+        // EnemyIsFreeRoam: when true, the enemy is NOT path-bound. It wanders the map freely
+        //   and attacks the nearest tower/player it can reach. Set by WaveSpawningSystem
+        //   when monsterConfig.Type == "FreeRoam". Default false (path-bound = zero overhead,
+        //   EnemyMovementSystem / EnemyAISystem check this field as an early-exit gate).
+        // EnemyWanderTargetX/Y: current wander target cell (in map coordinates). Updated each
+        //   frame by WanderRoamSystem; enemy walks toward this point until close, then picks
+        //   a new random cell. (0,0) is the default (origin) — never used in practice because
+        //   the first frame after spawn re-rolls the target via EnemyWanderRerollTimer.
+        // EnemyWanderRerollTimer: counts down each frame; when <= 0, the wander target is
+        //   re-rolled. 0 = expired (reroll this frame). Default 0f so the very first frame
+        //   picks a fresh target. This bounds the per-frame wander logic to O(1) per free
+        //   enemy (no random calls in the hot inner loop).
+        public bool[] EnemyIsFreeRoam = new bool[MAX_ENTITIES];
+        public float[] EnemyWanderTargetX = new float[MAX_ENTITIES];
+        public float[] EnemyWanderTargetY = new float[MAX_ENTITIES];
+        public float[] EnemyWanderRerollTimer = new float[MAX_ENTITIES];
+
         // ==================== 放逐 (Banish) ====================
         // EnemyIsBanished: when true, the enemy is removed from the active battlefield for
         //   `EnemyBanishDurationLeft` frames. During banish, the enemy cannot move, cannot
@@ -933,6 +951,12 @@ namespace BattleSystemECS.Core
             EnemyLeashReturnY[entityId] = 0f;
             // Taunt target: default -1 = not taunted (TauntSystem assigns a tower id when in range)
             EnemyTauntedByTowerId[entityId] = -1;
+            // Free-Roam (Round 84): default NOT free-roam. WaveSpawningSystem opts in by
+            // setting EnemyIsFreeRoam = true for monsterType "FreeRoam" archetypes.
+            EnemyIsFreeRoam[entityId] = false;
+            EnemyWanderTargetX[entityId] = 0f;
+            EnemyWanderTargetY[entityId] = 0f;
+            EnemyWanderRerollTimer[entityId] = 0f; // 0 = reroll on first frame after spawn
             // Banish fields (default: not banished)
             EnemyIsBanished[entityId] = false;
             EnemyBanishDurationLeft[entityId] = 0f;

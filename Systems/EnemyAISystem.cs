@@ -405,6 +405,20 @@ namespace BattleSystemECS.Systems
                             continue;
                         }
 
+                        // Free-Roam enemies (Round 84): off-path monsters skip the BT entirely.
+                        // Their behavior is steered by WanderRoamSystem (target selection) and
+                        // EnemyMovementSystem's Wandering action branch (position update).
+                        // Skipping BT here keeps the per-frame cost for free-roam enemies at
+                        // O(1) instead of the full BT evaluation cost, which is important when
+                        // a wave of 100+ free-roam enemies is on the field.
+                        if (store.EnemyIsFreeRoam[enemyId])
+                        {
+                            actionEnum = EnemyActionType.Wandering;
+                            store.SetEnemyActionEnum(enemyId, actionEnum);
+                            _lastActionCache[enemyId] = actionEnum;
+                            continue;
+                        }
+
                         if (cachedBt != null)
                         {
                             action = BTCachedTreeEvaluator.EvaluateWithEnumAndAbility(

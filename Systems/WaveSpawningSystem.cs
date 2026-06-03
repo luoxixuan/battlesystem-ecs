@@ -529,6 +529,23 @@ namespace BattleSystemECS.Systems
                         store.EnemyLeapStunDuration[enemyId] = 3f; // 3-frame stun on landing
                     }
 
+                    // Initialize free-roam (off-path) enemy properties (Round 84 Direction 6).
+                    // Monsters with Type "FreeRoam" do not follow the waypoint path. Instead
+                    // they wander the map freely and chase the nearest tower within aggro
+                    // range, or head toward the player base otherwise. The actual movement
+                    // steering is done by WanderRoamSystem (target selection) and
+                    // EnemyMovementSystem's Wandering action branch (position update).
+                    // Setting EnemyIsFreeRoam = true is the single opt-in signal; all other
+                    // fields default to safe values (target 0,0 / reroll 0 = reroll on first
+                    // frame after spawn).
+                    if (leaperType == "FreeRoam")
+                    {
+                        store.EnemyIsFreeRoam[enemyId] = true;
+                        store.EnemyWanderTargetX[enemyId] = 0f;
+                        store.EnemyWanderTargetY[enemyId] = 0f;
+                        store.EnemyWanderRerollTimer[enemyId] = 0f; // 0 = reroll on first frame
+                    }
+
                     // Initialize necromancer enemy properties
                     if (monsterConfig.IsNecromancer)
                     {

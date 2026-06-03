@@ -20,6 +20,7 @@ namespace BattleSystemECS.Core
         public Systems.HitShieldSystem? HitShield { get; set; }
         public Systems.HotZoneSystem? HotZone { get; set; }
         public Systems.FrostZoneSystem? FrostZone { get; set; }
+        public Systems.WanderRoamSystem? WanderRoam { get; set; }
         public Systems.TauntSystem? Taunt { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
@@ -43,6 +44,13 @@ namespace BattleSystemECS.Core
             // Runs after HotZone (placement pre-computed) and before Taunt (independent).
             FrostZone?.SetTurn(turn);
             FrostZone?.Update();
+            // Wander Roam (Round 84 Direction 6): resolves per-free-roam-enemy target
+            // cell. Writes EnemyWanderTargetX/Y which EnemyMovementSystem reads in its
+            // Wandering branch. Must run BEFORE Movement (which happens in a later phase),
+            // not before Combat. Cost: O(N_active_enemies) with O(1) fast-exit when
+            // no free-roam enemies exist.
+            WanderRoam?.SetTurn(turn);
+            WanderRoam?.Update();
             // Taunt tower: pre-compute taunt tower list (O(n_active_towers)) before Combat
             // assigns EnemyTauntedByTowerId. Cheap when no taunt towers exist.
             Taunt?.SetTurn();

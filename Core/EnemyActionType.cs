@@ -34,6 +34,7 @@ namespace BattleSystemECS.Components
         Staggered = 24,      // 失衡/破防：敌人姿态条满后强制硬直，暂停所有动作/可被处决
         Tethered = 25,        // 锁链/连接：与另一敌人被链子绑定，超距时减速 + 互拉；partner 受 DoT 伤害按比例传染
         Polymorphed = 26,     // 变形：变羊/变小鸡，强制 NoneAction + 1.5x 受伤（终极硬控，无害化）
-        Leaping = 27          // 跳斩/冲锋：沿抛物线跳向目标位置，落地时造成 AOE 伤害 + 可选眩晕；可被 CC 打断
+        Leaping = 27,         // 跳斩/冲锋：沿抛物线跳向目标位置，落地时造成 AOE 伤害 + 可选眩晕；可被 CC 打断
+        Wandering = 28        // 自由游荡：脱路径敌人在地图上自由巡逻/主动攻击范围内最近塔/玩家（Round 84 Direction 6）
     }
 }

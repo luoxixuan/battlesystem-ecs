@@ -117,6 +117,9 @@ namespace BattleSystemECS.Core
         // ── Frost Zone (Round 82 Direction 1) ── tower-positioned AoE slow
         public FrostZoneSystem? FrostZone { get; private set; }
 
+        // ── Wander Roam (Round 84 Direction 6) ── off-path enemy movement
+        public WanderRoamSystem? WanderRoam { get; private set; }
+
         // ── Magnetize zones (displacement fields, no damage) ──
         public MagnetizeSystem? Magnetize { get; private set; }
 
@@ -285,6 +288,9 @@ namespace BattleSystemECS.Core
 
             // ── Frost Zone (Round 82 Direction 1) — instantiates per registry
             FrostZone = new FrostZoneSystem(store);
+
+            // ── Wander Roam (Round 84 Direction 6) — instantiates per registry
+            WanderRoam = new WanderRoamSystem(store);
 
             // ── Magnetize (displacement fields) ──
             Magnetize = new MagnetizeSystem(store, logger);
@@ -487,6 +493,7 @@ namespace BattleSystemECS.Core
             scheduler.CombatSetup.HitShield = HitShield;
             scheduler.CombatSetup.HotZone = HotZone;
             scheduler.CombatSetup.FrostZone = FrostZone;
+            scheduler.CombatSetup.WanderRoam = WanderRoam;
             scheduler.CombatSetup.Taunt = Taunt;
 
             // ── Spatial ──

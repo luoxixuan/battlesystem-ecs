@@ -537,6 +537,11 @@ namespace BattleSystemECS.Core
                 EnemyIsDecoy[entityId] = false;
                 EnemyDecoyLifetime[entityId] = 0f;
                 EnemyDecoyLifetimeLeft[entityId] = 0f;
+                // Free-Roam fields (Round 84): reset on entity destruction
+                EnemyIsFreeRoam[entityId] = false;
+                EnemyWanderTargetX[entityId] = 0f;
+                EnemyWanderTargetY[entityId] = 0f;
+                EnemyWanderRerollTimer[entityId] = 0f;
                 // Banish fields (reset on entity destruction)
                 EnemyIsBanished[entityId] = false;
                 EnemyBanishDurationLeft[entityId] = 0f;
@@ -858,6 +863,9 @@ namespace BattleSystemECS.Core
             EnemyCastAbilityId = null!;
             EnemyMarked = null!; EnemyMarkedThreshold = null!; EnemyMarkedDamageBonus = null!;
             EnemyIsDecoy = null!; EnemyDecoyLifetime = null!; EnemyDecoyLifetimeLeft = null!;
+            // Round 84 Direction 6: Free-Roam Enemies — opt-in via monsterConfig.Type == "FreeRoam"
+            EnemyIsFreeRoam = null!; EnemyWanderTargetX = null!; EnemyWanderTargetY = null!;
+            EnemyWanderRerollTimer = null!;
             TowerTargetingMode = null!; TowerProjectileHoming = null!; TowerInterceptRate = null!;
             TowerDamageType = null!; TowerSelected = null!; TowerType = null!;
             TowerAttackDamage = null!; TowerRange = null!; TowerAttackSpeed = null!;
