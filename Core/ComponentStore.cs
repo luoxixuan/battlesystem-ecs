@@ -580,6 +580,9 @@ namespace BattleSystemECS.Core
                 TowerCurseSpeedReduction[entityId] = 0f;
                 TowerCurseArmorReduction[entityId] = 0f;
                 TowerCurseDmgTakenIncrease[entityId] = 0f;
+                // Taunt tower fields
+                TowerIsTaunt[entityId] = false;
+                TowerTauntRadius[entityId] = 0f;
                 // Ammo fields
                 TowerCurrentAmmo[entityId] = 0;
                 TowerMaxAmmo[entityId] = 0;

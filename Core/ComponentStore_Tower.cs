@@ -293,6 +293,17 @@ namespace BattleSystemECS.Core
         // TowerCurseDmgTakenIncrease: additional damage taken bonus applied to cursed enemies (e.g. 0.25 = +25% damage taken)
         public float[] TowerCurseDmgTakenIncrease = new float[MAX_ENTITIES];
 
+        // ==================== 嘲讽塔 (Taunt Tower — 强制敌人攻击该塔) ====================
+        // TowerIsTaunt: true if this tower is a taunt tower that forces nearby enemies to target it
+        //   (dual of the Aggro/Leash system: Aggro = enemy actively chases player; Taunt = tower
+        //   actively forces enemy to attack itself). Default false — zero-overhead when no
+        //   taunt tower is on the field.
+        public bool[] TowerIsTaunt = new bool[MAX_ENTITIES];
+        // TowerTauntRadius: world-units radius within which enemies are forced to retarget this
+        //   tower. 0 = no taunt effect (TowerIsTaunt=true with radius 0 = inert). Towers with
+        //   IsTaunt=false skip all taunt work in the hot path.
+        public float[] TowerTauntRadius = new float[MAX_ENTITIES];
+
         // ==================== 牵引/磁力/漩涡塔 (Pull / Magnet / Vortex Towers) ====================
         // TowerIsPullTower: true if this tower applies gravitational pull to nearby enemies
         public bool[] TowerIsPullTower = new bool[MAX_ENTITIES];
@@ -683,6 +694,9 @@ namespace BattleSystemECS.Core
             TowerCurseSpeedReduction[entityId] = 0f;
             TowerCurseArmorReduction[entityId] = 0f;
             TowerCurseDmgTakenIncrease[entityId] = 0f;
+            // Taunt tower fields: default to non-taunt (false/0)
+            TowerIsTaunt[entityId] = false;
+            TowerTauntRadius[entityId] = 0f;
             // Pull tower fields: default to non-pull (false/0)
             TowerIsPullTower[entityId] = false;
             TowerPullStrength[entityId] = 0f;
@@ -879,6 +893,9 @@ namespace BattleSystemECS.Core
             TowerCurseSpeedReduction[entityId] = 0f;
             TowerCurseArmorReduction[entityId] = 0f;
             TowerCurseDmgTakenIncrease[entityId] = 0f;
+            // Taunt tower fields reset
+            TowerIsTaunt[entityId] = false;
+            TowerTauntRadius[entityId] = 0f;
             // Pull tower fields reset
             TowerIsPullTower[entityId] = false;
             TowerPullStrength[entityId] = 0f;

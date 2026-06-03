@@ -616,6 +616,14 @@ namespace BattleSystemECS.Core
         public float[] EnemyLeashReturnX = new float[MAX_ENTITIES];
         public float[] EnemyLeashReturnY = new float[MAX_ENTITIES];
 
+        // ==================== 塔嘲讽目标 (Taunt Target) ====================
+        // EnemyTauntedByTowerId: tower ID this enemy is currently forced to attack (-1 = not
+        //   taunted). Set per-frame by the TauntSystem for each TowerIsTaunt tower in range;
+        //   enemies pick the *closest* taunting tower so multiple taunt towers resolve to a
+        //   sensible single target. Cleared to -1 when the taunt tower is destroyed/sold/loses
+        //   range. Default -1 (no taunt = zero overhead — Movement/AITargeting skip the field).
+        public int[] EnemyTauntedByTowerId = new int[MAX_ENTITIES];
+
         // ==================== 放逐 (Banish) ====================
         // EnemyIsBanished: when true, the enemy is removed from the active battlefield for
         //   `EnemyBanishDurationLeft` frames. During banish, the enemy cannot move, cannot
@@ -857,6 +865,8 @@ namespace BattleSystemECS.Core
             EnemyIsLeashed[entityId] = false;
             EnemyLeashReturnX[entityId] = 0f;
             EnemyLeashReturnY[entityId] = 0f;
+            // Taunt target: default -1 = not taunted (TauntSystem assigns a tower id when in range)
+            EnemyTauntedByTowerId[entityId] = -1;
             // Banish fields (default: not banished)
             EnemyIsBanished[entityId] = false;
             EnemyBanishDurationLeft[entityId] = 0f;

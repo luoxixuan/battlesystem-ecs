@@ -215,6 +215,12 @@ namespace BattleSystemECS.Config
         public float CurseArmorReduction { get; set; } = 0f;
         // CurseDmgTakenIncrease: additional damage taken bonus applied to cursed enemies (0.25 = +25% damage taken)
         public float CurseDmgTakenIncrease { get; set; } = 0f;
+        // Taunt tower: if true, tower forces nearby enemies to retarget it (dual of Aggro/Leash —
+        //   Aggro = enemy chases player; Taunt = tower forces enemy to attack itself)
+        public bool IsTauntTower { get; set; } = false;
+        // TauntRadius: world-units radius within which enemies are forced to retarget this tower
+        //   (only meaningful if IsTauntTower = true; 0 = inert even if IsTauntTower=true)
+        public float TauntRadius { get; set; } = 0f;
         // Pull tower: if true, tower applies gravitational pull to enemies in range
         public bool IsPullTower { get; set; } = false;
         // PullStrength: force magnitude pulling enemies toward the tower per second

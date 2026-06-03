@@ -210,6 +210,10 @@ namespace BattleSystemECS.Systems
                     // TowerConfig, so non-vampire towers never enter the active path.
                     store.TowerLifestealFraction[towerId] = tc.LifestealFraction;
                     store.TowerLifestealMaxPerFrame[towerId] = tc.LifestealMaxPerFrame;
+                    // Apply taunt tower properties (force-enemy-target-this-tower aura)
+                    // Both default false/0 in TowerConfig, so non-taunt towers are inert.
+                    store.TowerIsTaunt[towerId] = tc.IsTauntTower;
+                    store.TowerTauntRadius[towerId] = tc.TauntRadius;
                     // Apply turn rate for turret rotation delay (already set via AddTower params)
                     // Initialize facing angle to point at nearest enemy (or 0 if none)
                     store.TowerFacingAngle[towerId] = 0f;

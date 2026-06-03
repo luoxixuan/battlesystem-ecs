@@ -30,6 +30,7 @@ namespace BattleSystemECS.Core
         public Systems.ReflectTowerSystem? ReflectTower { get; set; }
         public Systems.TowerMorphSystem? TowerMorph { get; set; }
         public Systems.TowerStealthSystem? TowerStealth { get; set; }
+        public Systems.TauntSystem? Taunt { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -60,6 +61,10 @@ namespace BattleSystemECS.Core
             ReflectTower?.ResolveReflect();
             ReflectTower?.ApplyReflectDamage();
             TowerMorph?.Update(deltaTime);
+            // Taunt tower: assign EnemyTauntedByTowerId for enemies in range of any
+            // TowerIsTaunt tower. Runs after tower attacks (closest semantic — enemies are
+            // already locked-on to the taunt tower for the *next* frame's targeting).
+            Taunt?.ResolveTauntAssignments();
         }
     }
 }

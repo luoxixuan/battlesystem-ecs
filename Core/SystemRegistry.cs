@@ -52,6 +52,7 @@ namespace BattleSystemECS.Core
         public AuraTowerSystem? AuraTower { get; private set; }
         public CurseAuraSystem? Curse { get; private set; }
         public PullTowerSystem? PullTower { get; private set; }
+        public TauntSystem? Taunt { get; private set; }
         public BleedSystem? Bleed { get; private set; }
         public ProjectileSystem? Projectile { get; private set; }
         public ChronoTowerSystem? ChronoTower { get; private set; }
@@ -261,6 +262,8 @@ namespace BattleSystemECS.Core
             Curse = new CurseAuraSystem(store);
             PullTower = new PullTowerSystem(store);
             Bleed = new BleedSystem(store, playerId);
+            // ── Taunt tower (force-enemy-target-this-tower aura) ──
+            Taunt = new TauntSystem(store);
 
             // ── Projectile ──
             Projectile = new ProjectileSystem(store, logger);
@@ -477,6 +480,7 @@ namespace BattleSystemECS.Core
             scheduler.CombatSetup.GlobalSkill = GlobalSkill;
             scheduler.CombatSetup.HitShield = HitShield;
             scheduler.CombatSetup.HotZone = HotZone;
+            scheduler.CombatSetup.Taunt = Taunt;
 
             // ── Spatial ──
             scheduler.Spatial.PatrolTower = null;
@@ -510,6 +514,7 @@ namespace BattleSystemECS.Core
             scheduler.Combat.Pickup = Pickup;
             scheduler.Combat.Mana = Mana;
             scheduler.Combat.GlobalSkill = GlobalSkill;
+            scheduler.Combat.Taunt = Taunt;
 
             // ── Skill / Buff / Bleed ──
             scheduler.SkillBuff.Buff = Buff;

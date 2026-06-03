@@ -19,6 +19,7 @@ namespace BattleSystemECS.Core
         public Systems.GlobalSkillSystem? GlobalSkill { get; set; }
         public Systems.HitShieldSystem? HitShield { get; set; }
         public Systems.HotZoneSystem? HotZone { get; set; }
+        public Systems.TauntSystem? Taunt { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -37,6 +38,9 @@ namespace BattleSystemECS.Core
             GlobalSkill?.SetTurn(turn);
             HitShield?.SetTurn(turn);
             HotZone?.SetTurn(turn);
+            // Taunt tower: pre-compute taunt tower list (O(n_active_towers)) before Combat
+            // assigns EnemyTauntedByTowerId. Cheap when no taunt towers exist.
+            Taunt?.SetTurn();
         }
     }
 }
