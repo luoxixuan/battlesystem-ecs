@@ -203,6 +203,9 @@ namespace BattleSystemECS.Systems
                     // Both default to 0 in TowerConfig, so non-leech towers are unaffected.
                     store.TowerHealOnKillAmount[towerId] = tc.HealOnKillAmount;
                     store.TowerManaOnKillAmount[towerId] = tc.ManaOnKillAmount;
+                    // Apply elemental affinity (same-element bonus damage)
+                    store.TowerElementalAffinity[towerId] = tc.ElementalAffinity;
+                    store.TowerElementalAffinityBonus[towerId] = tc.ElementalAffinityBonus;
                     // Apply turn rate for turret rotation delay (already set via AddTower params)
                     // Initialize facing angle to point at nearest enemy (or 0 if none)
                     store.TowerFacingAngle[towerId] = 0f;

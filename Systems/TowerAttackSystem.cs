@@ -1057,6 +1057,23 @@ int bestTarget = -1;
                 // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
                 float resist = store.EnemyDamageResistance[enemyId];
                 float finalDmg = resist >= 1f ? 0f : damage * (1f - resist);
+                // ── Elemental Affinity bonus (Round 68 Direction 7) ──
+                // O(1) guard: skip entirely when the tower has no affinity configured.
+                // towerId is always valid here (already validated upstream). ElementType is a [Flags]
+                // bitmask, so the test is a single AND — zero GC, no allocations.
+                int towerAff = store.TowerElementalAffinity[towerId];
+                if (towerAff > 0)
+                {
+                    float affBonus = store.TowerElementalAffinityBonus[towerId];
+                    if (affBonus > 0f)
+                    {
+                        ElementType enemyElems = store.EnemyElementStatus[enemyId];
+                        if ((((ElementType)towerAff) & enemyElems) != 0)
+                        {
+                            finalDmg *= 1f + affBonus;
+                        }
+                    }
+                }
                 // Vanguard damage transfer: if this enemy is protected by a vanguard, transfer a fraction to the vanguard
                 float vanguardTransfer = store.EnemyVanguardDmgTransfer[enemyId];
                 if (vanguardTransfer > 0f && finalDmg > 0f)

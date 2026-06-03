@@ -1,0 +1,11 @@
+{
+  "Name": "Flame Striker",
+  "Type": "PulseCannon",
+  "Damage": 22,
+  "Range": 5,
+  "AttackSpeed": 1.4,
+  "Cost": 110,
+  "UpgradeCost": 55,
+  "ElementalAffinity": 1,
+  "ElementalAffinityBonus": 0.30
+}

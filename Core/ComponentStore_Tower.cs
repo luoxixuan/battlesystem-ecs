@@ -19,6 +19,11 @@ namespace BattleSystemECS.Core
         // ==================== 塔组件的 SOA 存储 ====================
         // Tower targeting mode: controls which enemy the tower selects as its target.
         public TowerTargetingMode[] TowerTargetingMode = new TowerTargetingMode[MAX_ENTITIES];
+        // Tower elemental affinity: -1 = no affinity (zero-overhead path). 0..3 = Fire/Ice/Lightning/Poison (see Core/ElementType.cs).
+        // When non-negative and the enemy has the matching element, the tower's damage is multiplied by (1 + TowerElementalAffinityBonus).
+        public int[] TowerElementalAffinity = new int[MAX_ENTITIES];
+        // Tower elemental affinity bonus: fraction multiplier when affinity matches enemy element (0.30 = +30% damage). 0 = inactive.
+        public float[] TowerElementalAffinityBonus = new float[MAX_ENTITIES];
         // Tower projectile homing: if true, this tower's projectiles track targets mid-flight
         public bool[] TowerProjectileHoming = new bool[MAX_ENTITIES];
         // Tower intercept rate: probability of intercepting enemy projectiles (for PointDefense towers)
@@ -813,6 +818,9 @@ namespace BattleSystemECS.Core
             TowerRampUpCurrent[entityId] = 1f;
             TowerRampUpTargetId[entityId] = -1;
             TowerRampUpResetOnSwitch[entityId] = true;
+            // Elemental affinity fields: default to no affinity (-1) and no bonus (0 = inactive zero-overhead path)
+            TowerElementalAffinity[entityId] = -1;
+            TowerElementalAffinityBonus[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
@@ -968,6 +976,9 @@ namespace BattleSystemECS.Core
             // Lure / bait fields reset (radius=0 disables lure, strength=0 disables bias)
             TowerLureRadius[entityId] = 0f;
             TowerLureStrength[entityId] = 0f;
+            // Elemental affinity fields reset (-1 = no affinity, 0 = no bonus)
+            TowerElementalAffinity[entityId] = -1;
+            TowerElementalAffinityBonus[entityId] = 0f;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
         }
         #endregion

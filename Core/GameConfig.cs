@@ -322,6 +322,15 @@ namespace BattleSystemECS.Config
         // ManaOnKillAmount: mana restored to the owning player whenever this tower scores a kill.
         // 0 = no mana restore. Capped at PlayerMaxMana inside AddPlayerMana.
         public float ManaOnKillAmount { get; set; } = 0f;
+        // ── Elemental Affinity (same-element bonus damage) ───────────────────────
+        // ElementalAffinity: -1 = no affinity (zero-overhead path). 0..3 = Fire/Ice/Lightning/Poison.
+        // When set to a value matching an enemy's element (EnemyElementStatus), the tower's damage
+        // is multiplied by (1 + ElementalAffinityBonus). Bench/profile: default -1 keeps the cost
+        // identical to legacy behavior on all 150 stock towers.
+        public int ElementalAffinity { get; set; } = -1;
+        // ElementalAffinityBonus: damage multiplier added when affinity matches enemy element.
+        // 0.30 = +30% damage. 0 = inactive even if ElementalAffinity >= 0.
+        public float ElementalAffinityBonus { get; set; } = 0f;
     }
 
     /// <summary>
