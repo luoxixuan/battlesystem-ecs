@@ -868,6 +868,7 @@ namespace BattleSystemECS.Core
             TowerSpecialAbilityDotDamage = null!; TowerSpecialAbilityDotInterval = null!;
             TowerKnockbackForce = null!; TowerKnockbackRadius = null!;
             TowerPathHugOnly = null!;
+            TowerIsLockOn = null!; TowerLockedTargetId = null!;
             TowerRequiresLOS = null!; TowerBlocksLOS = null!;
             TowerIsPhasing = null!;
             TowerProjectileCount = null!; TowerScatterAngle = null!;

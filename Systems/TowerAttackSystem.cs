@@ -462,117 +462,161 @@ namespace BattleSystemECS.Systems
                 // Read tower targeting mode
                 TowerTargetingMode targetingMode = store.TowerTargetingMode[towerId];
 
-int bestTarget = -1;
-                float bestScore = 0f;
-
-                // Initialize bestScore based on targeting mode to ensure first candidate is always evaluated
-                switch (targetingMode)
+                // ── Lock-On early-return: if this tower is a lock-on tower and its cached
+                //   target is still alive + still in range, skip the entire targeting loop
+                //   and reuse the cached enemy. This makes lock-on towers immune to target
+                //   switches during CC (Fear/Stun) and lets snipers focus fire on a high-priority
+                //   target through interrupts. Zero-overhead when TowerIsLockOn is false
+                //   (single bool read + early-continue past the targeting loop). — Round 79
+                bool isLockOn = store.TowerIsLockOn[towerId];
+                int lockedId = store.TowerLockedTargetId[towerId];
+                bool lockedValid = isLockOn && lockedId >= 0
+                    && lockedId < ComponentStore.MAX_ENTITIES
+                    && store.EnemyActive[lockedId]
+                    && !store.EnemyIsBurrowed[lockedId];
+                if (lockedValid)
                 {
-                    case TowerTargetingMode.Furthest:
-                        bestScore = float.MinValue;
-                        break;
-                    case TowerTargetingMode.LowestHealth:
-                    case TowerTargetingMode.FirstSpawned:
-                        bestScore = float.MaxValue; // minimize these scores
-                        break;
-                    case TowerTargetingMode.HighestHealth:
-                    case TowerTargetingMode.LastSpawned:
-                        bestScore = float.MinValue; // maximize these scores
-                        break;
-                    default: // Nearest — minimize distance
-                        bestScore = float.MaxValue;
-                        break;
+                    // Confirm in range (lock-on doesn't bypass range — only CC-driven switches)
+                    float lex = store.PositionX[lockedId];
+                    float ley = store.PositionY[lockedId];
+                    float ldx = lex - tx;
+                    float ldy = ley - ty;
+                    if (ldx * ldx + ldy * ldy > (float)effectiveRange * effectiveRange)
+                    {
+                        lockedValid = false; // out of range → fall through to normal selection
+                    }
                 }
-
-                for (int ci = 0; ci < candidateCount; ci++)
+                // Best target is filled either by lock-on (cached) or by the normal selection loop below
+                int bestTarget = -1;
+                if (lockedValid)
                 {
-                    int enemyId = candidates[ci];
-                    if (!store.EnemyActive[enemyId]) continue;
+                    // Skip targeting loop entirely — reuse cached enemy ID
+                    bestTarget = lockedId;
+                }
+                else
+                {
+                    // Clear stale lock when target died/left range so we re-pick on the next frame
+                    if (isLockOn && lockedId != -1) store.TowerLockedTargetId[towerId] = -1;
 
-                    // Path-Hug filter: skip enemies that are off-path (no PathId assigned).
-                    // Zero-overhead when TowerPathHugOnly[towerId] is false (the default).
-                    if (store.TowerPathHugOnly[towerId] && store.EnemyPathId[enemyId] < 0) continue;
+                    // ── Normal targeting: select best candidate from spatial grid ──
+                    float bestScore = 0f;
 
-                    // Burrow filter: skip enemies that are underground (cannot be targeted)
-                    if (store.EnemyIsBurrowed[enemyId]) continue;
-
-                    // Fog of War filter: skip enemies not visible to this tower
-                    // TowerVisibilityByTower[towerId][enemyId] — only towers with VisionRadius > 0 have entries
-                    // Towers without fog (VisionRadius=0) are not in the dictionary — treat as visible
-                    bool isVisible = true;
-                    if (store.TowerVisionRadius[towerId] > 0f)
-                    {
-                        if (store.TowerVisibilityByTower.TryGetValue(towerId, out bool[] visArray) && visArray != null && enemyId >= 0 && enemyId < visArray.Length)
-                            isVisible = visArray[enemyId];
-                        else
-                            isVisible = false; // fog tower but enemy not in range
-                    }
-                    if (!isVisible) continue;
-
-                    // Phase filter: skip phased enemies unless this tower is anti-phase (magic tower)
-                    if (store.EnemyIsPhased[enemyId] && !store.TowerIsAntiPhase[towerId]) continue;
-
-                    // Height-layer filter: skip enemies that this tower cannot hit
-                    bool enemyFlying = store.EnemyIsFlying[enemyId];
-                    bool canHitAir = store.TowerCanHitAir[towerId];
-                    bool canHitGround = store.TowerCanHitGround[towerId];
-                    if (enemyFlying && !canHitAir) continue;
-                    if (!enemyFlying && !canHitGround) continue;
-
-                    // LoS filter: opt-in towers (stealth/sniper) require unobstructed sight line.
-                    // Default: TowerRequiresLOS[towerId] = false → LoS check skipped (backward compat).
-                    // Phasing towers (TowerIsPhasing) ignore LoS — their shots phase through any
-                    // TowerBlocksLOS obstacles, regardless of TowerRequiresLOS state.
-                    if (store.TowerRequiresLOS[towerId] && !store.TowerIsPhasing[towerId])
-                    {
-                        float losTx = store.PositionX[enemyId];
-                        float losTy = store.PositionY[enemyId];
-                        if (!store.SpatialGrid.HasLineOfSight(store, towerId, tx, ty, losTx, losTy))
-                            continue;
-                    }
-
-                    float ex = store.PositionX[enemyId];
-                    float ey = store.PositionY[enemyId];
-
-                    float dx = ex - tx;
-                    float dy = ey - ty;
-
-                    float distSq = dx * dx + dy * dy;
-
-                    float score;
-                    bool isBetter;
+                    // Initialize bestScore based on targeting mode to ensure first candidate is always evaluated
                     switch (targetingMode)
                     {
                         case TowerTargetingMode.Furthest:
-                            score = distSq;
-                            isBetter = score > bestScore;
+                            bestScore = float.MinValue;
                             break;
                         case TowerTargetingMode.LowestHealth:
-                            score = store.EnemyHealth[enemyId];
-                            isBetter = score < bestScore;
+                        case TowerTargetingMode.FirstSpawned:
+                            bestScore = float.MaxValue; // minimize these scores
                             break;
                         case TowerTargetingMode.HighestHealth:
-                            score = store.EnemyHealth[enemyId];
-                            isBetter = score > bestScore;
-                            break;
-                        case TowerTargetingMode.FirstSpawned:
-                            score = store.EnemySpawnFrame[enemyId];
-                            isBetter = score < bestScore;
-                            break;
                         case TowerTargetingMode.LastSpawned:
-                            score = store.EnemySpawnFrame[enemyId];
-                            isBetter = score > bestScore;
+                            bestScore = float.MinValue; // maximize these scores
                             break;
                         default: // Nearest — minimize distance
-                            score = distSq;
-                            isBetter = distSq < bestScore;
+                            bestScore = float.MaxValue;
                             break;
                     }
 
-                    if (isBetter)
+                    for (int ci = 0; ci < candidateCount; ci++)
                     {
-                        bestScore = score;
-                        bestTarget = enemyId;
+                        int enemyId = candidates[ci];
+                        if (!store.EnemyActive[enemyId]) continue;
+
+                        // Path-Hug filter: skip enemies that are off-path (no PathId assigned).
+                        // Zero-overhead when TowerPathHugOnly[towerId] is false (the default).
+                        if (store.TowerPathHugOnly[towerId] && store.EnemyPathId[enemyId] < 0) continue;
+
+                        // Burrow filter: skip enemies that are underground (cannot be targeted)
+                        if (store.EnemyIsBurrowed[enemyId]) continue;
+
+                        // Fog of War filter: skip enemies not visible to this tower
+                        // TowerVisibilityByTower[towerId][enemyId] — only towers with VisionRadius > 0 have entries
+                        // Towers without fog (VisionRadius=0) are not in the dictionary — treat as visible
+                        bool isVisible = true;
+                        if (store.TowerVisionRadius[towerId] > 0f)
+                        {
+                            if (store.TowerVisibilityByTower.TryGetValue(towerId, out bool[] visArray) && visArray != null && enemyId >= 0 && enemyId < visArray.Length)
+                                isVisible = visArray[enemyId];
+                            else
+                                isVisible = false; // fog tower but enemy not in range
+                        }
+                        if (!isVisible) continue;
+
+                        // Phase filter: skip phased enemies unless this tower is anti-phase (magic tower)
+                        if (store.EnemyIsPhased[enemyId] && !store.TowerIsAntiPhase[towerId]) continue;
+
+                        // Height-layer filter: skip enemies that this tower cannot hit
+                        bool enemyFlying = store.EnemyIsFlying[enemyId];
+                        bool canHitAir = store.TowerCanHitAir[towerId];
+                        bool canHitGround = store.TowerCanHitGround[towerId];
+                        if (enemyFlying && !canHitAir) continue;
+                        if (!enemyFlying && !canHitGround) continue;
+
+                        // LoS filter: opt-in towers (stealth/sniper) require unobstructed sight line.
+                        // Default: TowerRequiresLOS[towerId] = false → LoS check skipped (backward compat).
+                        // Phasing towers (TowerIsPhasing) ignore LoS — their shots phase through any
+                        // TowerBlocksLOS obstacles, regardless of TowerRequiresLOS state.
+                        if (store.TowerRequiresLOS[towerId] && !store.TowerIsPhasing[towerId])
+                        {
+                            float losTx = store.PositionX[enemyId];
+                            float losTy = store.PositionY[enemyId];
+                            if (!store.SpatialGrid.HasLineOfSight(store, towerId, tx, ty, losTx, losTy))
+                                continue;
+                        }
+
+                        float ex = store.PositionX[enemyId];
+                        float ey = store.PositionY[enemyId];
+
+                        float dx = ex - tx;
+                        float dy = ey - ty;
+
+                        float distSq = dx * dx + dy * dy;
+
+                        float score;
+                        bool isBetter;
+                        switch (targetingMode)
+                        {
+                            case TowerTargetingMode.Furthest:
+                                score = distSq;
+                                isBetter = score > bestScore;
+                                break;
+                            case TowerTargetingMode.LowestHealth:
+                                score = store.EnemyHealth[enemyId];
+                                isBetter = score < bestScore;
+                                break;
+                            case TowerTargetingMode.HighestHealth:
+                                score = store.EnemyHealth[enemyId];
+                                isBetter = score > bestScore;
+                                break;
+                            case TowerTargetingMode.FirstSpawned:
+                                score = store.EnemySpawnFrame[enemyId];
+                                isBetter = score < bestScore;
+                                break;
+                            case TowerTargetingMode.LastSpawned:
+                                score = store.EnemySpawnFrame[enemyId];
+                                isBetter = score > bestScore;
+                                break;
+                            default: // Nearest — minimize distance
+                                score = distSq;
+                                isBetter = distSq < bestScore;
+                                break;
+                        }
+
+                        if (isBetter)
+                        {
+                            bestScore = score;
+                            bestTarget = enemyId;
+                        }
+                    }
+
+                    // Cache the selected target for lock-on towers (if Lock-On, only the
+                    // first frame fills this — subsequent frames short-circuit on `lockedValid`).
+                    if (isLockOn && bestTarget != -1)
+                    {
+                        store.TowerLockedTargetId[towerId] = bestTarget;
                     }
                 }
 

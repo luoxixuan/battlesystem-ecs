@@ -491,6 +491,17 @@ namespace BattleSystemECS.Core
         // off-path stealth / decoy enemies. Default false = no filter (backward compatible).
         public bool[] TowerPathHugOnly = new bool[MAX_ENTITIES];
 
+        // ==================== 锁定目标塔（Target Lock-On Tower）====================
+        // TowerIsLockOn: when true, the tower caches its first-selected target into
+        // TowerLockedTargetId and re-targets the same enemy each frame (ignoring CC/Fear
+        // transitions and superior-scored candidates). Default false = no lock-on
+        // (backward compatible, zero-overhead hot path).
+        public bool[] TowerIsLockOn = new bool[MAX_ENTITIES];
+        // TowerLockedTargetId: cached enemy ID this lock-on tower is currently locked onto
+        // (-1 = no active lock, e.g. no enemies in range or target died). Cleared when the
+        // locked target becomes inactive / out of range.
+        public int[] TowerLockedTargetId = new int[MAX_ENTITIES];
+
         // ==================== 塔能量/法力资源系统 (Tower Energy) ====================
         // TowerEnergy: current energy level for each tower (0 = depleted, cannot fire if below TowerEnergyPerShot)
         public float[] TowerEnergy = new float[MAX_ENTITIES];
@@ -783,6 +794,9 @@ namespace BattleSystemECS.Core
             TowerLuck[entityId] = 0f;
             // Path-Hug filter: default to false (no path restriction, backward compatible)
             TowerPathHugOnly[entityId] = false;
+            // Lock-On filter: default to false (no lock-on, backward compatible) + -1 = no cached target
+            TowerIsLockOn[entityId] = false;
+            TowerLockedTargetId[entityId] = -1;
             // Tower energy fields: default to no energy (0 capacity = no energy system)
             TowerEnergy[entityId] = 0f;
             TowerMaxEnergy[entityId] = 0f;
@@ -958,6 +972,9 @@ namespace BattleSystemECS.Core
             TowerCanOverheat[entityId] = false;
             // Tower Luck field reset
             TowerLuck[entityId] = 0f;
+            // Lock-On fields reset (no lock-on, no cached target — recycled slot starts inert)
+            TowerIsLockOn[entityId] = false;
+            TowerLockedTargetId[entityId] = -1;
             // Path-Hug filter reset
             TowerPathHugOnly[entityId] = false;
             // Tower energy fields reset
