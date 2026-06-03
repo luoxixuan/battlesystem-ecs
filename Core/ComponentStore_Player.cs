@@ -186,6 +186,18 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Applied multiplicatively at damage apply time via GetPlayerAttackDamage().
         public float[] PlayerSkipBonusDamagePct = new float[MAX_PLAYERS];
 
+        // ==================== Combo Chain Bonus (SOA) ====================
+        // PlayerChainKillCount: consecutive kill count within the chain window (resets when window expires).
+        // Increments on each OnEnemyKilled event; when count >= ChainKillThreshold, fires a global
+        // damage buff on all of this player's towers (PlayerChainKillBuffTimer = ChainKillBuffDuration).
+        // Default 0 = no chain active. Reset on AddPlayer (fresh game).
+        public int[] PlayerChainKillCount = new int[MAX_PLAYERS];
+        // PlayerChainKillBuffTimer: seconds remaining on the active chain damage buff.
+        // Decremented in ComboSystem.Update; when it reaches 0, PlayerChainKillCount resets to 0.
+        // O(1) guard in TowerAttackSystem damage apply: if > 0, multiply finalDmg by (1 + bonus).
+        // Default 0f = no buff active.
+        public float[] PlayerChainKillBuffTimer = new float[MAX_PLAYERS];
+
         #endregion
 
         // ==================== 玩家组件访问 ====================
@@ -218,6 +230,9 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             // Wave Skip Reward: reset both counters to 0 so each new game starts fresh.
             PlayerWaveSkipsUsed[entityId] = 0;
             PlayerSkipBonusDamagePct[entityId] = 0f;
+            // Combo Chain: reset both fields to 0 so a new game starts with no chain active.
+            PlayerChainKillCount[entityId] = 0;
+            PlayerChainKillBuffTimer[entityId] = 0f;
 
             PlayerEntityId = entityId;
         }

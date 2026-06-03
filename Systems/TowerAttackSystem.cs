@@ -1107,6 +1107,15 @@ namespace BattleSystemECS.Systems
                 // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
                 float resist = store.EnemyDamageResistance[enemyId];
                 float finalDmg = resist >= 1f ? 0f : damage * (1f - resist);
+                // ── Combo Chain bonus (Round 81) ──
+                // O(1) guard: read playerId's chain buff timer; if > 0, multiply by (1 + bonus).
+                // The check itself is one float read; the multiplier is applied only when the
+                // buff is active (timer > 0), so the common case (no chain) adds a single
+                // float load + branch — no GC, no allocation.
+                if (store.PlayerChainKillBuffTimer[playerId] > 0f)
+                {
+                    finalDmg *= 1.25f; // 1 + ChainKillDamageBonusPct (hardcoded in ComboSystem)
+                }
                 // ── Elemental Affinity bonus (Round 68 Direction 7) ──
                 // O(1) guard: skip entirely when the tower has no affinity configured.
                 // towerId is always valid here (already validated upstream). ElementType is a [Flags]

@@ -21,6 +21,17 @@ namespace BattleSystemECS.Systems
         private ComponentStore store;
         private ComboConfig config;
 
+        // ==================== Combo Chain (Round 81) ====================
+        // Kills within the combo window (config.ComboWindowSeconds) accumulate into
+        // PlayerChainKillCount. Once the count reaches ChainKillThreshold (default 3),
+        // a global buff is activated for ChainKillBuffDuration (default 5s) granting
+        // all of this player's towers +ChainKillDamageBonusPct (default 25%) damage.
+        // Constants are hardcoded with sane defaults rather than introducing a new
+        // config class — keeps the change small and matches the "≤3 files" budget.
+        private const int ChainKillThreshold = 3;
+        private const float ChainKillBuffDuration = 5.0f;
+        private const float ChainKillDamageBonusPct = 0.25f;
+
         /// <summary>
         /// 构造函数
         /// </summary>
@@ -59,6 +70,21 @@ namespace BattleSystemECS.Systems
                         store.PlayerComboDamageMult[i] = 1f;
                     }
                 }
+
+                // ── Combo Chain buff timer (Round 81) ──────────────────────────────
+                // Decrement chain buff timer; when it expires, reset the chain kill
+                // count so the next streak must rebuild from zero. The buff itself is
+                // O(1) read in TowerAttackSystem damage apply — no allocation, no work
+                // when timer is 0.
+                if (store.PlayerChainKillBuffTimer[i] > 0f)
+                {
+                    store.PlayerChainKillBuffTimer[i] -= deltaTime;
+                    if (store.PlayerChainKillBuffTimer[i] <= 0f)
+                    {
+                        store.PlayerChainKillBuffTimer[i] = 0f;
+                        store.PlayerChainKillCount[i] = 0;
+                    }
+                }
             }
         }
 
@@ -92,6 +118,32 @@ namespace BattleSystemECS.Systems
             {
                 store.PlayerComboKillStreak[playerId] = store.PlayerComboCount[playerId];
             }
+
+            // ── Combo Chain (Round 81) ────────────────────────────────────────────
+            // Each kill inside the chain window increments the counter. When the
+            // counter reaches ChainKillThreshold, activate a global damage buff
+            // for ChainKillBuffDuration seconds (applies to ALL of this player's
+            // towers, read O(1) in TowerAttackSystem damage apply).
+            // Counter is reset to 0 only when the buff timer expires (in Update).
+            store.PlayerChainKillCount[playerId] += 1;
+            if (store.PlayerChainKillCount[playerId] >= ChainKillThreshold)
+            {
+                store.PlayerChainKillBuffTimer[playerId] = ChainKillBuffDuration;
+                // Do NOT reset count here — let it accumulate further so the buff
+                // can be refreshed/extended by continued chains. Reset happens on
+                // timer expiry in Update().
+            }
+        }
+
+        /// <summary>
+        /// Returns 1.0f when no chain buff is active, or (1 + ChainKillDamageBonusPct)
+        /// when the chain kill buff timer is ticking. Read O(1) per damage apply.
+        /// </summary>
+        public float GetChainKillDamageMultiplier(int playerId)
+        {
+            if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) return 1f;
+            if (store.PlayerChainKillBuffTimer[playerId] <= 0f) return 1f;
+            return 1f + ChainKillDamageBonusPct;
         }
 
         /// <summary>
@@ -142,6 +194,9 @@ namespace BattleSystemECS.Systems
             store.PlayerComboTimer[playerId] = 0f;
             store.PlayerComboDamageMult[playerId] = 1f;
             store.PlayerComboGoldMult[playerId] = 1f;
+            // Round 81: also reset combo chain state so a new wave starts clean.
+            store.PlayerChainKillCount[playerId] = 0;
+            store.PlayerChainKillBuffTimer[playerId] = 0f;
             // 注意：ComboKillStreak 不重置，保留本波次最高记录
         }
 
@@ -157,6 +212,9 @@ namespace BattleSystemECS.Systems
                 store.PlayerComboDamageMult[i] = 1f;
                 store.PlayerComboKillStreak[i] = 0f;
                 store.PlayerComboGoldMult[i] = 1f;
+                // Round 81: also reset combo chain state.
+                store.PlayerChainKillCount[i] = 0;
+                store.PlayerChainKillBuffTimer[i] = 0f;
             }
         }
     }
