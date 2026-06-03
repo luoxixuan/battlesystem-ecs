@@ -1,0 +1,7 @@
+{
+  "DeflectChanceDefault": 0.0,
+  "DeflectChanceFloor": 0.0,
+  "DeflectChanceCeiling": 0.5,
+  "BossDeflectChance": 0.2,
+  "EliteDeflectChance": 0.1
+}

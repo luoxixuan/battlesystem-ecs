@@ -449,6 +449,12 @@ namespace BattleSystemECS.Core
         // Applied in TowerAttackSystem and PlayerTowerAttackSystem at the crit roll point.
         // Default 0 for normal enemies; Boss/Elite monsters typically 0.5 to balance crit-sniper builds.
         public float[] EnemyCritResistance = new float[MAX_ENTITIES];
+        // EnemyDeflectChance: 0-1, probability that the enemy deflects an incoming projectile each hit.
+        // Applied in ProjectileSystem.ResolveHit at the very top — on a successful deflect roll, the projectile
+        // deals 0 damage and exits early (no pierce immunity / thorns / fragment side-effects are triggered).
+        // Default 0 for normal enemies; Boss-tier / fast elites typically 0.15-0.30 to add visual punch
+        // and force players to combine high-damage hits (sniper / mortar) with reliable follow-up towers.
+        public float[] EnemyDeflectChance = new float[MAX_ENTITIES];
 
         // ==================== 自爆/殉爆敌人 (Suicide Bomber / Kamikaze, SOA) ====================
         // EnemyIsSuicide: true if this enemy is a suicide bomber that explodes near towers
@@ -817,6 +823,8 @@ namespace BattleSystemECS.Core
             EnemyIsPierceImmune[entityId] = false;
             // Crit Resistance: default 0 (full crit chance) — only Boss/Elite monsters get a non-zero value via SetCritResistance()
             EnemyCritResistance[entityId] = 0f;
+            // Deflect Chance: default 0 (projectiles always hit) — only Boss/Elite monsters get a non-zero value via SetDeflectChance()
+            EnemyDeflectChance[entityId] = 0f;
             EnemyShield[entityId] = shield;  // configurable initial shield
             // Hit Shield: default 0 layers, 0 max, 0 regen timer
             EnemyHitShieldCount[entityId] = 0f;
@@ -1066,6 +1074,21 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(enemyId)) return;
             // Clamp to [0,1] for safety; negative or >1 values would invert crit behavior unpredictably.
             EnemyCritResistance[enemyId] = System.Math.Clamp(critResistance, 0f, 1f);
+        }
+
+        /// <summary>
+        /// Configures projectile deflection probability for an enemy. Each incoming projectile that
+        /// hits the enemy rolls a uniform RNG; on success the projectile deals 0 damage and exits
+        /// (no pierce / thorns / fragment side-effects are triggered).
+        /// Used by fast / Boss-tier monsters to add visual punch and force reliable follow-up towers.
+        /// </summary>
+        /// <param name="enemyId">Target enemy entity ID</param>
+        /// <param name="deflectChance">0-1, probability of deflecting an incoming projectile (0 = never deflect, 1.0 = always deflect)</param>
+        public void SetDeflectChance(int enemyId, float deflectChance)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            // Clamp to [0,1] for safety; >1 would imply damage block probability > 1 (nonsense).
+            EnemyDeflectChance[enemyId] = System.Math.Clamp(deflectChance, 0f, 1f);
         }
 
         /// <summary>

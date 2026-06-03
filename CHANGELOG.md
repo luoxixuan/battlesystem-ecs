@@ -1,5 +1,8 @@
 # 更新记录 (Changelog)
 
+### 2026-06-04
+- 塔射弹偏转 Projectile Deflection（Core/ComponentStore_Enemy.cs + Core/ComponentStore.cs + Core/GameConfig.cs + Core/GameConfigLoader.cs + Systems/ProjectileSystem.cs + Systems/WaveSpawningSystem.cs + Data/Monsters/monster_doom_mech.json + Data/Configs/projectile_deflection.json，1 SOA 字段 EnemyDeflectChance (float, 0f=零开销) + AddEnemy 默认 0f + SetDeflectChance enemyId 访问器 System.Math.Clamp [0,1] + MonsterConfig.DeflectChance 字段 + GameConfigLoader ParseMonsterConfig 解析 DeflectChance 字段 + WaveSpawningSystem 3 处 spawn 路径全数调用 SetDeflectChance + ProjectileSystem.ResolveHit 入口 deflect roll：rng.NextDouble() < deflectChance → early-return 不入 damage queue 不触发 pierce/thorns/fragment 副作用 + System.Random 实例化在 ProjectileSystem._deflectRng 局部封装 + _damageQueueLock 包裹保证线程安全 + Doom Mech Boss 原型 0.2 偏转率 20% 射弹被弹开）；bench2: 9822, bench4: 4171, bench5: 3428 ⚠️
+
 ### 2026-06-03
 - 变形术 Polymorph（ComponentStore_Enemy.cs + ComponentStore.cs + EnemyActionType.cs + GameplayAbility.cs + GameConfig.cs + EnemyAISystem.cs + SkillSystem.cs，3 SOA 字段 EnemyIsPolymorphed/PolymorphDurationLeft/PolymorphDamageTakenMultiplier + ApplyPolymorph 访问器 + DestroyEntity 重置 + Polymorphed=26 动作枚举 + GameplayAbilityDef.PolymorphDuration/DamageTakenMultiplier 字段 + SkillConfig 桥接 + EnemyAISystem BT 评估短路 + SkillSystem CastPolymorphArea circle AoE：duration 计时到期自动清除 + 1.5x 受伤放大）；bench2: 10457, bench4: 4659, bench5: 3932 ⚠️
 - 穿透抗性 JSON 路径 Pierce Resistance Loader（GameConfigLoader.cs + game_config.json + Data/Monsters/monster_plated_warrior.json，monster JSON 解析 PierceResist/PierceImmune/DamageImmunities 字段 + null guard 保留默认 + Plated Warrior 怪物原型：HP350/护甲12/PierceResist 0.5 + Plated Carapace 技能）；bench2: 9230, bench4: 4690, bench5: 3885 ⚠️

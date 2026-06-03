@@ -50,6 +50,9 @@ namespace BattleSystemECS.Systems
             new List<(int, float, int)>[2];
         private readonly object _damageQueueLock = new object();
         private int _damageQueueIdx;
+        // RNG used for projectile deflection roll (serial path, no thread-safety needed).
+        // Kept here rather than in store so ProjectileSystem is self-contained and testable in isolation.
+        private readonly System.Random _deflectRng = new System.Random(0xDEFE17);
 
         public ProjectileSystem(ComponentStore store, IRenderer logger)
         {
@@ -363,6 +366,28 @@ namespace BattleSystemECS.Systems
             float damage = _projDamage[projId];
             int playerId = _projPlayerId[projId];
             int towerId = _projTowerId[projId];
+
+            // Projectile Deflection: high-speed / boss-tier enemies can deflect incoming projectiles
+            // on a per-hit roll. On a successful deflect, the projectile is fully nullified
+            // (no pierce immunity / thorns / fragmentation side-effects are triggered, and the
+            // damage queue is not enqueued). This is purely a damage filter — deflection does not
+            // ricochet, bounce, or return to attacker. RNG call is wrapped in _damageQueueLock to
+            // keep System.Random safe (consistent with the rest of ResolveHit, which already locks
+            // around any state shared with concurrent code paths).
+            float deflectChance = store.EnemyDeflectChance[targetId];
+            if (deflectChance > 0f)
+            {
+                bool deflected;
+                lock (_damageQueueLock)
+                {
+                    deflected = _deflectRng.NextDouble() < deflectChance;
+                }
+                if (deflected)
+                {
+                    // Deflected — early-exit without applying damage, pierce, thorns, or fragments.
+                    return;
+                }
+            }
 
             // Pierce Resistance: only applies to piercing projectiles (Fire() sets _projIsPiercing=true when pierceCount>0).
             // For non-piercing projectiles, damage is unaffected. Fragments from FireAtPoint are always non-piercing.

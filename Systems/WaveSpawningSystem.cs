@@ -216,6 +216,8 @@ namespace BattleSystemECS.Systems
                 store.SetPierceResist(enemyId, monsterConfig.PierceResist, monsterConfig.PierceImmune);
                 // Crit Resistance: suppress fraction of incoming crit chance (Boss/Elite = 0.5, normal = 0)
                 store.SetCritResistance(enemyId, monsterConfig.CritResist);
+                // Deflect Chance: probability of deflecting an incoming projectile (Boss-tier 0.2, normal 0)
+                store.SetDeflectChance(enemyId, monsterConfig.DeflectChance);
                 store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree("Normal");
                 totalEnemiesSpawned++;
             }
@@ -251,6 +253,8 @@ namespace BattleSystemECS.Systems
             store.SetPierceResist(enemyId, monsterConfig.PierceResist, monsterConfig.PierceImmune);
             // Crit Resistance: suppress fraction of incoming crit chance (Boss/Elite = 0.5, normal = 0)
             store.SetCritResistance(enemyId, monsterConfig.CritResist);
+            // Deflect Chance: probability of deflecting an incoming projectile (Boss-tier 0.2, normal 0)
+            store.SetDeflectChance(enemyId, monsterConfig.DeflectChance);
             store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree("Normal");
             store.EnemyIsElite[enemyId] = true;
             totalEnemiesSpawned++;
@@ -453,6 +457,8 @@ namespace BattleSystemECS.Systems
                     store.SetPierceResist(enemyId, monsterConfig.PierceResist, monsterConfig.PierceImmune);
                     // Crit Resistance: suppress fraction of incoming crit chance (Boss/Elite = 0.5, normal = 0)
                     store.SetCritResistance(enemyId, monsterConfig.CritResist);
+                    // Deflect Chance: probability of deflecting an incoming projectile (Boss-tier 0.2, normal 0)
+                    store.SetDeflectChance(enemyId, monsterConfig.DeflectChance);
                     store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(monsterType);
 
                     // Initialize flying enemy properties from monster config

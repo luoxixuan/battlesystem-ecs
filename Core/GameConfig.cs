@@ -155,6 +155,9 @@ namespace BattleSystemECS.Config
         // CritResistance: 0-1, fraction of incoming crit chance suppressed (0 = full crit, 0.5 = halved, 1.0 = immune).
         // Wired to EnemyCritResistance via SetCritResistance() in WaveSpawningSystem.
         public float CritResist { get; set; } = 0f;
+        // DeflectChance: 0-1, probability that the enemy deflects an incoming projectile (0 = never, 0.2 = boss-tier).
+        // Wired to EnemyDeflectChance via SetDeflectChance() in WaveSpawningSystem. Default 0.
+        public float DeflectChance { get; set; } = 0f;
     }
 
     public class TowerConfig

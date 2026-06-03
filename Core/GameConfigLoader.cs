@@ -784,6 +784,9 @@ namespace BattleSystemECS.Config
             // Crit resistance: 0-1, suppresses a fraction of incoming crit chance.
             // Used by Boss/Elite monsters to dampen crit-sniper tower builds. Default 0.
             monster.CritResist = ExtractFloat(json, "CritResist");
+            // Deflect chance: 0-1, probability of deflecting an incoming projectile.
+            // Used by Boss/Elite monsters to add visual punch and force reliable follow-up towers. Default 0.
+            monster.DeflectChance = ExtractFloat(json, "DeflectChance");
 
             return monster;
         }

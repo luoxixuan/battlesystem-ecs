@@ -820,6 +820,7 @@ namespace BattleSystemECS.Core
             EnemyArmorShredStacks = null!; EnemyArmorShredDuration = null!;
             EnemyCurseDmgReduction = null!; EnemyCurseSpeedReduction = null!;
             EnemyCurseArmorReduction = null!; EnemyCurseDmgTakenIncrease = null!;
+            EnemyDeflectChance = null!;
             EnemyBleedStacks = null!; EnemyBleedDamagePerStack = null!; EnemyBleedTimer = null!;
             EnemyBleedMaxStacks = null!; EnemyBleedResistance = null!; EnemyBleedDurationLeft = null!;
             EnemyStunFlag = null!; EnemyStunDurationLeft = null!; EnemySlowFactor = null!;
