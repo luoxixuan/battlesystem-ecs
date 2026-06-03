@@ -19,6 +19,7 @@ namespace BattleSystemECS.Core
         public Systems.GlobalSkillSystem? GlobalSkill { get; set; }
         public Systems.HitShieldSystem? HitShield { get; set; }
         public Systems.HotZoneSystem? HotZone { get; set; }
+        public Systems.FrostZoneSystem? FrostZone { get; set; }
         public Systems.TauntSystem? Taunt { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
@@ -38,6 +39,10 @@ namespace BattleSystemECS.Core
             GlobalSkill?.SetTurn(turn);
             HitShield?.SetTurn(turn);
             HotZone?.SetTurn(turn);
+            // Frost Zone: writes EnemyFrostZoneSlowMultiplier per enemy for this frame.
+            // Runs after HotZone (placement pre-computed) and before Taunt (independent).
+            FrostZone?.SetTurn(turn);
+            FrostZone?.Update();
             // Taunt tower: pre-compute taunt tower list (O(n_active_towers)) before Combat
             // assigns EnemyTauntedByTowerId. Cheap when no taunt towers exist.
             Taunt?.SetTurn();

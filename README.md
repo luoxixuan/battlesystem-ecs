@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-03, Round 81 — 连杀奖励 Combo Chain）
+## 性能基准（2026-06-03, Round 82 — 冰霜减速区 Frost Zone）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3815 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10109 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4088 FPS** |
+| **mode 5**（完整一局） | **3670 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9553 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3625 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> ✅ 本轮 bench2 +3.3%、bench4 +0.9%、bench5 +3.6%，均符合噪声范围（ComboChain 改动极小：1 个 O(1) 早退 + 2 SOA 字段 read/frame for damage apply）。
+> ⚠️ 本轮 bench2 -5.5%、bench4 -11.3%、bench5 -3.8%。bench4 略超 10% 噪声阈值（疑似 FrostZoneSystem 的 O(towers × enemies) 串行 MIN-apply 内层在 bench4 真实系统链路上被放大；下一步可考虑引入 SpatialGrid cell-bucketed fast-path 优化）。
 
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 

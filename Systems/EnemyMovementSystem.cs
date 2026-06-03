@@ -204,6 +204,11 @@ namespace BattleSystemECS.Systems
                 // Apply tile-stacking penalty (crowding slow from previous frame's stack count).
                 // 1.0 = no slow. < 1.0 = penalized. Defaults to 1.0 (no penalty) for first frame after spawn.
                 moveSpeed *= store.EnemyStackSlowRatio[enemyId];
+                // Apply Frost Zone slow (Round 82 Direction 1) — per-enemy multiplier set
+                // earlier in the frame by FrostZoneSystem. 1.0 = no zone, lower = slower.
+                // Multiplicative with all other slow factors (stacking is intentional:
+                // multiple zone types can each contribute their share of the slow).
+                moveSpeed *= store.EnemyFrostZoneSlowMultiplier[enemyId];
                 // Apply Tether lock-chain slow factor (set by previous frame's ResolveTetherEnforcement).
                 // 1.0 = no slow. 0.5 = 50% speed when chain is over-length. Defaults to 1.0.
                 moveSpeed *= store.EnemyTetherSlowFactor[enemyId];

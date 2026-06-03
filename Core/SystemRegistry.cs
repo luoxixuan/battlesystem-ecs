@@ -114,6 +114,9 @@ namespace BattleSystemECS.Core
         // ── Hot Zone / Terrain Bonus ──
         public HotZoneSystem? HotZone { get; private set; }
 
+        // ── Frost Zone (Round 82 Direction 1) ── tower-positioned AoE slow
+        public FrostZoneSystem? FrostZone { get; private set; }
+
         // ── Magnetize zones (displacement fields, no damage) ──
         public MagnetizeSystem? Magnetize { get; private set; }
 
@@ -279,6 +282,9 @@ namespace BattleSystemECS.Core
 
             // ── Hot Zone ──
             HotZone = new HotZoneSystem(store, config, playerId);
+
+            // ── Frost Zone (Round 82 Direction 1) — instantiates per registry
+            FrostZone = new FrostZoneSystem(store);
 
             // ── Magnetize (displacement fields) ──
             Magnetize = new MagnetizeSystem(store, logger);
@@ -480,6 +486,7 @@ namespace BattleSystemECS.Core
             scheduler.CombatSetup.GlobalSkill = GlobalSkill;
             scheduler.CombatSetup.HitShield = HitShield;
             scheduler.CombatSetup.HotZone = HotZone;
+            scheduler.CombatSetup.FrostZone = FrostZone;
             scheduler.CombatSetup.Taunt = Taunt;
 
             // ── Spatial ──

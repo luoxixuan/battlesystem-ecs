@@ -447,6 +447,21 @@ namespace BattleSystemECS.Core
         // TowerHotZoneSpeedBonus: cached attack speed multiplier bonus from hot zone (e.g. 0.1 = +10%).
         public float[] TowerHotZoneSpeedBonus = new float[MAX_ENTITIES];
 
+        // ==================== 冰霜减速区 (Frost Zone — Round 82 Direction 1) ====================
+        // TowerFrostZoneRadius: radius in grid cells of the "frost tile" centered on this tower.
+        // Enemies inside the radius have their effective move speed multiplied by
+        // TowerFrostZoneSlowFactor (lower = stronger slow; 1.0 = no slow). 0 = no frost zone
+        // (zero-overhead default; no allocations, no per-frame work for non-frost towers).
+        public float[] TowerFrostZoneRadius = new float[MAX_ENTITIES];
+        // TowerFrostZoneSlowFactor: per-tower slow factor applied to enemies in the zone
+        // (0.5 = 50% move speed, 0.3 = 30% move speed). Multiple overlapping zones take the
+        // MIN (most severe) of all contributing towers (resolved in FrostZoneSystem).
+        public float[] TowerFrostZoneSlowFactor = new float[MAX_ENTITIES];
+        // TowerFrostZoneDuration: seconds the zone has been active (0 = permanent, >0 = decaying).
+        // Decremented each frame; when the timer hits 0, the tower's frost zone disables itself
+        // by writing 0 to TowerFrostZoneRadius. Default 0 means permanent (zero-decrement path).
+        public float[] TowerFrostZoneDuration = new float[MAX_ENTITIES];
+
         // ==================== 迫击炮/弧线弹道 (Mortar / Arc Projectiles) ====================
         // TowerProjectileArcType: 0=直线（默认）, 1=跟踪, 2=弧线（抛物线）
         // Affects how the projectile moves through the air — arc uses gravity simulation
@@ -876,6 +891,11 @@ namespace BattleSystemECS.Core
             // Elemental affinity fields: default to no affinity (-1) and no bonus (0 = inactive zero-overhead path)
             TowerElementalAffinity[entityId] = -1;
             TowerElementalAffinityBonus[entityId] = 0f;
+            // Frost Zone fields: default to no zone (radius=0, factor=1=passthrough, duration=0=permanent)
+            // 1f is the neutral slow factor so the "no zone" default applies ZERO slow to enemies.
+            TowerFrostZoneRadius[entityId] = 0f;
+            TowerFrostZoneSlowFactor[entityId] = 1f;
+            TowerFrostZoneDuration[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
@@ -1045,6 +1065,10 @@ namespace BattleSystemECS.Core
             // Elemental affinity fields reset (-1 = no affinity, 0 = no bonus)
             TowerElementalAffinity[entityId] = -1;
             TowerElementalAffinityBonus[entityId] = 0f;
+            // Frost Zone fields reset (radius=0=disabled, factor=1=neutral, duration=0=permanent off)
+            TowerFrostZoneRadius[entityId] = 0f;
+            TowerFrostZoneSlowFactor[entityId] = 1f;
+            TowerFrostZoneDuration[entityId] = 0f;
             // Phasing field reset (false = no phasing, zero-overhead)
             TowerIsPhasing[entityId] = false;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }

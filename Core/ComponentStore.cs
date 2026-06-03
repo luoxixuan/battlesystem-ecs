@@ -404,6 +404,7 @@ namespace BattleSystemECS.Core
                 EnemyStunDurationLeft[entityId] = 0f;
                 EnemySlowFactor[entityId] = 0f;
                 EnemyTerrainMoveSpeedMult[entityId] = 1f;
+                EnemyFrostZoneSlowMultiplier[entityId] = 1f;  // default: no frost zone, neutral 1x
                 EnemyMoveSpeedBase[entityId] = 0f;
                 EnemySlowDurationLeft[entityId] = 0f;
                 // Polymorph CC fields (reset on entity destruction)
@@ -801,6 +802,7 @@ namespace BattleSystemECS.Core
             EnemyBleedMaxStacks = null!; EnemyBleedResistance = null!; EnemyBleedDurationLeft = null!;
             EnemyStunFlag = null!; EnemyStunDurationLeft = null!; EnemySlowFactor = null!;
             EnemyTerrainMoveSpeedMult = null!; EnemyMoveSpeedBase = null!; EnemySlowDurationLeft = null!;
+            EnemyFrostZoneSlowMultiplier = null!;
             EnemyIsPolymorphed = null!; EnemyPolymorphDurationLeft = null!; EnemyPolymorphDamageTakenMultiplier = null!;
             EnemyWoundThreshold = null!; EnemyWoundSlowRatio = null!; EnemyIsWounded = null!;
             EnemyKnockbackForceLeft = null!; EnemyIsElite = null!; EnemyIsFlying = null!;

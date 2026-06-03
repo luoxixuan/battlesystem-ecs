@@ -133,6 +133,11 @@ namespace BattleSystemECS.Core
         public float[] EnemySlowFactor = new float[MAX_ENTITIES];
         // EnemyTerrainMoveSpeedMult: terrain-based speed multiplier (1.0 = normal, 0.5 = mud slow)
         public float[] EnemyTerrainMoveSpeedMult = new float[MAX_ENTITIES];
+        // EnemyFrostZoneSlowMultiplier: per-enemy slow multiplier from overlapping FrostZone towers
+        // (1.0 = no frost zone touching this enemy, 0.5 = 50% move speed). Set each frame by
+        // FrostZoneSystem as the MIN over all active frost towers whose radius covers the enemy.
+        // Default 1.0 = neutral (no slow); falls back to 1.0 automatically on enemy death.
+        public float[] EnemyFrostZoneSlowMultiplier = new float[MAX_ENTITIES];
         // EnemyMoveSpeedBase: stores original speed for slow recovery
         public float[] EnemyMoveSpeedBase = new float[MAX_ENTITIES];
         // EnemySlowDurationLeft: tower-slow duration in turns. Separate from EnemyBuffDurationLeft
@@ -787,6 +792,10 @@ namespace BattleSystemECS.Core
             // Tile-stacking penalty: default 0 stack, 1.0 slow ratio (no penalty until first frame of crowding)
             EnemyStackCount[entityId] = 0;
             EnemyStackSlowRatio[entityId] = 1f;
+            // Frost Zone slow: default 1.0 (no frost zone touching this enemy) — set explicitly
+            // because float[] default is 0f and 0f multiplied into moveSpeed would freeze the
+            // enemy on spawn. FrostZoneSystem rewrites this every frame from a fresh 1.0.
+            EnemyFrostZoneSlowMultiplier[entityId] = 1f;
             // Elemental Shield: default None, no weakness/resistance, no break reaction
             EnemyShieldType[entityId] = ElementType.None;
             EnemyShieldWeakMult[entityId] = 0f;   // 0 = use default 2x when triggered
