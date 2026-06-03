@@ -507,6 +507,161 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public bool LastPreviewValid => _previewValid;
 
+        // ─── Build Queue (BuildPhase 预排多塔位) ────────────────────────────────
+        // Players can call EnqueueBuild() multiple times during BuildPhase to lay out
+        // a build order, then ProcessBuildQueue() drains the head of the queue at a
+        // paced interval (default 0.2s = 5 placements/sec) when called from the
+        // WavePhase loop. Gold is deducted per placement; if gold is insufficient the
+        // slot is skipped and logged (the rest of the queue is preserved).
+
+        /// <summary>
+        /// Append a (x, y, type) placement request to a player's build queue.
+        /// Returns true on success, false if the queue is full (default MAX_BUILD_QUEUE=16)
+        /// or the position is out of bounds. Validation against occupancy / tower cap is
+        /// deferred to drain time so the player can pre-plan a full wave layout.
+        /// </summary>
+        public bool EnqueueBuild(int playerId, int x, int y, TowerType type, float damage, int range, float speed, float cost)
+        {
+            if ((uint)playerId >= 10) return false;
+            if (store.PlayerBuildQueueCount[playerId] >= ComponentStore.MAX_BUILD_QUEUE)
+            {
+                logger.Log($"[BUILDQ] EnqueueBuild failed: player {playerId} queue is full ({ComponentStore.MAX_BUILD_QUEUE})");
+                return false;
+            }
+            if (x < 0 || x >= 10 || y < 0 || y >= 20)
+            {
+                logger.Log($"[BUILDQ] EnqueueBuild failed: position ({x},{y}) out of map range");
+                return false;
+            }
+            int slotIdx = playerId * ComponentStore.MAX_BUILD_QUEUE + store.PlayerBuildQueueCount[playerId];
+            // First-fill-any-inactive-slot (defensive — should be append-only)
+            while (store.PlayerBuildQueue[slotIdx].Active && slotIdx < (playerId + 1) * ComponentStore.MAX_BUILD_QUEUE)
+            {
+                slotIdx++;
+            }
+            if (slotIdx >= (playerId + 1) * ComponentStore.MAX_BUILD_QUEUE) return false;
+            store.PlayerBuildQueue[slotIdx] = new ComponentStore.BuildQueueSlot
+            {
+                X = x,
+                Y = y,
+                TowerType = (int)type,
+                Damage = damage,
+                Range = range,
+                Speed = speed,
+                Cost = cost,
+                Active = true
+            };
+            store.PlayerBuildQueueCount[playerId]++;
+            logger.Log($"[BUILDQ] Player {playerId} enqueued: {type} at ({x},{y}) — slot {store.PlayerBuildQueueCount[playerId]}/{ComponentStore.MAX_BUILD_QUEUE}");
+            return true;
+        }
+
+        /// <summary>
+        /// Clear all queued build orders for a player. Safe to call when the queue is empty.
+        /// </summary>
+        public void ClearBuildQueue(int playerId)
+        {
+            if ((uint)playerId >= 10) return;
+            int baseIdx = playerId * ComponentStore.MAX_BUILD_QUEUE;
+            for (int i = 0; i < ComponentStore.MAX_BUILD_QUEUE; i++)
+            {
+                store.PlayerBuildQueue[baseIdx + i] = default;
+            }
+            store.PlayerBuildQueueCount[playerId] = 0;
+            store.PlayerBuildQueueTimer[playerId] = 0f;
+            logger.Log($"[BUILDQ] Player {playerId} build queue cleared");
+        }
+
+        /// <summary>
+        /// Returns the number of pending build orders for a player. O(1) — backed by PlayerBuildQueueCount.
+        /// </summary>
+        public int GetBuildQueueCount(int playerId)
+        {
+            if ((uint)playerId >= 10) return 0;
+            return store.PlayerBuildQueueCount[playerId];
+        }
+
+        /// <summary>
+        /// Drain the head of the build queue for a single player. Called once per frame
+        /// from FrameScheduler (or any WavePhase entry point). Pacing is controlled by
+        /// PlayerBuildQueueTimer + GameConfig.BuildQueueInterval (default 0.2s).
+        /// Returns the number of towers actually placed this tick (0 or 1).
+        /// </summary>
+        public int ProcessBuildQueue(int playerId, float deltaTime)
+        {
+            if ((uint)playerId >= 10) return 0;
+            if (store.PlayerBuildQueueCount[playerId] <= 0) return 0;
+            float interval = gameConfig != null ? gameConfig.BuildQueueInterval : 0.2f;
+            store.PlayerBuildQueueTimer[playerId] += deltaTime;
+            if (store.PlayerBuildQueueTimer[playerId] < interval) return 0;
+            store.PlayerBuildQueueTimer[playerId] -= interval;
+            // Find the head (lowest active slot)
+            int baseIdx = playerId * ComponentStore.MAX_BUILD_QUEUE;
+            int headSlot = -1;
+            for (int i = 0; i < ComponentStore.MAX_BUILD_QUEUE; i++)
+            {
+                if (store.PlayerBuildQueue[baseIdx + i].Active)
+                {
+                    headSlot = baseIdx + i;
+                    break;
+                }
+            }
+            if (headSlot < 0)
+            {
+                store.PlayerBuildQueueCount[playerId] = 0;
+                return 0;
+            }
+            ref var slot = ref store.PlayerBuildQueue[headSlot];
+            // Gold check — skip if insufficient
+            float currentGold = store.GetPlayerGold(playerId);
+            if (currentGold < slot.Cost)
+            {
+                logger.Log($"[BUILDQ] Player {playerId} gold insufficient ({currentGold:F0} < {slot.Cost:F0}) — slot at ({slot.X},{slot.Y}) skipped");
+                slot = default;
+                CompactQueue(playerId);
+                return 0;
+            }
+            // Snapshot slot fields BEFORE clearing (ref becomes stale after slot = default).
+            int slotX = slot.X, slotY = slot.Y, slotType = slot.TowerType;
+            float slotDmg = slot.Damage, slotSpd = slot.Speed, slotCost = slot.Cost;
+            int slotRange = slot.Range;
+            // Deduct gold up front (PlaceTower increments PlayerTowerCount, but gold deduction
+            // is handled internally; we pre-deduct to avoid double-charge on PlaceTower's path).
+            // Actually, PlaceTower does NOT deduct gold (it only increments the count). The
+            // caller of PlaceTower is responsible for gold. So we deduct here.
+            store.SetPlayerGold(playerId, currentGold - slot.Cost);
+            int id = PlaceTower(slotX, slotY, (TowerType)slotType, slotDmg, slotRange, slotSpd, slotCost);
+            // Clear the consumed slot and compact
+            slot = default;
+            CompactQueue(playerId);
+            if (id >= 0)
+            {
+                logger.Log($"[BUILDQ] Player {playerId} drained: tower #{id} built at ({slotX},{slotY}) (cost {slotCost:F0})");
+            }
+            return id >= 0 ? 1 : 0;
+        }
+
+        // Compact the active slots in a player's queue so the head is always at the lowest
+        // index. O(MAX_BUILD_QUEUE)=O(16), negligible.
+        private void CompactQueue(int playerId)
+        {
+            int baseIdx = playerId * ComponentStore.MAX_BUILD_QUEUE;
+            int writeIdx = 0;
+            for (int readIdx = 0; readIdx < ComponentStore.MAX_BUILD_QUEUE; readIdx++)
+            {
+                if (store.PlayerBuildQueue[baseIdx + readIdx].Active)
+                {
+                    if (writeIdx != readIdx)
+                    {
+                        store.PlayerBuildQueue[baseIdx + writeIdx] = store.PlayerBuildQueue[baseIdx + readIdx];
+                        store.PlayerBuildQueue[baseIdx + readIdx] = default;
+                    }
+                    writeIdx++;
+                }
+            }
+            store.PlayerBuildQueueCount[playerId] = writeIdx;
+        }
+
         private void ApplyTowerSpecialAbility(ComponentStore store, int towerId, TowerSpecialAbility ability)
         {
             if (ability == null || string.IsNullOrEmpty(ability.AbilityType)) return;

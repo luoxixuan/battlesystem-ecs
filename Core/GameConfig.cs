@@ -1979,6 +1979,12 @@ namespace BattleSystemECS.Config
             return TowerTypes.Find(t => t.Type.ToString() == type);
         }
 
+        // ── Build Queue (BuildPhase 预排多塔位) ────────────────────────────────
+        // BuildQueueInterval: seconds between automatic PlaceTower calls when draining
+        // the build queue. 0.2f = 5 placements/sec (smooth visual + WavePhase pacing).
+        private float _buildQueueInterval = 0.2f;
+        public float BuildQueueInterval { get => _buildQueueInterval; set => _buildQueueInterval = value; }
+
         public BehaviorTreeDef GetBehaviorTree(string monsterType)
         {
             if (string.IsNullOrEmpty(monsterType)) return null;

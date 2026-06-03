@@ -109,6 +109,30 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // PlayerTowerCount: current number of towers placed by this player
         public int[] PlayerTowerCount = new int[MAX_PLAYERS];
 
+        // ==================== Build Queue (BuildPhase 预排多个塔位) ====================
+        // PlayerBuildQueue: SOA queue of pending tower placements (per player, indexed by playerId * MAX_BUILD_QUEUE + slot).
+        // Each slot holds (x, y, TowerType, damage, range, speed, cost, active) — a queued request is
+        // drained in FIFO order by TowerPlacementSystem.ProcessBuildQueue() at WavePhase start.
+        // Capacity is fixed at MAX_BUILD_QUEUE (16 by default) for zero-GC hot-path access.
+        public struct BuildQueueSlot
+        {
+            public int X;
+            public int Y;
+            public int TowerType;  // (int)TowerType enum
+            public float Damage;
+            public int Range;
+            public float Speed;
+            public float Cost;
+            public bool Active;     // true = slot occupied
+        }
+        public const int MAX_BUILD_QUEUE = 16;
+        public BuildQueueSlot[] PlayerBuildQueue = new BuildQueueSlot[MAX_PLAYERS * MAX_BUILD_QUEUE];
+        // PlayerBuildQueueCount: number of active slots per player (0..MAX_BUILD_QUEUE)
+        public int[] PlayerBuildQueueCount = new int[MAX_PLAYERS];
+        // PlayerBuildQueueTimer: per-player drain timer (seconds). Each tick, when >= BuildQueueInterval,
+        // the head of the queue is consumed via PlaceTower. Default 0 = ready to drain on next tick.
+        public float[] PlayerBuildQueueTimer = new float[MAX_PLAYERS];
+
         // ==================== 波次预览/侦查等级 (Wave Preview / Scouting Level) ====================
         // PlayerWavePreviewLevel: 0=None, 1=Vague (only count + type names, no stats), 2=Precise (full stats + skills).
         // Set externally by tech tree unlocks (e.g. "scouting_i" / "scouting_ii"). Default 0 = no preview.
