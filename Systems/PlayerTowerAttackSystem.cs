@@ -218,9 +218,12 @@ public void SetWaveNumber(int waveNumber)
 // H-3 fix: crit rolled per-enemy inside parallel loop, not once per frame globally.
                 // Optimized: merged crit rate threshold (precomputed _critRateThreshold) eliminates branch
                 // Round 67: capture wasCrit bool so the serial phase can publish EnemyHit / EnemyCrit events.
+                // Crit Resistance: enemy can suppress a fraction of incoming crit chance (Boss/Elite = 0.5).
+                // Effective threshold = _critRateThreshold * (1 - EnemyCritResistance), applied inline.
                 float finalDamage = baseDamage;
                 bool wasCrit = false;
-                if (GetDeterministicRandom(_currentTurn, enemyId, playerId) < (int)(_critRateThreshold * 0x7FFFFFFF))
+                float effectiveCritThreshold = _critRateThreshold * (1f - store.EnemyCritResistance[enemyId]);
+                if (GetDeterministicRandom(_currentTurn, enemyId, playerId) < (int)(effectiveCritThreshold * 0x7FFFFFFF))
                 {
                     finalDamage *= (1f + _critDamageBonus);
                     wasCrit = true;

@@ -960,7 +960,8 @@ namespace BattleSystemECS.Systems
                                 lock (splashLock) { splashBag.Add((bestTarget, baseDmg * 0.5f, store.PlayerEntityId, towerId)); }
                             }
                             // Special ability: critical strike
-                            float critRate = store.TowerCritChance[towerId] + _critRateBonus;
+                            // Crit Resistance: enemy can suppress a fraction of incoming crit chance (Boss/Elite = 0.5)
+                            float critRate = (store.TowerCritChance[towerId] + _critRateBonus) * (1f - store.EnemyCritResistance[bestTarget]);
                             if (critRate > 0f && _rand.NextDouble() < critRate)
                             {
                                 float critBonus = baseDmg * (store.TowerCritMultiplier[towerId] * _critDamageBonus - 1f);

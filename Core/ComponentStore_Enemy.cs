@@ -444,6 +444,11 @@ namespace BattleSystemECS.Core
         // EnemyIsPierceImmune: binary pierce immunity flag. When true, piercing projectiles deal 0 damage to this enemy.
         // Used for boss-type "armored core" enemies that completely shut down pierce tower strategies.
         public bool[] EnemyIsPierceImmune = new bool[MAX_ENTITIES];
+        // EnemyCritResistance: 0-1, fraction of incoming crit chance that is suppressed.
+        // Effective crit chance = towerCritChance * (1 - EnemyCritResistance). 0 = full crit chance, 0.5 = crit halved, 1.0 = cannot crit.
+        // Applied in TowerAttackSystem and PlayerTowerAttackSystem at the crit roll point.
+        // Default 0 for normal enemies; Boss/Elite monsters typically 0.5 to balance crit-sniper builds.
+        public float[] EnemyCritResistance = new float[MAX_ENTITIES];
 
         // ==================== 自爆/殉爆敌人 (Suicide Bomber / Kamikaze, SOA) ====================
         // EnemyIsSuicide: true if this enemy is a suicide bomber that explodes near towers
@@ -810,6 +815,8 @@ namespace BattleSystemECS.Core
             // Pierce Resistance: default 0 resist, false immune (no pierce mitigation)
             EnemyPierceResist[entityId] = 0f;
             EnemyIsPierceImmune[entityId] = false;
+            // Crit Resistance: default 0 (full crit chance) — only Boss/Elite monsters get a non-zero value via SetCritResistance()
+            EnemyCritResistance[entityId] = 0f;
             EnemyShield[entityId] = shield;  // configurable initial shield
             // Hit Shield: default 0 layers, 0 max, 0 regen timer
             EnemyHitShieldCount[entityId] = 0f;
@@ -1046,6 +1053,19 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(enemyId)) return;
             EnemyPierceResist[enemyId] = pierceResist;
             EnemyIsPierceImmune[enemyId] = pierceImmune;
+        }
+
+        /// <summary>
+        /// Configures crit resistance for an enemy. Effective crit chance = towerCritChance * (1 - critResistance).
+        /// Used by Boss/Elite monsters to dampen crit-sniper tower builds (default 0.5 → crit chance halved).
+        /// </summary>
+        /// <param name="enemyId">Target enemy entity ID</param>
+        /// <param name="critResistance">0-1, fraction of incoming crit chance suppressed (0 = full crit, 1.0 = no crits ever)</param>
+        public void SetCritResistance(int enemyId, float critResistance)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            // Clamp to [0,1] for safety; negative or >1 values would invert crit behavior unpredictably.
+            EnemyCritResistance[enemyId] = System.Math.Clamp(critResistance, 0f, 1f);
         }
 
         /// <summary>

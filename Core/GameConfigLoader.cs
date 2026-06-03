@@ -781,6 +781,9 @@ namespace BattleSystemECS.Config
             // Both are wired to EnemyPierceResist / EnemyIsPierceImmune via SetPierceResist.
             monster.PierceResist = ExtractFloat(json, "PierceResist");
             monster.PierceImmune = ExtractBool(json, "PierceImmune");
+            // Crit resistance: 0-1, suppresses a fraction of incoming crit chance.
+            // Used by Boss/Elite monsters to dampen crit-sniper tower builds. Default 0.
+            monster.CritResist = ExtractFloat(json, "CritResist");
 
             return monster;
         }

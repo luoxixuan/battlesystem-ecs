@@ -214,6 +214,8 @@ namespace BattleSystemECS.Systems
                     monsterConfig.LastStand?.SpeedMult ?? 1f,
                     monsterConfig.LastStand?.DamageMult ?? 1f);
                 store.SetPierceResist(enemyId, monsterConfig.PierceResist, monsterConfig.PierceImmune);
+                // Crit Resistance: suppress fraction of incoming crit chance (Boss/Elite = 0.5, normal = 0)
+                store.SetCritResistance(enemyId, monsterConfig.CritResist);
                 store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree("Normal");
                 totalEnemiesSpawned++;
             }
@@ -247,6 +249,8 @@ namespace BattleSystemECS.Systems
                 monsterConfig.LastStand?.SpeedMult ?? 1f,
                 monsterConfig.LastStand?.DamageMult ?? 1f);
             store.SetPierceResist(enemyId, monsterConfig.PierceResist, monsterConfig.PierceImmune);
+            // Crit Resistance: suppress fraction of incoming crit chance (Boss/Elite = 0.5, normal = 0)
+            store.SetCritResistance(enemyId, monsterConfig.CritResist);
             store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree("Normal");
             store.EnemyIsElite[enemyId] = true;
             totalEnemiesSpawned++;
@@ -447,6 +451,8 @@ namespace BattleSystemECS.Systems
                         monsterConfig.LastStand?.SpeedMult ?? 1f,
                         monsterConfig.LastStand?.DamageMult ?? 1f);
                     store.SetPierceResist(enemyId, monsterConfig.PierceResist, monsterConfig.PierceImmune);
+                    // Crit Resistance: suppress fraction of incoming crit chance (Boss/Elite = 0.5, normal = 0)
+                    store.SetCritResistance(enemyId, monsterConfig.CritResist);
                     store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(monsterType);
 
                     // Initialize flying enemy properties from monster config
