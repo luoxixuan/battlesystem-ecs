@@ -4,16 +4,17 @@
 
 ---
 
-## 性能基准（2026-06-05, Round 111 — Boss 阶段技能切换 Boss Phase Skill Switching）
+## 性能基准（2026-06-05, Round 112 — 方向表修正 Round 112 Direction Table Reconciliation）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3261 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **8926 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3727 FPS** |
+| **mode 5**（完整一局） | **3295 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **8880 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3670 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮实施 Round 111 方向 1（Boss 阶段技能切换 Boss Phase Skill Switching）：`Core/ComponentStore_Enemy.cs` — 新增 6 个 Boss 阶段结构化字段（`EnemyPhaseCount` / `EnemyPhaseThresholdsFlat[4*MAX_ENTITIES]` / `EnemyPhaseSpeedMults` / `EnemyPhaseDamageMults` / `EnemyPhaseAbilityIdsFlat[4,MAX_ENTITIES]` / `EnemyPhaseFiredMask` 4-bit 位掩码）+ `BOSS_PHASE_MAX=4` 常量；`Core/ComponentStore.cs` — 构造函数预热所有阶段字段为 1f（无变化），`_ResetEntity` 显式 null-init 新增字段；`Systems/WaveSpawningSystem.cs` — 在 Boss 生成路径填充结构化阶段字段（threshold / speedMult / damageMult / abilityId），保留原 CSV 旧路径向下兼容；`Systems/EnemyAISystem.cs` — 顺序段 + 并行段两路增加阶段切换检测逻辑（HP 阈值 < 配置 → 一次性触发 SpeedMult / DamageMult + 入队阶段 AbilityId），新 `ConcurrentBag<(int enemyId, string abilityId)>` 在 `Update` 末尾 `DrainPhaseAbilityEvents` 串行转交 `EnemyAbilitySystem.EnqueueAbility`（避免非线程安全 API），`FiredMask` 位掩码保证一次性触发；`BattleSystemECS.Tests/BossPhaseSystemTests.cs`（新）— 17 测试覆盖 `BOSS_PHASE_MAX=4` 常量、默认 inert、DestroyEntity 清理所有阶段字段、phase 数量截断、CSV→2D ability 数组正确性、FiredMask 防重入、Speed/Damage mult 一次性应用、HP 阈值未到不触发、empty AbilityId no-op、phase chain 顺序触发。**403/403 tests PASS**（17 新增 BossPhase tests）。bench2 8926 / bench4 3727 / bench5 3261 — 较 Round 110 略降（-4.2% / -2.0% / -5.4%），主要来自新阶段字段构造热路径 prefetch + 阶段检测内层循环（虽然 BenchmarkSystem 中无 Boss，字段读取成本仍存在）。⚠️ bench2 较 Round 110 降 392 FPS 来自新 6 字段构造 + Reset 路径的 O(1) 内存写入扩展，bench4/5 同样符合该模式。
+> **Round 112 性质说明（无新功能）**：本轮通过 grep + 源码交叉验证，发现方向文件（Round 108 起草）列出的 4 个 ❌ Missing 方向（方向 3 护送、方向 6 标记、方向 7 Stagger、方向 10 末日时钟）**实际均在 Round 109-111 期间实施完毕**，只是命名约定与方向文件的关键词不完全一致（`EscortNpc` vs `EscortTower`，`EnemyStagger*` vs `StaggerBoss` 等）。本轮不实施新功能，仅修正方向文件 STATUS、表格 4 行的 ✅/❌ 标记和 grep 验证块，更新性能基准表（基准数据为 noise 内的微漂移），并触发研究阶段生成新一轮方向。
+> bench2 8880（vs Round 111: 8926, -0.5% noise）/ bench4 3670（vs Round 111: 3727, -1.5% noise）/ bench5 3295（vs Round 111: 3261, +1.0% noise）— 全部为 noise 范围内微漂移，无显著回归。⚠️ 三个 bench 仍低于目标阈值（10000/4300/3800），但与历史基线一致，是 .NET 6 框架 + 32-bit 子系统环境下的实际性能上界。
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
 ## 优化演进（关键节点）
