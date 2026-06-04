@@ -41,6 +41,8 @@ namespace BattleSystemECS.Core
         public GlobalSkillSystem? GlobalSkill { get; private set; }
         // Round 107 Direction 6 — Target Mark subsystem (stack-based debuff counter)
         public MarkSystem? Mark { get; private set; }
+        // Round 109 Direction 5 — Time Rewind snapshot ring (HP / Mana / Shield restore)
+        public TimeRewindSnapshotSystem? TimeRewind { get; private set; }
 
         // ── Towers ──
         public TowerPlacementSystem? TowerPlacement { get; private set; }
@@ -343,6 +345,9 @@ namespace BattleSystemECS.Core
             // ── Round 107 Direction 6 — Target Mark subsystem ──
             Mark = new MarkSystem(store, playerId);
 
+            // ── Round 109 Direction 5 — Time Rewind snapshot ring ──
+            TimeRewind = new TimeRewindSnapshotSystem(store);
+
             // ── Store EventBus ──
             EventBus = eventBus;
         }
@@ -370,6 +375,7 @@ namespace BattleSystemECS.Core
             // ── Skill wiring ──
             Skill?.InjectDotSystem(Buff);
             Skill?.InjectHealingZoneSystem(HealingZone);
+            Skill?.InjectTimeRewindSystem(TimeRewind);
 
             // ── Mark wiring: subscribe to OnEnemyKilled to free the per-entity
             //    threshold-fired latch on enemy destroy (avoids ID-reuse leakage). ──
@@ -458,6 +464,7 @@ namespace BattleSystemECS.Core
             scheduler.PreGame.Construction = null;
             scheduler.PreGame.RandomEvent = RandomEvent;
             scheduler.PreGame.Desperation = Desperation;
+            scheduler.PreGame.TimeRewind = TimeRewind;
 
             // ── Spawning ──
             scheduler.Spawning.WaveSpawning = WaveSpawning;

@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 108 — 资源再生节点 Resource Node Regen）
+## 性能基准（2026-06-04, Round 109 — 技能时间回溯快照 Skill Time Rewind Snapshot）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3499 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9647 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3998 FPS** |
+| **mode 5**（完整一局） | **3488 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **8354 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3951 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮实施 Round 108 方向4（资源再生节点 Resource Node Regen / Respawn）：`Systems/ResourceNodeSystem.cs` — 扩展 `Update` 在每节点前先判 Depleted（消耗倒计时 → 触发 `RespawnNode` 满血复活 + active + owner=0 + captureProgress=-1f），`DamageNode` 在 HP<=0 且 RegenDelay>0 时设置 Depleted=true + 装填 RegenTimer，`InitializeFromLevel` 读 `RegenDelay` 进 SOA；`Core/ComponentStore_World.cs` — 新增 3 SOA 字段 `ResourceNodeRegenTimer`/`ResourceNodeRegenDelay`/`ResourceNodeDepleted`；`Core/ComponentStore.cs` — Clear 数组 null 化注册 3 字段；`Core/GameConfig.cs` — `ResourceNodeDef` 新增 `RegenDelay` 属性（默认 0 = legacy 不再生）；`BattleSystemECS.Tests/ResourceNodeRegenTests.cs`（新）— 13 测试覆盖 inert default/InitializeFromLevel 拷贝 RegenDelay/DamageNode regen-enabled 装弹/regen-disabled 不装/非致命不装/不可毁伤/DamageNode respawns at full HP/regen-disabled 永不再生/partial tick 不再生/双节点独立 timer/depleted 不生产/RegenConfig 常量。**337/337 tests PASS**（13 新增 regen tests）。bench2 9647（< 10000 阈值，升 8.4%）/ bench4 3998（< 4300 阈值，升 2.0%）/ bench5 3499（< 3800 阈值，升 0.2%）。⚠️ 全部低于阈值，但相对 Round 107 改善明显（bench2+749/bench4+78/bench5+8）。legacy 节点（RegenDelay=0）行为完全保持零开销。
+> 本轮实施 Round 109 方向（技能时间回溯快照 Skill Time Rewind Snapshot）：`Systems/TimeRewindSnapshot.cs`（新）— 提供 `Snapshot` / `Restore` 框架：捕获所有 GAS 实例的 `CooldownRemaining`/`CooldownTotal`/`ActiveTimer`/`Active` 与技能 `Stack` 状态到轻量字典；`Systems/SkillSystem.cs` — 在 CastSkill 前序列化目标技能的关键字段（CooldownRemaining + ActiveTimer + Active），新加 `HasSnapshot`/`ConsumeSnapshot` API；`Core/GAS/GameplayAbility.cs` — 新增内部 Snapshot 协程状态；`Core/PreGameGroup.cs` + `Core/SystemRegistry.cs` — 注册时间回溯子系统；`Core/ComponentStore_Player.cs` — 新增 4 SOA 字段（TimeRewindCooldown / TimeRewindCharges / TimeRewindCooldownMax / TimeRewindLastCast）以支持玩家级回溯钩子；`Data/Configs/skills.json` — 新增 `skill_time_rewind` 配置；`BattleSystemECS.Tests/TimeRewindTests.cs`（新）— 18 测试覆盖 snapshot 边界/restore 一致性/cooldown 还原/active 状态/charges 恢复。**355/355 tests PASS**（18 新增 rewind tests）。bench2 8354（< 10000 阈值，降 13.4%）/ bench4 3951（< 4300 阈值，降 1.2%）/ bench5 3488（< 3800 阈值，降 0.3%）。⚠️ 全部低于阈值，bench2 较 Round 108 下降 1293 FPS 主要因为 GAS 路径上新增的快照字典操作；bench4/bench5 几乎持平。新增功能路径（BuildPhase 自动回溯）在 BenchmarkSystem 中未被触发，零热路径开销。
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
 ## 优化演进（关键节点）

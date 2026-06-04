@@ -401,5 +401,29 @@
     "SlowAmount": 0.5,
     "SlowDuration": 3.0,
     "Modifiers": []
+  },
+  {
+    "Name": "Time Rewind",
+    "Description": "时光倒流 — 将玩家 HP / Mana / Shield 状态回滚到 3 秒前快照。冷却 60 秒。",
+    "AreaShape": "timerwind",
+    "AreaWidth": 0,
+    "AreaHeight": 0,
+    "AttackRange": 0,
+    "Cooldown": 60,
+    "DamageMultiplier": 0,
+    "AutoCast": false,
+    "Hotkey": "R",
+    "AreaRadius": 0,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
+    "HealPercent": 3.0,
+    "ShieldAmount": 0,
+    "ShieldDuration": 0,
+    "FreezeDuration": 0,
+    "FreezeChance": 0,
+    "SlowAmount": 0,
+    "SlowDuration": 0,
+    "Modifiers": []
   }
 ]

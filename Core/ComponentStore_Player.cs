@@ -133,6 +133,27 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // the head of the queue is consumed via PlaceTower. Default 0 = ready to drain on next tick.
         public float[] PlayerBuildQueueTimer = new float[MAX_PLAYERS];
 
+        // ==================== Time Rewind Snapshot Ring (Round 109) ====================
+        // PlayerStateSnapshot stores periodic samples of player HP / Mana / Shield so the
+        // "Time Rewind" ability can restore them. The buffer is a fixed-size ring indexed by
+        // (playerId * MAX_SNAPSHOTS + slot). Slot 0 is the oldest sample, slot MAX_SNAPSHOTS-1
+        // is the newest. Capacity MAX_SNAPSHOTS=20 × 0.25s sampling interval = 5s lookback.
+        public const int MAX_SNAPSHOTS = 20;
+        public const float SNAPSHOT_INTERVAL = 0.25f;
+        public const float DEFAULT_REWIND_SECONDS = 3.0f;
+        public float[] PlayerSnapshotHP = new float[MAX_PLAYERS * MAX_SNAPSHOTS];
+        public float[] PlayerSnapshotMana = new float[MAX_PLAYERS * MAX_SNAPSHOTS];
+        public float[] PlayerSnapshotShield = new float[MAX_PLAYERS * MAX_SNAPSHOTS];
+        // PlayerSnapshotHead: next write index for the ring (0..MAX_SNAPSHOTS-1). When the ring
+        // wraps, the oldest entry is overwritten. The newest sample is always at (head - 1) mod MAX_SNAPSHOTS.
+        public int[] PlayerSnapshotHead = new int[MAX_PLAYERS];
+        // PlayerSnapshotFilled: how many slots in the ring are valid (0..MAX_SNAPSHOTS). When < MAX_SNAPSHOTS,
+        // the skill is allowed to use a partial-buffer restore.
+        public int[] PlayerSnapshotFilled = new int[MAX_PLAYERS];
+        // PlayerSnapshotTick: per-player frame-counter accumulator. When >= SNAPSHOT_INTERVAL, a new
+        // sample is taken and the accumulator is reset. Default 0 (samples taken on first tick).
+        public float[] PlayerSnapshotTick = new float[MAX_PLAYERS];
+
         // ==================== 波次预览/侦查等级 (Wave Preview / Scouting Level) ====================
         // PlayerWavePreviewLevel: 0=None, 1=Vague (only count + type names, no stats), 2=Precise (full stats + skills).
         // Set externally by tech tree unlocks (e.g. "scouting_i" / "scouting_ii"). Default 0 = no preview.
@@ -271,6 +292,11 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             PlayerBulletTimeScale[entityId] = 1f;
             // Wave Skip Reward: reset both counters to 0 so each new game starts fresh.
             PlayerWaveSkipsUsed[entityId] = 0;
+            // Time Rewind snapshot ring: reset head/filled/tick so the new game starts with an empty buffer.
+            // Existing snapshot HP/Mana/Shield are simply overwritten on the first tick.
+            PlayerSnapshotHead[entityId] = 0;
+            PlayerSnapshotFilled[entityId] = 0;
+            PlayerSnapshotTick[entityId] = 0f;
             PlayerSkipBonusDamagePct[entityId] = 0f;
             // Combo Chain: reset both fields to 0 so a new game starts with no chain active.
             PlayerChainKillCount[entityId] = 0;

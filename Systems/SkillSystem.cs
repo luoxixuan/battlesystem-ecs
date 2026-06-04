@@ -26,6 +26,7 @@ namespace BattleSystemECS.Systems
         private ManaSystem manaSystem; // optional — null if mana system not yet initialized
         private PlayerSummonSystem summonSystem; // optional — null if summon system not yet initialized
         private HealingZoneSystem healingZoneSystem; // optional — null if healing zone system not yet initialized
+        private TimeRewindSnapshotSystem timeRewindSystem; // optional — null if snapshot system not yet initialized
         private List<int> _activeEnemyList;
         // Cached wave-based difficulty multiplier (updated via SetWaveNumber)
         private float _waveDifficultyMult = 1f;
@@ -104,6 +105,11 @@ namespace BattleSystemECS.Systems
         public void InjectHealingZoneSystem(HealingZoneSystem healingZoneSystem)
         {
             this.healingZoneSystem = healingZoneSystem;
+        }
+
+        public void InjectTimeRewindSystem(TimeRewindSnapshotSystem timeRewindSystem)
+        {
+            this.timeRewindSystem = timeRewindSystem;
         }
 
         /// <summary>
@@ -338,6 +344,10 @@ namespace BattleSystemECS.Systems
                     break;
                 case 15: // Polymorph — circle AoE that turns enemies into a harmless form (sheep/chicken)
                     enemiesHit = CastPolymorphArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def);
+                    break;
+                case 16: // TimeRewind — restore player HP / Mana / Shield from a recent snapshot
+                    CastTimeRewind(def);
+                    enemiesHit = 0;
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -1101,6 +1111,33 @@ namespace BattleSystemECS.Systems
                     return;
                 }
             }
+        }
+
+        /// <summary>
+        /// TimeRewind AreaShape (16): restore player HP / Mana / Shield from a recent snapshot
+        /// captured by TimeRewindSnapshotSystem. How far back to rewind is encoded in
+        /// <c>def.HealPercent</c> (treated as seconds, e.g. 3.0 = 3 seconds back).
+        /// Falls back to the system default (3.0s) when HealPercent is unset.
+        /// </summary>
+        private void CastTimeRewind(GameplayAbilityDef def)
+        {
+            if (timeRewindSystem == null)
+            {
+                renderer.Log($"[TIMEREWIND] TimeRewindSnapshotSystem not available — cannot cast '{def.Name}'");
+                return;
+            }
+
+            float secondsBack = def.HealPercent > 0f ? def.HealPercent : ComponentStore.DEFAULT_REWIND_SECONDS;
+            float actual = timeRewindSystem.RestoreFromSnapshot(playerId, secondsBack);
+            if (actual < 0f)
+            {
+                renderer.Log($"[TIMEREWIND] {def.Name} cast — no snapshot data yet (wait ~{ComponentStore.SNAPSHOT_INTERVAL:F2}s after game start)");
+                return;
+            }
+
+            renderer.Log($"[TIMEREWIND] {def.Name} cast — rolled state back {actual:F2}s " +
+                         $"(HP={store.PlayerCurrentHealth[playerId]:F1}/{store.PlayerMaxHealth[playerId]:F1}, " +
+                         $"Mana={store.PlayerMana[playerId]:F1}, Shield={store.PlayerShield[playerId]:F1})");
         }
     }
 }
