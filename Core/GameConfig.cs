@@ -2407,6 +2407,12 @@ namespace BattleSystemECS.Config
         public int InitialOwner { get; set; } = -1;
         /// <summary>Radius for enemy capture (enemies within this range start capturing)</summary>
         public float CaptureRadius { get; set; } = 2f;
+        /// <summary>
+        /// Seconds until the node respawns at full HP after being destroyed.
+        /// 0 or negative = never respawn (one-shot, default legacy behavior).
+        /// Recommended 30-60 seconds for a re-spawnable economy.
+        /// </summary>
+        public float RegenDelay { get; set; } = 0f;
     }
 
     /// <summary>

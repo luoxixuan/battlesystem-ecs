@@ -93,6 +93,12 @@ namespace BattleSystemECS.Core
         public float[] ResourceNodeCaptureProgress = new float[MAX_RESOURCE_NODES];
         // Active tower IDs on this node (0 = none)
         public int[] ResourceNodeTowerId = new int[MAX_RESOURCE_NODES];
+        // ResourceNodeDepleted: true if the node was destroyed and is waiting to respawn.
+        // ResourceNodeRegenTimer: seconds remaining until the depleted node respawns at full HP.
+        // Initialized in InitializeFromLevel when RegenDelay > 0; default 0/0 = no regen (legacy).
+        public float[] ResourceNodeRegenTimer = new float[MAX_RESOURCE_NODES];
+        public float[] ResourceNodeRegenDelay = new float[MAX_RESOURCE_NODES];
+        public bool[] ResourceNodeDepleted = new bool[MAX_RESOURCE_NODES];
         // Count of live nodes (maintained by ResourceNodeSystem)
         public int ActiveResourceNodeCount = 0;
         // ==================== Time Dilation / Bullet Time 组件（SOA） ====================

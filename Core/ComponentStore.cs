@@ -962,6 +962,7 @@ namespace BattleSystemECS.Core
             ResourceNodeActive = null!; ResourceNodeProductionRate = null!;
             ResourceNodeHealth = null!; ResourceNodeMaxHealth = null!;
             ResourceNodeAccumulated = null!; ResourceNodeCaptureProgress = null!; ResourceNodeTowerId = null!;
+            ResourceNodeRegenTimer = null!; ResourceNodeRegenDelay = null!; ResourceNodeDepleted = null!;
             PathModifierX = null!; PathModifierY = null!; PathModifierRadius = null!;
             PathModifierActive = null!; PathModifierOwnerId = null!; PathModifierTargetPathId = null!;
             PathModifierTurnsRemaining = null!;
