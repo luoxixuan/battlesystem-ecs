@@ -396,6 +396,20 @@ namespace BattleSystemECS.Systems
             logger.Log($"[TOWER] {type} placed at ({x},{y})");
             logger.Log($"[TOWER] Tower placed: {type} at ({x},{y}), damage: {damage}, range: {range}, ID: {towerId}");
 
+            // Round 100 — Palisade tower post-place init. Sets the SOA fields that drive the
+            // EnemyMovementSystem stun-on-collision check. Damage=0 + range=0 by design.
+            if (type == TowerType.Palisade)
+            {
+                store.TowerIsPalisade[towerId] = true;
+                store.PalisadeStunFrames[towerId] = PalisadeConfig.DefaultPalisadeStunFrames;
+                store.PalisadeBlockRadius[towerId] = PalisadeConfig.DefaultPalisadeBlockRadius;
+                store.PalisadeHP[towerId] = PalisadeConfig.DefaultPalisadeHP;
+                store.PalisadeMaxHP[towerId] = PalisadeConfig.DefaultPalisadeHP;
+                // Maintain ActivePalisadeCount for O(1) early-out in EnemyMovementSystem
+                store.ActivePalisadeCount++;
+                logger.Log($"[PALISADE] Tower #{towerId} at ({x},{y}): stunFrames={store.PalisadeStunFrames[towerId]}, blockRadius={store.PalisadeBlockRadius[towerId]}, HP={store.PalisadeHP[towerId]}");
+            }
+
             // Increment tower count for cap enforcement
             store.PlayerTowerCount[playerId]++;
 

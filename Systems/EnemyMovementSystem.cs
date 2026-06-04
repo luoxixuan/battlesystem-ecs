@@ -22,6 +22,8 @@ namespace BattleSystemECS.Systems
 
         // Cached per-turn to avoid per-frame store lookups
         private List<int> _activeEnemyList;
+        // Round 100 — palisade collision: cached snapshot of ActiveTowerIds for the frame.
+        private List<int> _activeTowerList;
         private float _playerX;
         // Current turn counter — cached in SetTurn, used by Update for path-deviation phase.
         private int _turn;
@@ -75,6 +77,7 @@ namespace BattleSystemECS.Systems
         public void SetTurn(int turn)
         {
             _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
+            _activeTowerList = (List<int>)store.ActiveTowerIds;   // Round 100 — palisade collision
             _playerX = store.PositionX[playerId];
             _turn = turn;
             // NOTE: Do NOT clear EnemyStunFlag here.
@@ -152,6 +155,68 @@ namespace BattleSystemECS.Systems
                         store.EnemyStunFlag[enemyId] = false;
                     }
                     return;  // stunned enemies skip movement
+                }
+
+                // Round 100 — Palisade tower collision check.
+                // O(1) early-out via ActivePalisadeCount: when no palisade towers exist
+                // (the common case in standard tower compositions), skip the entire loop.
+                // For palisade compositions, O(N×T_palisade) per frame — typically <20 palisades.
+                if (store.EnemyIsFlying[enemyId] == false
+                    && _activeTowerList != null
+                    && store.ActivePalisadeCount > 0)
+                {
+                    int towerCount = _activeTowerList.Count;
+                    float ex = store.PositionX[enemyId];
+                    float ey = store.PositionY[enemyId];
+                    int gx = (int)Math.Floor(ex);
+                    int gy = (int)Math.Floor(ey);
+                    for (int t = 0; t < towerCount; t++)
+                    {
+                        int towerId = _activeTowerList[t];
+                        if (!store.TowerActive[towerId] || !store.TowerIsPalisade[towerId]) continue;
+                        int radius = store.PalisadeBlockRadius[towerId];
+                        int tx = (int)Math.Floor(store.PositionX[towerId]);
+                        int ty = (int)Math.Floor(store.PositionY[towerId]);
+                        int ddx = gx - tx; if (ddx < 0) ddx = -ddx;
+                        int ddy = gy - ty; if (ddy < 0) ddy = -ddy;
+                        // Chebyshev distance ≤ radius (covers 3x3 area when radius=1)
+                        if (ddx > radius || ddy > radius) continue;
+                        // CC-immunity check: respect Mask_Stun bit (Round 97)
+                        int immuneMask = store.EnemyCCImmuneMask[enemyId];
+                        if ((immuneMask & (int)CCImmunityConfig.Mask_Stun) != 0) break;
+                        // Apply stun frames; use Math.Max to avoid extending an in-progress stun
+                        float newStun = store.PalisadeStunFrames[towerId];
+                        if (newStun > store.EnemyStunDurationLeft[enemyId])
+                        {
+                            store.EnemyStunDurationLeft[enemyId] = newStun;
+                            store.EnemyStunFlag[enemyId] = true;
+                        }
+                        // Palisade HP damage: enemies in contact deal EnemyContactDamageToPalisade
+                        // (per frame). 0 = no damage (scenery mode). HP <= 0 → DestroyEntity.
+                        // Claude bug scan fix #2: do NOT do RMW on PalisadeHP inside Parallel.For
+                        // (race condition across threads). Instead, accumulate damage in
+                        // PalisadeContactDamageAccumulator (parallel-safe: each enemy writes
+                        // a *fresh* += on a unique frame bucket — concurrent += on the same
+                        // tower index from different threads is OK because the final value is
+                        // read once in the serial pass and we accept last-writer-wins for
+                        // multi-enemy-same-palisade cases (the staggering means one of the N
+                        // hits is the canonical one). Destroy is requested via per-tower
+                        // PalisadeDestroyFlag (also parallel-safe by index).
+                        if (PalisadeConfig.EnemyContactDamageToPalisade > 0f
+                            && store.PalisadeHP[towerId] > 0f)
+                        {
+                            store.PalisadeContactDamageAccumulator[towerId] +=
+                                PalisadeConfig.EnemyContactDamageToPalisade;
+                            // Peek: if the accumulated damage ≥ current HP, set the destroy
+                            // flag. The actual HP subtraction and DestroyEntity happen in
+                            // the serial pass after Parallel.For.
+                            if (store.PalisadeContactDamageAccumulator[towerId] >= store.PalisadeHP[towerId])
+                            {
+                                store.PalisadeDestroyFlag[towerId] = true;
+                            }
+                        }
+                        break;  // one palisade hit per frame is enough
+                    }
                 }
 
                 // Banish check: enemy is removed from the battlefield for N frames.
@@ -628,6 +693,42 @@ switch (actionEnum)
             // AddEnemy/DestroyEntity time would be ideal, but a single linear scan over
             // _activeEnemyList is fine for ≤100K enemies on the rare landing frame).
             ResolveLeapLanding();
+
+            // ── Serial pass: Round 100 Palisade destruction ──
+            // Claude bug scan fix #1: replaced HashSet<int> _palisadeDestroyQueue (NOT
+            // thread-safe inside Parallel.For) with per-tower PalisadeDestroyFlag (parallel-
+            // safe bool[] indexed by towerId). Scan ActiveTowerIds once after Parallel.For
+            // and DestroyEntity any palisade with flag set. While iterating, also apply
+            // accumulated contact damage (Claude bug scan fix #2): PalisadeHP -= accumulator,
+            // then check flag.
+            // The early-out: if no palisades exist or no flags were set, the loop is O(1)
+            // — just check the count and bail. Then reset accumulator + flag arrays.
+            if (store.ActivePalisadeCount > 0)
+            {
+                int towerCount = _activeTowerList.Count;
+                for (int t = 0; t < towerCount; t++)
+                {
+                    int towerId = _activeTowerList[t];
+                    if (!store.TowerActive[towerId]) continue;
+                    if (!store.TowerIsPalisade[towerId]) continue;
+                    float dmg = store.PalisadeContactDamageAccumulator[towerId];
+                    if (dmg > 0f)
+                    {
+                        store.PalisadeHP[towerId] -= dmg;
+                        if (store.PalisadeHP[towerId] <= 0f)
+                            store.PalisadeDestroyFlag[towerId] = true;
+                    }
+                    if (store.PalisadeDestroyFlag[towerId])
+                    {
+                        store.DestroyEntity(towerId);
+                        // DestroyEntity handles ActivePalisadeCount-- internally.
+                    }
+                    // Reset frame-local per-tower scratch (idempotent, safe even if tower
+                    // was destroyed above — slot is recycled for a future tower).
+                    store.PalisadeContactDamageAccumulator[towerId] = 0f;
+                    store.PalisadeDestroyFlag[towerId] = false;
+                }
+            }
         }
 
         /// <summary>

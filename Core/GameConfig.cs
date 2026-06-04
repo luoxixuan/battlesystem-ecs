@@ -2665,4 +2665,31 @@ namespace BattleSystemECS.Config
         /// weaker than their base stats — the system only makes things harder, never easier.</summary>
         public const float MinThreatMultiplier = 1.0f;
     }
+
+    /// <summary>
+    /// Palisade Tower configuration (Round 100 Direction 6).
+    /// A palisade is a control-type tower: it has zero attack damage but applies a brief
+    /// movement delay to any enemy that walks into its block radius. The delay is implemented
+    /// by writing to the existing <c>EnemyStunDurationLeft</c> field, which means the stun
+    /// timer decrements automatically inside <c>EnemyMovementSystem</c> (no new path).
+    ///
+    /// HP-based destructible: <c>PalisadeHP</c> starts at <c>DefaultPalisadeHP</c>; if an enemy
+    /// deals damage to the palisade (handled in EnemyMovementSystem at end of step), HP
+    /// decreases; HP &lt;= 0 → <c>DestroyEntity</c>. Set <c>DefaultPalisadeHP=0</c> to keep
+    /// palisades indestructible (pathing blockers only).
+    /// </summary>
+    public static class PalisadeConfig
+    {
+        /// <summary>Default stun frames applied to enemies that step into a palisade's radius.
+        /// 18 frames @ 60 FPS ≈ 0.3s. Reuses <c>EnemyStunDurationLeft</c> countdown path.</summary>
+        public const int DefaultPalisadeStunFrames = 18;
+        /// <summary>Default block radius in grid cells (Manhattan-style). 1 = 3x3 area centered on palisade.</summary>
+        public const int DefaultPalisadeBlockRadius = 1;
+        /// <summary>Default HP pool of a palisade. 0 = indestructible. 100 means enemies can
+        /// grind it down over multiple waves.</summary>
+        public const float DefaultPalisadeHP = 100f;
+        /// <summary>Damage enemies deal to a palisade when standing on it (per frame at melee range).
+        /// 0 = enemies cannot damage palisade (treated as scenery).</summary>
+        public const float EnemyContactDamageToPalisade = 5f;
+    }
 }

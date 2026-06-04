@@ -34,9 +34,14 @@ namespace BattleSystemECS.Core
         /// <summary>Count of active enemies with TetherMaxLength > 0.
         /// Maintained by AddEnemy/DestroyEntity. Read by EnemyMovementSystem/TowerAttackSystem.</summary>
         public int ActiveTetheredCount = 0;
-        /// <summary>Count of active wisps across all players (PlayerWispType != None).
+        /// <summary>Count of active wisp across all players (PlayerWispType != None).
         /// Maintained by SpawnWisp/RemoveWisp. Read by WispSystem to skip Update.</summary>
         public int ActiveWispCount = 0;
+        /// <summary>Count of active palisade towers (Round 100).
+        /// Maintained by PlaceTower (++) and DestroyEntity (--).
+        /// Read by EnemyMovementSystem to early-out the O(N×T) palisade collision loop
+        /// when no palisades exist (the common case in standard tower comps).</summary>
+        public int ActivePalisadeCount = 0;
 
         // Inline boundary check helpers — replaces 100+ manual checks with zero-overhead guards.
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -436,6 +441,9 @@ namespace BattleSystemECS.Core
             // ── Phase 1: determine archetype ────────────────────────────────────────
             bool wasEnemy = EnemyActive[entityId];
             bool wasTower = TowerActive[entityId];
+            // Round 100 — capture whether this tower was a palisade BEFORE reset, so we can
+            // decrement ActivePalisadeCount when the entity is destroyed.
+            bool wasPalisade = wasTower && TowerIsPalisade[entityId];
 
             // ── Phase 2: shared state cleanup ─────────────────────────────────────
             PositionActive[entityId] = false;
@@ -712,6 +720,19 @@ namespace BattleSystemECS.Core
                 // Player-disabled flag: false (active) on entity recycle so stale 'true' from a
                 // previous owner doesn't carry over. ToggleTower() flips it back if needed.
                 TowerPlayerDisabled[entityId] = false;
+                // Round 100 — Palisade fields reset (recycled slot must not leak palisade state)
+                TowerIsPalisade[entityId] = false;
+                PalisadeStunFrames[entityId] = 0;
+                PalisadeBlockRadius[entityId] = 0;
+                PalisadeHP[entityId] = 0f;
+                PalisadeMaxHP[entityId] = 0f;
+                // Round 100 — Palisade frame-scratch fields reset (Claude bug scan fix #1):
+                // the per-tower accumulator + destroy flag must not leak into a recycled slot.
+                PalisadeContactDamageAccumulator[entityId] = 0f;
+                PalisadeDestroyFlag[entityId] = false;
+                // Maintain ActivePalisadeCount (Round 100) — decrement only if was palisade
+                if (wasPalisade)
+                    ActivePalisadeCount = Math.Max(0, ActivePalisadeCount - 1);
             }
 
             // ── Phase 4: recycle ID ────────────────────────────────────────────────

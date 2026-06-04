@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 99 — 难度曲线/威胁评分 Threat Score）
+## 性能基准（2026-06-04, Round 100 — 路障/城墙塔 Palisade Tower）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3543 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9583 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4009 FPS** |
+| **mode 5**（完整一局） | **3381 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9702 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3980 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮实施 Round 99 方向5（难度曲线/威胁评分 Threat Score / Dynamic Difficulty Scaling）：新增 `float[] PlayerRecentDPS` + `float[] PlayerDPSAccumulator` SOA 字段（默认 0 零开销）；`FrameScheduler` 每帧用 EMA 半衰期公式衰减（`alpha = 1 - exp(-ln(2) * dt / halfLife)`，半衰期 = `ThreatScoreConfig.DPSWindowSec=5s`），`PlayerDPSAccumulator` 按 `1/dt` 转换为 DPS 后混入 EMA（保证帧率独立）；`PlayerTowerAttackSystem` 与 `TowerAttackSystem` 在 serial phase 累加 `finalDamage` 到 `PlayerDPSAccumulator`；`WaveSpawningSystem` 在 spawn 时按 `1 + recentDps × 0.0001` 缩放敌人 HP（封顶 `MaxThreatMultiplier=3.0f`，下界 `MinThreatMultiplier=1.0f` 永不减难度）。新增 `ThreatScoreConfig` 静态类（4 常量）。配套 7 个测试覆盖：字段默认 0、Config 常量、零 DPS mult=1、高 DPS 线性缩放、超高 DPS 封顶、EMA 衰减、accumulator reset、端到端 spawn 缩放。bench2 9583（-0.7% 在噪声内）、bench4 4009（+3.0% 略升）、bench5 3543（+2.2% 略升），均在 ±5% 噪声带内。
+> 本轮实施 Round 100 方向6（路障/城墙塔 Palisade Tower）：新增 `bool[] TowerIsPalisade` / `int[] PalisadeStunFrames` / `int[] PalisadeBlockRadius` / `float[] PalisadeHP` / `float[] PalisadeMaxHP` / `float[] PalisadeContactDamageAccumulator` / `bool[] PalisadeDestroyFlag` 共 7 个 SOA 字段（默认零开销，零 palisade 场景下 O(1) 早退）；`int ActivePalisadeCount` 计数器在 PlaceTower 时 `++` / DestroyEntity 时 `--`，EnemyMovementSystem 的 palisade 碰撞循环用 `if (ActivePalisadeCount > 0)` O(1) 守卫；`EnemyMovementSystem.Update` Parallel.For 内做 Chebyshev 距离检查（3x3 区域），命中时通过复用现有 `EnemyStunDurationLeft` 字段写入 stun 帧（沿用现有倒数路径），遵循 CC 免疫（Round 97 `Mask_Stun`）+ flying enemy skip；palisade 接触伤害走 `PalisadeContactDamageAccumulator` 并行安全累加 + `PalisadeDestroyFlag` 并行安全标志，串行段（ActiveTowerIds 扫描）原子地 `PalisadeHP -= accumulator` 并 `DestroyEntity`；新增 `PalisadeConfig` 静态类（4 常量：`DefaultPalisadeStunFrames=18`、`DefaultPalisadeBlockRadius=1`、`DefaultPalisadeHP=100`、`EnemyContactDamageToPalisade=5`）。TowerType 枚举新增 `Palisade=9`（控制型塔，0 攻击）。配套 8 个测试覆盖：枚举值、Config 常量、PlaceTower 设字段、非 palisade 零开销、默认字段为 0、DestroyEntity reset、tile 占用。**Claude bug scan 修复 2 项并发 bug**：原 `_palisadeDestroyQueue` HashSet 不是线程安全 + 原 PalisadeHP 在 Parallel.For 内 RMW 竞争；改为 accumulator + bool[] flag 后 PASS。bench2 9702（+1.2% 在噪声内）、bench4 3980（-0.7% 在噪声内）、bench5 3381（-4.6% 略低但在 ±5% 噪声带内）。
 >
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 

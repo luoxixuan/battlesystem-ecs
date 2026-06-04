@@ -31,6 +31,37 @@ namespace BattleSystemECS.Core
         public float[] TowerInterceptRate = new float[MAX_ENTITIES];
         // Tower damage type: determines which resistance the target uses for mitigation.
         public DamageType[] TowerDamageType = new DamageType[MAX_ENTITIES];
+        // Round 100 — Palisade Tower Fields ─────────────────────────────────────────
+        // TowerIsPalisade: true if this tower is a Palisade (control-type, no attack).
+        // Default false = backward compatible zero-overhead path. Set at PlaceTower based on
+        // TowerType == Palisade.
+        public bool[] TowerIsPalisade = new bool[MAX_ENTITIES];
+        // PalisadeStunFrames: number of frames the palisade stuns an enemy on collision
+        // (range check inside EnemyMovementSystem). Stun is applied via existing
+        // EnemyStunDurationLeft[] field so duration countdown reuses the standard path.
+        public int[] PalisadeStunFrames = new int[MAX_ENTITIES];
+        // PalisadeBlockRadius: Manhattan-style distance in grid cells within which
+        // an enemy's movement is delayed. 1 = 3x3 cell block centered on the palisade.
+        public int[] PalisadeBlockRadius = new int[MAX_ENTITIES];
+        // PalisadeHP: health pool of the palisade tower. Enemies deal melee damage to
+        // nearby palisades; HP=0 → DestroyEntity. Default 0 means indestructible (legacy).
+        public float[] PalisadeHP = new float[MAX_ENTITIES];
+        // PalisadeMaxHP: snapshot of starting HP for UI / repair computations.
+        public float[] PalisadeMaxHP = new float[MAX_ENTITIES];
+        // PalisadeContactDamageAccumulator: per-frame contact-damage accumulator (parallel-safe
+        // by index). Each Parallel.For enemy iteration adds EnemyContactDamageToPalisade to
+        // PalisadeHP[towerId] — Interlocked? No, we only WRITE per tower (last-write-wins within
+        // a frame is acceptable for a stagger damage per frame), so a flat array add is safe.
+        // Reset to 0 at start of each frame's palisade pass; EnemyMovementSystem reads the
+        // accumulated damage and subtracts from PalisadeHP in the serial pass.
+        // Round 100 — used to be: HashSet<int> in EnemyMovementSystem (NOT thread-safe).
+        // Replaced with parallel-safe index-based accumulator (Claude bug scan fix #1).
+        public float[] PalisadeContactDamageAccumulator = new float[MAX_ENTITIES];
+        // PalisadeDestroyFlag: per-tower destroy request flag (parallel-safe by index).
+        // Set true inside Parallel.For when palisade HP drops to 0. The serial pass after
+        // Parallel.For scans ActiveTowerIds and DestroyEntity any with flag set. Replaces
+        // the old HashSet<int> _palisadeDestroyQueue (Claude bug scan fix #1).
+        public bool[] PalisadeDestroyFlag = new bool[MAX_ENTITIES];
         // Tower damage conversion: fraction of damage converted to ConvertedDamageType (0 = no conversion)
         // E.g. 0.5 = 50% damage converted, bypassing enemy immunity to primary type
         public float[] TowerDamageConversionRatio = new float[MAX_ENTITIES];
@@ -815,6 +846,12 @@ namespace BattleSystemECS.Core
             TowerDamageConversionRatio[entityId] = 0f; // default: no conversion
             TowerConvertedDamageType[entityId] = DamageType.Physical;
             TowerTurnRate[entityId] = turnRate;
+            // Round 100 — Palisade defaults: indestructible (HP=0) until PlaceTower overrides
+            TowerIsPalisade[entityId] = false;
+            PalisadeStunFrames[entityId] = 0;
+            PalisadeBlockRadius[entityId] = 0;
+            PalisadeHP[entityId] = 0f;
+            PalisadeMaxHP[entityId] = 0f;
             // Fog of War: default to no fog restriction (visionRadius=0 means see all)
             TowerVisionRadius[entityId] = 0f;
             // Arc projectile fields: default to straight trajectory (0=straight, 1=homing, 2=arc)
@@ -990,6 +1027,15 @@ namespace BattleSystemECS.Core
             TowerDamageType[entityId] = DamageType.Physical;
             TowerDamageConversionRatio[entityId] = 0f;
             TowerConvertedDamageType[entityId] = DamageType.Physical;
+            // Round 100 — Palisade fields reset (recycled slot must not leak palisade state)
+            TowerIsPalisade[entityId] = false;
+            PalisadeStunFrames[entityId] = 0;
+            PalisadeBlockRadius[entityId] = 0;
+            PalisadeHP[entityId] = 0f;
+            PalisadeMaxHP[entityId] = 0f;
+            // Round 100 — Palisade frame-scratch fields reset (Claude bug scan fix #1)
+            PalisadeContactDamageAccumulator[entityId] = 0f;
+            PalisadeDestroyFlag[entityId] = false;
             // Construction fields reset
             TowerIsConstructing[entityId] = false;
             TowerConstructionProgress[entityId] = 1f;

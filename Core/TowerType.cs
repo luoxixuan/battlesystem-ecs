@@ -14,6 +14,9 @@ namespace BattleSystemECS.Components
         Frost    = 5,
         Stun     = 6,
         EMP      = 7,
-        Firewall = 8
+        Firewall = 8,
+        // Round 100: Palisade — control-type tower, no attack, stuns nearby enemies
+        // (delays movement by N frames via EnemyStunDurationLeft). HP-based destructible.
+        Palisade = 9
     }
 }
