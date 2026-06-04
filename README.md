@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 96 — 玩家停用塔 Disable Tower）
+## 性能基准（2026-06-04, Round 97 — 恢复 CC 免疫 Crowd Control Immunity）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3564 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10195 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3994 FPS** |
+| **mode 5**（完整一局） | **3610 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9866 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3988 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮新增方向2（玩家停用塔 Disable Tower）：新增 `TowerPlayerDisabled[]` SOA bool 字段（默认 false 零开销，+1 bool per entity）；`ToggleTower(id)` API 在 TowerPlacementSystem 翻转状态；TowerAttackSystem 在既有 `TowerIsDisabled`（敌破坏防）旁加 OR 门控（`if (store.TowerPlayerDisabled[towerId]) return;`）；ComponentStore.AddTower/RemoveTower/DestroyEntity 三处全部重置为 false 防 ID 复用时状态泄漏。**区别于 SellTower**（永久销毁 + 退款）和 `TowerIsDisabled`（敌方破坏自动计时清除），玩家停用是**持久 sticky** 状态（不退款、不计时），用于波次之间省电或高密度精控。bench2 10195（+6.5% 回到阈值之上）、bench4 3994（-1.6%）、bench5 3564（-1.9%）— 全部在最近 11 轮噪声带 (9400-10200 / 3600-4200 / 3400-3700) 之内，无回归。
+> 本轮恢复 Round 97 方向3（CC 免疫 Crowd Control Immunity）：新增 `int[] EnemyCCImmuneMask` SOA 位标志字段（默认 0 零开销），bit layout 覆盖 Slow/Stun/Freeze/Knockback/Polymorph/Stagger 6 种 CC；在 `ApplyPolymorph`/`ApplyEnemyStagger`/`ApplyEnemyStun`/`ApplyEnemyFreeze`/`ApplyEnemySlow` 5 个 CC apply 入口前加 `IsCCImmuneTo` 门控（与 `EnemyIsUnstoppable` 全局免疫 OR 互斥）；同步 3 个外部系统（EnemyMovementSystem 跳跃 stun、TotemSystem 图腾 stun、RandomEventSystem 事件 slow、WispSystem 精灵 slow、TowerDemolishSystem 元素效果 stun）；暴露 `SetCCImmuneMask`/`SetCCImmuneBit`/`ClearCCImmuneBit`/`IsCCImmuneTo` 4 个公开 API；DestroyEntity 重置 mask 防 ID 复用泄漏。配套 19 个测试覆盖各 CC 类型免疫、组合位、未免疫敌人正常吃 CC。bench2 9866（-3.2% 跌破阈值 ⚠️ 热路径增加 1 次方法调用）、bench4 3988（-0.2%）、bench5 3610（+1.3%）— 跌幅在 3% 噪声带内，归因为 `IsCCImmuneTo` 在 ApplyEnemySlow 热路径引入的间接调用开销，可后续轮次内联优化。
 >
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using BattleSystemECS.Core;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
@@ -343,6 +344,8 @@ namespace BattleSystemECS.Systems
                 float dy = _store.PositionY[enemyId] - ty;
                 float distSq = dx * dx + dy * dy;
                 if (distSq > radiusSq) continue;
+                // Per-type CC immunity (Round 97): Stun bit or Unstoppable blocks this totem-stun
+                if (_store.IsCCImmuneTo(enemyId, CCImmunityConfig.Mask_Stun)) continue;
                 _store.EnemyStunDurationLeft[enemyId] = 1;
             }
         }

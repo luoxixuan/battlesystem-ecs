@@ -281,6 +281,8 @@ namespace BattleSystemECS.Systems
                 {
                     int eid = enemyIds[i];
                     if (!store.EnemyActive[eid]) continue;
+                    // Per-type CC immunity (Round 97): Slow bit or Unstoppable blocks this event-slow
+                    if (store.IsCCImmuneTo(eid, CCImmunityConfig.Mask_Slow)) continue;
                     store.EnemySlowFactor[eid] = Math.Min(store.EnemySlowFactor[eid], slowFactor);
                     store.EnemySlowDurationLeft[eid] = Math.Max(store.EnemySlowDurationLeft[eid], 5f); // 5 turn slow
                 }

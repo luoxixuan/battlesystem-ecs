@@ -2598,4 +2598,27 @@ namespace BattleSystemECS.Config
         /// strongly discouraging "wasted DPS" against the same target.</summary>
         public static float SaturationScaleMult = 0.1f;
     }
+
+    /// <summary>
+    /// CC Immunity (Round 97 Direction 3): per-enemy bitmask of which CC types are fully ignored.
+    /// Stacks with <c>EnemyIsUnstoppable</c> (total CC immunity): if either the bit for the CC
+    /// type is set OR the unstoppable flag is on, the CC is skipped.
+    /// Boss/Elite monsters can be configured with 0xFF (immune to all CC); weaker monsters may
+    /// only be immune to part (e.g. Slow) to balance CC-heavy tower compositions.
+    /// Default value 0 = no immunity, fully backward compatible.
+    /// </summary>
+    public static class CCImmunityConfig
+    {
+        // Bit positions match the CC type. Bits 0-7 are reserved; CC types use bits 0-5.
+        public const int Mask_Slow       = 1 << 0;
+        public const int Mask_Stun       = 1 << 1;
+        public const int Mask_Freeze     = 1 << 2;
+        public const int Mask_Knockback  = 1 << 3;
+        public const int Mask_Polymorph  = 1 << 4;
+        public const int Mask_Stagger    = 1 << 5;
+        /// <summary>All CC types (full immunity — equivalent to EnemyIsUnstoppable=true).</summary>
+        public const int Mask_AllCC      = Mask_Slow | Mask_Stun | Mask_Freeze | Mask_Knockback | Mask_Polymorph | Mask_Stagger;
+        /// <summary>Boss/Elite default: immune to all CC (forces pure-damage tower compositions).</summary>
+        public const int Mask_BossDefault = Mask_AllCC;
+    }
 }

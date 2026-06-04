@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Core.GAS;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
@@ -138,6 +139,8 @@ namespace BattleSystemECS.Systems
                 case EFFECT_TYPE_ICE:
                 case EFFECT_TYPE_LIGHTNING:
                     // Stun: set EnemyStunDurationLeft directly
+                    // Per-type CC immunity (Round 97): Stun bit or Unstoppable blocks this effect-stun
+                    if (store.IsCCImmuneTo(enemyId, CCImmunityConfig.Mask_Stun)) break;
                     int stunDuration = effectType == EFFECT_TYPE_ICE ? 2 : 1;
                     store.EnemyStunDurationLeft[enemyId] = Math.Max(store.EnemyStunDurationLeft[enemyId], stunDuration);
                     break;

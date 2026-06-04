@@ -269,6 +269,8 @@ namespace BattleSystemECS.Systems
                 // the same frame, we'll catch it next tick).
                 float baseSpeed = _store.EnemyMoveSpeedBase[enemyId];
                 if (baseSpeed <= 0f) continue;
+                // Per-type CC immunity (Round 97): Slow bit or Unstoppable blocks this wisp
+                if (_store.IsCCImmuneTo(enemyId, CCImmunityConfig.Mask_Slow)) continue;
                 _store.EnemySlowFactor[enemyId] = SLOW_FACTOR;
                 _store.EnemyMoveSpeed[enemyId] = baseSpeed * SLOW_FACTOR;
                 touched.Add(enemyId);

@@ -470,6 +470,8 @@ namespace BattleSystemECS.Core
                 EnemyArmor[entityId] = 0f;
                 EnemyStunFlag[entityId] = false;
                 EnemyStunDurationLeft[entityId] = 0f;
+                // CC Immunity (Round 97): reset mask on entity destroy to avoid ID-reuse leakage
+                EnemyCCImmuneMask[entityId] = 0;
                 EnemySlowFactor[entityId] = 0f;
                 EnemyTerrainMoveSpeedMult[entityId] = 1f;
                 EnemyFrostZoneSlowMultiplier[entityId] = 1f;  // default: no frost zone, neutral 1x

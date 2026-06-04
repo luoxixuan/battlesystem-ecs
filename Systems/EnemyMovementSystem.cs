@@ -931,6 +931,8 @@ switch (actionEnum)
                         float distSqV = dxv * dxv + dyv * dyv;
                         if (distSqV <= r2)
                         {
+                            // Per-type CC immunity (Round 97): Stun bit or Unstoppable blocks leaper-stun
+                            if (store.IsCCImmuneTo(victimId, CCImmunityConfig.Mask_Stun)) continue;
                             // Apply stun. Set both the bool flag and the duration counter so
                             // the early-return at the top of the movement loop blocks them
                             // for the configured number of frames. Decrement is handled by

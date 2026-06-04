@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
+using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
 
 namespace BattleSystemECS.Core
@@ -129,6 +130,11 @@ namespace BattleSystemECS.Core
         // EnemyStunDurationLeft: stun duration in turns. Decremented by EnemyMovementSystem.Update().
         // When > 0, IsEnemyStunned() returns true regardless of EnemyStunFlag.
         public float[] EnemyStunDurationLeft = new float[MAX_ENTITIES];
+        // EnemyCCImmuneMask: per-enemy bitmask of CC types this enemy fully ignores (Round 97).
+        // Stacks with EnemyIsUnstoppable: if either the bit OR the unstoppable flag is set, CC is skipped.
+        // Bit layout matches CCImmunityConfig.Mask_* (Slow=0, Stun=1, Freeze=2, Knockback=3,
+        // Polymorph=4, Stagger=5). Default 0 = no CC immunity, fully backward compatible.
+        public int[] EnemyCCImmuneMask = new int[MAX_ENTITIES];
         // EnemySlowFactor: speed multiplier (0.5 = 50% speed), 0 = no slow
         public float[] EnemySlowFactor = new float[MAX_ENTITIES];
         // EnemyTerrainMoveSpeedMult: terrain-based speed multiplier (1.0 = normal, 0.5 = mud slow)
@@ -1349,6 +1355,8 @@ namespace BattleSystemECS.Core
             if (duration <= 0) return;
             // Check total CC immunity (unstoppable enemies ignore polymorph too)
             if (EnemyIsUnstoppable[enemyId]) return;
+            // Per-type CC immunity (Round 97): Polymorph bit blocks this CC type
+            if (IsCCImmuneTo(enemyId, CCImmunityConfig.Mask_Polymorph)) return;
             // Clamp multiplier to a sane band (0.5x..3x) — protects against config typos
             if (damageTakenMultiplier < 0.5f) damageTakenMultiplier = 0.5f;
             if (damageTakenMultiplier > 3f) damageTakenMultiplier = 3f;
@@ -1379,6 +1387,8 @@ namespace BattleSystemECS.Core
             if (amount <= 0f) return false;
             if (EnemyStaggerMax[enemyId] <= 0f) return false;     // 永不失衡（普通小怪）
             if (EnemyIsUnstoppable[enemyId]) return false;        // 霸体免疫
+            // Per-type CC immunity (Round 97): Stagger bit blocks this CC type
+            if (IsCCImmuneTo(enemyId, CCImmunityConfig.Mask_Stagger)) return false;
             if (EnemyIsStaggered[enemyId]) return false;          // 已在硬直中
             if (EnemyStaggerImmuneTimer[enemyId] > 0f) return false; // 刚硬直过，免疫期
 
@@ -1470,6 +1480,8 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(enemyId)) return;
             // Check total CC immunity (unstoppable enemies ignore all CC)
             if (EnemyIsUnstoppable[enemyId]) return;
+            // Per-type CC immunity (Round 97): bit set in EnemyCCImmuneMask blocks this CC type
+            if (IsCCImmuneTo(enemyId, CCImmunityConfig.Mask_Stun)) return;
             // Apply stun resistance: reduce duration by resistance fraction
             if (EnemyStunResistance[enemyId] > 0f && duration > 0)
             {
@@ -1489,6 +1501,8 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(enemyId)) return;
             // Check total CC immunity (unstoppable enemies ignore all CC)
             if (EnemyIsUnstoppable[enemyId]) return;
+            // Per-type CC immunity (Round 97): Freeze bit blocks this CC type
+            if (IsCCImmuneTo(enemyId, CCImmunityConfig.Mask_Freeze)) return;
             // Apply freeze resistance: reduce duration by resistance fraction
             if (EnemyFreezeResistance[enemyId] > 0f && duration > 0)
             {
@@ -1507,11 +1521,48 @@ namespace BattleSystemECS.Core
             return IsEnemyStunned(enemyId);
         }
 
+        /// <summary>
+        /// Returns true if the enemy is currently immune to a given CC type (Round 97 Direction 3).
+        /// Checks both the per-type bit in <c>EnemyCCImmuneMask</c> and the global
+        /// <c>EnemyIsUnstoppable</c> flag (full immunity). Pass CCImmunityConfig.Mask_* constants
+        /// (Mask_Slow, Mask_Stun, etc.). Safe to call with any int — bit-AND tolerates unknown bits.
+        /// </summary>
+        public bool IsCCImmuneTo(int enemyId, int ccMask)
+        {
+            if (!IsValidEntity(enemyId)) return false;
+            if (EnemyIsUnstoppable[enemyId]) return true;       // total CC immunity
+            if ((EnemyCCImmuneMask[enemyId] & ccMask) != 0) return true; // per-type immunity
+            return false;
+        }
+
+        /// <summary>Overwrite the per-enemy CC immunity bitmask (Round 97). OR-merge in bits via SetCCImmuneBit.</summary>
+        public void SetCCImmuneMask(int enemyId, int mask)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyCCImmuneMask[enemyId] = mask;
+        }
+
+        /// <summary>OR a single CC immunity bit onto the existing mask (idempotent for already-set bits).</summary>
+        public void SetCCImmuneBit(int enemyId, int ccMask)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyCCImmuneMask[enemyId] |= ccMask;
+        }
+
+        /// <summary>Clear a single CC immunity bit (or all bits if ccMask == 0).</summary>
+        public void ClearCCImmuneBit(int enemyId, int ccMask)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyCCImmuneMask[enemyId] &= ~ccMask;
+        }
+
         /// <summary>Applies slow to the enemy. factor is a speed multiplier (e.g. 0.5 = 50% speed). Duration in turns tracked by EnemySlowDurationLeft.</summary>
         public void ApplyEnemySlow(int enemyId, float factor, int duration)
         {
             if (!IsValidEntity(enemyId)) return;
             if (factor <= 0f || factor >= 1f) return;
+            // Per-type CC immunity (Round 97): Slow bit blocks this CC type
+            if (IsCCImmuneTo(enemyId, CCImmunityConfig.Mask_Slow)) return;
             // Take the stronger slow if stacking
             if (factor < EnemySlowFactor[enemyId])
             {
