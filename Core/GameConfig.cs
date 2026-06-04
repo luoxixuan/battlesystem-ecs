@@ -2756,4 +2756,27 @@ namespace BattleSystemECS.Config
         /// the conversion branch is skipped entirely (zero-overhead fast path). 0.01 = 1%.</summary>
         public const float MinMeaningfulRatio = 0.01f;
     }
+
+    /// <summary>
+    /// Buff Share (Round 103 Direction 8) — towers with non-zero radius share a snapshot of
+    /// their own attack speed with nearby friendly towers. Encourages tight tower clusters
+    /// (4-tower surround) over spread-out placement.
+    /// </summary>
+    public static class BuffShareConfig
+    {
+        /// <summary>Hard cap on the buff share radius. Designer-set values above this are
+        /// clamped at deserializer. 8 = a 17x17 cell envelope around the sharing tower.</summary>
+        public const float MaxShareRadius = 8f;
+
+        /// <summary>Per-frame efficiency applied to the shared attack-speed bonus. 0.3 = each
+        /// sharing tower contributes +30% multiplicative attack speed to towers in range.
+        /// 4 sharing towers surrounding a target → target's attack speed is multiplied by
+        /// 1.3^4 ≈ 2.86 (a meaningful cluster bonus without breaking single-tower play).</summary>
+        public const float DefaultShareEfficiencyPct = 0.3f;
+
+        /// <summary>Bitmask flag indicating the tower shares its own attack speed with
+        /// nearby friendly towers. Designers OR these into TowerBuffShareMask per tower
+        /// type to opt into sharing.</summary>
+        public const int ShareAttackSpeed = 0x01;
+    }
 }

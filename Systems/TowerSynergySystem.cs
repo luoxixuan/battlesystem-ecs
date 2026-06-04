@@ -50,6 +50,10 @@ namespace BattleSystemECS.Systems
         {
             this.store = store;
             this.logger = logger;
+            // Round 103 — Buff Share: subscribe to entity-invalidated events so the per-frame
+            // base-attack-speed cache is purged when a tower is destroyed, removed, or
+            // recycled (Claude bug scan fix #2: stale cache on ID reuse).
+            ComponentStore.OnTowerEntityInvalidated += InvalidateBuffShareCache;
         }
 
         /// <summary>
@@ -128,6 +132,188 @@ namespace BattleSystemECS.Systems
 
                 // 应用协同效果
                 ApplySynergyEffect(synergy, towers);
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Buff Share (Round 103 Direction 8)
+        //
+        // Towers with TowerBuffShareRadius > 0 AND a non-zero TowerBuffShareMask
+        // share a snapshot of their own attack speed with nearby friendly towers.
+        // The shared bonus is APPLIED to TowerAttackSpeed in-place (multiplicative),
+        // and the original base value is cached in _baseAttackSpeedByTowerId so the
+        // next frame's ResolveBuffShares() can restore it before reapplying — this
+        // prevents frame-over-frame compound growth (a classic multiplicative-bug
+        // pattern caught by the bug scanner).
+        //
+        // CRITICAL (Claude bug scan #1, Round 103): The cache MUST be keyed by
+        // tower entity ID, NOT by position in ActiveTowerIds. ActiveTowerIds is a
+        // swap-and-pop list whose order mutates when towers are added/destroyed
+        // between frames — position-keyed cache would silently apply one tower's
+        // base stat to a completely different tower.
+        //
+        // Cost: O(N²) tower×tower pair scan (N ≤ 200 active towers typically),
+        //       but gated by a quick "any sharing tower" check at the top for
+        //       the zero-overhead fast path when no tower has a share radius set.
+        // ─────────────────────────────────────────────────────────────────────
+        private const int CACHE_SLOT_COUNT = 16; // small, plenty for typical max-tower counts
+        private int[] _cachedTowerId = new int[CACHE_SLOT_COUNT];
+        private float[] _baseAttackSpeed = new float[CACHE_SLOT_COUNT];
+        private int _cacheUsed = 0; // number of valid entries (entries with non-zero _cachedTowerId)
+
+        private int FindCacheSlot(int towerId)
+        {
+            for (int i = 0; i < _cacheUsed; i++)
+                if (_cachedTowerId[i] == towerId) return i;
+            return -1;
+        }
+
+        /// <summary>
+        /// Round 103 — Buff Share: drop any cached base-attack-speed entry for the given
+        /// towerId. Called from ComponentStore.OnTowerEntityInvalidated when a tower is
+        /// destroyed, removed, or a new tower occupies a recycled entityId.
+        /// Claude bug scan fix #2: stale cache on ID reuse.
+        /// </summary>
+        public void InvalidateBuffShareCache(int towerId)
+        {
+            int slot = FindCacheSlot(towerId);
+            if (slot < 0) return;
+            int last = _cacheUsed - 1;
+            if (slot != last)
+            {
+                _cachedTowerId[slot] = _cachedTowerId[last];
+                _baseAttackSpeed[slot] = _baseAttackSpeed[last];
+            }
+            _cacheUsed = last;
+        }
+
+        public void ResolveBuffShares()
+        {
+            var activeTowerIds = store.ActiveTowerIds;
+            int count = activeTowerIds.Count;
+            if (count == 0)
+            {
+                _cacheUsed = 0;
+                return;
+            }
+
+            // Fast-path: skip the entire pass if no sharing tower exists this frame
+            bool anyShare = false;
+            for (int i = 0; i < count; i++)
+            {
+                int tid = activeTowerIds[i];
+                if (store.TowerBuffShareRadius[tid] > 0f && store.TowerBuffShareMask[tid] != 0)
+                {
+                    anyShare = true;
+                    break;
+                }
+            }
+            if (!anyShare)
+            {
+                // Restore base speed for any tower that might have a stale shared value from
+                // a prior frame (e.g. the share tower was just sold), so speed returns to base.
+                // Also opportunistically drop cache entries whose tower is no longer active.
+                for (int i = _cacheUsed - 1; i >= 0; i--)
+                {
+                    int tid = _cachedTowerId[i];
+                    int slot = FindCacheSlot(tid);
+                    if (slot < 0) continue;
+                    if (store.TowerActive[tid])
+                    {
+                        store.TowerAttackSpeed[tid] = _baseAttackSpeed[slot];
+                    }
+                    else
+                    {
+                        // Tower was removed/destroyed — drop its cache entry (swap with last)
+                        int last = _cacheUsed - 1;
+                        if (slot != last)
+                        {
+                            _cachedTowerId[slot] = _cachedTowerId[last];
+                            _baseAttackSpeed[slot] = _baseAttackSpeed[last];
+                        }
+                        _cacheUsed = last;
+                    }
+                }
+                return;
+            }
+
+            // Step 1: restore each cached tower's attack speed to its base value.
+            // Cache is keyed by towerId, so order changes in ActiveTowerIds don't matter.
+            for (int i = _cacheUsed - 1; i >= 0; i--)
+            {
+                int tid = _cachedTowerId[i];
+                if (store.TowerActive[tid])
+                {
+                    store.TowerAttackSpeed[tid] = _baseAttackSpeed[i];
+                }
+                else
+                {
+                    // Tower was removed/destroyed — drop its cache entry
+                    int last = _cacheUsed - 1;
+                    if (i != last)
+                    {
+                        _cachedTowerId[i] = _cachedTowerId[last];
+                        _baseAttackSpeed[i] = _baseAttackSpeed[last];
+                    }
+                    _cacheUsed = last;
+                }
+            }
+
+            // Step 2: for each sharing tower, scan all towers within radius² and apply
+            // the configured share bits multiplicatively to the target's speed.
+            float efficiency = BuffShareConfig.DefaultShareEfficiencyPct;
+            for (int si = 0; si < count; si++)
+            {
+                int shareId = activeTowerIds[si];
+                float shareRadius = store.TowerBuffShareRadius[shareId];
+                if (shareRadius <= 0f) continue;
+                int shareMask = store.TowerBuffShareMask[shareId];
+                if (shareMask == 0) continue;
+                if (!store.TowerActive[shareId]) continue;
+                if (store.TowerIsDispelled[shareId]) continue; // dispel clears the share buff
+
+                float sx = store.PositionX[shareId];
+                float sy = store.PositionY[shareId];
+                float radiusSq = shareRadius * shareRadius;
+
+                for (int ti = 0; ti < count; ti++)
+                {
+                    if (ti == si) continue; // skip self
+                    int targetId = activeTowerIds[ti];
+                    if (!store.TowerActive[targetId]) continue;
+                    if (store.TowerIsDispelled[targetId]) continue;
+
+                    float tx = store.PositionX[targetId];
+                    float ty = store.PositionY[targetId];
+                    float dx = tx - sx;
+                    float dy = ty - sy;
+                    if (dx * dx + dy * dy > radiusSq) continue;
+
+                    // Seed base speed on first share received (keyed by towerId)
+                    int slot = FindCacheSlot(targetId);
+                    if (slot < 0)
+                    {
+                        if (_cacheUsed >= _cachedTowerId.Length)
+                        {
+                            // Grow cache (rare; CACHE_SLOT_COUNT=16 is plenty for typical play)
+                            int newSize = _cachedTowerId.Length * 2;
+                            int[] newIds = new int[newSize];
+                            float[] newSpeeds = new float[newSize];
+                            Array.Copy(_cachedTowerId, newIds, _cacheUsed);
+                            Array.Copy(_baseAttackSpeed, newSpeeds, _cacheUsed);
+                            _cachedTowerId = newIds;
+                            _baseAttackSpeed = newSpeeds;
+                        }
+                        slot = _cacheUsed++;
+                        _cachedTowerId[slot] = targetId;
+                        _baseAttackSpeed[slot] = store.TowerAttackSpeed[targetId];
+                    }
+
+                    if ((shareMask & BuffShareConfig.ShareAttackSpeed) != 0)
+                    {
+                        store.TowerAttackSpeed[targetId] *= (1f + efficiency);
+                    }
+                }
             }
         }
 

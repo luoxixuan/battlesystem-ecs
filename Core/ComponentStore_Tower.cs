@@ -75,6 +75,16 @@ namespace BattleSystemECS.Core
         // TowerManaDrainCap: per-hit cap on drained mana (overrides global ManaDrainConfig.ManaDrainCap).
         // 0 = use global cap. Designers can tighten per-tower if needed.
         public float[] TowerManaDrainCap = new float[MAX_ENTITIES];
+        // ── Buff Share (Round 103 Direction 8) ──────────────────────────────
+        // TowerBuffShareRadius: range (cells) within which this tower shares its own offensive
+        // stat snapshot with friendly towers. 0 = no sharing (zero-overhead fast path).
+        // Encodes the "encourage tight tower clusters" design — a 4-tower surround receives
+        // a multiplicative attack-speed bonus from each sharing tower in the cluster.
+        public float[] TowerBuffShareRadius = new float[MAX_ENTITIES];
+        // TowerBuffShareMask: bitmask of stats this tower shares. Bit definitions:
+        //   0x01 = AttackSpeed (multiplicative on TowerAttackSpeed for nearby towers)
+        // Default 0 = no sharing even if radius > 0 (defensive default — must opt-in by mask).
+        public int[] TowerBuffShareMask = new int[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
         // Tower cooldown reduction: per-tower CDR (0 = no reduction, 0.3 = 30% faster cooldowns)
@@ -842,6 +852,9 @@ namespace BattleSystemECS.Core
             TowerBlocksLOS[entityId] = false;
             // Phasing field: default to no phasing (regular tower, zero-overhead path)
             TowerIsPhasing[entityId] = false;
+            // Round 103 — Buff Share defaults: 0 radius = no sharing, 0 mask = no sharing
+            TowerBuffShareRadius[entityId] = 0f;
+            TowerBuffShareMask[entityId] = 0;
             // Construction fields: default to not in construction (active immediately)
             TowerIsConstructing[entityId] = false;
             TowerConstructionProgress[entityId] = 1f; // start at 100% (complete)
@@ -977,6 +990,12 @@ namespace BattleSystemECS.Core
             TowerWindupCountdown[entityId] = 0;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
+            // Round 103 — Buff Share: notify per-system caches that a fresh tower occupies
+            // this entityId. If the slot was recycled from a destroyed tower that previously
+            // had its base speed cached, that cache entry must be dropped (otherwise the new
+            // tower would inherit the old tower's base speed on the next ResolveBuffShares
+            // restore pass). Claude bug scan fix #2: stale cache on ID reuse.
+            RaiseTowerEntityInvalidated(entityId);
         }
 
         public void RemoveTower(int entityId)
@@ -1068,6 +1087,9 @@ namespace BattleSystemECS.Core
             TowerProjectileArcType[entityId] = 0;
             TowerProjectileArcPeakHeight[entityId] = 0f;
             TowerProjectileGravityScale[entityId] = 1f;
+            // Round 103 — Buff Share fields reset
+            TowerBuffShareRadius[entityId] = 0f;
+            TowerBuffShareMask[entityId] = 0;
             // Heat/overheat fields reset
             TowerHeat[entityId] = 0f;
             TowerMaxHeat[entityId] = 0f;
@@ -1165,6 +1187,9 @@ namespace BattleSystemECS.Core
             // Phasing field reset (false = no phasing, zero-overhead)
             TowerIsPhasing[entityId] = false;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
+            // Round 103 — Buff Share: drop any cached base-speed entry for the removed tower
+            // (Claude bug scan fix #2: stale cache on ID reuse).
+            RaiseTowerEntityInvalidated(entityId);
         }
         #endregion
 
@@ -1240,6 +1265,35 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(towerId)) return;
             TowerSynergyMultiplier[towerId] = multiplier;
+        }
+
+        // ==================== Buff Share (Round 103 Direction 8) ====================
+        /// <summary>Gets the buff share radius for a tower (0 = no sharing).</summary>
+        public float GetTowerBuffShareRadius(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0f;
+            return TowerBuffShareRadius[towerId];
+        }
+
+        /// <summary>Sets the buff share radius for a tower. 0 disables sharing.</summary>
+        public void SetTowerBuffShareRadius(int towerId, float radius)
+        {
+            if (!IsValidEntity(towerId)) return;
+            TowerBuffShareRadius[towerId] = radius < 0f ? 0f : radius;
+        }
+
+        /// <summary>Gets the buff share bitmask for a tower (0 = no sharing even with radius).</summary>
+        public int GetTowerBuffShareMask(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0;
+            return TowerBuffShareMask[towerId];
+        }
+
+        /// <summary>Sets the buff share bitmask for a tower.</summary>
+        public void SetTowerBuffShareMask(int towerId, int mask)
+        {
+            if (!IsValidEntity(towerId)) return;
+            TowerBuffShareMask[towerId] = mask;
         }
 
         // ==================== 塔索敌模式管理 ====================

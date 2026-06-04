@@ -4,17 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 102 — 玩家伤害转化 Damage Conversion）
+## 性能基准（2026-06-04, Round 103 — 队伍增益共享 Buff Share）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3362 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9655 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3923 FPS** |
+| **mode 5**（完整一局） | **3500 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9955 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3915 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮实施 Round 102 方向7（玩家伤害转化 Damage Conversion）：`GameConfig` 新增 `PlayerDamageConversionRatio`（默认 0f，0..1 区间）+ `PlayerConvertedDamageType`（默认 Physical）两字段；`DamageConversionConfig` 静态类 2 常量（`ConversionDefaultCap=0.5f` 全局 cap / `MinMeaningfulRatio=0.01f` 零开销阈值）；`PlayerTowerAttackSystem` 引入 `DamageType` 元组的 ping-pong damage queue（从 3-tuple 扩到 4-tuple，零额外分配），并行段提取 `ApplyResistancesAndEnqueue` 私有方法承担 resistance/immunity/exposure/death-mark 流水线；`convRatio < MinMeaningfulRatio` 走 fast path（单事件），否则按 `clamp(convRatio, 0, DefaultCap)` 拆成 original + converted 两段独立 apply（双事件，各自走对应的 armor/magicResist/immunity 路径）。`Data/Configs/damage_conversion.json` 配置元数据。配套 20 个测试覆盖 Config 常量、GameConfig defaults、Default 零分配、Clamp-at-Cap、Above-threshold 双事件、低于阈值 fast-path、Physical 走 armor、Physical-immune 仍吃 Magic portion、Magic 走 magicResist、crit 沿用、DestroyEntity reset 兼容性等。**228/228 tests PASS**。bench2 9655（bench2 仍 < 10000 阈值，与上轮 9259 相比 +4.3% 改善，但未达阈值）、bench4 3923（-3.8% 跌破 4300 阈值）、bench5 3362（-0.5% 跌破 3800 阈值，三项均未达阈值 ⚠️）。
->
+> 本轮实施 Round 103 方向8（队伍增益共享 Buff Share）：`ComponentStore_Tower` 新增 2 SOA 字段 `TowerBuffShareRadius[MAX_ENTITIES]` (float, 0=无共享零开销 fast path) + `TowerBuffShareMask[MAX_ENTITIES]` (int, 0x01=AttackSpeed)；`GameConfig` 新增 `BuffShareConfig` 静态类 3 常量（`MaxShareRadius=8f` / `DefaultShareEfficiencyPct=0.3f` / `ShareAttackSpeed=0x01`）；`TowerSynergySystem.ResolveBuffShares()` 新方法：每帧先 restore each cached tower's base attack speed（防 frame-over-frame 复合增长）→ 遍历 sharing tower 在 radius² 内的 nearby towers → 按 mask 位标志 multiplicative 应用 (1+eff) bonus → 缓存 base 用 entityId 键（不是 ActiveTowerIds 位置，Claude bug scan #1 修复位置键导致错位）；`CombatGroup` 在 `TowerAttack.Update()` 之前调用（attack speed 必须先共享再读）；`AddTower/RemoveTower/DestroyEntity` 三处重置双字段防 ID 复用泄漏 + 触发 `OnTowerEntityInvalidated` 事件清理 TowerSynergySystem 的 base-speed cache（**Claude bug scan #2 修复** ID 复用导致 stale base speed 写入新塔；新增 `ComponentStore.OnTowerEntityInvalidated` 静态事件 + `TowerSynergySystem` 订阅 + `InvalidateBuffShareCache(towerId)` 公开方法）。**248/248 tests PASS**（19 新增覆盖 default state / config / accessor / nearby bonus / out-of-range / mask=0 / radius=0 / self-skip / fast-path / 多帧不复合 / dispel sharer / dispel target / 2 sharing 乘法叠加 / DestroyEntity reset / RemoveTower reset / 回归测试 — cache 键为 towerId 而非位置 / ID 复用下新塔起始 base 正确 / 公开 invalidation API）。bench2 9955（< 10000 阈值但较上轮 9798 +1.6% 改善）、bench4 3915（< 4300 阈值但较上轮 3874 +1.1% 改善）、bench5 3500（< 3800 阈值，与上轮 3510 持平），三项均未达阈值 ⚠️ 但修复 #2 验证（实体 ID 复用下的 cache coherence）使 Buff Share 行为完全确定。
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
 ## 优化演进（关键节点）

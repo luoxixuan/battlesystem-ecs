@@ -15,10 +15,23 @@ namespace BattleSystemECS.Core
     /// SOA (Struct of Arrays) component storage.
     /// Provides cache-friendly continuous memory layout for high-throughput ECS operations.
     /// </summary>
-        public partial class ComponentStore : IDisposable
-        {
-            #region Constants & Helpers
+    public partial class ComponentStore : IDisposable
+    {
+        #region Constants & Helpers
         public const int MAX_ENTITIES = 100000;
+
+        // Round 103 — Buff Share cache invalidation hook.
+        // When a tower entity is destroyed (or its slot recycled via AddTower),
+        // TowerSynergySystem's per-frame base-attack-speed cache must drop the
+        // corresponding entry to avoid restoring a stale base speed onto a
+        // different tower that happens to land on the same entityId.
+        // Systems holding per-entity caches subscribe via += / -=
+        public static event Action<int> OnTowerEntityInvalidated;
+        internal static void RaiseTowerEntityInvalidated(int entityId)
+        {
+            var h = OnTowerEntityInvalidated;
+            if (h != null) h(entityId);
+        }
         internal const int MAX_PLAYERS = 10;
         internal const int MAX_MORPHS = 4; // max morph modes per tower (2 default + 2 alt forms)
         // MAX_PATH_NODES: max waypoints supported per path. Largest default path has 5
@@ -692,6 +705,9 @@ namespace BattleSystemECS.Core
                 // Round 101 — Mana Drain reset (recycled slot must start with no drain)
                 TowerManaDrainPct[entityId] = 0f;
                 TowerManaDrainCap[entityId] = 0f;
+                // Round 103 — Buff Share fields reset (recycled slot must start with no sharing)
+                TowerBuffShareRadius[entityId] = 0f;
+                TowerBuffShareMask[entityId] = 0;
                 // Dispel fields
                 TowerIsDispelled[entityId] = false;
                 TowerDispelTimer[entityId] = 0f;
@@ -744,6 +760,10 @@ namespace BattleSystemECS.Core
 
             // ── Phase 4: recycle ID ────────────────────────────────────────────────
             freeEntityIds.Push(entityId);
+            // Round 103 — Buff Share: notify per-system caches to drop stale base-speed entries
+            // for the recycled entityId (Claude bug scan fix #2: stale cache on ID reuse).
+            if (wasTower)
+                RaiseTowerEntityInvalidated(entityId);
         }
 
         public int NextEntityId => nextEntityId;

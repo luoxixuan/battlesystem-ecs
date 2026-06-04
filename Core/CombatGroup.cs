@@ -42,6 +42,10 @@ namespace BattleSystemECS.Core
             HitShield?.Update(deltaTime);
             TowerSabotage?.Update(deltaTime);
             TowerStealth?.Update(deltaTime);
+            // Round 103 — Buff Share: apply attack-speed sharing bonuses from sharing towers
+            // onto nearby friendly towers. Must run BEFORE TowerAttack because TowerAttack
+            // reads TowerAttackSpeed for cooldown / windup math.
+            TowerSynergy?.ResolveBuffShares();
             TowerAttack?.Update(deltaTime);
             TowerSynergy?.Update();
             TowerLink?.Update();
