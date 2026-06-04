@@ -352,6 +352,35 @@ namespace BattleSystemECS.Core
         // Example: 2.0 = double damage during LastStand.
         public float[] EnemyLastStandDamageMult = new float[MAX_ENTITIES];
 
+        // ==================== Boss Phase Skill / Speed / Damage (Round 111 Direction 1) ====================
+        // Per-enemy per-phase structured config. The pre-Round-111 implementation stored only a
+        // CSV string of thresholds in EnemyPhaseThresholds — the ability/speed/damage info from
+        // monsterConfig.Phases was silently dropped at spawn. Round 111 makes those fields
+        // queryable so EnemyAISystem can (a) trigger the phase's AbilityId via EnemyAbilitySystem,
+        // (b) apply SpeedMult / DamageMult one-shot, (c) remember which phases have already
+        // fired via a 4-bit fired mask. Hard-cap is 4 phases per boss (matches the JSON loader
+        // "up to 4 phases" assumption) — bosses with more phases are silently truncated.
+        public const int BOSS_PHASE_MAX = 4;
+        // EnemyPhaseCount: number of phases configured for this enemy (0 = no phases).
+        public int[] EnemyPhaseCount = new int[MAX_ENTITIES];
+        // EnemyPhaseThresholdsFlat[phase, enemyId]: HP fraction (0-1) at which this phase activates.
+        // Indexed as EnemyPhaseThresholdsFlat[phase * MAX_ENTITIES + enemyId] for cache locality.
+        // Note: named "Flat" to avoid clashing with the pre-existing EnemyPhaseThresholds string[]
+        // (kept for backwards-compat with the CSV parser used by legacy monster configs).
+        public float[] EnemyPhaseThresholdsFlat = new float[BOSS_PHASE_MAX * MAX_ENTITIES];
+        // EnemyPhaseSpeedMults[phase, enemyId]: speed multiplier applied on phase entry (1.0 = no change).
+        public float[] EnemyPhaseSpeedMults = new float[BOSS_PHASE_MAX * MAX_ENTITIES];
+        // EnemyPhaseDamageMults[phase, enemyId]: damage multiplier applied on phase entry (1.0 = no change).
+        public float[] EnemyPhaseDamageMults = new float[BOSS_PHASE_MAX * MAX_ENTITIES];
+        // EnemyPhaseAbilityIdsFlat[phase, enemyId]: per-(phase,enemy) abilityId to trigger
+        // on phase entry (e.g. "boss_summon", "boss_enrage", null, "boss_explode"). Null is no-op.
+        // Pre-split at spawn time from the original CSV to avoid per-frame string.Split allocations
+        // (Round 111 Direction 1 perf fix — Split was the prime cause of the 26% bench regression).
+        public string[,] EnemyPhaseAbilityIdsFlat = new string[BOSS_PHASE_MAX, MAX_ENTITIES];
+        // EnemyPhaseFiredMask: 4-bit bitmask. Bit (1 << phase) is set when the phase has fired
+        // its one-shot ability + multipliers. Prevents re-firing on subsequent HP recovery.
+        public int[] EnemyPhaseFiredMask = new int[MAX_ENTITIES];
+
         // ==================== Boss Invulnerable Phase（无敌阶段） ====================
         // EnemyIsInvulnerable: true when the enemy is in an invulnerable phase (e.g. Boss skill animation).
         // When true, the enemy takes 0 damage from all sources.

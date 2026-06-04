@@ -43,6 +43,15 @@ namespace BattleSystemECS.Systems
         private ConcurrentBag<LifestealEvent>[] _lifestealEvents = new ConcurrentBag<LifestealEvent>[2];
         private int _lifestealEventsIdx = 0;
 
+        // Round 111 Direction 1 — Boss phase ability event bag. Both the sequential path
+        // (small enemy counts) and the parallel batches (large enemy counts) push into this
+        // bag whenever a phase's AbilityId needs to fire. The bag is drained at the END of
+        // Update() into EnemyAbilitySystem.EnqueueAbility (which is NOT thread-safe — it
+        // mutates EnemyIsChanneling / _activeChannelers). One-shot guard is the FiredMask
+        // bit already set inside each path before the push, so even if two threads see the
+        // same transition in the same frame, only the first wins (CAS on FiredMask).
+        private readonly ConcurrentBag<(int enemyId, string abilityId)> _phaseAbilityEvents = new ConcurrentBag<(int, string)>();
+
         // BT evaluation cache — invalidates when enemy health, charge counter, or stun duration changes.
         private float _cachedPlayerHealth = -1;
         private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
@@ -147,6 +156,58 @@ namespace BattleSystemECS.Systems
                                         break;
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    // Round 111 Direction 1 — structured phase fields: one-shot fire of
+                    // SpeedMult / DamageMult and the phase's AbilityId. Uses the new
+                    // EnemyPhaseCount + EnemyPhaseThresholdsFlat arrays (Round 111), the
+                    // EnemyPhaseFiredMask bitmask to ensure each phase triggers exactly once
+                    // even if HP later recovers, and EnemyAbilitySystem.EnqueueAbility for the
+                    // ability trigger. Capped at BOSS_PHASE_MAX (4) to match WaveSpawningSystem.
+                    int phaseCount = store.EnemyPhaseCount[enemyId];
+                    if (phaseCount > 0)
+                    {
+                        int firedMask = store.EnemyPhaseFiredMask[enemyId];
+                        float healthFraction2 = (enemyMaxHealth > 0f) ? enemyHealth / enemyMaxHealth : 1f;
+                        for (int ph = 0; ph < phaseCount; ph++)
+                        {
+                            int bit = 1 << ph;
+                            if ((firedMask & bit) != 0) continue;
+                            int phIdx = ph * ComponentStore.MAX_ENTITIES + enemyId;
+                            float phThreshold = store.EnemyPhaseThresholdsFlat[phIdx];
+                            if (phThreshold <= 0f || phThreshold > 1f) continue;
+                            if (healthFraction2 < phThreshold)
+                            {
+                                // Mark fired first so re-entrant triggers can't double-apply
+                                store.EnemyPhaseFiredMask[enemyId] = firedMask | bit;
+                                // Apply speed multiplier one-shot (multiplicative on top of current)
+                                float speedMult = store.EnemyPhaseSpeedMults[phIdx];
+                                if (speedMult > 0f && speedMult != 1f)
+                                {
+                                    // Cache base on first application; subsequent phase mults multiply against it.
+                                    float baseSpeed = store.EnemyMoveSpeedBase[enemyId];
+                                    if (baseSpeed <= 0f) baseSpeed = store.EnemyMoveSpeed[enemyId];
+                                    store.EnemyMoveSpeed[enemyId] = baseSpeed * speedMult;
+                                }
+                                // Apply damage multiplier one-shot (multiplicative on top of current)
+                                float dmgMult = store.EnemyPhaseDamageMults[phIdx];
+                                if (dmgMult > 0f && dmgMult != 1f)
+                                {
+                                    store.EnemyDamage[enemyId] = store.EnemyDamage[enemyId] * dmgMult;
+                                }
+                                // Trigger phase ability — push to bag for end-of-Update serial drain.
+                                // Avoids calling non-thread-safe EnemyAbilitySystem.EnqueueAbility
+                                // from within a Parallel.For batch (race on EnemyIsChanneling /
+                                // _activeChannelers / cooldown timers). Direct 2D array read — no
+                                // per-frame string.Split (perf fix for 26% bench regression).
+                                string abId = store.EnemyPhaseAbilityIdsFlat[ph, enemyId];
+                                if (!string.IsNullOrEmpty(abId))
+                                {
+                                    _phaseAbilityEvents.Add((enemyId, abId));
+                                }
+                                firedMask = store.EnemyPhaseFiredMask[enemyId];
                             }
                         }
                     }
@@ -349,6 +410,50 @@ namespace BattleSystemECS.Systems
                                             break;
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        // Round 111 Direction 1 — structured phase fields (parallel path).
+                        // Per-enemy independent writes to FiredMask / SpeedMult / DamageMult
+                        // are safe in Parallel.For. Ability trigger goes to the bag and is
+                        // drained serially at end of Update(). See _phaseAbilityEvents field.
+                        int phaseCount = store.EnemyPhaseCount[enemyId];
+                        if (phaseCount > 0)
+                        {
+                            int firedMask = store.EnemyPhaseFiredMask[enemyId];
+                            float healthFraction2 = (enemyMaxHealth > 0f) ? enemyHealth / enemyMaxHealth : 1f;
+                            for (int ph = 0; ph < phaseCount; ph++)
+                            {
+                                int bit = 1 << ph;
+                                if ((firedMask & bit) != 0) continue;
+                                int phIdx = ph * ComponentStore.MAX_ENTITIES + enemyId;
+                                float phThreshold = store.EnemyPhaseThresholdsFlat[phIdx];
+                                if (phThreshold <= 0f || phThreshold > 1f) continue;
+                                if (healthFraction2 < phThreshold)
+                                {
+                                    // Mark fired first — guards against double-apply if this
+                                    // enemy lands in multiple Parallel.For batches (CAS on int).
+                                    store.EnemyPhaseFiredMask[enemyId] = firedMask | bit;
+                                    float speedMult = store.EnemyPhaseSpeedMults[phIdx];
+                                    if (speedMult > 0f && speedMult != 1f)
+                                    {
+                                        float baseSpeed = store.EnemyMoveSpeedBase[enemyId];
+                                        if (baseSpeed <= 0f) baseSpeed = store.EnemyMoveSpeed[enemyId];
+                                        store.EnemyMoveSpeed[enemyId] = baseSpeed * speedMult;
+                                    }
+                                    float dmgMult = store.EnemyPhaseDamageMults[phIdx];
+                                    if (dmgMult > 0f && dmgMult != 1f)
+                                    {
+                                        store.EnemyDamage[enemyId] = store.EnemyDamage[enemyId] * dmgMult;
+                                    }
+                                    // Direct 2D array read — no per-frame string.Split (perf fix).
+                                    string abId = store.EnemyPhaseAbilityIdsFlat[ph, enemyId];
+                                    if (!string.IsNullOrEmpty(abId))
+                                    {
+                                        _phaseAbilityEvents.Add((enemyId, abId));
+                                    }
+                                    firedMask = store.EnemyPhaseFiredMask[enemyId];
                                 }
                             }
                         }
@@ -897,6 +1002,35 @@ namespace BattleSystemECS.Systems
                     }
                 }
             }
+
+            // Round 111 Direction 1 — drain phase-ability bag into EnemyAbilitySystem.
+            // Both sequential + parallel paths above push (enemyId, abilityId) tuples into
+            // _phaseAbilityEvents whenever a phase transition fires. We now serially hand
+            // them off to EnemyAbilitySystem.EnqueueAbility (which mutates cooldown
+            // timers and _activeChannelers — NOT thread-safe). Drained at end of Update so
+            // the rest of the frame can still see the new ability channeling state.
+            DrainPhaseAbilityEvents();
+        }
+
+        /// <summary>
+        /// Round 111 Direction 1 — drain the phase-ability event bag into EnemyAbilitySystem.
+        /// Called at the end of Update() (after both sequential and parallel paths complete).
+        /// Uses TryTake in a tight loop to empty the bag without per-iteration allocations.
+        /// Drained count is exposed for tests / diagnostics.
+        /// </summary>
+        public int PhaseAbilityDrainCount { get; private set; }
+        private void DrainPhaseAbilityEvents()
+        {
+            int count = 0;
+            while (_phaseAbilityEvents.TryTake(out var ev))
+            {
+                if (enemyAbilitySystem != null && !string.IsNullOrEmpty(ev.abilityId))
+                {
+                    enemyAbilitySystem.EnqueueAbility(ev.enemyId, ev.abilityId);
+                    count++;
+                }
+            }
+            PhaseAbilityDrainCount = count;
         }
 
         private static int ParseDodgeDirection(string action)

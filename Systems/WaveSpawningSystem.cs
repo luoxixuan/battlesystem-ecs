@@ -671,7 +671,7 @@ namespace BattleSystemECS.Systems
                     // Initialize boss phase fields if this is a boss enemy
                     if (isBossWave && monsterConfig.IsBoss)
                     {
-                        // Build CSV string from Phases thresholds: "0.75,0.50,0.25"
+                        // Build CSV string from Phases thresholds: "0.75,0.50,0.25" (legacy path)
                         if (monsterConfig.Phases != null && monsterConfig.Phases.Count > 0)
                         {
                             var thresholds = new System.Text.StringBuilder();
@@ -681,6 +681,34 @@ namespace BattleSystemECS.Systems
                                 thresholds.Append(monsterConfig.Phases[p].Threshold.ToString(System.Globalization.CultureInfo.InvariantCulture));
                             }
                             store.EnemyPhaseThresholds[enemyId] = thresholds.ToString();
+                        }
+                        // Round 111 Direction 1 — populate the structured phase fields so
+                        // EnemyAISystem can (a) trigger phase AbilityId via EnemyAbilitySystem,
+                        // (b) apply SpeedMult / DamageMult one-shot, (c) skip already-fired
+                        // phases via EnemyPhaseFiredMask bitmask. Capped at BOSS_PHASE_MAX (4);
+                        // any extra phases defined in JSON are silently ignored to keep the
+                        // SOA arrays small and cache-friendly.
+                        int phaseCount = monsterConfig.Phases?.Count ?? 0;
+                        if (phaseCount > ComponentStore.BOSS_PHASE_MAX)
+                            phaseCount = ComponentStore.BOSS_PHASE_MAX;
+                        store.EnemyPhaseCount[enemyId] = phaseCount;
+                        if (phaseCount > 0)
+                        {
+                            for (int ph = 0; ph < phaseCount; ph++)
+                            {
+                                var phaseDef = monsterConfig.Phases[ph];
+                                int idx = ph * ComponentStore.MAX_ENTITIES + enemyId;
+                                store.EnemyPhaseThresholdsFlat[idx] = phaseDef.Threshold;
+                                // Defaults: 1.0 = no change. Storing the literal config value
+                                // (which may be 0 from JSON) is fine because the AI check
+                                // compares against 1.0f before applying.
+                                store.EnemyPhaseSpeedMults[idx] = phaseDef.SpeedMult > 0f ? phaseDef.SpeedMult : 1f;
+                                store.EnemyPhaseDamageMults[idx] = phaseDef.DamageMult > 0f ? phaseDef.DamageMult : 1f;
+                                // Pre-store per-phase abilityId directly into 2D array (no CSV, no
+                                // per-frame string.Split). Null = no-op; empty string also no-op.
+                                store.EnemyPhaseAbilityIdsFlat[ph, enemyId] =
+                                    string.IsNullOrEmpty(phaseDef.AbilityId) ? null : phaseDef.AbilityId;
+                            }
                         }
                         // Initialize enrage timer from config
                         if (monsterConfig.Enrage != null && monsterConfig.Enrage.EnrageAfterSeconds > 0f)

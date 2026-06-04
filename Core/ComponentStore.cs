@@ -417,6 +417,19 @@ namespace BattleSystemECS.Core
             // Initialize O(1) swap-and-pop index arrays
             for (int i = 0; i < MAX_ENTITIES; i++)
                 _enemyIndexInList[i] = _towerIndexInList[i] = -1;
+            // Round 111 Direction 1 — initialize per-(phase,enemy) speed/damage multipliers
+            // to 1f (no change). The default 0f would be a "neutral" sentinel but explicitly
+            // setting 1f makes the values queryable from the very first frame without any
+            // special-casing. Threshold defaults to 0f (no trigger) and fired mask to 0.
+            for (int ph = 0; ph < BOSS_PHASE_MAX; ph++)
+            {
+                int baseIdx = ph * MAX_ENTITIES;
+                for (int i = 0; i < MAX_ENTITIES; i++)
+                {
+                    EnemyPhaseSpeedMults[baseIdx + i] = 1f;
+                    EnemyPhaseDamageMults[baseIdx + i] = 1f;
+                }
+            }
             // Initialize player buffs
             for (int i = 0; i < MAX_PLAYERS; i++)
             {
@@ -627,6 +640,20 @@ namespace BattleSystemECS.Core
                 EnemyPhaseThresholds[entityId] = null;
                 EnemyEnrageTimer[entityId] = 0f;
                 EnemyIsEnraged[entityId] = false;
+                // Round 111 Direction 1 — Boss phase structured fields (speed/damage/fired mask)
+                EnemyPhaseCount[entityId] = 0;
+                EnemyPhaseFiredMask[entityId] = 0;
+                for (int ph = 0; ph < BOSS_PHASE_MAX; ph++)
+                {
+                    EnemyPhaseAbilityIdsFlat[ph, entityId] = null;
+                }
+                for (int ph = 0; ph < BOSS_PHASE_MAX; ph++)
+                {
+                    int idx = ph * MAX_ENTITIES + entityId;
+                    EnemyPhaseThresholdsFlat[idx] = 0f;
+                    EnemyPhaseSpeedMults[idx] = 1f;
+                    EnemyPhaseDamageMults[idx] = 1f;
+                }
                 // LastStand / DeathRattle fields
                 EnemyLastStandHpFraction[entityId] = 0f;
                 EnemyLastStandActive[entityId] = false;
@@ -1015,6 +1042,9 @@ namespace BattleSystemECS.Core
             SummonedUnitTargetId = null!; SummonedUnitGoldReward = null!;
             EnemyBossPhase = null!; EnemyPhaseThresholds = null!;
             EnemyEnrageTimer = null!; EnemyIsEnraged = null!;
+            // Round 111 Direction 1 — Boss phase structured fields
+            EnemyPhaseCount = null!; EnemyPhaseAbilityIdsFlat = null!; EnemyPhaseFiredMask = null!;
+            EnemyPhaseThresholdsFlat = null!; EnemyPhaseSpeedMults = null!; EnemyPhaseDamageMults = null!;
             // Round 107 Direction 6 — Target Mark Clear registration
             EnemyMarkStacks = null!; EnemyMarkDecayTimer = null!; EnemyMarkMaxThreshold = null!;
             EnemyIsInvulnerable = null!; EnemyInvulnerablePhaseName = null!;

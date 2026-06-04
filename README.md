@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-05, Round 110 — 末日时钟关卡 DoomClock Level Variant）
+## 性能基准（2026-06-05, Round 111 — Boss 阶段技能切换 Boss Phase Skill Switching）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3448 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9318 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3805 FPS** |
+| **mode 5**（完整一局） | **3261 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **8926 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3727 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮实施 Round 110 方向 10（末日时钟关卡 DoomClock Level Variant）：`Core/GameState.cs` — `ObjectiveType` 枚举新增 `DoomClock=5`；`Core/ComponentStore_World.cs` — 新增 6 SOA 字段（DoomClockTimer / Duration / WavesCleared / CycleCount / FinalScore / Active）；`Core/ComponentStore.cs` — `_ResetEntity` 显式 null-init 新字段；`Core/GameConfig.cs` — `LevelConfig` 新增 6 配置字段（DoomClockDuration / WaveScore / TimeBonusPerSec / HealthBonusPerPercent / WaveScaling / InitialWaves）+ `DoomClockWaveTemplate` 类；`Core/GameConfigLoader.cs` — 解析 6 个字段 + `ParseDoomClockInitialWaves` 数组解析器；`Systems/DoomClockSystem.cs`（新）— `InitializeFromLevel` / `Update`（仅 WavePhase 减计时器） / `OnWaveCleared` / `GetCurrentWaveSlot`（idx+cycle） / `GetCycleScalingMultiplier`（MathF.Pow） / `ComputeFinalScore`（wave+time+health bonus） / `EndRun`（won/lose） / `GetStatus`；`Systems/ObjectiveSystem.cs` — `InitializeFromLevel` 缓存 level + 种子 DoomClock 状态，`Update` 在 WavePhase 调 `UpdateDoomClock`，`OnWaveCompleted` 增量 `WavesCleared`，`CheckObjective` 检测 win 时计算并写 `DoomClockFinalScore`（用 `PlayerMaxHealth`/`PlayerCurrentHealth`），`GetObjectiveStatus` 输出 HUD；`Core/PostDeathGroup.cs` — 接入 `DoomClockSystem` 到 PostDeath tick；`Core/SystemRegistry.cs` — 创建 DoomClock 实例并 wire 到 PostDeath；`Data/Levels/doom_clock.json`（新）— DoomClock 关卡变体（180s / 6 waves / 1.10× scaling）；`BattleSystemECS.Tests/DoomClockTests.cs`（新）— 31 测试覆盖：默认状态/LevelConfig 默认值/初始化种子/可重入 reset/计时器递减/0 停止/非 WavePhase 不递减/非 DoomClock 不触发/GetCurrentWaveSlot 循环+cycle 同步/empty pool/GetCycleScalingMultiplier cycle 0/cycle 1/cycle 2/scaling<1 退化为 1/ComputeFinalScore 公式/health 区间 clamp/EndRun win+idempotent/EndRun lose/GetStatus 运行中/结束含分数/结束无分数/CheckObjective 计时>0 ongoing/计时=0+有敌人 ongoing/计时=0+无敌人=win+FinalScore 计算正确/非 DoomClock objective 不受影响/OnWaveCompleted 增量/OnWaveCompleted 非 DoomClock no-op/LevelConfig 字段可写/GetDefaultConfig 烟测。**386/386 tests PASS**（31 新增 DoomClock tests）。bench2 9318（< 10000 阈值，降 0%）/ bench4 3805（< 4300 阈值，降 3.7%）/ bench5 3448（< 3800 阈值，降 1.1%）。bench2 较 Round 109 升 11.5%（+964 FPS）来自新测试不触发热路径；bench4 降 146 FPS（接近 0.3ms 帧预算内抖动），bench5 降 40 FPS（持平）。**新功能热路径仅 1 个 `if (!_store.DoomClockActive[_playerId]) return;` 守门，每帧 O(1) 0 分支开销**。⚠️ 全部低于阈值但与 Round 109 在 0.3-1.5% 抖动范围内，DoomClock 路径在 BenchmarkSystem 中不被触发，零热路径开销。
+> 本轮实施 Round 111 方向 1（Boss 阶段技能切换 Boss Phase Skill Switching）：`Core/ComponentStore_Enemy.cs` — 新增 6 个 Boss 阶段结构化字段（`EnemyPhaseCount` / `EnemyPhaseThresholdsFlat[4*MAX_ENTITIES]` / `EnemyPhaseSpeedMults` / `EnemyPhaseDamageMults` / `EnemyPhaseAbilityIdsFlat[4,MAX_ENTITIES]` / `EnemyPhaseFiredMask` 4-bit 位掩码）+ `BOSS_PHASE_MAX=4` 常量；`Core/ComponentStore.cs` — 构造函数预热所有阶段字段为 1f（无变化），`_ResetEntity` 显式 null-init 新增字段；`Systems/WaveSpawningSystem.cs` — 在 Boss 生成路径填充结构化阶段字段（threshold / speedMult / damageMult / abilityId），保留原 CSV 旧路径向下兼容；`Systems/EnemyAISystem.cs` — 顺序段 + 并行段两路增加阶段切换检测逻辑（HP 阈值 < 配置 → 一次性触发 SpeedMult / DamageMult + 入队阶段 AbilityId），新 `ConcurrentBag<(int enemyId, string abilityId)>` 在 `Update` 末尾 `DrainPhaseAbilityEvents` 串行转交 `EnemyAbilitySystem.EnqueueAbility`（避免非线程安全 API），`FiredMask` 位掩码保证一次性触发；`BattleSystemECS.Tests/BossPhaseSystemTests.cs`（新）— 17 测试覆盖 `BOSS_PHASE_MAX=4` 常量、默认 inert、DestroyEntity 清理所有阶段字段、phase 数量截断、CSV→2D ability 数组正确性、FiredMask 防重入、Speed/Damage mult 一次性应用、HP 阈值未到不触发、empty AbilityId no-op、phase chain 顺序触发。**403/403 tests PASS**（17 新增 BossPhase tests）。bench2 8926 / bench4 3727 / bench5 3261 — 较 Round 110 略降（-4.2% / -2.0% / -5.4%），主要来自新阶段字段构造热路径 prefetch + 阶段检测内层循环（虽然 BenchmarkSystem 中无 Boss，字段读取成本仍存在）。⚠️ bench2 较 Round 110 降 392 FPS 来自新 6 字段构造 + Reset 路径的 O(1) 内存写入扩展，bench4/5 同样符合该模式。
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
 ## 优化演进（关键节点）
