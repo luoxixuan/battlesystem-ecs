@@ -1,0 +1,295 @@
+{
+  "_comment_top": "Round 105 Direction 9 — Daily Challenge modifier pool.",
+  "_comment_format": "Each modifier multiplies or adds to a small number of game-wide stats. Default values (1.0 mult / 0 add) are neutral so missing/extra fields are safe. The pool is sampled by DailyChallengeSystem at run start using a date-seeded RNG; modifierCount controls how many are picked.",
+  "modifierCount": 3,
+  "modifiers": [
+    {
+      "id": "glass_cannon",
+      "name": "玻璃大炮",
+      "description": "玩家伤害 +30%，敌人生命值 +20%",
+      "damageMult": 1.30,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.20,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "tank_horde",
+      "name": "坦克群",
+      "description": "敌人生命值 +50%，击杀奖励 +20%",
+      "damageMult": 1.00,
+      "goldMult": 1.20,
+      "enemyHpMult": 1.50,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "rich_start",
+      "name": "富贵开局",
+      "description": "起始金币 +150",
+      "damageMult": 1.00,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": 150
+    },
+    {
+      "id": "gold_rush",
+      "name": "金币风暴",
+      "description": "金币获得 ×1.5",
+      "damageMult": 1.00,
+      "goldMult": 1.50,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "swift_strike",
+      "name": "迅捷一击",
+      "description": "玩家伤害 +20%，攻击速度 +20% (用 damageMult 表达近似)",
+      "damageMult": 1.20,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "iron_will",
+      "name": "钢铁意志",
+      "description": "敌人伤害 -15% (用反向：玩家输出 ×1.10)",
+      "damageMult": 1.10,
+      "goldMult": 0.85,
+      "enemyHpMult": 1.15,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "blood_moon",
+      "name": "血月",
+      "description": "敌人生命值 +30%，击杀金币 +30%",
+      "damageMult": 1.00,
+      "goldMult": 1.30,
+      "enemyHpMult": 1.30,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "merchants_blessing",
+      "name": "商人祝福",
+      "description": "起始金币 +80，金币获得 +20%",
+      "damageMult": 1.00,
+      "goldMult": 1.20,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": 80
+    },
+    {
+      "id": "elite_assault",
+      "name": "精英突袭",
+      "description": "敌人生命值 +25%，玩家伤害 +15%",
+      "damageMult": 1.15,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.25,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "economy_crash",
+      "name": "经济崩盘",
+      "description": "起始金币 -50，金币获得 +30%",
+      "damageMult": 1.00,
+      "goldMult": 1.30,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": -50
+    },
+    {
+      "id": "siege_mode",
+      "name": "围攻模式",
+      "description": "敌人生命值 +40%，玩家伤害 +20%",
+      "damageMult": 1.20,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.40,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "lightning_rod",
+      "name": "引雷针",
+      "description": "玩家伤害 +25%",
+      "damageMult": 1.25,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "famine",
+      "name": "饥荒",
+      "description": "金币获得 ×0.7，敌人生命值 -15%",
+      "damageMult": 1.00,
+      "goldMult": 0.70,
+      "enemyHpMult": 0.85,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "bountiful",
+      "name": "丰饶",
+      "description": "起始金币 +100，金币获得 +15%",
+      "damageMult": 1.00,
+      "goldMult": 1.15,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": 100
+    },
+    {
+      "id": "punisher",
+      "name": "惩戒者",
+      "description": "玩家伤害 +35%，敌人生命值 +15%",
+      "damageMult": 1.35,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.15,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "endless_swarm",
+      "name": "无尽虫群",
+      "description": "敌人生命值 -25%，金币获得 -20%",
+      "damageMult": 1.00,
+      "goldMult": 0.80,
+      "enemyHpMult": 0.75,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "fortune",
+      "name": "命运之轮",
+      "description": "起始金币 +200",
+      "damageMult": 1.00,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": 200
+    },
+    {
+      "id": "berserker",
+      "name": "狂战士",
+      "description": "玩家伤害 +40%，敌人生命值 +10%",
+      "damageMult": 1.40,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.10,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "tax_collector",
+      "name": "税收官",
+      "description": "起始金币 +50，金币获得 -10%",
+      "damageMult": 1.00,
+      "goldMult": 0.90,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": 50
+    },
+    {
+      "id": "iron_fist",
+      "name": "铁拳",
+      "description": "玩家伤害 +20%，敌人生命值 -10%",
+      "damageMult": 1.20,
+      "goldMult": 1.00,
+      "enemyHpMult": 0.90,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "treasure_hunt",
+      "name": "寻宝",
+      "description": "起始金币 +120，金币获得 +10%",
+      "damageMult": 1.00,
+      "goldMult": 1.10,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": 120
+    },
+    {
+      "id": "dread_lord",
+      "name": "恐惧领主",
+      "description": "敌人生命值 +35%，玩家伤害 +10%",
+      "damageMult": 1.10,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.35,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "pauper",
+      "name": "贫民",
+      "description": "起始金币 -100，金币获得 +40%",
+      "damageMult": 1.00,
+      "goldMult": 1.40,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": -100
+    },
+    {
+      "id": "overcharge",
+      "name": "过载",
+      "description": "玩家伤害 +25%，起始金币 +30",
+      "damageMult": 1.25,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": 30
+    },
+    {
+      "id": "frostbite",
+      "name": "霜冻",
+      "description": "敌人生命值 -20%，金币获得 -10%",
+      "damageMult": 1.00,
+      "goldMult": 0.90,
+      "enemyHpMult": 0.80,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "war_tribute",
+      "name": "战争税",
+      "description": "起始金币 +75，敌人生命值 +15%",
+      "damageMult": 1.00,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.15,
+      "startingGoldBonus": 75
+    },
+    {
+      "id": "phantom",
+      "name": "幻影",
+      "description": "玩家伤害 +15%，金币获得 +15%，敌人生命值 -10%",
+      "damageMult": 1.15,
+      "goldMult": 1.15,
+      "enemyHpMult": 0.90,
+      "startingGoldBonus": 0
+    },
+    {
+      "id": "titan",
+      "name": "泰坦",
+      "description": "敌人生命值 +60%，玩家伤害 +25%，起始金币 +50",
+      "damageMult": 1.25,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.60,
+      "startingGoldBonus": 50
+    },
+    {
+      "id": "ranger",
+      "name": "游侠",
+      "description": "玩家伤害 +20%，起始金币 +60",
+      "damageMult": 1.20,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.00,
+      "startingGoldBonus": 60
+    },
+    {
+      "id": "hoard",
+      "name": "守财奴",
+      "description": "起始金币 +250，敌人生命值 +20%",
+      "damageMult": 1.00,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.20,
+      "startingGoldBonus": 250
+    },
+    {
+      "id": "stormcaller",
+      "name": "风暴召唤",
+      "description": "玩家伤害 +30%，敌人生命值 +5%，起始金币 +40",
+      "damageMult": 1.30,
+      "goldMult": 1.00,
+      "enemyHpMult": 1.05,
+      "startingGoldBonus": 40
+    },
+    {
+      "id": "scorched_earth",
+      "name": "焦土",
+      "description": "敌人生命值 -30%，起始金币 -50",
+      "damageMult": 1.00,
+      "goldMult": 1.00,
+      "enemyHpMult": 0.70,
+      "startingGoldBonus": -50
+    }
+  ]
+}

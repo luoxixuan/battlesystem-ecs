@@ -72,6 +72,13 @@ namespace BattleSystemECS.Config
                 // Load random mid-wave event definitions (direction 9)
                 LoadRandomEventDefs(gameConfig, renderer);
 
+                // Load daily challenge modifier pool (Round 105 Direction 9)
+                // and resolve today's daily seed into the GameConfig. Safe no-op
+                // when the JSON is missing or the pool is empty — the daily
+                // system is opt-in.
+                LoadDailyModifierPool(gameConfig, renderer);
+                ResolveDailyChallenge(gameConfig, renderer);
+
                 // Load damage saturation tunables (Round 92 Direction 1: per-enemy diminishing returns
                 // on incoming damage within a short rolling window). All three knobs are optional —
                 // missing fields fall back to the safe defaults in DamageSaturationConfig.
@@ -1591,6 +1598,98 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[EVENT] Failed to load random event defs: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Load the daily challenge modifier pool from <c>Data/Configs/daily_modifiers.json</c>.
+        /// Each entry becomes a <see cref="DailyModifierDef"/> available for selection.
+        /// Missing or empty file → empty pool → daily system is a no-op (stock values).
+        /// Optional <c>modifierCount</c> at the top level overrides the default 3.
+        /// </summary>
+        private static void LoadDailyModifierPool(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string file = "Data/Configs/daily_modifiers.json";
+            try
+            {
+                if (!File.Exists(file))
+                {
+                    renderer.Log("[DAILY] Daily modifier file not found: " + file + ", using defaults (no daily challenge)");
+                    return;
+                }
+                string json = File.ReadAllText(file);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[DAILY] Daily modifier file is empty: " + file);
+                    return;
+                }
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("modifierCount", out var mc) && mc.ValueKind == System.Text.Json.JsonValueKind.Number)
+                {
+                    int newCount = mc.GetInt32();
+                    if (newCount > 0) gameConfig.DailyModifierCount = newCount;
+                }
+                if (root.TryGetProperty("modifiers", out var arr) && arr.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var elem in arr.EnumerateArray())
+                    {
+                        var m = new DailyModifierDef();
+                        m.Id = elem.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "";
+                        m.Name = elem.TryGetProperty("name", out var nm) ? nm.GetString() ?? "" : "";
+                        m.Description = elem.TryGetProperty("description", out var d) ? d.GetString() ?? "" : "";
+                        m.DamageMult = elem.TryGetProperty("damageMult", out var dm) ? (float)dm.GetDouble() : 1.0f;
+                        m.GoldMult = elem.TryGetProperty("goldMult", out var gm) ? (float)gm.GetDouble() : 1.0f;
+                        m.EnemyHpMult = elem.TryGetProperty("enemyHpMult", out var ehm) ? (float)ehm.GetDouble() : 1.0f;
+                        m.StartingGoldBonus = elem.TryGetProperty("startingGoldBonus", out var sgb) ? (float)sgb.GetDouble() : 0f;
+                        gameConfig.DailyModifierPool.Add(m);
+                    }
+                }
+                renderer.Log("[DAILY] Loaded " + gameConfig.DailyModifierPool.Count + " daily modifier defs from " + file);
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[DAILY] Failed to load daily modifier defs: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Resolve today's daily challenge and apply it to the GameConfig. Pure
+        /// pass-through to <see cref="DailyChallengeSystem.ResolveForDate"/> +
+        /// <see cref="DailyChallengeSystem.ApplyToConfig"/>. Logs a one-line
+        /// summary so the run start screen can show "Daily: Glass Cannon + Rich Start + Tank Horde".
+        /// Safe no-op when the pool is empty.
+        /// </summary>
+        private static void ResolveDailyChallenge(GameConfig gameConfig, IRenderer renderer)
+        {
+            try
+            {
+                if (gameConfig.DailyModifierPool == null || gameConfig.DailyModifierPool.Count == 0)
+                {
+                    renderer.Log("[DAILY] Daily pool empty — daily system disabled (stock values)");
+                    return;
+                }
+                var result = DailyChallengeSystem.ResolveForDate(
+                    gameConfig.DailyModifierPool, DateTime.Today, gameConfig.DailyModifierCount);
+                DailyChallengeSystem.ApplyToConfig(gameConfig, result);
+                var names = new System.Text.StringBuilder();
+                for (int i = 0; i < result.Selected.Count; i++)
+                {
+                    if (i > 0) names.Append(" + ");
+                    names.Append(string.IsNullOrEmpty(result.Selected[i].Name)
+                        ? result.Selected[i].Id
+                        : result.Selected[i].Name);
+                }
+                renderer.Log("[DAILY] " + result.Date + " seed=" + result.Seed
+                    + " modifiers=[" + names.ToString() + "]"
+                    + " dmg=" + gameConfig.DailyDamageMult.ToString("F2")
+                    + " gold=" + gameConfig.DailyGoldMult.ToString("F2")
+                    + " enemyHp=" + gameConfig.DailyEnemyHpMult.ToString("F2")
+                    + " startGoldBonus=" + gameConfig.DailyStartingGoldBonus.ToString("F0"));
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[DAILY] Failed to resolve daily challenge: " + ex.Message);
             }
         }
 

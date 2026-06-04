@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 104 — 目标处决奖励 Execute Threshold）
+## 性能基准（2026-06-04, Round 105 — 每日挑战 Daily Challenge）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3402 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9615 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3807 FPS** |
+| **mode 5**（完整一局） | **3453 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9753 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3991 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮实施 Round 104 方向8（目标处决奖励 Execute Threshold）：`ComponentStore_Enemy` 新增 4 SOA 字段 `EnemyExecuteThreshold[MAX_ENTITIES]` (float, 0=opt-out) + `EnemyExecuteBonusGold[MAX_ENTITIES]` (float) + `EnemyExecuteBonusMana[MAX_ENTITIES]` (float) + `EnemyExecuted[MAX_ENTITIES]` (bool, 一次性防重付) + `AddEnemy` 初始化块 4 字段默认 0/false + `DestroyEntity` reset 4 字段防 ID 复用泄漏；`ComponentStore.ResolveEnemiesKilledThisFrame()` 在 Death Mark bonus 之后追加 Execute 一次性奖励（threshold>0 且 !EnemyExecuted 时付 gold/mana + 标记 executed）；`SetPlayerMana(playerId, curMana+execMana)` 复用现有 clamp 模式；`GameConfig` 新增 `ExecuteConfig` 静态类 6 常量（DefaultExecuteThreshold=0 / DefaultExecuteBonusGold=0 / DefaultExecuteBonusMana=0 / RecommendedExecuteThreshold=0.20f / RecommendedExecuteBonusGold=25f / RecommendedExecuteBonusMana=15f）；`ExecuteSystemTests` 12 测试覆盖 default-zero / config 推荐值 / 默认敌人不付 bonus / threshold>0 给 gold / threshold>0 给 mana / 双 bonus / threshold=0 opt-out / mana 上限 clamp / 一次性防双付 / 重复 queue 只付一次 / DestroyEntity reset 防 ID 泄漏 / 与 Death Mark 叠加。**260/260 tests PASS**（12 新增）。bench2 9615（< 10000 阈值）/ bench4 3807（< 4300 阈值）/ bench5 3402（< 3800 阈值）较上轮 9955/3915/3500 略降 3.4%/2.8%/2.8%（在典型 5-10% bench 噪声范围内，3 个新数组 read 引入 ~0.01ms/enemy 微小开销），⚠️ 三项均未达阈值但 Execute 行为完全确定。
+> 本轮实施 Round 105 方向9（每日挑战 Daily Challenge / Rotating Seed）：`Core/DailyChallengeSystem.cs`（新）— FNV-1a 32-bit date hash + xorshift32 seed-select + ResolveForDate/ApplyToConfig 纯函数 + DailyChallengeResult snapshot；`Data/Configs/daily_modifiers.json`（新）— 8 中文 modifier（玻璃大炮/坦克群/富贵开局/金币风暴/钢铁意志/快攻/法术风暴/经济压力），每条带 4 系数（damageMult/goldMult/enemyHpMult/startingGoldBonus）；`GameConfig` 新增 `DailyModifierPool` 列表 + `DailyModifierCount=3` + `DailyLastResult` snapshot + 4 聚合系数（DailyDamageMult/GoldMult/EnemyHpMult/StartingGoldBonus）；`GameConfigLoader.LoadDailyModifierPool` + `ResolveDailyChallenge` 启动期从 JSON 加载 + 日期 hash seed + 应用聚合；`GameManager.PrintDailySummary` 美化输出（stock run 提示 + modifier 列表 + 有效聚合系数）；`Program.cs` 新增 `dotnet run daily` 启动入口；`DailyChallengeTests` 19 测试覆盖 hash 确定性 / 同日同 seed / 跨日不同 seed / 池空 no-op / 池 null no-op / count>poolSize clamp / count=0 返回空 / 池单元素 / SeedSelectIndices distinct 索引 / 池大小 64+ 走 bool[] 路径 / ApplyToConfig 聚合乘加 / null result / null config / 空 Selected / DailyLastResult 写入 / 加载后 GameConfig 反射 / 字符串默认值 / FNV-1a 已知向量 / xorshift32 序列 / ResolveForDate 纯函数 / 启动 JSON 解析。**279/279 tests PASS**（19 新增）。bench2 9753（< 10000 阈值）/ bench4 3991（< 4300 阈值）/ bench5 3453（< 3800 阈值）较上轮 9615/3807/3402 升 1.4%/4.8%/1.5%（在典型 bench 噪声范围内，Daily 系统是 startup-only zero-ECS-overhead 不进入热路径），⚠️ 三项均未达阈值但 Daily 行为完全确定。
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
 ## 优化演进（关键节点）

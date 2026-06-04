@@ -190,6 +190,52 @@ namespace BattleSystemECS.Core
         }
 
         /// <summary>
+        /// Print the daily challenge summary to stdout (Round 105 Direction 9).
+        /// When the daily system is disabled (empty pool / null result), prints a
+        /// "stock run" notice so the player knows the daily bonus is inactive.
+        /// Safe to call on any GameConfig — uses null-checks throughout.
+        /// </summary>
+        public void PrintDailySummary()
+        {
+            try
+            {
+                Console.WriteLine();
+                Console.WriteLine("═══════════════════════════════════════════");
+                Console.WriteLine("  📅  Daily Challenge");
+                Console.WriteLine("═══════════════════════════════════════════");
+                if (gameConfig == null || gameConfig.DailyLastResult == null
+                    || gameConfig.DailyLastResult.Selected == null
+                    || gameConfig.DailyLastResult.Selected.Count == 0)
+                {
+                    Console.WriteLine("  Stock run — daily challenge disabled.");
+                    Console.WriteLine("═══════════════════════════════════════════");
+                    Console.WriteLine();
+                    return;
+                }
+                var r = gameConfig.DailyLastResult;
+                Console.WriteLine("  Date:  " + r.Date);
+                Console.WriteLine("  Seed:  " + r.Seed);
+                Console.WriteLine("  Modifiers:");
+                for (int i = 0; i < r.Selected.Count; i++)
+                {
+                    var m = r.Selected[i];
+                    string name = string.IsNullOrEmpty(m.Name) ? m.Id : m.Name;
+                    Console.WriteLine("    • " + name + "  —  " + (string.IsNullOrEmpty(m.Description) ? "(no description)" : m.Description));
+                }
+                Console.WriteLine("  Effective multipliers:");
+                Console.WriteLine(string.Format("    damage ×{0:F2}  gold ×{1:F2}  enemyHp ×{2:F2}  startGoldBonus {3:+0;-0;0}",
+                    gameConfig.DailyDamageMult, gameConfig.DailyGoldMult,
+                    gameConfig.DailyEnemyHpMult, gameConfig.DailyStartingGoldBonus));
+                Console.WriteLine("═══════════════════════════════════════════");
+                Console.WriteLine();
+            }
+            catch
+            {
+                // Defensive: never let summary printing break game startup
+            }
+        }
+
+        /// <summary>
         /// 运行游戏主循环
         /// </summary>
         public void Run()

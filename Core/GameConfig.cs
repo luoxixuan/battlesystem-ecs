@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using BattleSystemECS.Components;
 using BattleSystemECS.Systems;
+using BattleSystemECS.Core;
 
 namespace BattleSystemECS.Config
 {
@@ -1624,6 +1625,26 @@ namespace BattleSystemECS.Config
         // Random mid-wave event system configuration (direction 9)
         public RandomEventConfig RandomEvents { get; set; } = new RandomEventConfig();
 
+        // ── Daily Challenge / Rotating Seed (Round 105 Direction 9) ────────────
+        // The pool of available daily modifiers (loaded from Data/Configs/daily_modifiers.json).
+        // When empty, the daily system is a no-op and stock values are used.
+        public List<DailyModifierDef> DailyModifierPool { get; set; } = new List<DailyModifierDef>();
+        // Number of modifiers to pick per day (default 3). Configurable so designers
+        // can ramp difficulty curve per season.
+        public int DailyModifierCount { get; set; } = 3;
+        // Resolved daily challenge for the current run. Filled in by
+        // DailyChallengeSystem.ApplyToConfig — null when the system is disabled
+        // (no JSON pool, or pool is empty).
+        public DailyChallengeResult? DailyLastResult { get; set; } = null;
+        // Daily multiplicative damage modifier (default 1.0 = inert).
+        public float DailyDamageMult { get; set; } = 1.0f;
+        // Daily multiplicative gold modifier (default 1.0 = inert).
+        public float DailyGoldMult { get; set; } = 1.0f;
+        // Daily multiplicative enemy HP modifier (default 1.0 = inert).
+        public float DailyEnemyHpMult { get; set; } = 1.0f;
+        // Daily additive starting-gold bonus (default 0 = inert).
+        public float DailyStartingGoldBonus { get; set; } = 0f;
+
         // ── Meta Progression / Prestige (cross-run unlocks) ───────────────
         // Definitions of all available prestige nodes (loaded from Data/Configs/meta_progression.json)
         public List<MetaProgressionNode> PrestigeNodes { get; set; } = new List<MetaProgressionNode>();
@@ -2528,6 +2549,31 @@ namespace BattleSystemECS.Config
         public float MinEventGap { get; set; } = 30f;
         /// <summary>All defined event types.</summary>
         public List<RandomEventDef> Events { get; set; } = new List<RandomEventDef>();
+    }
+
+    /// <summary>
+    /// One modifier in the daily challenge pool (Round 105 Direction 9).
+    /// Each modifier multiplies or adds to a small number of game-wide stats and
+    /// is selected by DailyChallengeSystem at run start using a date-seeded RNG.
+    /// Defaults are neutral (DamageMult/GoldMult/EnemyHpMult = 1.0, StartingGoldBonus = 0)
+    /// so an unmodified pool has no effect.
+    /// </summary>
+    public class DailyModifierDef
+    {
+        /// <summary>Unique modifier id (e.g. "glass_cannon", "rich_start", "tank_horde").</summary>
+        public string Id { get; set; } = "";
+        /// <summary>Display name shown in the daily summary UI.</summary>
+        public string Name { get; set; } = "";
+        /// <summary>One-line flavor text describing the modifier.</summary>
+        public string Description { get; set; } = "";
+        /// <summary>Damage multiplier (1.0 = neutral, 1.3 = +30% damage, 0.7 = -30% damage).</summary>
+        public float DamageMult { get; set; } = 1.0f;
+        /// <summary>Gold earn multiplier (1.0 = neutral).</summary>
+        public float GoldMult { get; set; } = 1.0f;
+        /// <summary>Enemy max-HP multiplier (1.0 = neutral, 1.5 = +50% HP).</summary>
+        public float EnemyHpMult { get; set; } = 1.0f;
+        /// <summary>Flat starting-gold bonus (additive, 0 = neutral).</summary>
+        public float StartingGoldBonus { get; set; } = 0f;
     }
 
     public enum CorpseEffectTypeEnum

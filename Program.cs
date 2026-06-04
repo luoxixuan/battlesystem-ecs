@@ -30,6 +30,17 @@ namespace BattleSystemECS
                 {
                     RunBenchmarkDirect(3);
                 }
+                else if (string.Equals(args[0], "daily", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Round 105 Direction 9: Run the daily challenge — equivalent to
+                    // an interactive run with the daily modifiers baked into GameConfig.
+                    // The modifiers are loaded + resolved inside GameConfigLoader.LoadConfig.
+                    // The CLI just shows the daily summary and starts the game.
+                    GameManager dailyManager = new GameManager();
+                    dailyManager.Initialize();
+                    dailyManager.PrintDailySummary();
+                    dailyManager.Run();
+                }
                 else
                 {
                     RunBenchmarkDirect(mode);
