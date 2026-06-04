@@ -1372,6 +1372,53 @@ namespace BattleSystemECS.Systems
                         }
                     }
                 }
+                // ── Tower Enchantment bonus (Round 116 Direction 3) ──
+                // O(1) guard: when the tower has no active enchantment, this branch is
+                // skipped entirely. When enchanted, two things happen on a successful hit:
+                //   1) the matching ElementType is OR'd into EnemyElementStatus[enemyId]
+                //      and the per-element EnemyElementTimer[] slot is refreshed to the
+                //      configured duration, so the existing ElementalReactionSystem /
+                //      DoT / freeze / shock systems trigger as if a separate spell applied
+                //      the element (enables reactions, melts, freezes, etc.).
+                //   2) a damage bonus (1 + bonus) is applied to finalDmg, modelling the
+                //      "imbued strike" damage uplift of the enchanted weapon.
+                // element lookup uses GetTowerEnchantedElement() which auto-expires by
+                // comparing TowerEnchantExpiresAtTurn against store.CurrentFrame, so we
+                // don't need a dedicated TickEnchant() loop.
+                int enchantElem = store.GetTowerEnchantedElement(towerId);
+                if (enchantElem > 0 && finalDmg > 0f)
+                {
+                    float enchantBonus = store.TowerEnchantBonus[towerId];
+                    float enchantDur = store.TowerEnchantDuration[towerId];
+                    if (enchantBonus > 0f) finalDmg *= 1f + enchantBonus;
+                    if (enchantDur > 0f)
+                    {
+                        // Apply element to enemy — OR into status, refresh timer slot.
+                        // ElementType ordinals match EnemyElementTimer layout (0=Fire..3=Poison).
+                        ElementType elemBit;
+                        int elemIdx;
+                        switch (enchantElem)
+                        {
+                            case 1: elemBit = ElementType.Fire;       elemIdx = 0; break;
+                            case 2: elemBit = ElementType.Ice;        elemIdx = 1; break;
+                            case 3: elemBit = ElementType.Lightning; elemIdx = 2; break;
+                            case 4: elemBit = ElementType.Poison;     elemIdx = 3; break;
+                            default: elemBit = ElementType.None;      elemIdx = -1; break;
+                        }
+                        if (elemIdx >= 0)
+                        {
+                            store.EnemyElementStatus[enemyId] |= elemBit;
+                            int timerSlot = enemyId * 4 + elemIdx;
+                            // Refresh to max(currentTimer, enchantDur) so a longer-running
+                            // element (e.g. an existing Fire from a prior attack) is not
+                            // shortened by a shorter enchant duration.
+                            if (store.EnemyElementTimer[timerSlot] < enchantDur)
+                            {
+                                store.EnemyElementTimer[timerSlot] = enchantDur;
+                            }
+                        }
+                    }
+                }
                 // Vanguard damage transfer: if this enemy is protected by a vanguard, transfer a fraction to the vanguard
                 float vanguardTransfer = store.EnemyVanguardDmgTransfer[enemyId];
                 if (vanguardTransfer > 0f && finalDmg > 0f)

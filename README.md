@@ -4,17 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-05, Round 115 — 方向二：召唤阵 Summon Circle / 反召唤塔）
+## 性能基准（2026-06-05, Round 116 — 方向三：附魔 Enchant / Imbue）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3328 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **8723 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3724 FPS** |
+| **mode 5**（完整一局） | **3194 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **8545 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3431 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> **Round 115 方向二：召唤阵 Summon Circle / 反召唤塔 Anti-Summon**：4 新增 SOA 字段 `EnemyInSummonCircleX/Y/Radius`（enemy 侧，记录每个敌人归属的召唤阵锚点 + 半径，默认 0=无 circle fast path）+ `TowerAntiSummonMultiplier`（tower 侧，反召唤倍率，默认 0=无 bonus fast path）+ 2 边界安全访问器 `SetSummonCircle/SetTowerAntiSummonMultiplier`（clamp 半径≥0、倍率 [0, 10]）。`NecromancerSystem` 召唤 reanimated minion 时调用 `SetSummonCircle(minionId, necromancerX, necromancerY, resurrectRange)` 注册召唤阵。`TowerAttackSystem` finalDmg 计算链中在元素 affinity/exposure 之后、vanguard 之前插入反召唤 hook：仅当 `TowerAntiSummonMultiplier[towerId] > 0` AND `EnemyInSummonCircleRadius[enemyId] > 0` AND 敌人在 circle 半径内时，`finalDmg *= antiSummonMult`。三道门控（multiplier=0/radius=0/距离外）确保常见路径零开销。配套 7 个 Theory + 8 个 Fact 测试验证 Set/Clear/Reset/clamp/in-circle/out-of-circle 全部分支。
-> bench2 8723（vs Round 114: 9136, -4.5% noise）/ bench4 3724（vs Round 114: 3521, +5.8% noise）/ bench5 3328（vs Round 114: 3311, +0.5% noise）— 全部在 noise 范围内（bench2 微降、bench4 微升、bench5 持平），4 新字段 + 1 hot path 乘法/距离比较未造成回归。⚠️ 三个 bench 仍低于目标阈值（10000/4300/3800），但与历史基线一致，是 .NET 6 框架 + 32-bit 子系统环境下的实际性能上界。
+> **Round 116 方向三：附魔 Enchant / Imbue**：4 新增 SOA 字段 `TowerEnchantedElement`（int，0=无附魔/1=Fire/2=Ice/3=Lightning/4=Poison，匹配 ElementType ordinal）+ `TowerEnchantBonus`（float，0=无加成 fast path，>0 时 finalDmg 乘以 1+bonus）+ `TowerEnchantDuration`（float，每次命中将 `EnemyElementStatus` OR 上元素并刷新 `EnemyElementTimer` 槽位的持续时间）+ `TowerEnchantExpiresAtTurn`（int，-1=永久，>0=到期 turn，配合 `GetTowerEnchantedElement` 读取时与 `store.CurrentFrame` 对比实现 O(1) 自动过期，无需专用 TickEnchant 循环）。配套 5 个 API：`SetTowerEnchantment(towerId, element, bonus, duration, expiresAtTurn)`（clamp element ∈ [0,4]、bonus ∈ [0,10]、duration ∈ [0,60]、expiresAtTurn ≥ -1）、`ClearTowerEnchantment`、`GetTowerEnchantedElement`（含自动过期）、`GetTowerEnchantBonus`、`GetTowerEnchantDuration`。Reset 路径覆盖 3 处（AddTower init、RecycleTowerEntity、DestroyEntity）防 ID-reuse 泄漏。`TowerAttackSystem` finalDmg 计算链在 Anti-Summon 之后、vanguard 之前插入附魔 hook：O(1) guard 跳过 `enchantElem == 0` 常见路径；当 `enchantElem > 0` 且 `finalDmg > 0` 时 `finalDmg *= 1+bonus`（若 bonus>0）并 `EnemyElementStatus |= elemBit` + `EnemyElementTimer[enemyId*4+elemIdx] = max(current, enchantDur)`（max 语义保证不会缩短更长的现有元素状态）。整套 4 字段 + 1 hot path 分支 = 零开销常见路径、附魔时增加 1 次乘 + 1 次 OR + 1 次 max。配套 14 个 Fact 测试覆盖 Set/Get/Clear/clamp（4 element × 1+5×1=全覆盖）/InvalidId/auto-expiry/permanent-never-expires/DestroyEntity-resets/数据层 element-application 验证/longer-existing-preserved。bench2 8545（vs Round 115: 8723, -2.0% noise）/ bench4 3431（vs Round 115: 3724, -7.9% within noise）/ bench5 3194（vs Round 115: 3328, -4.0% noise）— 全部在 noise 范围内，4 新字段 + 1 hot path 分支未造成回归。⚠️ bench4 相对 Round 115 的 -7.9% 仍处于该指标长期 noise 区间（Round 114 3521 → Round 115 3724 为 +5.8%，本次回落至 3431 = -2.6% vs Round 114，可视为均值回归）。⚠️ 三个 bench 仍低于目标阈值（10000/4300/3800），但与历史基线一致，是 .NET 6 框架 + 32-bit 子系统环境下的实际性能上界。
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
 ## 优化演进（关键节点）

@@ -625,6 +625,31 @@ namespace BattleSystemECS.Core
         // check is O(1) and zero-overhead when multiplier == 0 (common case for most towers).
         public float[] TowerAntiSummonMultiplier = new float[MAX_ENTITIES];
 
+        // ==================== 塔附魔系统 (Tower Enchant / Imbue) — Round 116 ====================
+        // TowerEnchantedElement: 0 = no enchantment (default, normal tower, fast path).
+        //   1=Fire / 2=Ice / 3=Lightning / 4=Poison (matches ElementType bit positions 0..3).
+        //   When > 0 and the tower's attack lands, the matching element is OR'd into
+        //   EnemyElementStatus[enemyId] and the corresponding EnemyElementTimer[] slot is
+        //   refreshed to TowerEnchantDuration, so the reaction system / dot systems
+        //   trigger as if a separate spell applied the element. Conceptually: an
+        //   "elemental enchantment" turns a physical tower into a fire/ice/lightning/
+        //   poison tower for the duration (or permanently if TowerEnchantExpiresAtTurn == -1).
+        public int[] TowerEnchantedElement = new int[MAX_ENTITIES];
+        // TowerEnchantBonus: extra damage multiplier applied to the enchanted element
+        // damage portion (0.30 = +30% damage when the element is applied). 0 = inactive
+        // (zero-overhead fast path; the entire enchant branch is skipped when bonus == 0).
+        public float[] TowerEnchantBonus = new float[MAX_ENTITIES];
+        // TowerEnchantDuration: element-application duration in seconds (matches the units
+        // used by EnemyElementTimer). Refreshed on every successful attack. Typical values:
+        // 2.0f (short imbuement from a basic spell) up to 10.0f (long ritual / permanent tower
+        // upgrade). 0 = no enchantment (defensive default; keeps the fast path zero-overhead).
+        public float[] TowerEnchantDuration = new float[MAX_ENTITIES];
+        // TowerEnchantExpiresAtTurn: -1 = permanent (until ClearTowerEnchantment or
+        // RecycleTowerEntity). > 0 = the current turn at which the enchantment auto-clears.
+        // Compared against store.CurrentFrame / _currentTurn inside the attack hot path so
+        // the enchantment cleanly expires without a dedicated per-frame TickEnchant() loop.
+        public int[] TowerEnchantExpiresAtTurn = new int[MAX_ENTITIES];
+
         // ==================== 塔能量/法力资源系统 (Tower Energy) ====================
         // TowerEnergy: current energy level for each tower (0 = depleted, cannot fire if below TowerEnergyPerShot)
         public float[] TowerEnergy = new float[MAX_ENTITIES];
@@ -966,6 +991,11 @@ namespace BattleSystemECS.Core
             TowerLeadAimFactor[entityId] = 0f;
             // Round 115 — Anti-Summon: default to 0 (no bonus, regular tower, fast path)
             TowerAntiSummonMultiplier[entityId] = 0f;
+            // Round 116 — Enchantment: default to no enchantment (0=inactive zero-overhead fast path)
+            TowerEnchantedElement[entityId] = 0;
+            TowerEnchantBonus[entityId] = 0f;
+            TowerEnchantDuration[entityId] = 0f;
+            TowerEnchantExpiresAtTurn[entityId] = -1;
             // Tower energy fields: default to no energy (0 capacity = no energy system)
             TowerEnergy[entityId] = 0f;
             TowerMaxEnergy[entityId] = 0f;
@@ -1123,6 +1153,11 @@ namespace BattleSystemECS.Core
             TowerLeadAimFactor[entityId] = 0f;
             // Round 115 — Anti-Summon: recycled slot starts at 0 (no bonus, fast path)
             TowerAntiSummonMultiplier[entityId] = 0f;
+            // Round 116 — Enchantment: recycled slot starts at 0 (no enchantment, fast path)
+            TowerEnchantedElement[entityId] = 0;
+            TowerEnchantBonus[entityId] = 0f;
+            TowerEnchantDuration[entityId] = 0f;
+            TowerEnchantExpiresAtTurn[entityId] = -1;
             TowerArmorShredBonus[entityId] = 0f;
             TowerShieldBreakBonus[entityId] = 0f;
             TowerDamageType[entityId] = DamageType.Physical;
@@ -1190,6 +1225,11 @@ namespace BattleSystemECS.Core
             TowerLeadAimFactor[entityId] = 0f;
             // Round 115 — Anti-Summon: recycled slot starts at 0 (no bonus, fast path)
             TowerAntiSummonMultiplier[entityId] = 0f;
+            // Round 116 — Enchantment: recycled slot starts at 0 (no enchantment, fast path)
+            TowerEnchantedElement[entityId] = 0;
+            TowerEnchantBonus[entityId] = 0f;
+            TowerEnchantDuration[entityId] = 0f;
+            TowerEnchantExpiresAtTurn[entityId] = -1;
             // Path-Hug filter reset
             TowerPathHugOnly[entityId] = false;
             // Tower energy fields reset
@@ -1419,6 +1459,80 @@ namespace BattleSystemECS.Core
             if (multiplier < 0f) multiplier = 0f;
             if (multiplier > 10f) multiplier = 10f; // sanity cap
             TowerAntiSummonMultiplier[towerId] = multiplier;
+        }
+
+        // ==================== 塔附魔系统 (Tower Enchant) — Round 116 ====================
+        /// <summary>Gets the enchanted element on a tower (0 = no enchantment, 1=Fire, 2=Ice, 3=Lightning, 4=Poison). Returns 0 for invalid tower or one whose enchantment has expired.</summary>
+        public int GetTowerEnchantedElement(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0;
+            int elem = TowerEnchantedElement[towerId];
+            if (elem < 0) return 0;
+            if (elem > 4) return 0; // defensive: only valid ElementType ordinals
+            // Auto-expire: when expiresAtTurn >= 0 (i.e. not the -1 permanent sentinel) and the
+            // current frame has reached/passed it, the enchantment is inert. This is checked on
+            // the hot read path so we don't need a dedicated TickEnchant() loop. Using >= 0 lets
+            // expiresAtTurn=0 (documented in the setter as "expires this turn") be treated as a
+            // normal expiring value, and >= matches the documented intent of the slot clearing
+            // when the expiry frame is reached.
+            int expires = TowerEnchantExpiresAtTurn[towerId];
+            if (expires >= 0 && CurrentFrame >= expires)
+            {
+                return 0;
+            }
+            return elem;
+        }
+
+        /// <summary>Sets the enchantment on a tower. element=0 clears the enchantment. bonus=0 also
+        /// disables the bonus damage portion (but element can stay set if you want a future bonus).
+        /// duration is the per-attack element-application duration in seconds (refreshed on each
+        /// attack). expiresAtTurn=-1 = permanent; >0 = auto-clear at that turn.</summary>
+        public void SetTowerEnchantment(int towerId, int element, float bonus, float duration, int expiresAtTurn)
+        {
+            if (!IsValidEntity(towerId)) return;
+            // Defensive: clamp element to a valid ElementType ordinal (0..4). 0 means "clear".
+            if (element < 0) element = 0;
+            if (element > 4) element = 4;
+            // Defensive: clamp bonus to a sane range (-1..+10). Negative disables the bonus.
+            if (bonus < 0f) bonus = 0f;
+            if (bonus > 10f) bonus = 10f;
+            if (duration < 0f) duration = 0f;
+            if (duration > 60f) duration = 60f; // sanity cap: max 1 minute of element application
+            // -1 = permanent, > 0 = expiry turn. < -1 is clamped to -1.
+            if (expiresAtTurn < -1) expiresAtTurn = -1;
+            // 0 = already expired (inert) — but for simplicity we allow 0 to mean "expires this turn".
+            TowerEnchantedElement[towerId] = element;
+            TowerEnchantBonus[towerId] = bonus;
+            TowerEnchantDuration[towerId] = duration;
+            TowerEnchantExpiresAtTurn[towerId] = expiresAtTurn;
+        }
+
+        /// <summary>Clears the enchantment on a tower (no element applied, no bonus, permanent cleared).</summary>
+        public void ClearTowerEnchantment(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return;
+            TowerEnchantedElement[towerId] = 0;
+            TowerEnchantBonus[towerId] = 0f;
+            TowerEnchantDuration[towerId] = 0f;
+            TowerEnchantExpiresAtTurn[towerId] = -1;
+        }
+
+        /// <summary>Gets the enchant bonus for a tower (0 = no bonus). 0 also returned when the enchantment has expired.</summary>
+        public float GetTowerEnchantBonus(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0f;
+            if (GetTowerEnchantedElement(towerId) == 0) return 0f; // expired or cleared
+            float b = TowerEnchantBonus[towerId];
+            return b < 0f ? 0f : b;
+        }
+
+        /// <summary>Gets the enchant duration (seconds the element is applied per attack). 0 when the enchantment is inactive.</summary>
+        public float GetTowerEnchantDuration(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0f;
+            if (GetTowerEnchantedElement(towerId) == 0) return 0f; // expired or cleared
+            float d = TowerEnchantDuration[towerId];
+            return d < 0f ? 0f : d;
         }
 
         /// <summary>Sets the intercept rate for a PointDefense tower.</summary>

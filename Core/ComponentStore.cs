@@ -800,6 +800,11 @@ namespace BattleSystemECS.Core
                 TowerScatterAngle[entityId] = 0f;
                 // Round 114 — Lead Aim: recycled slot starts at 0 (no lead, zero-overhead fast path)
                 TowerLeadAimFactor[entityId] = 0f;
+                // Round 116 — Enchantment: recycled slot starts at 0 (no enchantment, fast path)
+                TowerEnchantedElement[entityId] = 0;
+                TowerEnchantBonus[entityId] = 0f;
+                TowerEnchantDuration[entityId] = 0f;
+                TowerEnchantExpiresAtTurn[entityId] = -1;
                 // Shotgun pellet fields (reset on recycle so stale values don't leak)
                 TowerPelletDamageMult[entityId] = 1f;
                 TowerPelletConeRadius[entityId] = 0f;
