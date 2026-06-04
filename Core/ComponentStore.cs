@@ -480,6 +480,10 @@ namespace BattleSystemECS.Core
                 EnemyStunDurationLeft[entityId] = 0f;
                 // CC Immunity (Round 97): reset mask on entity destroy to avoid ID-reuse leakage
                 EnemyCCImmuneMask[entityId] = 0;
+                // Mana Pool (Round 101 Direction 10): reset both fields to avoid ID-reuse leakage
+                // (an ID recycled from a high-mana boss to a no-mana peon would otherwise carry stale mana)
+                EnemyMaxMana[entityId] = 0f;
+                EnemyCurrentMana[entityId] = 0f;
                 EnemySlowFactor[entityId] = 0f;
                 EnemyTerrainMoveSpeedMult[entityId] = 1f;
                 EnemyFrostZoneSlowMultiplier[entityId] = 1f;  // default: no frost zone, neutral 1x
@@ -685,6 +689,9 @@ namespace BattleSystemECS.Core
                 // Round 98 — Windup fields reset (recycled slot must start with no windup)
                 TowerWindupFrames[entityId] = 0;
                 TowerWindupCountdown[entityId] = 0;
+                // Round 101 — Mana Drain reset (recycled slot must start with no drain)
+                TowerManaDrainPct[entityId] = 0f;
+                TowerManaDrainCap[entityId] = 0f;
                 // Dispel fields
                 TowerIsDispelled[entityId] = false;
                 TowerDispelTimer[entityId] = 0f;

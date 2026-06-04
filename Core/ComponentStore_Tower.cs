@@ -67,6 +67,14 @@ namespace BattleSystemECS.Core
         public float[] TowerDamageConversionRatio = new float[MAX_ENTITIES];
         // Tower converted damage type: the target type for damage conversion
         public DamageType[] TowerConvertedDamageType = new DamageType[MAX_ENTITIES];
+        // ── Mana Drain (Round 101 Direction 10) ─────────────────────────────
+        // TowerManaDrainPct: fraction of target enemy's current mana drained on hit.
+        // 0 = no drain. 0.1 = 10% of target's current mana → player mana per hit.
+        // Default 0 = backward compatible; designers opt-in per-tower via TowerConfig.ManaDrainPct.
+        public float[] TowerManaDrainPct = new float[MAX_ENTITIES];
+        // TowerManaDrainCap: per-hit cap on drained mana (overrides global ManaDrainConfig.ManaDrainCap).
+        // 0 = use global cap. Designers can tighten per-tower if needed.
+        public float[] TowerManaDrainCap = new float[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
         // Tower cooldown reduction: per-tower CDR (0 = no reduction, 0.3 = 30% faster cooldowns)
@@ -845,6 +853,9 @@ namespace BattleSystemECS.Core
             TowerDamageType[entityId] = damageType;
             TowerDamageConversionRatio[entityId] = 0f; // default: no conversion
             TowerConvertedDamageType[entityId] = DamageType.Physical;
+            // Round 101 — Mana Drain defaults: no drain until PlaceTower overrides
+            TowerManaDrainPct[entityId] = 0f;
+            TowerManaDrainCap[entityId] = 0f; // 0 = use global cap
             TowerTurnRate[entityId] = turnRate;
             // Round 100 — Palisade defaults: indestructible (HP=0) until PlaceTower overrides
             TowerIsPalisade[entityId] = false;

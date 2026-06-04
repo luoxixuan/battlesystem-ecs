@@ -1369,6 +1369,35 @@ namespace BattleSystemECS.Systems
                 {
                     store.PlayerDPSAccumulator[playerId] += finalDmg;
                 }
+                // ── Mana Drain (Round 101 Direction 10) ──────────────────────────
+                // Towers with ManaDrainPct > 0 drain a fraction of target enemy's current mana
+                // and add it to the player mana pool. Only fires on hit (finalDmg > 0) — a
+                // miss/dodge doesn't trigger drain. Zero-mana enemies (EnemyMaxMana == 0) silently
+                // no-op so non-mana-wielders pay nothing in the hot path.
+                if (finalDmg > 0f && store.TowerManaDrainPct[towerId] > 0f)
+                {
+                    float enemyMaxMana = store.EnemyMaxMana[enemyId];
+                    if (enemyMaxMana > 0f)
+                    {
+                        float enemyCurMana = store.EnemyCurrentMana[enemyId];
+                        if (enemyCurMana > 0f)
+                        {
+                            float drainPct = store.TowerManaDrainPct[towerId];
+                            float towerCap = store.TowerManaDrainCap[towerId]; // 0 = use global cap
+                            float cap = towerCap > 0f ? towerCap : ManaDrainConfig.ManaDrainCap;
+                            float drain = Math.Min(cap, enemyCurMana * drainPct);
+                            if (drain > 0f)
+                            {
+                                // Decrement enemy mana first (parallel-safe in serial phase)
+                                store.EnemyCurrentMana[enemyId] = enemyCurMana - drain;
+                                // Add to player mana pool, clamped to max
+                                float playerCur = store.PlayerMana[playerId];
+                                float playerMax = store.PlayerMaxMana[playerId];
+                                store.PlayerMana[playerId] = Math.Min(playerMax, playerCur + drain);
+                            }
+                        }
+                    }
+                }
                 // Stagger / Posture: heavy hits accumulate posture damage on the enemy.
                 // Heuristic: damage >= 20% of max HP is a "heavy hit" worth 1 stagger point.
                 // This works in the serial apply phase where we don't know if it was a crit.

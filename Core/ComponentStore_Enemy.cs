@@ -564,6 +564,15 @@ namespace BattleSystemECS.Core
         // EnemyManaBurnType: 0=flat, 1=percent_current, 2=percent_max (default 0=flat)
         public int[] EnemyManaBurnType = new int[MAX_ENTITIES];
 
+        // ==================== 敌人法力池（SOA，Round 101 方向 10）====================
+        // EnemyMaxMana: maximum mana pool for this enemy (0 = no mana, drain is a no-op).
+        // Default 0 = most enemies have no mana; only Mana-Wielder monsters populate this.
+        // Towers with ManaDrainPct > 0 drain from this pool on attack hits.
+        public float[] EnemyMaxMana = new float[MAX_ENTITIES];
+        // EnemyCurrentMana: current mana of this enemy. Decremented by tower drain;
+        // can be refilled by enemy self-casts / external sources (future extension).
+        public float[] EnemyCurrentMana = new float[MAX_ENTITIES];
+
         // ==================== 敌人吸血组件（SOA）====================
         // EnemyLifestealRatio: fraction of damage dealt that is healed back (0.3 = 30% lifesteal)
         public float[] EnemyLifestealRatio = new float[MAX_ENTITIES];
@@ -991,6 +1000,10 @@ namespace BattleSystemECS.Core
             EnemyManaBurnRadius[entityId] = 0f;
             EnemyManaBurnCooldown[entityId] = 0f;
             EnemyManaBurnType[entityId] = 0;
+            // Mana Pool (Round 101 Direction 10): default 0 (no mana, drain no-ops)
+            // Designers can populate via EnemyTypeEntry.MaxMana in the wave spawn config.
+            EnemyMaxMana[entityId] = ManaDrainConfig.DefaultEnemyMaxMana;
+            EnemyCurrentMana[entityId] = ManaDrainConfig.DefaultEnemyMaxMana;
 
             // Lifesteal: default 0 (no lifesteal)
             EnemyLifestealRatio[entityId] = 0f;

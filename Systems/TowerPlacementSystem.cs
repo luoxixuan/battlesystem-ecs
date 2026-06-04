@@ -365,6 +365,13 @@ namespace BattleSystemECS.Systems
                         store.TowerConvertedDamageType[towerId] = tc.ConvertedDamageType;
                         logger.Log($"[TOWER] {tc.Name} 伤害转换: {tc.DamageConversionRatio * 100:F0}% → {tc.ConvertedDamageType}");
                     }
+                    // Apply mana drain properties (Round 101 Direction 10)
+                    if (tc.ManaDrainPct > 0f)
+                    {
+                        store.TowerManaDrainPct[towerId] = tc.ManaDrainPct;
+                        store.TowerManaDrainCap[towerId] = tc.ManaDrainCap; // 0 = use global cap
+                        logger.Log($"[TOWER] {tc.Name} 吸敌法: {tc.ManaDrainPct * 100:F0}%/击, 上限 {tc.ManaDrainCap:F0}");
+                    }
                     // Apply overkill / excess damage properties
                     if (tc.OverkillType > 0 && tc.OverkillRatio > 0f && tc.OverkillRadius > 0f)
                     {

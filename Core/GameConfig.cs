@@ -322,6 +322,14 @@ namespace BattleSystemECS.Config
         public float DamageConversionRatio { get; set; } = 0f;
         // ConvertedDamageType: the damage type to convert to (e.g. Magic to bypass Physical immunity)
         public DamageType ConvertedDamageType { get; set; } = DamageType.Physical;
+        // ── Mana Drain (Round 101 Direction 10) ─────────────────────────────
+        // ManaDrainPct: fraction of target enemy's current mana drained on a successful attack hit.
+        // Drained mana is added to the player mana pool (not the tower — towers are mana-less).
+        // Default 0 = no drain. E.g. 0.1 = 10% of target's current mana converted to player mana per hit.
+        public float ManaDrainPct { get; set; } = 0f;
+        // ManaDrainCap: maximum amount of mana that can be drained from a single enemy per hit
+        // (prevents one-shot drain of mega-mana boss enemies from instantly filling player pool).
+        public float ManaDrainCap { get; set; } = 50f;
         // ── Overkill / Excess Damage ─────────────────────────────────────────────
         // OverkillType: 0=None (no effect), 1=Splash (excess damage splashes to nearby enemies in radius)
         // Default 0 = no overkill effect (backward compatible)
@@ -2691,5 +2699,30 @@ namespace BattleSystemECS.Config
         /// <summary>Damage enemies deal to a palisade when standing on it (per frame at melee range).
         /// 0 = enemies cannot damage palisade (treated as scenery).</summary>
         public const float EnemyContactDamageToPalisade = 5f;
+    }
+
+    /// <summary>
+    /// Round 101 Direction 10 — Mana Drain (tower → enemy).
+    /// Towers with <c>ManaDrainPct > 0</c> drain a fraction of target enemy's current mana
+    /// on each successful attack hit and add it to the player mana pool.
+    /// Note: this is the INVERSE direction of <c>ManaBurnSystem</c> (which is enemy→player).
+    /// Reuses the <c>EnemyCurrentMana[]</c> field populated on AddEnemy from
+    /// monster config (default 0 — only Mana-Wielder enemies have a mana pool).
+    /// </summary>
+    public static class ManaDrainConfig
+    {
+        /// <summary>Default fraction of target's current mana drained per hit when no per-tower
+        /// override is supplied. Designers can override per-tower via <c>TowerConfig.ManaDrainPct</c>.
+        /// 0.1 = 10% per hit. Set to 0 to disable globally.</summary>
+        public const float DefaultManaDrainPct = 0.1f;
+
+        /// <summary>Hard cap on mana drained from a single enemy in a single hit event.
+        /// Prevents boss-mana (e.g. 10K mana) from instantly filling the player pool.</summary>
+        public const float ManaDrainCap = 50f;
+
+        /// <summary>Per-enemy default mana pool when <c>EnemyMaxMana</c> is not configured.
+        /// 0 means "this enemy has no mana to drain" — drain silently no-ops.
+        /// Designers can override per-monster-type via <c>EnemyTypeEntry.MaxMana</c>.</summary>
+        public const float DefaultEnemyMaxMana = 0f;
     }
 }
