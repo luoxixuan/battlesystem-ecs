@@ -957,6 +957,8 @@ namespace BattleSystemECS.Core
             EscortNpcActive = null!; EscortNpcSpeed = null!;
             ObjectiveTimer = null!; ObjectiveWavesRemaining = null!; ObjectiveTimeLimit = null!;
             ObjectiveWaveScore = null!; ObjectiveHealthScore = null!;
+            DoomClockTimer = null!; DoomClockDuration = null!; DoomClockWavesCleared = null!;
+            DoomClockCycleCount = null!; DoomClockFinalScore = null!; DoomClockActive = null!;
             EnemiesLeakedThisWave = null!; AdaptiveDifficultyLevel = null!; AdaptiveDifficultyScore = null!;
             ResourceNodeX = null!; ResourceNodeY = null!; ResourceNodeOwner = null!; ResourceNodeType = null!;
             ResourceNodeActive = null!; ResourceNodeProductionRate = null!;

@@ -1,0 +1,22 @@
+{
+  "LevelNumber": 6,
+  "Name": "Doom Clock",
+  "Description": "Survive 3 minutes against infinite waves. Score = waves cleared × 100 + time remaining × 10 + HP%. The clock is ticking. (Round 110 Direction 10)",
+  "WaveCount": 0,
+  "Waves": [],
+  "ObjectiveType": 5,
+  "ObjectiveTimeLimit": 180,
+  "DoomClockDuration": 180,
+  "DoomClockWaveScore": 100,
+  "DoomClockTimeBonusPerSec": 10,
+  "DoomClockHealthBonusPerPercent": 5,
+  "DoomClockWaveScaling": 1.10,
+  "DoomClockInitialWaves": [
+    { "MonsterType": "Normal", "EnemyCount": 10 },
+    { "MonsterType": "Fast", "EnemyCount": 8 },
+    { "MonsterType": "Tank", "EnemyCount": 4 },
+    { "MonsterType": "Swarm", "EnemyCount": 14 },
+    { "MonsterType": "Normal", "EnemyCount": 12 },
+    { "MonsterType": "Electric", "EnemyCount": 6 }
+  ]
+}

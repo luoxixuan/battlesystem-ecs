@@ -114,6 +114,8 @@ namespace BattleSystemECS.Core
         public WaveBranchSystem? WaveBranch { get; private set; }
         public ResourceNodeSystem? ResourceNode { get; private set; }
         public WavePreviewSystem? WavePreview { get; private set; }
+        // Round 110 Direction 10 — DoomClock countdown + final-score helper.
+        public DoomClockSystem? DoomClock { get; private set; }
 
         // ── Replay / Recording ──
         public ReplaySystem? Replay { get; private set; }
@@ -286,6 +288,11 @@ namespace BattleSystemECS.Core
             WaveBranch = new WaveBranchSystem(store, logger, config, stateMachine);
             ResourceNode = new ResourceNodeSystem(store, logger, playerId);
             WavePreview = new WavePreviewSystem(store, config, playerId);
+            // Round 110 Direction 10 — DoomClock countdown + final score helper.
+            // Created here so it shares the same ComponentStore as the other
+            // objective / post-death systems. The countdown itself is ticked
+            // by PostDeathGroup.DoomClock.Update(...) each WavePhase frame.
+            DoomClock = new DoomClockSystem(store, playerId);
 
             // ── Replay / Recording (per-frame telemetry, opt-in via GameConfig.Replay.Enabled) ──
             Replay = new ReplaySystem(store, config, playerId);
@@ -573,6 +580,11 @@ namespace BattleSystemECS.Core
             scheduler.PostDeath.CorpseEffect = CorpseEffect;
             scheduler.PostDeath.WaveBranch = WaveBranch;
             scheduler.PostDeath.Combo = Combo;
+            // Round 110 Direction 10 — wire DoomClock into PostDeath so the
+            // countdown ticks alongside objective bookkeeping each WavePhase.
+            // Zero overhead when not active (Update() short-circuits on
+            // DoomClockActive[playerId] == false).
+            scheduler.PostDeath.DoomClock = DoomClock;
         }
     }
 }

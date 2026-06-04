@@ -51,6 +51,23 @@ namespace BattleSystemECS.Core
         // Objective score: tracks performance (used for Endless mode scoring)
         public int[] ObjectiveWaveScore = new int[MAX_PLAYERS];
         public float[] ObjectiveHealthScore = new float[MAX_PLAYERS];  // remaining health at game end
+        // ── DoomClock objective (Round 110 Direction 10) ─────────────────────────
+        // DoomClockTimer: remaining countdown seconds. Decrements during WavePhase.
+        public float[] DoomClockTimer = new float[MAX_PLAYERS];
+        // DoomClockDuration: total duration in seconds (snapshot from LevelConfig).
+        public float[] DoomClockDuration = new float[MAX_PLAYERS];
+        // DoomClockWavesCleared: count of waves fully cleared since start of run.
+        public int[] DoomClockWavesCleared = new int[MAX_PLAYERS];
+        // DoomClockCycleCount: how many times the wave pool has been cycled (0-based).
+        // Cycle 0 = first pass through DoomClockInitialWaves. Cycle 1 = second pass with scaling.
+        public int[] DoomClockCycleCount = new int[MAX_PLAYERS];
+        // DoomClockFinalScore: snapshot of computed final score at game end (win only).
+        // 0 while run is ongoing. Set by DoomClockSystem.ComputeFinalScore() on win.
+        public int[] DoomClockFinalScore = new int[MAX_PLAYERS];
+        // DoomClockActive: true while the DoomClock run is in progress (between start and end).
+        // Set true in ObjectiveSystem.InitializeFromLevel when ObjectiveType==DoomClock.
+        // Set false in ObjectiveSystem.CheckObjective when the run ends (win or lose).
+        public bool[] DoomClockActive = new bool[MAX_PLAYERS];
 
         // ==================== Adaptive Difficulty System 组件（SOA） ====================
         // EnemiesLeakedThisWave: track leaks during current wave (used to compute difficulty adjustment)

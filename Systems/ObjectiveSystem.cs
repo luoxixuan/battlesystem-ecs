@@ -21,6 +21,10 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore _store;
         private readonly int _playerId;
+        // Round 110 Direction 10 — cached LevelConfig so CheckObjective can
+        // compute DoomClock final score (needs DoomClockWaveScore / TimeBonusPerSec
+        // / HealthBonusPerPercent tunables) without a separate parameter.
+        private Config.LevelConfig? _currentLevel;
 
         public ObjectiveSystem(ComponentStore store, int playerId = 0)
         {
@@ -30,9 +34,15 @@ namespace BattleSystemECS.Systems
 
         /// <summary>
         /// Initialize objective state from level config. Called once per level load.
+        /// Round 110 Direction 10: also seeds DoomClockSystem state when the
+        /// DoomClock objective is active. DoomClock initialization is idempotent —
+        /// repeated calls reset the timer / counters rather than accumulating.
         /// </summary>
         public void InitializeFromLevel(Config.LevelConfig level, int mapHeight)
         {
+            // Round 110 Direction 10 — cache the level so CheckObjective can read
+            // DoomClock scoring tunables when the run wins (no extra parameter).
+            _currentLevel = level;
             _store.CurrentObjectiveType[_playerId] = level.ObjectiveType;
 
             if (level.ObjectiveType == (int)ObjectiveType.Escort)
@@ -72,11 +82,35 @@ namespace BattleSystemECS.Systems
             // Reset score tracking
             _store.ObjectiveWaveScore[_playerId] = 0;
             _store.ObjectiveHealthScore[_playerId] = 0f;
+
+            // Round 110 Direction 10 — DoomClock state seed/reset.
+            // DoomClockSystem reuses the wave spawn flow (it just adds a
+            // countdown and a final score), so the regular Objectives init
+            // handles wave data; the DoomClock-specific fields live on the
+            // DoomClockSystem helper. We invalidate stale final scores here
+            // so a level reload doesn't carry over the previous run's number.
+            if (level.ObjectiveType == (int)ObjectiveType.DoomClock)
+            {
+                _store.DoomClockActive[_playerId] = true;
+                _store.DoomClockTimer[_playerId] = level.DoomClockDuration;
+                _store.DoomClockDuration[_playerId] = level.DoomClockDuration;
+                _store.DoomClockWavesCleared[_playerId] = 0;
+                _store.DoomClockCycleCount[_playerId] = 0;
+                _store.DoomClockFinalScore[_playerId] = 0;
+            }
+            else
+            {
+                _store.DoomClockActive[_playerId] = false;
+                _store.DoomClockFinalScore[_playerId] = 0;
+            }
         }
 
         /// <summary>
         /// Per-frame tick — update escort movement and objective timers.
         /// Called every frame regardless of phase (movement is real-time).
+        /// Round 110 Direction 10: also ticks the DoomClock countdown during
+        /// WavePhase. The DoomClock timer stops at 0 — the objective check
+        /// is what actually fires the win condition (timer=0 && player alive).
         /// </summary>
         public void Update(float deltaTime, GameState phase)
         {
@@ -90,6 +124,11 @@ namespace BattleSystemECS.Systems
             if (objType == ObjectiveType.Timed && phase == GameState.WavePhase)
             {
                 UpdateTimed(deltaTime);
+            }
+
+            if (objType == ObjectiveType.DoomClock && phase == GameState.WavePhase)
+            {
+                UpdateDoomClock(deltaTime);
             }
         }
 
@@ -116,6 +155,9 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Called when a wave is completed (all enemies killed or timeout).
         /// Returns true if the game should continue, false if objective is satisfied.
+        /// Round 110 Direction 10: for DoomClock, every wave completion increments
+        /// the cleared counter (used for final score). Game continues regardless
+        /// (the timer is the only win condition).
         /// </summary>
         public bool OnWaveCompleted(int wavesRemaining)
         {
@@ -129,6 +171,12 @@ namespace BattleSystemECS.Systems
                     // Player survived all required waves — objective complete!
                     return false;
                 }
+            }
+
+            if (objType == ObjectiveType.DoomClock && _store.DoomClockActive[_playerId])
+            {
+                // Increment cleared-wave counter. DoomClock continues regardless.
+                _store.DoomClockWavesCleared[_playerId]++;
             }
 
             return true; // continue
@@ -194,6 +242,37 @@ namespace BattleSystemECS.Systems
                     // No win condition — runs until player loses (lives = 0 or escort dies)
                     // Score is tracked in ObjectiveWaveScore
                     break;
+
+                case ObjectiveType.DoomClock:
+                    // Round 110 Direction 10:
+                    // - Win when the countdown hits 0 AND no enemies remain on the field.
+                    //   (We require the wave to be cleared, not just the timer to expire,
+                    //   so the player actually finishes the current fight cleanly.)
+                    // - If the timer hits 0 but enemies are still alive, we keep waiting
+                    //   (return 0) — the wave is still winnable. The clock already expired
+                    //   and the score bonus for time-remaining will simply be 0.
+                    // - Lose is reported by the game-over path (lives = 0) before this
+                    //   function is reached, so we don't need to handle a -1 here.
+                    if (!_store.DoomClockActive[_playerId]) break;  // run already ended
+                    if (_store.DoomClockTimer[_playerId] <= 0f && activeEnemyCount == 0)
+                    {
+                        // Round 110 Direction 10 — compute and persist final score
+                        // before returning win. Uses cached _currentLevel tunables;
+                        // playerHealthFraction is read from the store. EndRun also
+                        // flips DoomClockActive=false so subsequent calls no-op.
+                        float maxHp = _store.PlayerMaxHealth[_playerId];
+                        float curHp = _store.PlayerCurrentHealth[_playerId];
+                        float frac = maxHp > 0f ? (curHp / maxHp) : 0f;
+                        if (frac < 0f) frac = 0f;
+                        if (frac > 1f) frac = 1f;
+                        int waveBonus = _store.DoomClockWavesCleared[_playerId] * (_currentLevel?.DoomClockWaveScore ?? 100);
+                        int timeBonus = (int)(_store.DoomClockTimer[_playerId] * (_currentLevel?.DoomClockTimeBonusPerSec ?? 10));
+                        int healthBonus = (int)(frac * 100f) * (_currentLevel?.DoomClockHealthBonusPerPercent ?? 5);
+                        _store.DoomClockFinalScore[_playerId] = waveBonus + timeBonus + healthBonus;
+                        _store.DoomClockActive[_playerId] = false;
+                        return 1; // survived the clock + cleared the wave = win
+                    }
+                    break;
             }
 
             return 0; // ongoing
@@ -226,6 +305,22 @@ namespace BattleSystemECS.Systems
                     var score = _store.ObjectiveWaveScore[_playerId];
                     return $"[ENDLESS] Waves survived: {score}";
 
+                case ObjectiveType.DoomClock:
+                    // Round 110 Direction 10: HUD readout combines the countdown,
+                    // the cleared-wave count (used for final score) and the cycle
+                    // number (0 = first pass through the wave pool, 1+ = wrapped).
+                    if (!_store.DoomClockActive[_playerId])
+                    {
+                        int final = _store.DoomClockFinalScore[_playerId];
+                        return final > 0
+                            ? $"[DOOM CLOCK] FINAL SCORE: {final}"
+                            : "[DOOM CLOCK] (ended)";
+                    }
+                    var dcTimer = _store.DoomClockTimer[_playerId];
+                    var dcWaves = _store.DoomClockWavesCleared[_playerId];
+                    var dcCycle = _store.DoomClockCycleCount[_playerId];
+                    return $"[DOOM CLOCK] Time: {dcTimer:F1}s | Waves: {dcWaves} | Cycle: {dcCycle}";
+
                 default:
                     return "[KILLALL] Defeat all enemies";
             }
@@ -251,6 +346,23 @@ namespace BattleSystemECS.Systems
                 if (_store.ObjectiveTimer[_playerId] < 0f)
                     _store.ObjectiveTimer[_playerId] = 0f;
             }
+        }
+
+        /// <summary>
+        /// DoomClock countdown — Round 110 Direction 10. Decrements the global
+        /// timer each frame during WavePhase. Stops at 0 (the win check in
+        /// CheckObjective is what actually fires the win). Mirror of UpdateTimed
+        /// but on the DoomClock-specific timer field, with an `Active` guard so
+        /// the loop short-circuits once the run is over.
+        /// </summary>
+        private void UpdateDoomClock(float deltaTime)
+        {
+            if (!_store.DoomClockActive[_playerId]) return;
+            float t = _store.DoomClockTimer[_playerId];
+            if (t <= 0f) return;
+            t -= deltaTime;
+            if (t < 0f) t = 0f;
+            _store.DoomClockTimer[_playerId] = t;
         }
     }
 }

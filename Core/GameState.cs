@@ -33,7 +33,12 @@ namespace BattleSystemECS.Core
         /// Timed: eliminate all enemies within a time limit. Win when timer expires with enemies remaining.
         Timed = 3,
         /// Endless: survive as many waves as possible. Score = total waves cleared.
-        Endless = 4
+        Endless = 4,
+        /// DoomClock (Round 110 Direction 10): survive a global countdown (e.g. 3 min)
+        /// while infinite waves spawn. Win when timer expires with player alive;
+        /// lose when player dies. Final score = waves cleared × wave bonus +
+        /// (remaining time × time bonus) + remaining HP bonus.
+        DoomClock = 5
     }
 
     /// <summary>

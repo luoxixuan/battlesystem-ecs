@@ -616,6 +616,33 @@ namespace BattleSystemECS.Config
         // Destructible objects (crates, oil barrels) on this level. Round 95 Direction 5.
         // Each entry references a DestructibleDef by DefId and is placed at (X, Y).
         public List<DestructiblePlacement> Destructibles { get; set; } = new List<DestructiblePlacement>();
+        // ── DoomClock objective (Round 110 Direction 10) ─────────────────────────
+        // For DoomClock mode: total countdown duration in seconds (e.g. 180 = 3 min).
+        // Default 180s. Win when timer hits 0 with player alive; lose if player dies first.
+        public float DoomClockDuration { get; set; } = 180f;
+        // For DoomClock mode: bonus points awarded per cleared wave (default 100).
+        public int DoomClockWaveScore { get; set; } = 100;
+        // For DoomClock mode: bonus points awarded per second of remaining time.
+        public int DoomClockTimeBonusPerSec { get; set; } = 10;
+        // For DoomClock mode: bonus points awarded per 1% of remaining HP at game end.
+        public int DoomClockHealthBonusPerPercent { get; set; } = 5;
+        // For DoomClock mode: enemy stat multiplier per wave cycle (1.1 = +10% per cycle).
+        // Cycle = one full pass through DoomClockInitialWaves. Default 1.10f.
+        public float DoomClockWaveScaling { get; set; } = 1.10f;
+        // For DoomClock mode: initial wave templates (re-used in cycle when waves exhausted).
+        // Each entry is a (MonsterType, EnemyCount) pair. If empty, falls back to level.Waves.
+        public List<DoomClockWaveTemplate> DoomClockInitialWaves { get; set; } = new List<DoomClockWaveTemplate>();
+    }
+
+    /// <summary>
+    /// Wave template used by DoomClock mode (Round 110 Direction 10).
+    /// After the initial pool is exhausted, DoomClockSystem cycles back to wave 0 with
+    /// stat scaling applied. Each template defines a monster type and a spawn count.
+    /// </summary>
+    public class DoomClockWaveTemplate
+    {
+        public string MonsterType { get; set; } = "Normal";
+        public int EnemyCount { get; set; } = 10;
     }
 
     /// <summary>

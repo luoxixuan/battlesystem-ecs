@@ -855,8 +855,68 @@ namespace BattleSystemECS.Config
             // Round 95 Direction 5: destructible placements on this level (crates/oil barrels).
             // Empty list = no destructibles spawn, zero hot-path overhead.
             level.Destructibles = ParseDestructiblePlacements(json, "Destructibles");
+            // Round 110 Direction 10: objective type + time limit (already existed for
+            // Timed/Escort/Survival/Endless). DoomClock reuses the same fields but
+            // the actual countdown is driven by the DoomClock-specific fields below.
+            level.ObjectiveType = ExtractInt(json, "ObjectiveType");
+            level.ObjectiveTimeLimit = ExtractFloat(json, "ObjectiveTimeLimit", level.ObjectiveTimeLimit);
+            level.SurvivalWaveCount = (int)ExtractFloat(json, "SurvivalWaveCount", level.SurvivalWaveCount);
+            // Round 110 Direction 10 — DoomClock objective tunables. All default
+            // sensibly when absent (level isn't a DoomClock level). The system
+            // helper short-circuits to zero overhead when ObjectiveType != DoomClock.
+            level.DoomClockDuration = ExtractFloat(json, "DoomClockDuration", level.DoomClockDuration);
+            level.DoomClockWaveScore = (int)ExtractFloat(json, "DoomClockWaveScore", level.DoomClockWaveScore);
+            level.DoomClockTimeBonusPerSec = (int)ExtractFloat(json, "DoomClockTimeBonusPerSec", level.DoomClockTimeBonusPerSec);
+            level.DoomClockHealthBonusPerPercent = (int)ExtractFloat(json, "DoomClockHealthBonusPerPercent", level.DoomClockHealthBonusPerPercent);
+            level.DoomClockWaveScaling = ExtractFloat(json, "DoomClockWaveScaling", level.DoomClockWaveScaling);
+            level.DoomClockInitialWaves = ParseDoomClockInitialWaves(json, "DoomClockInitialWaves");
 
             return level;
+        }
+
+        /// <summary>
+        /// Parse the DoomClock wave template pool — Round 110 Direction 10.
+        /// Empty list (key absent or array empty) means the level will fall
+        /// back to the regular level.Waves pool with cycling. Each entry is
+        /// expected to have {MonsterType, EnemyCount}. Malformed entries are
+        /// silently skipped (defensive against hand-edited JSON).
+        /// </summary>
+        private static List<DoomClockWaveTemplate> ParseDoomClockInitialWaves(string json, string key)
+        {
+            var list = new List<DoomClockWaveTemplate>();
+            string keyPattern = "\"" + key + "\":";
+            int keyIndex = json.IndexOf(keyPattern);
+            if (keyIndex == -1) return list;
+            int arrayStart = json.IndexOf("[", keyIndex);
+            if (arrayStart == -1) return list;
+            int arrayEnd = FindMatchingBrace(json, arrayStart);
+            if (arrayEnd == -1) return list;
+            string arrayContent = json.Substring(arrayStart + 1, arrayEnd - arrayStart - 1);
+            int pos = 0;
+            while (pos < arrayContent.Length)
+            {
+                while (pos < arrayContent.Length && (char.IsWhiteSpace(arrayContent[pos]) || arrayContent[pos] == ',')) pos++;
+                if (pos >= arrayContent.Length) break;
+                if (arrayContent[pos] == '{')
+                {
+                    int objEnd = FindMatchingBrace(arrayContent, pos);
+                    if (objEnd == -1) break;
+                    string objJson = arrayContent.Substring(pos, objEnd - pos + 1);
+                    var entry = new DoomClockWaveTemplate
+                    {
+                        MonsterType = ExtractString(objJson, "MonsterType"),
+                        EnemyCount = (int)ExtractFloat(objJson, "EnemyCount", 10f)
+                    };
+                    if (!string.IsNullOrEmpty(entry.MonsterType))
+                        list.Add(entry);
+                    pos = objEnd + 1;
+                }
+                else
+                {
+                    pos++;
+                }
+            }
+            return list;
         }
 
         /// <summary>
