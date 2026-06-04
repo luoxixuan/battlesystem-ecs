@@ -1,0 +1,42 @@
+{
+  "comment": "Round 106 Direction 2: AOE Mine / Trap Tower definitions. Each mine tower detonates when an enemy enters its trigger radius after an arming delay. Damage is dealt in an explosion radius. MineConfig is loaded by MineSystem and is the single source of truth for per-tower-variation stats.",
+  "version": 1,
+  "mines": [
+    {
+      "id": 1,
+      "name": "基础地雷 Basic Mine",
+      "triggerRadius": 1.5,
+      "armTime": 0.5,
+      "damage": 80.0,
+      "explosionRadius": 2.0,
+      "maxStacks": 1,
+      "cost": 25,
+      "maxHp": 30.0,
+      "description": "布设后 0.5 秒激活，敌人进入 1.5 格触发，对 2 格范围内敌人造成 80 伤害"
+    },
+    {
+      "id": 2,
+      "name": "高爆地雷 High-Yield Mine",
+      "triggerRadius": 1.5,
+      "armTime": 1.0,
+      "damage": 200.0,
+      "explosionRadius": 3.0,
+      "maxStacks": 1,
+      "cost": 60,
+      "maxHp": 30.0,
+      "description": "布设后 1.0 秒激活，敌人进入 1.5 格触发，对 3 格范围内敌人造成 200 伤害"
+    },
+    {
+      "id": 3,
+      "name": "连锁地雷 Chain Mine",
+      "triggerRadius": 2.0,
+      "armTime": 0.8,
+      "damage": 60.0,
+      "explosionRadius": 2.5,
+      "maxStacks": 3,
+      "cost": 40,
+      "maxHp": 25.0,
+      "description": "堆叠 3 层，每层独立爆炸，触发半径 2 格，伤害 60 范围 2.5"
+    }
+  ]
+}

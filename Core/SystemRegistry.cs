@@ -56,6 +56,8 @@ namespace BattleSystemECS.Core
         public BleedSystem? Bleed { get; private set; }
         public ProjectileSystem? Projectile { get; private set; }
         public ChronoTowerSystem? ChronoTower { get; private set; }
+        // Round 106 Direction 2 — Mine / Trap tower (proximity-triggered AoE)
+        public MineSystem? Mine { get; private set; }
 
         // ── Player ──
         public PlayerTowerAttackSystem? PlayerTowerAttack { get; private set; }
@@ -332,6 +334,9 @@ namespace BattleSystemECS.Core
             // ── Chrono tower ──
             ChronoTower = new ChronoTowerSystem(store);
 
+            // ── Round 106 Direction 2 — Mine / Trap tower ──
+            Mine = new MineSystem(store, logger, config, playerId);
+
             // ── Store EventBus ──
             EventBus = eventBus;
         }
@@ -504,6 +509,7 @@ namespace BattleSystemECS.Core
             scheduler.Spatial.Fog = null;
             scheduler.Spatial.PointDefense = null;
             scheduler.Spatial.Telegraph = Telegraph;
+            scheduler.Spatial.Mine = Mine;
 
             // ── Combat ──
             scheduler.Combat.PlayerTowerAttack = PlayerTowerAttack;

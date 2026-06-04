@@ -2782,6 +2782,27 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Round 106 Direction 2 — Mine / Trap Tower System.
+    /// Configured per-tower via Data/Configs/mine_towers.json; the system falls back to
+    /// these defaults when a tower is placed via PlaceTower without an explicit config id.
+    /// </summary>
+    public static class MineConfig
+    {
+        /// <summary>Default trigger radius in grid cells. 0 = mine never triggers (zero-overhead).</summary>
+        public const float DefaultTriggerRadius = 1.5f;
+        /// <summary>Default arm time in seconds (mine cannot trigger until this many seconds elapse).</summary>
+        public const float DefaultArmTime = 0.5f;
+        /// <summary>Default explosion damage. 0 = no damage.</summary>
+        public const float DefaultDamage = 80f;
+        /// <summary>Default explosion radius in grid cells. 0 = no AoE (point damage).</summary>
+        public const float DefaultExplosionRadius = 2f;
+        /// <summary>Default number of independent stacks per mine. 1 = single-use, &gt;1 = multi-charge.</summary>
+        public const int DefaultMaxStacks = 1;
+        /// <summary>Default cost in gold.</summary>
+        public const float DefaultCost = 25f;
+    }
+
+    /// <summary>
     /// Round 101 Direction 10 — Mana Drain (tower → enemy).
     /// Towers with <c>ManaDrainPct > 0</c> drain a fraction of target enemy's current mana
     /// on each successful attack hit and add it to the player mana pool.

@@ -17,6 +17,9 @@ namespace BattleSystemECS.Components
         Firewall = 8,
         // Round 100: Palisade — control-type tower, no attack, stuns nearby enemies
         // (delays movement by N frames via EnemyStunDurationLeft). HP-based destructible.
-        Palisade = 9
+        Palisade = 9,
+        // Round 106 Direction 2: Mine — defensive trap tower, no auto-attack, detonates AoE
+        // damage on enemy proximity after a short arm time. Stacks allow multi-charge mines.
+        Mine = 10
     }
 }

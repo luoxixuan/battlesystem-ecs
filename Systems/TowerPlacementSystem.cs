@@ -417,6 +417,26 @@ namespace BattleSystemECS.Systems
                 logger.Log($"[PALISADE] Tower #{towerId} at ({x},{y}): stunFrames={store.PalisadeStunFrames[towerId]}, blockRadius={store.PalisadeBlockRadius[towerId]}, HP={store.PalisadeHP[towerId]}");
             }
 
+            // Round 106 Direction 2 — Mine tower post-place init. Sets the SOA fields that
+            // drive the MineSystem trigger check. Mines have damage=0 + range=0 at the
+            // tower level (they don't auto-attack); all damage is delivered via the
+            // explosion AoE when the trigger condition is met. Mine stats are pulled
+            // from MineConfig defaults (per-tower variation can be added later via
+            // a towerId→MineDef lookup or extended PlaceTower signature).
+            if (type == TowerType.Mine)
+            {
+                store.TowerIsMine[towerId] = true;
+                store.MineTriggerRadius[towerId] = MineConfig.DefaultTriggerRadius;
+                store.MineArmTime[towerId] = MineConfig.DefaultArmTime;
+                store.MineArmProgress[towerId] = 0f;
+                store.MineDamage[towerId] = MineConfig.DefaultDamage;
+                store.MineExplosionRadius[towerId] = MineConfig.DefaultExplosionRadius;
+                store.MineMaxStacks[towerId] = MineConfig.DefaultMaxStacks;
+                store.MineStacksRemaining[towerId] = MineConfig.DefaultMaxStacks;
+                store.MineTriggeredThisFrame[towerId] = false;
+                logger.Log($"[MINE] Tower #{towerId} at ({x},{y}): triggerR={store.MineTriggerRadius[towerId]}, arm={store.MineArmTime[towerId]}s, dmg={store.MineDamage[towerId]}, explR={store.MineExplosionRadius[towerId]}, stacks={store.MineMaxStacks[towerId]}");
+            }
+
             // Increment tower count for cap enforcement
             store.PlayerTowerCount[playerId]++;
 

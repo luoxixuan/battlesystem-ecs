@@ -786,6 +786,16 @@ namespace BattleSystemECS.Core
                 // Maintain ActivePalisadeCount (Round 100) — decrement only if was palisade
                 if (wasPalisade)
                     ActivePalisadeCount = Math.Max(0, ActivePalisadeCount - 1);
+                // Round 106 — Mine fields reset (recycled slot must not leak mine state)
+                TowerIsMine[entityId] = false;
+                MineTriggerRadius[entityId] = 0f;
+                MineArmTime[entityId] = 0f;
+                MineArmProgress[entityId] = 0f;
+                MineDamage[entityId] = 0f;
+                MineExplosionRadius[entityId] = 0f;
+                MineMaxStacks[entityId] = 1;
+                MineStacksRemaining[entityId] = 0;
+                MineTriggeredThisFrame[entityId] = false;
             }
 
             // ── Phase 4: recycle ID ────────────────────────────────────────────────

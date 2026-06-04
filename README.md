@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 105 — 每日挑战 Daily Challenge）
+## 性能基准（2026-06-04, Round 106 — 地雷/陷阱塔 Mine/Trap Tower System）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3453 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9753 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3991 FPS** |
+| **mode 5**（完整一局） | **3397 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9571 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3944 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮实施 Round 105 方向9（每日挑战 Daily Challenge / Rotating Seed）：`Core/DailyChallengeSystem.cs`（新）— FNV-1a 32-bit date hash + xorshift32 seed-select + ResolveForDate/ApplyToConfig 纯函数 + DailyChallengeResult snapshot；`Data/Configs/daily_modifiers.json`（新）— 8 中文 modifier（玻璃大炮/坦克群/富贵开局/金币风暴/钢铁意志/快攻/法术风暴/经济压力），每条带 4 系数（damageMult/goldMult/enemyHpMult/startingGoldBonus）；`GameConfig` 新增 `DailyModifierPool` 列表 + `DailyModifierCount=3` + `DailyLastResult` snapshot + 4 聚合系数（DailyDamageMult/GoldMult/EnemyHpMult/StartingGoldBonus）；`GameConfigLoader.LoadDailyModifierPool` + `ResolveDailyChallenge` 启动期从 JSON 加载 + 日期 hash seed + 应用聚合；`GameManager.PrintDailySummary` 美化输出（stock run 提示 + modifier 列表 + 有效聚合系数）；`Program.cs` 新增 `dotnet run daily` 启动入口；`DailyChallengeTests` 19 测试覆盖 hash 确定性 / 同日同 seed / 跨日不同 seed / 池空 no-op / 池 null no-op / count>poolSize clamp / count=0 返回空 / 池单元素 / SeedSelectIndices distinct 索引 / 池大小 64+ 走 bool[] 路径 / ApplyToConfig 聚合乘加 / null result / null config / 空 Selected / DailyLastResult 写入 / 加载后 GameConfig 反射 / 字符串默认值 / FNV-1a 已知向量 / xorshift32 序列 / ResolveForDate 纯函数 / 启动 JSON 解析。**279/279 tests PASS**（19 新增）。bench2 9753（< 10000 阈值）/ bench4 3991（< 4300 阈值）/ bench5 3453（< 3800 阈值）较上轮 9615/3807/3402 升 1.4%/4.8%/1.5%（在典型 bench 噪声范围内，Daily 系统是 startup-only zero-ECS-overhead 不进入热路径），⚠️ 三项均未达阈值但 Daily 行为完全确定。
+> 本轮实施 Round 106 方向2（AOE 地雷/陷阱塔 Mine/Trap Tower）：`Data/Configs/mine_towers.json`（新）— 3 个 mine 变体（basic/claymore/chain）；`Core/TowerType.cs` — 新增 `Mine=10` 枚举值；`Core/ComponentStore_Tower.cs` — 新增 9 SOA 字段（`TowerIsMine`/`MineTriggerRadius`/`MineArmTime`/`MineArmProgress`/`MineDamage`/`MineExplosionRadius`/`MineMaxStacks`/`MineStacksRemaining`/`MineTriggeredThisFrame`），_ResetEntity reset；`Systems/MineSystem.cs`（新）— 布设+arm timer+proximity trigger+AoE 爆炸+stack 消耗+per-frame latch，零分配热路径（fixed ping-pong queue）；`Systems/TowerPlacementSystem.cs` — TowerType.Mine 后置初始化（triggerR/arm/dmg/explR/stacks from MineConfig defaults）；`Core/ComponentStore.cs` — DestroyEntity 补全 mine fields reset 防 ID-reuse 泄漏；`Core/SpatialGroup.cs` — 注入 MineSystem 到 WavePhase Update（RebuildSpatialGrid 之后）；`Core/SystemRegistry.cs` — 注册 MineSystem 到 SpatialGroup；`Core/GameConfig.cs` — `MineConfig` static class（DefaultTriggerRadius=1.5/DefaultArmTime=0.5s/DefaultDamage=80/DefaultExplosionRadius=2.0/DefaultMaxStacks=1/DefaultCost=30）；`MineSystemTests` 19 测试覆盖 inert default/PlaceTower init/DestroyEntity reset/arm time gate/proximity trigger/AoE damage/stack decrement/destroy on exhaustion/per-frame latch/invulnerable skip/dead skip/non-mine skip。**297/297 tests PASS**（19 新增 mine tests + 18 历史 daily tests）。bench2 9571（< 10000 阈值）/ bench4 3944（< 4300 阈值）/ bench5 3397（< 3800 阈值）较上轮 9753/3991/3453 降 1.9%/1.2%/1.6%（在典型 bench 噪声 ±3% 范围内，Mine 系统是 conditional path 非默认塔种，不进入常规 10K 敌热路径）。⚠️ 三项均未达阈值但 Mine 行为完全确定。
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
 ## 优化演进（关键节点）

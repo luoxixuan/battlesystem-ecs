@@ -85,6 +85,35 @@ namespace BattleSystemECS.Core
         //   0x01 = AttackSpeed (multiplicative on TowerAttackSpeed for nearby towers)
         // Default 0 = no sharing even if radius > 0 (defensive default — must opt-in by mask).
         public int[] TowerBuffShareMask = new int[MAX_ENTITIES];
+        // ── Mine / Trap Tower (Round 106 Direction 2) ─────────────────────
+        // TowerIsMine: true if this tower is a deployed mine (no auto-attack; triggers on enemy proximity).
+        // Default false = zero-overhead fast path. Set at PlaceTower time based on TowerType == Mine.
+        public bool[] TowerIsMine = new bool[MAX_ENTITIES];
+        // MineTriggerRadius: distance (in cells) at which an enemy entering triggers detonation.
+        // 0 = mine never triggers (zero-overhead default).
+        public float[] MineTriggerRadius = new float[MAX_ENTITIES];
+        // MineArmTime: seconds that must elapse from placement before the mine can trigger.
+        // 0 = instant arm. Designers can use this to give the player a brief safe window.
+        public float[] MineArmTime = new float[MAX_ENTITIES];
+        // MineArmProgress: seconds elapsed since placement. Increments per frame; triggers when >= MineArmTime.
+        // Reset to 0 on placement; reset on destroy.
+        public float[] MineArmProgress = new float[MAX_ENTITIES];
+        // MineDamage: flat physical damage dealt to every enemy inside MineExplosionRadius on detonation.
+        // 0 = no explosion damage.
+        public float[] MineDamage = new float[MAX_ENTITIES];
+        // MineExplosionRadius: AoE radius (in cells) for the detonation damage roll.
+        // 0 = no explosion (point damage only — usually undesirable).
+        public float[] MineExplosionRadius = new float[MAX_ENTITIES];
+        // MineMaxStacks: how many independent mine layers this tower occupies. Each layer detonates
+        // independently and is consumed. Default 1.
+        public int[] MineMaxStacks = new int[MAX_ENTITIES];
+        // MineStacksRemaining: how many un-detonated layers remain (decrements on each trigger).
+        // Reaches 0 → tower should be destroyed (MineSystem calls store.DestroyEntity).
+        public int[] MineStacksRemaining = new int[MAX_ENTITIES];
+        // MineTriggeredThisFrame: per-tower latch flag — true while at least one stack of this mine
+        // detonated in the current frame. Prevents the same mine from firing multiple times
+        // per frame (re-armed only next frame after stacks decrement).
+        public bool[] MineTriggeredThisFrame = new bool[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
         // Tower cooldown reduction: per-tower CDR (0 = no reduction, 0.3 = 30% faster cooldowns)
@@ -876,6 +905,16 @@ namespace BattleSystemECS.Core
             PalisadeBlockRadius[entityId] = 0;
             PalisadeHP[entityId] = 0f;
             PalisadeMaxHP[entityId] = 0f;
+            // Round 106 — Mine defaults: not a mine (PlaceTower will opt in via TowerType.Mine)
+            TowerIsMine[entityId] = false;
+            MineTriggerRadius[entityId] = 0f;
+            MineArmTime[entityId] = 0f;
+            MineArmProgress[entityId] = 0f;
+            MineDamage[entityId] = 0f;
+            MineExplosionRadius[entityId] = 0f;
+            MineMaxStacks[entityId] = 1;
+            MineStacksRemaining[entityId] = 0;
+            MineTriggeredThisFrame[entityId] = false;
             // Fog of War: default to no fog restriction (visionRadius=0 means see all)
             TowerVisionRadius[entityId] = 0f;
             // Arc projectile fields: default to straight trajectory (0=straight, 1=homing, 2=arc)
@@ -1090,6 +1129,16 @@ namespace BattleSystemECS.Core
             // Round 103 — Buff Share fields reset
             TowerBuffShareRadius[entityId] = 0f;
             TowerBuffShareMask[entityId] = 0;
+            // Round 106 — Mine fields reset (recycled slot must not leak mine state)
+            TowerIsMine[entityId] = false;
+            MineTriggerRadius[entityId] = 0f;
+            MineArmTime[entityId] = 0f;
+            MineArmProgress[entityId] = 0f;
+            MineDamage[entityId] = 0f;
+            MineExplosionRadius[entityId] = 0f;
+            MineMaxStacks[entityId] = 1;
+            MineStacksRemaining[entityId] = 0;
+            MineTriggeredThisFrame[entityId] = false;
             // Heat/overheat fields reset
             TowerHeat[entityId] = 0f;
             TowerMaxHeat[entityId] = 0f;
