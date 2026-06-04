@@ -345,5 +345,51 @@ namespace BattleSystemECS.Tests
             // Out-of-bounds now returns false (cache shrank)
             Assert.False(store.IsTileOccupied(7, 7));
         }
+
+        // ─── Direction 2: 玩家停用塔 (Player-Disabled Tower) ──────────────────
+
+        [Fact] public void ToggleTower_StartsActiveThenDisables()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            store.SetPlayerGold(0, 1000f);
+            int id = sys.PlaceTower(2, 2, TowerType.Basic, 50f, 3, 1f, 50f);
+            Assert.True(id >= 0);
+            // Default: tower is active
+            Assert.False(store.TowerPlayerDisabled[id]);
+            // First toggle: disable
+            int result = sys.ToggleTower(id);
+            Assert.Equal(1, result);
+            Assert.True(store.TowerPlayerDisabled[id]);
+        }
+
+        [Fact] public void ToggleTower_ReenableFlipsBack()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            store.SetPlayerGold(0, 1000f);
+            int id = sys.PlaceTower(4, 4, TowerType.Basic, 50f, 3, 1f, 50f);
+            Assert.True(id >= 0);
+            sys.ToggleTower(id); // disable
+            Assert.True(store.TowerPlayerDisabled[id]);
+            int result = sys.ToggleTower(id); // re-enable
+            Assert.Equal(0, result);
+            Assert.False(store.TowerPlayerDisabled[id]);
+        }
+
+        [Fact] public void ToggleTower_RejectsInvalidId()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            // -1 = invalid
+            Assert.Equal(-1, sys.ToggleTower(-1));
+            // 99999 = out of range
+            Assert.Equal(-1, sys.ToggleTower(99999));
+            // 0 = unallocated entity (not active)
+            Assert.Equal(-1, sys.ToggleTower(0));
+        }
     }
 }

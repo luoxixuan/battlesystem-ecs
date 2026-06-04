@@ -439,6 +439,11 @@ namespace BattleSystemECS.Systems
                 // Disabled/sabotage check: skip towers that are disabled by enemy sabotage
                 if (store.TowerIsDisabled[towerId]) return;
 
+                // Player-disabled check: skip towers that the player has toggled off (Round 96)
+                // Distinct from sabotage — both flags OR together: the tower stays inert
+                // until BOTH clear. ToggleTower() in TowerPlacementSystem flips this flag.
+                if (store.TowerPlayerDisabled[towerId]) return;
+
                 // Overheat check: skip if tower is overheated (cannot fire)
                 if (_heatSystem != null && _heatSystem.IsOverheated(towerId)) return;
 

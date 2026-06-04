@@ -702,6 +702,9 @@ namespace BattleSystemECS.Core
                 TowerOverchargeDuration[entityId] = 0f;
                 TowerOverchargeCooldown[entityId] = 0f;
                 TowerCanOvercharge[entityId] = false;
+                // Player-disabled flag: false (active) on entity recycle so stale 'true' from a
+                // previous owner doesn't carry over. ToggleTower() flips it back if needed.
+                TowerPlayerDisabled[entityId] = false;
             }
 
             // ── Phase 4: recycle ID ────────────────────────────────────────────────

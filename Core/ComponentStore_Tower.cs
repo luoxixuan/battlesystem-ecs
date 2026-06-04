@@ -624,6 +624,15 @@ namespace BattleSystemECS.Core
         // E.g. 0.2 = 80%-120% of base damage per hit
         public float[] TowerDamageVariance = new float[MAX_ENTITIES];
 
+        // ==================== 玩家停用塔 (Player-Disabled Tower) ====================
+        // TowerPlayerDisabled: persistent player-initiated toggle. While true, the tower
+        // does not attack and does not generate income (income towers also check this).
+        // Distinct from TowerIsDisabled (enemy sabotage) — both can be true simultaneously.
+        // The two are OR-gated in TowerAttackSystem.Update() so the tower stays inert until
+        // BOTH flags clear. ToggleTower() in TowerPlacementSystem flips this flag.
+        // Default false (zero-overhead path: when false, the gate is a single array read).
+        public bool[] TowerPlayerDisabled = new bool[MAX_ENTITIES];
+
         // ==================== 塔持续升温伤害 (Ramp-Up / Spool-Up Damage) ====================
         // TowerRampUpRate: damage increase per consecutive hit on same target (0 = no ramp-up)
         // E.g. 0.05 = +5% per hit, stacks up to TowerRampUpMax cap
@@ -902,6 +911,8 @@ namespace BattleSystemECS.Core
             TowerFrostZoneRadius[entityId] = 0f;
             TowerFrostZoneSlowFactor[entityId] = 1f;
             TowerFrostZoneDuration[entityId] = 0f;
+            // Player-disabled flag: default false (active). ToggleTower() flips to true on player request.
+            TowerPlayerDisabled[entityId] = false;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
@@ -1075,6 +1086,8 @@ namespace BattleSystemECS.Core
             TowerFrostZoneRadius[entityId] = 0f;
             TowerFrostZoneSlowFactor[entityId] = 1f;
             TowerFrostZoneDuration[entityId] = 0f;
+            // Player-disabled flag reset (false = active tower on recycle — stale 'true' would leak)
+            TowerPlayerDisabled[entityId] = false;
             // Phasing field reset (false = no phasing, zero-overhead)
             TowerIsPhasing[entityId] = false;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }

@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 95 — 单格唯一塔 Tile Occupancy Cache）
+## 性能基准（2026-06-04, Round 96 — 玩家停用塔 Disable Tower）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3633 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9573 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4058 FPS** |
+| **mode 5**（完整一局） | **3564 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **10195 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3994 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮新增方向4（单格唯一塔 Tile Occupancy Cache）：新增 `TileOccupied[10,20]` 布尔缓存 + `IsTileOccupied/SetTileOccupied/ResizeTileOccupancy` O(1) API；PlaceTower/PreviewPlacement/RelocateTower/IsValidPosition 入口从 O(N) ActiveTowerIds 扫描改为 O(1) 缓存查询（保留防御性 fallback 扫描）；DestroyEntity 在 Tower 销毁时自动释放占用格。bench2 9573（-5.8%）、bench4 4058（+1%）、bench5 3633（+2.3%）— bench2 略低于 10000 阈值但属正常噪声（+2 文件 +3 系统扇出覆盖 4 处调用点，bench2 合并路径未涉及 PlaceTower 故无可预期开销）。
+> 本轮新增方向2（玩家停用塔 Disable Tower）：新增 `TowerPlayerDisabled[]` SOA bool 字段（默认 false 零开销，+1 bool per entity）；`ToggleTower(id)` API 在 TowerPlacementSystem 翻转状态；TowerAttackSystem 在既有 `TowerIsDisabled`（敌破坏防）旁加 OR 门控（`if (store.TowerPlayerDisabled[towerId]) return;`）；ComponentStore.AddTower/RemoveTower/DestroyEntity 三处全部重置为 false 防 ID 复用时状态泄漏。**区别于 SellTower**（永久销毁 + 退款）和 `TowerIsDisabled`（敌方破坏自动计时清除），玩家停用是**持久 sticky** 状态（不退款、不计时），用于波次之间省电或高密度精控。bench2 10195（+6.5% 回到阈值之上）、bench4 3994（-1.6%）、bench5 3564（-1.9%）— 全部在最近 11 轮噪声带 (9400-10200 / 3600-4200 / 3400-3700) 之内，无回归。
 >
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 

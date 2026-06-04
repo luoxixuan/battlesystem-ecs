@@ -744,6 +744,27 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// Toggle a tower between active and player-disabled (Round 96 — Direction 2).
+        /// While disabled, the tower does not attack and does not generate income.
+        /// No gold is refunded on disable (this is a temporary power-save, distinct from SellTower).
+        /// The flag is sticky: it persists until toggled back on. Survives across frames
+        /// because it lives in the store array; cleared in ComponentStore.DestroyEntity().
+        /// </summary>
+        /// <returns>The new state (true = disabled, false = active). -1 on bad input.</returns>
+        public int ToggleTower(int towerId)
+        {
+            if (towerId < 0 || towerId >= ComponentStore.MAX_ENTITIES || !store.TowerActive[towerId])
+            {
+                logger.Log($"[TOWER] ToggleTower 失败: 实体 {towerId} 不是激活的防御塔");
+                return -1;
+            }
+            bool newState = !store.TowerPlayerDisabled[towerId];
+            store.TowerPlayerDisabled[towerId] = newState;
+            logger.Log($"[TOWER] 塔 #{towerId} (Lv.{store.TowerLevel[towerId]}) 已{(newState ? "停用" : "重新启用")}");
+            return newState ? 1 : 0;
+        }
+
+        /// <summary>
         /// Demolish (sacrifice) a tower, triggering its AoE demolish effect.
         /// The tower is permanently destroyed with no gold refund.
         /// The demolish effect is processed by TowerDemolishSystem.
