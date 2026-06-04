@@ -1355,6 +1355,17 @@ namespace BattleSystemECS.Config
         public float DifficultyGrowthPerWave { get; set; } = 0.05f;
         public float PlayerDamageScalingPerWave { get; set; } = 0.05f;
 
+        // ── Player Damage Conversion (Round 102 Direction 7) ─────────────────────
+        // Fraction of the player's base attack damage split into the converted type.
+        // 0 = no conversion (default, backward compatible). 0.3 = 30% of damage applied
+        // as PlayerConvertedDamageType, the rest stays in PlayerDamageType.
+        // Clamped at DamageConversionConfig.ConversionDefaultCap inside PlayerTowerAttackSystem
+        // to keep damage formulas sane.
+        public float PlayerDamageConversionRatio { get; set; } = 0f;
+        // The damage type the converted portion is applied as (e.g. Magic to bypass Physical
+        // immunity). Default Physical = inert when PlayerDamageConversionRatio = 0.
+        public DamageType PlayerConvertedDamageType { get; set; } = DamageType.Physical;
+
         // Behavior tree definitions keyed by monster type
         public Dictionary<string, BehaviorTreeDef> BehaviorTrees { get; set; } = new Dictionary<string, BehaviorTreeDef>();
         private Dictionary<string, BehaviorTreeDef> _btCache = new Dictionary<string, BehaviorTreeDef>();
@@ -2724,5 +2735,25 @@ namespace BattleSystemECS.Config
         /// 0 means "this enemy has no mana to drain" — drain silently no-ops.
         /// Designers can override per-monster-type via <c>EnemyTypeEntry.MaxMana</c>.</summary>
         public const float DefaultEnemyMaxMana = 0f;
+    }
+
+    /// <summary>
+    /// Round 102 — Direction 7: Damage Conversion (Physical → Elemental split).
+    /// Lets tower attacks split a configurable fraction of their damage into a different
+    /// DamageType (e.g. 30% of Physical damage becomes Fire). The two portions are applied
+    /// independently so the converted portion can bypass immunities to the original type
+    /// and trigger elemental reactions on the converted type.
+    /// </summary>
+    public static class DamageConversionConfig
+    {
+        /// <summary>Global cap on the conversion ratio (0..1). Tower configs that set
+        /// <c>DamageConversionRatio</c> above this value are clamped at <c>ConversionDefaultCap</c>
+        /// in the deserializer to keep design in check (a 100% conversion defeats the purpose).
+        /// 0.5 = 50% max — the sweet spot for "split damage" play.</summary>
+        public const float ConversionDefaultCap = 0.5f;
+
+        /// <summary>Minimum meaningful ratio to enter the split code path. Below this value
+        /// the conversion branch is skipped entirely (zero-overhead fast path). 0.01 = 1%.</summary>
+        public const float MinMeaningfulRatio = 0.01f;
     }
 }

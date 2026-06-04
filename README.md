@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 101 — 塔吸敌法 Mana Drain Tower → Enemy）
+## 性能基准（2026-06-04, Round 102 — 玩家伤害转化 Damage Conversion）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3378 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9259 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4080 FPS** |
+| **mode 5**（完整一局） | **3362 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9655 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3923 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮实施 Round 101 方向10（塔吸敌法 Mana Drain）：新增 `float[] EnemyMaxMana` / `float[] EnemyCurrentMana` / `float[] TowerManaDrainPct` / `float[] TowerManaDrainCap` 共 4 个 SOA 字段（默认 0 零开销）；`ManaDrainConfig` 静态类 3 常量（`DefaultManaDrainPct=0.1f` / `ManaDrainCap=50f` / `DefaultEnemyMaxMana=0f`）；`TowerConfig` 新增 `ManaDrainPct` / `ManaDrainCap` 字段（designer opt-in）；`TowerAttackSystem` damage apply 后（post-saturation 阶段）插入 drain 逻辑：零开销早退（`finalDmg<=0` / `TowerManaDrainPct==0` / `EnemyMaxMana==0` / `EnemyCurrentMana==0` 四道守卫）→ 命中时 `drain = min(cap, curMana × pct)` → 扣敌法 + 加玩家法力池（clamp MaxMana）；`AddEnemy` 初始化两字段为 0 + `DestroyEntity` 两处 reset（enemy + tower）防 ID 复用泄漏；`AddTower` / `TowerPlacementSystem` 默认 0（opt-in）。配套 12 个测试覆盖：默认值、Config 常量、ManaWielder/普通敌、百分比应用、global cap、per-tower cap、player clamp、zero-mana no-op、zero-cur-mana no-op、DestroyEntity reset。**Claude bug scan PASS**。bench2 9259（-4.6% 跌破 10000 阈值）、bench4 4080（-0.7% 在噪声内）、bench5 3378（-0.1% 在噪声内）。
+> 本轮实施 Round 102 方向7（玩家伤害转化 Damage Conversion）：`GameConfig` 新增 `PlayerDamageConversionRatio`（默认 0f，0..1 区间）+ `PlayerConvertedDamageType`（默认 Physical）两字段；`DamageConversionConfig` 静态类 2 常量（`ConversionDefaultCap=0.5f` 全局 cap / `MinMeaningfulRatio=0.01f` 零开销阈值）；`PlayerTowerAttackSystem` 引入 `DamageType` 元组的 ping-pong damage queue（从 3-tuple 扩到 4-tuple，零额外分配），并行段提取 `ApplyResistancesAndEnqueue` 私有方法承担 resistance/immunity/exposure/death-mark 流水线；`convRatio < MinMeaningfulRatio` 走 fast path（单事件），否则按 `clamp(convRatio, 0, DefaultCap)` 拆成 original + converted 两段独立 apply（双事件，各自走对应的 armor/magicResist/immunity 路径）。`Data/Configs/damage_conversion.json` 配置元数据。配套 20 个测试覆盖 Config 常量、GameConfig defaults、Default 零分配、Clamp-at-Cap、Above-threshold 双事件、低于阈值 fast-path、Physical 走 armor、Physical-immune 仍吃 Magic portion、Magic 走 magicResist、crit 沿用、DestroyEntity reset 兼容性等。**228/228 tests PASS**。bench2 9655（bench2 仍 < 10000 阈值，与上轮 9259 相比 +4.3% 改善，但未达阈值）、bench4 3923（-3.8% 跌破 4300 阈值）、bench5 3362（-0.5% 跌破 3800 阈值，三项均未达阈值 ⚠️）。
 >
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 

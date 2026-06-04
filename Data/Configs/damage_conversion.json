@@ -1,0 +1,6 @@
+{
+  "Enabled": true,
+  "DefaultCap": 0.5,
+  "MinMeaningfulRatio": 0.01,
+  "Description": "Damage Conversion (Round 102 Direction 7) — lets tower and player attacks split a configurable fraction of their damage into a different DamageType. E.g. 30% of Physical damage becomes Fire. The two portions are applied independently so the converted portion can bypass immunities to the original type and trigger elemental reactions on the converted type. DefaultCap=0.5 prevents designers from setting 100% conversion (which defeats the purpose). Tower conversion is configured per-tower via TowerConfig.DamageConversionRatio/ConvertedDamageType; player conversion is configured globally via GameConfig.PlayerDamageConversionRatio/PlayerConvertedDamageType. Set Enabled=false to disable the conversion path entirely (zero-overhead early-exit in PlayerTowerAttackSystem and TowerAttackSystem)."
+}

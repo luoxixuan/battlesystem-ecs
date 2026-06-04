@@ -67,11 +67,14 @@ namespace BattleSystemECS.Systems
         private int _currentTurn;
 
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
-        // Ping-pong double-buffer for damage (enemyId, raw damage, wasCrit).
+        // Ping-pong double-buffer for damage (enemyId, raw damage, wasCrit, damageType).
         // wasCrit is set in the parallel phase (where the crit roll happens) and
         // drained in the serial phase to publish EnemyHit / EnemyCrit events.
-        // Default-initialized to false; both bools and the 3-tuple are stack-friendly.
-        private List<(int enemyId, float damage, bool wasCrit)>[] _damageQueue = new List<(int, float, bool)>[2];
+        // damageType is the resolved type for this hit portion — when conversion is active
+        // the parallel phase enqueues TWO entries for the same enemy (one per type) so the
+        // serial phase applies them with the correct resistance/armor/immunity path.
+        // Default-initialized to false; both bools and the 4-tuple are stack-friendly.
+        private List<(int enemyId, float damage, bool wasCrit, DamageType damageType)>[] _damageQueue = new List<(int, float, bool, DamageType)>[2];
         private readonly object _damageQueueLock = new object();
         private int _damageQueueIdx = 0;
 
@@ -101,8 +104,8 @@ namespace BattleSystemECS.Systems
             this.techTreeSystem = techTreeSystem;
             this.gameConfig = gameConfig;
             this._eventBus = eventBus ?? new EventBus();
-            _damageQueue[0] = new List<(int, float, bool)>(256);
-            _damageQueue[1] = new List<(int, float, bool)>(256);
+            _damageQueue[0] = new List<(int, float, bool, DamageType)>(256);
+            _damageQueue[1] = new List<(int, float, bool, DamageType)>(256);
             _thornsQueue[0] = new List<float>(64);
             _thornsQueue[1] = new List<float>(64);
         }
@@ -229,63 +232,51 @@ public void SetWaveNumber(int waveNumber)
                     wasCrit = true;
                 }
 
-                // Apply damage type resistance (Physical=armor, Magic=magicResist, True=bypass all)
+                // Resolve the player's primary damage type once per parallel iteration.
+                // The resistance/immunity application + enqueue is delegated to
+                // ApplyResistancesAndEnqueue (Round 102 Direction 7 — Damage Conversion).
                 DamageType dmgType = store.PlayerDamageType[playerId];
-                // Immunity check: True bypasses immunity; all others check the mask
-                if (dmgType != DamageType.True)
-                {
-                    int immunityMask = store.EnemyDamageImmunityMask[enemyId];
-                    if ((immunityMask & (int)dmgType) != 0)
-                    {
-                        finalDamage = 0f;  // enemy is immune to this damage type
-                    }
-                }
-                if (dmgType == DamageType.True)
-                {
-                    // no resistance applied — skip to damageTakenMult below
-                }
-                else if (dmgType == DamageType.Magic)
-                {
-                    float magicResist = store.EnemyMagicResist[enemyId];
-                    finalDamage *= Math.Max(0.01f, 1f - magicResist);
-                }
-                else  // Physical (default) — uses armor + armor pen
-                {
-                    float enemyArmor = store.EnemyArmor[enemyId];
-                    if (enemyArmor > 0f)
-                        finalDamage *= Math.Max(0.01f, 1f - enemyArmor * (1f - _armorPenetration));
-                }
 
-                // Apply tech tree damage taken multiplier (e.g. "Iron Wall II" reduces incoming damage)
-                finalDamage *= _damageTakenMult;
-
-                // Death Mark / Execute bonus: marked enemies take +X% extra damage (default +50%).
-                // Applied after all resistances so the bonus is always meaningful.
-                if (store.EnemyMarked[enemyId])
+                // ── Damage Conversion (Round 102 Direction 7) ──────────────────────────
+                // If the player has a non-trivial conversion ratio configured (via
+                // gameConfig.PlayerDamageConversionRatio), split the damage into the original
+                // type portion + a converted type portion. Both portions are queued as separate
+                // hit events so the serial phase applies each with the correct resistance/immunity
+                // path. This mirrors TowerAttackSystem's damage conversion (lines 791-848) for
+                // consistency across the attack pipeline.
+                //
+                // IMPORTANT: crit was rolled on the COMBINED finalDamage, so we treat both
+                // portions as a single crit event from the enemy's perspective (wasCrit is true
+                // on both, matching how TowerAttackSystem handles post-crit conversion).
+                float convRatio = gameConfig != null ? gameConfig.PlayerDamageConversionRatio : 0f;
+                if (convRatio < DamageConversionConfig.MinMeaningfulRatio)
                 {
-                    finalDamage *= (1f + store.EnemyMarkedDamageBonus[enemyId]);
+                    // Fast path: no meaningful conversion — single-event apply
+                    ApplyResistancesAndEnqueue(enemyId, finalDamage, wasCrit, dmgType);
                 }
-
-                // ── Elemental Exposure bonus (Round 83 Direction 5) ──
-                // Player attacks have no element tag, so any active exposure window
-                // (EnemyExposureMask != None) counts as "off-element" and triggers
-                // the +30% bonus. The O(1) guard skips the common case where the
-                // enemy has no active exposure (timer <= 0 OR mask == None).
-                if (store.EnemyExposureTimer[enemyId] > 0f
-                    && store.EnemyExposureMask[enemyId] != ElementType.None)
+                else
                 {
-                    finalDamage *= 1.30f; // 1 + EXPOSURE_BONUS_PCT (hardcoded in ElementalReactionSystem)
-                }
+                    // Clamp at the global cap so designers can't accidentally break the formula
+                    if (convRatio > DamageConversionConfig.ConversionDefaultCap)
+                        convRatio = DamageConversionConfig.ConversionDefaultCap;
 
-                lock (_damageQueueLock) { _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage, wasCrit)); }
+                    DamageType convertToType = gameConfig.PlayerConvertedDamageType;
+                    float origPortion = finalDamage * (1f - convRatio);
+                    float convPortion = finalDamage * convRatio;
+
+                    // Original-type portion
+                    ApplyResistancesAndEnqueue(enemyId, origPortion, wasCrit, dmgType);
+                    // Converted-type portion
+                    ApplyResistancesAndEnqueue(enemyId, convPortion, wasCrit, convertToType);
+                }
             });
 
-// Phase 2 (serial): ping-pong swap — read from current bag, clear alternate for next frame
+            // Phase 2 (serial): ping-pong swap — read from current bag, clear alternate for next frame
             int readIdx = _damageQueueIdx;
             int writeIdx = 1 - _damageQueueIdx;
             _damageQueueIdx = writeIdx;
             _damageQueue[writeIdx].Clear(); // clear the bag threads will write to next frame
-            foreach (var (enemyId, damage, wasCrit) in _damageQueue[readIdx])
+            foreach (var (enemyId, damage, wasCrit, damageType) in _damageQueue[readIdx])
             {
                 if (!store.EnemyActive[enemyId]) continue;
                 // Invulnerability check: skip damage if enemy is invulnerable
@@ -409,6 +400,73 @@ public void SetWaveNumber(int waveNumber)
             if (store.EnemyHealth[linkedEnemyId] <= 0f)
             {
                 store.QueueEnemyDeath(linkedEnemyId, playerId);
+            }
+        }
+
+        /// <summary>
+        /// Apply damage-type-specific resistance/immunity to the given portion and enqueue
+        /// the hit for serial application. Extracted from the parallel phase so damage
+        /// conversion (Round 102 Direction 7) can call it twice — once per type — without
+        /// duplicating the resistance pipeline. Crit, exposure, death-mark and damage-taken
+        /// multipliers are all assumed to have been baked into <paramref name="rawDamage"/>
+        /// by the caller.
+        /// </summary>
+        private void ApplyResistancesAndEnqueue(int enemyId, float rawDamage, bool wasCrit, DamageType damageType)
+        {
+            float finalDamage = rawDamage;
+
+            // Apply damage type resistance (Physical=armor, Magic=magicResist, True=bypass all).
+            // Elemental types (Fire/Ice/Lightning) fall through to the "else" branch and use
+            // armor — matches the existing tower pipeline (see TowerAttackSystem.cs:865-880).
+            if (damageType != DamageType.True)
+            {
+                int immunityMask = store.EnemyDamageImmunityMask[enemyId];
+                if ((immunityMask & (int)damageType) != 0)
+                {
+                    finalDamage = 0f;  // enemy is immune to this damage type
+                }
+            }
+            if (damageType == DamageType.True)
+            {
+                // no resistance applied
+            }
+            else if (damageType == DamageType.Magic)
+            {
+                float magicResist = store.EnemyMagicResist[enemyId];
+                finalDamage *= Math.Max(0.01f, 1f - magicResist);
+            }
+            else  // Physical / Fire / Ice / Lightning — uses armor + armor pen
+            {
+                float enemyArmor = store.EnemyArmor[enemyId];
+                if (enemyArmor > 0f)
+                    finalDamage *= Math.Max(0.01f, 1f - enemyArmor * (1f - _armorPenetration));
+            }
+
+            // Apply tech tree damage taken multiplier
+            finalDamage *= _damageTakenMult;
+
+            // Death Mark / Execute bonus: marked enemies take +X% extra damage
+            if (store.EnemyMarked[enemyId])
+            {
+                finalDamage *= (1f + store.EnemyMarkedDamageBonus[enemyId]);
+            }
+
+            // ── Elemental Exposure bonus (Round 83 Direction 5) ──
+            // Active exposure window (EnemyExposureMask != None) triggers the +30% bonus
+            // for off-element hits. The O(1) guard skips the common case where the enemy
+            // has no active exposure.
+            if (store.EnemyExposureTimer[enemyId] > 0f
+                && store.EnemyExposureMask[enemyId] != ElementType.None)
+            {
+                finalDamage *= 1.30f; // 1 + EXPOSURE_BONUS_PCT (hardcoded in ElementalReactionSystem)
+            }
+
+            // Enqueue with damage type tag. Note: ThreatScore accumulator is bumped in the
+            // serial phase (post-saturation) so we don't add baseDamage here — that path
+            // already tracks combined finalDamage.
+            lock (_damageQueueLock)
+            {
+                _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage, wasCrit, damageType));
             }
         }
 
