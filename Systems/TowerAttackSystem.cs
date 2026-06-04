@@ -2077,10 +2077,13 @@ namespace BattleSystemECS.Systems
                     int towerFragCount = store.TowerProjectileFragmentCount[towerId];
                     float towerFragRange = store.TowerProjectileFragmentRange[towerId];
                     float towerFragDmgMult = store.TowerProjectileFragmentDmgMult[towerId];
+                    // Round 114 — Lead Aim: pass tower's leadAimFactor to fragment projectile fire path
+                    // so predictive-aim towers pre-compensate the target's motion at fire time.
+                    float leadAimFactor = store.TowerLeadAimFactor[towerId];
 
                     // Fire fragment projectile — uses homing to track the target enemy
                     projectileSystem.Fire(towerId, eid, damage, playerId, speed, isHoming,
-                        pierceCount, pierceFalloff, towerFragCount, towerFragRange, towerFragDmgMult);
+                        pierceCount, pierceFalloff, towerFragCount, towerFragRange, towerFragDmgMult, leadAimFactor);
                 }
             }
         }

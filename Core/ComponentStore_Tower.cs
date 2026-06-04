@@ -601,6 +601,21 @@ namespace BattleSystemECS.Core
         // locked target becomes inactive / out of range.
         public int[] TowerLockedTargetId = new int[MAX_ENTITIES];
 
+        // ==================== 塔预测瞄准/前置射击 (Predictive Aim / Lead Targeting) ====================
+        // TowerLeadAimFactor: 0 = no lead (default, straight aim at current target position).
+        //   > 0 = lead aim: the projectile is fired at the predicted target position based on
+        //   the target enemy's current movement direction (EnemyMoveDirX/Y) and speed. The
+        //   factor scales the lead amount: 1.0 = perfect lead (compensates target's motion
+        //   for the full flight time), 0.5 = half lead (more forgiving, simulates windage /
+        //   tracking inaccuracy). Only applied to projectiles fired via ProjectileSystem.Fire()
+        //   (e.g. fragment / homing / chain projectiles). Instant-hit tower attacks ignore it.
+        //   This implementation is intentionally light-weight: NO new SOA fields, NO path
+        //   lookup at fire time — the dir is already cached in EnemyMoveDirX/Y by
+        //   EnemyMovementSystem.SetTurn. The leading point is computed as:
+        //     leadOffset = EnemyMoveDir * EnemyMoveSpeed * timeToTarget
+        //     aim = targetPos + leadOffset * leadAimFactor
+        public float[] TowerLeadAimFactor = new float[MAX_ENTITIES];
+
         // ==================== 塔能量/法力资源系统 (Tower Energy) ====================
         // TowerEnergy: current energy level for each tower (0 = depleted, cannot fire if below TowerEnergyPerShot)
         public float[] TowerEnergy = new float[MAX_ENTITIES];
@@ -938,6 +953,8 @@ namespace BattleSystemECS.Core
             // Lock-On filter: default to false (no lock-on, backward compatible) + -1 = no cached target
             TowerIsLockOn[entityId] = false;
             TowerLockedTargetId[entityId] = -1;
+            // Round 114 — Lead Aim: default to 0 (no lead, straight aim, zero-overhead fast path)
+            TowerLeadAimFactor[entityId] = 0f;
             // Tower energy fields: default to no energy (0 capacity = no energy system)
             TowerEnergy[entityId] = 0f;
             TowerMaxEnergy[entityId] = 0f;
@@ -1091,6 +1108,8 @@ namespace BattleSystemECS.Core
             TowerProjectileFragmentCount[entityId] = 0;
             TowerProjectileFragmentRange[entityId] = 0f;
             TowerProjectileFragmentDmgMult[entityId] = 1f;
+            // Round 114 — Lead Aim: default to 0 (no lead, zero-overhead fast path on hot fire path)
+            TowerLeadAimFactor[entityId] = 0f;
             TowerArmorShredBonus[entityId] = 0f;
             TowerShieldBreakBonus[entityId] = 0f;
             TowerDamageType[entityId] = DamageType.Physical;
@@ -1154,6 +1173,8 @@ namespace BattleSystemECS.Core
             // Lock-On fields reset (no lock-on, no cached target — recycled slot starts inert)
             TowerIsLockOn[entityId] = false;
             TowerLockedTargetId[entityId] = -1;
+            // Round 114 — Lead Aim: recycled slot starts at 0 (no lead, zero-overhead fast path)
+            TowerLeadAimFactor[entityId] = 0f;
             // Path-Hug filter reset
             TowerPathHugOnly[entityId] = false;
             // Tower energy fields reset
@@ -1365,6 +1386,15 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(towerId)) return;
             TowerProjectileHoming[towerId] = isHoming;
+        }
+
+        /// <summary>Sets the lead-aim factor for a tower (0 = no lead, 1.0 = perfect lead). Clamped to [0, 2].</summary>
+        public void SetTowerLeadAimFactor(int towerId, float leadAimFactor)
+        {
+            if (!IsValidEntity(towerId)) return;
+            if (leadAimFactor < 0f) leadAimFactor = 0f;
+            if (leadAimFactor > 2f) leadAimFactor = 2f; // sanity cap: 2.0 = over-lead (rare/cheat-y case)
+            TowerLeadAimFactor[towerId] = leadAimFactor;
         }
 
         /// <summary>Sets the intercept rate for a PointDefense tower.</summary>

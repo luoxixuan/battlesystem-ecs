@@ -80,7 +80,10 @@ namespace BattleSystemECS.Systems
         /// <param name="fragmentCount">Number of child projectiles to spawn on impact (0 = no fragmentation)</param>
         /// <param name="fragmentRange">Search radius for fragment targets</param>
         /// <param name="fragmentDmgMult">Damage multiplier for each fragment relative to parent</param>
-        public void Fire(int towerId, int targetId, float damage, int playerId, float speed, bool isHoming = false, int pierceCount = 0, float pierceDmgFalloff = 1f, int fragmentCount = 0, float fragmentRange = 0f, float fragmentDmgMult = 1f)
+        /// <param name="leadAimFactor">Round 114 — predictive aim factor: 0 = no lead (aim at current target pos), > 0 = lead amount
+        ///   scales the predicted-offset vector derived from EnemyMoveDirX/Y × EnemyMoveSpeed × timeToTarget.
+        ///   1.0 = perfect lead, 0.5 = half lead. Default 0 = backward-compatible straight aim (zero overhead).</param>
+        public void Fire(int towerId, int targetId, float damage, int playerId, float speed, bool isHoming = false, int pierceCount = 0, float pierceDmgFalloff = 1f, int fragmentCount = 0, float fragmentRange = 0f, float fragmentDmgMult = 1f, float leadAimFactor = 0f)
         {
             if (_activeProjectileCount >= MAX_PROJ) return;
 
@@ -115,6 +118,49 @@ namespace BattleSystemECS.Systems
             _projGravity[projId] = 0f;
             _projArcType[projId] = 0;
             _projArcPeakHeight[projId] = 0f;
+            // Compute initial velocity — pre-compute the lead point when leadAimFactor > 0.
+            // We aim the projectile at target's predicted future position rather than current pos,
+            // so it intercepts the moving target. For non-homing + non-lead, velocity stays 0 here
+            // and is set when the projectile first has a valid target inside Update().
+            if (leadAimFactor > 0f && targetId >= 0 && store.EnemyActive[targetId])
+            {
+                float tx = store.PositionX[targetId];
+                float ty = store.PositionY[targetId];
+                float dx = tx - _projX[projId];
+                float dy = ty - _projY[projId];
+                float dist = MathF.Sqrt(dx * dx + dy * dy);
+                if (dist > 0.001f)
+                {
+                    float invDist = 1f / dist;
+                    // Avoid divide-by-zero on speed
+                    float safeSpeed = MathF.Max(speed, 0.1f);
+                    float timeToTarget = dist / safeSpeed;
+                    // Leading offset: target's current motion × flight time × lead factor
+                    // EnemyMoveDirX/Y is the unit movement direction cached by EnemyMovementSystem.SetTurn.
+                    // If the target is stationary (dir=0) or speed=0, leadOffset is 0 → aim at current pos.
+                    float moveSpeed = store.EnemyMoveSpeed[targetId];
+                    float leadOffX = store.EnemyMoveDirX[targetId] * moveSpeed * timeToTarget * leadAimFactor;
+                    float leadOffY = store.EnemyMoveDirY[targetId] * moveSpeed * timeToTarget * leadAimFactor;
+                    // Aim at predicted future position
+                    float aimX = tx + leadOffX;
+                    float aimY = ty + leadOffY;
+                    float aimDx = aimX - _projX[projId];
+                    float aimDy = aimY - _projY[projId];
+                    float aimDist = MathF.Sqrt(aimDx * aimDx + aimDy * aimDy);
+                    if (aimDist > 0.001f)
+                    {
+                        float aimInv = 1f / aimDist;
+                        _projVelX[projId] = aimDx * aimInv * safeSpeed;
+                        _projVelY[projId] = aimDy * aimInv * safeSpeed;
+                    }
+                    else
+                    {
+                        // Degenerate — fall back to straight aim
+                        _projVelX[projId] = dx * invDist * safeSpeed;
+                        _projVelY[projId] = dy * invDist * safeSpeed;
+                    }
+                }
+            }
             _projActive[projId] = true;
             _activeProjectileCount++;
         }

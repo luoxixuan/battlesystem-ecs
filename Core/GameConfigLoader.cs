@@ -656,6 +656,12 @@ namespace BattleSystemECS.Config
             tower.TargetingMode = (TowerTargetingMode)ExtractInt(json, "TargetingMode");
             tower.SpecialAbility = ParseTowerSpecialAbility(json);
             tower.ProjectileHoming = ExtractBool(json, "ProjectileHoming");
+            // Round 114 — Predictive Aim / Lead Targeting
+            // Parse the optional LeadAimFactor (default 0f = no lead, straight aim).
+            // Only meaningful for ProjectileSystem-fired projectiles (fragments, homing
+            // chains, etc.). Instant-hit attacks ignore it. Capped at 2.0 in the
+            // SetTowerLeadAimFactor accessor.
+            tower.LeadAimFactor = ExtractFloat(json, "LeadAimFactor");
             tower.TurnRate = ExtractFloat(json, "TurnRate");
             tower.DamageType = (DamageType)ExtractInt(json, "DamageType");
             tower.InterceptRate = ExtractFloat(json, "InterceptRate");

@@ -192,6 +192,12 @@ namespace BattleSystemECS.Config
         public float ReloadTime { get; set; } = 0f;
         // Homing projectile: if true, projectile tracks target and turns mid-flight
         public bool ProjectileHoming { get; set; } = false;
+        // Lead-aim factor: 0 = no lead (default, straight aim). > 0 = projectile is fired at the
+        // target's predicted future position based on its current movement direction + speed.
+        // 1.0 = perfect lead (compensates target's motion for the full flight time), 0.5 = half
+        // lead. Capped at 2.0 (over-lead). Only applied to ProjectileSystem-fired projectiles
+        // (fragment / homing variants); instant-hit tower attacks ignore it.
+        public float LeadAimFactor { get; set; } = 0f;
         // Turn rate: maximum angular change per second in radians (e.g. PI = 180°/sec, 0 = instant/snap to target)
         // Default 0 means instant rotation (existing behavior unchanged)
         public float TurnRate { get; set; } = 0f;

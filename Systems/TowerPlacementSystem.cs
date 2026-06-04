@@ -209,6 +209,12 @@ namespace BattleSystemECS.Systems
                     }
                     // Apply homing projectile flag for tracking towers
                     store.SetTowerProjectileHoming(towerId, tc.ProjectileHoming);
+                    // Round 114 — Predictive Aim / Lead Targeting
+                    // Apply lead-aim factor for Sniper / Cannon towers (any tower that
+                    // shoots slow projectiles at moving enemies). 0 = straight aim
+                    // (default), > 0 = lead target based on its current motion. Capped
+                    // at [0, 2] inside the accessor.
+                    store.SetTowerLeadAimFactor(towerId, tc.LeadAimFactor);
                     // Apply intercept rate for PointDefense towers
                     store.SetTowerInterceptRate(towerId, tc.InterceptRate);
                     // Apply bounce projectile settings
