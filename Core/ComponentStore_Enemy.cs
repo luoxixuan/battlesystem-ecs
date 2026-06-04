@@ -679,6 +679,22 @@ namespace BattleSystemECS.Core
         public float[] EnemyMarkedThreshold = new float[MAX_ENTITIES];
         public float[] EnemyMarkedDamageBonus = new float[MAX_ENTITIES];
 
+        // ==================== 目标处决 (Execute Threshold) ====================
+        // EnemyExecuteThreshold: HP fraction (0-1) below which the enemy becomes "executable".
+        //   0 = disabled (default; no execute effect). Set to e.g. 0.20f to designate an enemy
+        //   as vulnerable to execute when HP drops under 20% of max.
+        // EnemyExecuteBonusGold: flat gold awarded (added on top of normal kill reward) when this
+        //   enemy is killed while executable. Set to 0 to opt out, e.g. 25f for a 25-gold bonus.
+        // EnemyExecuteBonusMana: flat mana awarded to the killer on execute kill. Same semantics.
+        // EnemyExecuted: one-shot guard — set to true the first time the execute bonus is paid
+        //   so re-marks / re-checks don't double-pay. Reset in DestroyEntity.
+        // Round 105 Direction 8: Execute bonus rewards high-damage "finisher" plays. Pairs with
+        // the existing Death Mark system to give assassination-style towers a payoff window.
+        public float[] EnemyExecuteThreshold = new float[MAX_ENTITIES];
+        public float[] EnemyExecuteBonusGold = new float[MAX_ENTITIES];
+        public float[] EnemyExecuteBonusMana = new float[MAX_ENTITIES];
+        public bool[] EnemyExecuted = new bool[MAX_ENTITIES];
+
         // ==================== 诱饵 (Decoy) ====================
         // EnemyIsDecoy: when true, this enemy is a non-aggressive target dummy spawned by the player
         //   (e.g. a Hologram Decoy tower). Decoys do not move, do not attack, and cannot use abilities.
@@ -1020,6 +1036,13 @@ namespace BattleSystemECS.Core
             EnemyMarked[entityId] = false;
             EnemyMarkedThreshold[entityId] = 0.15f;
             EnemyMarkedDamageBonus[entityId] = 0.5f;
+            // Execute bonus (Round 105 Direction 8): default 0 = opt-out. Set EnemyExecuteThreshold
+            // to a positive HP fraction to designate an enemy as "executable" with the configured
+            // gold/mana bonus paid out on kill. The one-shot EnemyExecuted flag prevents double-pay.
+            EnemyExecuteThreshold[entityId] = 0f;
+            EnemyExecuteBonusGold[entityId] = 0f;
+            EnemyExecuteBonusMana[entityId] = 0f;
+            EnemyExecuted[entityId] = false;
             // Decoy: default not a decoy. WaveSpawningSystem / Hologram-tower spawn opts in by
             // setting EnemyIsDecoy = true and EnemyDecoyLifetime = N (seconds).
             EnemyIsDecoy[entityId] = false;

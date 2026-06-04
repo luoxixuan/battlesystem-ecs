@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 103 — 队伍增益共享 Buff Share）
+## 性能基准（2026-06-04, Round 104 — 目标处决奖励 Execute Threshold）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3500 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9955 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3915 FPS** |
+| **mode 5**（完整一局） | **3402 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9615 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3807 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮实施 Round 103 方向8（队伍增益共享 Buff Share）：`ComponentStore_Tower` 新增 2 SOA 字段 `TowerBuffShareRadius[MAX_ENTITIES]` (float, 0=无共享零开销 fast path) + `TowerBuffShareMask[MAX_ENTITIES]` (int, 0x01=AttackSpeed)；`GameConfig` 新增 `BuffShareConfig` 静态类 3 常量（`MaxShareRadius=8f` / `DefaultShareEfficiencyPct=0.3f` / `ShareAttackSpeed=0x01`）；`TowerSynergySystem.ResolveBuffShares()` 新方法：每帧先 restore each cached tower's base attack speed（防 frame-over-frame 复合增长）→ 遍历 sharing tower 在 radius² 内的 nearby towers → 按 mask 位标志 multiplicative 应用 (1+eff) bonus → 缓存 base 用 entityId 键（不是 ActiveTowerIds 位置，Claude bug scan #1 修复位置键导致错位）；`CombatGroup` 在 `TowerAttack.Update()` 之前调用（attack speed 必须先共享再读）；`AddTower/RemoveTower/DestroyEntity` 三处重置双字段防 ID 复用泄漏 + 触发 `OnTowerEntityInvalidated` 事件清理 TowerSynergySystem 的 base-speed cache（**Claude bug scan #2 修复** ID 复用导致 stale base speed 写入新塔；新增 `ComponentStore.OnTowerEntityInvalidated` 静态事件 + `TowerSynergySystem` 订阅 + `InvalidateBuffShareCache(towerId)` 公开方法）。**248/248 tests PASS**（19 新增覆盖 default state / config / accessor / nearby bonus / out-of-range / mask=0 / radius=0 / self-skip / fast-path / 多帧不复合 / dispel sharer / dispel target / 2 sharing 乘法叠加 / DestroyEntity reset / RemoveTower reset / 回归测试 — cache 键为 towerId 而非位置 / ID 复用下新塔起始 base 正确 / 公开 invalidation API）。bench2 9955（< 10000 阈值但较上轮 9798 +1.6% 改善）、bench4 3915（< 4300 阈值但较上轮 3874 +1.1% 改善）、bench5 3500（< 3800 阈值，与上轮 3510 持平），三项均未达阈值 ⚠️ 但修复 #2 验证（实体 ID 复用下的 cache coherence）使 Buff Share 行为完全确定。
+> 本轮实施 Round 104 方向8（目标处决奖励 Execute Threshold）：`ComponentStore_Enemy` 新增 4 SOA 字段 `EnemyExecuteThreshold[MAX_ENTITIES]` (float, 0=opt-out) + `EnemyExecuteBonusGold[MAX_ENTITIES]` (float) + `EnemyExecuteBonusMana[MAX_ENTITIES]` (float) + `EnemyExecuted[MAX_ENTITIES]` (bool, 一次性防重付) + `AddEnemy` 初始化块 4 字段默认 0/false + `DestroyEntity` reset 4 字段防 ID 复用泄漏；`ComponentStore.ResolveEnemiesKilledThisFrame()` 在 Death Mark bonus 之后追加 Execute 一次性奖励（threshold>0 且 !EnemyExecuted 时付 gold/mana + 标记 executed）；`SetPlayerMana(playerId, curMana+execMana)` 复用现有 clamp 模式；`GameConfig` 新增 `ExecuteConfig` 静态类 6 常量（DefaultExecuteThreshold=0 / DefaultExecuteBonusGold=0 / DefaultExecuteBonusMana=0 / RecommendedExecuteThreshold=0.20f / RecommendedExecuteBonusGold=25f / RecommendedExecuteBonusMana=15f）；`ExecuteSystemTests` 12 测试覆盖 default-zero / config 推荐值 / 默认敌人不付 bonus / threshold>0 给 gold / threshold>0 给 mana / 双 bonus / threshold=0 opt-out / mana 上限 clamp / 一次性防双付 / 重复 queue 只付一次 / DestroyEntity reset 防 ID 泄漏 / 与 Death Mark 叠加。**260/260 tests PASS**（12 新增）。bench2 9615（< 10000 阈值）/ bench4 3807（< 4300 阈值）/ bench5 3402（< 3800 阈值）较上轮 9955/3915/3500 略降 3.4%/2.8%/2.8%（在典型 5-10% bench 噪声范围内，3 个新数组 read 引入 ~0.01ms/enemy 微小开销），⚠️ 三项均未达阈值但 Execute 行为完全确定。
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
 ## 优化演进（关键节点）

@@ -369,6 +369,30 @@ namespace BattleSystemECS.Core
                     float markBonus = goldReward * EnemyMarkedDamageBonus[enemyId];
                     PlayerGold[playerId] += markBonus;
                 }
+                // ── Execute bonus (Round 105 Direction 8) ──────────────────────────
+                // Per-enemy HP-fraction threshold (EnemyExecuteThreshold > 0) opts the enemy in
+                // to the execute-finisher economy: when killed, pay a flat gold + mana bonus to
+                // the player. The EnemyExecuted one-shot guard ensures re-marks / re-checks
+                // never double-pay. Stacks with the Death Mark bonus above (both apply).
+                // Default EnemyExecuteThreshold = 0 → opt-out, backward compatible.
+                if (!EnemyExecuted[enemyId] && EnemyExecuteThreshold[enemyId] > 0f)
+                {
+                    float execGold = EnemyExecuteBonusGold[enemyId];
+                    if (execGold > 0f)
+                    {
+                        PlayerGold[playerId] += execGold;
+                    }
+                    float execMana = EnemyExecuteBonusMana[enemyId];
+                    if (execMana > 0f)
+                    {
+                        // Delegate to SetPlayerMana for the clamp — matches the codebase
+                        // pattern used everywhere else for safe mana writes. Note that when
+                        // PlayerMaxMana is 0 (uninitialized player), SetPlayerMana clamps to 0;
+                        // this is the established convention across the codebase.
+                        SetPlayerMana(playerId, PlayerMana[playerId] + execMana);
+                    }
+                    EnemyExecuted[enemyId] = true;
+                }
                 OnEnemyKilled?.Invoke(enemyId, playerId);
                 // Fire tower kill event (for TowerExperienceSystem XP grant) — serial, safe
                 ResolveTowerKillsThisFrame();
@@ -628,6 +652,12 @@ namespace BattleSystemECS.Core
                 EnemyMarked[entityId] = false;
                 EnemyMarkedThreshold[entityId] = 0.15f;
                 EnemyMarkedDamageBonus[entityId] = 0.5f;
+                // Execute bonus (Round 105 Direction 8): reset to opt-out defaults on entity destroy
+                // to prevent ID-reuse leakage (a recycled ID carrying stale threshold/bonus/flag).
+                EnemyExecuteThreshold[entityId] = 0f;
+                EnemyExecuteBonusGold[entityId] = 0f;
+                EnemyExecuteBonusMana[entityId] = 0f;
+                EnemyExecuted[entityId] = false;
                 // Decoy fields (reset on entity destruction)
                 EnemyIsDecoy[entityId] = false;
                 EnemyDecoyLifetime[entityId] = 0f;

@@ -2659,6 +2659,29 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Execute Threshold / Finisher Bonus (Round 105 Direction 8).
+    /// Enemies with <c>EnemyExecuteThreshold &gt; 0</c> opt in to a finisher economy: killing
+    /// them grants a flat gold + mana bonus to the player. Pairs with the existing Death Mark
+    /// system to reward high-damage "assassination" plays on low-HP enemies. Tunables below
+    /// are used as safe defaults when the JSON config is absent or fails to load.
+    /// </summary>
+    public static class ExecuteConfig
+    {
+        /// <summary>Default opt-out threshold. 0 = execute effect disabled for new enemies.</summary>
+        public const float DefaultExecuteThreshold = 0f;
+        /// <summary>Default gold bonus when an enemy is executed. 0 = no gold bonus.</summary>
+        public const float DefaultExecuteBonusGold = 0f;
+        /// <summary>Default mana bonus when an enemy is executed. 0 = no mana bonus.</summary>
+        public const float DefaultExecuteBonusMana = 0f;
+        /// <summary>Recommended HP fraction (0-1) for "executable" enemies. 0.20 = below 20% HP.</summary>
+        public const float RecommendedExecuteThreshold = 0.20f;
+        /// <summary>Recommended gold bonus for a finisher kill. Tunable via JSON.</summary>
+        public const float RecommendedExecuteBonusGold = 25f;
+        /// <summary>Recommended mana bonus for a finisher kill. Tunable via JSON.</summary>
+        public const float RecommendedExecuteBonusMana = 15f;
+    }
+
+    /// <summary>
     /// Threat Score / Dynamic Difficulty Scaling (Round 99 Direction 5).
     /// Tracks player DPS over a rolling window and scales incoming enemy HP upward when the
     /// player is over-performing. This keeps the challenge curve roughly constant across
