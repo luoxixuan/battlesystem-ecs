@@ -2621,4 +2621,21 @@ namespace BattleSystemECS.Config
         /// <summary>Boss/Elite default: immune to all CC (forces pure-damage tower compositions).</summary>
         public const int Mask_BossDefault = Mask_AllCC;
     }
+
+    /// <summary>
+    /// Tower windup / pre-cast configuration. (Round 98)
+    /// When a tower has TowerWindupFrames > 0, it counts down frames between cooldown end and actual fire,
+    /// creating a "charging" window during which silence / stun / disable cancels the shot.
+    /// </summary>
+    public static class WindupConfig
+    {
+        /// <summary>Default windup frames for new towers. 0 = no windup, instant fire.</summary>
+        public const int DefaultWindupFrames = 0;
+        /// <summary>Upper bound on configured windup. Beyond this, gameplay feels sluggish.</summary>
+        public const int MaxWindupFrames = 30;
+        /// <summary>Minimum windup to enable the interrupt window. 0 means disabled (instant fire).</summary>
+        public const int MinWindupFrames = 1;
+        /// <summary>If true, tower CC (silence/stun/sabotage) cancels in-flight windup + resets attack cooldown. If false, windup is uninterruptible.</summary>
+        public const bool WindupInterruptOnCC = true;
+    }
 }

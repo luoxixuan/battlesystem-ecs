@@ -421,11 +421,43 @@ namespace BattleSystemECS.Systems
                 }
                 else if (store.TowerLastAttackTime[towerId] < attackInterval) return;
 
+                // ── Round 98 — Windup / Pre-cast gate ─────────────────────────────
+                // TowerWindupFrames > 0 means the tower enters a "charging" phase between
+                // cooldown end and actual fire. WindupCountdown is set to WindupFrames on
+                // the first frame cooldown completes; subsequent frames decrement it.
+                // When WindupCountdown hits 0, the tower finally fires. CC (silence/stun/
+                // disable/overheat/player-disabled) cancels the in-flight windup below
+                // and resets LastAttackTime so the shot is fully lost.
+                int windupFrames = store.TowerWindupFrames[towerId];
+                if (windupFrames > 0)
+                {
+                    int countdown = store.TowerWindupCountdown[towerId];
+                    if (countdown <= 0)
+                    {
+                        // First frame cooldown is done: enter charging state
+                        store.TowerWindupCountdown[towerId] = windupFrames;
+                        return; // skip fire this frame — start counting down next frame
+                    }
+                    // Already in windup: decrement
+                    store.TowerWindupCountdown[towerId] = countdown - 1;
+                    if (countdown - 1 > 0) return; // not yet at zero — keep charging
+                    // WindupCountdown just hit 0: fall through to fire this frame
+                }
+
                 // Ammo check: skip targeting for towers that are reloading and empty
                 if (store.TowerMaxAmmo[towerId] > 0 && store.TowerCurrentAmmo[towerId] <= 0) return;
 
                 // Silence check: skip if tower is silenced by enemy ability
-                if (store.TowerIsSilenced[towerId]) return;
+                // Round 98: silence also cancels any in-flight windup (resets LastAttackTime + Countdown)
+                if (store.TowerIsSilenced[towerId])
+                {
+                    if (store.TowerWindupCountdown[towerId] > 0)
+                    {
+                        store.TowerWindupCountdown[towerId] = 0;
+                        store.TowerLastAttackTime[towerId] = 0f; // full reset, must re-cooldown
+                    }
+                    return;
+                }
 
                 // Income tower check: skip attack logic for income-generating towers
                 if (store.TowerIsIncomeTower[towerId]) return;
@@ -437,11 +469,21 @@ namespace BattleSystemECS.Systems
                 if (store.TowerIsConstructing[towerId]) return;
 
                 // Disabled/sabotage check: skip towers that are disabled by enemy sabotage
-                if (store.TowerIsDisabled[towerId]) return;
+                // Round 98: sabotage also cancels in-flight windup (full reset, must re-cooldown)
+                if (store.TowerIsDisabled[towerId])
+                {
+                    if (store.TowerWindupCountdown[towerId] > 0)
+                    {
+                        store.TowerWindupCountdown[towerId] = 0;
+                        store.TowerLastAttackTime[towerId] = 0f;
+                    }
+                    return;
+                }
 
                 // Player-disabled check: skip towers that the player has toggled off (Round 96)
                 // Distinct from sabotage — both flags OR together: the tower stays inert
                 // until BOTH clear. ToggleTower() in TowerPlacementSystem flips this flag.
+                // Round 98: player toggle does NOT cancel in-flight windup (player intent: pause — shot resumes on enable).
                 if (store.TowerPlayerDisabled[towerId]) return;
 
                 // Overheat check: skip if tower is overheated (cannot fire)

@@ -667,11 +667,16 @@ namespace BattleSystemECS.Core
                 TowerPlaceTime[entityId] = 0f;
                 TowerCanHitAir[entityId] = false;
                 TowerCanHitGround[entityId] = false;
-                // Aura tower fields
+                // Aura tower fields (Round 96 keep, do not remove)
                 TowerIsAuraTower[entityId] = false;
                 TowerAuraRadius[entityId] = 0f;
                 TowerAuraAttackSpeedBonus[entityId] = 0f;
                 TowerAuraDamageBonus[entityId] = 0f;
+                // Player-disabled flag (Round 96): default false on recycle
+                TowerPlayerDisabled[entityId] = false;
+                // Round 98 — Windup fields reset (recycled slot must start with no windup)
+                TowerWindupFrames[entityId] = 0;
+                TowerWindupCountdown[entityId] = 0;
                 // Dispel fields
                 TowerIsDispelled[entityId] = false;
                 TowerDispelTimer[entityId] = 0f;

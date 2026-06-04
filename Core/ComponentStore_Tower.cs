@@ -633,6 +633,17 @@ namespace BattleSystemECS.Core
         // Default false (zero-overhead path: when false, the gate is a single array read).
         public bool[] TowerPlayerDisabled = new bool[MAX_ENTITIES];
 
+        // ==================== 塔蓄力/前摇 (Tower Windup / Pre-Cast) ====================
+        // TowerWindupFrames: number of frames between cooldown end and actual fire (0 = no windup, instant fire).
+        // When > 0, the tower will count down TowerWindupCountdown to 0 before releasing its shot.
+        // Common in MOBAs/high-damage skills: a 5-30 frame "charging" phase gives enemies a window
+        // to interrupt with CC (silence/stun) — high-risk high-reward tradeoff for the player.
+        // Default 0 (zero-overhead path: when frames=0, countdown is never checked).
+        public int[] TowerWindupFrames = new int[MAX_ENTITIES];
+        // TowerWindupCountdown: frames remaining before fire (set to WindupFrames when cooldown ends, decrements each frame).
+        // When > 0, the tower is in "charging" state — target may have moved or CC may have landed.
+        public int[] TowerWindupCountdown = new int[MAX_ENTITIES];
+
         // ==================== 塔持续升温伤害 (Ramp-Up / Spool-Up Damage) ====================
         // TowerRampUpRate: damage increase per consecutive hit on same target (0 = no ramp-up)
         // E.g. 0.05 = +5% per hit, stacks up to TowerRampUpMax cap
@@ -913,6 +924,9 @@ namespace BattleSystemECS.Core
             TowerFrostZoneDuration[entityId] = 0f;
             // Player-disabled flag: default false (active). ToggleTower() flips to true on player request.
             TowerPlayerDisabled[entityId] = false;
+            // Round 98 — Tower Windup / Pre-cast: default to no windup (0 frames = instant fire, zero-overhead path)
+            TowerWindupFrames[entityId] = 0;
+            TowerWindupCountdown[entityId] = 0;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
         }
@@ -1088,6 +1102,9 @@ namespace BattleSystemECS.Core
             TowerFrostZoneDuration[entityId] = 0f;
             // Player-disabled flag reset (false = active tower on recycle — stale 'true' would leak)
             TowerPlayerDisabled[entityId] = false;
+            // Round 98 — Windup fields reset (frames=0 = no windup, countdown=0 = not in windup)
+            TowerWindupFrames[entityId] = 0;
+            TowerWindupCountdown[entityId] = 0;
             // Phasing field reset (false = no phasing, zero-overhead)
             TowerIsPhasing[entityId] = false;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }

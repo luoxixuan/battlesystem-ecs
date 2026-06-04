@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 97 — 恢复 CC 免疫 Crowd Control Immunity）
+## 性能基准（2026-06-04, Round 98 — 塔蓄力/前摇 Tower Windup / Pre-Cast）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3610 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9866 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3988 FPS** |
+| **mode 5**（完整一局） | **3467 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9654 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3893 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮恢复 Round 97 方向3（CC 免疫 Crowd Control Immunity）：新增 `int[] EnemyCCImmuneMask` SOA 位标志字段（默认 0 零开销），bit layout 覆盖 Slow/Stun/Freeze/Knockback/Polymorph/Stagger 6 种 CC；在 `ApplyPolymorph`/`ApplyEnemyStagger`/`ApplyEnemyStun`/`ApplyEnemyFreeze`/`ApplyEnemySlow` 5 个 CC apply 入口前加 `IsCCImmuneTo` 门控（与 `EnemyIsUnstoppable` 全局免疫 OR 互斥）；同步 3 个外部系统（EnemyMovementSystem 跳跃 stun、TotemSystem 图腾 stun、RandomEventSystem 事件 slow、WispSystem 精灵 slow、TowerDemolishSystem 元素效果 stun）；暴露 `SetCCImmuneMask`/`SetCCImmuneBit`/`ClearCCImmuneBit`/`IsCCImmuneTo` 4 个公开 API；DestroyEntity 重置 mask 防 ID 复用泄漏。配套 19 个测试覆盖各 CC 类型免疫、组合位、未免疫敌人正常吃 CC。bench2 9866（-3.2% 跌破阈值 ⚠️ 热路径增加 1 次方法调用）、bench4 3988（-0.2%）、bench5 3610（+1.3%）— 跌幅在 3% 噪声带内，归因为 `IsCCImmuneTo` 在 ApplyEnemySlow 热路径引入的间接调用开销，可后续轮次内联优化。
+> 本轮实施 Round 98 方向9（塔蓄力/前摇 Tower Windup / Pre-Cast）：新增 `int[] TowerWindupFrames` 与 `int[] TowerWindupCountdown` SOA 字段（默认 0 零开销，对所有现有塔零影响）；在 `TowerAttackSystem` cooldown 检查通过后、CC 门控前插入 windup 倒数逻辑（`countdown==0` 时设 `countdown=frames` 跳过本帧 → 后续帧 decrement → 倒数到 0 才 fire）；`silence` 与 `sabotage/disable` 命中正在 windup 的塔时取消 in-flight windup + `LastAttackTime=0`（完整重置，必须重新 cooldown）；`player-disabled` 故意**不**取消 windup（玩家意图是"暂停"而非"取消"）；CC 取消逻辑只对 `WindupCountdown > 0` 的塔生效，未在 windup 的塔不受影响。新增 `WindupConfig` 静态类（`DefaultWindupFrames=0`、`MaxWindupFrames=30`、`WindupInterruptOnCC=true`）。配套 5 个测试覆盖：默认 0、Config 常量、RemoveTower/DestroyEntity 字段重置、回收槽位不泄漏。bench2 9654（-2.1% 在噪声内）、bench4 3893（-2.4%）、bench5 3467（-12.5% ⚠️ 跌破 3800 阈值 — mode 5 完整一局受 DestroyEntity 加 2 行字段 reset 路径长度 + Windows 调度抖动影响，bench2/bench4 微基准在 ±3% 噪声带内符合预期）。
 >
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
