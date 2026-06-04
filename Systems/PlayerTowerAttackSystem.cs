@@ -340,6 +340,17 @@ public void SetWaveNumber(int waveNumber)
                     ApplyLinkedDamage(linkedEnemyId, linkedDamage);
                 }
 
+                // ── Threat Score accumulation (Round 99 Direction 5) ──
+                // Accumulate applied damage (post-saturation) into the per-frame accumulator.
+                // Single-player, single-thread context: this runs in the serial phase after
+                // the parallel damage-queue drain, so a plain += is safe and zero-overhead.
+                // The FrameScheduler post-tick hook decays the running average from this
+                // accumulator into PlayerRecentDPS using an EMA window (ThreatScoreConfig.DPSWindowSec).
+                if (finalDamage > 0f)
+                {
+                    store.PlayerDPSAccumulator[playerId] += finalDamage;
+                }
+
                 // Thorns: enemy reflects damage back to the player
                 float thornsRatio = store.EnemyThornsRatio[enemyId];
                 if (thornsRatio > 0f && finalDamage > 0f)

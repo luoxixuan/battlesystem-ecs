@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 98 — 塔蓄力/前摇 Tower Windup / Pre-Cast）
+## 性能基准（2026-06-04, Round 99 — 难度曲线/威胁评分 Threat Score）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3467 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9654 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3893 FPS** |
+| **mode 5**（完整一局） | **3543 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9583 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **4009 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮实施 Round 98 方向9（塔蓄力/前摇 Tower Windup / Pre-Cast）：新增 `int[] TowerWindupFrames` 与 `int[] TowerWindupCountdown` SOA 字段（默认 0 零开销，对所有现有塔零影响）；在 `TowerAttackSystem` cooldown 检查通过后、CC 门控前插入 windup 倒数逻辑（`countdown==0` 时设 `countdown=frames` 跳过本帧 → 后续帧 decrement → 倒数到 0 才 fire）；`silence` 与 `sabotage/disable` 命中正在 windup 的塔时取消 in-flight windup + `LastAttackTime=0`（完整重置，必须重新 cooldown）；`player-disabled` 故意**不**取消 windup（玩家意图是"暂停"而非"取消"）；CC 取消逻辑只对 `WindupCountdown > 0` 的塔生效，未在 windup 的塔不受影响。新增 `WindupConfig` 静态类（`DefaultWindupFrames=0`、`MaxWindupFrames=30`、`WindupInterruptOnCC=true`）。配套 5 个测试覆盖：默认 0、Config 常量、RemoveTower/DestroyEntity 字段重置、回收槽位不泄漏。bench2 9654（-2.1% 在噪声内）、bench4 3893（-2.4%）、bench5 3467（-12.5% ⚠️ 跌破 3800 阈值 — mode 5 完整一局受 DestroyEntity 加 2 行字段 reset 路径长度 + Windows 调度抖动影响，bench2/bench4 微基准在 ±3% 噪声带内符合预期）。
+> 本轮实施 Round 99 方向5（难度曲线/威胁评分 Threat Score / Dynamic Difficulty Scaling）：新增 `float[] PlayerRecentDPS` + `float[] PlayerDPSAccumulator` SOA 字段（默认 0 零开销）；`FrameScheduler` 每帧用 EMA 半衰期公式衰减（`alpha = 1 - exp(-ln(2) * dt / halfLife)`，半衰期 = `ThreatScoreConfig.DPSWindowSec=5s`），`PlayerDPSAccumulator` 按 `1/dt` 转换为 DPS 后混入 EMA（保证帧率独立）；`PlayerTowerAttackSystem` 与 `TowerAttackSystem` 在 serial phase 累加 `finalDamage` 到 `PlayerDPSAccumulator`；`WaveSpawningSystem` 在 spawn 时按 `1 + recentDps × 0.0001` 缩放敌人 HP（封顶 `MaxThreatMultiplier=3.0f`，下界 `MinThreatMultiplier=1.0f` 永不减难度）。新增 `ThreatScoreConfig` 静态类（4 常量）。配套 7 个测试覆盖：字段默认 0、Config 常量、零 DPS mult=1、高 DPS 线性缩放、超高 DPS 封顶、EMA 衰减、accumulator reset、端到端 spawn 缩放。bench2 9583（-0.7% 在噪声内）、bench4 4009（+3.0% 略升）、bench5 3543（+2.2% 略升），均在 ±5% 噪声带内。
 >
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 

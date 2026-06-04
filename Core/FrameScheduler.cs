@@ -132,6 +132,43 @@ namespace BattleSystemECS.Core
 
             // Phase 11: Post-death (fission, life link, objective, resources, corpses, combo) — COMBAT side
             PostDeath.Execute(store, combatDt, turn);
+
+            // Phase 12: Threat Score EMA update (Round 99 Direction 5)
+            // O(MAX_PLAYERS) per-tick: decay the running average using an exponential moving
+            // average with half-life ThreatScoreConfig.DPSWindowSec, then add this frame's
+            // PlayerDPSAccumulator (which is reset to 0 below). Hot-path cost: ~10 float ops.
+            DecayAndAccumulateThreatScore(combatDt);
+        }
+
+        /// <summary>
+        /// Per-tick decay of <c>PlayerRecentDPS</c> using an exponential moving average.
+        /// Single-player game uses index 0; loop covers all MAX_PLAYERS for future multi-player.
+        /// decayFactor is computed from <c>DPSWindowSec</c> and the actual tick deltaTime so
+        /// the half-life is in **seconds** (not frames), keeping the metric frame-rate independent.
+        ///
+        /// IMPORTANT: PlayerDPSAccumulator stores raw damage per-frame, not DPS. We divide by
+        /// deltaTime to convert it to actual damage-per-second before blending into the EMA.
+        /// Without this, the rate of accumulation would scale with FPS and the threat metric
+        /// would be tied to the framerate instead of the player's actual damage output.
+        /// </summary>
+        private void DecayAndAccumulateThreatScore(float deltaTime)
+        {
+            // Decay factor per tick: alpha = 1 - exp(-ln(2) * dt / halfLife)
+            // At dt = 1/60 and halfLife = 5s: alpha ≈ 0.00231, so 99% decay in ~33s.
+            // This is the standard EMA half-life formulation — independent of frame rate.
+            float halfLife = ThreatScoreConfig.DPSWindowSec;
+            float alpha = 1f - MathF.Exp(-0.6931472f * deltaTime / halfLife);
+            // Guard against dt=0 (BuildPhase or paused tick) — skip blending, keep last value.
+            float invDt = deltaTime > 0f ? 1f / deltaTime : 0f;
+            int playerCount = store.PlayerRecentDPS.Length; // uses MAX_PLAYERS, not a hardcoded literal
+            for (int p = 0; p < playerCount; p++)
+            {
+                float decayed = store.PlayerRecentDPS[p] * (1f - alpha);
+                // Convert per-frame accumulator to per-second DPS for frame-rate independence.
+                float added = store.PlayerDPSAccumulator[p] * invDt * alpha;
+                store.PlayerRecentDPS[p] = decayed + added;
+                store.PlayerDPSAccumulator[p] = 0f;
+            }
         }
 
         /// <summary>

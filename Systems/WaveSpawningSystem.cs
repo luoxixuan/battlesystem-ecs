@@ -433,6 +433,25 @@ namespace BattleSystemECS.Systems
                         scaledSpeed *= adaptMult; // speed scales slightly
                     }
 
+                    // ── Threat Score 缩放 (Round 99 Direction 5) ──
+                    // PlayerRecentDPS feeds back into enemy HP: high DPS → tougher enemies.
+                    // Capped by ThreatScoreConfig.MaxThreatMultiplier so the system can never
+                    // make enemies weaker than their base (MinThreatMultiplier=1.0f).
+                    // O(1) lookup, called once per spawn (not hot-path).
+                    {
+                        float recentDps = store.PlayerRecentDPS[0]; // single-player game → player 0
+                        float threatMult = 1.0f + recentDps * ThreatScoreConfig.ThreatScalingRate;
+                        if (threatMult > ThreatScoreConfig.MaxThreatMultiplier)
+                            threatMult = ThreatScoreConfig.MaxThreatMultiplier;
+                        if (threatMult < ThreatScoreConfig.MinThreatMultiplier)
+                            threatMult = ThreatScoreConfig.MinThreatMultiplier;
+                        if (threatMult > 1.0f) // skip when no scaling (common case, no overhead)
+                        {
+                            scaledHealth *= threatMult;
+                            scaledMaxHealth *= threatMult;
+                        }
+                    }
+
                     string enemyName = $"{monsterType}L{currentLevel}W{currentWave}T{_multiTypeIndex}E{_multiSpawnedForType}";
                     if (isBossWave) enemyName = "[BOSS] " + enemyName;
                     else if (isEliteWave) enemyName = "[ELITE] " + enemyName;

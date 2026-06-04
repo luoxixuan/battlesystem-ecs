@@ -60,6 +60,16 @@ namespace BattleSystemECS.Core
         // AdaptiveDifficultyScore: cumulative performance score (higher = better player performance)
         public float[] AdaptiveDifficultyScore = new float[MAX_PLAYERS];
 
+        // ==================== Threat Score System 组件 (Round 99) ====================
+        // PlayerRecentDPS: exponentially-decaying average of player damage output (per player)
+        // Used by WaveSpawningSystem to scale enemy HP: high DPS → tougher enemies.
+        // Decay is applied per-frame in FrameScheduler.RunWavePhase (Phase 11 PostDeath) so
+        // spawn-time lookup is O(1) and hot-path cost is one float mul + max(0).
+        public float[] PlayerRecentDPS = new float[MAX_PLAYERS];
+        // PlayerDPSAccumulator: per-frame raw damage dealt (decayed into PlayerRecentDPS)
+        // Reset to 0 every frame; pre-decay the running average then add this frame's damage.
+        public float[] PlayerDPSAccumulator = new float[MAX_PLAYERS];
+
         // ==================== Resource Node System 组件（SOA） ====================
         // Fixed-size arrays for map resource nodes (gold mines, mana springs, etc.)
         public const int MAX_RESOURCE_NODES = 50;

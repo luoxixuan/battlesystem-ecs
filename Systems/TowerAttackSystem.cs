@@ -1359,6 +1359,16 @@ namespace BattleSystemECS.Systems
                     (finalDmg, linkedDamage, linkedEnemyId) = _lifeLinkSystem.ComputeLinkedDamage(enemyId, finalDmg);
                 }
                 store.EnemyHealth[enemyId] -= finalDmg;
+
+                // ── Threat Score accumulation (Round 99 Direction 5) ──
+                // Accumulate applied damage (post-saturation) into the per-frame accumulator.
+                // This runs in the SERIAL phase (Phase 2 of Update), so a plain += to the
+                // per-player accumulator is safe and zero-overhead. The FrameScheduler
+                // post-tick hook decays PlayerRecentDPS using an EMA window.
+                if (finalDmg > 0f)
+                {
+                    store.PlayerDPSAccumulator[playerId] += finalDmg;
+                }
                 // Stagger / Posture: heavy hits accumulate posture damage on the enemy.
                 // Heuristic: damage >= 20% of max HP is a "heavy hit" worth 1 stagger point.
                 // This works in the serial apply phase where we don't know if it was a crit.

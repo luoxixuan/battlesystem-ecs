@@ -2638,4 +2638,31 @@ namespace BattleSystemECS.Config
         /// <summary>If true, tower CC (silence/stun/sabotage) cancels in-flight windup + resets attack cooldown. If false, windup is uninterruptible.</summary>
         public const bool WindupInterruptOnCC = true;
     }
+
+    /// <summary>
+    /// Threat Score / Dynamic Difficulty Scaling (Round 99 Direction 5).
+    /// Tracks player DPS over a rolling window and scales incoming enemy HP upward when the
+    /// player is over-performing. This keeps the challenge curve roughly constant across
+    /// BuildPhase optimizations — a "tower-comp" player faces the same effective difficulty
+    /// as a "minimal-tower" player. Inspired by Vampire Survivors / Diablo's dynamic difficulty.
+    ///
+    /// Hot-path design: <c>PlayerRecentDPS</c> is updated once per frame in FrameScheduler
+    /// (exponential decay), and read once per enemy spawn in WaveSpawningSystem. Damage
+    /// accumulation in PlayerTowerAttackSystem is a single += per hit — no per-enemy work.
+    /// </summary>
+    public static class ThreatScoreConfig
+    {
+        /// <summary>Half-life in seconds for the EMA-style decay of PlayerRecentDPS.
+        /// At 60 FPS, 5s ≈ 300 frames — high-DPS spikes fade over ~5s of inactivity.</summary>
+        public const float DPSWindowSec = 5.0f;
+        /// <summary>Per-DPS-point HP scaling rate applied at spawn time.
+        /// 0.0001f means 10000 sustained DPS adds 1.0× HP to new enemies (i.e. doubles them).</summary>
+        public const float ThreatScalingRate = 0.0001f;
+        /// <summary>Upper cap on the threat multiplier. Prevents runaway scaling if a player
+        /// is dealing extreme burst damage (e.g. one-shot Boss with super-crit).</summary>
+        public const float MaxThreatMultiplier = 3.0f;
+        /// <summary>Lower cap on the threat multiplier. Always &gt;= 1.0f so enemies never spawn
+        /// weaker than their base stats — the system only makes things harder, never easier.</summary>
+        public const float MinThreatMultiplier = 1.0f;
+    }
 }
