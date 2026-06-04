@@ -658,6 +658,11 @@ namespace BattleSystemECS.Core
                 EnemyExecuteBonusGold[entityId] = 0f;
                 EnemyExecuteBonusMana[entityId] = 0f;
                 EnemyExecuted[entityId] = false;
+                // Round 107 Direction 6 — Target Mark: reset on entity destroy to prevent
+                // ID-reuse leakage (a recycled ID carrying stale stacks/decay-timer/threshold).
+                EnemyMarkStacks[entityId] = 0;
+                EnemyMarkDecayTimer[entityId] = 0f;
+                EnemyMarkMaxThreshold[entityId] = 0;
                 // Decoy fields (reset on entity destruction)
                 EnemyIsDecoy[entityId] = false;
                 EnemyDecoyLifetime[entityId] = 0f;
@@ -1007,6 +1012,8 @@ namespace BattleSystemECS.Core
             SummonedUnitTargetId = null!; SummonedUnitGoldReward = null!;
             EnemyBossPhase = null!; EnemyPhaseThresholds = null!;
             EnemyEnrageTimer = null!; EnemyIsEnraged = null!;
+            // Round 107 Direction 6 — Target Mark Clear registration
+            EnemyMarkStacks = null!; EnemyMarkDecayTimer = null!; EnemyMarkMaxThreshold = null!;
             EnemyIsInvulnerable = null!; EnemyInvulnerablePhaseName = null!;
             EnemyFissionDefId = null!; EnemyFissionGeneration = null!;
             EnemyMorphDefId = null!; EnemyIsMorphed = null!; EnemyMorphTriggered = null!;

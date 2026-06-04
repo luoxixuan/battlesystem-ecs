@@ -695,6 +695,20 @@ namespace BattleSystemECS.Core
         public float[] EnemyExecuteBonusMana = new float[MAX_ENTITIES];
         public bool[] EnemyExecuted = new bool[MAX_ENTITIES];
 
+        // ==================== Target Mark (目标标记叠加/衰减, Round 107 Direction 6) ====================
+        // EnemyMarkStacks: current stack count of the mark debuff on this enemy.
+        // Each tower hit that opts into the mark subsystem adds +1 (or +stacks-per-hit).
+        // 0 = no mark active. Default 0 (no opt-in).
+        public int[] EnemyMarkStacks = new int[MAX_ENTITIES];
+        // EnemyMarkDecayTimer: seconds remaining before the stack count decays by 1.
+        // Resets to EnemyMarkDecayInterval each time AddMark() is called. When it reaches 0,
+        // decrement EnemyMarkStacks by 1 and reset timer. 0 = no decay timer (only refreshed by hits).
+        public float[] EnemyMarkDecayTimer = new float[MAX_ENTITIES];
+        // EnemyMarkMaxThreshold: stack count at which the mark "triggers" its payoff effect
+        // (e.g., +50% damage taken, vulnerability to execute). 0 = no payoff (mark is pure visual).
+        // Towers/enemies opt in by setting this > 0; default 0 keeps all enemies backward-compatible.
+        public int[] EnemyMarkMaxThreshold = new int[MAX_ENTITIES];
+
         // ==================== 诱饵 (Decoy) ====================
         // EnemyIsDecoy: when true, this enemy is a non-aggressive target dummy spawned by the player
         //   (e.g. a Hologram Decoy tower). Decoys do not move, do not attack, and cannot use abilities.
@@ -1043,6 +1057,11 @@ namespace BattleSystemECS.Core
             EnemyExecuteBonusGold[entityId] = 0f;
             EnemyExecuteBonusMana[entityId] = 0f;
             EnemyExecuted[entityId] = false;
+            // Round 107 Direction 6 — Target Mark: opt-in via EnemyMarkMaxThreshold > 0.
+            // 0 = no mark subsystem participation. Reset on entity add to prevent ID-reuse leakage.
+            EnemyMarkStacks[entityId] = 0;
+            EnemyMarkDecayTimer[entityId] = 0f;
+            EnemyMarkMaxThreshold[entityId] = 0;
             // Decoy: default not a decoy. WaveSpawningSystem / Hologram-tower spawn opts in by
             // setting EnemyIsDecoy = true and EnemyDecoyLifetime = N (seconds).
             EnemyIsDecoy[entityId] = false;

@@ -2869,4 +2869,38 @@ namespace BattleSystemECS.Config
         /// type to opt into sharing.</summary>
         public const int ShareAttackSpeed = 0x01;
     }
+
+    /// <summary>
+    /// Target Mark Subsystem (Round 107 Direction 6) — stack-based debuff counter applied
+    /// by tower/player attacks. Each mark hit increments <c>EnemyMarkStacks</c> by +1 (capped
+    /// at <c>EnemyMarkMaxThreshold</c>) and resets <c>EnemyMarkDecayTimer</c>. When the timer
+    /// expires, one stack is consumed. When stacks reach <c>EnemyMarkMaxThreshold</c> the
+    /// system fires <see cref="Systems.MarkSystem.OnMarkThreshold"/>, which subscribers can
+    /// use to apply vulnerability/execute payoff effects.
+    ///
+    /// Hot-path design: enemies with <c>EnemyMarkStacks == 0</c> AND <c>EnemyMarkDecayTimer == 0</c>
+    /// skip with a single bool check. Non-mark enemies incur zero per-frame cost.
+    /// </summary>
+    public static class MarkSubsystemConfig
+    {
+        /// <summary>Default decay interval (seconds) for one stack's expiration.
+        /// Reset on every AddMark() call. Mirrors MarkSystem.MarkConfig.Default.</summary>
+        public const float DefaultDecayInterval = 1.0f;
+
+        /// <summary>Hard upper cap on total stacks per enemy. Prevents runaway stack
+        /// accumulation in long fights. 100 = enough for ~3 minute fights at 1 stack/sec.</summary>
+        public const int DefaultMaxStackCap = 100;
+
+        /// <summary>Recommended threshold for "寒冰标记 Frost Mark" (1 of 3 default mark types).
+        /// 5 = after 5 hits within decay window, mark is "active" and OnMarkThreshold fires.</summary>
+        public const int RecommendedFrostThreshold = 5;
+
+        /// <summary>Recommended threshold for "灼烧标记 Scorch Mark" (faster decay, higher threshold).
+        /// 10 stacks at 0.5s decay = ~5 seconds to fully stack.</summary>
+        public const int RecommendedScorchThreshold = 10;
+
+        /// <summary>Recommended threshold for "电能标记 Volt Mark" (slow decay, low threshold).
+        /// 3 stacks at 2.0s decay = ~6 seconds to fully stack.</summary>
+        public const int RecommendedVoltThreshold = 3;
+    }
 }

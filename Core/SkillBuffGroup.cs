@@ -11,6 +11,10 @@ namespace BattleSystemECS.Core
         // Wisp aura pets — runs after HealingZone so wisp heal/slow/curse are layered
         // on top of any healing-zone heals in the same frame.
         public Systems.WispSystem? Wisp { get; set; }
+        // Round 107 Direction 6 — Target Mark decay. Runs after Bleed (combat debuff
+        // resolution) but before Skill cooldown update, so mark events triggered by
+        // a hit this frame are observable to SkillSystem in the same frame.
+        public Systems.MarkSystem? Mark { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -20,6 +24,7 @@ namespace BattleSystemECS.Core
             Bleed?.Update(deltaTime);
             Bleed?.ResolveBleedDamage();
             HealingZone?.Update(deltaTime);
+            Mark?.Update(deltaTime);
             Skill?.Update(deltaTime);
             Wisp?.Update(deltaTime);
         }

@@ -1,0 +1,35 @@
+{
+  "comment": "Round 107 Direction 6: Target Mark subsystem config. Defines the per-mark-type behavior: decay interval, max stacks, threshold-triggered payoff, and bonus damage-on-hit when above threshold. Enemies opt-in by having EnemyMarkMaxThreshold > 0 set at spawn (monster config or wave spawning override).",
+  "version": 1,
+  "defaultDecayInterval": 1.0,
+  "maxStackCap": 100,
+  "marks": [
+    {
+      "id": 1,
+      "name": "寒冰标记 Frost Mark",
+      "decayInterval": 1.0,
+      "threshold": 5,
+      "damageBonusOnHit": 0.25,
+      "color": "blue",
+      "description": "每次命中 +1 stack，每秒 -1 stack 自然衰减，5 stack 时敌人受到 +25% 伤害"
+    },
+    {
+      "id": 2,
+      "name": "灼烧标记 Scorch Mark",
+      "decayInterval": 0.5,
+      "threshold": 10,
+      "damageBonusOnHit": 0.5,
+      "color": "red",
+      "description": "每次命中 +1 stack，每 0.5 秒 -1 stack 衰减，10 stack 时 +50% 伤害"
+    },
+    {
+      "id": 3,
+      "name": "电能标记 Volt Mark",
+      "decayInterval": 2.0,
+      "threshold": 3,
+      "damageBonusOnHit": 0.15,
+      "color": "yellow",
+      "description": "每次命中 +1 stack，每 2 秒 -1 stack 衰减，3 stack 时 +15% 伤害"
+    }
+  ]
+}

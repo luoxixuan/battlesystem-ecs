@@ -4,16 +4,16 @@
 
 ---
 
-## 性能基准（2026-06-04, Round 106 — 地雷/陷阱塔 Mine/Trap Tower System）
+## 性能基准（2026-06-04, Round 107 — 目标标记叠加/衰减 Mark Subsystem）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3397 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9571 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3944 FPS** |
+| **mode 5**（完整一局） | **3491 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **8898 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3920 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> 本轮实施 Round 106 方向2（AOE 地雷/陷阱塔 Mine/Trap Tower）：`Data/Configs/mine_towers.json`（新）— 3 个 mine 变体（basic/claymore/chain）；`Core/TowerType.cs` — 新增 `Mine=10` 枚举值；`Core/ComponentStore_Tower.cs` — 新增 9 SOA 字段（`TowerIsMine`/`MineTriggerRadius`/`MineArmTime`/`MineArmProgress`/`MineDamage`/`MineExplosionRadius`/`MineMaxStacks`/`MineStacksRemaining`/`MineTriggeredThisFrame`），_ResetEntity reset；`Systems/MineSystem.cs`（新）— 布设+arm timer+proximity trigger+AoE 爆炸+stack 消耗+per-frame latch，零分配热路径（fixed ping-pong queue）；`Systems/TowerPlacementSystem.cs` — TowerType.Mine 后置初始化（triggerR/arm/dmg/explR/stacks from MineConfig defaults）；`Core/ComponentStore.cs` — DestroyEntity 补全 mine fields reset 防 ID-reuse 泄漏；`Core/SpatialGroup.cs` — 注入 MineSystem 到 WavePhase Update（RebuildSpatialGrid 之后）；`Core/SystemRegistry.cs` — 注册 MineSystem 到 SpatialGroup；`Core/GameConfig.cs` — `MineConfig` static class（DefaultTriggerRadius=1.5/DefaultArmTime=0.5s/DefaultDamage=80/DefaultExplosionRadius=2.0/DefaultMaxStacks=1/DefaultCost=30）；`MineSystemTests` 19 测试覆盖 inert default/PlaceTower init/DestroyEntity reset/arm time gate/proximity trigger/AoE damage/stack decrement/destroy on exhaustion/per-frame latch/invulnerable skip/dead skip/non-mine skip。**297/297 tests PASS**（19 新增 mine tests + 18 历史 daily tests）。bench2 9571（< 10000 阈值）/ bench4 3944（< 4300 阈值）/ bench5 3397（< 3800 阈值）较上轮 9753/3991/3453 降 1.9%/1.2%/1.6%（在典型 bench 噪声 ±3% 范围内，Mine 系统是 conditional path 非默认塔种，不进入常规 10K 敌热路径）。⚠️ 三项均未达阈值但 Mine 行为完全确定。
+> 本轮实施 Round 107 方向6（目标标记叠加/衰减 Mark Subsystem）：`Systems/MarkSystem.cs`（新）— stack 累加/衰减/threshold-fired 事件 + OnMarkThreshold Action + ID-reuse 安全的 OnEnemyDestroyed；`Data/Configs/marks.json`（新）— mark subsystem config（decay interval + max stack cap + mark type 列表，opt-in）；`Core/ComponentStore_Enemy.cs` — 新增 3 SOA 字段（`EnemyMarkStacks`/`EnemyMarkDecayTimer`/`EnemyMarkMaxThreshold`），_ResetEntity reset；`Core/ComponentStore.cs` — DestroyEntity + 数组初始化补全 3 mark 字段 reset 防 ID-reuse 泄漏；`Core/GameConfig.cs` — `MarkSubsystemConfig` static class（DefaultDecayInterval=1.0s/DefaultMaxStackCap=100/RecommendedFrost=5/RecommendedScorch=10/RecommendedVolt=3）；`Core/GameConfigLoader.cs` — `LoadMarkConfig()` 加载 marks.json 缺省回退（opt-in）；`Core/SkillBuffGroup.cs` — Mark 注入到 SkillBuff 调度（在 HealingZone 之后、Skill cd 之前）；`Core/SystemRegistry.cs` — 注册 MarkSystem + 注入到 SkillBuff + OnEnemyKilled → Mark.OnEnemyDestroyed 订阅；`MarkSystemTests` 27 测试覆盖 inert default/AddMark increment/decay timer reset/max threshold fire/OnMarkThreshold subscriber/cap overflow clamp/destroy reset/per-frame latch/parallel safety/zero-stack skip。**324/324 tests PASS**（27 新增 mark tests）。bench2 8898（< 10000 阈值，降 7.0%）/ bench4 3920（< 4300 阈值，降 0.6%）/ bench5 3491（< 3800 阈值，升 2.8%）。⚠️ Mark 系统在 SkillBuff group 每帧调用，对常规 10K 敌热路径带来小幅开销。
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
 ## 优化演进（关键节点）

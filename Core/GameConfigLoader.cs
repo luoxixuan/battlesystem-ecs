@@ -88,6 +88,11 @@ namespace BattleSystemECS.Config
                 // with on-destroy effects like gold drop or AoE explosion).
                 LoadDestructibleDefs(gameConfig, renderer);
 
+                // Load mark subsystem config (Round 107 Direction 6: target mark debuff).
+                // Opt-in: missing JSON file or missing fields fall back to MarkSubsystemConfig
+                // safe defaults (decay=1.0s, cap=100, no per-mark type registered).
+                LoadMarkConfig(gameConfig, renderer);
+
                 if (gameConfig == null)
                 {
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
@@ -1872,6 +1877,59 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[DESTRUCTIBLE] Failed to load destructible config: " + ex.Message + " — no destructibles will spawn");
+            }
+        }
+
+        /// <summary>
+        /// Round 107 Direction 6 — load mark subsystem config (Data/Configs/marks.json).
+        /// Top-level fields: <c>defaultDecayInterval</c>, <c>maxStackCap</c>. <c>marks</c>
+        /// array is informational/logged only; per-mark-type wiring (e.g. which tower
+        /// applies which mark) is done via monster/tower configs, not in this loader.
+        /// </summary>
+        private static void LoadMarkConfig(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string file = "Data/Configs/marks.json";
+            try
+            {
+                if (!File.Exists(file))
+                {
+                    renderer.Log("[MARK] Mark config not found: " + file + " — using MarkSubsystemConfig defaults (opt-in)");
+                    return;
+                }
+                string json = File.ReadAllText(file);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[MARK] Mark config is empty: " + file + " — using defaults");
+                    return;
+                }
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                int markCount = 0;
+                float decay = MarkSubsystemConfig.DefaultDecayInterval;
+                int cap = MarkSubsystemConfig.DefaultMaxStackCap;
+                if (root.TryGetProperty("defaultDecayInterval", out var decEl) && decEl.ValueKind == System.Text.Json.JsonValueKind.Number)
+                {
+                    decay = (float)decEl.GetDouble();
+                    if (decay < 0.05f) decay = 0.05f; // clamp: < 0.05s is effectively per-frame
+                }
+                if (root.TryGetProperty("maxStackCap", out var capEl) && capEl.ValueKind == System.Text.Json.JsonValueKind.Number)
+                {
+                    cap = capEl.GetInt32();
+                    if (cap < 1) cap = 1;
+                    if (cap > 1000) cap = 1000;
+                }
+                if (root.TryGetProperty("marks", out var marksEl) && marksEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    markCount = marksEl.GetArrayLength();
+                }
+                renderer.Log($"[MARK] Loaded mark subsystem config: decay={decay:F2}s, cap={cap}, {markCount} mark types defined in {file}");
+                // (We don't store these as fields on gameConfig because MarkSystem
+                // owns its own MarkConfig which defaults to safe values. The JSON is
+                // loaded for future per-mark-type wiring / debugging only.)
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[MARK] Failed to load mark config: " + ex.Message + " — using MarkSubsystemConfig defaults");
             }
         }
     }

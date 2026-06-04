@@ -33,11 +33,14 @@ namespace BattleSystemECS.Core
 
         // ── Skills & Buffs ──
         public SkillSystem? Skill { get; private set; }
+        // ── Buffs & Debuffs ──
         public BuffSystem? Buff { get; private set; }
         public ComboSystem? Combo { get; private set; }
         public AutoSkillSystem? AutoSkill { get; private set; }
         public ManaSystem? Mana { get; private set; }
         public GlobalSkillSystem? GlobalSkill { get; private set; }
+        // Round 107 Direction 6 — Target Mark subsystem (stack-based debuff counter)
+        public MarkSystem? Mark { get; private set; }
 
         // ── Towers ──
         public TowerPlacementSystem? TowerPlacement { get; private set; }
@@ -337,6 +340,9 @@ namespace BattleSystemECS.Core
             // ── Round 106 Direction 2 — Mine / Trap tower ──
             Mine = new MineSystem(store, logger, config, playerId);
 
+            // ── Round 107 Direction 6 — Target Mark subsystem ──
+            Mark = new MarkSystem(store, playerId);
+
             // ── Store EventBus ──
             EventBus = eventBus;
         }
@@ -364,6 +370,10 @@ namespace BattleSystemECS.Core
             // ── Skill wiring ──
             Skill?.InjectDotSystem(Buff);
             Skill?.InjectHealingZoneSystem(HealingZone);
+
+            // ── Mark wiring: subscribe to OnEnemyKilled to free the per-entity
+            //    threshold-fired latch on enemy destroy (avoids ID-reuse leakage). ──
+            store.OnEnemyKilled += (enemyId, pid) => Mark?.OnEnemyDestroyed(enemyId);
 
             // ── OnEnemyKilled → Combo + Necromancer ──
             store.OnEnemyKilled += (enemyId, pid) => Combo?.HandleComboIncrement(pid);
@@ -544,6 +554,8 @@ namespace BattleSystemECS.Core
             scheduler.SkillBuff.Bleed = Bleed;
             scheduler.SkillBuff.HealingZone = HealingZone;
             scheduler.SkillBuff.Wisp = Wisp;
+            // Round 107 Direction 6 — Target Mark decay tick (between HealingZone and Skill cd)
+            scheduler.SkillBuff.Mark = Mark;
 
             // ── Post-death ──
             scheduler.PostDeath.EnemyFission = EnemyFission;
