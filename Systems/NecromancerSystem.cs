@@ -218,6 +218,14 @@ namespace BattleSystemECS.Systems
             _store.EnemyIsReanimated[minionId] = true;
             _store.EnemyOwnerId[minionId] = necromancerId;
 
+            // ── Summon Circle registration (Round 115 Direction 2) ──
+            // Tag the minion with the necromancer's current position as the summon-circle
+            // anchor. We use the necromancer's position (not the corpse position) because
+            // the summon circle conceptually lives at the caster; radius is the necromancer's
+            // own resurrect range (re-using an existing field for simplicity — a dedicated
+            // SummonCircleRadius field can be added later if we need a different scale).
+            _store.SetSummonCircle(minionId, nx, ny, range);
+
             _logger?.Log($"[NECRO] Entity {necromancerId} resurrected corpse {bestCorpseId} as minion {minionId} at ({spawnX:F1}, {spawnY:F1})");
             return true;
         }

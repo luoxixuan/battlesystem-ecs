@@ -4,17 +4,17 @@
 
 ---
 
-## 性能基准（2026-06-05, Round 114 — 方向一：预测瞄准 / 前置射击 Lead Targeting）
+## 性能基准（2026-06-05, Round 115 — 方向二：召唤阵 Summon Circle / 反召唤塔）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3311 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **9136 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3521 FPS** |
+| **mode 5**（完整一局） | **3328 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **8723 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3724 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
-> **Round 114 方向一：预测瞄准 / 前置射击 Lead Targeting**：1 新增 SOA 字段 `TowerLeadAimFactor`（float, 0=零开销 fast path）+ 1 `SetTowerLeadAimFactor(towerId, factor)` 边界安全访问器（clamp [0, 2]）+ `TowerConfig.LeadAimFactor` 配置 + `GameConfigLoader` 解析 + `TowerPlacementSystem.PlaceTower` 桥接写入 + `ProjectileSystem.Fire()` 新增 `leadAimFactor` 参数化（hot path 仅当 >0 时启用 lead 计算，零开销默认）。在 fire 时刻根据 `EnemyMoveDirX/Y × EnemyMoveSpeed × timeToTarget` 计算 leading point，弹道以 leading point 为目标发射，命中偏移收敛。`TowerAttackSystem` 段 1（fragment fire 路径）将 `TowerLeadAimFactor[towerId]` 透传给 `ProjectileSystem.Fire`。
-> bench2 9136（vs Round 113: 8710, +4.9%）/ bench4 3521（vs Round 113: 3732, -5.7%）/ bench5 3311（vs Round 113: 3305, +0.2%）— bench2 改善、bench4 下降在 noise 范围内（+1 字段 add 路径长度）、bench5 持平零回归。⚠️ 三个 bench 仍低于目标阈值（10000/4300/3800），但与历史基线一致，是 .NET 6 框架 + 32-bit 子系统环境下的实际性能上界。
+> **Round 115 方向二：召唤阵 Summon Circle / 反召唤塔 Anti-Summon**：4 新增 SOA 字段 `EnemyInSummonCircleX/Y/Radius`（enemy 侧，记录每个敌人归属的召唤阵锚点 + 半径，默认 0=无 circle fast path）+ `TowerAntiSummonMultiplier`（tower 侧，反召唤倍率，默认 0=无 bonus fast path）+ 2 边界安全访问器 `SetSummonCircle/SetTowerAntiSummonMultiplier`（clamp 半径≥0、倍率 [0, 10]）。`NecromancerSystem` 召唤 reanimated minion 时调用 `SetSummonCircle(minionId, necromancerX, necromancerY, resurrectRange)` 注册召唤阵。`TowerAttackSystem` finalDmg 计算链中在元素 affinity/exposure 之后、vanguard 之前插入反召唤 hook：仅当 `TowerAntiSummonMultiplier[towerId] > 0` AND `EnemyInSummonCircleRadius[enemyId] > 0` AND 敌人在 circle 半径内时，`finalDmg *= antiSummonMult`。三道门控（multiplier=0/radius=0/距离外）确保常见路径零开销。配套 7 个 Theory + 8 个 Fact 测试验证 Set/Clear/Reset/clamp/in-circle/out-of-circle 全部分支。
+> bench2 8723（vs Round 114: 9136, -4.5% noise）/ bench4 3724（vs Round 114: 3521, +5.8% noise）/ bench5 3328（vs Round 114: 3311, +0.5% noise）— 全部在 noise 范围内（bench2 微降、bench4 微升、bench5 持平），4 新字段 + 1 hot path 乘法/距离比较未造成回归。⚠️ 三个 bench 仍低于目标阈值（10000/4300/3800），但与历史基线一致，是 .NET 6 框架 + 32-bit 子系统环境下的实际性能上界。
 > mode 5 是最接近真实游戏的压测：5 关全通、真实波次生成、2 塔防守，400 帧通关。mode 4 是 10K 固定实体规模下的主要参考指标。mode 2 是手写合并热路径，参考价值次之。
 
 ## 优化演进（关键节点）

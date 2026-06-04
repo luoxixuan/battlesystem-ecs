@@ -616,6 +616,15 @@ namespace BattleSystemECS.Core
         //     aim = targetPos + leadOffset * leadAimFactor
         public float[] TowerLeadAimFactor = new float[MAX_ENTITIES];
 
+        // ==================== 塔反召唤倍率 (Anti-Summon / Dispel Towers) ====================
+        // TowerAntiSummonMultiplier: damage multiplier vs enemies inside an active summon circle.
+        // 0 = no anti-summon (default, regular tower, fast path). 1.0 = normal damage (no bonus).
+        // 2.0 = double damage vs enemies spawned by a necromancer (within the summon circle
+        // radius). Conceptually: anti-summon towers are specialized counters — they read
+        // EnemyInSummonCircleRadius on the target and apply finalDmg *= multiplier. The
+        // check is O(1) and zero-overhead when multiplier == 0 (common case for most towers).
+        public float[] TowerAntiSummonMultiplier = new float[MAX_ENTITIES];
+
         // ==================== 塔能量/法力资源系统 (Tower Energy) ====================
         // TowerEnergy: current energy level for each tower (0 = depleted, cannot fire if below TowerEnergyPerShot)
         public float[] TowerEnergy = new float[MAX_ENTITIES];
@@ -955,6 +964,8 @@ namespace BattleSystemECS.Core
             TowerLockedTargetId[entityId] = -1;
             // Round 114 — Lead Aim: default to 0 (no lead, straight aim, zero-overhead fast path)
             TowerLeadAimFactor[entityId] = 0f;
+            // Round 115 — Anti-Summon: default to 0 (no bonus, regular tower, fast path)
+            TowerAntiSummonMultiplier[entityId] = 0f;
             // Tower energy fields: default to no energy (0 capacity = no energy system)
             TowerEnergy[entityId] = 0f;
             TowerMaxEnergy[entityId] = 0f;
@@ -1110,6 +1121,8 @@ namespace BattleSystemECS.Core
             TowerProjectileFragmentDmgMult[entityId] = 1f;
             // Round 114 — Lead Aim: default to 0 (no lead, zero-overhead fast path on hot fire path)
             TowerLeadAimFactor[entityId] = 0f;
+            // Round 115 — Anti-Summon: recycled slot starts at 0 (no bonus, fast path)
+            TowerAntiSummonMultiplier[entityId] = 0f;
             TowerArmorShredBonus[entityId] = 0f;
             TowerShieldBreakBonus[entityId] = 0f;
             TowerDamageType[entityId] = DamageType.Physical;
@@ -1175,6 +1188,8 @@ namespace BattleSystemECS.Core
             TowerLockedTargetId[entityId] = -1;
             // Round 114 — Lead Aim: recycled slot starts at 0 (no lead, zero-overhead fast path)
             TowerLeadAimFactor[entityId] = 0f;
+            // Round 115 — Anti-Summon: recycled slot starts at 0 (no bonus, fast path)
+            TowerAntiSummonMultiplier[entityId] = 0f;
             // Path-Hug filter reset
             TowerPathHugOnly[entityId] = false;
             // Tower energy fields reset
@@ -1395,6 +1410,15 @@ namespace BattleSystemECS.Core
             if (leadAimFactor < 0f) leadAimFactor = 0f;
             if (leadAimFactor > 2f) leadAimFactor = 2f; // sanity cap: 2.0 = over-lead (rare/cheat-y case)
             TowerLeadAimFactor[towerId] = leadAimFactor;
+        }
+
+        /// <summary>Sets the anti-summon damage multiplier for a tower (0 = no bonus, 2.0 = double damage vs summoned enemies). Clamped to [0, 10].</summary>
+        public void SetTowerAntiSummonMultiplier(int towerId, float multiplier)
+        {
+            if (!IsValidEntity(towerId)) return;
+            if (multiplier < 0f) multiplier = 0f;
+            if (multiplier > 10f) multiplier = 10f; // sanity cap
+            TowerAntiSummonMultiplier[towerId] = multiplier;
         }
 
         /// <summary>Sets the intercept rate for a PointDefense tower.</summary>

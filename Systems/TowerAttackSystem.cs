@@ -1345,6 +1345,33 @@ namespace BattleSystemECS.Systems
                         finalDmg *= 1.30f; // 1 + EXPOSURE_BONUS_PCT (hardcoded in ElementalReactionSystem)
                     }
                 }
+                // ── Anti-Summon bonus (Round 115 Direction 2) ──
+                // O(1) guard: skip entirely when the tower has no anti-summon config (multiplier
+                // == 0, the common case for most towers). Anti-summon towers are specialized
+                // counters that multiply damage against enemies tagged with an active summon
+                // circle. The enemy is "in" the circle when the registered radius > 0 and the
+                // enemy's current world position lies within radius of the circle anchor.
+                // Edge case: anchor (X,Y) defaults to (0,0) and radius to 0 when no circle
+                // exists, so the first guard (multiplier > 0) short-circuits before any
+                // distance math — zero overhead for the common path.
+                float antiSummonMult = store.TowerAntiSummonMultiplier[towerId];
+                if (antiSummonMult > 0f && finalDmg > 0f)
+                {
+                    float circleR = store.EnemyInSummonCircleRadius[enemyId];
+                    if (circleR > 0f)
+                    {
+                        float cx = store.EnemyInSummonCircleX[enemyId];
+                        float cy = store.EnemyInSummonCircleY[enemyId];
+                        float ex = store.PositionX[enemyId];
+                        float ey = store.PositionY[enemyId];
+                        float dx = ex - cx;
+                        float dy = ey - cy;
+                        if (dx * dx + dy * dy <= circleR * circleR)
+                        {
+                            finalDmg *= antiSummonMult;
+                        }
+                    }
+                }
                 // Vanguard damage transfer: if this enemy is protected by a vanguard, transfer a fraction to the vanguard
                 float vanguardTransfer = store.EnemyVanguardDmgTransfer[enemyId];
                 if (vanguardTransfer > 0f && finalDmg > 0f)

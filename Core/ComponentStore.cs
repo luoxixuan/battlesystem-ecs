@@ -628,6 +628,10 @@ namespace BattleSystemECS.Core
                 EnemyResurrectCorpseAgeLimit[entityId] = 0f;
                 EnemyIsReanimated[entityId] = false;
                 EnemyOwnerId[entityId] = -1;
+                // Round 115 — Summon Circle: default to (0,0,0) = no circle (fast path)
+                EnemyInSummonCircleX[entityId] = 0f;
+                EnemyInSummonCircleY[entityId] = 0f;
+                EnemyInSummonCircleRadius[entityId] = 0f;
                 // Bleed/rupture debuff fields (applied by Slash/Pierce towers)
                 EnemyBleedStacks[entityId] = 0f;
                 EnemyBleedDamagePerStack[entityId] = 0f;
@@ -1036,6 +1040,7 @@ namespace BattleSystemECS.Core
             EnemyResurrectCooldownRef = null!; EnemyResurrectHpMult = null!;
             EnemyMaxResurrectCount = null!; EnemyResurrectCorpseAgeLimit = null!;
             EnemyIsReanimated = null!; EnemyOwnerId = null!;
+            EnemyInSummonCircleX = null!; EnemyInSummonCircleY = null!; EnemyInSummonCircleRadius = null!;
             SummonedUnitActive = null!; SummonedUnitType = null!;
             SummonedUnitHealth = null!; SummonedUnitMaxHealth = null!;
             SummonedUnitDamage = null!; SummonedUnitMoveSpeed = null!;

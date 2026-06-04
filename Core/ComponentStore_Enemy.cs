@@ -293,6 +293,21 @@ namespace BattleSystemECS.Core
         // EnemyOwnerId: the necromancer entity ID that owns this reanimated minion (-1 if none)
         public int[] EnemyOwnerId = new int[MAX_ENTITIES];
 
+        // ==================== 召唤阵组件 (Summon Circle — Anti-Summon Tower Support) ====================
+        // EnemyInSummonCircleX / EnemyInSummonCircleY: world position of the summon circle this
+        // enemy currently belongs to (set at spawn by NecromancerSystem when reanimating a corpse).
+        // 0/0 (or radius 0) means the enemy is NOT inside any summon circle → anti-summon towers
+        // skip the bonus path entirely. We use a separate (X,Y,Radius) tuple rather than reading
+        // the necromancer's position at attack time, because:
+        //   (a) the necromancer may have moved (or died) by the time the minion is attacked,
+        //   (b) the summon circle is conceptually a per-summon spatial constraint, not a global
+        //       property of the caster, and
+        //   (c) it keeps the attack path O(1) — one read per field, zero branching until bonus.
+        public float[] EnemyInSummonCircleX = new float[MAX_ENTITIES];
+        public float[] EnemyInSummonCircleY = new float[MAX_ENTITIES];
+        // EnemyInSummonCircleRadius: radius of the summon circle (0 = no circle, fast path).
+        public float[] EnemyInSummonCircleRadius = new float[MAX_ENTITIES];
+
         // ==================== 玩家召唤单位组件 (Player-Summoned Units, SOA) ====================
         // SummonedUnitActive: true if this entity is a player-summoned combat unit
         public bool[] SummonedUnitActive = new bool[MAX_ENTITIES];
@@ -1260,6 +1275,28 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(enemyId)) return;
             // Clamp negative to 0
             EnemyInfightCooldown[enemyId] = System.Math.Max(0f, cooldown);
+        }
+
+        /// <summary>
+        /// Tags an enemy as belonging to a summon circle at (x,y) with given radius. 0/0 or
+        /// radius 0 means "no circle" (fast path). Called by NecromancerSystem when spawning a
+        /// reanimated minion, so anti-summon towers can compute the bonus.
+        /// </summary>
+        public void SetSummonCircle(int enemyId, float x, float y, float radius)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyInSummonCircleX[enemyId] = x;
+            EnemyInSummonCircleY[enemyId] = y;
+            EnemyInSummonCircleRadius[enemyId] = System.Math.Max(0f, radius);
+        }
+
+        /// <summary>Clears the summon circle tag from an enemy (radius = 0 = fast path).</summary>
+        public void ClearSummonCircle(int enemyId)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyInSummonCircleX[enemyId] = 0f;
+            EnemyInSummonCircleY[enemyId] = 0f;
+            EnemyInSummonCircleRadius[enemyId] = 0f;
         }
 
         /// <summary>
