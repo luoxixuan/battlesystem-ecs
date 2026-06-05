@@ -59,6 +59,8 @@ namespace BattleSystemECS.Core
         public PullTowerSystem? PullTower { get; private set; }
         public TauntSystem? Taunt { get; private set; }
         public BleedSystem? Bleed { get; private set; }
+        // Round 122 Direction 2 — Heal Aura System (passive tower-to-tower healing).
+        public HealAuraSystem? HealAura { get; private set; }
         public ProjectileSystem? Projectile { get; private set; }
         public ChronoTowerSystem? ChronoTower { get; private set; }
         // Round 106 Direction 2 — Mine / Trap tower (proximity-triggered AoE)
@@ -282,6 +284,12 @@ namespace BattleSystemECS.Core
             Bleed = new BleedSystem(store, playerId);
             // ── Taunt tower (force-enemy-target-this-tower aura) ──
             Taunt = new TauntSystem(store);
+
+            // Round 122 Direction 2 — Heal Aura System. Created alongside the other
+            // aura-flavor systems (Taunt, Curse, AuraTower) since it shares the same
+            // tower-only effect semantics: opt-in via tower-config fields, zero-overhead
+            // when no heal-aura tower is on the field (radius==0 fast path).
+            HealAura = new HealAuraSystem(store);
 
             // ── Projectile ──
             Projectile = new ProjectileSystem(store, logger);
@@ -576,6 +584,8 @@ namespace BattleSystemECS.Core
             scheduler.SkillBuff.Wisp = Wisp;
             // Round 107 Direction 6 — Target Mark decay tick (between HealingZone and Skill cd)
             scheduler.SkillBuff.Mark = Mark;
+            // Round 122 Direction 2 — Heal Aura System wiring (passive tower-to-tower healing)
+            scheduler.SkillBuff.HealAura = HealAura;
 
             // ── Post-death ──
             scheduler.PostDeath.EnemyFission = EnemyFission;

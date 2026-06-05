@@ -377,6 +377,26 @@ namespace BattleSystemECS.Core
         // TowerCurseDmgTakenIncrease: additional damage taken bonus applied to cursed enemies (e.g. 0.25 = +25% damage taken)
         public float[] TowerCurseDmgTakenIncrease = new float[MAX_ENTITIES];
 
+        // ==================== 治疗光环塔 (Heal Aura Tower — 塔-塔主动治疗链接) ====================
+        // TowerHealAuraRadius: world-units radius within which this tower heals friendly towers
+        //   each TowerHealAuraInterval seconds. 0 = no heal aura (zero-overhead fast path on hot
+        //   path). Stacks additively with other heal-aura towers in range (multiple healers
+        //   overlapping each contribute their TowerHealAuraAmount per tick).
+        public float[] TowerHealAuraRadius = new float[MAX_ENTITIES];
+        // TowerHealAuraAmount: HP restored to each friendly tower in range per heal tick.
+        //   Applied after clamping to the target's tower HP cap (so overheal is wasted, never
+        //   wasted on overflow). Designers should size this to be small (1-15 HP per tick) so
+        //   the system is a maintenance mechanic, not a hard invulnerability.
+        public float[] TowerHealAuraAmount = new float[MAX_ENTITIES];
+        // TowerHealAuraInterval: seconds between heal ticks. 0 = treat as instant (heal every
+        //   frame) — discouraged; designers should pick >= 0.25s. Negative values are clamped
+        //   to 0 in SetHealAura().
+        public float[] TowerHealAuraInterval = new float[MAX_ENTITIES];
+        // TowerHealAuraTimer: per-tower cooldown countdown in seconds. Starts at 0 (ready) and
+        //   is decremented each frame by deltaTime; when it reaches <= 0 the heal tick fires
+        //   and the timer resets to TowerHealAuraInterval (or stays 0 if interval is 0).
+        public float[] TowerHealAuraTimer = new float[MAX_ENTITIES];
+
         // ==================== 嘲讽塔 (Taunt Tower — 强制敌人攻击该塔) ====================
         // TowerIsTaunt: true if this tower is a taunt tower that forces nearby enemies to target it
         //   (dual of the Aggro/Leash system: Aggro = enemy actively chases player; Taunt = tower
@@ -1085,6 +1105,13 @@ namespace BattleSystemECS.Core
             // Round 98 — Tower Windup / Pre-cast: default to no windup (0 frames = instant fire, zero-overhead path)
             TowerWindupFrames[entityId] = 0;
             TowerWindupCountdown[entityId] = 0;
+            // Round 122 Direction 2 — Heal Aura Tower: default to no heal aura (radius=0, amount=0, interval=0, timer=0)
+            //   Designers opt-in by setting non-zero radius+amount. Timer=0 means "fire next frame" for
+            //   interval=0 healers; for interval>0 healers the timer is reset to interval on first tick.
+            TowerHealAuraRadius[entityId] = 0f;
+            TowerHealAuraAmount[entityId] = 0f;
+            TowerHealAuraInterval[entityId] = 0f;
+            TowerHealAuraTimer[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
             // Round 103 — Buff Share: notify per-system caches that a fresh tower occupies
@@ -1311,6 +1338,13 @@ namespace BattleSystemECS.Core
             TowerWindupCountdown[entityId] = 0;
             // Phasing field reset (false = no phasing, zero-overhead)
             TowerIsPhasing[entityId] = false;
+            // Round 122 Direction 2 — Heal Aura Tower fields reset (radius=0=inactive, amount=0, interval=0, timer=0=ready)
+            //   Reset is critical: a recycled tower slot must not retain a stale aura radius/amount
+            //   from the previous occupant (would cause a non-heal-aura tower to suddenly heal).
+            TowerHealAuraRadius[entityId] = 0f;
+            TowerHealAuraAmount[entityId] = 0f;
+            TowerHealAuraInterval[entityId] = 0f;
+            TowerHealAuraTimer[entityId] = 0f;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
             // Round 103 — Buff Share: drop any cached base-speed entry for the removed tower
             // (Claude bug scan fix #2: stale cache on ID reuse).

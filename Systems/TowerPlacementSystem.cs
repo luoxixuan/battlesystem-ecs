@@ -276,6 +276,20 @@ namespace BattleSystemECS.Systems
                         store.TowerCurseDmgTakenIncrease[towerId] = tc.CurseDmgTakenIncrease;
                         logger.Log($"[TOWER] {tc.Name} 诅咒塔: 半径 {tc.CurseRadius}, 减伤 {tc.CurseDmgReduction}, 减速 {tc.CurseSpeedReduction}, 护甲削减 {tc.CurseArmorReduction}, 增伤 {tc.CurseDmgTakenIncrease}");
                     }
+                    // Apply heal aura properties (Round 122 Dir 2) — passive tower-to-tower healing.
+                    //   Opt-in: only writers when radius>0 && amount>0. Interval 0 = fire every frame
+                    //   (discouraged; designers should pick >= 0.25s). The system targets PalisadeHP
+                    //   (the only tower type with a HP pool) — non-Palisade towers are not healed.
+                    if (tc.HealAuraRadius > 0f && tc.HealAuraAmount > 0f)
+                    {
+                        store.TowerHealAuraRadius[towerId] = tc.HealAuraRadius;
+                        store.TowerHealAuraAmount[towerId] = tc.HealAuraAmount;
+                        store.TowerHealAuraInterval[towerId] = tc.HealAuraInterval;
+                        // Timer starts at 0 (= "fire next frame"). For interval>0 the per-tick
+                        // logic resets it to interval after firing.
+                        store.TowerHealAuraTimer[towerId] = 0f;
+                        logger.Log($"[TOWER] {tc.Name} 治疗塔: 半径 {tc.HealAuraRadius}, 治疗 {tc.HealAuraAmount}/tick, 间隔 {tc.HealAuraInterval}s");
+                    }
                     // Apply pull tower properties (gravitational pull)
                     if (tc.IsPullTower)
                     {

@@ -240,6 +240,13 @@ namespace BattleSystemECS.Config
         public float CurseArmorReduction { get; set; } = 0f;
         // CurseDmgTakenIncrease: additional damage taken bonus applied to cursed enemies (0.25 = +25% damage taken)
         public float CurseDmgTakenIncrease { get; set; } = 0f;
+        // Heal aura tower (Round 122 Direction 2): if HealAuraRadius > 0 + HealAuraAmount > 0,
+        //   this tower passively heals friendly Palisade towers in radius every HealAuraInterval
+        //   seconds. Default 0/0/0 = no heal aura. Designers size this as a maintenance mechanic
+        //   (small per-tick HP), not a hard invulnerability.
+        public float HealAuraRadius { get; set; } = 0f;
+        public float HealAuraAmount { get; set; } = 0f;
+        public float HealAuraInterval { get; set; } = 0f;
         // Taunt tower: if true, tower forces nearby enemies to retarget it (dual of Aggro/Leash —
         //   Aggro = enemy chases player; Taunt = tower forces enemy to attack itself)
         public bool IsTauntTower { get; set; } = false;
