@@ -469,6 +469,13 @@ namespace BattleSystemECS.Config
         // Wave rhythm tag — controls spawn-time scaling (count + stats). Defaults to Normal.
         // Normalized to enum in WaveSpawningSystem at spawn time; missing/invalid values are treated as Normal.
         public string Rhythm { get; set; } = "Normal";
+        // Round 120 Dir 3 — Adaptive Spawn Count baseline. Number of kills the player is
+        // expected to land during this wave; AdaptiveDifficultySystem uses this to compute
+        // the rubber-band multiplier for the NEXT wave. 0 (default) DISABLES the scaling
+        // for this wave (backward-compatible — old JSON files stay at multiplier = 1.0).
+        // When a wave is multi-type, this is the SUM of expected kills across all types;
+        // designers can keep it per-type by setting per-type thresholds in their content.
+        public int ExpectedKillCount { get; set; } = 0;
 
         /// <summary>
         /// Returns how many enemies of a given monster type should spawn this wave.
@@ -2817,6 +2824,49 @@ namespace BattleSystemECS.Config
         /// <summary>Lower cap on the threat multiplier. Always &gt;= 1.0f so enemies never spawn
         /// weaker than their base stats — the system only makes things harder, never easier.</summary>
         public const float MinThreatMultiplier = 1.0f;
+    }
+
+    /// <summary>
+    /// Round 120 Direction 3 — Adaptive Spawn Count (Rubber-band Spawn Pacing).
+    /// Adjusts the number of enemies spawned per wave based on the player's previous-wave
+    /// performance: a player who kills more than expected sees more enemies next wave
+    /// (challenge ramps up); a player who leaks more than expected sees fewer (catch-up).
+    /// The scaling is applied in <c>WaveSpawningSystem</c>'s three spawn sites
+    /// (batch Update / InjectExtraEnemies / SpawnMinionNearPosition) as a multiplier
+    /// on the per-type enemy count.
+    ///
+    /// Pure performance signal: <see cref="Systems.AdaptiveDifficultySystem.OnWaveComplete"/>
+    /// reads the kill count for the just-finished wave, compares against
+    /// <c>WaveConfig.ExpectedKillCount</c> (0 disables the system for that wave —
+    /// backward-compatible), and writes the resulting multiplier to
+    /// <c>WaveSpawningSystem.PerformanceSpawnMultiplier</c> at the start of the
+    /// next wave. Multiplier is clamped to <c>[MinSpawnMultiplier, MaxSpawnMultiplier]</c>.
+    ///
+    /// Hot-path design: a single float field on WaveSpawningSystem + one branch in
+    /// each spawn site. The branch is a single `if (mult != 1f)` check so the zero-scaling
+    /// common case stays zero-overhead.
+    /// </summary>
+    public static class AdaptiveSpawnConfig
+    {
+        /// <summary>Default sensitivity for the rubber-band formula. The raw delta
+        /// (actualKills - expectedKills) / expectedKills is multiplied by this value
+        /// before being added to 1.0. 0.5 means: a 100% over-kill (twice expected)
+        /// → +50% spawn count next wave. Set to 0 to disable the system entirely.</summary>
+        public const float DefaultSpawnSensitivity = 0.5f;
+
+        /// <summary>Lower bound on <c>PerformanceSpawnMultiplier</c>. Even if the player
+        /// leaks every enemy (0 kills vs huge expected), spawn count is never less than
+        /// half the baseline (preserves wave identity for level scripting).</summary>
+        public const float MinSpawnMultiplier = 0.5f;
+
+        /// <summary>Upper bound on <c>PerformanceSpawnMultiplier</c>. Prevents one super-good
+        /// wave from doubling every wave afterward (runaway scaling). 2.0 = at most 2x spawns.</summary>
+        public const float MaxSpawnMultiplier = 2.0f;
+
+        /// <summary>When <c>true</c>, also apply the multiplier to mid-wave events
+        /// (InjectExtraEnemies ambush + SpawnMinionNearPosition boss-phase summon).
+        /// Designers can disable for a more predictable event cadence.</summary>
+        public const bool ApplyToMidWaveSpawns = true;
     }
 
     /// <summary>

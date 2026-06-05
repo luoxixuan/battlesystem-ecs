@@ -92,8 +92,12 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Called by WaveSpawningSystem.OnWaveComplete — computes new difficulty level.
         /// Uses: leaks this wave, kills this wave, damage taken, gold remaining.
+        /// <paramref name="expectedKills"/> is the designer-set baseline for this wave
+        /// (from <c>WaveConfig.ExpectedKillCount</c>). When &lt;= 0, the rubber-band
+        /// spawn multiplier is left at 1.0 (backward-compatible default for waves
+        /// that don't opt in via JSON config).
         /// </summary>
-        public void OnWaveComplete(int playerId)
+        public void OnWaveComplete(int playerId, int expectedKills = 0)
         {
             if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) return;
 
@@ -127,6 +131,29 @@ namespace BattleSystemECS.Systems
             _killsThisWave[playerId] = 0;
             _damageTakenThisWave[playerId] = 0f;
             _store.EnemiesLeakedThisWave[playerId] = 0;
+
+            // Round 120 Dir 3 — rubber-band spawn multiplier for the NEXT wave.
+            // Only compute when the just-finished wave opted in (expectedKills > 0).
+            // Sensitivity defaults to AdaptiveSpawnConfig.DefaultSpawnSensitivity.
+            // When sensitivity is 0 OR expectedKills is 0, multiplier stays at 1.0.
+            if (expectedKills > 0 && AdaptiveSpawnConfig.DefaultSpawnSensitivity > 0f)
+            {
+                // rawDelta = (actual - expected) / expected; >0 means player over-killed.
+                float rawDelta = (kills - expectedKills) / (float)expectedKills;
+                float mult = 1.0f + rawDelta * AdaptiveSpawnConfig.DefaultSpawnSensitivity;
+                // Note: WaveSpawningSystem.SetPerformanceSpawnMultiplier does the final clamp
+                // and the near-1 snap, so we write the unclamped value here for transparency.
+                _waveSpawningSystemRef?.SetPerformanceSpawnMultiplier(mult);
+            }
+        }
+
+        // Round 120 Dir 3 — back-reference to WaveSpawningSystem so OnWaveComplete can
+        // write the rubber-band multiplier. Set via SetWaveSpawningSystem() during
+        // GameManager's system wiring (same lifecycle as WaveSpawningSystem.SetAdaptiveDifficulty).
+        private WaveSpawningSystem _waveSpawningSystemRef;
+        public void SetWaveSpawningSystem(WaveSpawningSystem waveSpawningSystem)
+        {
+            _waveSpawningSystemRef = waveSpawningSystem;
         }
 
         /// <summary>

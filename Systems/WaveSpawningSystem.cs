@@ -104,6 +104,55 @@ namespace BattleSystemECS.Systems
             _adaptiveDifficulty = adaptiveDifficulty;
         }
 
+        // ── Round 120 Direction 3 — Adaptive Spawn Count (Rubber-band Spawn Pacing) ──
+        // Multiplier applied to the per-type baseline enemy count at each spawn site.
+        // Written by AdaptiveDifficultySystem.OnWaveComplete (1.0 = no scaling, default).
+        // The first wave of a level always uses 1.0 (no performance data yet).
+        // Clamped by AdaptiveSpawnConfig to [MinSpawnMultiplier, MaxSpawnMultiplier] when written.
+        private float _performanceSpawnMultiplier = 1.0f;
+
+        /// <summary>
+        /// Read-only view of the current rubber-band spawn multiplier. Public so tests
+        /// (and AdaptiveDifficultySystem) can verify the value after OnWaveComplete.
+        /// Defaults to 1.0 (no scaling) and resets to 1.0 at the start of every level.
+        /// </summary>
+        public float PerformanceSpawnMultiplier => _performanceSpawnMultiplier;
+
+        /// <summary>
+        /// Sets the rubber-band spawn multiplier. Called by <c>AdaptiveDifficultySystem.OnWaveComplete</c>
+        /// after computing the raw kill-vs-expected delta. Clamped to
+        /// <c>[AdaptiveSpawnConfig.MinSpawnMultiplier, MaxSpawnMultiplier]</c> on the way in
+        /// so a misbehaving caller can't push the value out of range.
+        /// </summary>
+        public void SetPerformanceSpawnMultiplier(float multiplier)
+        {
+            if (multiplier < AdaptiveSpawnConfig.MinSpawnMultiplier)
+                multiplier = AdaptiveSpawnConfig.MinSpawnMultiplier;
+            else if (multiplier > AdaptiveSpawnConfig.MaxSpawnMultiplier)
+                multiplier = AdaptiveSpawnConfig.MaxSpawnMultiplier;
+            // Snap near-1 values to exactly 1.0 so the hot-path branch stays cheap and test
+            // comparisons are exact. Threshold = 1e-4 is well below any meaningful sensitivity
+            // product (sensitivity 0.5 × delta 0.0002 = 1e-4 — i.e. a sub-0.02% deviation).
+            if (Math.Abs(multiplier - 1.0f) < 1e-4f) multiplier = 1.0f;
+            _performanceSpawnMultiplier = multiplier;
+        }
+
+        /// <summary>
+        /// Applies <see cref="PerformanceSpawnMultiplier"/> to a base count, with a floor of 0
+        /// (zero or negative multipliers would still yield 0 enemies, which is a valid no-op).
+        /// Centralized here so all three spawn sites share the same rounding policy.
+        /// </summary>
+        private int ApplySpawnMultiplier(int baseCount)
+        {
+            if (baseCount <= 0) return 0;
+            // Hot-path: multiplier == 1.0 → no scaling. This is the default state between
+            // wave 1 start and the first OnWaveComplete call, so it MUST be zero-overhead.
+            if (_performanceSpawnMultiplier == 1.0f) return baseCount;
+            int scaled = (int)Math.Round(baseCount * _performanceSpawnMultiplier);
+            if (scaled < 0) scaled = 0;
+            return scaled;
+        }
+
         private WaveSpawnConfig LoadWaveSpawnConfig()
         {
             const string configPath = "Data/Configs/wave_spawn.json";
@@ -172,6 +221,15 @@ namespace BattleSystemECS.Systems
         public void InjectExtraEnemies(int count)
         {
             if (count <= 0) return;
+            // Round 120 Dir 3 — rubber-band scaling for mid-wave ambush. Guarded by
+            // AdaptiveSpawnConfig.ApplyToMidWaveSpawns so designers can opt out without
+            // touching the call site. ApplySpawnMultiplier returns the same value when
+            // the multiplier is 1.0 (default), so this is zero-overhead in the common case.
+            if (AdaptiveSpawnConfig.ApplyToMidWaveSpawns)
+            {
+                count = ApplySpawnMultiplier(count);
+                if (count <= 0) return;
+            }
             var random = GetSpawnRandom();
             for (int i = 0; i < count; i++)
             {
@@ -284,6 +342,14 @@ namespace BattleSystemECS.Systems
         public int SpawnMinionNearPosition(int typeId, int count, float centerX, float centerY)
         {
             if (count <= 0) return 0;
+            // Round 120 Dir 3 — rubber-band scaling for boss-phase minion summon. Guarded
+            // by AdaptiveSpawnConfig.ApplyToMidWaveSpawns. Zero-overhead when multiplier
+            // is 1.0 (the default between wave 1 start and the first OnWaveComplete call).
+            if (AdaptiveSpawnConfig.ApplyToMidWaveSpawns)
+            {
+                count = ApplySpawnMultiplier(count);
+                if (count <= 0) return 0;
+            }
             if (typeId < 0 || typeId >= gameConfig.MonsterTypes.Count) return 0;
             var monsterConfig = gameConfig.GetMonsterConfigByTypeId(typeId);
             if (monsterConfig == null) return 0;
@@ -371,6 +437,9 @@ namespace BattleSystemECS.Systems
             currentWave = 1;
             enemiesSpawnedInWave = 0;
             totalEnemiesSpawned = 0;
+            // Round 120 Dir 3 — reset rubber-band multiplier at level start. Each new level
+            // gets a fresh slate (no carry-over from previous level's kill performance).
+            _performanceSpawnMultiplier = 1.0f;
             ClearMultiTypeState();
             OnWaveStart?.Invoke();
         }
@@ -850,7 +919,10 @@ namespace BattleSystemECS.Systems
                 currentWave++;
 
                 // Trigger adaptive difficulty evaluation (before OnWaveComplete so new difficulty is ready for next wave)
-                _adaptiveDifficulty?.OnWaveComplete(0); // player 0
+                // Round 120 Dir 3 — pass ExpectedKillCount from the just-completed wave so
+                // AdaptiveDifficultySystem can compute the rubber-band spawn multiplier.
+                int expectedKills = completedWaveConfig?.ExpectedKillCount ?? 0;
+                _adaptiveDifficulty?.OnWaveComplete(0, expectedKills); // player 0
 
                 // Fire Breather event before the generic event so subscribers (gold/heal/CDR) run first
                 // and are observable in logs before the next-wave hooks. Always non-null when rhythm == Breather.
@@ -884,14 +956,16 @@ namespace BattleSystemECS.Systems
                     _multiTypes[i] = entry.MonsterType ?? "";
                     // Apply rhythm scaling to per-type counts (Breather ×0.6, Surge ×1.3, Climax ×1.5).
                     // GetEnemyCountForType returns the scaled count with a floor of 1.
-                    _multiCounts[i] = waveConfig.GetEnemyCountForType(entry.MonsterType ?? "");
+                    // Round 120 Dir 3 — then apply rubber-band multiplier (1.0 = no change).
+                    // ApplySpawnMultiplier is the central site so all three spawn paths share policy.
+                    _multiCounts[i] = ApplySpawnMultiplier(waveConfig.GetEnemyCountForType(entry.MonsterType ?? ""));
                 }
             }
             else
             {
                 // Fallback: single type from MonsterType field
                 _multiTypes = new string[] { waveConfig.MonsterType ?? "Normal" };
-                _multiCounts = new int[] { waveConfig.GetEnemyCountForType(waveConfig.MonsterType ?? "Normal") };
+                _multiCounts = new int[] { ApplySpawnMultiplier(waveConfig.GetEnemyCountForType(waveConfig.MonsterType ?? "Normal")) };
             }
             _multiTypeIndex = 0;
             _multiSpawnedForType = 0;

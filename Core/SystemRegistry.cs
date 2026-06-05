@@ -318,6 +318,9 @@ namespace BattleSystemECS.Core
             // ── Adaptive Difficulty ──
             AdaptiveDifficulty = new AdaptiveDifficultySystem(store, config);
             WaveSpawning.SetAdaptiveDifficulty(AdaptiveDifficulty);
+            // Round 120 Dir 3 — wire WaveSpawning back to AdaptiveDifficulty so OnWaveComplete
+            // can write the rubber-band spawn multiplier for the next wave.
+            AdaptiveDifficulty.SetWaveSpawningSystem(WaveSpawning);
 
             // ── Misc ──
             Pickup = new PickupSystem(store, config, logger);
