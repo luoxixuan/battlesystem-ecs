@@ -867,6 +867,24 @@ namespace BattleSystemECS.Systems
                             float magicResist = store.EnemyMagicResist[bestTarget];
                             baseDmg *= Math.Max(0.01f, 1f - magicResist) * _damageTakenMult;
                         }
+                        else if (dmgType == DamageType.Fire)
+                        {
+                            // Elemental resistance (Round 117): fractional reduction per monster JSON FireResist.
+                            // Distinct from EnemyDamageImmunityMask (binary) — here we allow 30% / 70% partial resist.
+                            // Math.Max(0.01f, ...) preserves ≥1% damage floor so FireResist=0.999 still hits (not 0).
+                            float fireResist = store.EnemyFireResist[bestTarget];
+                            baseDmg *= Math.Max(0.01f, 1f - fireResist) * _damageTakenMult;
+                        }
+                        else if (dmgType == DamageType.Ice)
+                        {
+                            float iceResist = store.EnemyIceResist[bestTarget];
+                            baseDmg *= Math.Max(0.01f, 1f - iceResist) * _damageTakenMult;
+                        }
+                        else if (dmgType == DamageType.Lightning)
+                        {
+                            float lightningResist = store.EnemyLightningResist[bestTarget];
+                            baseDmg *= Math.Max(0.01f, 1f - lightningResist) * _damageTakenMult;
+                        }
                         else  // Physical (default) — uses armor + armor shred + pen
                         {
                             // Step 1: apply armor penetration (attacker's penetration ratio)

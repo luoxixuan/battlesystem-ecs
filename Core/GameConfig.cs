@@ -46,6 +46,13 @@ namespace BattleSystemECS.Config
         // MagicResist: reduces incoming Magic damage (0.0-1.0 fraction reduction).
         // Separate from armor. Physical ignores magic resist, Magic ignores armor.
         public float MagicResist { get; set; } = 0f;
+        // Elemental Resistance (Round 117): fractional reduction for Fire / Ice / Lightning damage (0.0-1.0).
+        // Distinct from DamageImmunities (binary 0% or 100%) — here we allow partial resists like 30% / 70%.
+        // Default 0 = no resist (take full damage). Negative values are clamped to 0; values >1 are clamped to 1.
+        // True damage bypasses all three; Physical and Magic damage ignore these arrays.
+        public float FireResist { get; set; } = 0f;
+        public float IceResist { get; set; } = 0f;
+        public float LightningResist { get; set; } = 0f;
         // DamageImmunities: list of damage type names this enemy is fully immune to
         // (binary, not percentage). Valid entries: "Physical", "Magic", "Fire", "Ice", "Lightning".
         // True damage bypasses immunity. Empty/null = no immunities.

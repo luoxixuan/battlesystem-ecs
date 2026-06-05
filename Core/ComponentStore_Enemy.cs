@@ -492,6 +492,16 @@ namespace BattleSystemECS.Core
         // True damage (DamageType.True) bypasses immunity entirely and ignores this mask.
         // Values: Physical=1, Magic=2, Fire=4, Ice=8, Lightning=16. Default 0 = no immunity.
         public int[] EnemyDamageImmunityMask = new int[MAX_ENTITIES];
+        // ==================== 元素抗性 (Elemental Resistance — fractional reduction for Fire/Ice/Lightning) ====================
+        // EnemyFireResist: 0-1, fraction of Fire damage reduced (0 = take full, 0.4 = take 60%, 1.0 = immune).
+        // EnemyIceResist: 0-1, fraction of Ice damage reduced.
+        // EnemyLightningResist: 0-1, fraction of Lightning damage reduced.
+        // Distinct from EnemyDamageImmunityMask (binary 0% or 100%) and EnemyMagicResist (Magic only).
+        // Applied in TowerAttackSystem damage application chain in the same branch order:
+        // True → Fire → Ice → Lightning → Magic → Physical (default).
+        public float[] EnemyFireResist = new float[MAX_ENTITIES];
+        public float[] EnemyIceResist = new float[MAX_ENTITIES];
+        public float[] EnemyLightningResist = new float[MAX_ENTITIES];
         // EnemyIsUnstoppable: total CC immunity flag. When true, enemy ignores ALL crowd control
         // (stun, freeze, slow, fear, knockback, pull, charm, taunt). Boss-level CC immunity.
         public bool[] EnemyIsUnstoppable = new bool[MAX_ENTITIES];
@@ -917,7 +927,7 @@ namespace BattleSystemECS.Core
             return (EnemyAffixFlags[enemyId] & affix) != 0;
         }
 
-        public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber, string fullName = null, float armor = 0f, float shield = 0f, float magicResist = 0f)
+        public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber, string fullName = null, float armor = 0f, float shield = 0f, float magicResist = 0f, float fireResist = 0f, float iceResist = 0f, float lightningResist = 0f)
         {
             int entityId = CreateEntity();
 
@@ -944,6 +954,11 @@ namespace BattleSystemECS.Core
             EnemySpawnFrame[entityId] = CurrentFrame;
             EnemyArmor[entityId] = armor;
             EnemyMagicResist[entityId] = magicResist;
+            // Elemental resistance (Round 117): fractional reduction for Fire/Ice/Lightning damage.
+            // Clamp to [0, 1] — values >1 would imply healing from elemental damage, which is out of scope.
+            EnemyFireResist[entityId]      = fireResist      < 0f ? 0f : (fireResist      > 1f ? 1f : fireResist);
+            EnemyIceResist[entityId]       = iceResist       < 0f ? 0f : (iceResist       > 1f ? 1f : iceResist);
+            EnemyLightningResist[entityId] = lightningResist < 0f ? 0f : (lightningResist > 1f ? 1f : lightningResist);
             EnemyDamageImmunityMask[entityId] = 0;  // default: no damage immunities
             // Pierce Resistance: default 0 resist, false immune (no pierce mitigation)
             EnemyPierceResist[entityId] = 0f;
@@ -1191,6 +1206,39 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(enemyId)) return;
             EnemyDamageImmunityMask[enemyId] = mask;
+        }
+
+        /// <summary>
+        /// Sets the fractional elemental resistances (Fire / Ice / Lightning) for an enemy.
+        /// Each value is in [0, 1]: 0 = no resist (take full), 1 = full resist (effectively immune).
+        /// Out-of-range inputs are clamped to [0, 1] — values >1 would imply healing from elemental
+        /// damage, which is out of scope; values <0 are treated as 0. Parallel-safe (read-modify-write
+        /// is single-threaded because callers only invoke this in serial spawn phase).
+        /// Used by WaveSpawningSystem to apply monster JSON elemental resistance config.
+        /// </summary>
+        public void SetElementalResist(int enemyId, float fireResist, float iceResist, float lightningResist)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyFireResist[enemyId]      = fireResist      < 0f ? 0f : (fireResist      > 1f ? 1f : fireResist);
+            EnemyIceResist[enemyId]       = iceResist       < 0f ? 0f : (iceResist       > 1f ? 1f : iceResist);
+            EnemyLightningResist[enemyId] = lightningResist < 0f ? 0f : (lightningResist > 1f ? 1f : lightningResist);
+        }
+
+        /// <summary>
+        /// Returns the elemental resistance (0-1) for the given damage type on the given enemy.
+        /// Returns 0 for True damage (always bypasses resistance) and for any non-elemental
+        /// type (Physical, Magic). Out-of-bounds enemyId returns 0.
+        /// </summary>
+        public float GetElementResist(int enemyId, DamageType type)
+        {
+            if (!IsValidEntity(enemyId)) return 0f;
+            switch (type)
+            {
+                case DamageType.Fire:      return EnemyFireResist[enemyId];
+                case DamageType.Ice:       return EnemyIceResist[enemyId];
+                case DamageType.Lightning: return EnemyLightningResist[enemyId];
+                default:                   return 0f;  // Physical/Magic/True all bypass elemental resist
+            }
         }
 
         /// <summary>

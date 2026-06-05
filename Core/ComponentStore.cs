@@ -595,6 +595,10 @@ namespace BattleSystemECS.Core
                 EnemySlowResistance[entityId] = 0f;
                 EnemyKnockbackResistance[entityId] = 0f;
                 EnemyDamageResistance[entityId] = 0f;
+                // Elemental Resistance (Round 117): reset to 0 on destroy to prevent ID-reuse leakage
+                EnemyFireResist[entityId] = 0f;
+                EnemyIceResist[entityId] = 0f;
+                EnemyLightningResist[entityId] = 0f;
                 EnemyIsUnstoppable[entityId] = false;
                 EnemyFearResistance[entityId] = 0f;
                 // Curse debuff fields (applied by curse towers)

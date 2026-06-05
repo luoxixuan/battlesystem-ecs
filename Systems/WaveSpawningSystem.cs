@@ -209,6 +209,8 @@ namespace BattleSystemECS.Systems
                 if (enemyId < 0) continue;
                 store.SetEntityName(enemyId, enemyName);
                 store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
+                // Elemental Resistance (Round 117): apply per-element fractional reduction.
+                store.SetElementalResist(enemyId, monsterConfig.FireResist, monsterConfig.IceResist, monsterConfig.LightningResist);
                 store.SetLastStandConfig(enemyId,
                     monsterConfig.LastStand?.HpFraction ?? 0f,
                     monsterConfig.LastStand?.SpeedMult ?? 1f,
@@ -249,6 +251,8 @@ namespace BattleSystemECS.Systems
             if (enemyId < 0) return;
             store.SetEntityName(enemyId, enemyName);
             store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
+            // Elemental Resistance (Round 117): apply per-element fractional reduction.
+            store.SetElementalResist(enemyId, monsterConfig.FireResist, monsterConfig.IceResist, monsterConfig.LightningResist);
             store.SetLastStandConfig(enemyId,
                 monsterConfig.LastStand?.HpFraction ?? 0f,
                 monsterConfig.LastStand?.SpeedMult ?? 1f,
@@ -475,6 +479,8 @@ namespace BattleSystemECS.Systems
                     }
                     store.SetEntityName(enemyId, enemyName);
                     store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
+                    // Elemental Resistance (Round 117): apply per-element fractional reduction.
+                    store.SetElementalResist(enemyId, monsterConfig.FireResist, monsterConfig.IceResist, monsterConfig.LightningResist);
                     store.SetLastStandConfig(enemyId,
                         monsterConfig.LastStand?.HpFraction ?? 0f,
                         monsterConfig.LastStand?.SpeedMult ?? 1f,

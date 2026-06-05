@@ -415,9 +415,8 @@ public void SetWaveNumber(int waveNumber)
         {
             float finalDamage = rawDamage;
 
-            // Apply damage type resistance (Physical=armor, Magic=magicResist, True=bypass all).
-            // Elemental types (Fire/Ice/Lightning) fall through to the "else" branch and use
-            // armor — matches the existing tower pipeline (see TowerAttackSystem.cs:865-880).
+            // Apply damage type resistance (Physical=armor, Magic=magicResist, Fire=fireResist, Ice=iceResist, Lightning=lightningResist, True=bypass all).
+            // Elemental types (Fire/Ice/Lightning) consult their dedicated fractional-resist SOA arrays (Round 117).
             if (damageType != DamageType.True)
             {
                 int immunityMask = store.EnemyDamageImmunityMask[enemyId];
@@ -435,7 +434,23 @@ public void SetWaveNumber(int waveNumber)
                 float magicResist = store.EnemyMagicResist[enemyId];
                 finalDamage *= Math.Max(0.01f, 1f - magicResist);
             }
-            else  // Physical / Fire / Ice / Lightning — uses armor + armor pen
+            else if (damageType == DamageType.Fire)
+            {
+                // Elemental resistance (Round 117): fractional reduction per monster JSON FireResist.
+                float fireResist = store.EnemyFireResist[enemyId];
+                finalDamage *= Math.Max(0.01f, 1f - fireResist);
+            }
+            else if (damageType == DamageType.Ice)
+            {
+                float iceResist = store.EnemyIceResist[enemyId];
+                finalDamage *= Math.Max(0.01f, 1f - iceResist);
+            }
+            else if (damageType == DamageType.Lightning)
+            {
+                float lightningResist = store.EnemyLightningResist[enemyId];
+                finalDamage *= Math.Max(0.01f, 1f - lightningResist);
+            }
+            else  // Physical (default) — uses armor + armor pen
             {
                 float enemyArmor = store.EnemyArmor[enemyId];
                 if (enemyArmor > 0f)
