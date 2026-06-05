@@ -729,6 +729,17 @@ namespace BattleSystemECS.Systems
                     store.SetFactionId(enemyId, monsterConfig.FactionId);
                     if (monsterConfig.FactionId > 0) store.FactionInfightEnabled = 1;
                     store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(monsterType);
+                    // Round 134 Direction 3 — Boss HP natural regen. Opt-in: 0 = legacy no regen.
+                    // PhaseRegenMult is stored as a flat array indexed by phase (max BOSS_PHASE_MAX).
+                    // Length-0 array → TickBossRegen falls back to 1.0× per phase.
+                    store.EnemyHealthRegenPerSec[enemyId] = monsterConfig.HealthRegenPerSec;
+                    if (monsterConfig.PhaseRegenMult != null && monsterConfig.PhaseRegenMult.Length > 0)
+                    {
+                        int ph = store.EnemyBossPhase[enemyId];
+                        if (ph >= 0 && ph < monsterConfig.PhaseRegenMult.Length)
+                            store.EnemyHealthRegenMult[enemyId] = monsterConfig.PhaseRegenMult[ph];
+                        // else leave at 1.0 (default from AddEnemy)
+                    }
 
                     // Initialize flying enemy properties from monster config
                     if (monsterConfig.IsFlying)

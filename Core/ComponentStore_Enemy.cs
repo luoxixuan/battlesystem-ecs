@@ -83,6 +83,29 @@ namespace BattleSystemECS.Core
         public float[] EnemyHitShieldTimer = new float[MAX_ENTITIES];
         // EnemyHitShieldRegenInterval: seconds between layer regen ticks (0 = no regen)
         public float[] EnemyHitShieldRegenInterval = new float[MAX_ENTITIES];
+        // ==================== Boss HP Regen (Round 134 Direction 3) ====================
+        // EnemyHealthRegenPerSec: HP/sec natural regen rate for this enemy. Default 0 = no
+        // regen (zero-overhead fast path). Sourced from monsterConfig.HealthRegenPerSec at
+        // spawn time. Bosses / elites opt in by setting a positive value — gives a "breathing
+        // window" mechanic so the player can't just burst them down in 1s of stun-lock.
+        public float[] EnemyHealthRegenPerSec = new float[MAX_ENTITIES];
+        // EnemyHealthRegenMult: per-phase multiplier on EnemyHealthRegenPerSec. 1.0 = no
+        // scaling. Indexed by EnemyBossPhase (0 = phase 1, 1 = phase 2, ...). Falls back
+        // to 1.0 when out-of-range or when monsterConfig.PhaseRegenMult is empty. Sourced
+        // from monsterConfig.PhaseRegenMult at spawn time. Default-initialized to 1.0 (not
+        // 0.0!) so legacy enemies that were never AddEnemy'd pass the no-scaling contract
+        // test and TickBossRegen can use this value directly without a per-tick fallback.
+        // Shared readonly template — every new ComponentStore() copies a fresh array via
+        // (float[])template.Clone() so writes stay per-instance, but the per-cctor 100k
+        // fill loop runs only once across the process lifetime.
+        private static readonly float[] _bossRegenMultTemplate = BossRegen_BuildDefaultMult();
+        public float[] EnemyHealthRegenMult = (float[])_bossRegenMultTemplate.Clone();
+        private static float[] BossRegen_BuildDefaultMult()
+        {
+            var arr = new float[MAX_ENTITIES];
+            for (int i = 0; i < arr.Length; i++) arr[i] = 1f;
+            return arr;
+        }
         // Enemy thorns: reflects a fraction of damage taken back to the attacker (player/tower).
         // Applied after damage is dealt, in the same frame's serial phase.
         public float[] EnemyThornsRatio = new float[MAX_ENTITIES];
@@ -1055,6 +1078,9 @@ namespace BattleSystemECS.Core
             EnemyHitShieldMax[entityId] = 0f;
             EnemyHitShieldTimer[entityId] = 0f;
             EnemyHitShieldRegenInterval[entityId] = 0f;
+            // Boss HP regen (Round 134 Dir 3) — default 0 regen / 1.0× mult (legacy zero overhead)
+            EnemyHealthRegenPerSec[entityId] = 0f;
+            EnemyHealthRegenMult[entityId] = 1f;
             EnemyEvasion[entityId] = 0f;  // default to no evasion
             // Tile-stacking penalty: default 0 stack, 1.0 slow ratio (no penalty until first frame of crowding)
             EnemyStackCount[entityId] = 0;

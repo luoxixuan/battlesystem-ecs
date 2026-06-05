@@ -98,6 +98,15 @@ namespace BattleSystemECS.Config
         public float HitShieldCount { get; set; } = 0f;
         // HitShieldRegenInterval: seconds between layer regen ticks (0 = no regen).
         public float HitShieldRegenInterval { get; set; } = 0f;
+        // HealthRegenPerSec: HP/sec natural regen rate (0 = no regen). Designed for boss / elite
+        // enemies that need a "breathing window" mechanic — e.g. a boss entering Phase 2 heals
+        // for X% of maxHP per second for N seconds, forcing the player to land damage inside a
+        // narrow DPS window. Default 0 keeps every existing monster config at zero overhead.
+        public float HealthRegenPerSec { get; set; } = 0f;
+        // PhaseRegenMult: per-phase multiplier on HealthRegenPerSec, indexed by phase index
+        // (0 = phase 1, 1 = phase 2, ...). E.g. { 1.0, 1.5, 2.5 } → phase 1 regen ×1, phase 2 ×1.5,
+        // phase 3 ×2.5. Empty array or phase index out of range → fallback 1.0 (no scaling).
+        public float[] PhaseRegenMult { get; set; } = System.Array.Empty<float>();
         // IsFlying: true if this is an airborne enemy (ignores obstacles, terrain effects)
         public bool IsFlying { get; set; } = false;
         // FlightHeight: flight altitude level (1=low, 2=high) — only meaningful if IsFlying=true

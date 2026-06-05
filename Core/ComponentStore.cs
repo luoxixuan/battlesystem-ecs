@@ -1088,6 +1088,8 @@ namespace BattleSystemECS.Core
             SummonedUnitTargetId = null!; SummonedUnitGoldReward = null!;
             EnemyBossPhase = null!; EnemyPhaseThresholds = null!;
             EnemyEnrageTimer = null!; EnemyIsEnraged = null!;
+            // Round 134 Direction 3 — Boss HP regen arrays
+            EnemyHealthRegenPerSec = null!; EnemyHealthRegenMult = null!;
             // Round 111 Direction 1 — Boss phase structured fields
             EnemyPhaseCount = null!; EnemyPhaseAbilityIdsFlat = null!; EnemyPhaseFiredMask = null!;
             EnemyPhaseThresholdsFlat = null!; EnemyPhaseSpeedMults = null!; EnemyPhaseDamageMults = null!;

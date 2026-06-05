@@ -1154,6 +1154,67 @@ namespace BattleSystemECS.Systems
             // warning). Safe to call even when _eventBus is a no-op (NullEventBus pattern) —
             // the bag is always drained and the count tracked.
             DrainPhaseChangeEvents();
+            // Round 134 Direction 3 — Boss HP natural regen. O(active enemies) single pass
+            // at end of Update. Runs AFTER all phase transitions + damage apply so the
+            // regen tick reflects the post-damage HP. Only mutates EnemyHealth[id] and is
+            // bounded by EnemyMaxHealth[id], so no over-heal / clamp hazards. Gated on
+            // EnemyHealthRegenPerSec > 0 (zero cost for legacy enemies).
+            TickBossRegen();
+        }
+
+        // Round 134 Direction 3 — Boss HP regen tick. Walks all active enemies; for any
+        // with EnemyHealthRegenPerSec > 0, applies regen * mult * dt to EnemyHealth,
+        // clamped to EnemyMaxHealth. The phase multiplier is recomputed live from
+        // monsterConfig.PhaseRegenMult indexed by EnemyBossPhase (or 1.0 if absent).
+        // Zero-overhead fast path: when no active enemy has a non-zero regen rate, the
+        // inner branch is skipped (the read of EnemyHealthRegenPerSec is a single array
+        // load — the L1 line stays hot). For 10K active enemies this is a single linear
+        // pass with two array reads + one conditional; ~10-20 ns/enemy in practice.
+        public int BossRegenDrainCount { get; private set; }
+        private void TickBossRegen()
+        {
+            if (_currentDeltaTime <= 0f) return;
+            var activeEnemyIds = _activeEnemyList;
+            int count = activeEnemyIds.Count;
+            int touched = 0;
+            for (int i = 0; i < count; i++)
+            {
+                int enemyId = activeEnemyIds[i];
+                if (!store.EnemyActive[enemyId]) continue;
+                float baseRegen = store.EnemyHealthRegenPerSec[enemyId];
+                if (baseRegen <= 0f) continue;
+                float currentHp = store.EnemyHealth[enemyId];
+                float maxHp = store.EnemyMaxHealth[enemyId];
+                if (currentHp <= 0f || currentHp >= maxHp) continue;
+                // Phase multiplier: live-lookup from monsterConfig.PhaseRegenMult indexed by
+                // the boss's current phase. If config lookup fails (uncommon — happens for
+                // injected/synthetic enemies in tests) fall back to the cached per-enemy
+                // mult that was seeded at spawn time. This way regen survives even if the
+                // GameConfig reference is incomplete in test harnesses.
+                float mult = store.EnemyHealthRegenMult[enemyId];
+                if (mult <= 0f) mult = 1f;
+                // Best-effort live refresh: only spend the dict lookup cost on enemies that
+                // actually have a non-zero base regen. The lookup is rare (boss < 10 active
+                // typically) so the per-frame cost is negligible.
+                string monsterType = store.GetEnemyTypeName(enemyId);
+                if (string.IsNullOrEmpty(monsterType))
+                    monsterType = store.GetName(enemyId);
+                var monsterConfig = gameConfig.GetMonsterConfig(monsterType);
+                if (monsterConfig != null && monsterConfig.PhaseRegenMult != null
+                    && monsterConfig.PhaseRegenMult.Length > 0)
+                {
+                    int ph = store.EnemyBossPhase[enemyId];
+                    if (ph >= 0 && ph < monsterConfig.PhaseRegenMult.Length)
+                        mult = monsterConfig.PhaseRegenMult[ph];
+                }
+                float heal = baseRegen * mult * _currentDeltaTime;
+                if (heal <= 0f) continue;
+                float newHp = currentHp + heal;
+                if (newHp > maxHp) newHp = maxHp;
+                store.EnemyHealth[enemyId] = newHp;
+                touched++;
+            }
+            BossRegenDrainCount = touched;
         }
 
         /// <summary>

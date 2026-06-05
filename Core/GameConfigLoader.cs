@@ -821,6 +821,13 @@ namespace BattleSystemECS.Config
             // Used by swarm archetypes to make them damage each other in close proximity.
             // Default 0; opt-in via monster JSON's "FactionId" field.
             monster.FactionId = ExtractInt(json, "FactionId");
+            // Round 134 Direction 3 — Boss HP natural regen. Default 0 keeps every existing
+            // monster config at zero overhead. Opt-in via monster JSON's "HealthRegenPerSec".
+            // PhaseRegenMult is a per-phase multiplier on HealthRegenPerSec (indexed by phase
+            // 0..BOSS_PHASE_MAX-1). Falls back to 1.0× when the array is empty or the phase
+            // index is out of range.
+            monster.HealthRegenPerSec = ExtractFloat(json, "HealthRegenPerSec");
+            monster.PhaseRegenMult = ParseFloatArray(json, "PhaseRegenMult");
 
             return monster;
         }
@@ -1114,6 +1121,61 @@ namespace BattleSystemECS.Config
             }
 
             return items;
+        }
+
+        // Round 134 Direction 3 — parse a JSON array of floats (e.g. PhaseRegenMult).
+        // Mirrors ParseStringArray but for unquoted numbers. Tolerates whitespace and
+        // trailing commas; malformed entries are silently skipped (defensive against
+        // hand-edited JSON). Returns an empty array when the key is absent so callers
+        // can use Length==0 as the "feature disabled" sentinel.
+        private static float[] ParseFloatArray(string json, string key)
+        {
+            var items = new List<float>();
+
+            string keyPattern = "\"" + key + "\":";
+            int keyIndex = json.IndexOf(keyPattern);
+            if (keyIndex == -1) return items.ToArray();
+
+            int arrayStart = json.IndexOf("[", keyIndex);
+            if (arrayStart == -1) return items.ToArray();
+
+            int arrayEnd = FindMatchingBrace(json, arrayStart);
+            if (arrayEnd == -1) return items.ToArray();
+
+            string arrayContent = json.Substring(arrayStart + 1, arrayEnd - arrayStart - 1);
+
+            int pos = 0;
+            while (pos < arrayContent.Length)
+            {
+                while (pos < arrayContent.Length && (char.IsWhiteSpace(arrayContent[pos]) || arrayContent[pos] == ',')) pos++;
+                if (pos >= arrayContent.Length) break;
+
+                // Read a number token: optional sign + digits + optional dot + digits
+                int tokenStart = pos;
+                if (arrayContent[pos] == '-' || arrayContent[pos] == '+') pos++;
+                while (pos < arrayContent.Length &&
+                       (char.IsDigit(arrayContent[pos]) || arrayContent[pos] == '.' || arrayContent[pos] == 'e' || arrayContent[pos] == 'E' || arrayContent[pos] == '-' || arrayContent[pos] == '+'))
+                {
+                    // Only advance on digits, '.', 'e', 'E' (sign handled separately above).
+                    char c = arrayContent[pos];
+                    if (c == '-' || c == '+')
+                    {
+                        // Sign only valid directly after 'e' or 'E'
+                        if (pos > tokenStart && (arrayContent[pos - 1] != 'e' && arrayContent[pos - 1] != 'E'))
+                            break;
+                    }
+                    pos++;
+                }
+                if (pos <= tokenStart) { pos++; continue; }
+                string token = arrayContent.Substring(tokenStart, pos - tokenStart);
+                if (float.TryParse(token, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out float v))
+                {
+                    items.Add(v);
+                }
+            }
+
+            return items.ToArray();
         }
 
         private static int FindMatchingBrace(string str, int startPos)
