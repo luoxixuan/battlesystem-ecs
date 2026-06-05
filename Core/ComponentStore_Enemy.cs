@@ -473,6 +473,11 @@ namespace BattleSystemECS.Core
         public int[] EnemyPathId = new int[MAX_ENTITIES];
         // EnemyPathNodeIndex: current waypoint index in the assigned path (-1 = reached goal / leaked)
         public int[] EnemyPathNodeIndex = new int[MAX_ENTITIES];
+        // EnemyPathSegmentStartIndex: index of the waypoint where the current path segment started
+        // (Round 121 — Direction 1: Runtime Path Branching). When the enemy crosses a junction
+        // and is re-assigned to a new path, this gets reset to 0 to mark a fresh segment.
+        // Used by EnemyMovementSystem to detect "node index went backwards" → trigger junction eval.
+        public int[] EnemyPathSegmentStartIndex = new int[MAX_ENTITIES];
         // EnemyTeleportCooldown: turns remaining until teleport is ready (0 = ready / no cooldown)
         public float[] EnemyTeleportCooldown = new float[MAX_ENTITIES];
         // EnemyTeleportDestinationX/Y: target position for teleport/blink destination
@@ -977,6 +982,9 @@ namespace BattleSystemECS.Core
             // Path/waypoint: default -1 = no path (use straight Y-axis movement)
             EnemyPathId[entityId] = -1;
             EnemyPathNodeIndex[entityId] = 0;
+            // Segment start: 0 = "fresh path assignment". Once the enemy crosses a junction and
+            // gets re-assigned, this resets to 0 to mark a new segment.
+            EnemyPathSegmentStartIndex[entityId] = 0;
             EnemySpawnFrame[entityId] = CurrentFrame;
             EnemyArmor[entityId] = armor;
             EnemyMagicResist[entityId] = magicResist;

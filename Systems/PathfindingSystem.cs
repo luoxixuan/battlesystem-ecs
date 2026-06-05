@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
 {
@@ -40,6 +41,15 @@ namespace BattleSystemECS.Systems
 
         private readonly Dictionary<string, Path> _paths = new Dictionary<string, Path>();
         private List<int> _activeEnemyList;
+        // Round 121 — Direction 1: Runtime Path Branching.
+        // Map of (sourcePathId, nodeIndex) -> JunctionDef. Key encoding avoids allocating a
+        // tuple per lookup (path id fits in 10 bits, node index in 22 bits; we shift).
+        private readonly Dictionary<long, JunctionDef> _junctions = new Dictionary<long, JunctionDef>();
+        // O(1) early-out: false = no junctions configured, skip the eval per frame.
+        private bool _hasJunctions;
+        // O(1) fast path cache for "is this (pathId, nodeIdx) a junction?" lookups from
+        // the hot per-enemy movement loop. Rebuilt only when junctions are added/removed.
+        // Key encoding matches _junctions.
 
         public PathfindingSystem(Core.ComponentStore store)
         {
@@ -230,5 +240,93 @@ namespace BattleSystemECS.Systems
         /// Get total path count.
         /// </summary>
         public int PathCount => _paths.Count;
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Round 121 — Direction 1: Runtime Path Branching
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Pack (sourcePathId, nodeIndex) into a single long key for O(1) junction lookup.
+        /// High 32 bits = sourcePathId, low 32 bits = nodeIndex. Both are non-negative ints.
+        /// </summary>
+        private static long PackJunctionKey(int sourcePathId, int nodeIndex)
+        {
+            return ((long)sourcePathId << 32) | (uint)nodeIndex;
+        }
+
+        /// <summary>
+        /// Register a junction at (sourcePathId, nodeIndex). Once any junction is registered,
+        /// the per-frame eval loop is enabled (otherwise the loop is a single bool check).
+        /// </summary>
+        public void AddJunction(JunctionDef def)
+        {
+            if (def == null) return;
+            long key = PackJunctionKey(def.SourcePathId, def.NodeIndex);
+            _junctions[key] = def;
+            _hasJunctions = true;
+        }
+
+        /// <summary>
+        /// Remove all registered junctions (typically called at level start to drop stale configs).
+        /// </summary>
+        public void ClearJunctions()
+        {
+            _junctions.Clear();
+            _hasJunctions = false;
+        }
+
+        /// <summary>
+        /// Get the junction registered at (sourcePathId, nodeIndex), or null.
+        /// </summary>
+        public JunctionDef GetJunction(int sourcePathId, int nodeIndex)
+        {
+            if (!_hasJunctions) return null;
+            long key = PackJunctionKey(sourcePathId, nodeIndex);
+            _junctions.TryGetValue(key, out JunctionDef def);
+            return def;
+        }
+
+        /// <summary>
+        /// True if at least one junction is registered (drives the per-frame fast-path).
+        /// </summary>
+        public bool HasJunctions => _hasJunctions;
+
+        /// <summary>
+        /// Evaluate which path an enemy should take at a junction.
+        /// </summary>
+        /// <param name="def">The junction configuration. Null = no junction → keep current path.</param>
+        /// <param name="currentHp">Enemy's current HP.</param>
+        /// <param name="maxHp">Enemy's max HP. If ≤ 0, HP-based policy treats the enemy as "low HP".</param>
+        /// <param name="isBossType">True if the enemy matches one of the configured boss tags (for TypeBased policy).</param>
+        /// <param name="towerCountInRadius">Number of towers within the junction's TowerDensityRadius (for TowerDensityBased policy).</param>
+        /// <returns>Path ID to assign. If no decision can be made (null def or unknown policy), returns the current path as a safe fallback.</returns>
+        public static int EvaluateJunction(JunctionDef def, float currentHp, float maxHp, bool isBossType, int towerCountInRadius)
+        {
+            if (def == null) return -1; // no junction → caller keeps current path
+
+            switch (def.Policy)
+            {
+                case JunctionPolicy.HpBased:
+                {
+                    // High-HP enemies take the "long" branch; low-HP take "short".
+                    float ratio = maxHp > 0f ? currentHp / maxHp : 0f;
+                    return ratio > def.HpLongPathThreshold ? def.LongPathId : def.ShortPathId;
+                }
+                case JunctionPolicy.TowerDensityBased:
+                {
+                    // High tower count → take the "short" path (avoid heavy defenses).
+                    return towerCountInRadius > def.TowerDensityShortPathThreshold
+                        ? def.ShortPathId
+                        : def.LongPathId;
+                }
+                case JunctionPolicy.TypeBased:
+                {
+                    // Boss-typed enemies take the "long" branch (direct path, e.g. to player).
+                    return isBossType ? def.LongPathId : def.ShortPathId;
+                }
+                default:
+                    return def.ShortPathId; // safe fallback
+            }
+        }
     }
 }

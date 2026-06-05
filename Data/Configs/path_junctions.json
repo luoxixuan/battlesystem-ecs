@@ -1,0 +1,30 @@
+[
+  {
+    "Id": "default_to_fork_at_y15",
+    "Name": "Default Path Branch at y=15",
+    "SourcePathId": 0,
+    "NodeIndex": 1,
+    "Policy": "HpBased",
+    "HpLongPathThreshold": 0.75,
+    "TowerDensityRadius": 4.0,
+    "TowerDensityShortPathThreshold": 2,
+    "BossTypeTags": ["boss", "elite"],
+    "ShortPathId": 0,
+    "LongPathId": 1,
+    "Description": "Default path: at the 2nd waypoint (y=15), high-HP enemies branch to fork_left."
+  },
+  {
+    "Id": "default_to_fork_at_y10_tower_density",
+    "Name": "Tower-Density Avoidance Branch at y=10",
+    "SourcePathId": 0,
+    "NodeIndex": 2,
+    "Policy": "TowerDensityBased",
+    "HpLongPathThreshold": 0.75,
+    "TowerDensityRadius": 4.0,
+    "TowerDensityShortPathThreshold": 2,
+    "BossTypeTags": ["boss", "elite"],
+    "ShortPathId": 0,
+    "LongPathId": 2,
+    "Description": "Default path: at the 3rd waypoint (y=10), enemies avoid heavy tower clusters by branching to fork_right."
+  }
+]

@@ -93,6 +93,10 @@ namespace BattleSystemECS.Systems
             // in O(1) instead of an O(N²) check on every frame.
             // Uses ComponentStore.ActiveTetheredCount (O(1)) instead of per-frame O(N) scan.
             _hasTetheredThisFrame = store.ActiveTetheredCount > 0;
+            // Round 121 — Direction 1: cache junction presence for O(1) early-out.
+            // When no junctions are configured (the common case), the per-enemy junction
+            // check is a single bool read and skipped entirely.
+            _pathfindingHasJunctions = _pathfinding != null && _pathfinding.HasJunctions;
         }
 
         // Cached per-turn: true if at least one active enemy has TrampleRadius & damage > 0.
@@ -101,6 +105,9 @@ namespace BattleSystemECS.Systems
         // Cached per-turn: true if at least one active enemy has TetherMaxLength > 0.
         // Set in SetTurn(); consumed in ResolveTetherEnforcement() for O(1) early-out.
         private bool _hasTetheredThisFrame;
+        // Round 121 — Direction 1: cached per-turn "any junctions registered?" flag.
+        // Drives O(1) early-out in the per-enemy loop. When false, no per-enemy work runs.
+        private bool _pathfindingHasJunctions;
 
         public void Update()
         {
@@ -142,6 +149,51 @@ namespace BattleSystemECS.Systems
                 store.EnemyPathTerrainSpeedMult[enemyId] = speedMult;
                 store.EnemyPathTerrainDmgMult[enemyId] = dmgMult;
 
+                // ── Round 121 — Direction 1: Runtime Path Branching ──
+                // When the enemy arrives at a waypoint, check if it's a junction. If so,
+                // re-evaluate which path the enemy should follow (HP-based / tower-density /
+                // type-based) and reset the path segment so movement continues from the new
+                // path's first waypoint. O(1) early-out via _pathfindingHasJunctions.
+                // Round 121 fix: read ex/ey here so the junction helper (CountTowersNearEnemy)
+                // can use them; they are also reused by the palisade block below (no double-read).
+                float ex = store.PositionX[enemyId];
+                float ey = store.PositionY[enemyId];
+                if (_pathfindingHasJunctions)
+                {
+                    int curPath = store.EnemyPathId[enemyId];
+                    int curNode = store.EnemyPathNodeIndex[enemyId];
+                    int segStart = store.EnemyPathSegmentStartIndex[enemyId];
+                    // Trigger condition: enemy is on a path with a valid node index, and either
+                    // it just reached the last node in the segment OR its node index is now
+                    // beyond the segment start (segment closed). Either way the segment is done.
+                    if (curPath >= 0 && curNode >= 0 && curNode > segStart)
+                    {
+                        JunctionDef junc = _pathfinding.GetJunction(curPath, curNode);
+                        if (junc != null)
+                        {
+                            int towerCount = CountTowersNearEnemy(ex, ey, junc.TowerDensityRadius);
+                            bool isBoss = IsBossEnemy(enemyId);
+                            int newPath = PathfindingSystem.EvaluateJunction(
+                                junc,
+                                store.EnemyHealth[enemyId],
+                                store.EnemyMaxHealth[enemyId],
+                                isBoss,
+                                towerCount);
+                            if (newPath >= 0 && newPath != curPath)
+                            {
+                                // Re-assign to new path; reset segment start so the next
+                                // junction is detected after the new path's first waypoint.
+                                store.EnemyPathId[enemyId] = newPath;
+                                store.EnemyPathNodeIndex[enemyId] = 0;
+                                store.EnemyPathSegmentStartIndex[enemyId] = 0;
+                                // Cached speedMult/dmgMult above were computed for the OLD node,
+                                // which is fine — the enemy is at the junction waypoint, not
+                                // moving toward a new one yet (movement happens further below).
+                            }
+                        }
+                    }
+                }
+
                 // Check stun BEFORE decrement so duration=1 blocks exactly 1 frame (current frame),
                 // then decrements to 0 for next frame.
                 if (store.EnemyStunDurationLeft[enemyId] > 0f)
@@ -166,8 +218,8 @@ namespace BattleSystemECS.Systems
                     && store.ActivePalisadeCount > 0)
                 {
                     int towerCount = _activeTowerList.Count;
-                    float ex = store.PositionX[enemyId];
-                    float ey = store.PositionY[enemyId];
+                    // Round 121: reuse ex/ey declared at the top of this lambda (path branching
+                    // block) so we don't re-read the same PositionX/Y on every enemy.
                     int gx = (int)Math.Floor(ex);
                     int gy = (int)Math.Floor(ey);
                     for (int t = 0; t < towerCount; t++)
@@ -1069,6 +1121,45 @@ switch (actionEnum)
                     return dir;
             }
             return 1; // default dodge right
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Round 121 — Direction 1: Runtime Path Branching helpers
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Count active towers within `radius` of (x, y). Used by TowerDensityBased junction
+        /// policy. Iterates ActiveTowerIds (typically O(10) for normal plays) and does a
+        /// squared-distance check. Parallel-safe: each enemy calls this in its own thread,
+        /// reads are read-only on TowerActive / PositionX / PositionY.
+        /// </summary>
+        private int CountTowersNearEnemy(float x, float y, float radius)
+        {
+            if (_activeTowerList == null) return 0;
+            float rSq = radius * radius;
+            int count = 0;
+            int n = _activeTowerList.Count;
+            for (int t = 0; t < n; t++)
+            {
+                int towerId = _activeTowerList[t];
+                if (!store.TowerActive[towerId]) continue;
+                float dx = store.PositionX[towerId] - x;
+                float dy = store.PositionY[towerId] - y;
+                if (dx * dx + dy * dy <= rSq) count++;
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// True if the enemy has any boss-related flag set (Elite or BossPhase > 0).
+        /// Used by TypeBased junction policy. Reads two SOA fields. Note: there is no
+        /// dedicated `EnemyIsBoss` flag in the store — bosses are identified by their
+        /// BossPhase field being non-zero (set when the boss enters a phase transition).
+        /// </summary>
+        private bool IsBossEnemy(int enemyId)
+        {
+            return store.EnemyIsElite[enemyId]
+                || store.EnemyBossPhase[enemyId] > 0;
         }
     }
 }

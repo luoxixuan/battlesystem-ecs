@@ -911,6 +911,51 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Runtime path branching junction definition (Round 121 — Direction 1).
+    /// Defines a single decision point on a path where the enemy dynamically chooses
+    /// which downstream path to follow, based on a JunctionPolicy. Loaded from
+    /// `path_junctions.json` (no JSON loader integration yet — wired directly in tests/code).
+    /// </summary>
+    public class JunctionDef
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        // Path ID where this junction lives (0 = default, 1 = fork_left, 2 = fork_right, 3 = ring).
+        public int SourcePathId { get; set; } = 0;
+        // Waypoint index within the source path that is the decision point.
+        public int NodeIndex { get; set; } = 0;
+        // Policy used to choose the downstream path. 0 = HpBased, 1 = TowerDensityBased, 2 = TypeBased.
+        // (String also accepted via ToString/Parse; integer form is the wire form.)
+        public JunctionPolicy Policy { get; set; } = JunctionPolicy.HpBased;
+        // For HpBased: HP fraction threshold (0-1). Enemies with HP/maxHP > threshold take the
+        // "long" branch; others take the "short" branch.
+        public float HpLongPathThreshold { get; set; } = 0.75f;
+        // For TowerDensityBased: tower count within TowerDensityRadius. If count > threshold,
+        // take the "short" branch (avoid heavy defenses); else take the "long" branch.
+        public float TowerDensityRadius { get; set; } = 4f;
+        public int TowerDensityShortPathThreshold { get; set; } = 2;
+        // For TypeBased: monster types (by tag) that take the "boss" branch (direct path).
+        public List<string> BossTypeTags { get; set; } = new List<string>();
+        // Path IDs to assign based on policy result.
+        // Index 0 = "short"/"direct" path; Index 1 = "long"/"boss" path. Default to existing paths.
+        public int ShortPathId { get; set; } = 0;
+        public int LongPathId { get; set; } = 1;
+        public string Description { get; set; } = "";
+    }
+
+    /// <summary>
+    /// Policy used by JunctionDef to decide which downstream path an enemy takes.
+    /// 0 = HpBased (high HP → long path), 1 = TowerDensityBased (high tower count → short path),
+    /// 2 = TypeBased (boss tag → direct path).
+    /// </summary>
+    public enum JunctionPolicy
+    {
+        HpBased = 0,
+        TowerDensityBased = 1,
+        TypeBased = 2,
+    }
+
+    /// <summary>
     /// Wave mutator definition — loaded from wave_mutators.json.
     /// A mutator applies a global modifier to all enemies during a specific wave.
     /// </summary>
