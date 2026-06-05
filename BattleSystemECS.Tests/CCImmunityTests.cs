@@ -277,7 +277,8 @@ namespace BattleSystemECS.Tests
         public void Mask_BossDefault_EqualsMask_AllCC()
         {
             Assert.Equal(CCImmunityConfig.Mask_AllCC, CCImmunityConfig.Mask_BossDefault);
-            Assert.Equal(0x3F, CCImmunityConfig.Mask_AllCC);
+            // Round 124 — added Mask_Disarm = 1<<6, so 6 bits → 0x3F (63) became 7 bits → 0x7F (127)
+            Assert.Equal(0x7F, CCImmunityConfig.Mask_AllCC);
         }
 
         // ─── Mask bits are unique (no overlap) ─────────────────────────────

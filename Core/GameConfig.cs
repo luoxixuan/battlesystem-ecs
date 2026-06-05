@@ -195,6 +195,9 @@ namespace BattleSystemECS.Config
         public float StunChance { get; set; } = 0f;   // probability per hit (0-1)
         public float SlowAmount { get; set; } = 0f;   // speed multiplier (e.g. 0.5 = 50% speed)
         public float SlowDuration { get; set; } = 0f; // duration in turns
+        // Round 124 — Disarm: probability per hit (0-1) and duration in turns (0 = no disarm)
+        public float DisarmChance { get; set; } = 0f;
+        public float DisarmDuration { get; set; } = 0f;
         // Targeting mode: which enemy the tower prefers to attack
         public TowerTargetingMode TargetingMode { get; set; } = TowerTargetingMode.Nearest;
         // Tower special ability fields (null = no special ability)
@@ -2815,8 +2818,9 @@ namespace BattleSystemECS.Config
         public const int Mask_Knockback  = 1 << 3;
         public const int Mask_Polymorph  = 1 << 4;
         public const int Mask_Stagger    = 1 << 5;
+        public const int Mask_Disarm     = 1 << 6;   // Disarm: enemy cannot use abilities (call of Round 124)
         /// <summary>All CC types (full immunity — equivalent to EnemyIsUnstoppable=true).</summary>
-        public const int Mask_AllCC      = Mask_Slow | Mask_Stun | Mask_Freeze | Mask_Knockback | Mask_Polymorph | Mask_Stagger;
+        public const int Mask_AllCC      = Mask_Slow | Mask_Stun | Mask_Freeze | Mask_Knockback | Mask_Polymorph | Mask_Stagger | Mask_Disarm;
         /// <summary>Boss/Elite default: immune to all CC (forces pure-damage tower compositions).</summary>
         public const int Mask_BossDefault = Mask_AllCC;
     }

@@ -197,6 +197,10 @@ namespace BattleSystemECS.Systems
                     if (string.IsNullOrEmpty(upgradePath)) upgradePath = "standard";
                     store.AddTower(towerId, type, damage, range, speed, 1, cost, upgradePath,
                         tc.StunChance, tc.SlowAmount, tc.SlowDuration, tc.DamageType, tc.TurnRate);
+                    // Round 124 — Apply disarm params from config (independent of AddTower signature;
+                    // AddTower leaves both fields at 0 by default, so this is a safe post-fill).
+                    store.TowerDisarmChance[towerId] = tc.DisarmChance;
+                    store.TowerDisarmDuration[towerId] = tc.DisarmDuration;
                     // Apply tower targeting mode from config
                     store.SetTowerTargetingMode(towerId, tc.TargetingMode);
                     // Apply ammo system if configured (0 = unlimited)

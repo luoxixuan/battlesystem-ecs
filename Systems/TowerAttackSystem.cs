@@ -1619,6 +1619,9 @@ namespace BattleSystemECS.Systems
                 float stunChance = store.TowerStunChance[towerId];
                 float slowAmount = store.TowerSlowAmount[towerId];
                 float slowDuration = store.TowerSlowDuration[towerId];
+                // Round 124 — Disarm: independent of stun/slow. Read once per debuff application.
+                float disarmChance = store.TowerDisarmChance[towerId];
+                float disarmDuration = store.TowerDisarmDuration[towerId];
 
                 // Apply knockback if tower has knockback force
                 float kbForce = store.TowerKnockbackForce[towerId];
@@ -1655,6 +1658,13 @@ namespace BattleSystemECS.Systems
                         {
                             int actualDuration = (int)Math.Max(1, slowDuration * (1f - _enemySlowResistance));
                             store.ApplyEnemySlow(enemyId, slowAmount, actualDuration);
+                        }
+                        // Round 124 — Disarm: separate from stun, doesn't share stun-resistance.
+                        // Applies after stun/slow so the enemy still has a chance to be stunned first.
+                        if (disarmChance > 0f && disarmDuration > 0f && _rand.NextDouble() < disarmChance)
+                        {
+                            int disarmTurns = Math.Max(1, (int)Math.Ceiling(disarmDuration));
+                            store.ApplyEnemyDisarm(enemyId, disarmTurns);
                         }
                         // Apply healing reduction debuff on every tower hit
                         store.EnemyHealingReduction[enemyId] = Math.Max(store.EnemyHealingReduction[enemyId], HEALING_REDUCTION_AMOUNT);

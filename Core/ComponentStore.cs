@@ -782,6 +782,9 @@ namespace BattleSystemECS.Core
                 TowerStunChance[entityId] = 0f;
                 TowerSlowAmount[entityId] = 0f;
                 TowerSlowDuration[entityId] = 0f;
+                // Round 124 — Disarm CC fields reset (recycled slot must start with no disarm)
+                TowerDisarmChance[entityId] = 0f;
+                TowerDisarmDuration[entityId] = 0f;
                 TowerPlaceTime[entityId] = 0f;
                 TowerCanHitAir[entityId] = false;
                 TowerCanHitGround[entityId] = false;
@@ -1135,6 +1138,8 @@ namespace BattleSystemECS.Core
             TowerLevel = null!; TowerUpgradeCost = null!; TowerTotalUpgradeSpent = null!; TowerUpgradePathId = null!;
             TowerFusionTier = null!; TowerActive = null!; TowerLastAttackTime = null!;
             TowerStunChance = null!; TowerSlowAmount = null!; TowerSlowDuration = null!;
+            // Round 124 — Disarm CC fields (per-tower chance + duration)
+            TowerDisarmChance = null!; TowerDisarmDuration = null!;
             TowerArmorPierceRatio = null!; TowerSplashRadius = null!;
             TowerArmorShredBonus = null!; TowerShieldBreakBonus = null!; TowerAccuracy = null!;
             TowerFalloffInnerRatio = null!; TowerFalloffOuterMult = null!;

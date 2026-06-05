@@ -130,6 +130,10 @@ namespace BattleSystemECS.Core
         // EnemyStunDurationLeft: stun duration in turns. Decremented by EnemyMovementSystem.Update().
         // When > 0, IsEnemyStunned() returns true regardless of EnemyStunFlag.
         public float[] EnemyStunDurationLeft = new float[MAX_ENTITIES];
+        // EnemyDisarmDurationLeft: disarm duration in turns. Decremented by EnemyAbilitySystem each frame.
+        // When > 0, IsEnemyDisarmed() returns true and the enemy cannot queue abilities (Round 124).
+        // Distinct from stun: disarmed enemies can still move and attack (basic melee), just not cast abilities.
+        public float[] EnemyDisarmDurationLeft = new float[MAX_ENTITIES];
         // EnemyCCImmuneMask: per-enemy bitmask of CC types this enemy fully ignores (Round 97).
         // Stacks with EnemyIsUnstoppable: if either the bit OR the unstoppable flag is set, CC is skipped.
         // Bit layout matches CCImmunityConfig.Mask_* (Slow=0, Stun=1, Freeze=2, Knockback=3,
@@ -519,6 +523,8 @@ namespace BattleSystemECS.Core
         // ==================== 敌人抗性字段（SOA） ====================
         // EnemyStunResistance: 0-1, reduces stun duration and chance
         public float[] EnemyStunResistance = new float[MAX_ENTITIES];
+        // EnemyDisarmResistance: 0-1, reduces disarm duration applied by tower attacks (Round 124)
+        public float[] EnemyDisarmResistance = new float[MAX_ENTITIES];
         // EnemyFreezeResistance: 0-1, reduces freeze duration and chance
         public float[] EnemyFreezeResistance = new float[MAX_ENTITIES];
         // EnemySlowResistance: 0-1, reduces slow factor severity
@@ -1566,6 +1572,39 @@ namespace BattleSystemECS.Core
             if (EnemyStunDurationLeft[enemyId] > 0f) return true;
             // Fallback: legacy flag (set by external systems, cleared by EnemyMovementSystem.SetTurn)
             return EnemyStunFlag[enemyId];
+        }
+
+        /// <summary>Returns true if the enemy is currently disarmed (cannot cast abilities). Round 124.</summary>
+        public bool IsEnemyDisarmed(int enemyId)
+        {
+            if (!IsValidEntity(enemyId)) return false;
+            return EnemyDisarmDurationLeft[enemyId] > 0f;
+        }
+
+        /// <summary>
+        /// Applies disarm to the enemy for `duration` turns. While disarmed, the enemy cannot
+        /// queue or cast abilities via EnemyAbilitySystem.EnqueueAbility(), but can still move
+        /// and perform basic melee attacks. Respects EnemyIsUnstoppable, per-type CC immunity
+        /// (CCImmunityConfig.Mask_Disarm), and EnemyDisarmResistance. Refreshing semantics:
+        /// if existing duration is longer than the new one, keep the longer one. (Round 124)
+        /// </summary>
+        public void ApplyEnemyDisarm(int enemyId, int duration)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            if (duration <= 0) return;
+            // Total CC immunity (unstoppable enemies ignore disarm too)
+            if (EnemyIsUnstoppable[enemyId]) return;
+            // Per-type CC immunity (Round 97): Disarm bit blocks this CC type
+            if (IsCCImmuneTo(enemyId, CCImmunityConfig.Mask_Disarm)) return;
+            // Apply disarm resistance: reduce duration by resistance fraction
+            if (EnemyDisarmResistance[enemyId] > 0f)
+            {
+                duration = (int)(duration * (1f - EnemyDisarmResistance[enemyId]));
+                if (duration <= 0) return;
+            }
+            // Refresh-or-set semantics: keep longer remaining duration (no double-dipping)
+            if (duration > EnemyDisarmDurationLeft[enemyId])
+                EnemyDisarmDurationLeft[enemyId] = duration;
         }
 
         /// <summary>Applies a stun to the enemy for the current frame. Stun clears automatically at start of each frame via SetTurnCCFlags.</summary>

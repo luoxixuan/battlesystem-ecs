@@ -150,6 +150,12 @@ namespace BattleSystemECS.Core
         public float[] TowerStunChance = new float[MAX_ENTITIES];
         public float[] TowerSlowAmount = new float[MAX_ENTITIES];
         public float[] TowerSlowDuration = new float[MAX_ENTITIES];
+        // Round 124 — Disarm: per-tower chance to apply a Disarm CC on hit (0 = no disarm, e.g. 0.15 = 15% chance per hit).
+        // Distinct from stun (which blocks movement). Disarm preserves mobility + basic attack
+        // but silences all enemy abilities (heal, summon, buff, AOE, etc.).
+        public float[] TowerDisarmChance = new float[MAX_ENTITIES];
+        // Round 124 — Disarm duration in turns applied when the disarm roll succeeds.
+        public float[] TowerDisarmDuration = new float[MAX_ENTITIES];
         // Tower special abilities from upgrade path (e.g., armor pierce, splash, critical strike)
         public float[] TowerArmorPierceRatio = new float[MAX_ENTITIES];
         public float[] TowerSplashRadius = new float[MAX_ENTITIES];
@@ -879,6 +885,9 @@ namespace BattleSystemECS.Core
             TowerStunChance[entityId] = stunChance;
             TowerSlowAmount[entityId] = slowAmount;
             TowerSlowDuration[entityId] = slowDuration;
+            // Round 124 — disarm defaults to 0 (not set by AddTower's signature; configured via TowerConfig)
+            TowerDisarmChance[entityId] = 0f;
+            TowerDisarmDuration[entityId] = 0f;
             // Aura tower fields: default to non-aura (false/0)
             TowerIsAuraTower[entityId] = false;
             TowerAuraRadius[entityId] = 0f;

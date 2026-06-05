@@ -94,6 +94,17 @@ namespace BattleSystemECS.Systems
             // If enemy is already channeling, ignore new ability requests (channel is locked).
             if (store.EnemyIsChanneling[enemyId]) return;
 
+            // Disarm CC (Round 124): a disarmed enemy cannot queue or cast any ability.
+            // Distinct from Stun (which blocks movement). Disarm preserves mobility + basic attack
+            // but silences all abilities (AOE heal, summon, buff, stun_aoe, etc.).
+            // Skip if the enemy is dead or invalid; otherwise check the per-enemy disarm duration.
+            if (!store.EnemyActive[enemyId]) return;
+            if (store.EnemyDisarmDurationLeft[enemyId] > 0f)
+            {
+                logger.Log($"[ABILITY] Enemy {enemyId} is DISARMED, skipping ability '{ability.Name}'");
+                return;
+            }
+
             // Channeling path: if ability has CastTime > 0, start a channel timer instead of
             // executing immediately. The string ability id is stored so TickCastTimers can
             // resolve the EnemyAbilityDef via the existing _abilityLookup (avoids hash
@@ -128,6 +139,14 @@ namespace BattleSystemECS.Systems
                 int idx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY; // slot 0
                 if (_abilityCooldownTimers[idx] > 0f)
                     _abilityCooldownTimers[idx] -= deltaTime;
+
+                // Round 124: tick down per-enemy disarm duration (independent of ability cooldowns)
+                float disarmLeft = store.EnemyDisarmDurationLeft[enemyId];
+                if (disarmLeft > 0f)
+                {
+                    disarmLeft -= deltaTime;
+                    store.EnemyDisarmDurationLeft[enemyId] = disarmLeft > 0f ? disarmLeft : 0f;
+                }
             }
         }
 
@@ -156,7 +175,24 @@ namespace BattleSystemECS.Systems
                 }
 
                 store.EnemyChannelTimer[enemyId] -= 1f;
-                if (store.EnemyChannelTimer[enemyId] > 0f) continue;
+                if (store.EnemyChannelTimer[enemyId] > 0f)
+                {
+                    // Round 124: disarm during a channel interrupts it (no cooldown refund —
+                    // consistent with AddStaggerDamage which also overrides Interruptible).
+                    if (store.EnemyDisarmDurationLeft[enemyId] > 0f)
+                    {
+                        store.EnemyIsChanneling[enemyId] = false;
+                        store.EnemyChannelTimer[enemyId] = 0f;
+                        store.EnemyChannelAbilityId[enemyId] = null;
+                        store.EnemyChannelInterruptible[enemyId] = true;
+                        int popIdx2 = _activeChannelers.Count - 1;
+                        if (i != popIdx2) _activeChannelers[i] = _activeChannelers[popIdx2];
+                        _activeChannelers.RemoveAt(popIdx2);
+                        logger.Log($"[ABILITY] Enemy {enemyId} channel interrupted by DISARM");
+                        continue;
+                    }
+                    continue;
+                }
 
                 // Channel complete: resolve the ability
                 string abilityId = store.EnemyChannelAbilityId[enemyId];
