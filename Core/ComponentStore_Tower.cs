@@ -383,6 +383,20 @@ namespace BattleSystemECS.Core
         // TowerCurseDmgTakenIncrease: additional damage taken bonus applied to cursed enemies (e.g. 0.25 = +25% damage taken)
         public float[] TowerCurseDmgTakenIncrease = new float[MAX_ENTITIES];
 
+        // ==================== 荆棘光环塔 (Thorns Aura Tower — 塔-塔被动伤害光环) ====================
+        // Round 126 Direction 4 — Thorns Aura. When TowerIsThornsTower=true with a non-zero
+        //   TowerThornsRadius and TowerThornsDps, every TowerThornsInterval seconds the tower
+        //   applies TowerThornsDps damage to every enemy in range (continuous per-frame
+        //   scaling when interval=0). Distinct from on-hit reflect: this is a constant
+        //   passive aura, like a poison cloud centered on the tower. Designers opt-in by
+        //   setting non-zero radius+dps. The system is serial (no Parallel.For) because
+        //   thorns towers are rare and the active-enemy count is bounded.
+        public bool[] TowerIsThornsTower = new bool[MAX_ENTITIES];
+        public float[] TowerThornsRadius = new float[MAX_ENTITIES];
+        public float[] TowerThornsDps = new float[MAX_ENTITIES];
+        public float[] TowerThornsInterval = new float[MAX_ENTITIES];
+        public float[] TowerThornsTimer = new float[MAX_ENTITIES];
+
         // ==================== 治疗光环塔 (Heal Aura Tower — 塔-塔主动治疗链接) ====================
         // TowerHealAuraRadius: world-units radius within which this tower heals friendly towers
         //   each TowerHealAuraInterval seconds. 0 = no heal aura (zero-overhead fast path on hot
@@ -1121,6 +1135,15 @@ namespace BattleSystemECS.Core
             TowerHealAuraAmount[entityId] = 0f;
             TowerHealAuraInterval[entityId] = 0f;
             TowerHealAuraTimer[entityId] = 0f;
+            // Round 126 Direction 4 — Thorns Aura Tower: default to no thorns aura (radius=0, dps=0, interval=0, timer=0).
+            //   TowerIsThornsTower remains false (recycled slot must not inherit opt-in flag from prior tower).
+            //   Timer=0 means "fire next frame" for interval=0 thorns towers; for interval>0 it's reset
+            //   to interval on first tick.
+            TowerIsThornsTower[entityId] = false;
+            TowerThornsRadius[entityId] = 0f;
+            TowerThornsDps[entityId] = 0f;
+            TowerThornsInterval[entityId] = 0f;
+            TowerThornsTimer[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
             // Round 103 — Buff Share: notify per-system caches that a fresh tower occupies
@@ -1354,6 +1377,15 @@ namespace BattleSystemECS.Core
             TowerHealAuraAmount[entityId] = 0f;
             TowerHealAuraInterval[entityId] = 0f;
             TowerHealAuraTimer[entityId] = 0f;
+            // Round 126 Direction 4 — Thorns Aura Tower fields reset. Reset is critical: a recycled
+            //   tower slot must not retain a stale thorns radius/dps from the previous occupant
+            //   (would cause a non-thorns tower to silently start damaging nearby enemies). Reset
+            //   the opt-in flag to false so the new tower has to explicitly opt-in via TowerConfig.
+            TowerIsThornsTower[entityId] = false;
+            TowerThornsRadius[entityId] = 0f;
+            TowerThornsDps[entityId] = 0f;
+            TowerThornsInterval[entityId] = 0f;
+            TowerThornsTimer[entityId] = 0f;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
             // Round 103 — Buff Share: drop any cached base-speed entry for the removed tower
             // (Claude bug scan fix #2: stale cache on ID reuse).

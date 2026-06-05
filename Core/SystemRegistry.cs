@@ -61,6 +61,8 @@ namespace BattleSystemECS.Core
         public BleedSystem? Bleed { get; private set; }
         // Round 122 Direction 2 — Heal Aura System (passive tower-to-tower healing).
         public HealAuraSystem? HealAura { get; private set; }
+        // Round 126 Direction 4 — Thorns Aura System (passive tower-centered damage aura on enemies).
+        public ThornsAuraSystem? ThornsAura { get; private set; }
         public ProjectileSystem? Projectile { get; private set; }
         public ChronoTowerSystem? ChronoTower { get; private set; }
         // Round 106 Direction 2 — Mine / Trap tower (proximity-triggered AoE)
@@ -297,6 +299,11 @@ namespace BattleSystemECS.Core
             // tower-only effect semantics: opt-in via tower-config fields, zero-overhead
             // when no heal-aura tower is on the field (radius==0 fast path).
             HealAura = new HealAuraSystem(store);
+            // Round 126 Direction 4 — Thorns Aura System. Mirrors the HealAura wiring:
+            // opt-in via tower-config fields, zero-overhead when no thorns tower is on
+            // the field (IsThornsTower==false fast path). Runs in SkillBuffGroup like
+            // HealAura, but deals damage to enemies instead of healing friendly towers.
+            ThornsAura = new ThornsAuraSystem(store);
 
             // ── Projectile ──
             Projectile = new ProjectileSystem(store, logger);
@@ -461,7 +468,15 @@ namespace BattleSystemECS.Core
                 // (queries GetCurrentLevel/GetCurrentWave directly from the spawner).
                 WavePreview?.Subscribe(WaveSpawning);
             }
+            // Round 126 Direction 4 — stashed so AssignToGroups can plumb playerId into
+            // the SkillBuffGroup. ThornsAuraSystem.Update needs the killing-player id
+            // to attribute QueueEnemyDeath calls (matches BleedSystem / TowerAttackSystem
+            // behavior). SystemRegistry itself has no SkillBuff field — the property
+            // lives on FrameScheduler.
+            _thornsAuraPlayerId = playerId;
         }
+
+        private int _thornsAuraPlayerId = 0;
 
         // ═══════════════════════════════════════════════════════════════════
         //  Assign to FrameScheduler groups — one block per group
@@ -593,6 +608,15 @@ namespace BattleSystemECS.Core
             scheduler.SkillBuff.Mark = Mark;
             // Round 122 Direction 2 — Heal Aura System wiring (passive tower-to-tower healing)
             scheduler.SkillBuff.HealAura = HealAura;
+            // Round 126 Direction 4 — Thorns Aura System wiring (passive tower-centered damage on enemies).
+            //   The system reference is wired in AssignToGroups; the playerId is set below in
+            //   WireDependencies where the parameter is in scope. (Moved from AssignToGroups
+            //   because that method does not take a playerId parameter.)
+            scheduler.SkillBuff.ThornsAura = ThornsAura;
+            // Round 126 Direction 4 — playerId stashed in WireDependencies (which is
+            // the only place the id is in scope) is now propagated to the SkillBuffGroup
+            // so ThornsAuraSystem.Update can attribute QueueEnemyDeath to the killing player.
+            scheduler.SkillBuff.ThornsAuraPlayerId = _thornsAuraPlayerId;
 
             // ── Post-death ──
             scheduler.PostDeath.EnemyFission = EnemyFission;

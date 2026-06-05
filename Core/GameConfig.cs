@@ -260,6 +260,17 @@ namespace BattleSystemECS.Config
         public float HealAuraRadius { get; set; } = 0f;
         public float HealAuraAmount { get; set; } = 0f;
         public float HealAuraInterval { get; set; } = 0f;
+        // Round 126 Direction 4 — Thorns Aura Tower. If IsThornsTower=true with non-zero
+        //   ThornsRadius and ThornsDps, this tower passively applies ThornsDps damage per
+        //   second (or per ThornsInterval seconds when interval > 0) to every enemy in
+        //   range. Default false/0/0/0 = no thorns aura. Designers size DPS to be small
+        //   (1-15 per tick) so the system is a maintenance pressure mechanic, not a
+        //   kill-the-whole-wave button. Distinct from on-hit reflect: this is a
+        //   constant passive aura, like a poison cloud centered on the tower.
+        public bool IsThornsTower { get; set; } = false;
+        public float ThornsRadius { get; set; } = 0f;
+        public float ThornsDps { get; set; } = 0f;
+        public float ThornsInterval { get; set; } = 0f;
         // Taunt tower: if true, tower forces nearby enemies to retarget it (dual of Aggro/Leash —
         //   Aggro = enemy chases player; Taunt = tower forces enemy to attack itself)
         public bool IsTauntTower { get; set; } = false;

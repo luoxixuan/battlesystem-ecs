@@ -2015,5 +2015,22 @@
         "SlowAmount": 0.5,
         "SlowDuration": 3,
         "TargetingMode": 0
+    },
+    {
+        "UpgradeCost": 150,
+        "Name": "Thorn Spire",
+        "Damage": 8,
+        "Type": "Nature",
+        "Cost": 220,
+        "AttackSpeed": 0.6,
+        "Range": 3,
+        "StunChance": 0.0,
+        "SlowAmount": 0.0,
+        "SlowDuration": 0.0,
+        "TargetingMode": 0,
+        "IsThornsTower": true,
+        "ThornsRadius": 4.0,
+        "ThornsDps": 6.0,
+        "ThornsInterval": 0.5
     }
 ]

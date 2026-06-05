@@ -20,6 +20,13 @@ namespace BattleSystemECS.Core
         // are layered on top of any other heal effects in the same frame. SetTurn first
         // rebuilds the healer cache; Update fires the actual heal ticks.
         public Systems.HealAuraSystem? HealAura { get; set; }
+        // Round 126 Direction 4 — Thorns Aura System (passive tower-centered damage on enemies).
+        // Runs after HealAura so thorns damage is layered on top of any same-frame heal
+        // effects (heal→thorns in the same frame can still kill a wounded enemy). The
+        // playerId is plumbed through the group so Update can attribute QueueEnemyDeath
+        // to the killing player.
+        public Systems.ThornsAuraSystem? ThornsAura { get; set; }
+        public int ThornsAuraPlayerId { get; set; } = 0;
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -35,6 +42,14 @@ namespace BattleSystemECS.Core
             // returns, Update early returns on empty healer cache).
             HealAura?.SetTurn();
             HealAura?.Update(deltaTime);
+            // Thorns aura: cache thorns-emitter tower IDs first, then fire thorns ticks.
+            // Same zero-overhead contract as HealAura. SetTurn early-returns on no
+            // IsThornsTower flag set; Update early-returns on empty cache or empty
+            // active-enemy set. The thorns damage write happens in serial Phase 9,
+            // before ResolveEnemiesKilledThisFrame in Phase 10, so any deaths
+            // queued here are resolved cleanly at the frame boundary.
+            ThornsAura?.SetTurn();
+            ThornsAura?.Update(deltaTime, ThornsAuraPlayerId);
             Skill?.Update(deltaTime);
             Wisp?.Update(deltaTime);
         }

@@ -294,6 +294,24 @@ namespace BattleSystemECS.Systems
                         store.TowerHealAuraTimer[towerId] = 0f;
                         logger.Log($"[TOWER] {tc.Name} 治疗塔: 半径 {tc.HealAuraRadius}, 治疗 {tc.HealAuraAmount}/tick, 间隔 {tc.HealAuraInterval}s");
                     }
+                    // Apply thorns aura properties (Round 126 Dir 4) — passive tower-centered damage aura.
+                    //   Opt-in via tc.IsThornsTower=true. We write all 5 fields together so a thorns
+                    //   tower config stays atomic (radius=0 + dps=0 + interval=0 means "no aura" and
+                    //   the SetTurn filter will still cache the tower, but Update's defensive checks
+                    //   bail before doing work). The system applies raw HP damage to enemies in
+                    //   range; no shield, no resistance (intentionally simple — thorns is a
+                    //   constant standing pressure zone, not a one-shot nuke).
+                    if (tc.IsThornsTower)
+                    {
+                        store.TowerIsThornsTower[towerId] = true;
+                        store.TowerThornsRadius[towerId] = tc.ThornsRadius;
+                        store.TowerThornsDps[towerId] = tc.ThornsDps;
+                        store.TowerThornsInterval[towerId] = tc.ThornsInterval;
+                        // Timer starts at 0 (= "fire next frame"). For interval>0 the per-tick
+                        // logic resets it to interval after firing.
+                        store.TowerThornsTimer[towerId] = 0f;
+                        logger.Log($"[TOWER] {tc.Name} 荆棘塔: 半径 {tc.ThornsRadius}, DPS {tc.ThornsDps}, 间隔 {tc.ThornsInterval}s");
+                    }
                     // Apply pull tower properties (gravitational pull)
                     if (tc.IsPullTower)
                     {
