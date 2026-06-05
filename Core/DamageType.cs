@@ -13,7 +13,8 @@ namespace BattleSystemECS.Components
         Fire     = 4,  // Reduced by fire resist; immune if Fire bit set in immunity mask
         Ice      = 8,  // Reduced by ice resist; immune if Ice bit set in immunity mask
         Lightning = 16,// Reduced by lightning resist; immune if Lightning bit set in immunity mask
-        True     = 32  // Bypasses all defenses (no resistance, no immunity)
+        True     = 32, // Bypasses all defenses (no resistance, no immunity)
+        Holy     = 64  // Round 135 Direction 1: Smite / Holy / Divine damage. Reduced by holy resist; immune if Holy bit set in immunity mask. Strong vs Undead (×2 via HolyVulnerable — TODO future), weak vs Demons (handled by monster JSON with high HolyResist).
     }
 
     /// <summary>

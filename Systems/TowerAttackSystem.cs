@@ -900,6 +900,15 @@ namespace BattleSystemECS.Systems
                             float lightningResist = store.EnemyLightningResist[bestTarget];
                             baseDmg *= Math.Max(0.01f, 1f - lightningResist) * _damageTakenMult;
                         }
+                        else if (dmgType == DamageType.Holy)
+                        {
+                            // Round 135 Dir 1: Holy / Smite / Divine damage — reduced by HolyResist only.
+                            // Distinct from HolyVulnerable (TODO future): a ×2 multiplier for Undead.
+                            // For now, Holy is a 4th elemental with same damage formula as Fire/Ice/Lightning.
+                            // 1% floor preserves non-zero damage even at HolyResist=0.999.
+                            float holyResist = store.EnemyHolyResist[bestTarget];
+                            baseDmg *= Math.Max(0.01f, 1f - holyResist) * _damageTakenMult;
+                        }
                         else  // Physical (default) — uses armor + armor shred + pen
                         {
                             // Step 1: apply armor penetration (attacker's penetration ratio)

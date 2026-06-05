@@ -1,0 +1,1 @@
+{"MoveSpeed":0.4,"AttackInterval":0.9,"Type":"Undead","AttackRange":2,"MaxHealth":12,"Damage":2,"Name":"Vampire Bat","Health":12,"GoldReward":7,"Skills":["Normal Attack"],"Armor":0,"MagicResist":0.1,"HolyResist":-0.3}

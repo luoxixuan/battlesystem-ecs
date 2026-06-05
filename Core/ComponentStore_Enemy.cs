@@ -561,16 +561,18 @@ namespace BattleSystemECS.Core
         // True damage (DamageType.True) bypasses immunity entirely and ignores this mask.
         // Values: Physical=1, Magic=2, Fire=4, Ice=8, Lightning=16. Default 0 = no immunity.
         public int[] EnemyDamageImmunityMask = new int[MAX_ENTITIES];
-        // ==================== 元素抗性 (Elemental Resistance — fractional reduction for Fire/Ice/Lightning) ====================
+        // ==================== 元素抗性 (Elemental Resistance — fractional reduction for Fire/Ice/Lightning/Holy) ====================
         // EnemyFireResist: 0-1, fraction of Fire damage reduced (0 = take full, 0.4 = take 60%, 1.0 = immune).
         // EnemyIceResist: 0-1, fraction of Ice damage reduced.
         // EnemyLightningResist: 0-1, fraction of Lightning damage reduced.
+        // EnemyHolyResist: 0-1, fraction of Holy damage reduced (Round 135 Direction 1: Smite / Holy / Divine).
         // Distinct from EnemyDamageImmunityMask (binary 0% or 100%) and EnemyMagicResist (Magic only).
         // Applied in TowerAttackSystem damage application chain in the same branch order:
-        // True → Fire → Ice → Lightning → Magic → Physical (default).
+        // True → Fire → Ice → Lightning → Holy → Magic → Physical (default).
         public float[] EnemyFireResist = new float[MAX_ENTITIES];
         public float[] EnemyIceResist = new float[MAX_ENTITIES];
         public float[] EnemyLightningResist = new float[MAX_ENTITIES];
+        public float[] EnemyHolyResist = new float[MAX_ENTITIES];
         // EnemyIsUnstoppable: total CC immunity flag. When true, enemy ignores ALL crowd control
         // (stun, freeze, slow, fear, knockback, pull, charm, taunt). Boss-level CC immunity.
         public bool[] EnemyIsUnstoppable = new bool[MAX_ENTITIES];
@@ -1022,7 +1024,7 @@ namespace BattleSystemECS.Core
             return (EnemyAffixFlags[enemyId] & affix) != 0;
         }
 
-        public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber, string fullName = null, float armor = 0f, float shield = 0f, float magicResist = 0f, float fireResist = 0f, float iceResist = 0f, float lightningResist = 0f)
+        public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber, string fullName = null, float armor = 0f, float shield = 0f, float magicResist = 0f, float fireResist = 0f, float iceResist = 0f, float lightningResist = 0f, float holyResist = 0f)
         {
             int entityId = CreateEntity();
 
@@ -1057,6 +1059,9 @@ namespace BattleSystemECS.Core
             EnemyFireResist[entityId]      = fireResist      < 0f ? 0f : (fireResist      > 1f ? 1f : fireResist);
             EnemyIceResist[entityId]       = iceResist       < 0f ? 0f : (iceResist       > 1f ? 1f : iceResist);
             EnemyLightningResist[entityId] = lightningResist < 0f ? 0f : (lightningResist > 1f ? 1f : lightningResist);
+            // Holy resistance (Round 135 Dir 1): fractional reduction for Holy damage.
+            // Same clamp semantics as Fire/Ice/Lightning.
+            EnemyHolyResist[entityId]      = holyResist      < 0f ? 0f : (holyResist      > 1f ? 1f : holyResist);
             EnemyDamageImmunityMask[entityId] = 0;  // default: no damage immunities
             // Pierce Resistance: default 0 resist, false immune (no pierce mitigation)
             EnemyPierceResist[entityId] = 0f;
@@ -1356,12 +1361,14 @@ namespace BattleSystemECS.Core
         /// is single-threaded because callers only invoke this in serial spawn phase).
         /// Used by WaveSpawningSystem to apply monster JSON elemental resistance config.
         /// </summary>
-        public void SetElementalResist(int enemyId, float fireResist, float iceResist, float lightningResist)
+        public void SetElementalResist(int enemyId, float fireResist, float iceResist, float lightningResist, float holyResist = 0f)
         {
             if (!IsValidEntity(enemyId)) return;
             EnemyFireResist[enemyId]      = fireResist      < 0f ? 0f : (fireResist      > 1f ? 1f : fireResist);
             EnemyIceResist[enemyId]       = iceResist       < 0f ? 0f : (iceResist       > 1f ? 1f : iceResist);
             EnemyLightningResist[enemyId] = lightningResist < 0f ? 0f : (lightningResist > 1f ? 1f : lightningResist);
+            // Round 135 Dir 1: Holy resistance is a new 4th element; default 0 for back-compat.
+            EnemyHolyResist[enemyId]      = holyResist      < 0f ? 0f : (holyResist      > 1f ? 1f : holyResist);
         }
 
         /// <summary>
@@ -1377,6 +1384,7 @@ namespace BattleSystemECS.Core
                 case DamageType.Fire:      return EnemyFireResist[enemyId];
                 case DamageType.Ice:       return EnemyIceResist[enemyId];
                 case DamageType.Lightning: return EnemyLightningResist[enemyId];
+                case DamageType.Holy:      return EnemyHolyResist[enemyId];   // Round 135 Dir 1
                 default:                   return 0f;  // Physical/Magic/True all bypass elemental resist
             }
         }

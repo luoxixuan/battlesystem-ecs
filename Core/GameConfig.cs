@@ -49,12 +49,16 @@ namespace BattleSystemECS.Config
         // Elemental Resistance (Round 117): fractional reduction for Fire / Ice / Lightning damage (0.0-1.0).
         // Distinct from DamageImmunities (binary 0% or 100%) — here we allow partial resists like 30% / 70%.
         // Default 0 = no resist (take full damage). Negative values are clamped to 0; values >1 are clamped to 1.
-        // True damage bypasses all three; Physical and Magic damage ignore these arrays.
+        // True damage bypasses all four; Physical and Magic damage ignore these arrays.
         public float FireResist { get; set; } = 0f;
         public float IceResist { get; set; } = 0f;
         public float LightningResist { get; set; } = 0f;
+        // Holy Resistance (Round 135 Direction 1): fractional reduction for Holy / Smite / Divine damage (0.0-1.0).
+        // Same semantics as FireResist/IceResist/LightningResist. Demons get high HolyResist (e.g. 0.5);
+        // Undead typically have 0 (vulnerable to Holy). Default 0 = no resist (take full Holy damage).
+        public float HolyResist { get; set; } = 0f;
         // DamageImmunities: list of damage type names this enemy is fully immune to
-        // (binary, not percentage). Valid entries: "Physical", "Magic", "Fire", "Ice", "Lightning".
+        // (binary, not percentage). Valid entries: "Physical", "Magic", "Fire", "Ice", "Lightning", "Holy".
         // True damage bypasses immunity. Empty/null = no immunities.
         public List<string> DamageImmunities { get; set; } = new List<string>();
         /// <summary>
@@ -76,6 +80,7 @@ namespace BattleSystemECS.Config
                     case "Fire":      mask |= (int)DamageType.Fire;      break;
                     case "Ice":       mask |= (int)DamageType.Ice;       break;
                     case "Lightning": mask |= (int)DamageType.Lightning; break;
+                    case "Holy":      mask |= (int)DamageType.Holy;      break;  // Round 135 Dir 1
                     // True damage is never immuned — intentionally omitted.
                 }
             }

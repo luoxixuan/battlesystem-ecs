@@ -1,0 +1,1 @@
+{"MoveSpeed":0.3,"AttackInterval":0.7,"Type":"Undead","AttackRange":1,"MaxHealth":15,"Damage":1,"Name":"Skeleton Warrior","Health":15,"GoldReward":6,"Skills":["Normal Attack"],"Armor":1,"MagicResist":0.2,"HolyResist":-0.5}

@@ -1,0 +1,13 @@
+{
+  "Name": "Holy Sanctum",
+  "Type": "Basic",
+  "Damage": 12,
+  "Range": 4,
+  "AttackSpeed": 1.0,
+  "Cost": 80,
+  "UpgradeCost": 50,
+  "DamageType": 64,
+  "StunChance": 0.0,
+  "SlowAmount": 0.0,
+  "SlowDuration": 0.0
+}

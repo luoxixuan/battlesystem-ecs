@@ -462,6 +462,14 @@ public void SetWaveNumber(int waveNumber)
                 float lightningResist = store.EnemyLightningResist[enemyId];
                 finalDamage *= Math.Max(0.01f, 1f - lightningResist);
             }
+            else if (damageType == DamageType.Holy)
+            {
+                // Round 135 Dir 1: Holy / Smite / Divine damage — reduced by HolyResist only.
+                // Player-side counterpart of TowerAttackSystem Holy branch.
+                // 1% floor preserves non-zero damage even at HolyResist=0.999.
+                float holyResist = store.EnemyHolyResist[enemyId];
+                finalDamage *= Math.Max(0.01f, 1f - holyResist);
+            }
             else  // Physical (default) — uses armor + armor pen
             {
                 float enemyArmor = store.EnemyArmor[enemyId];
