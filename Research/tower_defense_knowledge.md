@@ -1,7 +1,7 @@
 # 塔防游戏 ECS + GAS 知识库
-> 自动生成 · 2026-06-05 01:03 · v3
+> 自动生成 · 2026-06-06 01:02 · v3
 
-已分析 72 个仓库
+已分析 75 个仓库
 
 ## 塔防专项模式
 
@@ -13,25 +13,25 @@
 > ECS 风格：实体创建/销毁/查询
 来源：[sebas77/Svelto.ECS](https://github.com/sebas77/Svelto.ECS), [Gornhoth/Unity-Smoothed-Particle-Hydrodynamics](https://github.com/Gornhoth/Unity-Smoothed-Particle-Hydrodynamics), [areilly711/unity_ecs](https://github.com/areilly711/unity_ecs)
 
-### N击护盾/屏障
-> 需N次命中击破的护盾，或伤害阈值盾
-来源：[FlameskyDexive/Legends-Of-Heroes](https://github.com/FlameskyDexive/Legends-Of-Heroes), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity)
-
 ### 分裂/克隆
 > 敌人死后分裂为多个小怪，或主动克隆
 来源：[MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [pshenok/server-survival](https://github.com/pshenok/server-survival), [ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template)
+
+### N击护盾/屏障
+> 需N次命中击破的护盾，或伤害阈值盾
+来源：[FlameskyDexive/Legends-Of-Heroes](https://github.com/FlameskyDexive/Legends-Of-Heroes), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity)
 
 ### 锁链/连接
 > 两个敌人生命/伤害共享，强制绑定
 来源：[prabdhal/Tower-Defence-3D](https://github.com/prabdhal/Tower-Defence-3D), [MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity)
 
-### 处决/死亡标记
-> 目标血量低于阈值自动处决，额外金币
-来源：[PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity), [Antoshidza/NSprites](https://github.com/Antoshidza/NSprites), [v1vendi/minimal_ue5_GAS_demo](https://github.com/v1vendi/minimal_ue5_GAS_demo)
-
 ### 弧线弹道
 > 迫击炮/抛射弹道，无视地形障碍
 来源：[PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity), [chromealex/ecs](https://github.com/chromealex/ecs), [Antoshidza/NSprites](https://github.com/Antoshidza/NSprites)
+
+### 处决/死亡标记
+> 目标血量低于阈值自动处决，额外金币
+来源：[PixeyeHQ/actors.unity](https://github.com/PixeyeHQ/actors.unity), [Antoshidza/NSprites](https://github.com/Antoshidza/NSprites), [v1vendi/minimal_ue5_GAS_demo](https://github.com/v1vendi/minimal_ue5_GAS_demo)
 
 ### 范围溅射
 > 命中目标后对周围敌人造成范围伤害
@@ -185,11 +185,14 @@
 ### 配置数据
 来源：[DruidMech/GameplayAbilitySystem_Aura](https://github.com/DruidMech/GameplayAbilitySystem_Aura), [DruidMech/GameplayAbilitySystem_Aura](https://github.com/DruidMech/GameplayAbilitySystem_Aura), [intrxx/Obsidian](https://github.com/intrxx/Obsidian)
 
+### 塔系统
+来源：[quiver-dev/tower-defense-tutorial](https://github.com/quiver-dev/tower-defense-tutorial), [techwithtim/Tower-Defense-Game](https://github.com/techwithtim/Tower-Defense-Game), [SanderMertens/tower_defense](https://github.com/SanderMertens/tower_defense)
+
 ### 敌怪系统
 来源：[ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template), [quiver-dev/tower-defense-tutorial](https://github.com/quiver-dev/tower-defense-tutorial), [techwithtim/Tower-Defense-Game](https://github.com/techwithtim/Tower-Defense-Game)
 
-### 塔系统
-来源：[quiver-dev/tower-defense-tutorial](https://github.com/quiver-dev/tower-defense-tutorial), [techwithtim/Tower-Defense-Game](https://github.com/techwithtim/Tower-Defense-Game), [SanderMertens/tower_defense](https://github.com/SanderMertens/tower_defense)
+### AI/行为树
+来源：[pshenok/server-survival](https://github.com/pshenok/server-survival), [ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template), [techwithtim/Tower-Defense-Game](https://github.com/techwithtim/Tower-Defense-Game)
 
 ### 系统/组件分离
 来源：[maciej-trebacz/tower-of-time-game](https://github.com/maciej-trebacz/tower-of-time-game), [maciej-trebacz/tower-of-time-game](https://github.com/maciej-trebacz/tower-of-time-game), [Daivuk/tddod](https://github.com/Daivuk/tddod)
@@ -202,9 +205,6 @@
 
 ### 性能优化
 来源：[needle-mirror/com.unity.entities.graphics](https://github.com/needle-mirror/com.unity.entities.graphics), [scellecs/morpeh](https://github.com/scellecs/morpeh), [annulusgames/MagicTween](https://github.com/annulusgames/MagicTween)
-
-### AI/行为树
-来源：[pshenok/server-survival](https://github.com/pshenok/server-survival), [ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template), [techwithtim/Tower-Defense-Game](https://github.com/techwithtim/Tower-Defense-Game)
 
 ### 弹道系统
 来源：[ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template), [quiver-dev/tower-defense-tutorial](https://github.com/quiver-dev/tower-defense-tutorial), [quiver-dev/tower-defense-godot4](https://github.com/quiver-dev/tower-defense-godot4)
