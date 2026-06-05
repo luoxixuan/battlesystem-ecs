@@ -31,6 +31,11 @@ namespace BattleSystemECS.Systems
         // Cached desperation bonuses (updated each SetTurn from DesperationSystem)
         private float _desperationDmgBonus = 0f;
         private float _desperationSpeedBonus = 0f;
+        // Round 128 Direction 5 — Fire Trail System. Optional injection; null when
+        // not wired (in which case Firewall hits just apply their normal DoT and
+        // do not leave a burning patch). Calling SpawnTrail with a null reference
+        // is a no-op, so the hot path stays branch-free on the null case.
+        private FireTrailSystem _fireTrailSystem;
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate arrays (zero-allocation — no List.Clear() version bump)
@@ -238,6 +243,16 @@ namespace BattleSystemECS.Systems
         public void SetDesperationSystem(DesperationSystem desperationSystem)
         {
             _desperationSystem = desperationSystem;
+        }
+
+        /// <summary>
+        /// Round 128 Direction 5 — inject FireTrailSystem so the Firewall hit path
+        /// can leave a brief burning patch at the enemy position. May be null
+        /// (no-op in that case — the Firewall DoT still applies normally).
+        /// </summary>
+        public void SetFireTrailSystem(FireTrailSystem fireTrailSystem)
+        {
+            _fireTrailSystem = fireTrailSystem;
         }
 
         /// <summary>
@@ -1644,6 +1659,23 @@ namespace BattleSystemECS.Systems
                         {
                             int stunTurns = Math.Max(1, (int)Math.Ceiling(1f * (1f - _enemyStunResistance)));
                             store.ApplyEnemyStun(enemyId, stunTurns);
+                        }
+                        // Round 128 Direction 5 — leave a brief fire trail at the hit
+                        // position. SpawnTrail internally wraps AddCorpseEffect(type=3),
+                        // so the CorpseEffectSystem.Update() that runs in PostDeathGroup
+                        // will tick the DoT and eventually expire the zone. Multiple
+                        // hits on the same spot stack additively (the AddCorpseEffect
+                        // slot picker is round-robin, so a fresh hit always gets its
+                        // own zone). Null _fireTrailSystem is a no-op (zero cost).
+                        if (_fireTrailSystem != null)
+                        {
+                            _fireTrailSystem.SpawnTrail(
+                                x: store.PositionX[enemyId],
+                                y: store.PositionY[enemyId],
+                                radius: 1.5f,
+                                dps: 8.0f,
+                                duration: 2.0f,
+                                tickInterval: 0.5f);
                         }
                         break;
 

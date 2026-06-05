@@ -63,6 +63,12 @@ namespace BattleSystemECS.Core
         public HealAuraSystem? HealAura { get; private set; }
         // Round 126 Direction 4 — Thorns Aura System (passive tower-centered damage aura on enemies).
         public ThornsAuraSystem? ThornsAura { get; private set; }
+        // Round 128 Direction 5 — Fire Trail System. Thin wrapper that exposes
+        // SpawnTrail(x, y, radius, dps, duration) for callers that want to drop a
+        // brief burning patch at a position. No per-frame Update — the actual
+        // zone tick and DoT work is delegated to the existing CorpseEffectSystem
+        // (effectType 3 = fire DoT). Zero overhead when no caller invokes it.
+        public FireTrailSystem? FireTrail { get; private set; }
         public ProjectileSystem? Projectile { get; private set; }
         public ChronoTowerSystem? ChronoTower { get; private set; }
         // Round 106 Direction 2 — Mine / Trap tower (proximity-triggered AoE)
@@ -305,6 +311,11 @@ namespace BattleSystemECS.Core
             // HealAura, but deals damage to enemies instead of healing friendly towers.
             ThornsAura = new ThornsAuraSystem(store);
 
+            // Round 128 Direction 5 — Fire Trail System. Passive wrapper, no
+            // dependencies on Buff/Skill systems. Constructed early so it can be
+            // injected into TowerAttackSystem via WireDependencies below.
+            FireTrail = new FireTrailSystem(store);
+
             // ── Projectile ──
             Projectile = new ProjectileSystem(store, logger);
 
@@ -402,6 +413,11 @@ namespace BattleSystemECS.Core
             TowerAttack?.SetHitShieldSystem(HitShield);
             TowerAttack?.SetTowerStealthSystem(TowerStealth);
             TowerAttack?.SetDesperationSystem(Desperation);
+            // Round 128 Direction 5 — Fire Trail System. Inject after Desperation
+            // (last-situation system) to keep the wiring list ordered by
+            // injection-time-of-arrival. Optional dependency; null-safe at call
+            // site.
+            TowerAttack?.SetFireTrailSystem(FireTrail);
 
             // ── PlayerTowerAttack wiring ──
             PlayerTowerAttack?.SetLifeLinkSystem(LifeLink);
