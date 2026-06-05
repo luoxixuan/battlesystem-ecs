@@ -158,6 +158,26 @@
     "Modifiers": []
   },
   {
+    "Name": "Chain Heal",
+    "Description": "链式治疗 - 优先治疗血量最少的友方，最多跳跃 3 个目标，每次治疗量衰减 50% 并附加护盾",
+    "AreaShape": "chainheal",
+    "AreaWidth": 1,
+    "AreaHeight": 1,
+    "AttackRange": 0,
+    "Cooldown": 18,
+    "DamageMultiplier": 0,
+    "AutoCast": false,
+    "Hotkey": "H",
+    "AreaRadius": 200,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
+    "HealPercent": 0.25,
+    "ShieldAmount": 15,
+    "ShieldDuration": 3,
+    "Modifiers": []
+  },
+  {
     "Name": "Energy Shield",
     "Description": "护盾技能 - 吸收 50 点伤害，持续 5 秒，冷却 25 秒",
     "AreaShape": "shield",

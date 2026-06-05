@@ -70,6 +70,16 @@ namespace BattleSystemECS.Systems
         private bool[] _chainHitBuffer = new bool[0];
         private int _chainHitBufferSize = 0;
 
+        // Chain Heal constants (Round 131 — mirror of Chain Lightning, but applies heal to friendlies)
+        // Hits injured allies (most-HP-deficit first), then chains up to 3 additional allies, each at 50% of previous heal.
+        // Each healed ally also receives a small shield bonus (ShieldBonusPerHop) for survivability.
+        private const int CHAIN_HEAL_MAX_TARGETS = 4;        // primary + 3 chain targets (matches Chain Lightning symmetric)
+        private const float CHAIN_HEAL_DECAY = 0.50f;        // each hop heals 50% of previous (slower decay than damage, since healing is precious)
+        private const float CHAIN_HEAL_DEFAULT_RANGE = 200f; // default hop range in pixels (matches chain lightning default)
+        // Pre-allocated bool[] reused across CastChainHeal calls (avoids per-call allocation; tracks friendlies already healed)
+        private bool[] _chainHealHitBuffer = new bool[0];
+        private int _chainHealHitBufferSize = 0;
+
         public SkillSystem(ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem = null)
         {
             this.store = store;
@@ -348,6 +358,16 @@ namespace BattleSystemECS.Systems
                 case 16: // TimeRewind — restore player HP / Mana / Shield from a recent snapshot
                     CastTimeRewind(def);
                     enemiesHit = 0;
+                    break;
+                case 17: // Chain Heal — O(N) nearest-neighbor heal chaining on injured allies
+                    // base heal = HealPercent * player max HP (consistent with single-target CastHeal using HealPercent)
+                    // ShieldAmount = shield bonus applied per healed target; ShieldDuration = duration of that shield
+                    {
+                        float casterMaxHp = store.PlayerMaxHealth[playerId] > 0f ? store.PlayerMaxHealth[playerId] : 200f;
+                        float chainBaseHeal = def.HealPercent > 0f ? casterMaxHp * def.HealPercent : 0f;
+                        int chainRange = def.AreaRadius > 0 ? def.AreaRadius : (int)CHAIN_HEAL_DEFAULT_RANGE;
+                        enemiesHit = CastChainHeal(chainBaseHeal, playerX, playerY, chainRange, def.Name, def.ShieldAmount, def.ShieldDuration);
+                    }
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -635,6 +655,111 @@ namespace BattleSystemECS.Systems
                 originX = bestX;
                 originY = bestY;
                 currentDamage *= CHAIN_LIGHTNING_DAMAGE_DECAY;
+            }
+
+            return totalHit;
+        }
+
+        /// <summary>
+        /// Chain Heal: O(N) nearest-neighbor heal chaining on injured allies (Round 131).
+        /// Targets players in the same arena. Primary target = most-injured friendly (max HP deficit),
+        /// ties broken by distance. Caster is excluded from the friendly pool so the heal always
+        /// jumps to OTHER injured allies first (caster can self-heal via the default Guardian Heal
+        /// spell — chain heal is explicitly a "heal teammates" skill).
+        /// Each hop deals 50% of the previous heal (CHAIN_HEAL_DECAY), up to 3 chain targets.
+        /// Dead or full-HP friendlies are skipped (no overheal). Serial implementation — no parallel needed.
+        /// On heal hit, also applies a small shield bonus (shieldPerHit > 0) for survivability,
+        /// with the shield persisting for shieldDuration seconds.
+        /// </summary>
+        public int CastChainHealPublic(float baseHeal, float playerX, float playerY, int range, string name, float shieldPerHit, float shieldDuration) =>
+            CastChainHeal(baseHeal, playerX, playerY, range, name, shieldPerHit, shieldDuration);
+
+        private int CastChainHeal(float baseHeal, float playerX, float playerY, int range, string name, float shieldPerHit, float shieldDuration)
+        {
+            if (baseHeal <= 0f) return 0;
+            // Build friendly pool (players 0..MAX_PLAYERS) — pool is tiny (≤10) so no need to cache
+            int friendlyCount = ComponentStore.MAX_PLAYERS;
+            // Ensure pooled buffer is large enough for the friendly pool (cheap, MAX_PLAYERS=10)
+            if (_chainHealHitBufferSize < friendlyCount)
+            {
+                _chainHealHitBuffer = new bool[friendlyCount];
+                _chainHealHitBufferSize = friendlyCount;
+            }
+            else
+            {
+                Array.Clear(_chainHealHitBuffer, 0, _chainHealHitBufferSize);
+                _chainHealHitBufferSize = friendlyCount;
+            }
+
+            float rangeSq = (float)range * range;
+            float currentHeal = baseHeal;
+            int totalHit = 0;
+            float originX = playerX;
+            float originY = playerY;
+
+            for (int hop = 0; hop < CHAIN_HEAL_MAX_TARGETS; hop++)
+            {
+                int bestIdx = -1;
+                float bestDistSq = float.MaxValue;
+                // Pick most-injured friendly within range (max HP deficit = max(MaxHP - CurrentHP))
+                float bestDeficit = 0f; // 0 = skip; only consider friendlies with positive deficit AND in range
+
+                for (int i = 0; i < friendlyCount; i++)
+                {
+                    if (i == playerId) continue;     // exclude caster — chain heal targets OTHER allies
+                    if (_chainHealHitBuffer[i]) continue;
+                    float maxHp = store.PlayerMaxHealth[i];
+                    if (maxHp <= 0f) continue;       // invalid / uninitialized player slot
+                    float curHp = store.PlayerCurrentHealth[i];
+                    if (curHp <= 0f) continue;       // dead
+                    float deficit = maxHp - curHp;
+                    if (deficit <= 0.001f) continue; // already full HP
+
+                    float fx = store.PositionX[i];
+                    float fy = store.PositionY[i];
+                    float dx = fx - originX;
+                    float dy = fy - originY;
+                    float distSq = dx * dx + dy * dy;
+
+                    if (distSq > rangeSq) continue;
+
+                    // Pick max-deficit, ties broken by nearest
+                    bool isBetter = deficit > bestDeficit ||
+                                    (deficit == bestDeficit && distSq < bestDistSq);
+                    if (isBetter)
+                    {
+                        bestDeficit = deficit;
+                        bestDistSq = distSq;
+                        bestIdx = i;
+                    }
+                }
+
+                if (bestIdx == -1) break;
+
+                _chainHealHitBuffer[bestIdx] = true;
+                int friendlyId = bestIdx;
+
+                // Apply heal: clamp to MaxHealth (no overheal)
+                float friendlyMaxHp = store.PlayerMaxHealth[friendlyId];
+                float newHp = store.PlayerCurrentHealth[friendlyId] + currentHeal;
+                if (newHp > friendlyMaxHp) newHp = friendlyMaxHp;
+                store.PlayerCurrentHealth[friendlyId] = newHp;
+
+                // Apply shield bonus if requested (small bonus, 0 = no shield)
+                if (shieldPerHit > 0f)
+                {
+                    store.ApplyPlayerShield(friendlyId, shieldPerHit, shieldDuration);
+                }
+
+                totalHit++;
+                float friendlyX = store.PositionX[friendlyId];
+                float friendlyY = store.PositionY[friendlyId];
+                renderer.Log($"[SKILL] {name} chain #{hop + 1} → player {friendlyId} at ({friendlyX:F0},{friendlyY:F0}), heal: {currentHeal:F1}, shield: {shieldPerHit:F0}");
+
+                // Chain origin moves to the healed friendly (next hop searches around the heal target)
+                originX = friendlyX;
+                originY = friendlyY;
+                currentHeal *= CHAIN_HEAL_DECAY;
             }
 
             return totalHit;

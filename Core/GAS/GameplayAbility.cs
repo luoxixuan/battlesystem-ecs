@@ -26,6 +26,7 @@ namespace BattleSystemECS.Core.GAS
         public const int HealingZone = 14;   // HealingZone: places a ground healing zone that heals allies in radius
         public const int Polymorph = 15;     // Polymorph: circle AoE that transforms enemies into a harmless form (sheep/chicken)
         public const int TimeRewind = 16;    // TimeRewind: restore player HP / Mana / Shield from a recent snapshot (Round 109)
+        public const int ChainHeal = 17;    // ChainHeal: O(N) nearest-neighbor heal chaining (Round 131) — mirror of ChainLightning but applies heal + small shield to friendlies
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -49,6 +50,7 @@ namespace BattleSystemECS.Core.GAS
                 "healingzone" => HealingZone,
                 "polymorph" => Polymorph,
                 "timerwind" => TimeRewind,
+                "chainheal" => ChainHeal,
                 _ => Single
             };
         }
