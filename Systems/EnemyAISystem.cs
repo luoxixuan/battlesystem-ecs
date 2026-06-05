@@ -68,6 +68,17 @@ namespace BattleSystemECS.Systems
         private readonly ConcurrentBag<(int bossId, int typeId, int count, float x, float y)> _phaseMinionEvents
             = new ConcurrentBag<(int, int, int, float, float)>();
 
+        // Round 129 Dir 2 — Boss phase change event bag. Pushed in BOTH the sequential (small
+        // enemy count) and parallel (large enemy count) branches whenever a phase transition
+        // fires (legacy CSV path uses the in-place `currentPhase` gate; structured path uses
+        // EnemyPhaseFiredMask bit). Drained serially at end of Update() into the IEventBus.
+        // This decouples the Boss-phase system from any specific subscriber (BossTrailAoeSystem,
+        // music, AoE warning, telemetry) — they subscribe via GameEvents.BossPhaseChanged and
+        // react to the payload. Drain is always performed (count tracked) even when the event
+        // bus is null, matching the pattern of the other two phase-related bags.
+        private readonly ConcurrentBag<BossPhaseChangedEvent> _phaseChangeEvents
+            = new ConcurrentBag<BossPhaseChangedEvent>();
+
         // BT evaluation cache — invalidates when enemy health, charge counter, or stun duration changes.
         private float _cachedPlayerHealth = -1;
         private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
@@ -178,6 +189,19 @@ namespace BattleSystemECS.Systems
                                     int newPhase = ph + 1;
                                     if (newPhase > currentPhase)
                                     {
+                                        // Round 129 Dir 2 — push phase-change event BEFORE writing
+                                        // the new phase so the payload's OldPhase reflects the
+                                        // pre-transition value. HealthFraction is the boss's HP
+                                        // fraction AT THE TRANSITION (just below the threshold).
+                                        _phaseChangeEvents.Add(new BossPhaseChangedEvent
+                                        {
+                                            EnemyId = enemyId,
+                                            BossTypeName = null, // filled in by drain (serial)
+                                            OldPhase = currentPhase,
+                                            NewPhase = newPhase,
+                                            HealthFraction = healthFraction,
+                                            Turn = currentTurn,
+                                        });
                                         store.EnemyBossPhase[enemyId] = newPhase;
                                         break;
                                     }
@@ -208,6 +232,22 @@ namespace BattleSystemECS.Systems
                             {
                                 // Mark fired first so re-entrant triggers can't double-apply
                                 store.EnemyPhaseFiredMask[enemyId] = firedMask | bit;
+                                // Round 129 Dir 2 — push phase-change event AFTER FiredMask is set
+                                // (so a re-entrant parallel batch that sees the same transition
+                                // will skip the duplicate bit, and the listener is guaranteed to
+                                // observe the FiredMask write before the event is published). Old
+                                // phase index is `ph` (0-indexed of the phase being entered, the
+                                // previously-stored value). HealthFraction is captured at this
+                                // frame's HP ratio (just below the threshold).
+                                _phaseChangeEvents.Add(new BossPhaseChangedEvent
+                                {
+                                    EnemyId = enemyId,
+                                    BossTypeName = null, // filled in by drain (serial)
+                                    OldPhase = ph,
+                                    NewPhase = ph + 1,
+                                    HealthFraction = healthFraction2,
+                                    Turn = currentTurn,
+                                });
                                 // Apply speed multiplier one-shot (multiplicative on top of current)
                                 float speedMult = store.EnemyPhaseSpeedMults[phIdx];
                                 if (speedMult > 0f && speedMult != 1f)
@@ -442,9 +482,30 @@ namespace BattleSystemECS.Systems
                                     if (healthFraction < threshold)
                                     {
                                         int newPhase = ph + 1;
-                                        if (newPhase > currentPhase)
+                                        // Round 129 Dir 2 — atomic CAS guard. Two parallel batches
+                                        // can both see the same `currentPhase`; without CAS both
+                                        // would push the event AND overwrite the phase. The CAS
+                                        // loop ensures only one batch's update sticks; on loss we
+                                        // skip the event push so subscribers see exactly one event
+                                        // per phase transition.
+                                        if (newPhase > currentPhase &&
+                                            Interlocked.CompareExchange(
+                                                ref store.EnemyBossPhase[enemyId],
+                                                newPhase, currentPhase) == currentPhase)
                                         {
-                                            store.EnemyBossPhase[enemyId] = newPhase;
+                                            // Round 129 Dir 2 — push phase-change event. OldPhase
+                                            // is the pre-transition value (the CAS saw this same
+                                            // value), HealthFraction is the current frame's HP
+                                            // ratio. ConcurrentBag.Add is thread-safe.
+                                            _phaseChangeEvents.Add(new BossPhaseChangedEvent
+                                            {
+                                                EnemyId = enemyId,
+                                                BossTypeName = null, // filled in by drain (serial)
+                                                OldPhase = currentPhase,
+                                                NewPhase = newPhase,
+                                                HealthFraction = healthFraction,
+                                                Turn = currentTurn,
+                                            });
                                             break;
                                         }
                                     }
@@ -470,39 +531,63 @@ namespace BattleSystemECS.Systems
                                 if (phThreshold <= 0f || phThreshold > 1f) continue;
                                 if (healthFraction2 < phThreshold)
                                 {
-                                    // Mark fired first — guards against double-apply if this
-                                    // enemy lands in multiple Parallel.For batches (CAS on int).
-                                    store.EnemyPhaseFiredMask[enemyId] = firedMask | bit;
-                                    float speedMult = store.EnemyPhaseSpeedMults[phIdx];
-                                    if (speedMult > 0f && speedMult != 1f)
+                                    // Round 129 Dir 2 — atomic CAS guard on FiredMask. Without
+                                    // CAS, two parallel batches both reading firedMask=0 would
+                                    // both write firedMask|bit and both push the event. The CAS
+                                    // ensures exactly one batch's push + speed/damage application
+                                    // sticks; the loser skips the event and skips the multiplier
+                                    // application. firedMask may have been mutated by a sibling
+                                    // bit before the CAS returns, so we read the post-CAS value
+                                    // once for the loop's continued iteration safety.
+                                    int oldFiredMask = Interlocked.CompareExchange(
+                                        ref store.EnemyPhaseFiredMask[enemyId],
+                                        firedMask | bit, firedMask);
+                                    if (oldFiredMask == firedMask)
                                     {
-                                        float baseSpeed = store.EnemyMoveSpeedBase[enemyId];
-                                        if (baseSpeed <= 0f) baseSpeed = store.EnemyMoveSpeed[enemyId];
-                                        store.EnemyMoveSpeed[enemyId] = baseSpeed * speedMult;
+                                        // Round 129 Dir 2 — push phase-change event. ConcurrentBag
+                                        // push is thread-safe; the serial drain later resolves the
+                                        // BossTypeName via store.GetEnemyTypeName. OldPhase is the
+                                        // 0-indexed phase being entered (the value just stored).
+                                        _phaseChangeEvents.Add(new BossPhaseChangedEvent
+                                        {
+                                            EnemyId = enemyId,
+                                            BossTypeName = null, // filled in by drain (serial)
+                                            OldPhase = ph,
+                                            NewPhase = ph + 1,
+                                            HealthFraction = healthFraction2,
+                                            Turn = currentTurn,
+                                        });
+                                        float speedMult = store.EnemyPhaseSpeedMults[phIdx];
+                                        if (speedMult > 0f && speedMult != 1f)
+                                        {
+                                            float baseSpeed = store.EnemyMoveSpeedBase[enemyId];
+                                            if (baseSpeed <= 0f) baseSpeed = store.EnemyMoveSpeed[enemyId];
+                                            store.EnemyMoveSpeed[enemyId] = baseSpeed * speedMult;
+                                        }
+                                        float dmgMult = store.EnemyPhaseDamageMults[phIdx];
+                                        if (dmgMult > 0f && dmgMult != 1f)
+                                        {
+                                            store.EnemyDamage[enemyId] = store.EnemyDamage[enemyId] * dmgMult;
+                                        }
+                                        // Direct 2D array read — no per-frame string.Split (perf fix).
+                                        string abId = store.EnemyPhaseAbilityIdsFlat[ph, enemyId];
+                                        if (!string.IsNullOrEmpty(abId))
+                                        {
+                                            _phaseAbilityEvents.Add((enemyId, abId));
+                                        }
+                                        // Round 119 Dir 3 — Boss phase minion summon trigger (parallel
+                                        // path). Same semantics as the sequential path: read pre-populated
+                                        // fields, push to bag, drain serially at end of Update. Position
+                                        // is captured per-frame at the boss's CURRENT location.
+                                        int minionType = store.EnemyPhaseMinionTypeIdFlat[phIdx];
+                                        int minionCount = store.EnemyPhaseMinionCountsFlat[phIdx];
+                                        if (minionType >= 0 && minionCount > 0)
+                                        {
+                                            _phaseMinionEvents.Add((enemyId, minionType, minionCount,
+                                                store.PositionX[enemyId], store.PositionY[enemyId]));
+                                        }
+                                        firedMask = store.EnemyPhaseFiredMask[enemyId];
                                     }
-                                    float dmgMult = store.EnemyPhaseDamageMults[phIdx];
-                                    if (dmgMult > 0f && dmgMult != 1f)
-                                    {
-                                        store.EnemyDamage[enemyId] = store.EnemyDamage[enemyId] * dmgMult;
-                                    }
-                                    // Direct 2D array read — no per-frame string.Split (perf fix).
-                                    string abId = store.EnemyPhaseAbilityIdsFlat[ph, enemyId];
-                                    if (!string.IsNullOrEmpty(abId))
-                                    {
-                                        _phaseAbilityEvents.Add((enemyId, abId));
-                                    }
-                                    // Round 119 Dir 3 — Boss phase minion summon trigger (parallel
-                                    // path). Same semantics as the sequential path: read pre-populated
-                                    // fields, push to bag, drain serially at end of Update. Position
-                                    // is captured per-frame at the boss's CURRENT location.
-                                    int minionType = store.EnemyPhaseMinionTypeIdFlat[phIdx];
-                                    int minionCount = store.EnemyPhaseMinionCountsFlat[phIdx];
-                                    if (minionType >= 0 && minionCount > 0)
-                                    {
-                                        _phaseMinionEvents.Add((enemyId, minionType, minionCount,
-                                            store.PositionX[enemyId], store.PositionY[enemyId]));
-                                    }
-                                    firedMask = store.EnemyPhaseFiredMask[enemyId];
                                 }
                             }
                         }
@@ -1063,6 +1148,12 @@ namespace BattleSystemECS.Systems
             // Same pattern as ability drain: serial, end-of-Update, thread-safe. Bag is always
             // drained (count tracked) so diagnostics work even when _waveSpawningSystem is null.
             DrainPhaseMinionEvents();
+            // Round 129 Dir 2 — drain phase-change bag into IEventBus. Fills in BossTypeName
+            // (needs single-threaded access to store.EnemyTypeName[]) and publishes the
+            // GameEvents.BossPhaseChanged event for any subscribers (music, telemetry, AoE
+            // warning). Safe to call even when _eventBus is a no-op (NullEventBus pattern) —
+            // the bag is always drained and the count tracked.
+            DrainPhaseChangeEvents();
         }
 
         /// <summary>
@@ -1106,6 +1197,33 @@ namespace BattleSystemECS.Systems
             }
             PhaseMinionDrainCount = drained;
             PhaseMinionSpawnedCount = spawned;
+        }
+
+        // Round 129 Dir 2 — drain the phase-change event bag into IEventBus. Fills in the
+        // BossTypeName from store.EnemyTypeName[] (single-threaded access) and publishes each
+        // event via _eventBus.Publish. Empty BossTypeName is normalized to null so subscribers
+        // see a consistent "no name available" sentinel. Drain count is exposed for tests /
+        // diagnostics. Safe to call when _eventBus is null (the constructor default-fallback
+        // creates a fresh EventBus, but tests that pass null will get a NullReferenceException
+        // here — that's intentional, mirrors the existing pattern for other drains).
+        public int PhaseChangeDrainCount { get; private set; }
+        public int PhaseChangePublishCount { get; private set; }
+        private void DrainPhaseChangeEvents()
+        {
+            int count = 0;
+            int published = 0;
+            while (_phaseChangeEvents.TryTake(out var ev))
+            {
+                count++;
+                // Resolve BossTypeName in the serial drain (avoids contention on the
+                // EnemyTypeName[] array — push sites can run in parallel).
+                string typeName = store.GetEnemyTypeName(ev.EnemyId);
+                ev.BossTypeName = string.IsNullOrEmpty(typeName) ? null : typeName;
+                _eventBus.Publish(GameEvents.BossPhaseChanged, ev);
+                published++;
+            }
+            PhaseChangeDrainCount = count;
+            PhaseChangePublishCount = published;
         }
 
         private static int ParseDodgeDirection(string action)

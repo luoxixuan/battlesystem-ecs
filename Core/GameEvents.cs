@@ -18,6 +18,13 @@ namespace BattleSystemECS.Core
         // Damage, IsCrit. Subscribers can implement affix logic (heal on crit, slow on crit, etc).
         public const string EnemyHit              = "enemy_hit";
         public const string EnemyCrit             = "enemy_crit";
+        // Boss phase transition event (Round 129 Direction 2). Published in the serial end-of-Update
+        // drain phase of EnemyAISystem whenever a boss enemy crosses a phase threshold
+        // (HP-fraction based; one-shot per phase, gated by EnemyPhaseFiredMask). Payload fields:
+        // EnemyId, BossTypeName, OldPhase, NewPhase, HealthFraction, Turn. Subscribers can drive
+        // boss mechanic changes (music swap, AoE warning, dialogue, telemetry, etc) without
+        // tightly coupling to EnemyAISystem internals.
+        public const string BossPhaseChanged      = "boss_phase_changed";
     }
 
     // ── Event Data Transfer Objects ──
@@ -68,5 +75,19 @@ namespace BattleSystemECS.Core
         public byte AttackerKind;    // 0=player, 1=tower
         public float Damage;         // raw damage applied (post-resistance, pre-cap)
         public bool IsCrit;          // true if the hit rolled as a critical strike
+    }
+
+    // BossPhaseChanged event DTO (Round 129 Direction 2). Published by EnemyAISystem
+    // whenever a boss enemy crosses a phase threshold. HealthFraction is the boss's HP
+    // fraction AT THE TIME OF TRANSITION (i.e. just below the threshold). Turn is the
+    // current frame/turn counter from EnemyAISystem.SetTurn.
+    public class BossPhaseChangedEvent
+    {
+        public int EnemyId;
+        public string BossTypeName;   // monsterConfig.Type for the boss (e.g. "Dragon", "Lich")
+        public int OldPhase;          // 0-indexed; phase 1 = 0
+        public int NewPhase;          // 0-indexed; NewPhase > OldPhase
+        public float HealthFraction;  // enemyHealth / enemyMaxHealth at transition
+        public int Turn;              // game turn when transition fired
     }
 }
