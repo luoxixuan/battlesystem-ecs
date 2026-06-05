@@ -1,0 +1,58 @@
+{
+  "_comment": "Curve presets for difficulty scaling (Round 127 方向1: 成长曲线). Each curve maps a 1-based wave index to a multiplier applied to the base stat. Identity returns 1.0 (no scaling). Linear preserves the legacy 1 + (wave-1) * coef formula. Other shapes let designers shape difficulty rhythm: exponential for compounding pressure, logarithmic for front-loaded growth, sigmoid for smooth ramp-up to a plateau, piecewise for hand-tuned inflection points.",
+  "curves": [
+    {
+      "id": "identity",
+      "type": "Identity",
+      "coefficient": 0.0
+    },
+    {
+      "id": "healthDefault",
+      "type": "Linear",
+      "coefficient": 0.05
+    },
+    {
+      "id": "damageDefault",
+      "type": "Linear",
+      "coefficient": 0.05
+    },
+    {
+      "id": "armorDefault",
+      "type": "Linear",
+      "coefficient": 0.02
+    },
+    {
+      "id": "speedDefault",
+      "type": "Linear",
+      "coefficient": 0.01
+    },
+    {
+      "id": "healthExponential",
+      "type": "Exponential",
+      "coefficient": 1.04
+    },
+    {
+      "id": "healthLogarithmic",
+      "type": "Logarithmic",
+      "coefficient": 0.5
+    },
+    {
+      "id": "healthSigmoid",
+      "type": "Sigmoid",
+      "coefficient": 3.0,
+      "midpoint": 15.0,
+      "steepness": 0.3
+    },
+    {
+      "id": "bossPlateau",
+      "type": "Piecewise",
+      "controlPoints": [
+        [1, 1.0],
+        [10, 1.5],
+        [20, 2.0],
+        [30, 2.0],
+        [50, 2.5]
+      ]
+    }
+  ]
+}

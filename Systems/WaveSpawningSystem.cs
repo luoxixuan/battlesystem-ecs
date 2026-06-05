@@ -10,6 +10,14 @@ namespace BattleSystemECS.Systems
 {
     /// <summary>
     /// Difficulty configuration for wave scaling — loaded from wave_spawn.json.
+    ///
+    /// Round 127 Direction 1 — Curve-based scaling. Each `*CurveId` field is an
+    /// optional id into the global <see cref="Core.CurveTable"/>. If non-empty,
+    /// the curve evaluator is used; if empty, the legacy linear formula
+    /// <c>1.0f + (currentWave - 1) * &lt;Growth&gt;</c> is used unchanged. This
+    /// keeps every existing JSON config and unit test bit-identical to the
+    /// pre-curve codebase while letting designers opt in to richer shapes
+    /// (linear / exponential / logarithmic / sigmoid / piecewise) per stat.
     /// </summary>
     public class DifficultyConfig
     {
@@ -23,6 +31,12 @@ namespace BattleSystemECS.Systems
         public float EliteDamageMult { get; set; } = 1.5f;
         public float BossHealthMult { get; set; } = 5.0f;
         public float BossDamageMult { get; set; } = 3.0f;
+
+        // Optional curve ids (Round 127). Empty string = fall back to legacy linear.
+        public string HealthCurveId { get; set; } = "";
+        public string DamageCurveId { get; set; } = "";
+        public string ArmorCurveId { get; set; } = "";
+        public string SpeedCurveId { get; set; } = "";
     }
 
     /// <summary>
@@ -90,6 +104,49 @@ namespace BattleSystemECS.Systems
             this.gameConfig = gameConfig;
             this.spawnConfig = LoadWaveSpawnConfig();
             this._enemyAffixSystem = enemyAffixSystem;
+            // Round 127 Dir 1 — lazy-load the global curve registry. Idempotent and
+            // thread-safe; a missing curves.json is logged but never throws, so the
+            // spawn loop falls back to the legacy linear formulas.
+            Core.CurveTable.Load("Data/Configs/curves.json", renderer);
+        }
+
+        // ── Round 127 Direction 1 — Curve-based scaling helpers ───────────────
+        // These four helpers centralize the "use curve if set, else fall back to
+        // legacy linear" branch. They're called once per enemy spawn (NOT on the
+        // per-frame hot path), so the cost of an extra dictionary lookup is
+        // negligible. Hot-path note: when the curve id is empty AND the legacy
+        // wave-1 branch is taken, we get the same `1.0f` the codebase had before
+        // — there is zero regression for unmodified configs.
+        private float GetHealthMult()
+        {
+            var id = spawnConfig.DifficultyConfig.HealthCurveId;
+            if (!string.IsNullOrEmpty(id))
+                return Core.CurveTable.Evaluate(id, currentWave);
+            return 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.BaseHealthMultPerWave;
+        }
+
+        private float GetDamageMult()
+        {
+            var id = spawnConfig.DifficultyConfig.DamageCurveId;
+            if (!string.IsNullOrEmpty(id))
+                return Core.CurveTable.Evaluate(id, currentWave);
+            return 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.BaseDamageMultPerWave;
+        }
+
+        private float GetArmorMult()
+        {
+            var id = spawnConfig.DifficultyConfig.ArmorCurveId;
+            if (!string.IsNullOrEmpty(id))
+                return Core.CurveTable.Evaluate(id, currentWave);
+            return 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.ArmorGrowthPerWave;
+        }
+
+        private float GetSpeedMult()
+        {
+            var id = spawnConfig.DifficultyConfig.SpeedCurveId;
+            if (!string.IsNullOrEmpty(id))
+                return Core.CurveTable.Evaluate(id, currentWave);
+            return 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.SpeedGrowthPerWave;
         }
 
         private AscensionSystem _ascensionSystem;
@@ -198,6 +255,18 @@ namespace BattleSystemECS.Systems
                             cfg.DifficultyConfig.BossHealthMult = bohm.GetSingle();
                         if (dc.TryGetProperty("bossDamageMult", out var bodm))
                             cfg.DifficultyConfig.BossDamageMult = bodm.GetSingle();
+                        // Round 127 Dir 1 — optional curve ids. Empty string (the
+                        // default) keeps the legacy linear formula. Setting any of
+                        // these to a non-empty id from curves.json switches the
+                        // corresponding stat to a curve-driven multiplier.
+                        if (dc.TryGetProperty("healthCurveId", out var hci))
+                            cfg.DifficultyConfig.HealthCurveId = hci.GetString() ?? "";
+                        if (dc.TryGetProperty("damageCurveId", out var dci))
+                            cfg.DifficultyConfig.DamageCurveId = dci.GetString() ?? "";
+                        if (dc.TryGetProperty("armorCurveId", out var aci))
+                            cfg.DifficultyConfig.ArmorCurveId = aci.GetString() ?? "";
+                        if (dc.TryGetProperty("speedCurveId", out var sci))
+                            cfg.DifficultyConfig.SpeedCurveId = sci.GetString() ?? "";
                     }
                     renderer.Log($"[SPAWN] Loaded difficulty config: health/wave={cfg.DifficultyConfig.BaseHealthMultPerWave:P0}, elite@wave{cfg.DifficultyConfig.EliteStartWave}, boss@wave{cfg.DifficultyConfig.BossStartWave}");
                     return cfg;
@@ -235,9 +304,10 @@ namespace BattleSystemECS.Systems
             {
                 float startX = (float)random.Next(0, 10);
                 float startY = 19f;
-                float waveScaling = 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.BaseHealthMultPerWave;
-                float dmgGrowth = spawnConfig.DifficultyConfig.BaseDamageMultPerWave;
-                float damageMult = 1.0f + (currentWave - 1) * dmgGrowth;
+                // Round 127 Dir 1 — curve-aware multipliers; fall back to legacy linear
+                // when no curveId is set (the default for existing configs).
+                float waveScaling = GetHealthMult();
+                float damageMult = GetDamageMult();
                 bool isEliteWave = currentWave >= spawnConfig.DifficultyConfig.EliteStartWave;
                 bool isBossWave = currentWave >= spawnConfig.DifficultyConfig.BossStartWave;
 
@@ -259,8 +329,8 @@ namespace BattleSystemECS.Systems
                 float scaledHealth = monsterConfig.Health * healthMult;
                 float scaledMaxHealth = monsterConfig.MaxHealth * healthMult;
                 float scaledDamage = monsterConfig.Damage * damageMult;
-                float scaledArmor = monsterConfig.Armor * (1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.ArmorGrowthPerWave);
-                float scaledSpeed = monsterConfig.MoveSpeed * (1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.SpeedGrowthPerWave);
+                float scaledArmor = monsterConfig.Armor * GetArmorMult();
+                float scaledSpeed = monsterConfig.MoveSpeed * GetSpeedMult();
 
                 string enemyName = $"[AMBUSH] NormalL{currentLevel}W{currentWave}";
                 int enemyId = store.AddEnemy(startX, startY, scaledSpeed, scaledHealth, scaledMaxHealth, scaledDamage, monsterConfig.GoldReward, currentWave, enemyName, scaledArmor, monsterConfig.Shield, monsterConfig.MagicResist);
@@ -296,11 +366,12 @@ namespace BattleSystemECS.Systems
             var monsterConfig = gameConfig.GetMonsterConfig("Normal");
             if (monsterConfig == null) return;
 
-            float waveScaling = 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.BaseHealthMultPerWave;
-            float dmgGrowth = spawnConfig.DifficultyConfig.BaseDamageMultPerWave;
+            // Round 127 Dir 1 — curve-aware multipliers; fall back to legacy linear
+            // when no curveId is set.
+            float waveScaling = GetHealthMult();
             float scaledHealth = monsterConfig.Health * waveScaling * spawnConfig.DifficultyConfig.BossHealthMult * 0.5f;
             float scaledMaxHealth = monsterConfig.MaxHealth * waveScaling * spawnConfig.DifficultyConfig.BossHealthMult * 0.5f;
-            float scaledDamage = monsterConfig.Damage * (1.0f + (currentWave - 1) * dmgGrowth) * spawnConfig.DifficultyConfig.BossDamageMult * 0.5f;
+            float scaledDamage = monsterConfig.Damage * GetDamageMult() * spawnConfig.DifficultyConfig.BossDamageMult * 0.5f;
             float scaledArmor = monsterConfig.Armor;
             float scaledSpeed = monsterConfig.MoveSpeed;
 
@@ -354,18 +425,20 @@ namespace BattleSystemECS.Systems
             var monsterConfig = gameConfig.GetMonsterConfigByTypeId(typeId);
             if (monsterConfig == null) return 0;
 
-            float waveScaling = 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.BaseHealthMultPerWave;
-            float dmgGrowth = spawnConfig.DifficultyConfig.BaseDamageMultPerWave;
+            // Round 127 Dir 1 — curve-aware multipliers; fall back to legacy linear
+            // when no curveId is set. The minion path uses the same curve resolution
+            // as the regular wave spawn so curve-driven difficulty scales minions too.
+            float waveScaling = GetHealthMult();
             bool isBossWave = currentWave >= spawnConfig.DifficultyConfig.BossStartWave;
             float healthMult = waveScaling;
-            float damageMult = 1.0f + (currentWave - 1) * dmgGrowth;
+            float damageMult = GetDamageMult();
             if (isBossWave)
             {
                 healthMult *= spawnConfig.DifficultyConfig.BossHealthMult * 0.5f; // minions get half-boss HP
                 damageMult *= spawnConfig.DifficultyConfig.BossDamageMult * 0.5f;
             }
-            float armorMult = 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.ArmorGrowthPerWave;
-            float speedMult = 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.SpeedGrowthPerWave;
+            float armorMult = GetArmorMult();
+            float speedMult = GetSpeedMult();
 
             float scaledHealth = monsterConfig.Health * healthMult;
             float scaledMaxHealth = monsterConfig.MaxHealth * healthMult;
@@ -544,16 +617,16 @@ namespace BattleSystemECS.Systems
 
                     // ── 波次动态难度曲线 ───────────────────────────────────────
                     // 1. Base wave scaling: each wave increases stats by base mult
-                    float waveGrowth = spawnConfig.DifficultyConfig.BaseHealthMultPerWave;
-                    float dmgGrowth = spawnConfig.DifficultyConfig.BaseDamageMultPerWave;
-                    float waveScaling = 1.0f + (currentWave - 1) * waveGrowth;
+                    //    (Round 127 Dir 1: GetHealthMult/GetDamageMult honor optional
+                    //     curveId; if empty, returns the legacy 1 + (wave-1) * growth.)
+                    float waveScaling = GetHealthMult();
 
                     // 2. Elite scaling: wave >= EliteStartWave gets ×eliteMult
                     bool isEliteWave = currentWave >= spawnConfig.DifficultyConfig.EliteStartWave;
                     bool isBossWave = currentWave >= spawnConfig.DifficultyConfig.BossStartWave;
 
                     float healthMult = waveScaling;
-                    float damageMult = 1.0f + (currentWave - 1) * dmgGrowth;
+                    float damageMult = GetDamageMult();
 
                     if (isBossWave)
                     {
@@ -566,11 +639,9 @@ namespace BattleSystemECS.Systems
                         damageMult *= spawnConfig.DifficultyConfig.EliteDamageMult;
                     }
 
-                    // 3. Armor & Speed scaling per wave
-                    float armorGrowth = spawnConfig.DifficultyConfig.ArmorGrowthPerWave;
-                    float speedGrowth = spawnConfig.DifficultyConfig.SpeedGrowthPerWave;
-                    float armorMult = 1.0f + (currentWave - 1) * armorGrowth;
-                    float speedMult = 1.0f + (currentWave - 1) * speedGrowth;
+                    // 3. Armor & Speed scaling per wave (Round 127 Dir 1: curve-aware)
+                    float armorMult = GetArmorMult();
+                    float speedMult = GetSpeedMult();
 
                     // 4. Wave rhythm — Breather eases the wave, Surge/Climax push it
                     // (Count is already scaled via WaveConfig.GetEnemyCountForType; here we scale stats.)
