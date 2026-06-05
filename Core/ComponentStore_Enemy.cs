@@ -376,6 +376,12 @@ namespace BattleSystemECS.Core
         // fired via a 4-bit fired mask. Hard-cap is 4 phases per boss (matches the JSON loader
         // "up to 4 phases" assumption) — bosses with more phases are silently truncated.
         public const int BOSS_PHASE_MAX = 4;
+        // Round 119 Dir 3 — per-boss-phase minion summon cap. Bounds EnemyPhaseMinionCountsFlat
+        // values written from JSON; values > cap are silently clamped at set-time. Default 8
+        // keeps total boss adds manageable: 4 phases × 8 = 32 max minions per boss. With the
+        // active-boss pool usually < 5, the global ceiling is ~160 — well under MAX_ENTITIES (100K)
+        // and below the per-frame spawn cap (10/sec × ~16s phase gap).
+        public const int BOSS_PHASE_SUMMON_CAP = 8;
         // EnemyPhaseCount: number of phases configured for this enemy (0 = no phases).
         public int[] EnemyPhaseCount = new int[MAX_ENTITIES];
         // EnemyPhaseThresholdsFlat[phase, enemyId]: HP fraction (0-1) at which this phase activates.
@@ -395,6 +401,15 @@ namespace BattleSystemECS.Core
         // EnemyPhaseFiredMask: 4-bit bitmask. Bit (1 << phase) is set when the phase has fired
         // its one-shot ability + multipliers. Prevents re-firing on subsequent HP recovery.
         public int[] EnemyPhaseFiredMask = new int[MAX_ENTITIES];
+        // EnemyPhaseMinionTypeIdFlat[phase, enemyId]: typeId of the minion to summon when this
+        // BossPhase activates. -1 = no minion summon. Indexed as
+        // [phase * MAX_ENTITIES + enemyId] for cache locality (same layout as SpeedMult/DamageMult).
+        // TypeId is the index into GameConfig.MonsterTypes (NOT the string Type). Round 119 Dir 3.
+        public int[] EnemyPhaseMinionTypeIdFlat = new int[BOSS_PHASE_MAX * MAX_ENTITIES];
+        // EnemyPhaseMinionCountsFlat[phase, enemyId]: how many minions to spawn when this phase
+        // activates. 0 = no summon. Same indexing convention as EnemyPhaseMinionTypeIdFlat.
+        // Capped at BOSS_PHASE_SUMMON_CAP to prevent per-boss phase from flooding the arena.
+        public int[] EnemyPhaseMinionCountsFlat = new int[BOSS_PHASE_MAX * MAX_ENTITIES];
 
         // ==================== Boss Invulnerable Phase（无敌阶段） ====================
         // EnemyIsInvulnerable: true when the enemy is in an invulnerable phase (e.g. Boss skill animation).
@@ -1173,6 +1188,39 @@ namespace BattleSystemECS.Core
             // H-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeEnemyIds.Add(entityId); _enemyIndexInList[entityId] = _activeEnemyIds.Count - 1; }
             return entityId;
+        }
+
+        // ==================== Boss Phase Minion Summon (Round 119 Dir 3) ====================
+        // SetEnemyPhaseMinion: configure the minion summon for a (phase, enemy) pair.
+        // - typeId: index into GameConfig.MonsterTypes; -1 = no minion; 0..N = valid typeId
+        // - count: 0 = no minion; > 0 clamped to BOSS_PHASE_SUMMON_CAP
+        //   This method does NOT validate the typeId against GameConfig.MonsterTypes.Count — that
+        //   is done at drain time in EnemyAISystem so we don't pay the validation cost at spawn
+        //   (which runs on every enemy). Out-of-bounds typeIds are silently skipped at fire time.
+        public void SetEnemyPhaseMinion(int enemyId, int phase, int typeId, int count)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (phase < 0 || phase >= BOSS_PHASE_MAX) return;
+            int idx = phase * MAX_ENTITIES + enemyId;
+            EnemyPhaseMinionTypeIdFlat[idx] = (typeId < -1) ? -1 : typeId;
+            EnemyPhaseMinionCountsFlat[idx] = (count <= 0) ? 0 :
+                                              (count > BOSS_PHASE_SUMMON_CAP ? BOSS_PHASE_SUMMON_CAP : count);
+        }
+
+        // GetEnemyPhaseMinionTypeId: boundary-safe accessor. Returns -1 for invalid (enemyId, phase).
+        public int GetEnemyPhaseMinionTypeId(int enemyId, int phase)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return -1;
+            if (phase < 0 || phase >= BOSS_PHASE_MAX) return -1;
+            return EnemyPhaseMinionTypeIdFlat[phase * MAX_ENTITIES + enemyId];
+        }
+
+        // GetEnemyPhaseMinionCount: boundary-safe accessor. Returns 0 for invalid (enemyId, phase).
+        public int GetEnemyPhaseMinionCount(int enemyId, int phase)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0;
+            if (phase < 0 || phase >= BOSS_PHASE_MAX) return 0;
+            return EnemyPhaseMinionCountsFlat[phase * MAX_ENTITIES + enemyId];
         }
 
         // ==================== 敌人基础属性访问 ====================

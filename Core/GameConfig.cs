@@ -741,6 +741,14 @@ namespace BattleSystemECS.Config
         // New behavior tree subtree to use during this phase.
         // Empty = continue using current BT.
         public string NewBehaviorTree { get; set; }
+        // Round 119 Dir 3 — optional minion summon trigger. When the phase fires, the boss
+        // spawns MinionCount copies of the MonsterTypes[MinionTypeId] entry near its current
+        // position. Both fields are 0 by default (= no summon). MinionTypeId uses the index
+        // into GameConfig.MonsterTypes (NOT the string Type), so it is data-driven without
+        // re-running the JSON loader at runtime. Designers can leave both fields at 0 to
+        // keep the phase behaving like Round 111 (speed/damage/ability only).
+        public int MinionTypeId { get; set; } = 0;
+        public int MinionCount { get; set; } = 0;
     }
 
     /// <summary>
@@ -2042,6 +2050,17 @@ namespace BattleSystemECS.Config
             if (found != null)
                 _monsterCache[type] = found;
             return found;
+        }
+
+        // Round 119 Dir 3 — typeId-based lookup used by Boss Phase minion summon. typeId is the
+        // index into MonsterTypes (NOT the string Type). Returns null for out-of-range or
+        // negative typeId so callers can early-out without an exception. The cache-by-string
+        // path above is unused here because minions are spawned infrequently (1-2 per phase
+        // transition, max ~32 per boss) — a per-call linear scan is fine.
+        public MonsterConfig GetMonsterConfigByTypeId(int typeId)
+        {
+            if (typeId < 0 || typeId >= MonsterTypes.Count) return null;
+            return MonsterTypes[typeId];
         }
 
         public LevelConfig GetLevelConfig(int levelNumber)

@@ -428,6 +428,12 @@ namespace BattleSystemECS.Core
                 {
                     EnemyPhaseSpeedMults[baseIdx + i] = 1f;
                     EnemyPhaseDamageMults[baseIdx + i] = 1f;
+                    // Round 119 Dir 3 — initialise minion-summon defaults across the whole SOA
+                    // range. -1 = "no minion type set" and 0 = "no count set" — both sentinel
+                    // values that the per-(phase,enemy) SetEnemyPhaseMinion() will overwrite
+                    // when a boss actually declares a minion in its MonsterConfig.
+                    EnemyPhaseMinionTypeIdFlat[baseIdx + i] = -1;
+                    EnemyPhaseMinionCountsFlat[baseIdx + i] = 0;
                 }
             }
             // Initialize player buffs
@@ -664,6 +670,11 @@ namespace BattleSystemECS.Core
                     EnemyPhaseThresholdsFlat[idx] = 0f;
                     EnemyPhaseSpeedMults[idx] = 1f;
                     EnemyPhaseDamageMults[idx] = 1f;
+                    // Round 119 Dir 3 — reset per-phase minion summon fields. typeId -1 / count 0
+                    // is the canonical "no summon" state; a recycled enemyId would otherwise carry
+                    // the previous boss's summon config into a freshly-spawned unit.
+                    EnemyPhaseMinionTypeIdFlat[idx] = -1;
+                    EnemyPhaseMinionCountsFlat[idx] = 0;
                 }
                 // LastStand / DeathRattle fields
                 EnemyLastStandHpFraction[entityId] = 0f;

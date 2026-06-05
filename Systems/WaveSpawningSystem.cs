@@ -270,6 +270,101 @@ namespace BattleSystemECS.Systems
             totalEnemiesSpawned++;
         }
 
+        /// <summary>
+        /// Round 119 Dir 3 — Boss phase minion spawn. Spawns up to <paramref name="count"/>
+        /// copies of the MonsterTypes[<paramref name="typeId"/>] entry in a 1.5-unit ring
+        /// around (centerX, centerY). The ring placement is deterministic per call index (k
+        /// * 60deg in [0,360)) so multiple summons from the same phase don't overlap. Skips
+        /// silently when: typeId is out of range, MonsterConfig is missing, or AddEnemy
+        /// returns -1 (entity pool exhausted). All standard spawn-site initialisation
+        /// (DamageImmunity / ElementalResist / FactionId / BehaviorTree / Burrow / Fission /
+        /// Morph / Thief / Lifesteal / etc.) is applied just like the regular WavePhase
+        /// spawn path so the new minion behaves identically to a wave-spawned copy.
+        /// </summary>
+        public int SpawnMinionNearPosition(int typeId, int count, float centerX, float centerY)
+        {
+            if (count <= 0) return 0;
+            if (typeId < 0 || typeId >= gameConfig.MonsterTypes.Count) return 0;
+            var monsterConfig = gameConfig.GetMonsterConfigByTypeId(typeId);
+            if (monsterConfig == null) return 0;
+
+            float waveScaling = 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.BaseHealthMultPerWave;
+            float dmgGrowth = spawnConfig.DifficultyConfig.BaseDamageMultPerWave;
+            bool isBossWave = currentWave >= spawnConfig.DifficultyConfig.BossStartWave;
+            float healthMult = waveScaling;
+            float damageMult = 1.0f + (currentWave - 1) * dmgGrowth;
+            if (isBossWave)
+            {
+                healthMult *= spawnConfig.DifficultyConfig.BossHealthMult * 0.5f; // minions get half-boss HP
+                damageMult *= spawnConfig.DifficultyConfig.BossDamageMult * 0.5f;
+            }
+            float armorMult = 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.ArmorGrowthPerWave;
+            float speedMult = 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.SpeedGrowthPerWave;
+
+            float scaledHealth = monsterConfig.Health * healthMult;
+            float scaledMaxHealth = monsterConfig.MaxHealth * healthMult;
+            float scaledDamage = monsterConfig.Damage * damageMult;
+            float scaledArmor = monsterConfig.Armor * armorMult;
+            float scaledMagicResist = monsterConfig.MagicResist * armorMult;
+            float scaledSpeed = monsterConfig.MoveSpeed * speedMult;
+
+            int spawned = 0;
+            const float SummonRingRadius = 1.5f;
+            for (int k = 0; k < count; k++)
+            {
+                // Deterministic ring placement: k * 60deg. No RNG so multiple minions from the
+                // same phase spread evenly. Within BOSS_PHASE_SUMMON_CAP (8) this covers 360deg.
+                float angleRad = (k * 60f) * (float)Math.PI / 180f;
+                float spawnX = centerX + SummonRingRadius * (float)Math.Cos(angleRad);
+                float spawnY = centerY + SummonRingRadius * (float)Math.Sin(angleRad);
+
+                string enemyName = $"[PHASE-SUMMON] {monsterConfig.Type}L{currentLevel}W{currentWave}#{k}";
+                int enemyId = store.AddEnemy(
+                    spawnX, spawnY,
+                    scaledSpeed,
+                    scaledHealth,
+                    scaledMaxHealth,
+                    scaledDamage,
+                    monsterConfig.GoldReward,
+                    currentWave,
+                    enemyName,
+                    scaledArmor,
+                    monsterConfig.Shield,
+                    scaledMagicResist
+                );
+                if (enemyId < 0) continue; // pool exhausted; bail out for this slot
+                store.SetEntityName(enemyId, enemyName);
+                store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
+                store.SetElementalResist(enemyId, monsterConfig.FireResist, monsterConfig.IceResist, monsterConfig.LightningResist);
+                store.SetLastStandConfig(enemyId,
+                    monsterConfig.LastStand?.HpFraction ?? 0f,
+                    monsterConfig.LastStand?.SpeedMult ?? 1f,
+                    monsterConfig.LastStand?.DamageMult ?? 1f);
+                store.SetPierceResist(enemyId, monsterConfig.PierceResist, monsterConfig.PierceImmune);
+                store.SetCritResistance(enemyId, monsterConfig.CritResist);
+                store.SetDeflectChance(enemyId, monsterConfig.DeflectChance);
+                store.SetFactionId(enemyId, monsterConfig.FactionId);
+                if (monsterConfig.FactionId > 0) store.FactionInfightEnabled = 1;
+                store.EnemyBehaviorTree[enemyId] = gameConfig.GetCachedBehaviorTree(monsterConfig.Type);
+                if (monsterConfig.IsFlying)
+                {
+                    store.EnemyIsFlying[enemyId] = true;
+                    store.EnemyFlightHeight[enemyId] = monsterConfig.FlightHeight;
+                    store.EnemyCanLand[enemyId] = monsterConfig.CanLand;
+                }
+                int fissionDefId = gameConfig.GetFissionDefIdBySourceType(monsterConfig.Type);
+                store.EnemyFissionDefId[enemyId] = fissionDefId;
+                store.EnemyFissionGeneration[enemyId] = 0;
+                int morphDefId = gameConfig.GetMorphDefIdBySourceType(monsterConfig.Type);
+                store.EnemyMorphDefId[enemyId] = morphDefId;
+                store.EnemyIsMorphed[enemyId] = false;
+                store.EnemyMorphTriggered[enemyId] = false;
+                totalEnemiesSpawned++;
+                spawned++;
+            }
+            return spawned;
+        }
+
         public void SetLevel(int levelNumber)
         {
             currentLevel = levelNumber;
@@ -714,6 +809,12 @@ namespace BattleSystemECS.Systems
                                 // per-frame string.Split). Null = no-op; empty string also no-op.
                                 store.EnemyPhaseAbilityIdsFlat[ph, enemyId] =
                                     string.IsNullOrEmpty(phaseDef.AbilityId) ? null : phaseDef.AbilityId;
+                                // Round 119 Dir 3 — Boss phase minion summon config. Both fields
+                                // are 0 by default in BossPhaseDef; SetEnemyPhaseMinion() will treat
+                                // (MinionTypeId <= 0, MinionCount <= 0) as "no summon" (writes -1/0).
+                                // No need to validate MinionTypeId here — the AI system does the
+                                // typeId-vs-MonsterTypes.Count bounds check at fire time.
+                                store.SetEnemyPhaseMinion(enemyId, ph, phaseDef.MinionTypeId, phaseDef.MinionCount);
                             }
                         }
                         // Initialize enrage timer from config

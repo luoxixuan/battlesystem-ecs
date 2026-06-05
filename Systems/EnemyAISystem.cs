@@ -26,6 +26,11 @@ namespace BattleSystemECS.Systems
         private readonly TechTreeSystem techTreeSystem;
         private readonly IEventBus _eventBus;
         private readonly ReflectTowerSystem? _reflectTowerSystem;
+        // Round 119 Dir 3 — optional WaveSpawningSystem ref. Set via SetWaveSpawningSystem() after
+        // construction. When null (e.g. in unit tests that construct EnemyAISystem without the
+        // full GameManager), the minion-summon bag is drained but no spawn happens (drained
+        // count is still tracked for diagnostics).
+        private WaveSpawningSystem _waveSpawningSystem;
 
         private int currentTurn;
         // Per-turn cached fields for cache locality
@@ -52,6 +57,17 @@ namespace BattleSystemECS.Systems
         // same transition in the same frame, only the first wins (CAS on FiredMask).
         private readonly ConcurrentBag<(int enemyId, string abilityId)> _phaseAbilityEvents = new ConcurrentBag<(int, string)>();
 
+        // Round 119 Dir 3 — Boss phase minion-summon event bag. Pushed in the same Parallel.For
+        // path as _phaseAbilityEvents whenever a phase's (MinionTypeId, MinionCount) trigger
+        // fires. Drained serially at end of Update() into WaveSpawningSystem.SpawnMinionNearPosition
+        // (which calls AddEnemy — NOT thread-safe). Each event carries the boss id, typeId,
+        // count, and current position so the spawn site can ring-place the new minions. One-shot
+        // guard is the same EnemyPhaseFiredMask bit that guards the ability + speed/damage
+        // triggers; the minion push happens AFTER the bit is set so a re-entrant parallel batch
+        // cannot double-summon.
+        private readonly ConcurrentBag<(int bossId, int typeId, int count, float x, float y)> _phaseMinionEvents
+            = new ConcurrentBag<(int, int, int, float, float)>();
+
         // BT evaluation cache — invalidates when enemy health, charge counter, or stun duration changes.
         private float _cachedPlayerHealth = -1;
         private readonly float[] _enemyHealthCache = new float[ComponentStore.MAX_ENTITIES];
@@ -75,6 +91,16 @@ namespace BattleSystemECS.Systems
             _attackEvents[1] = new ConcurrentBag<AttackEvent>();
             _lifestealEvents[0] = new ConcurrentBag<LifestealEvent>();
             _lifestealEvents[1] = new ConcurrentBag<LifestealEvent>();
+        }
+
+        /// <summary>
+        /// Round 119 Dir 3 — wire the WaveSpawningSystem into EnemyAISystem so that phase-triggered
+        /// minion summons can be drained into SpawnMinionNearPosition(). Called from GameManager
+        /// after both systems are constructed. Safe to call multiple times (idempotent).
+        /// </summary>
+        public void SetWaveSpawningSystem(WaveSpawningSystem waveSpawningSystem)
+        {
+            _waveSpawningSystem = waveSpawningSystem;
         }
 
         /// <summary>
@@ -206,6 +232,18 @@ namespace BattleSystemECS.Systems
                                 if (!string.IsNullOrEmpty(abId))
                                 {
                                     _phaseAbilityEvents.Add((enemyId, abId));
+                                }
+                                // Round 119 Dir 3 — Boss phase minion summon trigger. Reads the
+                                // pre-populated per-(phase,enemy) minion fields and pushes a
+                                // (bossId, typeId, count, x, y) event for end-of-Update serial
+                                // drain. Position is captured HERE (per-frame) so the minion
+                                // appears at the boss's CURRENT location, not the spawn point.
+                                int minionType = store.EnemyPhaseMinionTypeIdFlat[phIdx];
+                                int minionCount = store.EnemyPhaseMinionCountsFlat[phIdx];
+                                if (minionType >= 0 && minionCount > 0)
+                                {
+                                    _phaseMinionEvents.Add((enemyId, minionType, minionCount,
+                                        store.PositionX[enemyId], store.PositionY[enemyId]));
                                 }
                                 firedMask = store.EnemyPhaseFiredMask[enemyId];
                             }
@@ -452,6 +490,17 @@ namespace BattleSystemECS.Systems
                                     if (!string.IsNullOrEmpty(abId))
                                     {
                                         _phaseAbilityEvents.Add((enemyId, abId));
+                                    }
+                                    // Round 119 Dir 3 — Boss phase minion summon trigger (parallel
+                                    // path). Same semantics as the sequential path: read pre-populated
+                                    // fields, push to bag, drain serially at end of Update. Position
+                                    // is captured per-frame at the boss's CURRENT location.
+                                    int minionType = store.EnemyPhaseMinionTypeIdFlat[phIdx];
+                                    int minionCount = store.EnemyPhaseMinionCountsFlat[phIdx];
+                                    if (minionType >= 0 && minionCount > 0)
+                                    {
+                                        _phaseMinionEvents.Add((enemyId, minionType, minionCount,
+                                            store.PositionX[enemyId], store.PositionY[enemyId]));
                                     }
                                     firedMask = store.EnemyPhaseFiredMask[enemyId];
                                 }
@@ -1010,6 +1059,10 @@ namespace BattleSystemECS.Systems
             // timers and _activeChannelers — NOT thread-safe). Drained at end of Update so
             // the rest of the frame can still see the new ability channeling state.
             DrainPhaseAbilityEvents();
+            // Round 119 Dir 3 — drain phase-minion bag into WaveSpawningSystem.SpawnMinionNearPosition.
+            // Same pattern as ability drain: serial, end-of-Update, thread-safe. Bag is always
+            // drained (count tracked) so diagnostics work even when _waveSpawningSystem is null.
+            DrainPhaseMinionEvents();
         }
 
         /// <summary>
@@ -1031,6 +1084,28 @@ namespace BattleSystemECS.Systems
                 }
             }
             PhaseAbilityDrainCount = count;
+        }
+
+        // Round 119 Dir 3 — drain the phase-minion bag into WaveSpawningSystem.SpawnMinionNearPosition.
+        // Called at the end of Update() (after both sequential and parallel paths complete). Like
+        // DrainPhaseAbilityEvents, this is serial and thread-safe. When _waveSpawningSystem is null
+        // (e.g. unit tests without a full GameManager) the bag is drained but no spawn happens —
+        // the count is still tracked for diagnostics via PhaseMinionDrainCount.
+        public int PhaseMinionDrainCount { get; private set; }
+        public int PhaseMinionSpawnedCount { get; private set; }
+        private void DrainPhaseMinionEvents()
+        {
+            int drained = 0;
+            int spawned = 0;
+            while (_phaseMinionEvents.TryTake(out var ev))
+            {
+                drained++;
+                if (_waveSpawningSystem == null) continue;
+                int n = _waveSpawningSystem.SpawnMinionNearPosition(ev.typeId, ev.count, ev.x, ev.y);
+                spawned += n;
+            }
+            PhaseMinionDrainCount = drained;
+            PhaseMinionSpawnedCount = spawned;
         }
 
         private static int ParseDodgeDirection(string action)

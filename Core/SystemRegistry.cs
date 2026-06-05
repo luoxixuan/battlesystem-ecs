@@ -208,6 +208,9 @@ namespace BattleSystemECS.Core
             // ── Enemy AI & Abilities ──
             EnemyAbility = new EnemyAbilitySystem(store, logger, playerId, config, eventBus);
             EnemyAI = new EnemyAISystem(store, logger, playerId, config, EnemyAbility, TechTree, eventBus, ReflectTower);
+            // Round 119 Dir 3 — wire WaveSpawningSystem into EnemyAISystem so phase-triggered
+            // minion summons can be drained into SpawnMinionNearPosition() at end of Update.
+            EnemyAI.SetWaveSpawningSystem(WaveSpawning);
 
             // ── Hit Shield ──
             var hitShield = new HitShieldSystem(store, logger);
