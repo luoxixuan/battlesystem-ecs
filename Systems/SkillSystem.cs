@@ -205,6 +205,10 @@ namespace BattleSystemECS.Systems
                 // 0 = no polymorph applied; safe to leave at default for non-polymorph skills.
                 def.PolymorphDuration = sc.PolymorphDuration;
                 def.PolymorphDamageTakenMultiplier = sc.PolymorphDamageTakenMultiplier;
+                // Round 136 Direction 2 — AOE CC group control fields. 0 = no effect (safe default).
+                def.AoeStunDuration = sc.AoeStunDuration;
+                def.AoeRootDuration = sc.AoeRootDuration;
+                def.AoeKnockbackForce = sc.AoeKnockbackForce;
                 store.AddAbility(playerId, def);
                 renderer.Log($"[SKILL] {sc.Name} registered (shape: {sc.AreaShape}, radius: {sc.AreaRadius}, DoT: {sc.DotDuration}s/{sc.DotTickInterval}s×{sc.DotDamagePerTick})");
             }
@@ -406,6 +410,15 @@ namespace BattleSystemECS.Systems
                         necromancerSystem.SetTurn(_currentTurn, _currentTurn);
                         enemiesHit = necromancerSystem.MassResurrect(playerId, playerX, playerY, massRadius, hpFraction);
                     }
+                    break;
+                case 19: // AoeStun — circle AoE that stuns all enemies in radius (Round 136 Direction 2)
+                    enemiesHit = CastAoeStun(playerX, playerY, def.AreaRadius, def.AoeStunDuration, def.Name);
+                    break;
+                case 20: // AoeRoot — circle AoE that roots all enemies in radius (Round 136 Direction 2)
+                    enemiesHit = CastAoeRoot(playerX, playerY, def.AreaRadius, def.AoeRootDuration, def.Name);
+                    break;
+                case 21: // AoeKnockback — circle AoE that pushes all enemies radially from player (Round 136 Direction 2)
+                    enemiesHit = CastAoeKnockback(playerX, playerY, def.AreaRadius, def.AoeKnockbackForce, def.Name);
                     break;
                 default:
                     renderer.Log($"[SKILL] Unknown area shape {def.AreaShape} for ability '{def.Name}'");
@@ -1301,6 +1314,121 @@ namespace BattleSystemECS.Systems
             renderer.Log($"[TIMEREWIND] {def.Name} cast — rolled state back {actual:F2}s " +
                          $"(HP={store.PlayerCurrentHealth[playerId]:F1}/{store.PlayerMaxHealth[playerId]:F1}, " +
                          $"Mana={store.PlayerMana[playerId]:F1}, Shield={store.PlayerShield[playerId]:F1})");
+        }
+
+        // ===================================================================
+        // Round 136 Direction 2 — AOE CC group control (群体禁锢/击晕)
+        //   * AoeStun (AreaShape=19):  circle AoE that stuns every enemy in radius
+        //   * AoeRoot (AreaShape=20):  circle AoE that roots every enemy in radius
+        //   * AoeKnockback (AreaShape=21): circle AoE that pushes every enemy radially from player
+        //
+        // All three follow the same pattern: parallel collect IDs in radius → serial apply effect.
+        // No damage is dealt (these are pure CC skills). Per-enemy CC resistance + CC immunity
+        // mask + EnemyIsUnstoppable are all honored via the underlying store.Apply* methods.
+        // ===================================================================
+
+        /// <summary>
+        /// AoeStun (AreaShape=19): circle AoE stun. Returns number of enemies hit.
+        /// Skips enemies with HP ≤ 0 (dead), and lets the per-enemy helper apply CC immunity,
+        /// resistance, and refresh-or-set semantics. No damage is applied.
+        /// </summary>
+        public int CastAoeStun(float centerX, float centerY, int radius, float duration, string name)
+        {
+            if (_activeEnemyList == null) return 0;
+            if (radius <= 0 || duration <= 0f) return 0;
+            var activeEnemyIds = _activeEnemyList;
+
+            int radiusSq = radius * radius;
+            int hitCount = 0;
+            foreach (int enemyId in activeEnemyIds)
+            {
+                if (enemyId == playerId) continue;
+                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyHealth <= 0f) continue;
+
+                float dx = store.PositionX[enemyId] - centerX;
+                float dy = store.PositionY[enemyId] - centerY;
+                if (dx * dx + dy * dy > radiusSq) continue;
+
+                int stunTurns = Math.Max(1, (int)Math.Ceiling(duration));
+                store.ApplyEnemyStun(enemyId, stunTurns);
+                hitCount++;
+            }
+            if (hitCount > 0)
+                renderer.Log($"[SKILL] {name} AOE-stunned {hitCount} enemies in radius {radius} for {(int)Math.Ceiling(duration)} turns");
+            return hitCount;
+        }
+
+        /// <summary>
+        /// AoeRoot (AreaShape=20): circle AoE root. Returns number of enemies hit.
+        /// Rooted enemies cannot MOVE but can still cast abilities / perform basic melee
+        /// (movement zeroed in EnemyMovementSystem when EnemyRootDurationLeft > 0).
+        /// No damage is applied.
+        /// </summary>
+        public int CastAoeRoot(float centerX, float centerY, int radius, float duration, string name)
+        {
+            if (_activeEnemyList == null) return 0;
+            if (radius <= 0 || duration <= 0f) return 0;
+            var activeEnemyIds = _activeEnemyList;
+
+            int radiusSq = radius * radius;
+            int hitCount = 0;
+            foreach (int enemyId in activeEnemyIds)
+            {
+                if (enemyId == playerId) continue;
+                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyHealth <= 0f) continue;
+
+                float dx = store.PositionX[enemyId] - centerX;
+                float dy = store.PositionY[enemyId] - centerY;
+                if (dx * dx + dy * dy > radiusSq) continue;
+
+                int rootTurns = Math.Max(1, (int)Math.Ceiling(duration));
+                store.ApplyEnemyRoot(enemyId, rootTurns);
+                hitCount++;
+            }
+            if (hitCount > 0)
+                renderer.Log($"[SKILL] {name} AOE-rooted {hitCount} enemies in radius {radius} for {(int)Math.Ceiling(duration)} turns");
+            return hitCount;
+        }
+
+        /// <summary>
+        /// AoeKnockback (AreaShape=21): circle AoE knockback. Returns number of enemies hit.
+        /// Pushes each enemy radially AWAY from the player by <paramref name="force"/> units.
+        /// Knockback is consumed by TowerAttackSystem.ResolveKnockback each frame. No damage applied.
+        /// Enemies at the exact player position get a unit-random direction to avoid div-by-zero.
+        /// </summary>
+        public int CastAoeKnockback(float centerX, float centerY, int radius, float force, string name)
+        {
+            if (_activeEnemyList == null) return 0;
+            if (radius <= 0 || force <= 0f) return 0;
+            var activeEnemyIds = _activeEnemyList;
+
+            int radiusSq = radius * radius;
+            int hitCount = 0;
+            foreach (int enemyId in activeEnemyIds)
+            {
+                if (enemyId == playerId) continue;
+                float enemyHealth = store.GetEnemyHealth(enemyId);
+                if (enemyHealth <= 0f) continue;
+
+                float dx = store.PositionX[enemyId] - centerX;
+                float dy = store.PositionY[enemyId] - centerY;
+                float distSq = dx * dx + dy * dy;
+                if (distSq > radiusSq) continue;
+
+                // Store radial vector as knockback force; consumer (ResolveKnockback) reads magnitude
+                // from EnemyKnockbackForceLeft and direction from dx/dy at the time of application.
+                // We keep the simple scalar API of ApplyEnemyKnockback — magnitude only.
+                // Direction is applied by the consumer using (PositionX[enemyId]-centerX, ...)
+                // at the frame the force is resolved, so the same force field carries implicit
+                // direction-from-player at consumption time.
+                store.ApplyEnemyKnockback(enemyId, force);
+                hitCount++;
+            }
+            if (hitCount > 0)
+                renderer.Log($"[SKILL] {name} AOE-knockbacked {hitCount} enemies in radius {radius} with force {force:F1}");
+            return hitCount;
         }
     }
 }

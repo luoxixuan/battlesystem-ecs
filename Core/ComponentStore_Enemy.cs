@@ -157,6 +157,11 @@ namespace BattleSystemECS.Core
         // When > 0, IsEnemyDisarmed() returns true and the enemy cannot queue abilities (Round 124).
         // Distinct from stun: disarmed enemies can still move and attack (basic melee), just not cast abilities.
         public float[] EnemyDisarmDurationLeft = new float[MAX_ENTITIES];
+        // EnemyRootDurationLeft: root duration in turns. Decremented by EnemyMovementSystem each frame (Round 136).
+        // When > 0, IsEnemyRooted() returns true and the enemy cannot MOVE but can still cast + attack.
+        // Distinct from stun: rooted enemies retain AI / ability use, just lose movement vector.
+        // Applied by ApplyEnemyRoot (group-control AOE skill "Earthroot"). 0 = no root.
+        public float[] EnemyRootDurationLeft = new float[MAX_ENTITIES];
         // EnemyCCImmuneMask: per-enemy bitmask of CC types this enemy fully ignores (Round 97).
         // Stacks with EnemyIsUnstoppable: if either the bit OR the unstoppable flag is set, CC is skipped.
         // Bit layout matches CCImmunityConfig.Mask_* (Slow=0, Stun=1, Freeze=2, Knockback=3,
@@ -1687,6 +1692,31 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(enemyId)) return false;
             return EnemyDisarmDurationLeft[enemyId] > 0f;
+        }
+
+        /// <summary>Returns true if the enemy is currently rooted (cannot move but can still cast/attack). Round 136.</summary>
+        public bool IsEnemyRooted(int enemyId)
+        {
+            if (!IsValidEntity(enemyId)) return false;
+            return EnemyRootDurationLeft[enemyId] > 0f;
+        }
+
+        /// <summary>
+        /// Applies root to the enemy for `duration` turns. While rooted, the enemy cannot
+        /// MOVE (EnemyMovementSystem skips the position update) but can still cast abilities
+        /// and perform basic melee attacks. Respects EnemyIsUnstoppable (total CC immunity).
+        /// Refreshing semantics: if existing duration is longer than the new one, keep the
+        /// longer one. (Round 136 Direction 2 — AOE Root group control)
+        /// </summary>
+        public void ApplyEnemyRoot(int enemyId, int duration)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            if (duration <= 0) return;
+            // Total CC immunity (unstoppable enemies ignore root too — same as stun)
+            if (EnemyIsUnstoppable[enemyId]) return;
+            // Take the longer of the two durations (refresh semantics consistent with stun/disarm)
+            if (duration > EnemyRootDurationLeft[enemyId])
+                EnemyRootDurationLeft[enemyId] = duration;
         }
 
         /// <summary>

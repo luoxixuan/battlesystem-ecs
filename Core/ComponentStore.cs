@@ -534,6 +534,8 @@ namespace BattleSystemECS.Core
                 EnemyArmor[entityId] = 0f;
                 EnemyStunFlag[entityId] = false;
                 EnemyStunDurationLeft[entityId] = 0f;
+                // Root CC (Round 136 Direction 2): reset on entity destroy to avoid ID-reuse leakage
+                EnemyRootDurationLeft[entityId] = 0f;
                 // CC Immunity (Round 97): reset mask on entity destroy to avoid ID-reuse leakage
                 EnemyCCImmuneMask[entityId] = 0;
                 // Mana Pool (Round 101 Direction 10): reset both fields to avoid ID-reuse leakage
@@ -1066,6 +1068,7 @@ namespace BattleSystemECS.Core
             EnemyBleedStacks = null!; EnemyBleedDamagePerStack = null!; EnemyBleedTimer = null!;
             EnemyBleedMaxStacks = null!; EnemyBleedResistance = null!; EnemyBleedDurationLeft = null!;
             EnemyStunFlag = null!; EnemyStunDurationLeft = null!; EnemySlowFactor = null!;
+            EnemyRootDurationLeft = null!; // Round 136 Direction 2: AOE root CC field
             EnemyTerrainMoveSpeedMult = null!; EnemyMoveSpeedBase = null!; EnemySlowDurationLeft = null!;
             EnemyFrostZoneSlowMultiplier = null!;
             EnemyIsPolymorphed = null!; EnemyPolymorphDurationLeft = null!; EnemyPolymorphDamageTakenMultiplier = null!;

@@ -28,6 +28,10 @@ namespace BattleSystemECS.Core.GAS
         public const int TimeRewind = 16;    // TimeRewind: restore player HP / Mana / Shield from a recent snapshot (Round 109)
         public const int ChainHeal = 17;    // ChainHeal: O(N) nearest-neighbor heal chaining (Round 131) — mirror of ChainLightning but applies heal + small shield to friendlies
         public const int MassResurrect = 18; // MassResurrect: AOE revival of all un-reanimated corpses within radius (Round 133) — player-triggered divine spell, mirrors NecromancerSystem.MassResurrect
+        // Round 136 Direction 2 — AOE CC group control skills (群体禁锢/击晕)
+        public const int AoeStun      = 19; // AoeStun: circle AoE that stuns all enemies in radius for AoeStunDuration turns (war-stomp, earthquake, etc.)
+        public const int AoeRoot      = 20; // AoeRoot: circle AoE that roots all enemies in radius for AoeRootDuration turns (immobilizes movement only; enemy can still cast/attack)
+        public const int AoeKnockback = 21; // AoeKnockback: circle AoE that applies AoeKnockbackForce push impulse to all enemies in radius (radial direction from player)
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -53,6 +57,9 @@ namespace BattleSystemECS.Core.GAS
                 "timerwind" => TimeRewind,
                 "chainheal" => ChainHeal,
                 "massresurrect" => MassResurrect,
+                "aoestun" => AoeStun,
+                "aoeroot" => AoeRoot,
+                "aoeknockback" => AoeKnockback,
                 _ => Single
             };
         }
@@ -102,6 +109,13 @@ namespace BattleSystemECS.Core.GAS
         /// <summary>Cone angle in degrees for AreaShape.Cone. Fan spread. Default: 60.</summary>
         public float ConeAngleDegrees;   // degrees, used only when AreaShape == Cone
 
+        // AOE CC fields (Round 136 Direction 2 — group control: stun / root / knockback)
+        // Each is only used when AreaShape matches the corresponding constant (AoeStun/AoeRoot/AoeKnockback).
+        // 0 = no effect. Stun/Root duration in turns; Knockback force is added to EnemyKnockbackForceLeft.
+        public float AoeStunDuration;       // turns to stun enemies in radius; 0 = no stun
+        public float AoeRootDuration;       // turns to root enemies in radius; 0 = no root
+        public float AoeKnockbackForce;     // radial push impulse for enemies in radius; 0 = no knockback
+
         public GameplayAbilityDef(string name, string desc, float cooldown, float cost,
             int dmgAttr, float fixedDmg, AbilityActivation act, int areaShape, int areaRadius,
             float dotDuration = 0f, float dotTickInterval = 0f, float dotDamagePerTick = 0f,
@@ -127,6 +141,10 @@ namespace BattleSystemECS.Core.GAS
             // immediately after construction from the JSON config (def.PolymorphDuration = sc.PolymorphDuration).
             PolymorphDuration = 0f;
             PolymorphDamageTakenMultiplier = 1f;
+            // AOE CC fields default to 0 (no effect) — SkillSystem sets from SkillConfig post-construction.
+            AoeStunDuration = 0f;
+            AoeRootDuration = 0f;
+            AoeKnockbackForce = 0f;
         }
 
         /// <summary>True if this ability applies a periodic DoT effect.</summary>

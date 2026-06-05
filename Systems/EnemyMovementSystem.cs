@@ -209,6 +209,19 @@ namespace BattleSystemECS.Systems
                     }
                 }
 
+                // Round 136 — Root CC: rooted enemies cannot MOVE but can still cast + attack.
+                // Decrement BEFORE the stun early-return so root ticks down even while the enemy
+                // is simultaneously stunned (otherwise root would outlast its intended duration
+                // by the length of the stun).
+                if (store.EnemyRootDurationLeft[enemyId] > 0f)
+                {
+                    store.EnemyRootDurationLeft[enemyId] -= 1f;
+                    if (store.EnemyRootDurationLeft[enemyId] <= 0f)
+                    {
+                        store.EnemyRootDurationLeft[enemyId] = 0f;
+                    }
+                }
+
                 // Check stun BEFORE decrement so duration=1 blocks exactly 1 frame (current frame),
                 // then decrements to 0 for next frame.
                 if (store.EnemyStunDurationLeft[enemyId] > 0f)
@@ -350,6 +363,9 @@ namespace BattleSystemECS.Systems
                 moveSpeed *= store.EnemyTerrainMoveSpeedMult[enemyId];
                 // Apply Chrono Tower time dilation (per-enemy, accumulated min across all chrono towers)
                 moveSpeed *= store.EnemyTimeScale[enemyId];
+                // Round 136 — Root CC: zero move speed while rooted so position update is a no-op.
+                // Rooted enemies can still cast + attack (handled by separate systems).
+                if (store.EnemyRootDurationLeft[enemyId] > 0f) moveSpeed = 0f;
                 // Apply weather move speed modifier (Rain/Fog/Storm slow)
                 if (_weather != null)
                     moveSpeed *= _weather.GetEnemySpeedMultiplier(playerId);

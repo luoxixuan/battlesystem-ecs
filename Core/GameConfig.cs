@@ -1180,6 +1180,10 @@ namespace BattleSystemECS.Config
         public float ManaCost { get; set; }
         // Summon definition ID (for summon_unit ability type) — null/empty = not a summon skill
         public string SummonDefId { get; set; }
+        // Round 136 Direction 2 — AOE CC group control fields
+        public float AoeStunDuration { get; set; }     // turns (used by AreaShape=aoestun)
+        public float AoeRootDuration { get; set; }     // turns (used by AreaShape=aoeroot)
+        public float AoeKnockbackForce { get; set; }   // radial push impulse (used by AreaShape=aoeknockback)
     }
 
     public class BehaviorTreeDef

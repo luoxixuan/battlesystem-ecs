@@ -1237,6 +1237,10 @@ namespace BattleSystemECS.Config
             skill.SlowAmount = ExtractFloat(json, "SlowAmount");
             skill.SlowDuration = ExtractFloat(json, "SlowDuration");
             skill.ManaCost = ExtractFloat(json, "ManaCost");
+            // Round 136 Direction 2 — AOE CC group control
+            skill.AoeStunDuration = ExtractFloat(json, "AoeStunDuration");
+            skill.AoeRootDuration = ExtractFloat(json, "AoeRootDuration");
+            skill.AoeKnockbackForce = ExtractFloat(json, "AoeKnockbackForce");
             return skill;
         }
 
