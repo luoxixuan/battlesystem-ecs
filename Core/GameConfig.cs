@@ -1725,6 +1725,12 @@ namespace BattleSystemECS.Config
         // Pickup rarity roll configuration (loaded from pickup_defs.json → "PickupRarity" object)
         public PickupRarityConfig PickupRarity { get; set; } = new PickupRarityConfig();
 
+        // Round 130 — Inventory item definitions (loaded from items.json).
+        // Used by InventorySystem to define consumable items (potions / grenades / scrolls / shield sigils).
+        // Each item has ItemType (heal/mana/shield/speedBoost/damageBoost/aoeBurst/summon/cleanse)
+        // and Value (magnitude); InventorySystem dispatches by ItemType.
+        public ItemDef[] ItemDefs { get; set; } = Array.Empty<ItemDef>();
+
         // Obstacle definitions (loaded from obstacles.json)
         public ObstacleDef[] ObstacleDefs { get; set; } = Array.Empty<ObstacleDef>();
 
@@ -2508,6 +2514,39 @@ namespace BattleSystemECS.Config
         // Rarity tier for this pickup: 0=Common, 1=Uncommon, 2=Rare, 3=Epic, 4=Legendary.
         // Default 0 (Common) for backward compat. PickupSystem uses this to filter weighted random rolls.
         public int Rarity { get; set; } = 0;
+    }
+
+    /// <summary>
+    /// Inventory item type (Round 130) — semantic category used by InventorySystem.UseItem to dispatch effect.
+    /// String from JSON, parsed to enum at load time. Keep alphabetical for stable order.
+    /// </summary>
+    public enum InventoryItemType
+    {
+        Unknown = 0,
+        Heal = 1,         // +Value HP to player
+        Mana = 2,         // +Value mana to player
+        Shield = 3,       // +Value shield to player
+        SpeedBoost = 4,   // +50% speed for fixed duration
+        DamageBoost = 5,  // +X% attack damage for fixed duration
+        AoEBurst = 6,     // damage nearby enemies (Value = damage, 0-arg radius from Radius field)
+        Summon = 7,       // spawn Value allied units
+        Cleanse = 8,      // remove all CC/DoT flags
+    }
+
+    /// <summary>
+    /// Inventory item definition (Round 130) — loaded from items.json.
+    /// Each item is a consumable stored in a per-player inventory slot.
+    /// InventorySystem dispatches on ItemType; Value/BuffDuration/Radius are typed meaning.
+    /// </summary>
+    public class ItemDef
+    {
+        public string Type { get; set; } = "";          // unique id (e.g. "healing_potion")
+        public string Name { get; set; } = "";          // display name (e.g. "Healing Potion")
+        public InventoryItemType ItemType { get; set; } = InventoryItemType.Unknown;
+        public float Value { get; set; } = 0f;          // magnitude (heal amount, damage, etc.)
+        public float BuffDuration { get; set; } = 0f;   // seconds (for buff-type items)
+        public float Radius { get; set; } = 0f;         // world units (for AoE items)
+        public int MaxStack { get; set; } = 1;          // per-slot max count (default 1 = single-use)
     }
 
     /// <summary>

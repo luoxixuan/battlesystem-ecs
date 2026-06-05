@@ -150,6 +150,8 @@ namespace BattleSystemECS.Core
         // ── Tech & Misc ──
         public TechTreeSystem? TechTree { get; private set; }
         public PickupSystem? Pickup { get; private set; }
+        // Round 130 — Inventory / Item system (per-player slot-based consumables).
+        public InventorySystem? Inventory { get; private set; }
         public AscensionSystem? Ascension { get; private set; }
         public SaveSystem? Save { get; private set; }
 
@@ -357,6 +359,7 @@ namespace BattleSystemECS.Core
 
             // ── Misc ──
             Pickup = new PickupSystem(store, config, logger);
+            Inventory = new InventorySystem(store, config, logger);
             Ascension = new AscensionSystem(store, logger, config);
             Ascension.SelectModifier("tough_enemies");
             WaveSpawning.SetAscensionSystem(Ascension);

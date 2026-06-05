@@ -54,6 +54,9 @@ namespace BattleSystemECS.Config
                 // Load pickup definitions
                 LoadPickupDefs(gameConfig, renderer);
 
+                // Load inventory item definitions (Round 130)
+                LoadItemDefs(gameConfig, renderer);
+
                 // Load enemy fission definitions
                 LoadFissionDefs(gameConfig, renderer);
 
@@ -1424,6 +1427,74 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[PICKUP] Failed to load pickup defs: " + ex.Message);
+            }
+        }
+
+        // ── Round 130 Inventory items ─────────────────────────────────────
+        // Load item definitions from items.json. Each item has a Type (unique id),
+        // Name (display), ItemType (semantic category), Value/BuffDuration/Radius
+        // (typed meaning per ItemType), MaxStack (per-slot count cap).
+        // On parse failure, ItemDefs stays empty (InventorySystem fast-paths on empty).
+        private static void LoadItemDefs(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string itemFile = "Data/Configs/items.json";
+            try
+            {
+                if (!File.Exists(itemFile))
+                {
+                    renderer.Log("[INVENTORY] Item defs file not found: " + itemFile + ", inventory disabled");
+                    return;
+                }
+                string json = File.ReadAllText(itemFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[INVENTORY] Item defs file is empty: " + itemFile);
+                    return;
+                }
+
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var defs = new List<ItemDef>();
+                foreach (var elem in root.EnumerateArray())
+                {
+                    var it = new ItemDef();
+                    it.Type = elem.TryGetProperty("Type", out var t) ? t.GetString() ?? "" : "";
+                    it.Name = elem.TryGetProperty("Name", out var n) ? n.GetString() ?? "" : "";
+                    string itemTypeStr = elem.TryGetProperty("ItemType", out var it0) ? it0.GetString() ?? "Unknown" : "Unknown";
+                    it.ItemType = ParseItemType(itemTypeStr);
+                    it.Value = elem.TryGetProperty("Value", out var v) ? (float)v.GetDouble() : 0f;
+                    it.BuffDuration = elem.TryGetProperty("BuffDuration", out var bd) ? (float)bd.GetDouble() : 0f;
+                    it.Radius = elem.TryGetProperty("Radius", out var rd) ? (float)rd.GetDouble() : 0f;
+                    it.MaxStack = elem.TryGetProperty("MaxStack", out var ms) ? ms.GetInt32() : 1;
+                    if (it.MaxStack < 1) it.MaxStack = 1;
+                    defs.Add(it);
+                }
+
+                gameConfig.ItemDefs = defs.ToArray();
+                renderer.Log("[INVENTORY] Loaded " + defs.Count + " item defs from " + itemFile);
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[INVENTORY] Failed to load item defs: " + ex.Message);
+            }
+        }
+
+        // Map JSON string to InventoryItemType enum. Unknown → Unknown (caller must skip).
+        private static InventoryItemType ParseItemType(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return InventoryItemType.Unknown;
+            switch (s.Trim().ToLowerInvariant())
+            {
+                case "heal": return InventoryItemType.Heal;
+                case "mana": return InventoryItemType.Mana;
+                case "shield": return InventoryItemType.Shield;
+                case "speedboost": return InventoryItemType.SpeedBoost;
+                case "damageboost": return InventoryItemType.DamageBoost;
+                case "aoeburst": return InventoryItemType.AoEBurst;
+                case "summon": return InventoryItemType.Summon;
+                case "cleanse": return InventoryItemType.Cleanse;
+                default: return InventoryItemType.Unknown;
             }
         }
 

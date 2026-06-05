@@ -1,0 +1,53 @@
+[
+  {
+    "Type": "healing_potion",
+    "Name": "Healing Potion",
+    "ItemType": "Heal",
+    "Value": 50,
+    "MaxStack": 3
+  },
+  {
+    "Type": "mana_potion",
+    "Name": "Mana Potion",
+    "ItemType": "Mana",
+    "Value": 30,
+    "MaxStack": 3
+  },
+  {
+    "Type": "shield_sigil",
+    "Name": "Shield Sigil",
+    "ItemType": "Shield",
+    "Value": 25,
+    "BuffDuration": 12,
+    "MaxStack": 2
+  },
+  {
+    "Type": "speed_tonic",
+    "Name": "Speed Tonic",
+    "ItemType": "SpeedBoost",
+    "BuffDuration": 8,
+    "MaxStack": 2
+  },
+  {
+    "Type": "rage_draught",
+    "Name": "Rage Draught",
+    "ItemType": "DamageBoost",
+    "Value": 0.2,
+    "BuffDuration": 10,
+    "MaxStack": 2
+  },
+  {
+    "Type": "grenade",
+    "Name": "Grenade",
+    "ItemType": "AoEBurst",
+    "Value": 80,
+    "Radius": 3.5,
+    "MaxStack": 2
+  },
+  {
+    "Type": "cleanse_charm",
+    "Name": "Cleanse Charm",
+    "ItemType": "Cleanse",
+    "MaxStack": 2
+  }
+]

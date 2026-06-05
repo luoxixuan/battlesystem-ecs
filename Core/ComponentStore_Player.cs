@@ -174,6 +174,26 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // ComboGoldMult: current gold bonus multiplier = min(1 + ComboCount * ComboGoldBonusPerKill, ComboMaxMultiplier)
         public float[] PlayerComboGoldMult = new float[MAX_PLAYERS];
 
+        // ── Round 130 Inventory ──────────────────────────────────────────────
+        // Per-player slot-based inventory. Slot count is fixed (MAX_INVENTORY_SLOTS = 8).
+        // ItemId indexes into GameConfig.ItemDefs (-1 = empty slot, default 0-initialized → must call ResetInventory() on init).
+        // Count is 0..MaxStack (default 0 = empty; MaxStack from def at load time).
+        // All arrays are 0-initialized; default state = empty inventory. Zero-overhead fast path.
+        public const int MAX_INVENTORY_SLOTS = 8;
+        public int[] PlayerInventoryItemId = new int[MAX_PLAYERS * MAX_INVENTORY_SLOTS];
+        public int[] PlayerInventoryCount = new int[MAX_PLAYERS * MAX_INVENTORY_SLOTS];
+        // Total non-empty slot count (denormalized O(1) "is full" check).
+        public int[] PlayerInventoryUsed = new int[MAX_PLAYERS];
+        // Total items used (cumulative lifetime stat) for telemetry/achievements.
+        public int[] PlayerInventoryUsedTotal = new int[MAX_PLAYERS];
+        // Round 130 — DamageBoost item uses its OWN duration field (PlayerSlowDuration is shared
+        // with SpeedBoost). Without separation, applying a DamageBoost would clobber an active
+        // SpeedBoost timer (or vice versa). Tracked in turns, decremented by status tick.
+        public int[] PlayerDamageBoostDuration = new int[MAX_PLAYERS];
+        // DamageBoost magnitude (e.g., 0.2 = +20% attack). Default 0 = no boost active.
+        // DamageSystem multiplies base attack by (1 + this). Stays at 0 when no Rage Draught active.
+        public float[] PlayerDamageBoostMultiplier = new float[MAX_PLAYERS];
+
         // ==================== Bank / Interest System 组件（SOA） ====================
         // PlayerBankedGold: gold stored in the bank (earns interest each wave)
         public float[] PlayerBankedGold = new float[MAX_PLAYERS];
@@ -301,6 +321,13 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             // Combo Chain: reset both fields to 0 so a new game starts with no chain active.
             PlayerChainKillCount[entityId] = 0;
             PlayerChainKillBuffTimer[entityId] = 0f;
+
+            // Round 130 Inventory: reset all slots to empty (-1 item, 0 count).
+            ResetInventory(entityId);
+            // Round 130 DamageBoost timer + multiplier must be zeroed; otherwise a recycled
+            // player entity would inherit a stale attack buff (BUG scan finding).
+            PlayerDamageBoostDuration[entityId] = 0;
+            PlayerDamageBoostMultiplier[entityId] = 0f;
 
             PlayerEntityId = entityId;
         }
@@ -884,6 +911,56 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             TotemDurationLeft[totemId] = 0f;
             TotemChargesLeft[totemId] = 0;
             TotemCooldown[totemId] = 0f;
+        }
+
+        // ── Round 130 Inventory accessors ─────────────────────────────────────
+        // Compute flat index into per-player inventory arrays.
+        // Returns -1 on out-of-range inputs (caller must check). Mirrors the safety
+        // contract of GetInventoryItemId/GetInventoryCount, so callers that bypass
+        // the instance accessors (e.g., hot paths) get a sentinel instead of a
+        // silently corrupted valid-looking index (BUG scan finding).
+        public static int InventoryIndex(int playerId, int slot)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return -1;
+            if (slot < 0 || slot >= MAX_INVENTORY_SLOTS) return -1;
+            return playerId * MAX_INVENTORY_SLOTS + slot;
+        }
+
+        /// <summary>Reset all inventory slots for a player to empty (-1 item, 0 count).
+        /// Call on player add / wave start. Defensive: also clamps out-of-range playerId.</summary>
+        public void ResetInventory(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+            for (int s = 0; s < MAX_INVENTORY_SLOTS; s++)
+            {
+                int idx = playerId * MAX_INVENTORY_SLOTS + s;
+                PlayerInventoryItemId[idx] = -1;
+                PlayerInventoryCount[idx] = 0;
+            }
+            PlayerInventoryUsed[playerId] = 0;
+        }
+
+        /// <summary>Get the item id at (playerId, slot) or -1 if empty/invalid.</summary>
+        public int GetInventoryItemId(int playerId, int slot)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return -1;
+            if (slot < 0 || slot >= MAX_INVENTORY_SLOTS) return -1;
+            return PlayerInventoryItemId[playerId * MAX_INVENTORY_SLOTS + slot];
+        }
+
+        /// <summary>Get the stack count at (playerId, slot) or 0 if empty/invalid.</summary>
+        public int GetInventoryCount(int playerId, int slot)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            if (slot < 0 || slot >= MAX_INVENTORY_SLOTS) return 0;
+            return PlayerInventoryCount[playerId * MAX_INVENTORY_SLOTS + slot];
+        }
+
+        /// <summary>Number of non-empty slots for player (O(1) cached counter).</summary>
+        public int GetInventoryUsed(int playerId)
+        {
+            if (playerId < 0 || playerId >= MAX_PLAYERS) return 0;
+            return PlayerInventoryUsed[playerId];
         }
     }
 }
