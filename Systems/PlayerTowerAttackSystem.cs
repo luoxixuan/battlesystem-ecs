@@ -397,6 +397,8 @@ public void SetWaveNumber(int waveNumber)
             float finalLinkedDmg = resist >= 1f ? 0f : linkedDamage * (1f - resist);
 
             store.EnemyHealth[linkedEnemyId] -= finalLinkedDmg;
+            // Round 132 Dir 8 — honor Boss Min-Health Floor on player→LifeLink partner route.
+            store.ApplyMinHealthFloorInPlace(linkedEnemyId);
 
             // Thorns on linked enemy (if any)
             float thornsRatio = store.EnemyThornsRatio[linkedEnemyId];

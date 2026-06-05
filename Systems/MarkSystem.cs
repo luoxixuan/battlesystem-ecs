@@ -143,6 +143,10 @@ namespace BattleSystemECS.Systems
             if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) return 0;
             if (!store.EnemyActive[enemyId]) return 0;
             if (stacksToAdd <= 0) return 0;
+            // Round 132 Dir 8 — Execute Immunity: enemies with EnemyExecuteImmune=true opt out of
+            // the Mark subsystem entirely. Prevents Bosses from being tagged for execute-style
+            // payoff effects regardless of hit count. Zero cost on immune enemies (single bool read).
+            if (store.EnemyExecuteImmune[enemyId]) return 0;
 
             int threshold = store.EnemyMarkMaxThreshold[enemyId];
             if (threshold <= 0) return 0; // opt-out

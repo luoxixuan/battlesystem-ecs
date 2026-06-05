@@ -806,6 +806,21 @@ namespace BattleSystemECS.Core
         public float[] EnemyExecuteBonusMana = new float[MAX_ENTITIES];
         public bool[] EnemyExecuted = new bool[MAX_ENTITIES];
 
+        // ==================== 处决免疫 / 血量地板 (Execute Immunity / Min-Health Floor, Round 132 Dir 8) ====================
+        // EnemyMinHealthFloor: HP fraction (0-1) of MaxHealth that the enemy's HP cannot drop below.
+        //   0 = no floor (default, opt-out). Set to e.g. 0.05f for a 5% HP floor on a Boss, ensuring
+        //   it cannot be one-shot killed by a crit spike / chain reaction. Damage that would push HP
+        //   below the floor is clamped to (CurrentHP - FloorHP). Classic Boss design: "boss hits 5% HP,
+        //   enters last phase, immune to instant-kill" — gives the player a 30s window to clear.
+        // EnemyExecuteImmune: hard opt-out flag for execute-style effects. When true:
+        //   - MarkSystem.AddMark is a no-op (cannot be marked or threshold-fired).
+        //   - Damage below the execute threshold cannot trigger execute-bonus payouts.
+        //   Used by Bosses that should never be one-shot killed regardless of damage type.
+        //   Default false = full participation; designers opt in via boss configs.
+        // Hot-path cost: 1 float comparison + 1 bool check per ApplyEnemyDamage call. Zero alloc.
+        public float[] EnemyMinHealthFloor = new float[MAX_ENTITIES];
+        public bool[] EnemyExecuteImmune = new bool[MAX_ENTITIES];
+
         // ==================== Target Mark (目标标记叠加/衰减, Round 107 Direction 6) ====================
         // EnemyMarkStacks: current stack count of the mark debuff on this enemy.
         // Each tower hit that opts into the mark subsystem adds +1 (or +stacks-per-hit).
@@ -1176,6 +1191,12 @@ namespace BattleSystemECS.Core
             EnemyExecuteBonusGold[entityId] = 0f;
             EnemyExecuteBonusMana[entityId] = 0f;
             EnemyExecuted[entityId] = false;
+            // Round 132 Dir 8 — Execute Immunity: default 0/false = opt-out. Set EnemyMinHealthFloor
+            // to a positive HP fraction (e.g. 0.05f for a 5% Boss floor) and/or EnemyExecuteImmune=true
+            // to designate an enemy as immune to execute-style effects. Reset on entity add to
+            // prevent ID-reuse leakage (a recycled ID carrying stale floor/immune from a Boss).
+            EnemyMinHealthFloor[entityId] = 0f;
+            EnemyExecuteImmune[entityId] = false;
             // Round 107 Direction 6 — Target Mark: opt-in via EnemyMarkMaxThreshold > 0.
             // 0 = no mark subsystem participation. Reset on entity add to prevent ID-reuse leakage.
             EnemyMarkStacks[entityId] = 0;
@@ -1441,6 +1462,51 @@ namespace BattleSystemECS.Core
         }
 
         /// <summary>
+        /// Clamp damage so that applying it would not push EnemyHealth below the configured
+        /// Min-Health Floor (Round 132 Dir 8 — Execute Immunity). The floor is expressed as a
+        /// fraction of MaxHealth (e.g. 0.05f = 5%). Returns the (possibly reduced) damage value.
+        /// Returns the input unchanged when:
+        ///   - enemy is invalid
+        ///   - EnemyMinHealthFloor is 0 (opt-out, default)
+        ///   - MaxHealth is 0 (can't compute a floor)
+        ///   - current EnemyHealth is already at or below the floor (no clamp needed)
+        ///   - damage wouldn't reach the floor
+        /// Hot-path cost: ~3 array indexes + 2 compares. Zero allocation. Safe to call from
+        /// the serial damage-application phase of any attack pipeline.
+        /// </summary>
+        public float ClampDamageToHealthFloor(int enemyId, float damage)
+        {
+            if (damage <= 0f) return damage;
+            float floor = EnemyMinHealthFloor[enemyId];
+            if (floor <= 0f) return damage;
+            float maxHp = EnemyMaxHealth[enemyId];
+            if (maxHp <= 0f) return damage;
+            float minHp = maxHp * floor;
+            float curHp = EnemyHealth[enemyId];
+            float allowed = curHp - minHp;
+            if (allowed <= 0f) return 0f;        // already at/under floor → fully block
+            if (damage > allowed) return allowed; // clamp to floor
+            return damage;
+        }
+
+        /// <summary>
+        /// In-place enforcement of the Min-Health Floor (Round 132 Dir 8). Call this AFTER any
+        /// direct <c>EnemyHealth[id] -= dmg</c> statement that bypasses <see cref="ApplyEnemyDamage"/>
+        /// (e.g. TowerAttackSystem splash/explosion/transfer routes, Linked-Damage routing). The
+        /// helper is a no-op when the enemy has no floor configured (zero cost on the hot path).
+        /// Equivalent to: <c>if (EnemyMinHealthFloor[id] &gt; 0 &amp;&amp; EnemyHealth[id] &lt; maxHp*floor) EnemyHealth[id] = maxHp*floor;</c>
+        /// </summary>
+        public void ApplyMinHealthFloorInPlace(int enemyId)
+        {
+            float floor = EnemyMinHealthFloor[enemyId];
+            if (floor <= 0f) return;
+            float maxHp = EnemyMaxHealth[enemyId];
+            if (maxHp <= 0f) return;
+            float minHp = maxHp * floor;
+            if (EnemyHealth[enemyId] < minHp) EnemyHealth[enemyId] = minHp;
+        }
+
+        /// <summary>
         /// Applies damage to an enemy, with shield absorbing damage before it reaches health.
         /// </summary>
         public void ApplyEnemyDamage(int enemyId, float damage)
@@ -1471,6 +1537,14 @@ namespace BattleSystemECS.Core
             {
                 damage *= pathDmgMult;
             }
+
+            // ── Min-Health Floor (Round 132 Dir 8) ──
+            // If the enemy has a configured HP floor, clamp damage so EnemyHealth never drops
+            // below (MaxHealth × EnemyMinHealthFloor). Default 0f = opt-out, no clamp.
+            // Applies AFTER path terrain mult but BEFORE shield/health split so the floor is
+            // expressed in terms of final health damage. This is the canonical Boss "can't be
+            // one-shot" guard. Cost: 1 array index + 1 compare per damage event.
+            damage = ClampDamageToHealthFloor(enemyId, damage);
 
             float shield = EnemyShield[enemyId];
             if (shield <= 0f)

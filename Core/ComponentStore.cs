@@ -716,6 +716,10 @@ namespace BattleSystemECS.Core
                 EnemyExecuteBonusGold[entityId] = 0f;
                 EnemyExecuteBonusMana[entityId] = 0f;
                 EnemyExecuted[entityId] = false;
+                // Round 132 Dir 8 — Execute Immunity: reset on destroy to prevent ID-reuse leakage
+                // (a recycled ID carrying stale Boss-floor / execute-immune flags).
+                EnemyMinHealthFloor[entityId] = 0f;
+                EnemyExecuteImmune[entityId] = false;
                 // Round 107 Direction 6 — Target Mark: reset on entity destroy to prevent
                 // ID-reuse leakage (a recycled ID carrying stale stacks/decay-timer/threshold).
                 EnemyMarkStacks[entityId] = 0;
