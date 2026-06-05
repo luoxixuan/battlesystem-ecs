@@ -74,6 +74,17 @@ namespace BattleSystemECS.Systems
             _dayNight = dayNight;
         }
 
+        /// <summary>
+        /// Inject BossTrailAoeSystem (Round 124 Dir 1). When injected, the per-enemy
+        /// movement loop will call TryQueueTrail on each enemy that has the trail flag
+        /// set. Trail events are drained via BossTrailAoeSystem.ResolveTrailEvents
+        /// at the end of Update().
+        /// </summary>
+        public void SetBossTrailSystem(BossTrailAoeSystem bossTrail)
+        {
+            _bossTrailSystem = bossTrail;
+        }
+
         public void SetTurn(int turn)
         {
             _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
@@ -108,6 +119,10 @@ namespace BattleSystemECS.Systems
         // Round 121 — Direction 1: cached per-turn "any junctions registered?" flag.
         // Drives O(1) early-out in the per-enemy loop. When false, no per-enemy work runs.
         private bool _pathfindingHasJunctions;
+        // Round 124 — Direction 1: Boss Path Trail AoE. Reference to the trail system
+        // (injected via SetBossTrailSystem). When null, the per-enemy trail trigger check
+        // is a single null-check and skipped entirely (zero overhead on the common case).
+        private BossTrailAoeSystem _bossTrailSystem;
 
         public void Update()
         {
@@ -713,6 +728,28 @@ switch (actionEnum)
                     store.EnemyMoveDirX[enemyId] = 0f;
                     store.EnemyMoveDirY[enemyId] = (float)-dirEnum; // -1 when moving toward player, +1 when retreating
                 }
+
+                // ── Round 124 — Direction 1: Boss Path Trail AoE trigger ──
+                // After the enemy has finished moving, if it is a boss with trail configured
+                // and is on a path, queue a trail event when the path progress has advanced
+                // by ≥ BossTrailProgressInterval since the last trigger. The event is drained
+                // by BossTrailAoeSystem.ResolveTrailEvents() at the end of Update().
+                // Per-enemy cost: 6-7 array reads + a few comparisons — no allocation.
+                if (_bossTrailSystem != null && store.EnemyIsBossTrail[enemyId])
+                {
+                    int pathId = store.EnemyPathId[enemyId];
+                    if (pathId >= 0)
+                    {
+                        int total = _pathfinding != null ? _pathfinding.GetPathWaypointCount(pathId) : 0;
+                        if (total > 0)
+                        {
+                            float progress = (float)store.EnemyPathNodeIndex[enemyId] / total;
+                            if (progress > 1f) progress = 1f;
+                            if (progress < 0f) progress = 0f;
+                            _bossTrailSystem.TryQueueTrail(enemyId, progress);
+                        }
+                    }
+                }
             });
 
             // ── Serial pass: tile-stacking penalty ──
@@ -780,6 +817,15 @@ switch (actionEnum)
                     store.PalisadeContactDamageAccumulator[towerId] = 0f;
                     store.PalisadeDestroyFlag[towerId] = false;
                 }
+            }
+
+            // ── Serial pass: Round 124 — Direction 1 Boss Path Trail AoE drain ──
+            // Drains all per-thread BossTrailEvent queues serially. Each event applies
+            // (a) damage to the player if within radius and (b) slow to nearby enemies.
+            // No-op when _bossTrailSystem is null or no trail was queued this frame.
+            if (_bossTrailSystem != null)
+            {
+                _bossTrailSystem.ResolveTrailEvents();
             }
         }
 

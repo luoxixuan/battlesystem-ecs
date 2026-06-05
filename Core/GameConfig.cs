@@ -149,8 +149,18 @@ namespace BattleSystemECS.Config
         // Example: 0.1 = 10% of base damage stolen per second.
         public float DrainRate { get; set; } = 0f;
         // Phases: ordered list of boss phase definitions (by threshold, descending).
-        // Example: [{\"threshold\": 0.75, \"abilityId\": \"phase2_buff\"}, {\"threshold\": 0.50, \"abilityId\": \"enrage\"}]
+        // Example: [{"threshold": 0.75, "abilityId": "phase2_buff"}, {"threshold": 0.50, "abilityId": "enrage"}]
         public List<BossPhaseDef> Phases { get; set; } = new List<BossPhaseDef>();
+        // Round 124 Dir 1 — Boss Path Trail AoE: when set on a boss, leaves a damaging
+        // AoE trail along the path as the boss advances. All fields default to 0 = no trail
+        // (zero-overhead on the hot path). When BossTrailProgressInterval > 0 AND
+        // BossTrailRadius > 0 AND BossTrailDamage > 0, the boss drops one trail AoE per
+        // "Interval" worth of path progress (0.1 = every 10% of the waypoints).
+        // BossTrailSlow is applied to nearby enemies (0.5 = 50% slow for 1 frame).
+        public float BossTrailProgressInterval { get; set; } = 0f;
+        public float BossTrailRadius { get; set; } = 0f;
+        public float BossTrailDamage { get; set; } = 0f;
+        public float BossTrailSlow { get; set; } = 0f;
         // Enrage: enrage configuration (timer-based). Null = no enrage.
         public BossEnrageConfig Enrage { get; set; }
         // LastStand: HP-threshold-based death rattle. Null = no LastStand.

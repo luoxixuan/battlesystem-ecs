@@ -241,6 +241,20 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public int PathCount => _paths.Count;
 
+        /// <summary>
+        /// Get the total waypoint count for a given path (by int id, same mapping as GetPathKey).
+        /// Returns 0 if the path id is unknown or the path has no waypoints.
+        /// Used by BossTrailAoeSystem to compute path progress.
+        /// </summary>
+        public int GetPathWaypointCount(int pathId)
+        {
+            string key = GetPathKey(pathId);
+            if (key == null) return 0;
+            if (_paths.TryGetValue(key, out Path path))
+                return path.Waypoints.Count;
+            return 0;
+        }
+
         // ─────────────────────────────────────────────────────────────────────
         // Round 121 — Direction 1: Runtime Path Branching
         // ─────────────────────────────────────────────────────────────────────

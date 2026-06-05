@@ -478,6 +478,26 @@ namespace BattleSystemECS.Core
         // and is re-assigned to a new path, this gets reset to 0 to mark a fresh segment.
         // Used by EnemyMovementSystem to detect "node index went backwards" → trigger junction eval.
         public int[] EnemyPathSegmentStartIndex = new int[MAX_ENTITIES];
+        // ==================== Boss 路径 AoE 轨迹字段 (Round 124 Dir 1) ====================
+        // EnemyIsBossTrail: true if this boss has a "path AoE trail" — when it advances along
+        // the path, drops periodic damaging AoE at its current position. Default 0/false = no trail.
+        // EnemyBossTrailRadius: world-unit radius of each trail AoE.
+        // EnemyBossTrailDamage: damage dealt to player per trail tick (matches codebase convention
+        // for "AoE damages player when enemies attack towers" — see SuicideBombSystem.ApplyDamageToTowers).
+        // EnemyBossTrailSlow: slow factor (0.5 = 50% slow) applied to nearby enemies for 1 frame.
+        // 0 = no slow applied.
+        // EnemyBossTrailProgressInterval: how much path progress (0-1) the boss must advance
+        // before triggering a new trail AoE. 0.1 = every 10% of the path. Default 0 = disabled.
+        // EnemyBossTrailLastTriggerProgress: last path progress value at which a trail fired
+        // (used to detect when progress has advanced by Interval). Init 0 = "first threshold
+        // at Interval, then continues".
+        public bool[] EnemyIsBossTrail = new bool[MAX_ENTITIES];
+        public float[] EnemyBossTrailRadius = new float[MAX_ENTITIES];
+        public float[] EnemyBossTrailDamage = new float[MAX_ENTITIES];
+        public float[] EnemyBossTrailSlow = new float[MAX_ENTITIES];
+        public float[] EnemyBossTrailProgressInterval = new float[MAX_ENTITIES];
+        public float[] EnemyBossTrailLastTriggerProgress = new float[MAX_ENTITIES];
+
         // EnemyTeleportCooldown: turns remaining until teleport is ready (0 = ready / no cooldown)
         public float[] EnemyTeleportCooldown = new float[MAX_ENTITIES];
         // EnemyTeleportDestinationX/Y: target position for teleport/blink destination

@@ -895,6 +895,22 @@ namespace BattleSystemECS.Systems
                         // Note: SetLastStandConfig was already called above (along with SetDamageImmunityMask),
                         // so values from monsterConfig.LastStand are already wired into the SOA fields.
                         // The HP-threshold check is performed each frame in EnemyAISystem.
+                        // Round 124 — Direction 1: Boss Path Trail AoE. Wire the per-monster
+                        // boss-trail config into the enemy's SOA fields. When BossTrailProgressInterval
+                        // > 0 AND BossTrailRadius > 0 AND BossTrailDamage > 0, the boss drops one
+                        // trail AoE per "Interval" worth of path progress. 0/false = no trail
+                        // (zero overhead on the hot path).
+                        if (monsterConfig.BossTrailProgressInterval > 0f
+                            && monsterConfig.BossTrailRadius > 0f
+                            && monsterConfig.BossTrailDamage > 0f)
+                        {
+                            store.EnemyIsBossTrail[enemyId] = true;
+                            store.EnemyBossTrailRadius[enemyId] = monsterConfig.BossTrailRadius;
+                            store.EnemyBossTrailDamage[enemyId] = monsterConfig.BossTrailDamage;
+                            store.EnemyBossTrailSlow[enemyId] = monsterConfig.BossTrailSlow;
+                            store.EnemyBossTrailProgressInterval[enemyId] = monsterConfig.BossTrailProgressInterval;
+                            store.EnemyBossTrailLastTriggerProgress[enemyId] = 0f;
+                        }
                     }
                 }
 

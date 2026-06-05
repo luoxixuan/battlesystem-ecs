@@ -576,6 +576,15 @@ namespace BattleSystemECS.Core
                 // Path / waypoint fields
                 EnemyPathId[entityId] = -1;
                 EnemyPathNodeIndex[entityId] = 0;
+                // Round 124 Dir 1 — Boss Path Trail AoE: default = no trail (WaveSpawningSystem
+                // overrides per archetype if the monster config specifies BossTrail* fields).
+                EnemyIsBossTrail[entityId] = false;
+                EnemyBossTrailRadius[entityId] = 0f;
+                EnemyBossTrailDamage[entityId] = 0f;
+                EnemyBossTrailSlow[entityId] = 0f;
+                EnemyBossTrailProgressInterval[entityId] = 0f;
+                EnemyBossTrailLastTriggerProgress[entityId] = 0f;
+                EnemyPathSegmentStartIndex[entityId] = 0;
                 // Teleport / portal fields
                 EnemyTeleportCooldown[entityId] = 0f;
                 EnemyTeleportDestinationX[entityId] = 0f;

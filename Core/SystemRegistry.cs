@@ -137,6 +137,8 @@ namespace BattleSystemECS.Core
         // ── Wisp aura pets (passive support pets: heal/slow/curse) ──
         public WispSystem? Wisp { get; private set; }
 
+        // ── Boss Path Trail AoE (Round 124 Direction 1) — boss leaves damaging trail
+        public BossTrailAoeSystem? BossTrailAoe { get; private set; }
         // ── Tech & Misc ──
         public TechTreeSystem? TechTree { get; private set; }
         public PickupSystem? Pickup { get; private set; }
@@ -166,6 +168,11 @@ namespace BattleSystemECS.Core
             Pathfinding = new PathfindingSystem(store);
             EnemyMovement = new EnemyMovementSystem(store, playerId, config.MapWidth, config);
             EnemyMovement.SetPathfindingSystem(Pathfinding);
+            // Round 124 — Direction 1: Boss Path Trail AoE. Create the system and inject it
+            // into EnemyMovementSystem so the parallel pass can queue trail events. The actual
+            // drain runs in EnemyMovementSystem.Update()'s serial pass.
+            BossTrailAoe = new BossTrailAoeSystem(store, playerId);
+            EnemyMovement.SetBossTrailSystem(BossTrailAoe);
 
             // ── Tower core systems ──
             TowerPlacement = new TowerPlacementSystem(store, logger, config);

@@ -4,13 +4,13 @@
 
 ---
 
-## 性能基准（2026-06-05, Round 122 — 方向二：塔-塔治疗链接 Tower-to-Tower Heal Link）
+## 性能基准（2026-06-05, Round 124 — 方向四：Boss 路径 AoE 轨迹 Boss Path AoE Trail）
 
 | 指标 | 数值 |
 |------|------|
-| **mode 5**（完整一局） | **3244 FPS**，400 帧 |
-| **mode 2**（合并热路径，10K 敌 × 500 帧） | **8910 FPS** |
-| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3487 FPS** |
+| **mode 5**（完整一局） | **3227 FPS**，400 帧 |
+| **mode 2**（合并热路径，10K 敌 × 500 帧） | **8009 FPS** |
+| **mode 4**（真实系统链路，10K 敌 × 500 帧） | **3631 FPS** |
 | mode 3 | 微基准测试（单系统操作级性能剖析） |
 
 > **Round 122 方向二：塔-塔治疗链接 Tower-to-Tower Heal Link / Tower Healing Aura**：兑现塔生态协同的最后一块拼图——之前塔血量只能靠 `TowerRegen` 缓慢被动恢复（5 HP/s 典型值），无主动治疗；BOSS/高强度波次时塔被破坏后无法快速回血，玩家只能重建或等待。`HealAuraSystem` 是 `WispSystem.HealAura` 的"对塔版本"——某些塔（治疗塔/支援塔）有 `HealAuraRadius` / `HealAuraAmount` / `HealAuraInterval` 3 字段，Update 时给范围内友军 Palisade 塔每 `Interval` 秒回 `Amount` HP（不超过 `PalisadeMaxHP`，overheal 静默丢弃）。3 个新 SOA 字段 `TowerHealAuraRadius` / `TowerHealAuraAmount` / `TowerHealAuraInterval` + 1 个运行时计时器 `TowerHealAuraTimer`（per-healer 冷却，初始 0=ready，interval>0 时 fire 后重置为 interval，interval=0 时 fire-every-frame）— 0 = 零开销 fast path（"无光环"塔与不配置此机制的塔完全等价）。`AddTower` / `DestroyEntity` 双侧 init/reset 4 字段防 ID-reuse 泄漏（防止 recycled slot 残留前一个 tower 的光环配置）。`TowerPlacementSystem` 在 curse 配置后、`pullTower` 配置前注入 `if (HealAuraRadius > 0 && HealAuraAmount > 0) { … TowerHealAuraRadius/Amount/Interval/Timer = 0f … }` opt-in 块。`SkillBuffGroup` 在 `Mark` 后 `Skill` 前插入 `HealAura?.SetTurn(); HealAura?.Update(deltaTime);`（`SetTurn` 缓存 heal-aura tower 列表 O(ActiveTowers) 一次，filter 半径>0；`Update` 串行扫描 active towers 应用治疗 — heal-aura 塔本身稀少，无需 Parallel.For）。`SystemRegistry` wire `HealAura = new HealAuraSystem(store)` + `scheduler.SkillBuff.HealAura = HealAura`。`TowerConfig` 加 3 字段 `HealAuraRadius` / `HealAuraAmount` / `HealAuraInterval` 默认 0f。多 healer 在范围时**加性叠加**（每个 healer 各自贡献 amount per tick）— 设计师可平衡 per-healer 数值。系统是 serial（O(ActiveTowers²) 距离检查，但 ActiveTowerIds 上限 20 个，无 SpatialGrid 必要）。配套 12 个 Fact 测试覆盖配置默认 0 / AddTower 默认 0 / DestroyEntity reset（含 ID-reuse）/ SetTurn+Update 在无 healer 时 no-throw / 范围+interval=0 治疗 / 不自愈 / 范围外不治 / 非 Palisade 不治 / overheal clamp / 双 healer 加性叠加 / interval 1s 冷却门控不误触。bench2 8910（vs Round 121: 8692, +2.5% noise）/ bench4 3487（vs Round 121: 3619, -3.6% noise）/ bench5 3244（vs Round 121: 3264, -0.6% noise）— 全部 noise 内微漂移零回归，4 个新 SOA 字段 + 新增 `HealAuraSystem.SetTurn/Update` + 1 个 opt-in 块未造成回归。⚠️ 三个数值仍低于目标阈值（10000/4300/3800）— bench2 8910、bench4 3487、bench5 3244；本方向 12 个新测试 + 0 bug 扫描 + 0 回归，整体方向 100% 落地。
