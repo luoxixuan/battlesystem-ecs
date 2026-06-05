@@ -178,6 +178,26 @@
     "Modifiers": []
   },
   {
+    "Name": "Mass Resurrect",
+    "Description": "群体复活 - 以玩家为中心 4 格范围内所有尸体按 30% 生命值一次性复活（无冷却周期），冷却 60 秒",
+    "AreaShape": "massresurrect",
+    "AreaWidth": 4,
+    "AreaHeight": 4,
+    "AttackRange": 0,
+    "Cooldown": 60,
+    "DamageMultiplier": 0,
+    "AutoCast": false,
+    "Hotkey": "R",
+    "AreaRadius": 4,
+    "DotDuration": 0,
+    "DotTickInterval": 0,
+    "DotDamagePerTick": 0,
+    "HealPercent": 0.3,
+    "ShieldAmount": 0,
+    "ShieldDuration": 0,
+    "Modifiers": []
+  },
+  {
     "Name": "Energy Shield",
     "Description": "护盾技能 - 吸收 50 点伤害，持续 5 秒，冷却 25 秒",
     "AreaShape": "shield",

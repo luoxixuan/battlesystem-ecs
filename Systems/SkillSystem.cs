@@ -27,6 +27,9 @@ namespace BattleSystemECS.Systems
         private PlayerSummonSystem summonSystem; // optional — null if summon system not yet initialized
         private HealingZoneSystem healingZoneSystem; // optional — null if healing zone system not yet initialized
         private TimeRewindSnapshotSystem timeRewindSystem; // optional — null if snapshot system not yet initialized
+        private NecromancerSystem necromancerSystem; // optional — null if necromancer system not yet initialized (Round 133 — for MassResurrect)
+        // Cached turn counter from SetTurn (used for MassResurrect's corpse-age gating)
+        private int _currentTurn;
         private List<int> _activeEnemyList;
         // Cached wave-based difficulty multiplier (updated via SetWaveNumber)
         private float _waveDifficultyMult = 1f;
@@ -123,10 +126,21 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// Inject NecromancerSystem for MassResurrect ability (Round 133).
+        /// Called by GameManager after NecromancerSystem construction. Without this,
+        /// casting AreaShapeType.MassResurrect logs a warning and returns 0.
+        /// </summary>
+        public void InjectNecromancerSystem(NecromancerSystem necromancerSystem)
+        {
+            this.necromancerSystem = necromancerSystem;
+        }
+
+        /// <summary>
         /// Cache active enemy list at turn start — uses frame-cached list (zero allocation).
         /// </summary>
         public void SetTurn(int turn)
         {
+            this._currentTurn = turn;
             this._activeEnemyList = store.GetCachedActiveEnemyIds();
             // Cache armor stats from tech tree
             _armorPenetration = techTreeSystem != null ? techTreeSystem.GetArmorPenetration() : 0f;
@@ -367,6 +381,30 @@ namespace BattleSystemECS.Systems
                         float chainBaseHeal = def.HealPercent > 0f ? casterMaxHp * def.HealPercent : 0f;
                         int chainRange = def.AreaRadius > 0 ? def.AreaRadius : (int)CHAIN_HEAL_DEFAULT_RANGE;
                         enemiesHit = CastChainHeal(chainBaseHeal, playerX, playerY, chainRange, def.Name, def.ShieldAmount, def.ShieldDuration);
+                    }
+                    break;
+                case 18: // Mass Resurrect — AOE revival of all un-reanimated corpses within AreaRadius tiles (Round 133)
+                    // Delegates to NecromancerSystem.MassResurrect(playerId, playerX, playerY, radius, hpFraction)
+                    // where hpFraction = HealPercent (0.0-1.0 of corpse's max HP). AreaRadius = AOE radius in
+                    // tiles (matches Necromancer range convention; corpses are positioned in world units but
+                    // MassResurrect is a tactical AOE so a small radius like 3-5 tiles is appropriate).
+                    {
+                        if (necromancerSystem == null)
+                        {
+                            renderer.Log($"[SKILL] '{def.Name}' failed: NecromancerSystem not injected into SkillSystem");
+                            enemiesHit = 0;
+                            break;
+                        }
+                        float massRadius = def.AreaRadius > 0 ? def.AreaRadius : 3f; // default 3 tiles
+                        float hpFraction = def.HealPercent > 0f ? def.HealPercent : 0.3f; // 30% HP fallback
+                        // Ensure the necromancer system has an up-to-date sim time for corpse age gating.
+                        // NecromancerSystem.SetTurn signature is (int turn, float simTime); the AIGroup
+                        // wires it before SkillSystem runs (Necromancer sits in AI group, Skill in SkillBuff
+                        // group — so the simTime is already current). We re-set it here as a defensive
+                        // measure in case the order ever changes, using the same turn-based time proxy
+                        // convention the AIGroup uses (pass `turn` for both args — turn as time).
+                        necromancerSystem.SetTurn(_currentTurn, _currentTurn);
+                        enemiesHit = necromancerSystem.MassResurrect(playerId, playerX, playerY, massRadius, hpFraction);
                     }
                     break;
                 default:

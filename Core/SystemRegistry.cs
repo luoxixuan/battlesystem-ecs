@@ -430,6 +430,12 @@ namespace BattleSystemECS.Core
             Skill?.InjectDotSystem(Buff);
             Skill?.InjectHealingZoneSystem(HealingZone);
             Skill?.InjectTimeRewindSystem(TimeRewind);
+            // Round 133 Direction 5 — wire NecromancerSystem into SkillSystem so the
+            // MassResurrect (AreaShapeType.MassResurrect = 18) ability can delegate to
+            // NecromancerSystem.MassResurrect for the actual AOE corpse revive. Optional
+            // dependency: null-safe at the call site (ExecuteAbility case 18 logs a
+            // warning and returns 0 if not injected).
+            Skill?.InjectNecromancerSystem(Necromancer);
 
             // ── Mark wiring: subscribe to OnEnemyKilled to free the per-entity
             //    threshold-fired latch on enemy destroy (avoids ID-reuse leakage). ──

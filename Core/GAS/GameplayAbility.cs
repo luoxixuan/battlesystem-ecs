@@ -27,6 +27,7 @@ namespace BattleSystemECS.Core.GAS
         public const int Polymorph = 15;     // Polymorph: circle AoE that transforms enemies into a harmless form (sheep/chicken)
         public const int TimeRewind = 16;    // TimeRewind: restore player HP / Mana / Shield from a recent snapshot (Round 109)
         public const int ChainHeal = 17;    // ChainHeal: O(N) nearest-neighbor heal chaining (Round 131) — mirror of ChainLightning but applies heal + small shield to friendlies
+        public const int MassResurrect = 18; // MassResurrect: AOE revival of all un-reanimated corpses within radius (Round 133) — player-triggered divine spell, mirrors NecromancerSystem.MassResurrect
 
         /// <summary>Parse AreaShape string from skills.json config to int constant.</summary>
         public static int FromString(string s)
@@ -51,6 +52,7 @@ namespace BattleSystemECS.Core.GAS
                 "polymorph" => Polymorph,
                 "timerwind" => TimeRewind,
                 "chainheal" => ChainHeal,
+                "massresurrect" => MassResurrect,
                 _ => Single
             };
         }

@@ -162,9 +162,86 @@ namespace BattleSystemECS.Systems
             _store.CorpseOwnerId[bestCorpseId] = necromancerId;
             _store.CorpseReanimated[bestCorpseId] = true;
 
-            // Spawn the reanimated minion at corpse position
-            string monsterType = _store.CorpseMonsterType[bestCorpseId];
-            float corpseHpPercent = _store.CorpseHealth[bestCorpseId]; // 0.0-1.0 HP fraction
+            // Spawn the reanimated minion (refactored into shared helper so MassResurrect
+            // can reuse it). The necromancer variant uses its own hpMult + position as
+            // summon-circle anchor.
+            SpawnReanimatedMinion(bestCorpseId, necromancerId, hpMult, nx, ny, range, isNecromancer: true);
+            return true;
+        }
+
+        // ── Round 133 Dir 5 ─────────────────────────────────────────────────────
+        // MassResurrect — player-triggered AOE revival. Scans the entire CorpseQueue
+        // (bounded MAX_CORPSE_QUEUE = 256 by default — linear scan is cheap and avoids
+        // needing a spatial-grid secondary structure for corpse positions, which are not
+        // registered in SpatialGrid since SpatialGrid only tracks live enemies).
+        //
+        // Behavior:
+        //   - Claim every active, un-reanimated corpse within `radius` of (centerX, centerY).
+        //   - Age-gate by `MAX_CORPSE_AGE_SEC` (use CorpseReanimated flag to prevent double-revive).
+        //   - Spawn reanimated minion at corpse position with `hpFraction` of max HP
+        //     (lower than per-necromancer hpMult, since this is a one-shot divine spell).
+        //   - Returns the count of corpses successfully resurrected (claimed).
+        //
+        // Integration:
+        //   - Exposed as a public method (called by SkillSystem.ExecuteAbility case 18).
+        //   - The caster position is passed separately so the SummonCircle anchor is the
+        //     player (matches the typical "divine aura" flavor).
+        //   - One-shot semantics: no cooldown, no per-frame state. The caller (SkillSystem)
+        //     handles cooldown via AbilityInstance.CurrentCooldown.
+        public int MassResurrect(int playerId, float centerX, float centerY, float radius, float hpFraction)
+        {
+            if (radius <= 0f) return 0;
+            if (hpFraction <= 0f) hpFraction = 0.3f; // safety default (matches direction spec)
+            float radiusSq = radius * radius;
+            int revived = 0;
+
+            for (int i = 0; i < ComponentStore.MAX_CORPSE_QUEUE; i++)
+            {
+                if (!_store.CorpseActive[i]) continue;
+                if (_store.CorpseReanimated[i]) continue;
+                if (_store.CorpseOwnerId[i] >= 0) continue; // already claimed by a necromancer
+
+                // AOE gate (cheap squared distance, no sqrt)
+                float dx = _store.CorpseX[i] - centerX;
+                float dy = _store.CorpseY[i] - centerY;
+                if (dx * dx + dy * dy > radiusSq) continue;
+
+                // Age gate — corpses older than MAX_CORPSE_AGE_SEC are too decomposed
+                float age = _currentSimTime - _store.CorpseDeathTime[i];
+                if (age > ComponentStore.MAX_CORPSE_AGE_SEC) continue;
+
+                // Claim & spawn
+                _store.CorpseOwnerId[i] = playerId;
+                _store.CorpseReanimated[i] = true;
+                SpawnReanimatedMinion(i, playerId, hpFraction, centerX, centerY, radius, isNecromancer: false);
+                revived++;
+            }
+            if (revived > 0)
+            {
+                _logger?.Log($"[MASS-RES] Player {playerId} mass-resurrected {revived} corpses within radius {radius:F1} (hpFraction={hpFraction:F2})");
+            }
+            return revived;
+        }
+
+        // ── Shared spawn helper (refactored out of TryResurrectCorpse, Round 133) ──
+        // Spawns a reanimated minion at the corpse's recorded position. Used by both:
+        //   - TryResurrectCorpse (necromancer-driven, per-corpse cooldown, hpMult from config)
+        //   - MassResurrect (player-driven, AOE, fixed hpFraction)
+        //
+        // Behavior is identical to the original TryResurrectCorpse body:
+        //   - look up monster stats from MonsterTypes config (string match on Type or Name)
+        //   - AddEnemy at corpse position with hpMult * corpseHpPercent HP
+        //   - mark EnemyIsReanimated + EnemyOwnerId
+        //   - register SummonCircle at caster position with given radius
+        //
+        // Returns the spawned minion's entity id, or -1 if AddEnemy failed (pool full).
+        // The "isNecromancer" flag exists for future divergence (e.g., player-raised
+        // minions could be tagged as friendly/player-summoned); current behavior is
+        // identical for both callers.
+        private int SpawnReanimatedMinion(int corpseId, int ownerId, float hpMult, float ownerX, float ownerY, float ownerRange, bool isNecromancer)
+        {
+            string monsterType = _store.CorpseMonsterType[corpseId];
+            float corpseHpPercent = _store.CorpseHealth[corpseId]; // 0.0-1.0 HP fraction from death state
 
             // Look up the base monster config for spawn parameters
             float baseMoveSpeed = 1f;
@@ -194,8 +271,8 @@ namespace BattleSystemECS.Systems
                 }
             }
 
-            float spawnX = _store.CorpseX[bestCorpseId];
-            float spawnY = _store.CorpseY[bestCorpseId];
+            float spawnX = _store.CorpseX[corpseId];
+            float spawnY = _store.CorpseY[corpseId];
             float spawnHealth = baseMaxHealth * corpseHpPercent * hpMult;
 
             int minionId = _store.AddEnemy(
@@ -212,22 +289,21 @@ namespace BattleSystemECS.Systems
                 baseMagicResist
             );
 
-            if (minionId < 0) return true; // Corpse claimed but spawn failed (pool full) — still mark as reanimated
+            if (minionId < 0) return -1; // Pool exhausted — corpse already claimed; minion won't spawn
 
-            // Mark as reanimated
+            // Mark as reanimated (shared flag for both necromancer + mass-resurrect paths)
             _store.EnemyIsReanimated[minionId] = true;
-            _store.EnemyOwnerId[minionId] = necromancerId;
+            _store.EnemyOwnerId[minionId] = ownerId;
 
             // ── Summon Circle registration (Round 115 Direction 2) ──
-            // Tag the minion with the necromancer's current position as the summon-circle
-            // anchor. We use the necromancer's position (not the corpse position) because
-            // the summon circle conceptually lives at the caster; radius is the necromancer's
-            // own resurrect range (re-using an existing field for simplicity — a dedicated
-            // SummonCircleRadius field can be added later if we need a different scale).
-            _store.SetSummonCircle(minionId, nx, ny, range);
+            // Tag the minion with the caster's position as the summon-circle anchor.
+            // For necromancers this is the necromancer's own position; for MassResurrect
+            // this is the player-caster's position. Radius mirrors the source caster's
+            // range (necromancer's per-corpse range OR player's mass-resurrect radius).
+            _store.SetSummonCircle(minionId, ownerX, ownerY, ownerRange);
 
-            _logger?.Log($"[NECRO] Entity {necromancerId} resurrected corpse {bestCorpseId} as minion {minionId} at ({spawnX:F1}, {spawnY:F1})");
-            return true;
+            _logger?.Log($"[NECRO] {(isNecromancer ? "Entity" : "Player")} {ownerId} resurrected corpse {corpseId} as minion {minionId} at ({spawnX:F1}, {spawnY:F1})");
+            return minionId;
         }
 
         /// <summary>
