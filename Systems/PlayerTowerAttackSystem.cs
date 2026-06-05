@@ -283,6 +283,16 @@ public void SetWaveNumber(int waveNumber)
                 if (store.EnemyIsInvulnerable[enemyId]) continue;
                 // N-Hit Shield check: if enemy has hit shield layers, consume 1 layer and block damage
                 if (_hitShieldSystem != null && _hitShieldSystem.ConsumeHitShield(enemyId)) continue;
+                // I-frames check (Round 118): skip damage while EnemyInvulnFramesLeft > 0
+                if (store.EnemyInvulnFramesLeft[enemyId] > 0) continue;
+                // I-frames write-back (Round 118): after this hit lands, set invuln counter
+                // to the configured per-monster value. Mirrors TowerAttackSystem's behavior so
+                // Boss/Elite I-frames apply uniformly to BOTH tower and player attacks.
+                int playerInvulnConfig = store.EnemyInvulnOnHitFrames[enemyId];
+                if (playerInvulnConfig > 0)
+                {
+                    store.EnemyInvulnFramesLeft[enemyId] = playerInvulnConfig;
+                }
                 float prevHealth = store.EnemyHealth[enemyId];
 
                 // Life Link damage split: if enemy is linked, share damage with linked partner

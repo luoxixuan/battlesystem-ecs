@@ -505,6 +505,17 @@ namespace BattleSystemECS.Core
         // EnemyIsUnstoppable: total CC immunity flag. When true, enemy ignores ALL crowd control
         // (stun, freeze, slow, fear, knockback, pull, charm, taunt). Boss-level CC immunity.
         public bool[] EnemyIsUnstoppable = new bool[MAX_ENTITIES];
+        // ==================== 受击无敌帧 I-Frames (Post-Hit Invulnerability, Round 118) ====================
+        // EnemyInvulnFramesLeft: remaining invulnerability frames for this enemy. > 0 means
+        // all damage to this enemy is suppressed for the rest of the frame (and subsequent frames
+        // until counter reaches 0). Counted down in FrameScheduler.WavePhase header so it is
+        // frame-rate independent. Default 0 = no I-frames.
+        public int[] EnemyInvulnFramesLeft = new int[MAX_ENTITIES];
+        // EnemyInvulnOnHitFrames: per-enemy configuration — how many I-frames to set when this
+        // enemy is hit. 0 (default) means I-frames disabled for normal enemies; Boss/Elite
+        // monsters typically set 3-10 (= 0.3-1.0s @ 10Hz tick rate) to throttle high-frequency
+        // DoT and multishot-tower bursts.
+        public int[] EnemyInvulnOnHitFrames = new int[MAX_ENTITIES];
         // EnemyFearResistance: 0-1, reduces fear duration fraction (1 = complete fear immunity)
         public float[] EnemyFearResistance = new float[MAX_ENTITIES];
 

@@ -47,6 +47,13 @@ namespace BattleSystemECS.Core
             store.BeginFrame();
             store.SetTurnCCFlags();
 
+            // ── I-frames countdown (Round 118) ───────────────────────────────────
+            // Decrement EnemyInvulnFramesLeft for every active enemy. Runs once per tick
+            // (both BuildPhase and WavePhase) at the top of Tick so the countdown is
+            // frame-rate independent and uniform regardless of phase. Hits floor at 0
+            // (no negative). O(MAX_ENEMIES) per tick but cheap (1 int cmp/sub per slot).
+            DecrementInvulnFramesLeft();
+
             UpdateTimeScale(ref deltaTime);
 
             if (Phase == GameState.BuildPhase)
@@ -197,6 +204,27 @@ namespace BattleSystemECS.Core
             {
                 enemyDt = inputDt;
                 combatDt = inputDt;
+            }
+        }
+
+        /// <summary>
+        /// Round 118 — Post-Hit Invulnerability (I-frames) countdown.
+        /// Walks ActiveEnemyIds (not the full MAX_ENTITIES array) and decrements
+        /// EnemyInvulnFramesLeft for each. The write is safe here because we run serially
+        /// at the top of Tick(), before any Parallel.For in combat systems. When the counter
+        /// hits 0 it stays at 0 (no negative clamp needed since the check in TowerAttackSystem
+        /// is "> 0" not "!= 0"). Inactive enemies (counter already 0) are a no-op branch.
+        /// </summary>
+        private void DecrementInvulnFramesLeft()
+        {
+            var activeEnemies = store.ActiveEnemyIds;
+            for (int i = 0; i < activeEnemies.Count; i++)
+            {
+                int eid = activeEnemies[i];
+                if (store.EnemyInvulnFramesLeft[eid] > 0)
+                {
+                    store.EnemyInvulnFramesLeft[eid]--;
+                }
             }
         }
     }

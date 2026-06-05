@@ -600,6 +600,9 @@ namespace BattleSystemECS.Core
                 EnemyIceResist[entityId] = 0f;
                 EnemyLightningResist[entityId] = 0f;
                 EnemyIsUnstoppable[entityId] = false;
+                // I-frames (Round 118): reset remaining invuln frames and per-monster config
+                EnemyInvulnFramesLeft[entityId] = 0;
+                EnemyInvulnOnHitFrames[entityId] = 0;
                 EnemyFearResistance[entityId] = 0f;
                 // Curse debuff fields (applied by curse towers)
                 EnemyCurseDmgReduction[entityId] = 0f;

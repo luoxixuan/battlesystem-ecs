@@ -940,6 +940,22 @@ namespace BattleSystemECS.Systems
                     // ── Tower type-specific mechanics ─────────────────────────────────────
                     TowerType towerType = store.TowerType[towerId];
 
+                    // ── I-frames guard (Round 118) ─────────────────────────────────────
+                    // If bestTarget is currently invulnerable (EnemyInvulnFramesLeft > 0), skip
+                    // damage application entirely. This throttles high-frequency DoT and multishot
+                    // tower bursts on the same enemy within a single tick. The counter is decremented
+                    // by FrameScheduler at the start of each WavePhase tick, so this check is
+                    // O(1) and only fires when I-frames are actually active.
+                    // Note: True damage is NOT exempted here — I-frames are a time-lock, not a damage
+                    // type. Per the design doc, I-frames block ALL damage including True; if a future
+                    // tower needs to bypass I-frames, expose EnemyInvulnOnHitFrames=0 on the target enemy.
+                    // We're inside a Parallel.For lambda, so 'return' (not 'continue') skips the
+                    // current iteration.
+                    if (store.EnemyInvulnFramesLeft[bestTarget] > 0)
+                    {
+                        return;
+                    }
+
                     switch (towerType)
                     {
                         case TowerType.AOE:
@@ -1148,6 +1164,18 @@ namespace BattleSystemECS.Systems
                             break;
                     }
 
+                    // ── I-frames write-back (Round 118) ─────────────────────────────────
+                    // After all damage events for this tower→target hit have been queued, set the
+                    // enemy's invuln-frames-left to the configured per-monster value. This causes the
+                    // NEXT tower (within this frame or future frames) to skip this target until the
+                    // counter expires. Default 0 = no I-frames; Boss/Elite monsters set 3-10.
+                    // Cheap O(1) per tower hit, only writes when config > 0.
+                    int invulnConfig = store.EnemyInvulnOnHitFrames[bestTarget];
+                    if (invulnConfig > 0)
+                    {
+                        store.EnemyInvulnFramesLeft[bestTarget] = invulnConfig;
+                    }
+
                     // ── Chain Attack: if this tower has a linked partner, queue partner's damage too ──
                     int chainPartnerId = store.TowerLinkPartnerId[towerId];
                     if (chainPartnerId != -1 && chainPartnerId < ComponentStore.MAX_ENTITIES
@@ -1289,6 +1317,8 @@ namespace BattleSystemECS.Systems
                 if (store.EnemyIsInvulnerable[enemyId]) continue;
                 // N-Hit Shield check: if enemy has hit shield layers, consume 1 layer and block damage
                 if (_hitShieldSystem != null && _hitShieldSystem.ConsumeHitShield(enemyId)) continue;
+                // I-frames check (Round 118): skip damage while EnemyInvulnFramesLeft > 0
+                if (store.EnemyInvulnFramesLeft[enemyId] > 0) continue;
                 // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
                 float resist = store.EnemyDamageResistance[enemyId];
                 float finalDmg = resist >= 1f ? 0f : damage * (1f - resist);
