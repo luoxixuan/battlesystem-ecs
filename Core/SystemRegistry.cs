@@ -198,6 +198,8 @@ namespace BattleSystemECS.Core
             // ── Tower core systems ──
             TowerPlacement = new TowerPlacementSystem(store, logger, config);
             TowerAttack = new TowerAttackSystem(store, logger, TechTree);
+            // Round 143 Direction 1 — inject the effectiveness matrix for tower-vs-enemy damage
+            TowerAttack.SetGameConfig(config);
             TowerUpgrade = new TowerUpgradeSystem(store, logger, config);
             TowerExperience = new TowerExperienceSystem(store, config);
             TowerSynergy = new TowerSynergySystem(store, logger);

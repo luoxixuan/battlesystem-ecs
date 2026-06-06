@@ -28,6 +28,14 @@ namespace BattleSystemECS.Systems
         private HitShieldSystem _hitShieldSystem; // injected for N-hit shield blocking
         private EnemyStrafeSystem _enemyStrafeSystem; // injected for enemy dodge/strafe
         private DesperationSystem _desperationSystem; // injected for last stand damage/speed bonuses
+        // Round 143 Direction 1 — Tower-vs-Enemy type effectiveness matrix.
+        // Optional injection; null disables the feature (multiplier = 1.0).
+        // Lookups are O(1) Dictionary<string,float> with composite "<int>|<string>" key.
+        private GameConfig _gameConfig;
+        // Cached hot-path flag — bypass the lookup entirely when the matrix is empty
+        // (the file was missing or had no entries). Saves the string-allocation per hit
+        // in the common case where designers haven't configured effectiveness yet.
+        private bool _hasEffectiveness;
         // Cached desperation bonuses (updated each SetTurn from DesperationSystem)
         private float _desperationDmgBonus = 0f;
         private float _desperationSpeedBonus = 0f;
@@ -195,6 +203,39 @@ namespace BattleSystemECS.Systems
         public void SetBleedSystem(BleedSystem bleedSystem)
         {
             this.bleedSystem = bleedSystem;
+        }
+
+        /// <summary>
+        /// Round 143 Direction 1 — Inject the GameConfig to read the
+        /// tower-vs-enemy type effectiveness matrix. Late-bound so existing
+        /// SystemRegistry wiring (which doesn't pass GameConfig) keeps compiling.
+        /// When null or matrix is empty, effectiveness multiplier defaults to 1.0.
+        /// </summary>
+        public void SetGameConfig(GameConfig config)
+        {
+            _gameConfig = config;
+            _hasEffectiveness = config != null
+                && config.TowerEffectivenessMatrix != null
+                && config.TowerEffectivenessMatrix.Count > 0;
+        }
+
+        /// <summary>
+        /// Round 143 Direction 1 — Compute the effectiveness multiplier for a tower attacking
+        /// a given enemy. Returns 1.0 (no change) when the matrix is empty / entry is missing.
+        /// Hot path: O(1) dictionary lookup, single string allocation per call (kept on the
+        /// stack-path side via the string.Concat overload; no LINQ, no boxing).
+        /// </summary>
+        private float GetEffectivenessMultiplier(int towerTypeIndex, int enemyId)
+        {
+            if (!_hasEffectiveness || _gameConfig == null) return 1.0f;
+            if ((uint)enemyId >= ComponentStore.MAX_ENTITIES) return 1.0f;
+            string enemyType = store.GetEnemyTypeName(enemyId);
+            if (string.IsNullOrEmpty(enemyType)) return 1.0f;
+            // Build composite key without string.Format to avoid culture / boxing overhead.
+            // We use the simple "+" concat — both operands are small (int + short string).
+            string key = towerTypeIndex.ToString() + "|" + enemyType;
+            if (_gameConfig.TowerEffectivenessMatrix.TryGetValue(key, out float mult)) return mult;
+            return 1.0f;
         }
 
         /// <summary>
@@ -978,6 +1019,19 @@ namespace BattleSystemECS.Systems
                     if (store.EnemyInvulnFramesLeft[bestTarget] > 0)
                     {
                         return;
+                    }
+
+                    // ── Round 143 Direction 1: Tower-vs-enemy type effectiveness multiplier ──
+                    // Applied AFTER armor / resist / ramp / falloff / wave / synergy / weather
+                    // math, so effectiveness stacks multiplicatively with those modifiers and
+                    // doesn't get washed out by them. The composite-key dictionary lookup is
+                    // O(1); the only allocation is the int→string + concat per hit. When the
+                    // matrix is empty (_hasEffectiveness = false), the call short-circuits and
+                    // returns 1.0 with no allocation — the common case for benchmarks / first-run.
+                    if (_hasEffectiveness)
+                    {
+                        float effMult = GetEffectivenessMultiplier((int)towerType, bestTarget);
+                        if (effMult != 1.0f) baseDmg *= effMult;
                     }
 
                     switch (towerType)

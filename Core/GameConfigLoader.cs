@@ -69,6 +69,9 @@ namespace BattleSystemECS.Config
                 // Load tower affix (reforge) definitions (Round 34, Reforge — Split A)
                 LoadTowerAffixDefs(gameConfig, renderer);
 
+                // Load tower-vs-enemy type effectiveness matrix (Round 143 Direction 1)
+                LoadTowerEffectiveness(gameConfig, renderer);
+
                 // Load summon definitions (direction 1: player-summoned combat units)
                 LoadSummonDefs(gameConfig, renderer);
 
@@ -1754,6 +1757,86 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[AFFIX] Failed to load tower affix defs: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Round 143 Direction 1 — Load tower-vs-enemy type effectiveness matrix from
+        /// Data/Configs/tower_effectiveness.json. The JSON has the shape:
+        ///   { "Round143Dir1_TowerEffectiveness": [
+        ///       { "towerType": 1, "towerTypeName": "AOE",
+        ///         "effectiveness": [ { "enemyType": "Swarm", "multiplier": 1.30 }, ... ] },
+        ///       ...
+        ///     ] }
+        /// Each entry is keyed as "&lt;towerTypeIndex&gt;|&lt;enemyType&gt;" in
+        /// GameConfig.TowerEffectivenessMatrix. Missing entries default to 1.0 at lookup time.
+        /// Safe no-op when the file is missing (effectiveness disabled).
+        /// </summary>
+        private static void LoadTowerEffectiveness(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string effFile = "Data/Configs/tower_effectiveness.json";
+            try
+            {
+                if (!File.Exists(effFile))
+                {
+                    renderer.Log("[EFFECTIVENESS] Tower effectiveness file not found: " + effFile + ", using defaults (multiplier = 1.0)");
+                    return;
+                }
+                string json = File.ReadAllText(effFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[EFFECTIVENESS] Tower effectiveness file is empty: " + effFile);
+                    return;
+                }
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                // Find the array under any of the known wrapper keys.
+                System.Text.Json.JsonElement arrayElem = default;
+                bool found = false;
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.Value.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    {
+                        arrayElem = prop.Value;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    renderer.Log("[EFFECTIVENESS] No array root in " + effFile);
+                    return;
+                }
+
+                int entryCount = 0;
+                var matrix = gameConfig.TowerEffectivenessMatrix;
+                matrix.Clear();
+                foreach (var towerElem in arrayElem.EnumerateArray())
+                {
+                    int towerType = towerElem.TryGetProperty("towerType", out var tt) ? tt.GetInt32() : 0;
+                    if (towerType < 0) continue;
+                    if (towerElem.TryGetProperty("effectiveness", out var effList) &&
+                        effList.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    {
+                        foreach (var e in effList.EnumerateArray())
+                        {
+                            string enemyType = e.TryGetProperty("enemyType", out var et) ? (et.GetString() ?? "") : "";
+                            float mult = e.TryGetProperty("multiplier", out var m) ? (float)m.GetDouble() : 1.0f;
+                            if (string.IsNullOrEmpty(enemyType)) continue;
+                            // Composite key: "towerType|enemyType" — avoids tuple allocation.
+                            string key = towerType + "|" + enemyType;
+                            matrix[key] = mult;
+                            entryCount++;
+                        }
+                    }
+                }
+                gameConfig.TowerEffectivenessEntryCount = entryCount;
+                renderer.Log("[EFFECTIVENESS] Loaded " + entryCount + " tower-vs-enemy effectiveness entries from " + effFile);
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[EFFECTIVENESS] Failed to load tower effectiveness: " + ex.Message);
             }
         }
 

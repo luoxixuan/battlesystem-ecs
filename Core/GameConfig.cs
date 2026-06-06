@@ -1650,6 +1650,16 @@ namespace BattleSystemECS.Config
         // Tower affix pool (loaded from Data/Configs/tower_affixes.json).
         public TowerAffixDef[] TowerAffixes { get; set; } = Array.Empty<TowerAffixDef>();
 
+        // Round 143 Direction 1 — Tower-vs-Enemy Type Effectiveness Matrix
+        // Loaded from Data/Configs/tower_effectiveness.json. Keyed by
+        // (TowerType enum index, enemy Type string). Missing entries default to 1.0.
+        // The dictionary key is built as "<towerTypeIndex>|<enemyType>" to avoid
+        // composite-key allocation on the hot path. Stored as a flat dictionary for
+        // O(1) lookups.
+        public Dictionary<string, float> TowerEffectivenessMatrix { get; set; } = new Dictionary<string, float>();
+        // Total entries loaded (informational; for log messages and tests).
+        public int TowerEffectivenessEntryCount { get; set; } = 0;
+
         // Look up a tower affix def by its AffixId (returns null if not found).
         public TowerAffixDef GetTowerAffixDef(string affixId)
         {

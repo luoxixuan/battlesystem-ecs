@@ -1,0 +1,84 @@
+{
+  "Round143Dir1_TowerEffectiveness": [
+    {
+      "towerType": 1,
+      "towerTypeName": "AOE",
+      "effectiveness": [
+        { "enemyType": "Swarm",     "multiplier": 1.30 },
+        { "enemyType": "Normal",    "multiplier": 1.00 },
+        { "enemyType": "Fast",      "multiplier": 1.10 },
+        { "enemyType": "Tank",      "multiplier": 0.85 },
+        { "enemyType": "Boss",      "multiplier": 0.90 },
+        { "enemyType": "Elite",     "multiplier": 0.95 },
+        { "enemyType": "Flying",    "multiplier": 0.80 },
+        { "enemyType": "Armored",   "multiplier": 0.70 },
+        { "enemyType": "Undead",    "multiplier": 1.00 },
+        { "enemyType": "Elemental", "multiplier": 1.00 }
+      ]
+    },
+    {
+      "towerType": 2,
+      "towerTypeName": "Sniper",
+      "effectiveness": [
+        { "enemyType": "Swarm",     "multiplier": 0.80 },
+        { "enemyType": "Normal",    "multiplier": 1.00 },
+        { "enemyType": "Fast",      "multiplier": 0.90 },
+        { "enemyType": "Tank",      "multiplier": 1.15 },
+        { "enemyType": "Boss",      "multiplier": 1.30 },
+        { "enemyType": "Elite",     "multiplier": 1.20 },
+        { "enemyType": "Flying",    "multiplier": 1.40 },
+        { "enemyType": "Armored",   "multiplier": 1.50 },
+        { "enemyType": "Undead",    "multiplier": 1.00 },
+        { "enemyType": "Elemental", "multiplier": 1.00 }
+      ]
+    },
+    {
+      "towerType": 5,
+      "towerTypeName": "Frost",
+      "effectiveness": [
+        { "enemyType": "Swarm",     "multiplier": 1.20 },
+        { "enemyType": "Normal",    "multiplier": 1.00 },
+        { "enemyType": "Fast",      "multiplier": 1.30 },
+        { "enemyType": "Tank",      "multiplier": 0.90 },
+        { "enemyType": "Boss",      "multiplier": 0.80 },
+        { "enemyType": "Elite",     "multiplier": 0.95 },
+        { "enemyType": "Flying",    "multiplier": 0.70 },
+        { "enemyType": "Armored",   "multiplier": 0.80 },
+        { "enemyType": "Undead",    "multiplier": 1.20 },
+        { "enemyType": "Elemental", "multiplier": 1.10 }
+      ]
+    },
+    {
+      "towerType": 9,
+      "towerTypeName": "Palisade",
+      "effectiveness": [
+        { "enemyType": "Swarm",     "multiplier": 1.40 },
+        { "enemyType": "Normal",    "multiplier": 1.00 },
+        { "enemyType": "Fast",      "multiplier": 1.20 },
+        { "enemyType": "Tank",      "multiplier": 0.80 },
+        { "enemyType": "Boss",      "multiplier": 0.70 },
+        { "enemyType": "Elite",     "multiplier": 0.85 },
+        { "enemyType": "Flying",    "multiplier": 0.50 },
+        { "enemyType": "Armored",   "multiplier": 0.70 },
+        { "enemyType": "Undead",    "multiplier": 1.20 },
+        { "enemyType": "Elemental", "multiplier": 1.00 }
+      ]
+    },
+    {
+      "towerType": 10,
+      "towerTypeName": "Mine",
+      "effectiveness": [
+        { "enemyType": "Swarm",     "multiplier": 1.50 },
+        { "enemyType": "Normal",    "multiplier": 1.00 },
+        { "enemyType": "Fast",      "multiplier": 0.80 },
+        { "enemyType": "Tank",      "multiplier": 0.60 },
+        { "enemyType": "Boss",      "multiplier": 0.30 },
+        { "enemyType": "Elite",     "multiplier": 0.70 },
+        { "enemyType": "Flying",    "multiplier": 0.10 },
+        { "enemyType": "Armored",   "multiplier": 0.50 },
+        { "enemyType": "Undead",    "multiplier": 1.00 },
+        { "enemyType": "Elemental", "multiplier": 0.90 }
+      ]
+    }
+  ]
+}
