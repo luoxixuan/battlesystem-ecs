@@ -16,6 +16,7 @@ namespace BattleSystemECS.Systems
     /// Effect types:
     ///   0 = Poison (DoT), 1 = Slow, 2 = Ice (freeze), 3 = Fire (DoT), 4 = Healing, 5 = DamageBoost
     ///   6 = HallowedGround (positive DoT, holy smite — Round 168 Direction 3)
+    ///   7 = ThornyBramble (DoT + slow combo — Round 169 Direction 10)
     /// 
     /// Integration points:
     ///   - FrameScheduler.Tick() Phase 9.6 calls CorpseEffectSystem.Update()
@@ -125,9 +126,9 @@ namespace BattleSystemECS.Systems
 
                 // Tick timer for DoT effects
                 int curEffectType = _store.CorpseEffectType[zoneId];
-                if (curEffectType == 0 || curEffectType == 3 || curEffectType == 6)
+                if (curEffectType == 0 || curEffectType == 3 || curEffectType == 6 || curEffectType == 7)
                 {
-                    // Poison (0), Fire (3), or HallowedGround (6) — all DoT effects
+                    // Poison (0), Fire (3), HallowedGround (6), ThornyBramble (7) — all DoT effects
                     _store.CorpseEffectTickTimer[zoneId] += deltaTime;
                     float interval = _store.CorpseEffectTickInterval[zoneId];
                     if (interval <= 0f) interval = 1f; // fallback
@@ -172,7 +173,7 @@ namespace BattleSystemECS.Systems
                 if (distSq <= radius * radius)
                 {
                     // Apply DoT via BuffSystem
-                    // effectType 0 = Poison, 3 = Fire, 6 = HallowedGround
+                    // effectType 0 = Poison, 3 = Fire, 6 = HallowedGround, 7 = ThornyBramble
                     if (_buffSystem != null)
                     {
                         _ = effectType; // keep switch-like intent explicit
@@ -204,7 +205,7 @@ namespace BattleSystemECS.Systems
             int effectType = _store.CorpseEffectType[zoneId];
             float slowAmount = _store.CorpseEffectSlowAmount[zoneId];
 
-            if (effectType != 1 && effectType != 2) return; // Only Slow and Ice need per-frame
+            if (effectType != 1 && effectType != 2 && effectType != 7) return; // Slow, Ice, ThornyBramble need per-frame
 
             var enemies = _store.GetCachedActiveEnemyIds();
             foreach (int enemyId in enemies)
@@ -234,6 +235,15 @@ namespace BattleSystemECS.Systems
                     if (iceSlow < existingSlow)
                     {
                         _store.EnemyTerrainMoveSpeedMult[enemyId] = iceSlow;
+                    }
+                }
+                else if (effectType == 7) // ThornyBramble — DoT + slow combo
+                {
+                    // Same slow application rule as type 1 (Slow): use the slowAmount from JSON
+                    float existingSlow = _store.EnemyTerrainMoveSpeedMult[enemyId];
+                    if (slowAmount < existingSlow)
+                    {
+                        _store.EnemyTerrainMoveSpeedMult[enemyId] = slowAmount;
                     }
                 }
             }
