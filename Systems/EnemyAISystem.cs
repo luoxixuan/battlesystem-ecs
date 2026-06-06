@@ -152,6 +152,16 @@ namespace BattleSystemECS.Systems
                     if (!store.EnemyActive[enemyId])
                         continue;
 
+                    // Round 174 Direction 8 — Stalker auto-reveal: if this enemy is a stalker
+                    // and not yet revealed, scan nearest friendly tower and reveal when in
+                    // range. The check is O(activeTowers) per stalker, but the hot path
+                    // fast-returns via EnemyIsStalker[enemyId] == false so non-stalkers pay
+                    // exactly one bool read. Sentinel-gated for zero-cost when no stalkers.
+                    if (store.EnemyIsStalker[enemyId] && !store.EnemyStalkRevealed[enemyId])
+                    {
+                        UpdateStalkerReveal(enemyId);
+                    }
+
                     var cachedBt = store.EnemyBehaviorTree[enemyId];
 
                     // Check BT evaluation cache — also track stun duration changes
@@ -879,6 +889,47 @@ namespace BattleSystemECS.Systems
             if (distance <= 1.5f)
                 return "attack_melee";
             return "move_to_target";
+        }
+
+        /// <summary>
+        /// Round 174 Direction 8 — Stalker auto-reveal. Walks all friendly tower positions
+        /// and reveals the stalker if any tower is within EnemyStalkRevealRadius.
+        /// Reveal is sticky (one-shot per spawn) so the O(activeTowers) scan only runs
+        /// until the stalker is revealed — once revealed, EnemyStalkRevealed=true skips
+        /// the check at the call site.
+        /// Caller must guarantee EnemyIsStalker[enemyId] && !EnemyStalkRevealed[enemyId].
+        /// </summary>
+        private void UpdateStalkerReveal(int enemyId)
+        {
+            float revealRadius = store.EnemyStalkRevealRadius[enemyId];
+            // 0 = "no auto-reveal" — stalker stays hidden until something else reveals it.
+            // This makes detection-tower-only monsters possible: a sniper that patrols
+            // invisibly until a detection-tower pings it.
+            if (revealRadius <= 0f) return;
+            float radiusSq = revealRadius * revealRadius;
+            float ex = store.PositionX[enemyId];
+            float ey = store.PositionY[enemyId];
+            var towerIds = store.ActiveTowerIds;
+            int tCount = towerIds.Count;
+            for (int i = 0; i < tCount; i++)
+            {
+                int tid = towerIds[i];
+                if (!store.TowerActive[tid]) continue;
+                float tx = store.PositionX[tid];
+                float ty = store.PositionY[tid];
+                float dx = tx - ex;
+                float dy = ty - ey;
+                float distSq = dx * dx + dy * dy;
+                if (distSq <= radiusSq)
+                {
+                    // Reveal! Sticky flag; the ambush bonus is consumed by the FIRST
+                    // attack post-reveal (see TowerAttackSystem / PlayerTowerAttackSystem
+                    // / EnemyAbilitySystem — EnemyStalkConsumed becomes true after the
+                    // first damage application).
+                    store.EnemyStalkRevealed[enemyId] = true;
+                    return;
+                }
+            }
         }
 
         public static EnemyActionType StringToActionEnum(string action)

@@ -109,6 +109,25 @@ namespace BattleSystemECS.Core
         // Enemy thorns: reflects a fraction of damage taken back to the attacker (player/tower).
         // Applied after damage is dealt, in the same frame's serial phase.
         public float[] EnemyThornsRatio = new float[MAX_ENTITIES];
+        // Round 174 Direction 8 — Stalker / Predator Enemy Fields ────────────────────────
+        // EnemyIsStalker: true if this enemy is a "Stalker" — spawns invisible, becomes
+        // visible when within EnemyStalkRevealRadius of any friendly tower, and the first
+        // attack after reveal deals ×EnemyStalkAmbushMult damage. Default false = inert
+        // zero-overhead fast path. Set at AddEnemy + SetEnemyStalker() when MonsterDef.IsStalker.
+        public bool[] EnemyIsStalker = new bool[MAX_ENTITIES];
+        // EnemyStalkRevealed: has the stalker been revealed this lifetime? Sticky true after
+        // first reveal so the ambush bonus only fires ONCE per spawn. Reset to false on
+        // AddEnemy/DestroyEntity to keep the ambush fresh across enemy recycling.
+        public bool[] EnemyStalkRevealed = new bool[MAX_ENTITIES];
+        // EnemyStalkRevealRadius: distance (in cells) to nearest friendly tower at which the
+        // stalker becomes visible. 0 = never auto-reveal (must be revealed by detection tower).
+        public float[] EnemyStalkRevealRadius = new float[MAX_ENTITIES];
+        // EnemyStalkAmbushMult: damage multiplier applied to the FIRST attack after reveal.
+        // Example: 3.0f = +300% damage on the ambush strike. 1.0f = no ambush bonus.
+        public float[] EnemyStalkAmbushMult = new float[MAX_ENTITIES];
+        // EnemyStalkConsumed: sticky flag — true once the ambush strike has been delivered
+        // so subsequent attacks revert to the base damage. Reset on AddEnemy.
+        public bool[] EnemyStalkConsumed = new bool[MAX_ENTITIES];
         // Armor Shred: stacks of armor reduction applied by attacker (e.g. AcidTower debuff)
         // Each stack reduces armor by a fixed amount (_armorShredPerStack in TechTree)
         public float[] EnemyArmorShredStacks = new float[MAX_ENTITIES];
@@ -1115,6 +1134,14 @@ namespace BattleSystemECS.Core
             EnemyCritResistance[entityId] = 0f;
             // Deflect Chance: default 0 (projectiles always hit) — only Boss/Elite monsters get a non-zero value via SetDeflectChance()
             EnemyDeflectChance[entityId] = 0f;
+            // Round 174 Direction 8 — Stalker default state at AddEnemy. Each new spawn
+            // starts as a non-stalker (zero-overhead fast path). Callers that want the
+            // stalker behavior must invoke SetEnemyStalker() right after AddEnemy.
+            EnemyIsStalker[entityId] = false;
+            EnemyStalkRevealed[entityId] = false;
+            EnemyStalkRevealRadius[entityId] = 0f;
+            EnemyStalkAmbushMult[entityId] = 1f;
+            EnemyStalkConsumed[entityId] = false;
             // Damage Saturation (Round 92): default 0 rolling sum + 0 last-touched frame. Lazily used by
             // TowerAttackSystem and PlayerTowerAttackSystem — the (currentFrame - lastFrame) > window
             // check naturally expires the rolling window for any enemy that hasn't been hit recently.
@@ -1503,6 +1530,31 @@ namespace BattleSystemECS.Core
             // Clamp to [0,1] for safety; negative or >1 values would invert crit behavior unpredictably.
             EnemyCritResistance[enemyId] = System.Math.Clamp(critResistance, 0f, 1f);
         }
+
+        /// <summary>
+        /// Round 174 Direction 8 — Configures a Stalker / Predator enemy. Stalkers spawn
+        /// invisible and become visible when within revealRadius of any friendly tower.
+        /// The first attack after reveal deals baseDamage × ambushMult damage.
+        /// Safe to call on a non-stalker enemy — IsStalker stays false so the hot-path
+        /// branches in EnemyAISystem / TowerAttackSystem short-circuit out.
+        /// </summary>
+        /// <param name="enemyId">Target enemy entity ID (must be valid)</param>
+        /// <param name="revealRadius">Distance (in cells) to nearest friendly tower at which
+        /// the stalker auto-reveals. 0 = no auto-reveal (only detection-tower reveal counts).</param>
+        /// <param name="ambushMult">Damage multiplier for the FIRST attack post-reveal. 1.0
+        /// means no bonus; 3.0 = triple damage ambush strike; clamped to [1.0, 10.0].</param>
+        public void SetEnemyStalker(int enemyId, float revealRadius, float ambushMult)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyIsStalker[enemyId] = true;
+            EnemyStalkRevealRadius[enemyId] = revealRadius;
+            EnemyStalkAmbushMult[enemyId] = System.Math.Clamp(ambushMult, 1.0f, 10.0f);
+            // Start fresh: hidden + ambush-available. SetEnemyStalker is intended to be
+            // called once at AddEnemy time; calling it again on a revealed enemy intentionally
+            // does NOT reset reveal/consume flags (use DestroyEntity + AddEnemy for a true
+            // respawn). This keeps the API surface honest: stalker config is set-once.
+        }
+
 
         /// <summary>
         /// Configures projectile deflection probability for an enemy. Each incoming projectile that

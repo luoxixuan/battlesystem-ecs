@@ -633,6 +633,14 @@ namespace BattleSystemECS.Systems
                         // Zero-overhead when TowerPathHugOnly[towerId] is false (the default).
                         if (store.TowerPathHugOnly[towerId] && store.EnemyPathId[enemyId] < 0) continue;
 
+                        // Round 174 Direction 8 — Stalker filter: skip enemies that are stalkers
+                        // AND not yet revealed. The bool read is one branch — non-stalkers
+                        // (the 99% case) take the fast path with one extra bool comparison per
+                        // candidate. Stalkers that are revealed (EnemyStalkRevealed=true) also
+                        // take the fast path on subsequent frames. This implements the
+                        // "invisible until close to a tower" tactical identity.
+                        if (store.EnemyIsStalker[enemyId] && !store.EnemyStalkRevealed[enemyId]) continue;
+
                         // Burrow filter: skip enemies that are underground (cannot be targeted)
                         if (store.EnemyIsBurrowed[enemyId]) continue;
 
@@ -1396,13 +1404,40 @@ namespace BattleSystemECS.Systems
                 if (!store.EnemyActive[enemyId]) continue;
                 // Invulnerability check: if enemy is invulnerable, skip damage
                 if (store.EnemyIsInvulnerable[enemyId]) continue;
+                // Round 174 Direction 8 — Stalker Ambush bonus: if this enemy is a revealed
+                // stalker that has not yet had its ambush strike consumed, multiply incoming
+                // damage by EnemyStalkAmbushMult (e.g. 3.0x) and flip the consumed flag so
+                // the bonus fires EXACTLY ONCE per spawn. Sticky after consumption → subsequent
+                // attacks deal base damage. Both flags are reset by AddEnemy / DestroyEntity
+                // so the next spawn of this enemy id gets a fresh ambush opportunity.
+                // Note: `damage` here is a foreach-iteration variable (deconstructed tuple
+                // from the double-buffer queue) so it can't be reassigned in-place. We
+                // compute the scaled value into a local and propagate it via the finalDmg
+                // path below.
+                float stalkerAmbushMult = 1f;
+                if (store.EnemyIsStalker[enemyId] && store.EnemyStalkRevealed[enemyId] && !store.EnemyStalkConsumed[enemyId])
+                {
+                    stalkerAmbushMult = store.EnemyStalkAmbushMult[enemyId];
+                    if (stalkerAmbushMult > 1f)
+                    {
+                        store.EnemyStalkConsumed[enemyId] = true;
+                    }
+                }
                 // N-Hit Shield check: if enemy has hit shield layers, consume 1 layer and block damage
                 if (_hitShieldSystem != null && _hitShieldSystem.ConsumeHitShield(enemyId)) continue;
                 // I-frames check (Round 118): skip damage while EnemyInvulnFramesLeft > 0
                 if (store.EnemyInvulnFramesLeft[enemyId] > 0) continue;
                 // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
                 float resist = store.EnemyDamageResistance[enemyId];
+                // Stalker ambush multiplier (Round 174 Dir 8) is applied AFTER damage resistance
+                // so the bonus doesn't get partially eaten by armor. This preserves the "3x
+                // ambush" feel even against high-resist bosses — which is exactly the design
+                // intent (stalker bonus is meant to threaten armored/boss enemies).
                 float finalDmg = resist >= 1f ? 0f : damage * (1f - resist);
+                if (stalkerAmbushMult > 1f)
+                {
+                    finalDmg *= stalkerAmbushMult;
+                }
                 // ── Damage Saturation (Round 92 Direction 1) ──
                 // O(1) guard: skip entirely when saturation is disabled (WindowFrames == -1 sentinel)
                 // or when the per-hit damage is too small to ever matter (< 0.01f). When enabled,

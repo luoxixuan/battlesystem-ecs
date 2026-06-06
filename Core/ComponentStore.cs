@@ -596,6 +596,14 @@ namespace BattleSystemECS.Core
                 EnemyStealthMultiplier[entityId] = 1f;
                 EnemyShield[entityId] = 0f;
                 EnemyThornsRatio[entityId] = 0f;
+                // Round 174 Direction 8 — Stalker reset (recycled slot must not leak stealth
+                // state — a freshly-spawned enemy must start hidden + fresh ambush, never
+                // inherit a revealed/ambush-consumed state from the prior slot occupant)
+                EnemyIsStalker[entityId] = false;
+                EnemyStalkRevealed[entityId] = false;
+                EnemyStalkRevealRadius[entityId] = 0f;
+                EnemyStalkAmbushMult[entityId] = 1f;
+                EnemyStalkConsumed[entityId] = false;
                 EnemyArmorShredStacks[entityId] = 0f;
                 EnemyArmorShredDuration[entityId] = 0f;
                 // Fear / Taunt / Charm fields
