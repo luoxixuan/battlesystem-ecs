@@ -7,6 +7,10 @@ namespace BattleSystemECS.Core
         public Systems.BuffSystem? Buff { get; set; }
         public Systems.SkillSystem? Skill { get; set; }
         public Systems.BleedSystem? Bleed { get; set; }
+        // Round 170 Direction 6 — Frostbite (non-stacking %-of-maxHP DoT).
+        // Runs after Bleed (combat debuff resolution) so %-based damage is layered
+        // on top of any bleed damage in the same frame.
+        public Systems.FrostbiteSystem? Frostbite { get; set; }
         public Systems.HealingZoneSystem? HealingZone { get; set; }
         // Wisp aura pets — runs after HealingZone so wisp heal/slow/curse are layered
         // on top of any healing-zone heals in the same frame.
@@ -35,6 +39,9 @@ namespace BattleSystemECS.Core
             Buff?.ResolveDotDamage();
             Bleed?.Update(deltaTime);
             Bleed?.ResolveBleedDamage();
+            // Round 170 Direction 6 — Frostbite (non-stacking %-of-maxHP DoT)
+            Frostbite?.Update(deltaTime);
+            Frostbite?.ResolveFrostbiteDamage();
             HealingZone?.Update(deltaTime);
             Mark?.Update(deltaTime);
             // Heal aura: cache healer tower IDs first, then fire heal ticks. Both calls

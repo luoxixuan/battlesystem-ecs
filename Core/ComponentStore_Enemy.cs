@@ -137,6 +137,20 @@ namespace BattleSystemECS.Core
         public float[] EnemyBleedResistance = new float[MAX_ENTITIES];
         // EnemyBleedDurationLeft: total duration remaining for the bleed effect in seconds
         public float[] EnemyBleedDurationLeft = new float[MAX_ENTITIES];
+        // ==================== 霜灼 (Frostbite — %-of-maxHP DoT) ====================
+        // Round 170 Direction 6 — Frostbite: non-stacking percentage-of-maxHP DoT.
+        // Distinct from Bleed (stacking, fixed-per-stack damage) — Frostbite deals
+        // a flat percentage of target's current max HP per tick, making it scale
+        // naturally with Boss HP pools (a Boss that hits the 0% flat damage floor
+        // still loses % per second).
+        // EnemyFrostbiteMaxHpPct: fraction of EnemyMaxHealth dealt per tick (e.g. 0.02 = 2% max HP/sec)
+        public float[] EnemyFrostbiteMaxHpPct = new float[MAX_ENTITIES];
+        // EnemyFrostbiteDuration: total duration remaining for the frostbite effect in seconds
+        public float[] EnemyFrostbiteDurationLeft = new float[MAX_ENTITIES];
+        // EnemyFrostbiteTimer: remaining time in seconds until next frostbite tick (1s default)
+        public float[] EnemyFrostbiteTimer = new float[MAX_ENTITIES];
+        // EnemyFrostbiteResistance: fraction of frostbite application that is resisted (0 = no resist, 0.7 = 70% resist)
+        public float[] EnemyFrostbiteResistance = new float[MAX_ENTITIES];
         // ==================== 敌人堆叠惩罚 (Enemy Tile Stacking Penalty) ====================
         // EnemyStackCount: number of other enemies sharing the same cell this frame.
         // 0 = no stacking (alone in cell), 1 = one other enemy in same cell, etc.

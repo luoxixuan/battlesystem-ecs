@@ -59,6 +59,8 @@ namespace BattleSystemECS.Core
         public PullTowerSystem? PullTower { get; private set; }
         public TauntSystem? Taunt { get; private set; }
         public BleedSystem? Bleed { get; private set; }
+        // Round 170 Direction 6 — Frostbite (non-stacking %-of-maxHP DoT)
+        public FrostbiteSystem? Frostbite { get; private set; }
         // Round 122 Direction 2 — Heal Aura System (passive tower-to-tower healing).
         public HealAuraSystem? HealAura { get; private set; }
         // Round 126 Direction 4 — Thorns Aura System (passive tower-centered damage aura on enemies).
@@ -329,6 +331,8 @@ namespace BattleSystemECS.Core
             Curse = new CurseAuraSystem(store);
             PullTower = new PullTowerSystem(store);
             Bleed = new BleedSystem(store, playerId);
+            // Round 170 Direction 6 — Frostbite (non-stacking %-of-maxHP DoT)
+            Frostbite = new FrostbiteSystem(store, playerId);
             // ── Taunt tower (force-enemy-target-this-tower aura) ──
             Taunt = new TauntSystem(store);
 
@@ -692,6 +696,7 @@ namespace BattleSystemECS.Core
             scheduler.SkillBuff.Buff = Buff;
             scheduler.SkillBuff.Skill = Skill;
             scheduler.SkillBuff.Bleed = Bleed;
+            scheduler.SkillBuff.Frostbite = Frostbite;
             scheduler.SkillBuff.HealingZone = HealingZone;
             scheduler.SkillBuff.Wisp = Wisp;
             // Round 107 Direction 6 — Target Mark decay tick (between HealingZone and Skill cd)

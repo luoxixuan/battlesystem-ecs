@@ -670,6 +670,11 @@ namespace BattleSystemECS.Core
                 EnemyBleedMaxStacks[entityId] = 0f;
                 EnemyBleedResistance[entityId] = 0f;
                 EnemyBleedDurationLeft[entityId] = 0f;
+                // Round 170 Direction 6 — Frostbite (non-stacking %-maxHP DoT)
+                EnemyFrostbiteMaxHpPct[entityId] = 0f;
+                EnemyFrostbiteDurationLeft[entityId] = 0f;
+                EnemyFrostbiteTimer[entityId] = 0f;
+                EnemyFrostbiteResistance[entityId] = 0f;
                 // Boss phase / enrage fields
                 EnemyBossPhase[entityId] = 0;
                 EnemyPhaseThresholds[entityId] = null;
@@ -1121,6 +1126,7 @@ namespace BattleSystemECS.Core
             EnemyDeflectChance = null!;
             EnemyBleedStacks = null!; EnemyBleedDamagePerStack = null!; EnemyBleedTimer = null!;
             EnemyBleedMaxStacks = null!; EnemyBleedResistance = null!; EnemyBleedDurationLeft = null!;
+            EnemyFrostbiteMaxHpPct = null!; EnemyFrostbiteDurationLeft = null!; EnemyFrostbiteTimer = null!; EnemyFrostbiteResistance = null!;
             EnemyStunFlag = null!; EnemyStunDurationLeft = null!; EnemySlowFactor = null!;
             EnemyRootDurationLeft = null!; // Round 136 Direction 2: AOE root CC field
             EnemyTerrainMoveSpeedMult = null!; EnemyMoveSpeedBase = null!; EnemySlowDurationLeft = null!;
