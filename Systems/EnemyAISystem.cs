@@ -65,8 +65,11 @@ namespace BattleSystemECS.Systems
         // guard is the same EnemyPhaseFiredMask bit that guards the ability + speed/damage
         // triggers; the minion push happens AFTER the bit is set so a re-entrant parallel batch
         // cannot double-summon.
-        private readonly ConcurrentBag<(int bossId, int typeId, int count, float x, float y)> _phaseMinionEvents
-            = new ConcurrentBag<(int, int, int, float, float)>();
+        // Round 137 Dir 6 — bag now carries boss element affinity (int ElementType) at fire time
+        // so the serial drain can pass it to SpawnMinionNearPosition. Reading the SOA array in
+        // the parallel push site is safe (single writer here, per-enemy slot).
+        private readonly ConcurrentBag<(int bossId, int typeId, int count, float x, float y, int elementAffinity)> _phaseMinionEvents
+            = new ConcurrentBag<(int bossId, int typeId, int count, float x, float y, int elementAffinity)>();
 
         // Round 129 Dir 2 — Boss phase change event bag. Pushed in BOTH the sequential (small
         // enemy count) and parallel (large enemy count) branches whenever a phase transition
@@ -282,8 +285,12 @@ namespace BattleSystemECS.Systems
                                 int minionCount = store.EnemyPhaseMinionCountsFlat[phIdx];
                                 if (minionType >= 0 && minionCount > 0)
                                 {
+                                    // Round 137 Dir 6 — capture the boss's element affinity at fire time
+                                    // (already pre-stored as ElementType int) so SpawnMinionNearPosition
+                                    // can apply +10% HP to matching minions.
+                                    int bossElem = store.EnemyPhaseElementAffinityFlat[phIdx];
                                     _phaseMinionEvents.Add((enemyId, minionType, minionCount,
-                                        store.PositionX[enemyId], store.PositionY[enemyId]));
+                                        store.PositionX[enemyId], store.PositionY[enemyId], bossElem));
                                 }
                                 firedMask = store.EnemyPhaseFiredMask[enemyId];
                             }
@@ -583,8 +590,10 @@ namespace BattleSystemECS.Systems
                                         int minionCount = store.EnemyPhaseMinionCountsFlat[phIdx];
                                         if (minionType >= 0 && minionCount > 0)
                                         {
+                                            // Round 137 Dir 6 — capture boss element affinity for themed bonus
+                                            int bossElem = store.EnemyPhaseElementAffinityFlat[phIdx];
                                             _phaseMinionEvents.Add((enemyId, minionType, minionCount,
-                                                store.PositionX[enemyId], store.PositionY[enemyId]));
+                                                store.PositionX[enemyId], store.PositionY[enemyId], bossElem));
                                         }
                                         firedMask = store.EnemyPhaseFiredMask[enemyId];
                                     }
@@ -1243,6 +1252,8 @@ namespace BattleSystemECS.Systems
         // DrainPhaseAbilityEvents, this is serial and thread-safe. When _waveSpawningSystem is null
         // (e.g. unit tests without a full GameManager) the bag is drained but no spawn happens —
         // the count is still tracked for diagnostics via PhaseMinionDrainCount.
+        // Round 137 Dir 6 — bag now carries the boss's ElementType int; passed to the spawn
+        // overload so minions with matching MonsterConfig.ElementAffinity get a +10% HP bonus.
         public int PhaseMinionDrainCount { get; private set; }
         public int PhaseMinionSpawnedCount { get; private set; }
         private void DrainPhaseMinionEvents()
@@ -1253,7 +1264,7 @@ namespace BattleSystemECS.Systems
             {
                 drained++;
                 if (_waveSpawningSystem == null) continue;
-                int n = _waveSpawningSystem.SpawnMinionNearPosition(ev.typeId, ev.count, ev.x, ev.y);
+                int n = _waveSpawningSystem.SpawnMinionNearPosition(ev.typeId, ev.count, ev.x, ev.y, ev.elementAffinity);
                 spawned += n;
             }
             PhaseMinionDrainCount = drained;

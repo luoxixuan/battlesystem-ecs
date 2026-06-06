@@ -434,6 +434,9 @@ namespace BattleSystemECS.Core
                     // when a boss actually declares a minion in its MonsterConfig.
                     EnemyPhaseMinionTypeIdFlat[baseIdx + i] = -1;
                     EnemyPhaseMinionCountsFlat[baseIdx + i] = 0;
+                    // Round 137 Dir 6 — initialise per-(phase,enemy) boss element affinity to
+                    // 0 (None). SetEnemyPhaseElementAffinity() will overwrite on boss spawn.
+                    EnemyPhaseElementAffinityFlat[baseIdx + i] = 0;
                 }
             }
             // Initialize player buffs
@@ -686,6 +689,10 @@ namespace BattleSystemECS.Core
                     // the previous boss's summon config into a freshly-spawned unit.
                     EnemyPhaseMinionTypeIdFlat[idx] = -1;
                     EnemyPhaseMinionCountsFlat[idx] = 0;
+                    // Round 137 Dir 6 — reset per-phase boss element affinity. 0 = None = no
+                    // themed bonus; a recycled enemyId would otherwise carry the previous
+                    // boss's element affinity into a freshly-spawned unit.
+                    EnemyPhaseElementAffinityFlat[idx] = 0;
                 }
                 // LastStand / DeathRattle fields
                 EnemyLastStandHpFraction[entityId] = 0f;
@@ -1096,6 +1103,8 @@ namespace BattleSystemECS.Core
             // Round 111 Direction 1 — Boss phase structured fields
             EnemyPhaseCount = null!; EnemyPhaseAbilityIdsFlat = null!; EnemyPhaseFiredMask = null!;
             EnemyPhaseThresholdsFlat = null!; EnemyPhaseSpeedMults = null!; EnemyPhaseDamageMults = null!;
+            // Round 137 Dir 6 — Themed Boss Summon per-(phase,enemy) element affinity
+            EnemyPhaseElementAffinityFlat = null!;
             // Round 107 Direction 6 — Target Mark Clear registration
             EnemyMarkStacks = null!; EnemyMarkDecayTimer = null!; EnemyMarkMaxThreshold = null!;
             EnemyIsInvulnerable = null!; EnemyInvulnerablePhaseName = null!;

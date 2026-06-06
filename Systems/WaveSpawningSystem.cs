@@ -412,6 +412,20 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public int SpawnMinionNearPosition(int typeId, int count, float centerX, float centerY)
         {
+            // 4-arg legacy form: no boss element affinity = no themed bonus. Delegates to the
+            // 6-arg form with bossElementAffinity=0 (None). Round 137 Dir 6.
+            return SpawnMinionNearPosition(typeId, count, centerX, centerY, 0);
+        }
+
+        /// <summary>
+        /// Round 137 Dir 6 — overload that accepts the boss's ElementType int (0=None) for
+        /// themed-summon synergy. When bossElementAffinity > 0 AND the spawned minion's
+        /// MonsterConfig.ElementAffinity (parsed case-insensitively) matches the boss's
+        /// element name, the minion gets a +10% HP bonus (themed resonance). No bonus
+        /// when bossElementAffinity == 0 (None) or minion's affinity is empty/unknown.
+        /// </summary>
+        public int SpawnMinionNearPosition(int typeId, int count, float centerX, float centerY, int bossElementAffinity)
+        {
             if (count <= 0) return 0;
             // Round 120 Dir 3 — rubber-band scaling for boss-phase minion summon. Guarded
             // by AdaptiveSpawnConfig.ApplyToMidWaveSpawns. Zero-overhead when multiplier
@@ -442,6 +456,24 @@ namespace BattleSystemECS.Systems
 
             float scaledHealth = monsterConfig.Health * healthMult;
             float scaledMaxHealth = monsterConfig.MaxHealth * healthMult;
+            // Round 137 Dir 6 — Themed Boss Summon bonus. If the boss declared an element
+            // affinity and the minion's MonsterConfig.ElementAffinity matches (case-insensitive
+            // string compare against the ElementType name), apply a +10% HP bonus. This is
+            // applied AFTER all other health multipliers (wave/difficulty/boss) so the bonus
+            // is a clean relative bump. Mismatch or no boss affinity = no bonus (1.0f).
+            float themedHpMult = 1.0f;
+            if (bossElementAffinity > 0)
+            {
+                ElementType bossElem = (ElementType)bossElementAffinity;
+                string minionAffinity = monsterConfig.ElementAffinity;
+                if (!string.IsNullOrEmpty(minionAffinity) &&
+                    string.Equals(minionAffinity, bossElem.ToString(), StringComparison.OrdinalIgnoreCase))
+                {
+                    themedHpMult = 1.10f;
+                }
+            }
+            scaledHealth *= themedHpMult;
+            scaledMaxHealth *= themedHpMult;
             float scaledDamage = monsterConfig.Damage * damageMult;
             float scaledArmor = monsterConfig.Armor * armorMult;
             float scaledMagicResist = monsterConfig.MagicResist * armorMult;
@@ -966,6 +998,15 @@ namespace BattleSystemECS.Systems
                                 // No need to validate MinionTypeId here — the AI system does the
                                 // typeId-vs-MonsterTypes.Count bounds check at fire time.
                                 store.SetEnemyPhaseMinion(enemyId, ph, phaseDef.MinionTypeId, phaseDef.MinionCount);
+                                // Round 137 Dir 6 — Themed Boss Summon. Parse the string affinity
+                                // ("Fire" / "Ice" / "Lightning" / "Poison" / "") to ElementType int.
+                                // Empty string → None → no themed bonus. Unknown strings → None
+                                // (no match at spawn time, no bonus applied). Pre-storing here
+                                // means the AI system reads the int from the SOA without per-frame
+                                // string allocation. ParseElementType already exists at the
+                                // bottom of this file (returns None for null/empty/unknown).
+                                store.SetEnemyPhaseElementAffinity(enemyId, ph,
+                                    (int)ParseElementType(phaseDef.BossElementAffinity));
                             }
                         }
                         // Initialize enrage timer from config

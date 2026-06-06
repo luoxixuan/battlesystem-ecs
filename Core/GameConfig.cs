@@ -57,6 +57,12 @@ namespace BattleSystemECS.Config
         // Same semantics as FireResist/IceResist/LightningResist. Demons get high HolyResist (e.g. 0.5);
         // Undead typically have 0 (vulnerable to Holy). Default 0 = no resist (take full Holy damage).
         public float HolyResist { get; set; } = 0f;
+        // Round 137 Dir 6 — Themed Boss Summon. ElementAffinity declares this monster's element
+        // ("Fire" / "Ice" / "Lightning" / "Poison" / ""). When a boss with a matching
+        // BossElementAffinity summons this minion, the minion gets +10% HP (themed resonance).
+        // Empty string (default) = no affinity = no bonus. Compared case-insensitively.
+        // Distinct from FireResist/IceResist (those are damage reduction; this is summon synergy).
+        public string ElementAffinity { get; set; } = "";
         // DamageImmunities: list of damage type names this enemy is fully immune to
         // (binary, not percentage). Valid entries: "Physical", "Magic", "Fire", "Ice", "Lightning", "Holy".
         // True damage bypasses immunity. Empty/null = no immunities.
@@ -801,6 +807,13 @@ namespace BattleSystemECS.Config
         // keep the phase behaving like Round 111 (speed/damage/ability only).
         public int MinionTypeId { get; set; } = 0;
         public int MinionCount { get; set; } = 0;
+        // Round 137 Dir 6 — Themed Boss Summon. BossElementAffinity declares this boss's
+        // element ("Fire" / "Ice" / "Lightning" / "Poison" / ""). When the phase fires, spawned
+        // minions whose MonsterConfig.ElementAffinity matches this string get a +10% HP
+        // bonus (and the same element-based bonus damage to the player via the existing
+        // ElementalResistanceSystem). Empty string (default) = no affinity = no bonus.
+        // Compared case-insensitively against MonsterConfig.ElementAffinity at spawn time.
+        public string BossElementAffinity { get; set; } = "";
     }
 
     /// <summary>

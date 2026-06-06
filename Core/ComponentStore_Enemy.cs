@@ -442,6 +442,13 @@ namespace BattleSystemECS.Core
         // activates. 0 = no summon. Same indexing convention as EnemyPhaseMinionTypeIdFlat.
         // Capped at BOSS_PHASE_SUMMON_CAP to prevent per-boss phase from flooding the arena.
         public int[] EnemyPhaseMinionCountsFlat = new int[BOSS_PHASE_MAX * MAX_ENTITIES];
+        // EnemyPhaseElementAffinityFlat[phase, enemyId]: ElementType int (0=None, 1=Fire, 2=Ice,
+        // 4=Lightning, 8=Poison) for the boss's element affinity at this phase. Read at phase
+        // fire time and passed through to WaveSpawningSystem.SpawnMinionNearPosition so
+        // spawned minions with matching MonsterConfig.ElementAffinity get a +10% HP bonus
+        // (themed resonance). 0 = no affinity = no bonus. Same indexing convention as
+        // EnemyPhaseMinionTypeIdFlat. Round 137 Dir 6.
+        public int[] EnemyPhaseElementAffinityFlat = new int[BOSS_PHASE_MAX * MAX_ENTITIES];
 
         // ==================== Boss Invulnerable Phase（无敌阶段） ====================
         // EnemyIsInvulnerable: true when the enemy is in an invulnerable phase (e.g. Boss skill animation).
@@ -1312,6 +1319,26 @@ namespace BattleSystemECS.Core
             if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0;
             if (phase < 0 || phase >= BOSS_PHASE_MAX) return 0;
             return EnemyPhaseMinionCountsFlat[phase * MAX_ENTITIES + enemyId];
+        }
+        // SetEnemyPhaseElementAffinity: configure the boss's element affinity for a (phase, enemy)
+        // pair. element is the int representation of ElementType (0 = None = no affinity = no
+        // themed bonus at spawn). Round 137 Dir 6.
+        public void SetEnemyPhaseElementAffinity(int enemyId, int phase, int element)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return;
+            if (phase < 0 || phase >= BOSS_PHASE_MAX) return;
+            // Accept any int (no clamp) — caller passes ElementType cast; unknown values are
+            // treated as "no match" at spawn time (string compare fails), so the bonus is
+            // safely skipped. Negative values normalize to 0 (None) for cleanliness.
+            EnemyPhaseElementAffinityFlat[phase * MAX_ENTITIES + enemyId] = (element < 0) ? 0 : element;
+        }
+        // GetEnemyPhaseElementAffinity: boundary-safe accessor. Returns 0 (None) for invalid
+        // (enemyId, phase). Round 137 Dir 6.
+        public int GetEnemyPhaseElementAffinity(int enemyId, int phase)
+        {
+            if (enemyId < 0 || enemyId >= MAX_ENTITIES) return 0;
+            if (phase < 0 || phase >= BOSS_PHASE_MAX) return 0;
+            return EnemyPhaseElementAffinityFlat[phase * MAX_ENTITIES + enemyId];
         }
 
         // ==================== 敌人基础属性访问 ====================
