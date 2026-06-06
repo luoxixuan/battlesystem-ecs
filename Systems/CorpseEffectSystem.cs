@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
 using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Systems
@@ -14,6 +15,7 @@ namespace BattleSystemECS.Systems
     /// 
     /// Effect types:
     ///   0 = Poison (DoT), 1 = Slow, 2 = Ice (freeze), 3 = Fire (DoT), 4 = Healing, 5 = DamageBoost
+    ///   6 = HallowedGround (positive DoT, holy smite — Round 168 Direction 3)
     /// 
     /// Integration points:
     ///   - FrameScheduler.Tick() Phase 9.6 calls CorpseEffectSystem.Update()
@@ -122,9 +124,10 @@ namespace BattleSystemECS.Systems
                 _store.CorpseEffectDuration[zoneId] -= deltaTime;
 
                 // Tick timer for DoT effects
-                if (_store.CorpseEffectType[zoneId] == 0 || _store.CorpseEffectType[zoneId] == 3)
+                int curEffectType = _store.CorpseEffectType[zoneId];
+                if (curEffectType == 0 || curEffectType == 3 || curEffectType == 6)
                 {
-                    // Poison or Fire DoT
+                    // Poison (0), Fire (3), or HallowedGround (6) — all DoT effects
                     _store.CorpseEffectTickTimer[zoneId] += deltaTime;
                     float interval = _store.CorpseEffectTickInterval[zoneId];
                     if (interval <= 0f) interval = 1f; // fallback
@@ -169,12 +172,21 @@ namespace BattleSystemECS.Systems
                 if (distSq <= radius * radius)
                 {
                     // Apply DoT via BuffSystem
-                    // effectType 0 = Poison, 3 = Fire
+                    // effectType 0 = Poison, 3 = Fire, 6 = HallowedGround
                     if (_buffSystem != null)
                     {
-                        // Create a temporary buff definition for the DoT
-                        string dotBuffId = effectType == 0 ? "corpse_poison_dot" : "corpse_fire_dot";
-                        _buffSystem.ApplyDot(enemyId, damage, 1); // 1 tick
+                        _ = effectType; // keep switch-like intent explicit
+                        // Build a properly-initialized Periodic DoT (legacy ApplyDot(int,float,int)
+                        // overload leaves TicksRemaining=0 so it never ticks). Use the full
+                        // GameplayEffectDef.Periodic factory which initializes TicksRemaining.
+                        var dotDef = GameplayEffectDef.Periodic(
+                            name: $"corpse_zone_tick_{effectType}",
+                            attrIdx: AttributeSetDefinitions.ENEMY_HEALTH,
+                            damagePerTick: damage,
+                            totalDuration: 1f,             // 1s — one tick per zone pulse
+                            tickInterval: 1f
+                        );
+                        _buffSystem.ApplyDot(enemyId, dotDef);
                     }
                 }
             }

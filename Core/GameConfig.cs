@@ -2871,7 +2871,10 @@ namespace BattleSystemECS.Config
         Ice = 2,
         Fire = 3,
         Healing = 4,
-        DamageBoost = 5
+        DamageBoost = 5,
+        // Round 168 Direction 3 — Hallowed Ground: positive-feedback ground zone.
+        // Damages enemies in range every tick. (Friendly-tower buff is a planned v2 extension.)
+        HallowedGround = 6
     }
 
     // ── Meta Progression / Prestige Node Definition ─────────────────────

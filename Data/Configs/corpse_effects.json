@@ -42,5 +42,16 @@
     "tickInterval": 1.0,
     "slowAmount": 1.0,
     "monsterTypes": ["FireDemon", "FlameImp", "InfernoSlime"]
+  },
+  {
+    "id": "hallowed_ground",
+    "name": "Hallowed Ground",
+    "effectType": 6,
+    "duration": 5.0,
+    "radius": 1.5,
+    "damagePerTick": 4.0,
+    "tickInterval": 1.0,
+    "slowAmount": 1.0,
+    "monsterTypes": ["HolyAvenger", "Paladin", "Lightbringer"]
   }
 ]
