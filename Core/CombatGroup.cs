@@ -31,6 +31,11 @@ namespace BattleSystemECS.Core
         public Systems.TowerMorphSystem? TowerMorph { get; set; }
         public Systems.TowerStealthSystem? TowerStealth { get; set; }
         public Systems.TauntSystem? Taunt { get; set; }
+        // Round 138 — Per-Tower Active Skill (manual cast, cooldown-tick). Wired after
+        //   TowerAttack so its per-frame cooldown tick happens alongside other tower
+        //   state updates. Effect dispatch is a no-op log + cooldown flip until the
+        //   SkillSystem.CastByTower refactor lands; the gate itself is the value.
+        public Systems.TowerActiveSkillSystem? TowerActiveSkill { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -69,6 +74,11 @@ namespace BattleSystemECS.Core
             // TowerIsTaunt tower. Runs after tower attacks (closest semantic — enemies are
             // already locked-on to the taunt tower for the *next* frame's targeting).
             Taunt?.ResolveTauntAssignments();
+            // Round 138 — Per-tower active skill cooldown tick. Runs last in the
+            //   combat phase so the cooldown we tick is the one the player sees
+            //   in the HUD this frame (no half-frame drift). TriggerTowerActive()
+            //   is event-driven by the player; it can be called from anywhere.
+            TowerActiveSkill?.Update(deltaTime);
         }
     }
 }

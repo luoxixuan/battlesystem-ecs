@@ -341,6 +341,14 @@ namespace BattleSystemECS.Systems
                         store.TowerTimeScale[towerId] = tc.TimeScale;
                         logger.Log($"[TOWER] {tc.Name} 时间塔: 半径 {tc.TimeFieldRadius}, 时间缩放 {tc.TimeScale:F1}x");
                     }
+                    // Apply per-tower active skill (Round 138) — manual cast. Opt-in:
+                    //   tc.ActiveSkillId >= 0 enables the system; we delegate to the helper
+                    //   so the wiring stays in one place (reset + placement both reach here).
+                    if (tc.ActiveSkillId >= 0)
+                    {
+                        store.SetTowerActiveSkill(towerId, tc.ActiveSkillId, tc.ActiveCooldown);
+                        logger.Log($"[TOWER] {tc.Name} 主动技能: skillId={tc.ActiveSkillId}, 冷却 {tc.ActiveCooldown}s");
+                    }
                     // Apply deployable trap properties (passive trigger on enemy walk-in)
                     if (tc.IsTrap)
                     {

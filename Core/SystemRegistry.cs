@@ -63,6 +63,11 @@ namespace BattleSystemECS.Core
         public HealAuraSystem? HealAura { get; private set; }
         // Round 126 Direction 4 — Thorns Aura System (passive tower-centered damage aura on enemies).
         public ThornsAuraSystem? ThornsAura { get; private set; }
+        // Round 138 — Per-Tower Active Skill System (manual cast, cooldown-tick + public API).
+        //   Constructed in the same block as the other tower systems; CombatGroup wires
+        //   it after Taunt. Pure state machine — no per-tower field writes when
+        //   ActiveSkillId==-1, so cost is O(activeTowers) per frame in the worst case.
+        public TowerActiveSkillSystem? TowerActiveSkill { get; private set; }
         // Round 128 Direction 5 — Fire Trail System. Thin wrapper that exposes
         // SpawnTrail(x, y, radius, dps, duration) for callers that want to drop a
         // brief burning patch at a position. No per-frame Update — the actual
@@ -312,6 +317,12 @@ namespace BattleSystemECS.Core
             // the field (IsThornsTower==false fast path). Runs in SkillBuffGroup like
             // HealAura, but deals damage to enemies instead of healing friendly towers.
             ThornsAura = new ThornsAuraSystem(store);
+
+            // Round 138 — Per-Tower Active Skill System. Pure state machine that ticks
+            //   per-tower cooldowns and exposes TriggerTowerActive(towerId) for the
+            //   player/HUD. No effect dispatch yet (SkillSystem refactor is a future
+            //   round) — this round establishes the gate + cooldown contract.
+            TowerActiveSkill = new TowerActiveSkillSystem(store, config);
 
             // Round 128 Direction 5 — Fire Trail System. Passive wrapper, no
             // dependencies on Buff/Skill systems. Constructed early so it can be
@@ -622,6 +633,8 @@ namespace BattleSystemECS.Core
             scheduler.Combat.Mana = Mana;
             scheduler.Combat.GlobalSkill = GlobalSkill;
             scheduler.Combat.Taunt = Taunt;
+            // Round 138 — Per-tower active skill (cooldown tick).
+            scheduler.Combat.TowerActiveSkill = TowerActiveSkill;
 
             // ── Skill / Buff / Bleed ──
             scheduler.SkillBuff.Buff = Buff;

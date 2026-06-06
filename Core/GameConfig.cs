@@ -429,6 +429,16 @@ namespace BattleSystemECS.Config
         // sum — that would need a per-tower accumulator). 0 = uncapped. Use this to prevent
         // a 10K-enemy burst from overhealing past PlayerMaxHealth in a single frame.
         public float LifestealMaxPerFrame { get; set; } = 0f;
+
+        // Round 138 — Per-Tower Active Skill (manual cast by the player, e.g. press a hotkey
+        //   to trigger a powerful ability tied to this specific tower). ActiveSkillId = -1
+        //   (default) means this tower has no active skill — the system is fully inert for
+        //   it. When ≥ 0, the id refers to the shared SkillDefs[] table (the same one used by
+        //   players), so any existing player skill can be repurposed as a tower active.
+        //   ActiveCooldown is the configured max cooldown in seconds between casts. Effect
+        //   dispatch is the responsibility of TowerActiveSkillSystem on TriggerTowerActive() input.
+        public int ActiveSkillId { get; set; } = -1;
+        public float ActiveCooldown { get; set; } = 0f;
     }
 
     /// <summary>

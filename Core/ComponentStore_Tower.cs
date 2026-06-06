@@ -865,6 +865,18 @@ namespace BattleSystemECS.Core
         // linearly with proximity (max at center, 0 at the rim). Default 0 = no effect.
         public float[] TowerLureStrength = new float[MAX_ENTITIES];
 
+        // Round 138 — Per-Tower Active Skill (manual cast). -1 = no active skill. Otherwise
+        //   stores the skill definition id that the player can trigger via TowerActiveSkillSystem
+        //   (HUD key binding is the caller's responsibility; this system only handles cooldown
+        //   gating + a public TriggerTowerActive(towerId) API). Hot path: ActiveSkillId==-1
+        //   branches are skipped; per active tower the cooldown tick is O(1).
+        public int[] TowerActiveSkillId = new int[MAX_ENTITIES];
+        // TowerActiveCooldown: current remaining cooldown in seconds (0 = ready to fire)
+        public float[] TowerActiveCooldown = new float[MAX_ENTITIES];
+        // TowerActiveCooldownMax: configured maximum cooldown in seconds (0 = no active skill,
+        //   or copy of Cooldown from TowerConfig at AddTower time). Used for tests/UI display.
+        public float[] TowerActiveCooldownMax = new float[MAX_ENTITIES];
+
         // ==================== 塔组件访问 ====================
 
         /// <summary>
@@ -1094,6 +1106,10 @@ namespace BattleSystemECS.Core
             // Lure / bait fields: default to no lure (0 radius → branch skipped on hot path)
             TowerLureRadius[entityId] = 0f;
             TowerLureStrength[entityId] = 0f;
+            // Per-tower active skill: default to no active skill (-1 = inert, 0 = ready)
+            TowerActiveSkillId[entityId] = -1;
+            TowerActiveCooldown[entityId] = 0f;
+            TowerActiveCooldownMax[entityId] = 0f;
             // Burst fire: default to no burst (0 count = single-shot)
             TowerBurstCount[entityId] = 0;
             TowerBurstInterval[entityId] = 0f;
@@ -1356,6 +1372,10 @@ namespace BattleSystemECS.Core
             // Lure / bait fields reset (radius=0 disables lure, strength=0 disables bias)
             TowerLureRadius[entityId] = 0f;
             TowerLureStrength[entityId] = 0f;
+            // Per-tower active skill reset (-1 = inert, 0 = ready, max=0 means no skill)
+            TowerActiveSkillId[entityId] = -1;
+            TowerActiveCooldown[entityId] = 0f;
+            TowerActiveCooldownMax[entityId] = 0f;
             // Elemental affinity fields reset (-1 = no affinity, 0 = no bonus)
             TowerElementalAffinity[entityId] = -1;
             TowerElementalAffinityBonus[entityId] = 0f;
@@ -1804,6 +1824,65 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(towerId)) return 0;
             TowerReforgeCount[towerId]++;
             return TowerReforgeCount[towerId];
+        }
+
+        // ===== Round 138 — Per-Tower Active Skill helpers =====
+
+        /// <summary>Configures a tower's per-tower active skill. -1 disables, ≥0 enables.
+        /// Cooldown is the configured max in seconds. Use ResetTowerActive to clear it back to -1.</summary>
+        public void SetTowerActiveSkill(int towerId, int skillId, float cooldown)
+        {
+            if (!IsValidEntity(towerId)) return;
+            if (skillId < 0)
+            {
+                TowerActiveSkillId[towerId] = -1;
+                TowerActiveCooldown[towerId] = 0f;
+                TowerActiveCooldownMax[towerId] = 0f;
+                return;
+            }
+            TowerActiveSkillId[towerId] = skillId;
+            TowerActiveCooldownMax[towerId] = cooldown < 0f ? 0f : cooldown;
+            // Start ready (cooldown=0) so the player can cast immediately after placement
+            TowerActiveCooldown[towerId] = 0f;
+        }
+
+        /// <summary>Returns true if the tower has a non-inert active skill AND the cooldown is ready.</summary>
+        public bool IsTowerActiveReady(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return false;
+            return TowerActiveSkillId[towerId] >= 0 && TowerActiveCooldown[towerId] <= 0f;
+        }
+
+        /// <summary>Returns the configured active skill id, or -1 if the tower has none.</summary>
+        public int GetTowerActiveSkillId(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return -1;
+            return TowerActiveSkillId[towerId];
+        }
+
+        /// <summary>Returns the remaining cooldown in seconds (0 = ready).</summary>
+        public float GetTowerActiveCooldown(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0f;
+            return TowerActiveCooldown[towerId] < 0f ? 0f : TowerActiveCooldown[towerId];
+        }
+
+        /// <summary>Forces the active-skill cooldown to its max value (used after a successful cast
+        /// by TowerActiveSkillSystem; tests can also drive this directly to validate the gate).</summary>
+        public void SetTowerActiveOnCooldown(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return;
+            TowerActiveCooldown[towerId] = TowerActiveCooldownMax[towerId];
+        }
+
+        /// <summary>Reduces the active-skill cooldown by dt seconds (called by the system tick).
+        /// Floors at 0 so we never drift negative.</summary>
+        public void TickTowerActiveCooldown(int towerId, float dt)
+        {
+            if (!IsValidEntity(towerId)) return;
+            if (TowerActiveCooldown[towerId] <= 0f) return;
+            TowerActiveCooldown[towerId] -= dt;
+            if (TowerActiveCooldown[towerId] < 0f) TowerActiveCooldown[towerId] = 0f;
         }
     }
 }
