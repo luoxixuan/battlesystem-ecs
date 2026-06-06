@@ -77,5 +77,18 @@
     "armorReduction": 0.30,
     "speedReduction": 0.20,
     "monsterTypes": ["BlightedHorror", "Wraith", "PlagueBearer"]
+  },
+  {
+    "id": "smokescreen",
+    "name": "Smokescreen",
+    "effectType": 9,
+    "duration": 4.0,
+    "radius": 1.8,
+    "damagePerTick": 0.0,
+    "tickInterval": 1.0,
+    "slowAmount": 1.0,
+    "missChance": 0.30,
+    "enemySpeedBoost": 1.20,
+    "monsterTypes": ["SmokeImp", "ShadowStalker", "PhaseWraith"]
   }
 ]

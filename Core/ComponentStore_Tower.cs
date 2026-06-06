@@ -153,6 +153,15 @@ namespace BattleSystemECS.Core
         public float[] TowerShrineCachedManaRegen = new float[MAX_ENTITIES];
         public float[] TowerShrineCachedDmgBonus = new float[MAX_ENTITIES];
         public float[] TowerShrineCachedAtkSpdBonus = new float[MAX_ENTITIES];
+        // ── Round 175 Direction 9 — Smokescreen (per-frame, additive miss chance) ──
+        // TowerSmokeMissChance: per-tower per-frame miss chance set by CorpseEffectSystem when
+        // a Smokescreen corpse-effect zone (effectType=9) is within range. Reset to 0 each
+        // frame by BeginFrame(). Consumed by TowerAttackSystem as an additional miss roll
+        // AFTER the existing TowerAccuracy check. Default 0 = no smoke effect (inert fast path).
+        // 0.30 = 30% miss chance. Multiple overlapping smokescreens use max() (best-of) so the
+        // penalty doesn't stack into 100% miss. Kept as float[] rather than bool[] so future
+        // tuning (e.g. dense-fog variants at 0.5) can read from the same field.
+        public float[] TowerSmokeMissChance = new float[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
         // Tower cooldown reduction: per-tower CDR (0 = no reduction, 0.3 = 30% faster cooldowns)

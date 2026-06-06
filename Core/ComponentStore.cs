@@ -303,6 +303,13 @@ namespace BattleSystemECS.Core
                 TowerShrineCachedManaRegen[tid] = 0f;
                 TowerShrineCachedDmgBonus[tid] = 0f;
                 TowerShrineCachedAtkSpdBonus[tid] = 0f;
+                // Round 175 Direction 9 — Smokescreen per-frame miss chance reset.
+                // CorpseEffectSystem.ApplyContinuousEffect runs each frame for active
+                // smokescreen zones and writes the miss chance into this array. Without
+                // a per-frame wipe the value would carry over (so a tower that left the
+                // smoke would keep missing). Note: this is O(active_towers) per frame;
+                // for the 200-tower cap this is 200 writes/frame — negligible.
+                TowerSmokeMissChance[tid] = 0f;
             }
             CurrentFrame++;
         }
@@ -950,6 +957,10 @@ namespace BattleSystemECS.Core
                 TowerShrineCachedManaRegen[entityId] = 0f;
                 TowerShrineCachedDmgBonus[entityId] = 0f;
                 TowerShrineCachedAtkSpdBonus[entityId] = 0f;
+                // Round 175 Direction 9 — Smokescreen per-frame miss chance (recycled slot
+                // must not carry the previous occupant's stale smoke miss chance — would
+                // cause a freshly-placed tower to inherit a phantom miss debuff).
+                TowerSmokeMissChance[entityId] = 0f;
                 // Round 145 Direction 3 — Per-Tower Modifier reset (recycled slot must not
                 // carry the previous occupant's modifier — would cause a freshly-placed
                 // tower to inherit a random modifier it never rolled)

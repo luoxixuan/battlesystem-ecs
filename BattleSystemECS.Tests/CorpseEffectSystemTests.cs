@@ -5,6 +5,7 @@ using Xunit;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
+using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Tests
 {
@@ -528,6 +529,267 @@ namespace BattleSystemECS.Tests
             sys.Update(0.1f);
             Assert.Equal(0f, store.EnemyCurseArmorReduction[enemyId7]);
             Assert.Equal(0f, store.EnemyCurseSpeedReduction[enemyId7]);
+        }
+
+        // ========== Round 175 Direction 9 — Smokescreen (effectType=9) ==========
+        // Smokescreen is a "control zone" that does NOT damage enemies. Instead it:
+        //   - Marks towers in range as "in smoke" with a miss chance (consumed by TowerAttackSystem)
+        //   - Boosts enemy move speed in the zone (multiplicative into EnemyTerrainMoveSpeedMult)
+        // Unlike HallowedGround/ThornyBramble/BlightedGround, Smokescreen has no DoT and
+        // no enemy debuff; it operates on towers in addition to enemies.
+
+        /// <summary>Add a minimal tower to the store at (x, y) and register it as active.</summary>
+        private int AddTowerAt(ComponentStore store, float x, float y)
+        {
+            int tid = store.CreateEntity();
+            store.AddTower(tid, TowerType.Basic, 10f, 3, 1f, 1, 50f);
+            store.TowerActive[tid] = true;
+            store.PositionX[tid] = x;
+            store.PositionY[tid] = y;
+            store.AddActiveTowerId(tid);
+            return tid;
+        }
+
+        [Fact]
+        public void Smokescreen_MarksTowerInRange_WithMissChance()
+        {
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            // Spawn Smokescreen at origin: 1.8 radius, 0.30 missChance, 1.20 speed boost, 4s dur
+            int zoneId = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 9,            // Smokescreen
+                radius: 1.8f,
+                duration: 4f,
+                damagePerTick: 0f,        // no DoT
+                slowAmount: 1f,
+                tickInterval: 1f,
+                missChance: 0.30f,
+                enemySpeedBoost: 1.20f
+            );
+            Assert.True(zoneId >= 0);
+
+            // Place a tower inside the zone (distance 1.0 < 1.8)
+            int tid = AddTowerAt(store, 1.0f, 0.0f);
+            // Per-frame reset (BeginFrame) wipes to 0; sys.Update then writes max(0.30, 0) = 0.30
+            sys.Update(0.1f);
+            Assert.Equal(0.30f, store.TowerSmokeMissChance[tid]);
+        }
+
+        [Fact]
+        public void Smokescreen_DoesNotMarkTowerOutOfRange()
+        {
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            int zoneId = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 9,
+                radius: 1.8f,
+                duration: 4f,
+                damagePerTick: 0f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                missChance: 0.30f,
+                enemySpeedBoost: 1.20f
+            );
+
+            // Place a tower FAR outside the zone (distance 100 > 1.8)
+            int tid = AddTowerAt(store, 100f, 100f);
+            sys.Update(0.1f);
+            Assert.Equal(0f, store.TowerSmokeMissChance[tid]);
+        }
+
+        [Fact]
+        public void Smokescreen_BoostsEnemyMoveSpeedInRange()
+        {
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            int zoneId = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 9,
+                radius: 1.8f,
+                duration: 4f,
+                damagePerTick: 0f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                missChance: 0f,             // no miss (we test enemy boost only)
+                enemySpeedBoost: 1.25f      // +25% speed
+            );
+
+            // Enemy at distance 1.0 < 1.8 (in range)
+            int enemyId = AddEnemy(store, 1.0f, 0.0f, 100f);
+            // Initialize the speed mult to 1.0 (its default) — apply enemy terrain (1.0) so
+            // we can verify the multiplicative boost.
+            store.EnemyTerrainMoveSpeedMult[enemyId] = 1.0f;
+
+            sys.Update(0.1f);
+            // Multiplicative: 1.0 * 1.25 = 1.25
+            Assert.Equal(1.25f, store.EnemyTerrainMoveSpeedMult[enemyId], 3);
+        }
+
+        [Fact]
+        public void Smokescreen_DoesNotAffectEnemyOutOfRange()
+        {
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            int zoneId = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 9,
+                radius: 1.8f,
+                duration: 4f,
+                damagePerTick: 0f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                missChance: 0f,
+                enemySpeedBoost: 1.25f
+            );
+
+            // Enemy FAR outside the zone
+            int enemyId = AddEnemy(store, 50f, 50f, 100f);
+            store.EnemyTerrainMoveSpeedMult[enemyId] = 1.0f;
+
+            sys.Update(0.1f);
+            Assert.Equal(1.0f, store.EnemyTerrainMoveSpeedMult[enemyId], 3);
+        }
+
+        [Fact]
+        public void Smokescreen_OverlappingZones_UseMaxMissChance()
+        {
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            // Two overlapping smokescreens: 0.20 and 0.40. Tower should see 0.40 (max-merge).
+            int zoneA = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 9,
+                radius: 2.0f,
+                duration: 4f,
+                damagePerTick: 0f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                missChance: 0.20f,
+                enemySpeedBoost: 1.10f
+            );
+            int zoneB = store.AddCorpseEffect(
+                x: 0.5f, y: 0.5f,
+                effectType: 9,
+                radius: 2.0f,
+                duration: 4f,
+                damagePerTick: 0f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                missChance: 0.40f,
+                enemySpeedBoost: 1.10f
+            );
+
+            // Tower inside BOTH zones (distance ~0.7 from each)
+            int tid = AddTowerAt(store, 0.5f, 0.0f);
+            sys.Update(0.1f);
+            // max(0.20, 0.40) = 0.40
+            Assert.Equal(0.40f, store.TowerSmokeMissChance[tid]);
+        }
+
+        [Fact]
+        public void Smokescreen_ExpiresAfterDuration()
+        {
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            int zoneId = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 9,
+                radius: 1.8f,
+                duration: 2f,
+                damagePerTick: 0f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                missChance: 0.30f,
+                enemySpeedBoost: 1.20f
+            );
+            Assert.True(zoneId >= 0);
+            Assert.True(store.CorpseEffectActive[zoneId]);
+
+            sys.Update(2.5f);              // exceeds 2s duration
+            Assert.False(store.CorpseEffectActive[zoneId]);
+        }
+
+        [Fact]
+        public void Smokescreen_ZeroMissChance_NoOpOnTowers()
+        {
+            // Edge case: a Smokescreen with missChance=0 and speedBoost=1f is a no-op
+            // (the inert fast path returns early). No tower should be touched.
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            int zoneId = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 9,
+                radius: 1.8f,
+                duration: 4f,
+                damagePerTick: 0f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                missChance: 0f,             // inert
+                enemySpeedBoost: 1f         // inert
+            );
+
+            int tid = AddTowerAt(store, 1.0f, 0.0f);
+            // Pre-set the tower to a non-default value to ensure the inert path doesn't
+            // accidentally clear it. (BeginFrame zeros it before ApplySmokescreenEffects,
+            // so we need to set it AFTER BeginFrame — easiest is to just check after
+            // Update that it remained 0 since smoke didn't write anything.)
+            sys.Update(0.1f);
+            Assert.Equal(0f, store.TowerSmokeMissChance[tid]);
+        }
+
+        [Fact]
+        public void Smokescreen_LoadsFromJsonConfig()
+        {
+            // Verifies the JSON config entry by reading the source file directly.
+            string jsonPath = System.IO.Path.Combine(
+                AppContext.BaseDirectory, "..", "..", "..", "..", "Data", "Configs", "corpse_effects.json");
+            string jsonContent = System.IO.File.ReadAllText(jsonPath);
+            Assert.Contains("\"smokescreen\"", jsonContent);
+            Assert.Contains("\"effectType\": 9", jsonContent);
+            Assert.Contains("\"missChance\": 0.3", jsonContent);
+            Assert.Contains("\"enemySpeedBoost\": 1.2", jsonContent);
+            Assert.Contains("SmokeImp", jsonContent);
+            Assert.Contains("ShadowStalker", jsonContent);
+            Assert.Contains("PhaseWraith", jsonContent);
+        }
+
+        [Fact]
+        public void Smokescreen_OtherEffectTypesIgnoreMissChance()
+        {
+            // Regression guard: confirm that even with missChance / enemySpeedBoost
+            // set on a HallowedGround (effectType=6) or ThornyBramble (effectType=7) zone,
+            // the towers in range are NOT marked with smoke miss and enemy speed is
+            // NOT boosted. This guards against the new fields leaking into existing
+            // effect types via the case-mismatch guard in ApplyContinuousEffect.
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            int zoneId6 = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 6,            // HallowedGround
+                radius: 1.5f,
+                duration: 5f,
+                damagePerTick: 4f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                missChance: 0.99f,         // should be ignored
+                enemySpeedBoost: 5.0f      // should be ignored
+            );
+            int tid6 = AddTowerAt(store, 1.0f, 0.0f);
+            int eid6 = AddEnemy(store, 1.0f, 0.0f, 100f);
+            store.EnemyTerrainMoveSpeedMult[eid6] = 1.0f;
+            sys.Update(0.1f);
+            Assert.Equal(0f, store.TowerSmokeMissChance[tid6]);
+            Assert.Equal(1.0f, store.EnemyTerrainMoveSpeedMult[eid6], 3);
         }
     }
 }

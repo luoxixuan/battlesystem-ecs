@@ -764,6 +764,17 @@ namespace BattleSystemECS.Systems
                     float towerAccuracy = store.TowerAccuracy[towerId];
                     if (towerAccuracy < 1f && _rand.NextDouble() >= towerAccuracy) return;
 
+                    // Round 175 Direction 9 — Smokescreen miss check: a smokescreen zone
+                    // (effectType=9 corpse effect) under this tower adds an additional miss
+                    // chance. The CorpseEffectSystem writes max(zoneMissChance) into
+                    // TowerSmokeMissChance[towerId] each frame; ComponentStore.BeginFrame()
+                    // zeroes it at frame start so a tower that leaves the smoke is no longer
+                    // affected. We roll AFTER the existing accuracy/evasion check so the
+                    // miss is additive on top of base accuracy (e.g. 100% accuracy + 30%
+                    // smoke = 70% effective hit rate).
+                    float smokeMiss = store.TowerSmokeMissChance[towerId];
+                    if (smokeMiss > 0f && _rand.NextDouble() < smokeMiss) return;
+
                     // Enemy evasion: if enemy has evasion > 0, roll for dodge (after accuracy check passes)
                     float enemyEvasion = store.EnemyEvasion[bestTarget];
                     if (enemyEvasion > 0f && _rand.NextDouble() < enemyEvasion) return;

@@ -1700,6 +1700,10 @@ namespace BattleSystemECS.Config
                         // default 0 so existing effect types are unaffected).
                         c.ArmorReduction = elem.TryGetProperty("armorReduction", out var ar) ? (float)ar.GetDouble() : 0f;
                         c.SpeedReduction = elem.TryGetProperty("speedReduction", out var sr) ? (float)sr.GetDouble() : 0f;
+                        // Round 175 Direction 9 — Smokescreen fields (optional in JSON, default 0
+                        // and 1f so existing effect types are unaffected).
+                        c.MissChance = elem.TryGetProperty("missChance", out var mc) ? (float)mc.GetDouble() : 0f;
+                        c.EnemySpeedBoost = elem.TryGetProperty("enemySpeedBoost", out var esb) ? (float)esb.GetDouble() : 1f;
                         if (elem.TryGetProperty("monsterTypes", out var mtElem) && mtElem.ValueKind == System.Text.Json.JsonValueKind.Array)
                         {
                             c.MonsterTypes = new List<string>();

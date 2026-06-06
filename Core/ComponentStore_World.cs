@@ -280,6 +280,12 @@ namespace BattleSystemECS.Core
         // EnemyCurseArmorReduction / EnemyCurseSpeedReduction when enemy in range).
         public float[] CorpseEffectArmorReduction = new float[MAX_CORPSE_EFFECTS];
         public float[] CorpseEffectSpeedReduction = new float[MAX_CORPSE_EFFECTS];
+        // Round 175 Direction 9 — Smokescreen miss chance (per-zone, applied to towers in
+        // range via TowerSmokeMissChance[]; consumed by TowerAttackSystem).
+        public float[] CorpseEffectMissChance = new float[MAX_CORPSE_EFFECTS];
+        // Round 175 Direction 9 — Smokescreen enemy move-speed boost (per-zone, multiplicative
+        // into EnemyTerrainMoveSpeedMult[]; 1.0 = no boost, 1.2 = +20% speed).
+        public float[] CorpseEffectEnemySpeedBoost = new float[MAX_CORPSE_EFFECTS];
         private List<int> _activeCorpseEffectIds = new List<int>();
         private int _nextCorpseEffectId = 0;
 
@@ -420,7 +426,7 @@ namespace BattleSystemECS.Core
         /// Called from EnemyFissionSystem or ResolveEnemiesKilledThisFrame.
         /// Returns zone ID or -1 if no free slots.
         /// </summary>
-        public int AddCorpseEffect(float x, float y, int effectType, float radius, float duration, float damagePerTick = 0f, float slowAmount = 1f, float tickInterval = 1f, float armorReduction = 0f, float speedReduction = 0f)
+        public int AddCorpseEffect(float x, float y, int effectType, float radius, float duration, float damagePerTick = 0f, float slowAmount = 1f, float tickInterval = 1f, float armorReduction = 0f, float speedReduction = 0f, float missChance = 0f, float enemySpeedBoost = 1f)
         {
             int zoneId = -1;
             for (int i = 0; i < MAX_CORPSE_EFFECTS; i++)
@@ -448,6 +454,10 @@ namespace BattleSystemECS.Core
             // Round 171 Direction 4 — Blighted Ground debuff fields
             CorpseEffectArmorReduction[zoneId] = armorReduction;
             CorpseEffectSpeedReduction[zoneId] = speedReduction;
+            // Round 175 Direction 9 — Smokescreen fields (ignored for other effect types
+            // because their MissChance/EnemySpeedBoost default to 0/1f respectively).
+            CorpseEffectMissChance[zoneId] = missChance;
+            CorpseEffectEnemySpeedBoost[zoneId] = enemySpeedBoost;
             _activeCorpseEffectIds.Add(zoneId);
             return zoneId;
         }
@@ -470,6 +480,9 @@ namespace BattleSystemECS.Core
             // Round 171 Direction 4 — Blighted Ground debuff fields
             CorpseEffectArmorReduction[zoneId] = 0f;
             CorpseEffectSpeedReduction[zoneId] = 0f;
+            // Round 175 Direction 9 — Smokescreen fields
+            CorpseEffectMissChance[zoneId] = 0f;
+            CorpseEffectEnemySpeedBoost[zoneId] = 1f;
             _activeCorpseEffectIds.Remove(zoneId);
         }
 

@@ -2788,6 +2788,19 @@ namespace BattleSystemECS.Config
         /// Only consumed by effectType=8 (BlightedGround). 0 = no debuff (default for all other types).
         /// </summary>
         public float SpeedReduction { get; set; } = 0f;
+        /// <summary>
+        /// Round 175 Direction 9 — Smokescreen tower miss chance (e.g. 0.30 = 30% miss).
+        /// Only consumed by effectType=9 (Smokescreen). 0 = no miss (default for all other types).
+        /// Applies to towers within zone radius; multiple overlapping smokescreens use max() so
+        /// they don't stack multiplicatively into 100% miss.
+        /// </summary>
+        public float MissChance { get; set; } = 0f;
+        /// <summary>
+        /// Round 175 Direction 9 — Smokescreen enemy move-speed multiplier (e.g. 1.20 = +20% speed).
+        /// Only consumed by effectType=9 (Smokescreen). 1.0 = no boost (default for all other types).
+        /// Multiplies into EnemyTerrainMoveSpeedMult[] for enemies in range.
+        /// </summary>
+        public float EnemySpeedBoost { get; set; } = 1f;
         /// <summary>Enemy types that leave this corpse effect (comma-separated in JSON).</summary>
         public List<string> MonsterTypes { get; set; } = new List<string>();
     }

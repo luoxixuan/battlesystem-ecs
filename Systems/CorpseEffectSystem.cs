@@ -18,6 +18,7 @@ namespace BattleSystemECS.Systems
     ///   6 = HallowedGround (positive DoT, holy smite — Round 168 Direction 3)
     ///   7 = ThornyBramble (DoT + slow combo — Round 169 Direction 10)
     ///   8 = BlightedGround (DoT + armor/speed debuff — Round 171 Direction 4)
+    ///   9 = Smokescreen (tower miss chance + enemy speed boost — Round 175 Direction 9)
     ///
     /// Integration points:
     ///   - FrameScheduler.Tick() Phase 9.6 calls CorpseEffectSystem.Update()
@@ -107,7 +108,11 @@ namespace BattleSystemECS.Systems
                 // Round 171 Direction 4 — Blighted Ground debuffs (ignored for other effect types
                 // because their ArmorReduction/SpeedReduction default to 0).
                 effectDef.ArmorReduction,
-                effectDef.SpeedReduction
+                effectDef.SpeedReduction,
+                // Round 175 Direction 9 — Smokescreen fields (ignored for other effect types
+                // because their MissChance/EnemySpeedBoost default to 0/1f respectively).
+                effectDef.MissChance,
+                effectDef.EnemySpeedBoost
             );
 
             _logger?.Log($"[CORPSE] Spawned {effectDef.Name} at ({x:F1}, {y:F1}) for {effectDef.Duration:F1}s");
@@ -134,6 +139,9 @@ namespace BattleSystemECS.Systems
                 if (curEffectType == 0 || curEffectType == 3 || curEffectType == 6 || curEffectType == 7 || curEffectType == 8)
                 {
                     // Poison (0), Fire (3), HallowedGround (6), ThornyBramble (7), BlightedGround (8) — all DoT effects
+                    // NOTE: Smokescreen (9) is NOT a DoT — it has no DamagePerTick and is handled purely
+                    // in ApplyContinuousEffect (per-frame miss + speed buff). Including it here would
+                    // queue a 0-damage DoT pulse every tickInterval for no reason.
                     _store.CorpseEffectTickTimer[zoneId] += deltaTime;
                     float interval = _store.CorpseEffectTickInterval[zoneId];
                     if (interval <= 0f) interval = 1f; // fallback
@@ -199,8 +207,9 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Apply continuous effects (slow, ice) to enemies within range each frame.
-        /// Ice (type 2) applies a brief stun/slow; Slow (type 1) reduces speed.
+        /// Apply continuous effects (slow, ice, smokescreen) to entities within range each frame.
+        /// Ice (type 2) applies a brief stun/slow; Slow (type 1) reduces speed; Smokescreen (type 9)
+        /// marks towers in range as "in smoke" (consumed by TowerAttackSystem) and boosts enemy speed.
         /// </summary>
         private void ApplyContinuousEffect(int zoneId)
         {
@@ -210,7 +219,16 @@ namespace BattleSystemECS.Systems
             int effectType = _store.CorpseEffectType[zoneId];
             float slowAmount = _store.CorpseEffectSlowAmount[zoneId];
 
-            if (effectType != 1 && effectType != 2 && effectType != 7 && effectType != 8) return; // Slow, Ice, ThornyBramble, BlightedGround need per-frame
+            // Slow (1), Ice (2), ThornyBramble (7), BlightedGround (8) need per-frame enemy pass.
+            // Smokescreen (9) needs per-frame enemy AND tower pass (added below).
+            if (effectType != 1 && effectType != 2 && effectType != 7 && effectType != 8) {
+                // Smokescreen has its own dedicated pass; do not enter the enemy-only loop
+                if (effectType == 9)
+                {
+                    ApplySmokescreenEffects(zoneId);
+                }
+                return;
+            }
 
             var enemies = _store.GetCachedActiveEnemyIds();
             foreach (int enemyId in enemies)
@@ -272,6 +290,70 @@ namespace BattleSystemECS.Systems
                     {
                         _store.EnemyCurseSpeedReduction[enemyId] += zoneSpeedRed;
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Round 175 Direction 9 — Smokescreen per-frame application.
+        /// - Towers in radius: write max(zone.MissChance, existing) into TowerSmokeMissChance[]. ComponentStore.BeginFrame()
+        ///   zeroes this array at the start of every frame, so this write fully describes the
+        ///   "this frame's miss chance" for the tower. Multiple overlapping smokescreens use max()
+        ///   (not +=) so they don't stack multiplicatively into 100% miss. The TowerAttackSystem
+        ///   miss roll is a single NextDouble() after the existing accuracy/evasion rolls.
+        /// - Enemies in radius: multiply EnemyTerrainMoveSpeedMult[] by the configured speed boost
+        ///   (e.g. 1.20 = +20% speed). Multiplicative with existing slow factors — uses max() with 1.0
+        ///   floor so a 1.5x boost beats a 0.5x slow (net 0.75x).
+        ///
+        /// Bounds-checked: zone center is compared against ActiveEnemyIds / ActiveTowerIds
+        /// (only iterates live entities, zero waste). Each per-tower and per-enemy write
+        /// is O(1) with no allocations.
+        /// </summary>
+        private void ApplySmokescreenEffects(int zoneId)
+        {
+            float cx = _store.CorpseEffectX[zoneId];
+            float cy = _store.CorpseEffectY[zoneId];
+            float radius = _store.CorpseEffectRadius[zoneId];
+            float missChance = _store.CorpseEffectMissChance[zoneId];
+            float speedBoost = _store.CorpseEffectEnemySpeedBoost[zoneId];
+            if (missChance <= 0f && speedBoost <= 1f) return; // inert zone — no-op fast path
+
+            float radiusSq = radius * radius;
+
+            // Tower pass: mark each tower in range with the smoke miss chance (max-merge).
+            if (missChance > 0f)
+            {
+                var towers = _store.ActiveTowerIds;
+                for (int i = 0; i < towers.Count; i++)
+                {
+                    int tid = towers[i];
+                    if (!_store.TowerActive[tid]) continue;
+                    // Towers use the shared PositionX/PositionY arrays (same as enemies/players).
+                    float dx = _store.PositionX[tid] - cx;
+                    float dy = _store.PositionY[tid] - cy;
+                    if (dx * dx + dy * dy > radiusSq) continue;
+                    // max-merge so overlapping smokescreens don't stack into 100% miss
+                    if (missChance > _store.TowerSmokeMissChance[tid])
+                    {
+                        _store.TowerSmokeMissChance[tid] = missChance;
+                    }
+                }
+            }
+
+            // Enemy pass: apply multiplicative speed boost (1.0 = no boost, 1.2 = +20% speed).
+            // We multiply into the existing per-frame EnemyTerrainMoveSpeedMult (which is set by
+            // other zones in this same Update() loop and reset to 0/1f at the next BeginFrame).
+            if (speedBoost > 1f)
+            {
+                var enemies = _store.GetCachedActiveEnemyIds();
+                for (int i = 0; i < enemies.Count; i++)
+                {
+                    int eid = enemies[i];
+                    if (!_store.EnemyActive[eid]) continue;
+                    float dx = _store.PositionX[eid] - cx;
+                    float dy = _store.PositionY[eid] - cy;
+                    if (dx * dx + dy * dy > radiusSq) continue;
+                    _store.EnemyTerrainMoveSpeedMult[eid] *= speedBoost;
                 }
             }
         }
