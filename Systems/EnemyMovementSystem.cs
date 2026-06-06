@@ -359,6 +359,11 @@ namespace BattleSystemECS.Systems
                 }
 
                 float moveSpeed = store.EnemyMoveSpeed[enemyId];
+                // Round 176 Direction 7 — Siege base-speed multiplier. Applied FIRST so the
+                // structural slowness is multiplicative with all subsequent slow/boost factors
+                // (terrain, root, weather, stack, frost zone, tether, path tile). Default 1.0
+                // = no slow (inert for non-siege enemies — single float multiply, JIT folds).
+                moveSpeed *= store.EnemySiegeSpeedMult[enemyId];
                 // Apply terrain move speed modifier (Mud/Ice slow)
                 moveSpeed *= store.EnemyTerrainMoveSpeedMult[enemyId];
                 // Apply Chrono Tower time dilation (per-enemy, accumulated min across all chrono towers)

@@ -891,6 +891,10 @@ namespace BattleSystemECS.Systems
                                 float shred = store.EnemyArmorShredStacks[bestTarget];
                                 if (shred > 0f && _armorShredPerStack > 0f)
                                     ea = Math.Max(0f, ea - shred * _armorShredPerStack);
+                                // Round 176 Direction 7 — Siege armor bonus (additive on top of
+                                // EnemyArmor). 0.95 max combined so no enemy is unkillable.
+                                ea += store.EnemySiegeArmorBonus[bestTarget];
+                                if (ea > 0.95f) ea = 0.95f;
                                 d *= Math.Max(0.01f, 1f - ea) * _damageTakenMult;
                             }
                             finalDmg += d;
@@ -914,6 +918,11 @@ namespace BattleSystemECS.Systems
                                 float shred = store.EnemyArmorShredStacks[bestTarget];
                                 if (shred > 0f && _armorShredPerStack > 0f)
                                     ea = Math.Max(0f, ea - shred * _armorShredPerStack);
+                                // Round 176 Direction 7 — Siege armor bonus (mirror of the
+                                // primary damage branch above; same additive-on-EnemyArmor
+                                // formula, same 0.95 clamp to keep the math symmetric).
+                                ea += store.EnemySiegeArmorBonus[bestTarget];
+                                if (ea > 0.95f) ea = 0.95f;
                                 d *= Math.Max(0.01f, 1f - ea) * _damageTakenMult;
                             }
                             finalDmg += d;
@@ -977,6 +986,10 @@ namespace BattleSystemECS.Systems
                             float armorShredStacks = store.EnemyArmorShredStacks[bestTarget];
                             if (armorShredStacks > 0f && _armorShredPerStack > 0f)
                                 effectiveArmor = Math.Max(0f, effectiveArmor - armorShredStacks * _armorShredPerStack);
+                            // Round 176 Direction 7 — Siege armor bonus (additive on top of
+                            // EnemyArmor). 0.95 max combined so no enemy is unkillable.
+                            effectiveArmor += store.EnemySiegeArmorBonus[bestTarget];
+                            if (effectiveArmor > 0.95f) effectiveArmor = 0.95f;
                             // Step 3: apply effective armor to damage
                             baseDmg *= Math.Max(0.01f, 1f - effectiveArmor) * _damageTakenMult;
                         }

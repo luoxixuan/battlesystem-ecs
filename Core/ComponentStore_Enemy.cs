@@ -109,6 +109,25 @@ namespace BattleSystemECS.Core
         // Enemy thorns: reflects a fraction of damage taken back to the attacker (player/tower).
         // Applied after damage is dealt, in the same frame's serial phase.
         public float[] EnemyThornsRatio = new float[MAX_ENTITIES];
+        // Round 176 Direction 7 — Siege Enemy Fields ────────────────────────
+        // EnemyIsSiege: true if this enemy is a "Siege" (heavy armored tank) — has bonus
+        // armor (EnemySiegeArmorBonus adds to EnemyArmor with 0.95 clamp) and a base
+        // move-speed multiplier (EnemySiegeSpeedMult applied to EnemyMoveSpeedBase at
+        // MovementSystem). Default false = inert zero-overhead fast path. Set at AddEnemy
+        // + SetEnemySiege() when MonsterDef.IsSiege. Stays false for normal enemies so
+        // the MovementSystem + damage hot paths pay one bool read + branch.
+        public bool[] EnemyIsSiege = new bool[MAX_ENTITIES];
+        // EnemySiegeArmorBonus: ADDITIONAL armor reduction fraction contributed by being
+        // a Siege enemy. Applied ON TOP of EnemyArmor and clamped to 0.95 max combined
+        // reduction (so no enemy is unkillable). Example: 0.8 = Siege gets 80% damage
+        // reduction baseline (in addition to any other armor on the monster config).
+        // 0 = inert (no bonus).
+        public float[] EnemySiegeArmorBonus = new float[MAX_ENTITIES];
+        // EnemySiegeSpeedMult: base move speed multiplier for Siege enemies. Applied to
+        // EnemyMoveSpeedBase at MovementSystem start (before terrain/CC multipliers) so
+        // the slowness feels structural, not a temporary debuff. 1.0 = no slow (inert).
+        // Example: 0.5 = Siege walks at 50% base speed.
+        public float[] EnemySiegeSpeedMult = new float[MAX_ENTITIES];
         // Round 174 Direction 8 — Stalker / Predator Enemy Fields ────────────────────────
         // EnemyIsStalker: true if this enemy is a "Stalker" — spawns invisible, becomes
         // visible when within EnemyStalkRevealRadius of any friendly tower, and the first
@@ -1134,6 +1153,12 @@ namespace BattleSystemECS.Core
             EnemyCritResistance[entityId] = 0f;
             // Deflect Chance: default 0 (projectiles always hit) — only Boss/Elite monsters get a non-zero value via SetDeflectChance()
             EnemyDeflectChance[entityId] = 0f;
+            // Round 176 Direction 7 — Siege default state at AddEnemy. Each new spawn
+            // starts as a non-siege enemy (zero-overhead fast path). Callers that want
+            // the Siege behavior must invoke SetEnemySiege() right after AddEnemy.
+            EnemyIsSiege[entityId] = false;
+            EnemySiegeArmorBonus[entityId] = 0f;
+            EnemySiegeSpeedMult[entityId] = 1f;
             // Round 174 Direction 8 — Stalker default state at AddEnemy. Each new spawn
             // starts as a non-stalker (zero-overhead fast path). Callers that want the
             // stalker behavior must invoke SetEnemyStalker() right after AddEnemy.
@@ -1553,6 +1578,28 @@ namespace BattleSystemECS.Core
             // called once at AddEnemy time; calling it again on a revealed enemy intentionally
             // does NOT reset reveal/consume flags (use DestroyEntity + AddEnemy for a true
             // respawn). This keeps the API surface honest: stalker config is set-once.
+        }
+
+        /// <summary>
+        /// Round 176 Direction 7 — Configures a Siege (heavy armored tank) enemy. Siege
+        /// enemies get bonus armor (additive on top of EnemyArmor, 0.95 max combined) and
+        /// a base move-speed multiplier (applied to EnemyMoveSpeedBase at MovementSystem).
+        /// armorBonus clamped to [0, 0.95] to prevent unkillable enemies. speedMult clamped
+        /// to [0.1, 1.0] so the enemy is never frozen (0) and never sped up (>1.0).
+        /// Safe to call on a non-siege enemy — IsSiege stays true, but the bonus is 0/1.0
+        /// by default so the hot path stays inert until SetEnemySiege is invoked.
+        /// </summary>
+        /// <param name="enemyId">Target enemy entity ID (must be valid)</param>
+        /// <param name="armorBonus">Additional damage reduction fraction (e.g. 0.8 = +80%
+        /// reduction on top of EnemyArmor; clamped to [0, 0.95]).</param>
+        /// <param name="speedMult">Base move speed multiplier (e.g. 0.5 = 50% of base speed;
+        /// clamped to [0.1, 1.0]).</param>
+        public void SetEnemySiege(int enemyId, float armorBonus, float speedMult)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyIsSiege[enemyId] = true;
+            EnemySiegeArmorBonus[enemyId] = System.Math.Clamp(armorBonus, 0f, 0.95f);
+            EnemySiegeSpeedMult[enemyId] = System.Math.Clamp(speedMult, 0.1f, 1.0f);
         }
 
 

@@ -603,6 +603,12 @@ namespace BattleSystemECS.Core
                 EnemyStealthMultiplier[entityId] = 1f;
                 EnemyShield[entityId] = 0f;
                 EnemyThornsRatio[entityId] = 0f;
+                // Round 176 Direction 7 — Siege reset (recycled slot must not leak siege
+                // armor/slow state — a freshly-spawned enemy must start as a normal enemy,
+                // never inherit +80% damage reduction / 50% slow from a prior slot occupant)
+                EnemyIsSiege[entityId] = false;
+                EnemySiegeArmorBonus[entityId] = 0f;
+                EnemySiegeSpeedMult[entityId] = 1f;
                 // Round 174 Direction 8 — Stalker reset (recycled slot must not leak stealth
                 // state — a freshly-spawned enemy must start hidden + fresh ambush, never
                 // inherit a revealed/ambush-consumed state from the prior slot occupant)

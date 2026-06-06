@@ -473,8 +473,17 @@ public void SetWaveNumber(int waveNumber)
             else  // Physical (default) — uses armor + armor pen
             {
                 float enemyArmor = store.EnemyArmor[enemyId];
-                if (enemyArmor > 0f)
+                // Round 176 Direction 7 — Siege armor bonus (additive on top of
+                // EnemyArmor). 0.95 max combined so no enemy is unkillable.
+                // siegeBonus>0 also enters the branch so pure-siege monsters
+                // (EnemyArmor=0, SiegeArmorBonus=0.8) still get reduced.
+                float siegeBonus = store.EnemySiegeArmorBonus[enemyId];
+                if (enemyArmor > 0f || siegeBonus > 0f)
+                {
+                    enemyArmor += siegeBonus;
+                    if (enemyArmor > 0.95f) enemyArmor = 0.95f;
                     finalDamage *= Math.Max(0.01f, 1f - enemyArmor * (1f - _armorPenetration));
+                }
             }
 
             // Apply tech tree damage taken multiplier

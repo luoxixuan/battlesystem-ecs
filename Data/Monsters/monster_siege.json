@@ -1,0 +1,3 @@
+{"Name":"Siege Ram","Type":"Heavy","Health":600,"MaxHealth":600,"Damage":18,"MoveSpeed":0.2,"AttackRange":1,"AttackInterval":2.5,"GoldReward":120,"Skills":["Normal Attack","Battering Ram"],"Armor":8,"PierceResist":0.6,"PierceImmune":false}
+{"Name":"Ironclad Titan","Type":"Heavy","Health":450,"MaxHealth":450,"Damage":12,"MoveSpeed":0.3,"AttackRange":1,"AttackInterval":2.0,"GoldReward":95,"Skills":["Normal Attack","Fortified Plating"],"Armor":15,"PierceResist":0.7,"PierceImmune":false}
+{"Name":"Stoneguard","Type":"Heavy","Health":300,"MaxHealth":300,"Damage":10,"MoveSpeed":0.4,"AttackRange":1,"AttackInterval":1.8,"GoldReward":80,"Skills":["Normal Attack","Stone Skin"],"Armor":10,"PierceResist":0.55,"PierceImmune":false}
