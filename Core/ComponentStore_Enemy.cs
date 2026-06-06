@@ -914,6 +914,19 @@ namespace BattleSystemECS.Core
         //   range. Default -1 (no taunt = zero overhead — Movement/AITargeting skip the field).
         public int[] EnemyTauntedByTowerId = new int[MAX_ENTITIES];
 
+        // ==================== 仇恨聚焦 (Aggro / Focus Fire, Round 142 方向5) ====================
+        // EnemyFocusTowerId: tower ID this enemy is currently "focusing" (i.e. has been tagged
+        //   by the player's mark-focus command to prioritize as a primary attack target for
+        //   the next N seconds). -1 = no focus assigned (default — zero overhead, AI/Movement
+        //   skip the field with a single cmp). Set by AggroSystem.MarkFocusTower() and cleared
+        //   automatically when EnemyFocusDurationLeft counts down to 0. Stale IDs (tower sold
+        //   / destroyed) are sanitized lazily on the next per-frame tick.
+        // EnemyFocusDurationLeft: remaining seconds of focus assignment. 0 = inactive (default).
+        //   Decremented each WavePhase frame by AggroSystem.Update(); when it hits 0, the
+        //   focus is cleared (tower id reset to -1).
+        public int[] EnemyFocusTowerId = new int[MAX_ENTITIES];
+        public float[] EnemyFocusDurationLeft = new float[MAX_ENTITIES];
+
         // ==================== 自由游荡敌人 (Free-Roam Enemies, Round 84 Direction 6) ====================
         // EnemyIsFreeRoam: when true, the enemy is NOT path-bound. It wanders the map freely
         //   and attacks the nearest tower/player it can reach. Set by WaveSpawningSystem
@@ -1266,6 +1279,12 @@ namespace BattleSystemECS.Core
             EnemyLeashReturnY[entityId] = 0f;
             // Taunt target: default -1 = not taunted (TauntSystem assigns a tower id when in range)
             EnemyTauntedByTowerId[entityId] = -1;
+            // Aggro / Focus Fire (Round 142 方向5): default -1/0f = not focused.
+            // AggroSystem.MarkFocusTower() sets a non-default value when the player commands
+            // a focus mark; the per-frame tick decrements the duration and clears back to
+            // these defaults.
+            EnemyFocusTowerId[entityId] = -1;
+            EnemyFocusDurationLeft[entityId] = 0f;
             // Free-Roam (Round 84): default NOT free-roam. WaveSpawningSystem opts in by
             // setting EnemyIsFreeRoam = true for monsterType "FreeRoam" archetypes.
             EnemyIsFreeRoam[entityId] = false;

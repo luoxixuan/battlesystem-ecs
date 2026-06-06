@@ -68,6 +68,12 @@ namespace BattleSystemECS.Core
         //   it after Taunt. Pure state machine — no per-tower field writes when
         //   ActiveSkillId==-1, so cost is O(activeTowers) per frame in the worst case.
         public TowerActiveSkillSystem? TowerActiveSkill { get; private set; }
+        // Round 142 方向5 — Aggro / Focus Fire System. Player-driven mark-focus command.
+        //   Public API: MarkFocusTower(enemyId, towerId, duration) +
+        //   MarkFocusTowerBulk(enemyIds, towerId, duration) + ClearFocus / HasFocus /
+        //   GetFocusTowerId read helpers + OnEnemyDestroyed lifecycle hook. Per-frame
+        //   Update() is O(1) when no focus is active (sentinel-gated fast path).
+        public AggroSystem? Aggro { get; private set; }
         // Round 128 Direction 5 — Fire Trail System. Thin wrapper that exposes
         // SpawnTrail(x, y, radius, dps, duration) for callers that want to drop a
         // brief burning patch at a position. No per-frame Update — the actual
@@ -323,6 +329,13 @@ namespace BattleSystemECS.Core
             //   player/HUD. No effect dispatch yet (SkillSystem refactor is a future
             //   round) — this round establishes the gate + cooldown contract.
             TowerActiveSkill = new TowerActiveSkillSystem(store, config);
+
+            // Round 142 方向5 — Aggro / Focus Fire System. Player-driven mark-focus
+            //   command. Constructed after the tower-side systems (no per-tower
+            //   dependency; operates on enemy-side state) and before FireTrail
+            //   (which is also a passive system). Wired into CombatGroup.Update()
+            //   last in the combat phase, after TowerActiveSkill.
+            Aggro = new AggroSystem(store);
 
             // Round 128 Direction 5 — Fire Trail System. Passive wrapper, no
             // dependencies on Buff/Skill systems. Constructed early so it can be
@@ -635,6 +648,11 @@ namespace BattleSystemECS.Core
             scheduler.Combat.Taunt = Taunt;
             // Round 138 — Per-tower active skill (cooldown tick).
             scheduler.Combat.TowerActiveSkill = TowerActiveSkill;
+            // Round 142 方向5 — Aggro / Focus Fire (per-frame duration tick). Wired
+            //   last in the combat phase, after TowerActiveSkill. O(1) when no
+            //   focus is active; O(n_enemies) when at least one enemy has an
+            //   active focus assignment.
+            scheduler.Combat.Aggro = Aggro;
 
             // ── Skill / Buff / Bleed ──
             scheduler.SkillBuff.Buff = Buff;

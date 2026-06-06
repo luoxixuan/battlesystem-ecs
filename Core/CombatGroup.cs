@@ -36,6 +36,12 @@ namespace BattleSystemECS.Core
         //   state updates. Effect dispatch is a no-op log + cooldown flip until the
         //   SkillSystem.CastByTower refactor lands; the gate itself is the value.
         public Systems.TowerActiveSkillSystem? TowerActiveSkill { get; set; }
+        // Round 142 方向5 — Aggro / Focus Fire System. Player-driven mark-focus command
+        //   that lets enemies prioritize a chosen tower for N seconds. Update() is
+        //   O(n_active_enemies) only when at least one focus is active; otherwise
+        //   O(1) fast-path (single bool sentinel). Runs last in Combat so the focus
+        //   duration tick happens after all attack resolution for the frame.
+        public Systems.AggroSystem? Aggro { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -79,6 +85,11 @@ namespace BattleSystemECS.Core
             //   in the HUD this frame (no half-frame drift). TriggerTowerActive()
             //   is event-driven by the player; it can be called from anywhere.
             TowerActiveSkill?.Update(deltaTime);
+            // Round 142 方向5 — Aggro / Focus Fire per-frame duration tick. Runs
+            //   after TowerActiveSkill (also a post-attack-phase tick) and after
+            //   Taunt (which writes EnemyTauntedByTowerId for the next frame's
+            //   targeting). Aggro's Update() is O(1) when no focus is active.
+            Aggro?.Update(deltaTime);
         }
     }
 }

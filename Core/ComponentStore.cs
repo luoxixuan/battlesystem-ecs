@@ -738,6 +738,10 @@ namespace BattleSystemECS.Core
                 EnemyMarkStacks[entityId] = 0;
                 EnemyMarkDecayTimer[entityId] = 0f;
                 EnemyMarkMaxThreshold[entityId] = 0;
+                // Round 142 方向5 — Aggro / Focus Fire: reset on entity destroy to prevent
+                // ID-reuse leakage (a recycled ID carrying stale focus tower id / duration).
+                EnemyFocusTowerId[entityId] = -1;
+                EnemyFocusDurationLeft[entityId] = 0f;
                 // Decoy fields (reset on entity destruction)
                 EnemyIsDecoy[entityId] = false;
                 EnemyDecoyLifetime[entityId] = 0f;
@@ -902,6 +906,25 @@ namespace BattleSystemECS.Core
                 int capBase = ownerIdx * MAX_TOWER_TYPES + rtType;
                 if (PlayerTowersOfType[capBase] > 0) PlayerTowersOfType[capBase]--;
                 if (PlayerTowerCount[ownerIdx] > 0) PlayerTowerCount[ownerIdx]--;
+            }
+            // Round 142 方向5 — Aggro / Focus Fire: when a tower is destroyed, clear any
+            // focus assignment that pointed at it. Sweep is O(n_active_enemies) which is
+            // acceptable: tower destruction is rare (sale / destruction event), and the
+            // sweep is a single int compare per enemy. Alternative lazy-clear (check
+            // TowerActive[] in AggroSystem tick) is O(n_enemies) every frame instead of
+            // only on tower destruction — so eager-clear here is cheaper in aggregate.
+            if (wasTower)
+            {
+                var activeEnemies = ActiveEnemyIds;
+                for (int ei = 0; ei < activeEnemies.Count; ei++)
+                {
+                    int eid = activeEnemies[ei];
+                    if (EnemyActive[eid] && EnemyFocusTowerId[eid] == entityId)
+                    {
+                        EnemyFocusTowerId[eid] = -1;
+                        EnemyFocusDurationLeft[eid] = 0f;
+                    }
+                }
             }
             freeEntityIds.Push(entityId);
             // Round 103 — Buff Share: notify per-system caches to drop stale base-speed entries
