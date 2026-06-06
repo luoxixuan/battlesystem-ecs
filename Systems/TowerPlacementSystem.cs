@@ -598,6 +598,21 @@ namespace BattleSystemECS.Systems
                 logger.Log($"[MINE] Tower #{towerId} at ({x},{y}): triggerR={store.MineTriggerRadius[towerId]}, arm={store.MineArmTime[towerId]}s, dmg={store.MineDamage[towerId]}, explR={store.MineExplosionRadius[towerId]}, stacks={store.MineMaxStacks[towerId]}");
             }
 
+            // Round 173 Direction 1 — Shrine Tower post-place init. Sets the SOA fields
+            // that drive TowerShrineSystem. Default 3-shrine template values here are
+            // conservative: a single gold-buff shrine (aura type 1) that gives +0.10
+            // extra gold per kill to friendly towers in 3 cells. PlaceTower callers
+            // who need a different aura can overwrite the SOA fields directly after
+            // this block (or extend the signature with a ShrineDef parameter).
+            if (type == TowerType.Shrine)
+            {
+                store.TowerIsShrine[towerId] = true;
+                store.TowerShrineAuraType[towerId] = 1; // 1 = Gold (default)
+                store.TowerShrineRadius[towerId] = 3.0f;
+                store.TowerShrinePotency[towerId] = 0.10f;
+                logger.Log($"[SHRINE] Tower #{towerId} at ({x},{y}): aura=Gold, radius={store.TowerShrineRadius[towerId]}, potency={store.TowerShrinePotency[towerId]}");
+            }
+
             // Increment tower count for cap enforcement
             store.PlayerTowerCount[playerId]++;
             // Round 139 — Per-Type Placement Cap: bump the per-type counter on successful

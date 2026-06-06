@@ -92,6 +92,12 @@ namespace BattleSystemECS.Core
         public ChronoTowerSystem? ChronoTower { get; private set; }
         // Round 106 Direction 2 — Mine / Trap tower (proximity-triggered AoE)
         public MineSystem? Mine { get; private set; }
+        // Round 173 Direction 1 — Shrine Tower (persistent pure-buff aura, no attack).
+        //   Reads TowerIsShrine / TowerShrineAuraType / TowerShrineRadius / TowerShrinePotency
+        //   on every active tower and writes per-frame cache arrays that downstream
+        //   systems can consume (GoldSystem / ManaSystem / TowerAttackSystem in v2).
+        //   Cost: O(activeShrines × activeTowers) when ≥1 shrine on field, O(1) otherwise.
+        public TowerShrineSystem? TowerShrine { get; private set; }
 
         // ── Player ──
         public PlayerTowerAttackSystem? PlayerTowerAttack { get; private set; }
@@ -444,6 +450,12 @@ namespace BattleSystemECS.Core
             // ── Round 106 Direction 2 — Mine / Trap tower ──
             Mine = new MineSystem(store, logger, config, playerId);
 
+            // ── Round 173 Direction 1 — Shrine Tower (persistent pure-buff aura) ──
+            // Created alongside Mine because both are "non-attack" tower-flavor systems
+            // with their own TowerType enum value. Sentinel-gated fast path when no
+            // shrine is on the field.
+            TowerShrine = new TowerShrineSystem(store);
+
             // ── Round 107 Direction 6 — Target Mark subsystem ──
             Mark = new MarkSystem(store, playerId);
 
@@ -687,10 +699,15 @@ namespace BattleSystemECS.Core
             //   focus is active; O(n_enemies) when at least one enemy has an
             //   active focus assignment.
             scheduler.Combat.Aggro = Aggro;
-            // Round 144 方向4 — Hero Active Skill Set per-frame cooldown tick.
-            //   Wired last in the combat phase, after Aggro. O(1) when no skill
-            //   is configured (sentinel _anySkillConfigured in the system).
+            // Round 144 方向4 — Hero Active Skill Set per-frame cooldown tick. Wired
+            //   last in the combat phase, after Aggro. O(1) when no skill is
+            //   configured (sentinel _anySkillConfigured in the system).
             scheduler.Combat.HeroSkill = HeroSkill;
+            // Round 173 Direction 1 — Shrine Tower: resolve persistent aura buffs.
+            //   Runs after AuraTower.ResolveAuraBuffs (both are serial aura-phase
+            //   passes) and before the projectile/buff downstream consumers, so
+            //   any v2 wiring that consumes the cached bonuses sees fresh values.
+            scheduler.Combat.TowerShrine = TowerShrine;
 
             // ── Skill / Buff / Bleed ──
             scheduler.SkillBuff.Buff = Buff;

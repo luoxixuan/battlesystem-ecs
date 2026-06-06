@@ -290,6 +290,20 @@ namespace BattleSystemECS.Core
                 EnemyCurseArmorReduction[eid] = 0f;
                 EnemyCurseDmgTakenIncrease[eid] = 0f;
             }
+            // Round 173 Direction 1 — reset Shrine "this frame" cache arrays on every
+            // active tower. TowerShrineSystem then += accumulates into these during the
+            // combat phase; the next frame's BeginFrame() wipes them so downstream
+            // consumers always see "this frame's contribution" (no drift). O(active_towers)
+            // worst case × 4 fields = 800 writes/frame for the 200-tower cap.
+            var activeTowers = _activeTowerIds;
+            for (int i = 0; i < activeTowers.Count; i++)
+            {
+                int tid = activeTowers[i];
+                TowerShrineCachedGoldBonus[tid] = 0f;
+                TowerShrineCachedManaRegen[tid] = 0f;
+                TowerShrineCachedDmgBonus[tid] = 0f;
+                TowerShrineCachedAtkSpdBonus[tid] = 0f;
+            }
             CurrentFrame++;
         }
 
@@ -918,6 +932,16 @@ namespace BattleSystemECS.Core
                 MineChainRadius[entityId] = 0f;
                 MineChainDamageMult[entityId] = 0f;
                 MineChainDepth[entityId] = 0;
+                // Round 173 — Shrine Tower reset (recycled slot must not leak shrine state)
+                TowerIsShrine[entityId] = false;
+                TowerShrineAuraType[entityId] = 0;
+                TowerShrineRadius[entityId] = 0f;
+                TowerShrinePotency[entityId] = 0f;
+                // Round 173 — Shrine per-frame caches reset (no carry-over from recycled slot)
+                TowerShrineCachedGoldBonus[entityId] = 0f;
+                TowerShrineCachedManaRegen[entityId] = 0f;
+                TowerShrineCachedDmgBonus[entityId] = 0f;
+                TowerShrineCachedAtkSpdBonus[entityId] = 0f;
                 // Round 145 Direction 3 — Per-Tower Modifier reset (recycled slot must not
                 // carry the previous occupant's modifier — would cause a freshly-placed
                 // tower to inherit a random modifier it never rolled)

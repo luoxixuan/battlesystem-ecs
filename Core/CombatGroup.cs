@@ -13,6 +13,12 @@ namespace BattleSystemECS.Core
         public Systems.TowerSynergySystem? TowerSynergy { get; set; }
         public Systems.TowerLinkSystem? TowerLink { get; set; }
         public Systems.AuraTowerSystem? AuraTower { get; set; }
+        // Round 173 Direction 1 — Shrine Tower System. Persistent pure-buff aura on
+        //   friendly towers; no auto-attack, no projectile, no enemy targeting. Runs
+        //   alongside AuraTower.ResolveAuraBuffs in the serial aura phase so the
+        //   cached damage / attack-speed bonuses are visible to downstream consumers
+        //   this same frame.
+        public Systems.TowerShrineSystem? TowerShrine { get; set; }
         public Systems.CurseAuraSystem? Curse { get; set; }
         public Systems.PullTowerSystem? PullTower { get; set; }
         public Systems.TowerSilenceSystem? TowerSilence { get; set; }
@@ -65,6 +71,11 @@ namespace BattleSystemECS.Core
             TowerSynergy?.Update();
             TowerLink?.Update();
             AuraTower?.ResolveAuraBuffs();
+            // Round 173 Direction 1 — Shrine aura resolve. SetTurn/Resolve pair mirrors
+            //   AuraTower's pattern: SetTurn collects shrine IDs, Resolve accumulates
+            //   the per-frame cache for downstream consumers.
+            TowerShrine?.SetTurn();
+            TowerShrine?.ResolveShrineBuffs();
             Curse?.ResolveCurseDebuffs();
             PullTower?.Update(deltaTime);
             TowerSilence?.Update(deltaTime);

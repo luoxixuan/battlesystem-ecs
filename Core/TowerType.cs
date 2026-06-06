@@ -20,6 +20,11 @@ namespace BattleSystemECS.Components
         Palisade = 9,
         // Round 106 Direction 2: Mine — defensive trap tower, no auto-attack, detonates AoE
         // damage on enemy proximity after a short arm time. Stacks allow multi-charge mines.
-        Mine = 10
+        Mine = 10,
+        // Round 173 Direction 1: Shrine — pure-buff "tower-form totem" with no auto-attack.
+        // Provides a persistent radius-based buff (aura type: gold=1, mana=2, damage=3,
+        // attack-speed=4) to all friendly towers in TowerShrineRadius. Zero attack damage
+        // and zero attack range by design; the value is the aura, not the kill.
+        Shrine = 11
     }
 }

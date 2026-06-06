@@ -1,0 +1,39 @@
+{
+  "comment": "Round 173 Direction 1: Shrine Tower definitions. A Shrine is a pure-buff tower with NO auto-attack, NO projectile, and NO enemy targeting. Its only role is to apply a persistent radius-based buff to all friendly towers in TowerShrineRadius. Four aura types: 0=None/inert, 1=Gold (+X gold per kill on towers in range), 2=Mana (+X mana regen/s on towers in range), 3=Damage (multiplier on tower attacks in range), 4=AttackSpeed (multiplier on tower cooldown in range). The PlaceTower post-init defaults to a Gold-buff shrine (aura=1, radius=3, potency=0.10); this JSON documents the v1 template values designers can override.",
+  "version": 1,
+  "shrines": [
+    {
+      "id": 1,
+      "name": "Gold Shrine",
+      "auraType": 1,
+      "auraTypeName": "Gold",
+      "radius": 3.0,
+      "potency": 0.10,
+      "cost": 50,
+      "maxHp": 50.0,
+      "description": "+0.10 gold per kill on friendly towers in 3 cells"
+    },
+    {
+      "id": 2,
+      "name": "Mana Shrine",
+      "auraType": 2,
+      "auraTypeName": "Mana",
+      "radius": 3.0,
+      "potency": 0.5,
+      "cost": 75,
+      "maxHp": 50.0,
+      "description": "+0.5 mana regen per second on friendly towers in 3 cells"
+    },
+    {
+      "id": 3,
+      "name": "Battle Shrine",
+      "auraType": 3,
+      "auraTypeName": "Damage",
+      "radius": 2.5,
+      "potency": 0.08,
+      "cost": 100,
+      "maxHp": 50.0,
+      "description": "+8 percent damage on friendly tower attacks in 2.5 cells"
+    }
+  ]
+}

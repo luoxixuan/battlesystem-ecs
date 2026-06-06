@@ -75,6 +75,8 @@ namespace BattleSystemECS.Systems
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
             var towerAttack  = new TowerAttackSystem(store, logger, null);
             var auraTower    = new AuraTowerSystem(store);
+            // Round 173 Direction 1 — Shrine Tower. No-op when no Shrine is on the field.
+            var towerShrine  = new TowerShrineSystem(store);
             var projectile   = new ProjectileSystem(store, logger);
             var gold         = new GoldSystem(store, logger);
             var upgrade      = new UpgradeSystem(store, logger, playerId, gameConfig);
@@ -207,6 +209,9 @@ namespace BattleSystemECS.Systems
 
                 sw.Restart(); towerAttack.SetTurn(turn); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
                 sw.Restart(); auraTower.SetTurn(); auraTower.ResolveAuraBuffs();
+                // Round 173 Direction 1 — Shrine aura resolve. O(1) fast-path when
+                //   no Shrine is on the field (sentinel _anyShrineOnField).
+                towerShrine.SetTurn(); towerShrine.ResolveShrineBuffs();
                 sw.Restart(); projectile.Update(1f);
                 sw.Restart(); gold.SetTurn(turn); gold.Update(); tGold += sw.ElapsedTicks;
                 sw.Restart(); upgrade.Update(); tUpgrade += sw.ElapsedTicks;
@@ -385,6 +390,8 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
             var towerAttack   = new TowerAttackSystem(store, logger, null);
             var auraTower     = new AuraTowerSystem(store);
+            // Round 173 Direction 1 — Shrine Tower. No-op when no Shrine is on the field.
+            var towerShrine   = new TowerShrineSystem(store);
             var projectile    = new ProjectileSystem(store, logger);
             var gold          = new GoldSystem(store, logger);
             var upgrade       = new UpgradeSystem(store, logger, playerId, gameConfig);
@@ -419,6 +426,9 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
                 sw.Restart(); playerAttack.SetTurn(turn); playerAttack.Update(); tPlayerAttack += sw.ElapsedTicks;
                 sw.Restart(); towerAttack.SetTurn(turn); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
                 sw.Restart(); auraTower.SetTurn(); auraTower.ResolveAuraBuffs();
+                // Round 173 Direction 1 — Shrine aura resolve. O(1) fast-path when
+                //   no Shrine is on the field (sentinel _anyShrineOnField).
+                towerShrine.SetTurn(); towerShrine.ResolveShrineBuffs();
                 sw.Restart(); projectile.Update(1f);
                 sw.Restart(); gold.SetTurn(turn); gold.Update(); tGold += sw.ElapsedTicks;
                 sw.Restart(); upgrade.Update(); tUpgrade += sw.ElapsedTicks;
@@ -487,6 +497,8 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
             var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
             var towerAttack   = new TowerAttackSystem(store, logger, null);
             var auraTower     = new AuraTowerSystem(store);
+            // Round 173 Direction 1 — Shrine Tower. No-op when no Shrine is on the field.
+            var towerShrine   = new TowerShrineSystem(store);
             var projectile    = new ProjectileSystem(store, logger);
             var gold          = new GoldSystem(store, logger);
             var upgrade       = new UpgradeSystem(store, logger, playerId, gameConfig);
@@ -495,6 +507,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
             var comboSystem   = new ComboSystem(store, gameConfig.Combo);
             skill.InjectDotSystem(buffSystem);
             towerAttack.SetBuffSystem(buffSystem);
+            scheduler.Combat.TowerShrine = towerShrine;
             var pathfinding   = new PathfindingSystem(store);
             enemyMovement.SetPathfindingSystem(pathfinding);
 

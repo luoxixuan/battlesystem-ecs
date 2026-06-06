@@ -3,6 +3,18 @@
 
 已分析 75 个仓库
 
+## 📋 待办任务（下一轮研究/同步前请先看）
+
+来自 Codex review pass（commit `2d6bb6b`）的 5 条 doc 同步任务，详见 [`Research/codereview-doc-sync-round172.md`](./handoff-doc-sync-round172.md)：
+
+1. 同步 `docs/architecture.md`（13 阶段 + SystemRegistry 文档化）
+2. 同步 `docs/design-and-bugs.md`（48 Bug 范围界定 + Round 100+ 增量）
+3. 同步 `README.md` 性能数字（bench + 测试数 946）
+4. 加 U+FFFD doc-quality guardrail（防 350 处 GBK→UTF-8 残留再现）
+5. 确认/拒绝新的硬/相对门禁框架（`AGENTS.md §7`）
+
+**作用域提醒**：本 handoff 限 doc 同步；`CHANGLLOG.md` / `docs/philosophy.md` / `.csproj` 升级不在范围。
+
 ## 塔防专项模式
 
 ### 技能系统

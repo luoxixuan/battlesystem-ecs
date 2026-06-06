@@ -128,6 +128,31 @@ namespace BattleSystemECS.Core
         // MineChainDepth: how many chain hops a single trigger can propagate through (1 = single hop,
         // 2 = chain-of-chains, etc.). Default 1 = direct neighbors only.
         public int[] MineChainDepth = new int[MAX_ENTITIES];
+        // ── Round 173 Direction 1 — Shrine Tower Fields ───────────────────────
+        // TowerIsShrine: true if this tower is a Shrine (pure-buff aura, no auto-attack).
+        // Default false = inert zero-overhead fast path. Set at PlaceTower when
+        // TowerType == Shrine.
+        public bool[] TowerIsShrine = new bool[MAX_ENTITIES];
+        // TowerShrineAuraType: which buff the shrine applies to friendly towers in range.
+        // 0 = None (inert), 1 = Gold (gold-on-kill bonus), 2 = Mana (mana regen),
+        // 3 = Damage (per-frame damage mult cached into _cachedShrineDmgBonus in the
+        // Shrine system), 4 = AttackSpeed (per-frame attack-speed mult).
+        public int[] TowerShrineAuraType = new int[MAX_ENTITIES];
+        // TowerShrineRadius: range (in cells) at which this shrine applies its buff.
+        // 0 = no aura (effectively inert even if TowerIsShrine=true).
+        public float[] TowerShrineRadius = new float[MAX_ENTITIES];
+        // TowerShrinePotency: magnitude of the buff (fraction or absolute depending on
+        // auraType). 0 = inert. Example: 0.10 = +10% damage / +0.10 gold-per-kill.
+        public float[] TowerShrinePotency = new float[MAX_ENTITIES];
+        // Round 173 — Shrine "this frame" cache arrays. Populated by TowerShrineSystem
+        // every frame, then consumed by downstream systems (GoldSystem / ManaSystem /
+        // TowerAttackSystem in v2; v1 just populates and exposes via read helpers).
+        // Reset to 0 at the start of every frame by ComponentStore.BeginFrame() to
+        // avoid accumulation drift across frames.
+        public float[] TowerShrineCachedGoldBonus = new float[MAX_ENTITIES];
+        public float[] TowerShrineCachedManaRegen = new float[MAX_ENTITIES];
+        public float[] TowerShrineCachedDmgBonus = new float[MAX_ENTITIES];
+        public float[] TowerShrineCachedAtkSpdBonus = new float[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
         // Tower cooldown reduction: per-tower CDR (0 = no reduction, 0.3 = 30% faster cooldowns)
@@ -1052,6 +1077,16 @@ namespace BattleSystemECS.Core
             MineChainRadius[entityId] = 0f;
             MineChainDamageMult[entityId] = 0f;
             MineChainDepth[entityId] = 0;
+            // Round 173 — Shrine Tower defaults: not a shrine (PlaceTower will opt in via TowerType.Shrine)
+            TowerIsShrine[entityId] = false;
+            TowerShrineAuraType[entityId] = 0;
+            TowerShrineRadius[entityId] = 0f;
+            TowerShrinePotency[entityId] = 0f;
+            // Round 173 — Shrine per-frame caches default to 0 (no carry-over from recycled slot)
+            TowerShrineCachedGoldBonus[entityId] = 0f;
+            TowerShrineCachedManaRegen[entityId] = 0f;
+            TowerShrineCachedDmgBonus[entityId] = 0f;
+            TowerShrineCachedAtkSpdBonus[entityId] = 0f;
             // Fog of War: default to no fog restriction (visionRadius=0 means see all)
             TowerVisionRadius[entityId] = 0f;
             // Arc projectile fields: default to straight trajectory (0=straight, 1=homing, 2=arc)
@@ -1325,6 +1360,16 @@ namespace BattleSystemECS.Core
             MineChainRadius[entityId] = 0f;
             MineChainDamageMult[entityId] = 0f;
             MineChainDepth[entityId] = 0;
+            // Round 173 — Shrine Tower reset (recycled slot must not leak shrine state)
+            TowerIsShrine[entityId] = false;
+            TowerShrineAuraType[entityId] = 0;
+            TowerShrineRadius[entityId] = 0f;
+            TowerShrinePotency[entityId] = 0f;
+            // Round 173 — Shrine per-frame caches reset (no carry-over from recycled slot)
+            TowerShrineCachedGoldBonus[entityId] = 0f;
+            TowerShrineCachedManaRegen[entityId] = 0f;
+            TowerShrineCachedDmgBonus[entityId] = 0f;
+            TowerShrineCachedAtkSpdBonus[entityId] = 0f;
             // Heat/overheat fields reset
             TowerHeat[entityId] = 0f;
             TowerMaxHeat[entityId] = 0f;
