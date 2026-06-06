@@ -568,6 +568,12 @@ namespace BattleSystemECS.Core
         public float[] EnemyKnockbackResistance = new float[MAX_ENTITIES];
         // EnemyDamageResistance: 0-1, reduces all damage taken (applied in TowerAttackSystem and SkillSystem)
         public float[] EnemyDamageResistance = new float[MAX_ENTITIES];
+        // EnemyDebuffResistMult: 0-1, multiplier applied to all debuff durations (root/disarm/polymorph/slow).
+        // Distinct from per-type CC resistances above: this is a *uniform* duration scaler for
+        // boss-level debuff decay (boss: 0.5 → debuffs last 50% of base; normal: 0.0 → unchanged).
+        // Applied on top of per-type resistances (SlowResistance, DisarmResistance, etc.) as a final
+        // scaling step. (Round 141 Direction 8)
+        public float[] EnemyDebuffResistMult = new float[MAX_ENTITIES];
         // EnemyDamageImmunityMask: bit mask of damage types this enemy is immune to.
         // Computed from DamageImmunities[] in monster JSON. If (damageType & mask) != 0, damage = 0.
         // True damage (DamageType.True) bypasses immunity entirely and ignores this mask.
@@ -1729,6 +1735,21 @@ namespace BattleSystemECS.Core
         }
 
         /// <summary>
+        /// Boss-level debuff duration scaler (Round 141 Direction 8). Reduces a debuff duration
+        /// by the enemy's EnemyDebuffResistMult (0-1). e.g., resist=0.5 and duration=10 → 5.
+        /// Returns max(0, duration) so callers can early-out on zero. Does NOT mutate state.
+        /// </summary>
+        public int ApplyDebuffResistToDuration(int enemyId, int duration)
+        {
+            if (duration <= 0) return 0;
+            float resist = EnemyDebuffResistMult[enemyId];
+            if (resist <= 0f) return duration;
+            if (resist >= 1f) return 0; // fully immune to debuffs
+            int reduced = (int)(duration * (1f - resist));
+            return reduced < 0 ? 0 : reduced;
+        }
+
+        /// <summary>
         /// Applies root to the enemy for `duration` turns. While rooted, the enemy cannot
         /// MOVE (EnemyMovementSystem skips the position update) but can still cast abilities
         /// and perform basic melee attacks. Respects EnemyIsUnstoppable (total CC immunity).
@@ -1741,6 +1762,9 @@ namespace BattleSystemECS.Core
             if (duration <= 0) return;
             // Total CC immunity (unstoppable enemies ignore root too — same as stun)
             if (EnemyIsUnstoppable[enemyId]) return;
+            // Boss-level debuff decay (Round 141 Direction 8): uniform duration multiplier
+            duration = ApplyDebuffResistToDuration(enemyId, duration);
+            if (duration <= 0) return;
             // Take the longer of the two durations (refresh semantics consistent with stun/disarm)
             if (duration > EnemyRootDurationLeft[enemyId])
                 EnemyRootDurationLeft[enemyId] = duration;
@@ -1767,6 +1791,9 @@ namespace BattleSystemECS.Core
                 duration = (int)(duration * (1f - EnemyDisarmResistance[enemyId]));
                 if (duration <= 0) return;
             }
+            // Boss-level debuff decay (Round 141 Direction 8): uniform duration multiplier
+            duration = ApplyDebuffResistToDuration(enemyId, duration);
+            if (duration <= 0) return;
             // Refresh-or-set semantics: keep longer remaining duration (no double-dipping)
             if (duration > EnemyDisarmDurationLeft[enemyId])
                 EnemyDisarmDurationLeft[enemyId] = duration;
@@ -1793,6 +1820,9 @@ namespace BattleSystemECS.Core
                 factor = factor + (1f - factor) * EnemySlowResistance[enemyId];
                 if (factor >= 1f) return; // fully resisted
             }
+            // Boss-level debuff decay (Round 141 Direction 8): uniform duration multiplier
+            duration = ApplyDebuffResistToDuration(enemyId, duration);
+            if (duration <= 0) return;
 
             float baseSpeed = EnemyMoveSpeedBase[enemyId];
             if (baseSpeed <= 0f) baseSpeed = EnemyMoveSpeed[enemyId];
@@ -1821,6 +1851,9 @@ namespace BattleSystemECS.Core
             if (damageTakenMultiplier < 0.5f) damageTakenMultiplier = 0.5f;
             if (damageTakenMultiplier > 3f) damageTakenMultiplier = 3f;
 
+            // Boss-level debuff decay (Round 141 Direction 8): uniform duration multiplier
+            duration = ApplyDebuffResistToDuration(enemyId, duration);
+            if (duration <= 0) return;
             // Refresh-or-set semantics: take the longer remaining duration (no double-dipping)
             if (duration > EnemyPolymorphDurationLeft[enemyId])
                 EnemyPolymorphDurationLeft[enemyId] = duration;
