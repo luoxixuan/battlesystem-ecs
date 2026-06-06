@@ -193,12 +193,10 @@ namespace BattleSystemECS.Systems
                 int tid = _pendingDestroy[i];
                 if (tid < 0 || tid >= ComponentStore.MAX_ENTITIES) continue;
                 if (!store.TowerActive[tid]) continue;
-                // Decrement player tower count to keep PlacementCountByType in sync.
-                // We use the player's ID mapping: mine towers belong to the player
-                // that placed them, but we don't track that per-entity — fall back
-                // to playerId 0. (Single-player game.)
-                if (store.PlayerTowerCount[playerId] > 0)
-                    store.PlayerTowerCount[playerId]--;
+                // Round 139 — Per-Type Placement Cap: ComponentStore.DestroyEntity now handles
+                // PlayerTowerCount / PlayerTowersOfType decrement. The explicit pre-decrement
+                // here was removed to avoid double-decrementing (destroy would drop the counter
+                // twice and drive it negative).
                 store.DestroyEntity(tid);
             }
         }

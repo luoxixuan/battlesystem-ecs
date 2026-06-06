@@ -39,6 +39,7 @@ namespace BattleSystemECS.Systems
             this.store = store;
             this.logger = logger;
             LoadSellConfig();
+            LoadPerTypeCaps();
         }
 
         /// <summary>
@@ -50,6 +51,7 @@ namespace BattleSystemECS.Systems
             this.logger = logger;
             this.gameConfig = gameConfig;
             LoadSellConfig();
+            LoadPerTypeCaps();
         }
 
         private void LoadSellConfig()
@@ -76,6 +78,46 @@ namespace BattleSystemECS.Systems
                     if (root.TryGetProperty("salvageUpgradeRate", out var sur)) salvageUpgradeRate = sur.GetSingle();
                 }
                 catch { /* use defaults */ }
+            }
+        }
+
+        /// <summary>
+        /// Round 139 — Per-Type Placement Cap. Loads the per-tower-type cap matrix from
+        /// tower_placement.json's `maxPerTypeByType` map. Each entry is keyed by the
+        /// TowerType enum int value (0..MAX_TOWER_TYPES-1). 0 = unlimited.
+        /// Loaded into <see cref="ComponentStore.PlayerTowersOfTypeCap"/> for every player
+        /// (single-player game; player 0 is the only consumer).
+        /// </summary>
+        public void LoadPerTypeCaps()
+        {
+            string basePath = AppDomain.CurrentDomain.BaseDirectory;
+            string configPath = Path.Combine(basePath, "Data", "Configs", "tower_placement.json");
+            if (!File.Exists(configPath)) return;
+            try
+            {
+                string json = File.ReadAllText(configPath);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (!doc.RootElement.TryGetProperty("maxPerTypeByType", out var map)) return;
+                if (map.ValueKind != System.Text.Json.JsonValueKind.Object) return;
+                // Player 0 is the only consumer in this single-player build, but fill all players
+                // for future-proofing.
+                int loaded = 0;
+                foreach (var prop in map.EnumerateObject())
+                {
+                    if (!int.TryParse(prop.Name, out int typeIdx)) continue;
+                    if (typeIdx < 0 || typeIdx >= ComponentStore.MAX_TOWER_TYPES) continue;
+                    int cap = prop.Value.GetInt32();
+                    for (int pid = 0; pid < ComponentStore.MAX_PLAYERS; pid++)
+                    {
+                        store.PlayerTowersOfTypeCap[pid * ComponentStore.MAX_TOWER_TYPES + typeIdx] = cap;
+                    }
+                    loaded++;
+                }
+                logger.Log($"[TOWER] Per-type placement caps loaded: {loaded} entries");
+            }
+            catch (Exception ex)
+            {
+                logger.Log($"[TOWER] LoadPerTypeCaps failed: {ex.Message}");
             }
         }
 
@@ -172,6 +214,21 @@ namespace BattleSystemECS.Systems
             {
                 logger.Log($"[TOWER] PlaceTower failed: tower cap reached ({currentTowerCount}/{maxTowers}). Sell or upgrade a tower first.");
                 return -1;
+            }
+
+            // 3.6. Check per-type cap (Round 139 — Direction 2). Enforces maxPerTypeByType from
+            // tower_placement.json so players can't spam a single dominant type. Cap of 0
+            // means "no cap" (default before LoadPerTypeCaps is called).
+            int towerTypeIdx = (int)type;
+            if (towerTypeIdx >= 0 && towerTypeIdx < ComponentStore.MAX_TOWER_TYPES)
+            {
+                int perTypeCount = store.PlayerTowersOfType[playerId * ComponentStore.MAX_TOWER_TYPES + towerTypeIdx];
+                int perTypeCap = store.PlayerTowersOfTypeCap[playerId * ComponentStore.MAX_TOWER_TYPES + towerTypeIdx];
+                if (perTypeCap > 0 && perTypeCount >= perTypeCap)
+                {
+                    logger.Log($"[TOWER] PlaceTower failed: per-type cap reached for {type} ({perTypeCount}/{perTypeCap}). Mix tower types.");
+                    return -1;
+                }
             }
 
             // 4. Create tower entity
@@ -489,6 +546,13 @@ namespace BattleSystemECS.Systems
 
             // Increment tower count for cap enforcement
             store.PlayerTowerCount[playerId]++;
+            // Round 139 — Per-Type Placement Cap: bump the per-type counter on successful
+            // placement. Mirrors the decrement path in ComponentStore.DestroyEntity so the
+            // counter always equals the live count for that (player, type) cell.
+            if (towerTypeIdx >= 0 && towerTypeIdx < ComponentStore.MAX_TOWER_TYPES)
+            {
+                store.PlayerTowersOfType[playerId * ComponentStore.MAX_TOWER_TYPES + towerTypeIdx]++;
+            }
 
             return towerId;
         }
@@ -823,8 +887,11 @@ namespace BattleSystemECS.Systems
             float currentGold = store.GetPlayerGold(playerId);
             store.SetPlayerGold(playerId, currentGold + sellGold);
 
-            // Decrement tower count for cap enforcement
-            store.PlayerTowerCount[playerId]--;
+            // Decrement tower count for cap enforcement. NOTE: ComponentStore.DestroyEntity()
+            // (called below) ALSO decrements PlayerTowerCount / PlayerTowersOfType as part of its
+            // recycle cleanup, so we do NOT decrement here — doing so would double-decrement and
+            // drive the counters negative. The per-type cap enforcement lives entirely on the
+            // destroy path now, with PlaceTower's mirror increment.
 
             // Destroy tower entity (handles ActiveTowerIds removal and state cleanup)
             store.DestroyEntity(towerId);

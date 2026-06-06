@@ -204,6 +204,18 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // PlacementCountByType: tracks how many towers of each type this player has placed (for cost scaling)
         public int[] PlacementCountByType = new int[9]; // index = (int)TowerType, size = 9 (Basic..Firewall)
 
+        // ==================== Per-Type Placement Cap (Round 139) ====================
+        // PlayerTowersOfType: how many towers of each TowerType this player currently has placed.
+        // Indexed as [playerId * MAX_TOWER_TYPES + (int)TowerType]. 0 = none.
+        // Enforces the maxPerTypeByType config (e.g. Sniper ≤ 4, EMP ≤ 3) so players can't
+        // spam a single dominant type and must mix-and-match.
+        // Cleared on DestroyEntity when the entity was a tower to prevent ID-reuse leakage.
+        public const int MAX_TOWER_TYPES = 11; // Basic..Mine (must match TowerType enum count)
+        public int[] PlayerTowersOfType = new int[MAX_PLAYERS * MAX_TOWER_TYPES];
+        // PlayerTowersOfTypeCap: per-player, per-type cap (loaded from tower_placement.json maxPerTypeByType).
+        // 0 = no cap. Default-initialized to 0 in constructor; LoadPerTypeCaps populates from JSON.
+        public int[] PlayerTowersOfTypeCap = new int[MAX_PLAYERS * MAX_TOWER_TYPES];
+
         // ==================== Cooldown Reduction (CDR) 系统 ====================
         // PlayerCooldownReduction: global CDR multiplier per player (0 = no reduction, 0.3 = 30% faster cooldowns)
         // Multiplicative diminishing returns: effectiveCooldown = baseCooldown * (1 - cdr)

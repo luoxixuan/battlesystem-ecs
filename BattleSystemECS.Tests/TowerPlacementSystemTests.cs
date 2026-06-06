@@ -391,5 +391,190 @@ namespace BattleSystemECS.Tests
             // 0 = unallocated entity (not active)
             Assert.Equal(-1, sys.ToggleTower(0));
         }
+
+        // ─── Direction 2: Per-Type Placement Cap (Round 139) ─────────────────────
+        // Verifies that maxPerTypeByType from tower_placement.json is enforced:
+        // - LoadPerTypeCaps populates the per-type cap table
+        // - PlaceTower rejects the N+1th tower of a capped type
+        // - PlaceTower still works for other types even when one type is capped
+        // - SellTower frees the per-type slot so a new one can be placed
+        // - PlayerTowersOfType increments and decrements in lockstep with the entity count
+
+        [Fact] public void PerTypeCap_LoadFromConfig_PopulatesCapTable()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            // Re-load caps because the test may not have the production config next to it.
+            // (The default AppDomain.BaseDirectory in dotnet test is the test bin folder,
+            // which DOES copy Data/Configs/ to output, so this should work end-to-end.)
+            var sys = new TowerPlacementSystem(store, r);
+            sys.LoadPerTypeCaps();
+            // Spot-check known entries from tower_placement.json:
+            // Basic=8, Sniper=4, EMP=3, Mine=6, Palisade=6
+            int basicIdx = 0 * ComponentStore.MAX_TOWER_TYPES + (int)TowerType.Basic;
+            int sniperIdx = 0 * ComponentStore.MAX_TOWER_TYPES + (int)TowerType.Sniper;
+            int empIdx = 0 * ComponentStore.MAX_TOWER_TYPES + (int)TowerType.EMP;
+            int mineIdx = 0 * ComponentStore.MAX_TOWER_TYPES + (int)TowerType.Mine;
+            Assert.Equal(8, store.PlayerTowersOfTypeCap[basicIdx]);
+            Assert.Equal(4, store.PlayerTowersOfTypeCap[sniperIdx]);
+            Assert.Equal(3, store.PlayerTowersOfTypeCap[empIdx]);
+            Assert.Equal(6, store.PlayerTowersOfTypeCap[mineIdx]);
+        }
+
+        [Fact] public void PerTypeCap_BlocksExceedingTypeCount()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            sys.LoadPerTypeCaps();
+            // EMP cap = 3. Place 3 EMPs (cost-free, layout occupies (0,0)/(1,0)/(2,0))
+            for (int i = 0; i < 3; i++)
+            {
+                int placed = sys.PlaceTower(i, 0, TowerType.EMP, 50f, 3, 1f, 50f);
+                Assert.True(placed >= 0, $"EMP #{i + 1} should place");
+            }
+            // 4th EMP must be rejected
+            int overflow = sys.PlaceTower(3, 0, TowerType.EMP, 50f, 3, 1f, 50f);
+            Assert.Equal(-1, overflow);
+            // Counter should be 3, not 4
+            int empCount = store.PlayerTowersOfType[0 * ComponentStore.MAX_TOWER_TYPES + (int)TowerType.EMP];
+            Assert.Equal(3, empCount);
+            // 3 active towers total
+            Assert.Equal(3, store.ActiveTowerIds.Count);
+        }
+
+        [Fact] public void PerTypeCap_DoesNotAffectOtherTypes()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            sys.LoadPerTypeCaps();
+            // Fill Sniper to cap (4)
+            for (int i = 0; i < 4; i++)
+            {
+                int placed = sys.PlaceTower(i, 0, TowerType.Sniper, 50f, 3, 1f, 50f);
+                Assert.True(placed >= 0, $"Sniper #{i + 1} should place");
+            }
+            // 5th Sniper rejected
+            Assert.Equal(-1, sys.PlaceTower(4, 0, TowerType.Sniper, 50f, 3, 1f, 50f));
+            // But a Basic tower still works (cap 8, none placed yet)
+            int basicPlaced = sys.PlaceTower(0, 5, TowerType.Basic, 50f, 3, 1f, 50f);
+            Assert.True(basicPlaced >= 0);
+            int basicCount = store.PlayerTowersOfType[0 * ComponentStore.MAX_TOWER_TYPES + (int)TowerType.Basic];
+            Assert.Equal(1, basicCount);
+        }
+
+        [Fact] public void PerTypeCap_SellFreesTheSlot()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            sys.LoadPerTypeCaps();
+            // Place 3 EMPs
+            for (int i = 0; i < 3; i++)
+            {
+                int placed = sys.PlaceTower(i, 0, TowerType.EMP, 50f, 3, 1f, 50f);
+                Assert.True(placed >= 0);
+            }
+            // 4th is blocked
+            Assert.Equal(-1, sys.PlaceTower(3, 0, TowerType.EMP, 50f, 3, 1f, 50f));
+            // Sell ONE EMP — find the entity at (0,0) and sell it. Slot freed.
+            int eid = FindTowerIdAtPosition(store, 0, 0);
+            Assert.True(eid >= 0, "expected an EMP tower at (0,0)");
+            float refund = sys.SellTower(eid, 0);
+            Assert.True(refund > 0f, "SellTower should refund gold");
+            // Counter dropped from 3 to 2
+            int empCount = store.PlayerTowersOfType[0 * ComponentStore.MAX_TOWER_TYPES + (int)TowerType.EMP];
+            Assert.Equal(2, empCount);
+            // Now a new EMP fits within the cap of 3
+            int freed = sys.PlaceTower(3, 0, TowerType.EMP, 50f, 3, 1f, 50f);
+            Assert.True(freed >= 0, "After sell, the freed per-type slot must allow placement");
+            int empCount2 = store.PlayerTowersOfType[0 * ComponentStore.MAX_TOWER_TYPES + (int)TowerType.EMP];
+            Assert.Equal(3, empCount2);
+        }
+
+        [Fact] public void PerTypeCap_DestroyEntityDecrementsCounter()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            sys.LoadPerTypeCaps();
+            // Place 1 Mine, then directly destroy it
+            int placed = sys.PlaceTower(0, 0, TowerType.Mine, 50f, 3, 1f, 50f);
+            Assert.True(placed >= 0);
+            int mineIdx = 0 * ComponentStore.MAX_TOWER_TYPES + (int)TowerType.Mine;
+            Assert.Equal(1, store.PlayerTowersOfType[mineIdx]);
+            Assert.Equal(1, store.PlayerTowerCount[0]);
+            // Direct destroy (simulates death, mine detonation, etc.)
+            store.DestroyEntity(placed);
+            Assert.Equal(0, store.PlayerTowersOfType[mineIdx]);
+            Assert.Equal(0, store.PlayerTowerCount[0]);
+        }
+
+        [Fact] public void PerTypeCap_ZeroCapMeansUnlimited()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            // Manually zero out the EMP cap
+            int empIdx = 0 * ComponentStore.MAX_TOWER_TYPES + (int)TowerType.EMP;
+            store.PlayerTowersOfTypeCap[empIdx] = 0;
+            // Should be able to place many EMPs (capped only by maxTowers = 20)
+            for (int i = 0; i < 10; i++)
+            {
+                int placed = sys.PlaceTower(i % 10, i / 10, TowerType.EMP, 50f, 3, 1f, 50f);
+                Assert.True(placed >= 0, $"EMP #{i + 1} with cap=0 should place (was rejected)");
+            }
+        }
+
+        [Fact] public void PerTypeCap_PlayerTowerCountMatchesTypeSum()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            sys.LoadPerTypeCaps();
+            // Place 2 Basic, 1 Sniper, 3 Stun
+            sys.PlaceTower(0, 0, TowerType.Basic, 50f, 3, 1f, 50f);
+            sys.PlaceTower(1, 0, TowerType.Basic, 50f, 3, 1f, 50f);
+            sys.PlaceTower(2, 0, TowerType.Sniper, 50f, 3, 1f, 50f);
+            sys.PlaceTower(3, 0, TowerType.Stun, 50f, 3, 1f, 50f);
+            sys.PlaceTower(4, 0, TowerType.Stun, 50f, 3, 1f, 50f);
+            sys.PlaceTower(5, 0, TowerType.Stun, 50f, 3, 1f, 50f);
+            // PlayerTowerCount = 6
+            Assert.Equal(6, store.PlayerTowerCount[0]);
+            // Sum of all per-type counters should also be 6
+            int sum = 0;
+            for (int t = 0; t < ComponentStore.MAX_TOWER_TYPES; t++)
+            {
+                sum += store.PlayerTowersOfType[0 * ComponentStore.MAX_TOWER_TYPES + t];
+            }
+            Assert.Equal(6, sum);
+            // Sell one Stun — both drop by 1
+            int stunEid = -1;
+            foreach (int tid in store.ActiveTowerIds)
+            {
+                if (store.TowerType[tid] == TowerType.Stun) { stunEid = tid; break; }
+            }
+            Assert.True(stunEid >= 0);
+            sys.SellTower(stunEid, 0);
+            Assert.Equal(5, store.PlayerTowerCount[0]);
+            int sum2 = 0;
+            for (int t = 0; t < ComponentStore.MAX_TOWER_TYPES; t++)
+            {
+                sum2 += store.PlayerTowersOfType[0 * ComponentStore.MAX_TOWER_TYPES + t];
+            }
+            Assert.Equal(5, sum2);
+        }
+
+        // Helper: find a tower at (x, y) or -1 if none. Used by PerTypeCap_SellFreesTheSlot.
+        private static int FindTowerIdAtPosition(ComponentStore store, int x, int y)
+        {
+            foreach (int tid in store.ActiveTowerIds)
+            {
+                if ((int)store.PositionX[tid] == x && (int)store.PositionY[tid] == y)
+                    return tid;
+            }
+            return -1;
+        }
     }
 }

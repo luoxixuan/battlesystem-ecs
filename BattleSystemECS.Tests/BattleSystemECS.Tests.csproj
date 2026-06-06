@@ -26,4 +26,9 @@
     <None Include="..\game_config.json" Link="game_config.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Round 139: Test placement cap matrix from tower_placement.json -->
+    <None Include="..\Data\Configs\tower_placement.json" Link="Data\Configs\tower_placement.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

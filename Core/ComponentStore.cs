@@ -503,6 +503,10 @@ namespace BattleSystemECS.Core
             // Round 100 — capture whether this tower was a palisade BEFORE reset, so we can
             // decrement ActivePalisadeCount when the entity is destroyed.
             bool wasPalisade = wasTower && TowerIsPalisade[entityId];
+            // Round 139 — Per-Type Placement Cap: snapshot the tower type BEFORE reset.
+            // (TowerType[entityId] is zeroed in the recycle block below; the per-type counter
+            // decrement in phase 4 needs the original value.)
+            int rtType = wasTower ? (int)TowerType[entityId] : -1;
 
             // ── Phase 2: shared state cleanup ─────────────────────────────────────
             PositionActive[entityId] = false;
@@ -779,6 +783,8 @@ namespace BattleSystemECS.Core
                 int tileX = (int)PositionX[entityId];
                 int tileY = (int)PositionY[entityId];
                 SetTileOccupied(tileX, tileY, false);
+                // Round 139 — Per-Type Placement Cap: the type snapshot was already taken
+                // in phase 1 (rtType) before this reset block runs.
                 TowerActive[entityId] = false;
                 TowerIsAntiPhase[entityId] = false;
                 TowerTargetingMode[entityId] = Components.TowerTargetingMode.Nearest;
@@ -885,6 +891,18 @@ namespace BattleSystemECS.Core
             }
 
             // ── Phase 4: recycle ID ────────────────────────────────────────────────
+            // Round 139 — Per-Type Placement Cap: now that all TowerType fields are reset, drop
+            // the per-player per-type counter. Done at phase-end (not inside the reset block) so
+            // we don't need to read the player-id anywhere except this single moment. For now,
+            // the only player with active towers is player 0; future multi-player would require
+            // storing owner on the entity (out of scope).
+            if (wasTower && rtType >= 0 && rtType < MAX_TOWER_TYPES)
+            {
+                int ownerIdx = 0; // single-player; TODO multi-player owner lookup
+                int capBase = ownerIdx * MAX_TOWER_TYPES + rtType;
+                if (PlayerTowersOfType[capBase] > 0) PlayerTowersOfType[capBase]--;
+                if (PlayerTowerCount[ownerIdx] > 0) PlayerTowerCount[ownerIdx]--;
+            }
             freeEntityIds.Push(entityId);
             // Round 103 — Buff Share: notify per-system caches to drop stale base-speed entries
             // for the recycled entityId (Claude bug scan fix #2: stale cache on ID reuse).

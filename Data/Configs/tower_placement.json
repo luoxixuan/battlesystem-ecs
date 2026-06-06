@@ -17,5 +17,18 @@
   "sellDecayPerSecond": 0.005,
   "minSellRatioDecayed": 0.2,
   "sellDecayGracePeriod": 2,
-  "salvageUpgradeRate": 0.3
+  "salvageUpgradeRate": 0.3,
+  "maxPerTypeByType": {
+    "0": 8,
+    "1": 6,
+    "2": 4,
+    "3": 5,
+    "4": 4,
+    "5": 5,
+    "6": 4,
+    "7": 3,
+    "8": 5,
+    "9": 6,
+    "10": 6
+  }
 }
