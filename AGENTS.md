@@ -7,12 +7,12 @@
 ## 1. 项目概述
 
 **BattleSystem-ECS** 是一个基于 **SOA (Struct of Arrays) ECS 架构**的塔防战斗系统性能基准项目。
-
 - **语言**: C# / .NET 6（主程序），测试项目使用 .NET 9
 - **架构**: SOA ECS（逻辑与渲染完全分离）
 - **运行时**: 控制台应用（含交互式游戏 + 非交互式压测）
 - **核心特征**: 全系统并行化 (`Parallel.For`)、零分配热路径、配置驱动、帧末统一结算
-- **代码规模**: 约 20+ 个系统，Core + Systems 约 1.5k+ 行核心逻辑（不含配置加载与数据定义）
+- **代码规模**: 126 个系统类、12 个 SystemGroup、43 个 Core 文件；Core ≈ 17.3k 行、Systems ≈ 34.7k 行、Tests ≈ 17.1k 行（均按行数计；含配置加载与数据定义）
+- **当前规模（截至 Round 172）**: 946 项 xUnit 测试，60 个测试文件；639 个 JSON 静态数据
 
 ---
 
@@ -56,6 +56,25 @@ dotnet test BattleSystemECS.Tests
 
 ## 3. 项目结构与模块划分
 
+### 3.1 SystemGroup 模式与 SystemRegistry
+
+`FrameScheduler` 不直接持有 system，而是通过 **SystemGroup 模式**解耦调度与 system 实现：
+
+- 12 个 `*Group.cs` 位于 `Core/`：`BuildGroup` / `PreGameGroup` / `SpawningGroup` / `AIGroup` / `MovementGroup` / `TerrainGroup` / `CombatSetupGroup` / `SpatialGroup` / `CombatGroup` / `SkillBuffGroup` / `PostDeathGroup`（加 `ISystemGroup` / `IBuildPhaseGroup` 两个接口）。
+- 每个 group 是一组相关 system + 它们的固定执行顺序。
+- `Core/SystemRegistry.cs`（~726 行）集中负责所有 system 的 `CreateAll` / `WireDependencies` / `AssignToGroups`。
+- 添加新 system 的标准流程：
+  1. `SystemRegistry` 加 `public XxxSystem? Xxx { get; private set; }`
+  2. `CreateAll()` 中 `new`
+  3. `WireDependencies()` 中调 `SetXxx(...)` 注入依赖
+  4. `AssignToGroups()` 中分配到正确的 `scheduler.Group.Xxx = Xxx`
+
+新增 system 必须通过 `SystemRegistry` 注入，不要直接改 `FrameScheduler`。
+
+### 3.2 GAS 子模块
+
+`Core/GAS/` 是独立的 Gameplay Ability System 模块：`Attributes.cs` / `GameplayEffect.cs` / `GameplayAbility.cs`（含 `AreaShapeType` 枚举等）。技能、护盾、Buff 的核心定义都在此。
+
 ```
 BattleSystem-ECS/
 ├── Core/                          # ECS 核心与基础设施
@@ -68,8 +87,10 @@ BattleSystem-ECS/
 │   ├── EntityManager.cs           # 实体创建/销毁/命名
 │   ├── GameManager.cs             # 游戏主循环、系统初始化、关卡循环
 │   ├── FrameScheduler.cs          # 统一帧调度器（所有帧路径唯一入口）
+│   ├── SystemRegistry.cs          # 所有 system 的集中创建/依赖注入/group 分配
 │   ├── StateMachine.cs            # 游戏状态机（BuildPhase / WavePhase / Intermission...）
 │   ├── EventBus.cs                # 事件总线（并行安全：lock + snapshot）
+│   ├── IEventBus.cs               # EventBus 接口
 │   ├── IRenderer.cs               # 渲染接口（逻辑与渲染分离）
 │   ├── ConsoleLogger.cs           # 控制台渲染器实现
 │   ├── FileLogger.cs              # 文件日志实现
@@ -82,20 +103,37 @@ BattleSystem-ECS/
 │   ├── Time.cs                    # 时间工具
 │   ├── BuffType.cs                # Buff 类型枚举 + 位标志
 │   ├── EnemyActionType.cs         # 敌人动作枚举（BT 结果预计算）
+│   ├── TowerTargetingMode.cs      # 塔索敌模式枚举
+│   ├── TowerType.cs               # 塔类型枚举
+│   ├── DamageType.cs              # 伤害类型枚举
+│   ├── ElementType.cs             # 元素类型枚举
+│   ├── CurveTable.cs              # 曲线表（伤害/经验成长）
+│   ├── AIGroup.cs                 # 阶段 3 system 组
+│   ├── BuildGroup.cs              # 阶段 1 system 组（BuildPhase）
+│   ├── CombatGroup.cs             # 阶段 9 system 组
+│   ├── CombatSetupGroup.cs        # 阶段 7 system 组
+│   ├── ISystemGroup.cs            # Group 接口
+│   ├── MovementGroup.cs           # 阶段 5 system 组
+│   ├── PostDeathGroup.cs          # 阶段 11 system 组
+│   ├── PreGameGroup.cs            # 阶段 2 system 组
+│   ├── SkillBuffGroup.cs          # 阶段 10 system 组
+│   ├── SpatialGroup.cs            # 阶段 8 system 组
+│   ├── SpawningGroup.cs           # 阶段 2.5 system 组
+│   ├── TerrainGroup.cs            # 阶段 6 system 组
+│   ├── SaveSystem.cs              # 存档系统
 │   └── GAS/                       # Gameplay Ability System 模块
 │       ├── Attributes.cs
 │       ├── GameplayEffect.cs
 │       └── GameplayAbility.cs
-│
-├── Systems/                       # 游戏系统（职责单一）
+├── Systems/                       # 游戏系统（职责单一，126 个）
 │   ├── WaveSpawningSystem.cs      # 波次生成 + 难度曲线
 │   ├── EnemyAISystem.cs           # 行为树评估（两阶段：并行评估 + 串行执行）
 │   ├── EnemyMovementSystem.cs     # 敌人移动（EnemyActionEnum 驱动）
-│   ├── EnemyAbilitySystem.cs      # 敌人技能（冷却 / Buff / 自疗 / AoE）
+│   ├── EnemyAbilitySystem.cs      # 敌人技能（冷却/Buff/自疗/AoE）
 │   ├── PlayerTowerAttackSystem.cs # 玩家攻击（两阶段：并行收集 damage，串行 apply）
 │   ├── TowerAttackSystem.cs       # 塔攻击（两阶段 + ActiveTowerIds + 多索敌模式）
-│   ├── TowerPlacementSystem.cs    # 塔放置 / 出售
-│   ├── TowerUpgradeSystem.cs      # 塔升级 / 路径切换
+│   ├── TowerPlacementSystem.cs    # 塔放置/出售
+│   ├── TowerUpgradeSystem.cs      # 塔升级/路径切换
 │   ├── TowerSynergySystem.cs      # 塔协同增益（配置驱动）
 │   ├── SkillSystem.cs             # GAS 技能施放（AreaShape 驱动，只 queue 死亡）
 │   ├── BuffSystem.cs              # DoT 追踪（ping-pong 双缓冲 damage 队列）
@@ -105,43 +143,21 @@ BattleSystem-ECS/
 │   ├── GoldSystem.cs              # 击杀产金与波次结算
 │   ├── UpgradeSystem.cs           # 玩家升级（阈值触发）
 │   ├── MapSystem.cs               # 地图渲染（Debug 用）
-│   ├── BenchmarkSystem.cs         # 性能压测（mode 2 / mode 3 / mode 4）
+│   ├── BenchmarkSystem.cs         # 性能压测（mode 2 / mode 3 / mode 4 / mode 5）
 │   ├── BehaviorTreeEvaluator.cs   # BT 评估器（flat-array BTCachedTree）
-│   └── BehaviorTreeNodes.cs       # BT 节点定义桩
-│
-├── Data/                          # 静态数据与运行时配置
-│   ├── Configs/                   # JSON 运行时配置
+│   ├── BehaviorTreeNodes.cs       # BT 节点定义桩
+│   └── ...（共 126 个，详见 Systems/ 目录）
+├── Data/                          # 静态数据与运行时配置（639 个 JSON）
+│   ├── Configs/                   # 运行时子配置
 │   ├── Levels/                    # 5 个关卡
 │   ├── Monsters/                  # 200 种怪物
 │   ├── Skills/                    # 150 种技能
 │   └── Towers/                    # 150 种塔
-│
-├── BattleSystemECS.Tests/         # 单元测试（xUnit）
-│   ├── CombatResolutionTests.cs   # 战斗结算不变量测试
-│   ├── ComponentStoreTests.cs     # 组件存储生命周期测试
-│   ├── FrameSchedulerTests.cs     # 帧调度测试
-│   ├── GameConfigIntegrationTests.cs
-│   ├── GameConfigLoaderTests.cs
-│   ├── GameplayAbilityTests.cs
-│   ├── GameSimulationTests.cs
-│   ├── SkillSystemTests.cs
-│   ├── TowerPlacementSystemTests.cs
-│   ├── UpgradeSystemTests.cs
-│   ├── WaveSpawningSystemTests.cs
-│   └── MockRenderer.cs            # 测试用渲染器桩
-│
-├── docs/
-│   ├── architecture.md            # 架构文档（系统结构、设计决策、更新记录）
-│   ├── design-and-bugs.md         # 设计治理与 Bug 追踪（48 项 Bug 全部已修复）
-│   └── philosophy.md              # 开发理念与工程原则
-│
+├── BattleSystemECS.Tests/         # 单元测试（xUnit，60 个文件，946 项）
+├── docs/                          # 架构文档 + 设计治理
 ├── Research/                      # 研究、日志与知识库
-│   ├── tower_defense_knowledge.md
-│   ├── logs/
-│   └── tower_defense_explorer.py
-│
 ├── Program.cs                     # 入口（游戏 / 压测 / 微基准）
-└── game_config.json               # 运行时主配置（根目录，构建时复制到输出目录）
+└── game_config.json               # 运行时主配置（构建时复制到输出目录）
 ```
 
 ---
@@ -166,6 +182,8 @@ BattleSystem-ECS/
 
 `FrameScheduler.Tick(deltaTime, turn)` 是所有帧路径（GameManager / Benchmark / Tests）的**唯一入口**。
 
+13 阶段（WavePhase），每个对应一个 `Core/*Group.cs`，由 `FrameScheduler.RunWavePhase` 严格按序调度（`bullet-time dt split` 让 enemyDt 走 `PlayerBulletTimeScale` 倍率、combatDt 保持 1.0）：
+
 帧顺序（WavePhase）：
 
 ```
@@ -183,7 +201,7 @@ BattleSystem-ECS/
 12. ResolveEnemiesKilledThisFrame()# 帧末统一死亡结算
 ```
 
-BuildPhase 时只运行：Gold / Upgrade / Skill(cd) / AutoSkill，**不运行**任何战斗系统。
+BuildPhase 时只运行 `BuildGroup`（Gold / Upgrade / Skill(cd) / AutoSkill / Interest / Mana / Objective / ResourceNode / GlobalSkill / Desperation / ShopReroll / TowerIncome / TowerRelocate），**不运行**任何战斗系统。PreGameGroup / SpawningGroup / AIGroup / MovementGroup / TerrainGroup / CombatSetupGroup / SpatialGroup / CombatGroup / SkillBuffGroup / PostDeathGroup 全部跳过。
 
 ### 4.3 两阶段并行安全模式
 
@@ -265,23 +283,22 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 - **xUnit**（`Xunit`），测试项目 `BattleSystemECS.Tests`（TargetFramework=`net9.0`）。
 - 测试运行器：`xunit.runner.visualstudio`，覆盖率收集：`coverlet.collector`。
-- 当前测试数量：**120 项**（全部通过为门禁要求）。
+- 当前测试数量：**946 项**（截至 Round 172，全部通过为门禁要求；分布于 60 个测试文件中）。
 
 ### 6.2 测试组织
 
-| 测试类 | 关注领域 |
-|--------|----------|
-| `CombatResolutionTests` | 实体销毁、死亡结算幂等性、多塔同目标击杀只计一次、活跃列表不变量 |
-| `ComponentStoreTests` | SOA 存储生命周期、BeginFrame / Resolve 语义 |
-| `FrameSchedulerTests` | 帧调度顺序、Phase 门控 |
-| `GameConfigIntegrationTests` | 配置加载与整合 |
-| `GameConfigLoaderTests` | Loader 单元 |
-| `GameplayAbilityTests` | GAS 属性与效果基础 |
-| `GameSimulationTests` | 端到端模拟 |
-| `SkillSystemTests` | 技能施放、DoT、护盾、范围形状 |
-| `TowerPlacementSystemTests` | 塔放置与移除 |
-| `UpgradeSystemTests` | 玩家升级阈值触发 |
-| `WaveSpawningSystemTests` | 波次生成与事件 |
+60 个测试文件按主题归类（每类仅列代表测试）：
+
+| 主题 | 代表测试 |
+|------|----------|
+| 战斗结算 / ECS 不变量 | `CombatResolutionTests` / `ComponentStoreTests` / `FrameSchedulerTests` / `StateMachineTests` / `GameSimulationTests` / `InvulnerabilityFramesTests` / `DisarmTests` / `ExecuteSystemTests` / `ExecuteImmunityTests` / `CCImmunityTests` |
+| 配置 / GAS | `GameConfigLoaderTests` / `GameConfigIntegrationTests` / `GameplayAbilityTests` / `SkillSystemTests` / `DamageFormulaTests` / `DamageConversionTests` / `ElementalResistanceTests` / `HolyDamageTests` / `ChainHealTests` / `CurveTableTests` |
+| 塔相关 | `TowerPlacementSystemTests` / `TowerEffectivenessTests` / `TowerModifierSystemTests` / `BuffShareSystemTests` / `ThornsAuraSystemTests` / `HealAuraSystemTests` / `MineSystemTests` / `WindupSystemTests` |
+| 敌人机制 | `BossPathTrailAoeTests` / `BossPhaseSystemTests` / `BossPhaseEventTests` / `BossPhaseMinionSpawnTests` / `BossRegenTests` / `AdaptiveSpawnCountTests` / `AoeCcTests` / `ThemedSummonTests` / `CorpseEffectSystemTests` |
+| 状态效果 / 元素 | `DebuffResistTests` / `FrostbiteSystemTests` / `FrostZoneSystemTests` / `FireTrailSystemTests` / `MarkSystemTests` / `ManaDrainSystemTests` |
+| 资源 / 经济 | `UpgradeSystemTests` / `WaveSpawningSystemTests` / `ShopRerollSystemTests` / `InventorySystemTests` / `ResourceNodeRegenTests` / `DoomClockTests` |
+| 时间 / 状态机 | `FrameSchedulerTests` / `StateMachineTests` / `TimeRewindTests` / `ThreatScoreTests` / `DailyChallengeTests` |
+| 杂项 | `AggroSystemTests` / `HeroSkillSystemTests` / `MassResurrectTests` / `SummonCircleTests` / `PalisadeSystemTests` / `RuntimePathBranchingTests` / `DebugHallowedTest` |
 
 ### 6.3 测试辅助
 
@@ -294,17 +311,29 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 > **门禁是硬要求，任何代码改动后必须验证，否则禁止提交。**
 
-| 压测模式 | 说明 | 门禁 FPS | 允许误差 |
-|----------|------|----------|----------|
-| mode 2 | 合并热路径（手写合并循环，含完整 skill+buff） | ≥ 12,000 | ±5% |
-| mode 4 | 真实系统链路（调用真实系统 Update 链，含完整 skill+buff） | ≥ 7,000 | ±5% |
+### 7.1 硬门禁（历史峰值 / 目标基线）
 
-**mode 2 与 mode 4 语义不同，禁止用一个数字代表全部性能。**
+| 压测模式 | 说明 | 历史峰值 FPS | 当前基线 FPS（最近） | 硬门禁 |
+|----------|------|------------|---------------------|---------|
+| mode 2 | 合并热路径（手写合并循环，含完整 skill+buff） | 13,663 | 7,400（Round 172） | ≥ 12,000 |
+| mode 4 | 真实系统链路（调用真实系统 Update 链，含完整 skill+buff） | 7,096 | 3,436（Round 172） | ≥ 7,000 |
+| mode 5 | 完整一局压测（5 关全通，真实波次生成） | 3,212 | 2,675（Round 172） | ≥ 2,500 |
 
-运行方式：
+### 7.2 相对门禁（每次 commit 必须满足）
+
+由于代码规模持续增长（Core 17.3k / Systems 34.7k / Tests 17.1k 行），绝对硬门禁在长期尺度上被多次突破。**每个 commit 必须满足**：
+
+- 与上一 round 相比，mode 2 / mode 4 / mode 5 任何一项 FPS **不得下降超过 ±5%**（CHANGELOG 中用 ⚠️ 标注越线项）。
+- 三个模式全部测一遍；不能只跑一个模式就提交。
+
+**mode 2 / mode 4 / mode 5 语义不同，禁止用一个数字代表全部性能。**
+
+### 7.3 运行方式
+
 ```bash
 echo 2 | dotnet run   # 或 dotnet run 2
 echo 4 | dotnet run   # 或 dotnet run 4
+echo 5 | dotnet run   # 或 dotnet run 5
 ```
 
 ---
@@ -314,16 +343,17 @@ echo 4 | dotnet run   # 或 dotnet run 4
 > 严格按顺序执行，**全部通过后才能 `git commit`**。
 
 1. **`dotnet build`** — 确认 0 warnings, 0 errors。
-2. **`dotnet test BattleSystemECS.Tests`** — 确认全部通过（当前 120/120）。
-3. **`echo 2 | dotnet run`** — mode 2 压测，确认 FPS 无下降（±5% 误差内）。
-4. **`echo 4 | dotnet run`** — mode 4 压测，确认主指标无下降（±5% 误差内）。
-5. **同步文档** — 若修改了架构、Bug 状态或性能数字，更新：
+2. **`dotnet test BattleSystemECS.Tests`** — 确认全部通过（当前 946/946，Round 172）。
+3. **`echo 2 | dotnet run`** — mode 2 压测，确认 FPS 无下降（与上一 round ±5% 误差内）。
+4. **`echo 4 | dotnet run`** — mode 4 压测，确认主指标无下降（与上一 round ±5% 误差内）。
+5. **`echo 5 | dotnet run`** — mode 5 压测，确认完整一局无明显退化（与上一 round ±10% 误差内）。
+6. **同步文档** — 若修改了架构、Bug 状态或性能数字，更新：
    - `AGENTS.md`
    - `README.md`
    - `docs/architecture.md`
    - `docs/design-and-bugs.md`
-6. **`git add -A && git commit -m "描述"`** — 原子性最小改动，一个 commit 只做一件事。
-7. **`git push`** — commit 完成后立即推送。
+7. **`git add -A && git commit -m "描述"`** — 原子性最小改动，一个 commit 只做一件事。
+8. **`git push`** — commit 完成后立即推送。
 
 ### Git 提交风格
 
@@ -356,18 +386,19 @@ echo 4 | dotnet run   # 或 dotnet run 4
 | 需求 | 文件 |
 |------|------|
 | 添加新组件字段 | 对应领域的 `Core/ComponentStore_Xxx.cs`（字段声明 + 构造初始化 + DestroyEntity 清理）；核心生命周期字段在 `ComponentStore.cs` |
-| 添加新系统 | `Systems/XxxSystem.cs` + `Core/GameManager.cs` 初始化 + `Core/FrameScheduler.cs` 注入 |
-| 修改帧顺序 | `Core/FrameScheduler.cs` 的 `Tick()` 方法 |
+| 添加新系统 | `Systems/XxxSystem.cs` + 在 `Core/SystemRegistry.cs` 注册（4 步：属性 / `CreateAll` / `WireDependencies` / `AssignToGroups`，见 §3.1） |
+| 修改帧顺序 | `Core/FrameScheduler.cs` 的 `RunWavePhase()` 方法（13 阶段严格按序）；具体 system 在各 `*Group.cs` 的 `Execute()` 中编排 |
 | 修改并行策略 | 对应系统的 `Update()`，注意两阶段模式审查 |
 | 修改配置格式 | `Core/GameConfig.cs`（类定义）+ `Core/GameConfigLoader.cs`（解析）+ `Data/Configs/*.json` |
-| 修改技能/效果 | `Core/GAS/*.cs` + `Systems/SkillSystem.cs` + `Data/Configs/skills.json` |
+| 修改技能/效果 | `Core/GAS/{Attributes,GameplayEffect,GameplayAbility}.cs` + `Systems/SkillSystem.cs` + `Data/Configs/skills.json` |
 | 修改科技树 | `Core/TechTreeDef.cs` + `Systems/TechTreeSystem.cs` + `Data/Configs/tech_tree.json` |
 | 修改行为树 | `Data/Configs/behavior_trees.json` + `Systems/BehaviorTreeEvaluator.cs` |
 | 修改测试 | `BattleSystemECS.Tests/XxxTests.cs` |
 | 查看 Bug 历史 | `docs/design-and-bugs.md` |
+| 查看系统注册 | `Core/SystemRegistry.cs`（所有 system 的创建、依赖注入、group 分配） |
 | 查看架构决策 | `docs/architecture.md` |
 | 查看开发理念 | `docs/philosophy.md` |
 
 ---
 
-> **最后更新**：2026-05-30（ComponentStore 按领域拆分为 5 个 partial 文件 + 120 测试）
+> **最后更新**：2026-06-07（AGENTS.md 同步到 Round 172 实际规模：126 system / 946 test / 12 Group / SystemRegistry / GAS 子模块；补 13 阶段 + bullet-time dt split + 相对门禁；同时修复了 350 处 U+FFFD 字符损坏）
