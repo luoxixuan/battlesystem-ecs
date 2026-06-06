@@ -33,11 +33,20 @@ namespace BattleSystemECS.Systems
         // 0.3 = 30% of TowerTotalUpgradeSpent is returned, encouraging players to experiment with upgrades
         // knowing their gold investment is partially recoverable.
         private float salvageUpgradeRate = 0.3f;
+        // Per-tower-type sell ratio override (Round 140 — Direction 7). Indexed by TowerType int value.
+        // -1f = use the global sellRatio (legacy fallback). 0..1 = override that replaces the global
+        // sellRatio for that type. The level-decay and time-decay are still applied on top of the
+        // override value (clamped to [minSellRatio, 1]). Lets designers tune "rare → high refund",
+        // "cheap → low refund" without code changes.
+        private float[] sellRatioOverrideByType = new float[ComponentStore.MAX_TOWER_TYPES];
 
         public TowerPlacementSystem(ComponentStore store, IRenderer logger)
         {
             this.store = store;
             this.logger = logger;
+            // Initialize all per-type overrides to -1f (use global). LoadSellConfig / LoadSellRatioOverrides
+            // then populates any explicit entries from JSON.
+            for (int i = 0; i < sellRatioOverrideByType.Length; i++) sellRatioOverrideByType[i] = -1f;
             LoadSellConfig();
             LoadPerTypeCaps();
         }
@@ -50,6 +59,7 @@ namespace BattleSystemECS.Systems
             this.store = store;
             this.logger = logger;
             this.gameConfig = gameConfig;
+            for (int i = 0; i < sellRatioOverrideByType.Length; i++) sellRatioOverrideByType[i] = -1f;
             LoadSellConfig();
             LoadPerTypeCaps();
         }
@@ -76,6 +86,26 @@ namespace BattleSystemECS.Systems
                     if (root.TryGetProperty("sellDecayGracePeriod", out var sdgp)) sellDecayGracePeriod = sdgp.GetSingle();
                     // Salvage upgrade rate: optional, defaults to 0.3 (Round 85 direction 4)
                     if (root.TryGetProperty("salvageUpgradeRate", out var sur)) salvageUpgradeRate = sur.GetSingle();
+                    // Per-tower-type sell ratio override (Round 140 — Direction 7). Optional map
+                    // { "typeIdx": ratio, ... }. Entries replace the global sellRatio for that
+                    // TowerType. Missing entries / -1 / out-of-range → keep the existing value
+                    // (initialized to -1f in the constructor → falls back to global).
+                    if (root.TryGetProperty("sellRatioOverrideByType", out var srobt)
+                        && srobt.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    {
+                        int loadedOverrides = 0;
+                        foreach (var prop in srobt.EnumerateObject())
+                        {
+                            if (!int.TryParse(prop.Name, out int typeIdx)) continue;
+                            if (typeIdx < 0 || typeIdx >= ComponentStore.MAX_TOWER_TYPES) continue;
+                            float ratio = prop.Value.GetSingle();
+                            if (ratio < 0f || ratio > 1f) continue; // ignore nonsensical values
+                            sellRatioOverrideByType[typeIdx] = ratio;
+                            loadedOverrides++;
+                        }
+                        if (loadedOverrides > 0)
+                            logger.Log($"[TOWER] Per-type sell ratio overrides loaded: {loadedOverrides} entries");
+                    }
                 }
                 catch { /* use defaults */ }
             }
@@ -124,10 +154,18 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Calculate the effective sell ratio for a given tower level.
         /// Ratio decreases per level but never drops below minSellRatio.
+        /// Round 140 — Direction 7: if a per-type sellRatioOverride is set (>= 0), that value
+        /// replaces the global sellRatio as the base before level decay is applied.
         /// </summary>
-        private float GetEffectiveSellRatio(int towerLevel)
+        private float GetEffectiveSellRatio(int towerLevel, int towerTypeIndex)
         {
-            float ratio = sellRatio - (towerLevel - 1) * sellRatioDecreasePerLevel;
+            float baseRatio = sellRatio;
+            if (towerTypeIndex >= 0 && towerTypeIndex < sellRatioOverrideByType.Length
+                && sellRatioOverrideByType[towerTypeIndex] >= 0f)
+            {
+                baseRatio = sellRatioOverrideByType[towerTypeIndex];
+            }
+            float ratio = baseRatio - (towerLevel - 1) * sellRatioDecreasePerLevel;
             return Math.Max(ratio, minSellRatio);
         }
 
@@ -872,7 +910,9 @@ namespace BattleSystemECS.Systems
             }
 
             int level = store.TowerLevel[towerId];
-            float baseRatio = GetEffectiveSellRatio(level);
+            // Round 140 — Direction 7: pass tower type so per-type sell ratio override is honored.
+            int towerTypeIdx = (int)store.TowerType[towerId];
+            float baseRatio = GetEffectiveSellRatio(level, towerTypeIdx);
             float placeTime = store.TowerPlaceTime[towerId];
             float effectiveRatio = GetDecayedSellRatio(placeTime, baseRatio);
             float sellGold = store.TowerUpgradeCost[towerId] * effectiveRatio;

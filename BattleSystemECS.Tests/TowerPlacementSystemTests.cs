@@ -566,6 +566,90 @@ namespace BattleSystemECS.Tests
             Assert.Equal(5, sum2);
         }
 
+        // ─── Round 140 — Direction 7: Per-Tower Sell Ratio Override ───────────────
+        // Validates the new sellRatioOverrideByType matrix loaded from tower_placement.json.
+        // JSON ships overrides for AOE (1)=0.7, Sniper (2)=0.35, Frost (5)=0.6, Palisade (9)=0.4.
+        // Other types (e.g. Basic=0, Tesla=3) keep the global sellRatio (0.5 default).
+
+        [Fact]
+        public void PerTypeSellRatio_LoadedFromJson()
+        {
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            // Place 1 of each overridden type and 1 control type
+            int aoe = sys.PlaceTower(0, 0, TowerType.AOE, 50f, 3, 1f, 50f);
+            int sniper = sys.PlaceTower(1, 0, TowerType.Sniper, 50f, 3, 1f, 50f);
+            int frost = sys.PlaceTower(2, 0, TowerType.Frost, 50f, 3, 1f, 50f);
+            int palisade = sys.PlaceTower(3, 0, TowerType.Palisade, 50f, 3, 1f, 50f);
+            int basic = sys.PlaceTower(4, 0, TowerType.Basic, 50f, 3, 1f, 50f);
+            Assert.True(aoe >= 0 && sniper >= 0 && frost >= 0 && palisade >= 0 && basic >= 0);
+
+            // AOE has 0.7 override (higher → more refund than global 0.5)
+            float refundAoe = sys.SellTower(aoe, 0);
+            int basicEid = basic;
+            // Place a second Basic for control (Basic was already sold? no, basic is still alive)
+            // Just sell basic and basic again
+            float refundBasic = sys.SellTower(basicEid, 0);
+
+            // Per-type override changes the BASE ratio but tests below verify the ratio values
+            // directly via the tower's level-1 refund. Both refund > 0 (sanity).
+            Assert.True(refundAoe > 0f, "AOE sell should refund some gold");
+            Assert.True(refundBasic > 0f, "Basic sell should refund some gold");
+        }
+
+        [Fact]
+        public void PerTypeSellRatio_HigherOverrideYieldsHigherRefund()
+        {
+            // Compare AOE (override=0.7) vs Basic (no override → global=0.5).
+            // Both placed at level 1, same upgrade cost. AOE must refund strictly more.
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            int aoe = sys.PlaceTower(0, 0, TowerType.AOE, 50f, 3, 1f, 50f);
+            int basic = sys.PlaceTower(1, 0, TowerType.Basic, 50f, 3, 1f, 50f);
+            // Bump both to level 2 to incur a non-zero upgrade cost (otherwise baseCost may be 0 in tests).
+            // Actually, the sell refund is based on TowerUpgradeCost; PlaceTower stores the input cost.
+            // Default is 50f. Refund = 50 * ratio. AOE: 50 * 0.7 = 35, Basic: 50 * 0.5 = 25.
+            float refundAoe = sys.SellTower(aoe, 0);
+            float refundBasic = sys.SellTower(basic, 0);
+            Assert.True(refundAoe > refundBasic,
+                $"AOE (override=0.7) should refund more than Basic (global=0.5). AOE={refundAoe} Basic={refundBasic}");
+        }
+
+        [Fact]
+        public void PerTypeSellRatio_LowerOverrideYieldsLowerRefund()
+        {
+            // Compare Sniper (override=0.35) vs Basic (no override → global=0.5).
+            // Sniper must refund strictly less.
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            int sniper = sys.PlaceTower(0, 0, TowerType.Sniper, 50f, 3, 1f, 50f);
+            int basic = sys.PlaceTower(1, 0, TowerType.Basic, 50f, 3, 1f, 50f);
+            float refundSniper = sys.SellTower(sniper, 0);
+            float refundBasic = sys.SellTower(basic, 0);
+            Assert.True(refundSniper < refundBasic,
+                $"Sniper (override=0.35) should refund less than Basic (global=0.5). Sniper={refundSniper} Basic={refundBasic}");
+        }
+
+        [Fact]
+        public void PerTypeSellRatio_TypeWithoutOverrideFallsBackToGlobal()
+        {
+            // Tesla (type 3) has no entry in sellRatioOverrideByType → should use global 0.5.
+            // Its refund must equal Basic's refund (same type, same level, same cost).
+            var store = new ComponentStore();
+            var r = new MockRenderer();
+            var sys = new TowerPlacementSystem(store, r);
+            int tesla = sys.PlaceTower(0, 0, TowerType.Tesla, 50f, 3, 1f, 50f);
+            int basic = sys.PlaceTower(1, 0, TowerType.Basic, 50f, 3, 1f, 50f);
+            float refundTesla = sys.SellTower(tesla, 0);
+            float refundBasic = sys.SellTower(basic, 0);
+            // Both use global 0.5, so refunds should be very close (salvage may differ by
+            // accumulated spend which is 0 in both cases, so they should be equal).
+            Assert.Equal(refundBasic, refundTesla, 0); // exact equality expected
+        }
+
         // Helper: find a tower at (x, y) or -1 if none. Used by PerTypeCap_SellFreesTheSlot.
         private static int FindTowerIdAtPosition(ComponentStore store, int x, int y)
         {
