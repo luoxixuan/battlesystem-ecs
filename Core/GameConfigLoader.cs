@@ -72,6 +72,12 @@ namespace BattleSystemECS.Config
                 // Load tower-vs-enemy type effectiveness matrix (Round 143 Direction 1)
                 LoadTowerEffectiveness(gameConfig, renderer);
 
+                // Load per-tower modifier pool (Round 145 Direction 3 — 塔类型专精重随)
+                // The system rolls ONE modifier per tower at placement time from this
+                // weighted pool. Missing file → safe empty pool → towers spawn with
+                // ModifierId == -1 (a no-op fast path).
+                LoadTowerModifiers(gameConfig, renderer);
+
                 // Load summon definitions (direction 1: player-summoned combat units)
                 LoadSummonDefs(gameConfig, renderer);
 
@@ -1837,6 +1843,61 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[EFFECTIVENESS] Failed to load tower effectiveness: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Load the per-tower modifier pool from <c>Data/Configs/tower_modifiers.json</c>.
+        /// Each entry is a <see cref="GameConfig.TowerModifierDef"/> with weight + rarity.
+        /// Distinct from the affix system: affixes are stackable stat rerolls (Round 35),
+        /// modifiers are ONE roll per tower at placement (Round 145 Direction 3).
+        /// Missing file → safe empty pool (no modifiers rolled — towers spawn with -1).
+        /// </summary>
+        private static void LoadTowerModifiers(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string modFile = "Data/Configs/tower_modifiers.json";
+            try
+            {
+                if (!File.Exists(modFile))
+                {
+                    renderer.Log("[TOWER-MODIFIER] Modifier file not found: " + modFile + " (towers spawn with no modifier — -1 sentinel).");
+                    gameConfig.TowerModifiers = Array.Empty<GameConfig.TowerModifierDef>();
+                    return;
+                }
+                string json = File.ReadAllText(modFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[TOWER-MODIFIER] Modifier file is empty: " + modFile);
+                    gameConfig.TowerModifiers = Array.Empty<GameConfig.TowerModifierDef>();
+                    return;
+                }
+                var arr = System.Text.Json.JsonSerializer.Deserialize<List<GameConfig.TowerModifierDef>>(json,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (arr == null || arr.Count == 0)
+                {
+                    renderer.Log("[TOWER-MODIFIER] No modifiers parsed from " + modFile);
+                    gameConfig.TowerModifiers = Array.Empty<GameConfig.TowerModifierDef>();
+                    return;
+                }
+
+                // Drop malformed entries (no ModifierId or zero-weight) and clamp fields.
+                var clean = new List<GameConfig.TowerModifierDef>(arr.Count);
+                foreach (var m in arr)
+                {
+                    if (m == null) continue;
+                    if (string.IsNullOrWhiteSpace(m.ModifierId)) continue;
+                    if (m.Weight <= 0) m.Weight = 1;
+                    if (m.Rarity < 0) m.Rarity = 0;
+                    if (m.Rarity > 4) m.Rarity = 4;
+                    clean.Add(m);
+                }
+                gameConfig.TowerModifiers = clean.ToArray();
+                renderer.Log("[TOWER-MODIFIER] Loaded " + gameConfig.TowerModifiers.Length + " tower modifiers from " + modFile);
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[TOWER-MODIFIER] Failed to load tower modifiers: " + ex.Message);
+                gameConfig.TowerModifiers = Array.Empty<GameConfig.TowerModifierDef>();
             }
         }
 

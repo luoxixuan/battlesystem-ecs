@@ -74,6 +74,12 @@ namespace BattleSystemECS.Core
         //   GetFocusTowerId read helpers + OnEnemyDestroyed lifecycle hook. Per-frame
         //   Update() is O(1) when no focus is active (sentinel-gated fast path).
         public AggroSystem? Aggro { get; private set; }
+        // Round 145 Direction 3 — Per-Tower Modifier Pool (塔类型专精重随).
+        //   Rolls ONE modifier per tower from a weighted pool at placement time.
+        //   BuildPhase-only public API (RollAtPlacement / RerollModifier / ClearModifier);
+        //   read helpers are pure array reads and may be called from any frame phase.
+        //   No per-frame Update() — modifiers are persistent for the tower's lifetime.
+        public TowerModifierSystem? TowerModifier { get; private set; }
         // Round 128 Direction 5 — Fire Trail System. Thin wrapper that exposes
         // SpawnTrail(x, y, radius, dps, duration) for callers that want to drop a
         // brief burning patch at a position. No per-frame Update — the actual
@@ -350,6 +356,12 @@ namespace BattleSystemECS.Core
             //   last in the combat phase, after TowerActiveSkill.
             Aggro = new AggroSystem(store);
 
+            // Round 145 Direction 3 — Per-Tower Modifier Pool. Constructed early so
+            //   TowerPlacementSystem can call RollAtPlacement() right after AddTower.
+            //   BuildPhase-only system — no per-frame work; the modifier is rolled
+            //   once and consumed lazily by combat systems.
+            TowerModifier = new TowerModifierSystem(store, config);
+
             // Round 128 Direction 5 — Fire Trail System. Passive wrapper, no
             // dependencies on Buff/Skill systems. Constructed early so it can be
             // injected into TowerAttackSystem via WireDependencies below.
@@ -458,6 +470,11 @@ namespace BattleSystemECS.Core
             // injection-time-of-arrival. Optional dependency; null-safe at call
             // site.
             TowerAttack?.SetFireTrailSystem(FireTrail);
+
+            // Round 145 Direction 3 — Per-Tower Modifier Pool: inject into TowerPlacementSystem
+            //   so PlaceTower() can roll the modifier at placement time. Optional dependency;
+            //   null-safe (the placement path branches on null before calling).
+            TowerPlacement?.SetTowerModifierSystem(TowerModifier);
 
             // ── PlayerTowerAttack wiring ──
             PlayerTowerAttack?.SetLifeLinkSystem(LifeLink);

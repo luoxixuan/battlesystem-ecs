@@ -1,0 +1,74 @@
+[
+  {
+    "modifierId": "crit_master",
+    "name": "Crit Master",
+    "stat": "CritChance",
+    "magnitude": 0.15,
+    "rarity": 0,
+    "weight": 30,
+    "description": "+15% critical hit chance. Always rolled first — most common modifier."
+  },
+  {
+    "modifierId": "vampire",
+    "name": "Vampire",
+    "stat": "LifeOnKill",
+    "magnitude": 3.0,
+    "rarity": 1,
+    "weight": 20,
+    "description": "Recover 3 HP on each kill."
+  },
+  {
+    "modifierId": "treasure_hunter",
+    "name": "Treasure Hunter",
+    "stat": "GoldOnKill",
+    "magnitude": 2.0,
+    "rarity": 1,
+    "weight": 20,
+    "description": "Earn +2 bonus gold per kill."
+  },
+  {
+    "modifierId": "arcane_channel",
+    "name": "Arcane Channel",
+    "stat": "ManaOnHit",
+    "magnitude": 1.5,
+    "rarity": 1,
+    "weight": 15,
+    "description": "Recover 1.5 mana on each hit."
+  },
+  {
+    "modifierId": "executioner",
+    "name": "Executioner",
+    "stat": "DamageVsLowHp",
+    "magnitude": 0.40,
+    "rarity": 2,
+    "weight": 8,
+    "description": "+40% damage against enemies below 30% HP."
+  },
+  {
+    "modifierId": "relentless",
+    "name": "Relentless",
+    "stat": "CooldownReduction",
+    "magnitude": 0.20,
+    "rarity": 3,
+    "weight": 4,
+    "description": "-20% ability cooldown. (Very rare — Epic.)"
+  },
+  {
+    "modifierId": "annihilator",
+    "name": "Annihilator",
+    "stat": "CritMultiplier",
+    "magnitude": 0.75,
+    "rarity": 4,
+    "weight": 2,
+    "description": "Critical hits deal +75% bonus damage. (Legendary — extremely rare.)"
+  },
+  {
+    "modifierId": "swift_striker",
+    "name": "Swift Striker",
+    "stat": "AttackSpeed",
+    "magnitude": 0.20,
+    "rarity": 0,
+    "weight": 25,
+    "description": "+20% attack speed. Common but very useful."
+  }
+]

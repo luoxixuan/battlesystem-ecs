@@ -14,6 +14,9 @@ namespace BattleSystemECS.Systems
         private ComponentStore store;
         private IRenderer logger;
         private GameConfig gameConfig;
+        // Round 145 Direction 3 — Per-Tower Modifier Pool reference. Optional injection;
+        // when null, PlaceTower() skips the modifier roll and towers keep ModifierId=-1.
+        private TowerModifierSystem? towerModifierSystem;
 
         // Sell ratio: fraction of upgrade cost refunded (0.5 = 50%)
         private float sellRatio = 0.5f;
@@ -150,6 +153,13 @@ namespace BattleSystemECS.Systems
                 logger.Log($"[TOWER] LoadPerTypeCaps failed: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Round 145 Direction 3 — Inject the per-tower modifier system. Called by the registry
+        /// before PlaceTower() is invoked by gameplay. Optional — if never called, towers spawn
+        /// with TowerModifierId=-1 (the sentinel no-op default).
+        /// </summary>
+        public void SetTowerModifierSystem(TowerModifierSystem modifierSystem) => towerModifierSystem = modifierSystem;
 
         /// <summary>
         /// Calculate the effective sell ratio for a given tower level.
@@ -590,6 +600,22 @@ namespace BattleSystemECS.Systems
             if (towerTypeIdx >= 0 && towerTypeIdx < ComponentStore.MAX_TOWER_TYPES)
             {
                 store.PlayerTowersOfType[playerId * ComponentStore.MAX_TOWER_TYPES + towerTypeIdx]++;
+            }
+
+            // Round 145 Direction 3 — Per-Tower Modifier Pool: roll ONE modifier from the
+            // weighted pool at placement time. No-op when TowerModifier is null (system
+            // disabled) or when the pool is empty. The rolled modifier is read lazily by
+            // combat systems (TowerAttackSystem / BuffSystem / etc.) — no per-frame work.
+            if (towerModifierSystem != null)
+            {
+                int rolledIdx = towerModifierSystem.RollAtPlacement(towerId);
+                if (rolledIdx >= 0)
+                {
+                    string modName = towerModifierSystem.GetModifierName(towerId);
+                    string modStat = towerModifierSystem.GetModifierStat(towerId);
+                    float modMag = towerModifierSystem.GetModifierMagnitude(towerId);
+                    logger.Log($"[MODIFIER] Tower #{towerId} ({type}) rolled '{modName}' (stat={modStat}, magnitude={modMag:F2})");
+                }
             }
 
             return towerId;

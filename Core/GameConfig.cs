@@ -1650,6 +1650,56 @@ namespace BattleSystemECS.Config
         // Tower affix pool (loaded from Data/Configs/tower_affixes.json).
         public TowerAffixDef[] TowerAffixes { get; set; } = Array.Empty<TowerAffixDef>();
 
+        // ==================== 塔类型专精 (Tower Modifier — Round 145 方向3) ====================
+        // Per-tower passive modifier — distinct from the stackable affix system.
+        // Each tower rolls ONE modifier from the weighted pool at placement time.
+        // Modifiers are read-only stat / effect descriptors consumed by combat systems
+        // (combat-side integration is left to a follow-up round; Round 145 establishes
+        // the config + roll + storage + read API surface only).
+        //
+        // ModifierId  — index into GameConfig.TowerModifiers[] (-1 = no modifier)
+        // Magnitude   — designer-tuned scalar the consuming system applies to its effect
+        // Rarity      — 0=Common, 1=Uncommon, 2=Rare, 3=Epic, 4=Legendary (mirrors affix)
+        // Tier        — placement-time weighted random bracket (heavier bias toward Common)
+        public class TowerModifierDef
+        {
+            public string ModifierId { get; set; } = "";
+            public string Name { get; set; } = "";
+            // Stat this modifier applies to: "CritChance" | "CritMultiplier" |
+            // "LifeOnKill" | "GoldOnKill" | "ManaOnHit" | "AttackSpeed" |
+            // "CooldownReduction" | "DamageVsFullHp" | "DamageVsLowHp" | "ExecuteThreshold".
+            // Consumed by combat systems — Round 145 only stores / surfaces the value.
+            public string Stat { get; set; } = "";
+            public float Magnitude { get; set; } = 0f;
+            public int Rarity { get; set; } = 0;
+            public int Weight { get; set; } = 1;
+            public string Description { get; set; } = "";
+        }
+
+        // Tower modifier pool (loaded from Data/Configs/tower_modifiers.json).
+        public TowerModifierDef[] TowerModifiers { get; set; } = Array.Empty<TowerModifierDef>();
+
+        // Look up a tower modifier def by its ModifierId (returns null if not found).
+        public TowerModifierDef? GetTowerModifierDef(string modifierId)
+        {
+            if (string.IsNullOrEmpty(modifierId)) return null;
+            return Array.Find(TowerModifiers, m => m.ModifierId == modifierId);
+        }
+
+        // Get the index of a tower modifier in TowerModifiers[] by ModifierId (returns -1 if not found).
+        public int GetTowerModifierIndex(string modifierId)
+        {
+            if (string.IsNullOrEmpty(modifierId)) return -1;
+            return Array.FindIndex(TowerModifiers, m => m.ModifierId == modifierId);
+        }
+
+        // Look up a tower modifier def by its index in TowerModifiers[] (returns null if not found).
+        public TowerModifierDef? GetTowerModifierDef(int index)
+        {
+            if (index < 0 || index >= TowerModifiers.Length) return null;
+            return TowerModifiers[index];
+        }
+
         // Round 143 Direction 1 — Tower-vs-Enemy Type Effectiveness Matrix
         // Loaded from Data/Configs/tower_effectiveness.json. Keyed by
         // (TowerType enum index, enemy Type string). Missing entries default to 1.0.

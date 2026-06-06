@@ -892,6 +892,12 @@ namespace BattleSystemECS.Core
                 MineMaxStacks[entityId] = 1;
                 MineStacksRemaining[entityId] = 0;
                 MineTriggeredThisFrame[entityId] = false;
+                // Round 145 Direction 3 — Per-Tower Modifier reset (recycled slot must not
+                // carry the previous occupant's modifier — would cause a freshly-placed
+                // tower to inherit a random modifier it never rolled)
+                TowerModifierId[entityId] = -1;
+                TowerModifierMagnitude[entityId] = 0f;
+                TowerModifierRarity[entityId] = 0;
             }
 
             // ── Phase 4: recycle ID ────────────────────────────────────────────────

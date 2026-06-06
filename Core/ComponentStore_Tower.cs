@@ -877,6 +877,20 @@ namespace BattleSystemECS.Core
         //   or copy of Cooldown from TowerConfig at AddTower time). Used for tests/UI display.
         public float[] TowerActiveCooldownMax = new float[MAX_ENTITIES];
 
+        // Round 145 Direction 3 — Per-Tower Modifier Pool (塔类型专精重随). Distinct from
+        //   the affix system: each tower rolls ONE modifier from the weighted pool at
+        //   placement time. Modifiers are persistent (no per-frame work) and are read
+        //   by combat systems via TowerModifierId[towerId] (consume the value when
+        //   the trigger event fires — no per-frame poll cost).
+        //   -1 = no modifier (sentinel; the consumer branches skip on this value).
+        public int[] TowerModifierId = new int[MAX_ENTITIES];
+        // Magnitude mirror — cached from TowerModifierDef.Magnitude at roll time so
+        //   consumers do not need to look up the def on the hot path.
+        public float[] TowerModifierMagnitude = new float[MAX_ENTITIES];
+        // Rarity mirror — 0=Common, 1=Uncommon, 2=Rare, 3=Epic, 4=Legendary. Used
+        //   for UI display and for the designer's "min rarity" roll gate.
+        public int[] TowerModifierRarity = new int[MAX_ENTITIES];
+
         // ==================== 塔组件访问 ====================
 
         /// <summary>
@@ -1110,6 +1124,12 @@ namespace BattleSystemECS.Core
             TowerActiveSkillId[entityId] = -1;
             TowerActiveCooldown[entityId] = 0f;
             TowerActiveCooldownMax[entityId] = 0f;
+            // Round 145 Direction 3 — Per-Tower Modifier (sentinel -1 = no modifier, zero-overhead)
+            // Note: the actual roll is performed by TowerModifierSystem.RollAtPlacement() AFTER
+            // AddTower() returns; this is the "before roll" default. Reset on destroy also clears.
+            TowerModifierId[entityId] = -1;
+            TowerModifierMagnitude[entityId] = 0f;
+            TowerModifierRarity[entityId] = 0;
             // Burst fire: default to no burst (0 count = single-shot)
             TowerBurstCount[entityId] = 0;
             TowerBurstInterval[entityId] = 0f;
@@ -1376,6 +1396,10 @@ namespace BattleSystemECS.Core
             TowerActiveSkillId[entityId] = -1;
             TowerActiveCooldown[entityId] = 0f;
             TowerActiveCooldownMax[entityId] = 0f;
+            // Round 145 Direction 3 — Per-Tower Modifier reset (recycled slot starts with -1 = no modifier)
+            TowerModifierId[entityId] = -1;
+            TowerModifierMagnitude[entityId] = 0f;
+            TowerModifierRarity[entityId] = 0;
             // Elemental affinity fields reset (-1 = no affinity, 0 = no bonus)
             TowerElementalAffinity[entityId] = -1;
             TowerElementalAffinityBonus[entityId] = 0f;
@@ -1883,6 +1907,57 @@ namespace BattleSystemECS.Core
             if (TowerActiveCooldown[towerId] <= 0f) return;
             TowerActiveCooldown[towerId] -= dt;
             if (TowerActiveCooldown[towerId] < 0f) TowerActiveCooldown[towerId] = 0f;
+        }
+
+        // ════════════════════════════════════════════════════════════════════════
+        // Round 145 Direction 3 — Per-Tower Modifier Pool accessors.
+        // Distinct from affixes (which are stackable rerolls): modifiers are ONE
+        // rolled descriptor per tower (or -1 = no modifier).
+        // ════════════════════════════════════════════════════════════════════════
+
+        /// <summary>Returns true if the tower has a non-inert modifier (i.e. one was rolled).</summary>
+        public bool HasTowerModifier(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return false;
+            return TowerModifierId[towerId] >= 0;
+        }
+
+        /// <summary>Returns the modifier index into GameConfig.TowerModifiers[] (-1 = none).</summary>
+        public int GetTowerModifierId(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return -1;
+            return TowerModifierId[towerId];
+        }
+
+        /// <summary>Returns the cached magnitude scalar (0f if no modifier).</summary>
+        public float GetTowerModifierMagnitude(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0f;
+            return TowerModifierMagnitude[towerId];
+        }
+
+        /// <summary>Returns the cached rarity (0=Common .. 4=Legendary; 0 if no modifier).</summary>
+        public int GetTowerModifierRarity(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0;
+            return TowerModifierRarity[towerId];
+        }
+
+        /// <summary>Writer used by TowerModifierSystem.RollAtPlacement (and RerollModifier).
+        /// Sentinel for "clear": modifierIndex &lt; 0 → magnitude=0, rarity=0.</summary>
+        public void SetTowerModifier(int towerId, int modifierIndex, float magnitude, int rarity)
+        {
+            if (!IsValidEntity(towerId)) return;
+            if (modifierIndex < 0)
+            {
+                TowerModifierId[towerId] = -1;
+                TowerModifierMagnitude[towerId] = 0f;
+                TowerModifierRarity[towerId] = 0;
+                return;
+            }
+            TowerModifierId[towerId] = modifierIndex;
+            TowerModifierMagnitude[towerId] = magnitude;
+            TowerModifierRarity[towerId] = rarity < 0 ? 0 : (rarity > 4 ? 4 : rarity);
         }
     }
 }
