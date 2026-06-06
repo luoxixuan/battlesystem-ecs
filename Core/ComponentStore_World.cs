@@ -276,6 +276,10 @@ namespace BattleSystemECS.Core
         public float[] CorpseEffectSlowAmount = new float[MAX_CORPSE_EFFECTS];  // for Slow type
         public float[] CorpseEffectTickTimer = new float[MAX_CORPSE_EFFECTS];  // accumulator for tick timing
         public float[] CorpseEffectTickInterval = new float[MAX_CORPSE_EFFECTS];  // configured tick interval (from JSON)
+        // Round 171 Direction 4 — Blighted Ground debuff fields (per-zone, additive into
+        // EnemyCurseArmorReduction / EnemyCurseSpeedReduction when enemy in range).
+        public float[] CorpseEffectArmorReduction = new float[MAX_CORPSE_EFFECTS];
+        public float[] CorpseEffectSpeedReduction = new float[MAX_CORPSE_EFFECTS];
         private List<int> _activeCorpseEffectIds = new List<int>();
         private int _nextCorpseEffectId = 0;
 
@@ -416,7 +420,7 @@ namespace BattleSystemECS.Core
         /// Called from EnemyFissionSystem or ResolveEnemiesKilledThisFrame.
         /// Returns zone ID or -1 if no free slots.
         /// </summary>
-        public int AddCorpseEffect(float x, float y, int effectType, float radius, float duration, float damagePerTick = 0f, float slowAmount = 1f, float tickInterval = 1f)
+        public int AddCorpseEffect(float x, float y, int effectType, float radius, float duration, float damagePerTick = 0f, float slowAmount = 1f, float tickInterval = 1f, float armorReduction = 0f, float speedReduction = 0f)
         {
             int zoneId = -1;
             for (int i = 0; i < MAX_CORPSE_EFFECTS; i++)
@@ -441,6 +445,9 @@ namespace BattleSystemECS.Core
             CorpseEffectSlowAmount[zoneId] = slowAmount;
             CorpseEffectTickTimer[zoneId] = 0f;
             CorpseEffectTickInterval[zoneId] = tickInterval;
+            // Round 171 Direction 4 — Blighted Ground debuff fields
+            CorpseEffectArmorReduction[zoneId] = armorReduction;
+            CorpseEffectSpeedReduction[zoneId] = speedReduction;
             _activeCorpseEffectIds.Add(zoneId);
             return zoneId;
         }
@@ -460,6 +467,9 @@ namespace BattleSystemECS.Core
             CorpseEffectSlowAmount[zoneId] = 1f;
             CorpseEffectTickTimer[zoneId] = 0f;
             CorpseEffectTickInterval[zoneId] = 1f;
+            // Round 171 Direction 4 — Blighted Ground debuff fields
+            CorpseEffectArmorReduction[zoneId] = 0f;
+            CorpseEffectSpeedReduction[zoneId] = 0f;
             _activeCorpseEffectIds.Remove(zoneId);
         }
 

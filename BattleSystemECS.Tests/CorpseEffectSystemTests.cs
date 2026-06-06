@@ -284,5 +284,250 @@ namespace BattleSystemECS.Tests
             Assert.Contains("\"Demon\"", jsonContent);
             Assert.Contains("\"ThornedShambler\"", jsonContent);
         }
+
+        // ========== Round 171 Direction 4 — Blighted Ground (effectType=8) ==========
+        // Blighted Ground deals per-tick DoT AND applies armor+speed debuffs to enemies
+        // standing in the zone. The debuffs are written to EnemyCurseArmorReduction /
+        // EnemyCurseSpeedReduction (same SOA fields CurseAuraSystem writes to).
+
+        [Fact]
+        public void BlightedGround_AppliesArmorAndSpeedDebuffPerFrame()
+        {
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            // Spawn BlightedGround: 1.4 radius, 2 dmg/tick, 30% armor, 20% speed, 1s tick, 5s dur
+            int zoneId = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 8,            // BlightedGround
+                radius: 1.4f,
+                duration: 5f,
+                damagePerTick: 2f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                armorReduction: 0.30f,    // 30% armor debuff
+                speedReduction: 0.20f     // 20% speed debuff
+            );
+            Assert.True(zoneId >= 0);
+            Assert.True(store.CorpseEffectActive[zoneId]);
+
+            // Enemy in range (distance 1.0 < 1.4)
+            int enemyId = AddEnemy(store, 1.0f, 0.0f, 100f);
+
+            // Frame 1 (deltaTime small so no tick fires): continuous debuffs applied
+            sys.Update(0.1f);
+            Assert.Equal(0.30f, store.EnemyCurseArmorReduction[enemyId]);
+            Assert.Equal(0.20f, store.EnemyCurseSpeedReduction[enemyId]);
+        }
+
+        [Fact]
+        public void BlightedGround_DoesNotAffectEnemyOutOfRange()
+        {
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            int zoneId = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 8,
+                radius: 1.4f,
+                duration: 5f,
+                damagePerTick: 2f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                armorReduction: 0.30f,
+                speedReduction: 0.20f
+            );
+            Assert.True(zoneId >= 0);
+
+            // Enemy far outside radius
+            int enemyId = AddEnemy(store, 10f, 10f, 100f);
+            float hpBefore = store.EnemyHealth[enemyId];
+
+            sys.Update(1.0f);
+            buff.Update(1.0f);
+            buff.ResolveDotDamage();
+
+            // Out-of-range: no DoT, no debuffs
+            Assert.Equal(hpBefore, store.EnemyHealth[enemyId]);
+            Assert.Equal(0f, store.EnemyCurseArmorReduction[enemyId]);
+            Assert.Equal(0f, store.EnemyCurseSpeedReduction[enemyId]);
+        }
+
+        [Fact]
+        public void BlightedGround_TicksDoTAlongsideDebuff()
+        {
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            int zoneId = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 8,
+                radius: 1.4f,
+                duration: 5f,
+                damagePerTick: 2f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                armorReduction: 0.30f,
+                speedReduction: 0.20f
+            );
+            Assert.True(zoneId >= 0);
+
+            // Enemy in range
+            int enemyId = AddEnemy(store, 1.0f, 0.0f, 100f);
+            float hpBefore = store.EnemyHealth[enemyId];
+
+            // After 1s: DoT tick + debuffs applied
+            sys.Update(1.0f);
+            buff.Update(1.0f);
+            buff.ResolveDotDamage();
+            float hpAfter1 = store.EnemyHealth[enemyId];
+
+            // DoT did damage
+            Assert.True(hpAfter1 < hpBefore, $"Expected DoT to damage; before={hpBefore} after={hpAfter1}");
+            // Debuffs also applied
+            Assert.Equal(0.30f, store.EnemyCurseArmorReduction[enemyId]);
+            Assert.Equal(0.20f, store.EnemyCurseSpeedReduction[enemyId]);
+
+            // After 2s: another tick
+            float hpAfter1Snap = store.EnemyHealth[enemyId];
+            sys.Update(1.0f);
+            buff.Update(1.0f);
+            buff.ResolveDotDamage();
+            float hpAfter2 = store.EnemyHealth[enemyId];
+            Assert.True(hpAfter2 < hpAfter1Snap, $"Expected 2nd DoT tick to damage; before={hpAfter1Snap} after={hpAfter2}");
+        }
+
+        [Fact]
+        public void BlightedGround_AccumulatesAdditivelyWithMultipleZones()
+        {
+            // Two BlightedGround zones overlapping — their debuffs should stack additively
+            // per frame (each zone contributes 0.30 armor, total 0.60).
+            // ComponentStore.BeginFrame() (called by the frame scheduler in real gameplay)
+            // resets the field to 0 at frame start, so accumulation is well-bounded.
+            // In this unit test we don't call BeginFrame, so we can verify that
+            // successive sys.Update() calls accumulate across zones.
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            int zoneId1 = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 8,
+                radius: 1.4f,
+                duration: 5f,
+                damagePerTick: 2f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                armorReduction: 0.30f,
+                speedReduction: 0.20f
+            );
+            int zoneId2 = store.AddCorpseEffect(
+                x: 0.5f, y: 0f,    // overlap with zone 1
+                effectType: 8,
+                radius: 1.4f,
+                duration: 5f,
+                damagePerTick: 2f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                armorReduction: 0.30f,
+                speedReduction: 0.20f
+            );
+            Assert.True(zoneId1 >= 0);
+            Assert.True(zoneId2 >= 0);
+
+            int enemyId = AddEnemy(store, 0.5f, 0.0f, 100f);
+
+            // Single frame: both zones apply; expect 0.30 + 0.30 = 0.60 additive
+            sys.Update(0.1f);
+            Assert.Equal(0.60f, store.EnemyCurseArmorReduction[enemyId]);
+            Assert.Equal(0.40f, store.EnemyCurseSpeedReduction[enemyId]);
+        }
+
+        [Fact]
+        public void BlightedGround_ExpiresAfterDuration()
+        {
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            int zoneId = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 8,
+                radius: 1.4f,
+                duration: 2f,
+                damagePerTick: 2f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                armorReduction: 0.30f,
+                speedReduction: 0.20f
+            );
+            Assert.True(zoneId >= 0);
+            Assert.True(store.CorpseEffectActive[zoneId]);
+
+            sys.Update(2.5f);
+            buff.ResolveDotDamage();
+
+            Assert.False(store.CorpseEffectActive[zoneId]);
+        }
+
+        [Fact]
+        public void BlightedGround_LoadsFromJsonConfig()
+        {
+            // Verifies the JSON config entry by reading the source file directly
+            // (corpse_effects.json is not CopyToOutputDirectory'd into the test bin,
+            // so we can't use GameConfigLoader.LoadConfig from a test process).
+            string jsonPath = System.IO.Path.Combine(
+                AppContext.BaseDirectory, "..", "..", "..", "..", "Data", "Configs", "corpse_effects.json");
+            string jsonContent = System.IO.File.ReadAllText(jsonPath);
+            Assert.Contains("\"blighted_ground\"", jsonContent);
+            Assert.Contains("\"effectType\": 8", jsonContent);
+            Assert.Contains("\"armorReduction\": 0.3", jsonContent);
+            Assert.Contains("\"speedReduction\": 0.2", jsonContent);
+            Assert.Contains("\"BlightedHorror\"", jsonContent);
+            Assert.Contains("\"Wraith\"", jsonContent);
+            Assert.Contains("\"PlagueBearer\"", jsonContent);
+        }
+
+        [Fact]
+        public void BlightedGround_OtherEffectTypesIgnoreNewDebuffFields()
+        {
+            // Verify that HallowedGround (effectType=6) and ThornyBramble (effectType=7)
+            // are NOT affected by the new BlightedGround debuff fields. This guards
+            // against regression where the new fields leak into existing effect types.
+            var (store, config, buff, playerId) = CreateEnv();
+            var sys = new CorpseEffectSystem(store, config, buff, new MockRenderer());
+
+            // HallowedGround with armor/speed fields set (they should be ignored)
+            int zoneId6 = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 6,
+                radius: 1.5f,
+                duration: 5f,
+                damagePerTick: 4f,
+                slowAmount: 1f,
+                tickInterval: 1f,
+                armorReduction: 0.99f,    // should be ignored
+                speedReduction: 0.99f     // should be ignored
+            );
+            int enemyId6 = AddEnemy(store, 1.0f, 0.0f, 100f);
+            sys.Update(0.1f);
+            Assert.Equal(0f, store.EnemyCurseArmorReduction[enemyId6]);
+            Assert.Equal(0f, store.EnemyCurseSpeedReduction[enemyId6]);
+
+            // ThornyBramble with armor/speed fields set (they should be ignored)
+            int zoneId7 = store.AddCorpseEffect(
+                x: 0f, y: 0f,
+                effectType: 7,
+                radius: 1.2f,
+                duration: 4f,
+                damagePerTick: 3f,
+                slowAmount: 0.6f,
+                tickInterval: 1f,
+                armorReduction: 0.99f,    // should be ignored
+                speedReduction: 0.99f     // should be ignored
+            );
+            int enemyId7 = AddEnemy(store, 1.0f, 0.0f, 100f);
+            sys.Update(0.1f);
+            Assert.Equal(0f, store.EnemyCurseArmorReduction[enemyId7]);
+            Assert.Equal(0f, store.EnemyCurseSpeedReduction[enemyId7]);
+        }
     }
 }

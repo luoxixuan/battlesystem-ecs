@@ -274,6 +274,22 @@ namespace BattleSystemECS.Core
             _deathQueueIdx = 1 - _deathQueueIdx;
             _deathQueue[_deathQueueIdx].Clear();
             _deathQueueResolved = false;
+            // Round 171 Direction 4 — reset curse debuff accumulators so that curse auras
+            // (CurseAuraSystem +=) and BlightedGround (CorpseEffectSystem +=) both build
+            // up fresh each frame. Without this reset, repeated += calls would compound
+            // frame-over-frame, making the debuffs grow unboundedly.
+            // The cost is O(MAX_ENTITIES) = 100K float writes × 4 fields = 400K writes/frame.
+            // For 10K enemies and a hot benchmark, this is sub-millisecond on modern CPUs.
+            // Only iterate active enemies to avoid touching 90K dead slots (perf budget).
+            var activeEnemies = _activeEnemyIds;
+            for (int i = 0; i < activeEnemies.Count; i++)
+            {
+                int eid = activeEnemies[i];
+                EnemyCurseDmgReduction[eid] = 0f;
+                EnemyCurseSpeedReduction[eid] = 0f;
+                EnemyCurseArmorReduction[eid] = 0f;
+                EnemyCurseDmgTakenIncrease[eid] = 0f;
+            }
             CurrentFrame++;
         }
 

@@ -1696,6 +1696,10 @@ namespace BattleSystemECS.Config
                         c.DamagePerTick = elem.TryGetProperty("damagePerTick", out var dpt) ? (float)dpt.GetDouble() : 0f;
                         c.TickInterval = elem.TryGetProperty("tickInterval", out var ti) ? (float)ti.GetDouble() : 1f;
                         c.SlowAmount = elem.TryGetProperty("slowAmount", out var sa) ? (float)sa.GetDouble() : 1f;
+                        // Round 171 Direction 4 — Blighted Ground debuff fields (optional in JSON,
+                        // default 0 so existing effect types are unaffected).
+                        c.ArmorReduction = elem.TryGetProperty("armorReduction", out var ar) ? (float)ar.GetDouble() : 0f;
+                        c.SpeedReduction = elem.TryGetProperty("speedReduction", out var sr) ? (float)sr.GetDouble() : 0f;
                         if (elem.TryGetProperty("monsterTypes", out var mtElem) && mtElem.ValueKind == System.Text.Json.JsonValueKind.Array)
                         {
                             c.MonsterTypes = new List<string>();

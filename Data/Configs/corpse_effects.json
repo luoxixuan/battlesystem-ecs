@@ -64,5 +64,18 @@
     "tickInterval": 1.0,
     "slowAmount": 0.6,
     "monsterTypes": ["Troll", "Demon", "ThornedShambler"]
+  },
+  {
+    "id": "blighted_ground",
+    "name": "Blighted Ground",
+    "effectType": 8,
+    "duration": 5.0,
+    "radius": 1.4,
+    "damagePerTick": 2.0,
+    "tickInterval": 1.0,
+    "slowAmount": 1.0,
+    "armorReduction": 0.30,
+    "speedReduction": 0.20,
+    "monsterTypes": ["BlightedHorror", "Wraith", "PlagueBearer"]
   }
 ]

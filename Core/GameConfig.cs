@@ -2778,6 +2778,16 @@ namespace BattleSystemECS.Config
         public float TickInterval { get; set; } = 1f;
         /// <summary>Slow multiplier (0.5 = 50% speed, for Slow type).</summary>
         public float SlowAmount { get; set; } = 1f;
+        /// <summary>
+        /// Round 171 Direction 4 — Blighted Ground armor reduction (additive, e.g. 0.3 = -30% armor).
+        /// Only consumed by effectType=8 (BlightedGround). 0 = no debuff (default for all other types).
+        /// </summary>
+        public float ArmorReduction { get; set; } = 0f;
+        /// <summary>
+        /// Round 171 Direction 4 — Blighted Ground attack/move speed reduction (additive, e.g. 0.2 = -20% speed).
+        /// Only consumed by effectType=8 (BlightedGround). 0 = no debuff (default for all other types).
+        /// </summary>
+        public float SpeedReduction { get; set; } = 0f;
         /// <summary>Enemy types that leave this corpse effect (comma-separated in JSON).</summary>
         public List<string> MonsterTypes { get; set; } = new List<string>();
     }
@@ -2874,7 +2884,16 @@ namespace BattleSystemECS.Config
         DamageBoost = 5,
         // Round 168 Direction 3 — Hallowed Ground: positive-feedback ground zone.
         // Damages enemies in range every tick. (Friendly-tower buff is a planned v2 extension.)
-        HallowedGround = 6
+        HallowedGround = 6,
+        // Round 169 Direction 10 — Thorny Bramble: DoT + slow combo zone.
+        ThornyBramble = 7,
+        // Round 171 Direction 4 — Blighted Ground: continuous DoT + armor/speed debuff zone.
+        // Reuses EnemyCurseArmorReduction / EnemyCurseSpeedReduction fields set by
+        // CurseAuraSystem (Round 77). Note: these values are accumulated in the SOA arrays
+        // and are *not* reset when the enemy leaves the zone — this matches existing
+        // CurseAuraSystem semantics (zone debuffs persist for a short window until the
+        // next full reset). For v2, decay-timer fields can be added to time-bound the buff.
+        BlightedGround = 8
     }
 
     // ── Meta Progression / Prestige Node Definition ─────────────────────

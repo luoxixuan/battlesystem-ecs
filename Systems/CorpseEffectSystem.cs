@@ -8,16 +8,17 @@ namespace BattleSystemECS.Systems
 {
     /// <summary>
     /// Corpse Effect System — manages ground effects spawned when enemies die.
-    /// 
+    ///
     /// Two-phase pattern:
     ///   - Phase 1 (ResolveEnemiesKilledThisFrame): subscribe to OnEnemyKilled, queue corpse effects
     ///   - Phase 2 (Update): tick durations, apply effects, expire zones
-    /// 
+    ///
     /// Effect types:
     ///   0 = Poison (DoT), 1 = Slow, 2 = Ice (freeze), 3 = Fire (DoT), 4 = Healing, 5 = DamageBoost
     ///   6 = HallowedGround (positive DoT, holy smite — Round 168 Direction 3)
     ///   7 = ThornyBramble (DoT + slow combo — Round 169 Direction 10)
-    /// 
+    ///   8 = BlightedGround (DoT + armor/speed debuff — Round 171 Direction 4)
+    ///
     /// Integration points:
     ///   - FrameScheduler.Tick() Phase 9.6 calls CorpseEffectSystem.Update()
     ///   - FrameScheduler registers CorpseEffectSystem via scheduler.CorpseEffect
@@ -102,7 +103,11 @@ namespace BattleSystemECS.Systems
                 effectDef.Duration,
                 effectDef.DamagePerTick,
                 effectDef.SlowAmount,
-                effectDef.TickInterval
+                effectDef.TickInterval,
+                // Round 171 Direction 4 — Blighted Ground debuffs (ignored for other effect types
+                // because their ArmorReduction/SpeedReduction default to 0).
+                effectDef.ArmorReduction,
+                effectDef.SpeedReduction
             );
 
             _logger?.Log($"[CORPSE] Spawned {effectDef.Name} at ({x:F1}, {y:F1}) for {effectDef.Duration:F1}s");
@@ -126,9 +131,9 @@ namespace BattleSystemECS.Systems
 
                 // Tick timer for DoT effects
                 int curEffectType = _store.CorpseEffectType[zoneId];
-                if (curEffectType == 0 || curEffectType == 3 || curEffectType == 6 || curEffectType == 7)
+                if (curEffectType == 0 || curEffectType == 3 || curEffectType == 6 || curEffectType == 7 || curEffectType == 8)
                 {
-                    // Poison (0), Fire (3), HallowedGround (6), ThornyBramble (7) — all DoT effects
+                    // Poison (0), Fire (3), HallowedGround (6), ThornyBramble (7), BlightedGround (8) — all DoT effects
                     _store.CorpseEffectTickTimer[zoneId] += deltaTime;
                     float interval = _store.CorpseEffectTickInterval[zoneId];
                     if (interval <= 0f) interval = 1f; // fallback
@@ -173,7 +178,7 @@ namespace BattleSystemECS.Systems
                 if (distSq <= radius * radius)
                 {
                     // Apply DoT via BuffSystem
-                    // effectType 0 = Poison, 3 = Fire, 6 = HallowedGround, 7 = ThornyBramble
+                    // effectType 0 = Poison, 3 = Fire, 6 = HallowedGround, 7 = ThornyBramble, 8 = BlightedGround
                     if (_buffSystem != null)
                     {
                         _ = effectType; // keep switch-like intent explicit
@@ -205,7 +210,7 @@ namespace BattleSystemECS.Systems
             int effectType = _store.CorpseEffectType[zoneId];
             float slowAmount = _store.CorpseEffectSlowAmount[zoneId];
 
-            if (effectType != 1 && effectType != 2 && effectType != 7) return; // Slow, Ice, ThornyBramble need per-frame
+            if (effectType != 1 && effectType != 2 && effectType != 7 && effectType != 8) return; // Slow, Ice, ThornyBramble, BlightedGround need per-frame
 
             var enemies = _store.GetCachedActiveEnemyIds();
             foreach (int enemyId in enemies)
@@ -244,6 +249,28 @@ namespace BattleSystemECS.Systems
                     if (slowAmount < existingSlow)
                     {
                         _store.EnemyTerrainMoveSpeedMult[enemyId] = slowAmount;
+                    }
+                }
+                else if (effectType == 8) // BlightedGround — DoT + armor/speed debuff
+                {
+                    // Round 171 Direction 4 — applies both an armor debuff and a speed debuff to
+                    // enemies standing in the zone. The values are read from JSON
+                    // (armorReduction / speedReduction on the CorpseEffectDef) and accumulated
+                    // additively into the existing EnemyCurse*Reduction fields set by
+                    // CurseAuraSystem. The ComponentStore.BeginFrame() reset (added in this
+                    // round) zeroes these fields at the start of each frame, so the +=
+                    // accumulation here is well-defined: each frame starts at 0 and any
+                    // overlapping zones / curse towers stack their contributions.
+                    // Multiple BlightedGround zones can overlap and stack additively.
+                    float zoneArmorRed = _store.CorpseEffectArmorReduction[zoneId];
+                    float zoneSpeedRed = _store.CorpseEffectSpeedReduction[zoneId];
+                    if (zoneArmorRed > 0f)
+                    {
+                        _store.EnemyCurseArmorReduction[enemyId] += zoneArmorRed;
+                    }
+                    if (zoneSpeedRed > 0f)
+                    {
+                        _store.EnemyCurseSpeedReduction[enemyId] += zoneSpeedRed;
                     }
                 }
             }
