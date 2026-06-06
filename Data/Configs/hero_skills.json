@@ -1,0 +1,21 @@
+{
+  "Description": "Hero Active Skill Set (Round 144) — binds 4 skill slots per hero, mapped to existing GameConfig.SkillDefs by Name.",
+  "Skills": [
+    {
+      "SlotIndex": 0,
+      "SkillName": "Cross Slash"
+    },
+    {
+      "SlotIndex": 1,
+      "SkillName": "Mega Explosion"
+    },
+    {
+      "SlotIndex": 2,
+      "SkillName": "Guardian Heal"
+    },
+    {
+      "SlotIndex": 3,
+      "SkillName": "Cold Nova"
+    }
+  ]
+}

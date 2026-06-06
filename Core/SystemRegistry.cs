@@ -88,6 +88,10 @@ namespace BattleSystemECS.Core
         // ── Player ──
         public PlayerTowerAttackSystem? PlayerTowerAttack { get; private set; }
         public HeroSystem? Hero { get; private set; }
+        // Round 144 方向4 — Hero Active Skill Set. Per-hero, per-slot cooldown-gated
+        //   skill triggers. Soft-coupled: gate + cooldown + log; effect dispatch is
+        //   a follow-up (mirrors the Round 138 TowerActiveSkillSystem approach).
+        public HeroSkillSystem? HeroSkill { get; private set; }
 
         // ── Enemies ──
         public EnemyMovementSystem? EnemyMovement { get; private set; }
@@ -213,6 +217,13 @@ namespace BattleSystemECS.Core
             // ── Player attack ──
             PlayerTowerAttack = new PlayerTowerAttackSystem(store, logger, playerId, config, TechTree);
             Hero = new HeroSystem(store, playerId);
+            // Round 144 方向4 — Hero Active Skill Set. Constructed alongside Hero
+            //   and Skill (it needs config to resolve SkillName → SkillDef id).
+            //   Initialize() loads slot bindings from Data/Configs/hero_skills.json
+            //   and is idempotent (safe to call again on hot-reload).
+            HeroSkill = new HeroSkillSystem(store, playerId, config: config);
+            HeroSkill.SetConfig(config);
+            HeroSkill.Initialize();
 
             // ── Spawning ──
             WaveSpawning = new WaveSpawningSystem(store, logger, config);
@@ -655,6 +666,10 @@ namespace BattleSystemECS.Core
             //   focus is active; O(n_enemies) when at least one enemy has an
             //   active focus assignment.
             scheduler.Combat.Aggro = Aggro;
+            // Round 144 方向4 — Hero Active Skill Set per-frame cooldown tick.
+            //   Wired last in the combat phase, after Aggro. O(1) when no skill
+            //   is configured (sentinel _anySkillConfigured in the system).
+            scheduler.Combat.HeroSkill = HeroSkill;
 
             // ── Skill / Buff / Bleed ──
             scheduler.SkillBuff.Buff = Buff;

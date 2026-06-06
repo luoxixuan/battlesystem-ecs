@@ -42,6 +42,10 @@ namespace BattleSystemECS.Core
         //   O(1) fast-path (single bool sentinel). Runs last in Combat so the focus
         //   duration tick happens after all attack resolution for the frame.
         public Systems.AggroSystem? Aggro { get; set; }
+        // Round 144 方向4 — Hero Active Skill Set. Per-frame cooldown tick for the
+        //   4-slot skill set bound to each deployed hero. O(1) when no skill is
+        //   configured (sentinel _anySkillConfigured in the system).
+        public Systems.HeroSkillSystem? HeroSkill { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -90,6 +94,11 @@ namespace BattleSystemECS.Core
             //   Taunt (which writes EnemyTauntedByTowerId for the next frame's
             //   targeting). Aggro's Update() is O(1) when no focus is active.
             Aggro?.Update(deltaTime);
+            // Round 144 方向4 — Hero Active Skill per-frame cooldown tick. Runs
+            //   last in the combat phase so the cooldown we tick is the one the
+            //   player sees in the HUD this frame (no half-frame drift). HeroSkill
+            //   is O(1) when no skill is configured (sentinel _anySkillConfigured).
+            HeroSkill?.Update(deltaTime);
         }
     }
 }
