@@ -1,5 +1,5 @@
 {
-  "comment": "Round 106 Direction 2: AOE Mine / Trap Tower definitions. Each mine tower detonates when an enemy enters its trigger radius after an arming delay. Damage is dealt in an explosion radius. MineConfig is loaded by MineSystem and is the single source of truth for per-tower-variation stats.",
+  "comment": "Round 106 Direction 2: AOE Mine / Trap Tower definitions. Each mine tower detonates when an enemy enters its trigger radius after an arming delay. Damage is dealt in an explosion radius. MineConfig is loaded by MineSystem and is the single source of truth for per-tower-variation stats. Round 172 Direction 5: Chain Detonation — a mine with canChain=true propagates its explosion to any chain-capable neighbor within chainRadius, with damage scaling by chainDamageMult per hop (bounded by chainDepth).",
   "version": 1,
   "mines": [
     {
@@ -12,7 +12,11 @@
       "maxStacks": 1,
       "cost": 25,
       "maxHp": 30.0,
-      "description": "布设后 0.5 秒激活，敌人进入 1.5 格触发，对 2 格范围内敌人造成 80 伤害"
+      "canChain": false,
+      "chainRadius": 0.0,
+      "chainDamageMult": 0.0,
+      "chainDepth": 0,
+      "description": "布设后 0.5 秒激活，敌人进入 1.5 格触发，对 2 格范围内敌人造成 80 伤害（无连锁）"
     },
     {
       "id": 2,
@@ -24,7 +28,11 @@
       "maxStacks": 1,
       "cost": 60,
       "maxHp": 30.0,
-      "description": "布设后 1.0 秒激活，敌人进入 1.5 格触发，对 3 格范围内敌人造成 200 伤害"
+      "canChain": false,
+      "chainRadius": 0.0,
+      "chainDamageMult": 0.0,
+      "chainDepth": 0,
+      "description": "布设后 1.0 秒激活，敌人进入 1.5 格触发，对 3 格范围内敌人造成 200 伤害（无连锁）"
     },
     {
       "id": 3,
@@ -36,7 +44,27 @@
       "maxStacks": 3,
       "cost": 40,
       "maxHp": 25.0,
-      "description": "堆叠 3 层，每层独立爆炸，触发半径 2 格，伤害 60 范围 2.5"
+      "canChain": true,
+      "chainRadius": 4.0,
+      "chainDamageMult": 0.7,
+      "chainDepth": 2,
+      "description": "堆叠 3 层，每层独立爆炸，触发半径 2 格，伤害 60 范围 2.5；引爆后 4 格内的连锁地雷以 70% 伤害二次引爆，最多 2 跳"
+    },
+    {
+      "id": 4,
+      "name": "巨型连锁地雷 Mega Chain Mine",
+      "triggerRadius": 2.5,
+      "armTime": 1.5,
+      "damage": 120.0,
+      "explosionRadius": 3.5,
+      "maxStacks": 1,
+      "cost": 80,
+      "maxHp": 40.0,
+      "canChain": true,
+      "chainRadius": 6.0,
+      "chainDamageMult": 0.8,
+      "chainDepth": 3,
+      "description": "高价值连锁地雷，5 格触发 3.5 范围 120 伤害；引爆后 6 格内的连锁地雷以 80% 伤害链式引爆，最多 3 跳"
     }
   ]
 }

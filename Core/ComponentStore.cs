@@ -913,6 +913,11 @@ namespace BattleSystemECS.Core
                 MineMaxStacks[entityId] = 1;
                 MineStacksRemaining[entityId] = 0;
                 MineTriggeredThisFrame[entityId] = false;
+                // Round 172 — Chain Detonation reset (recycled slot must not leak chain state)
+                MineCanChain[entityId] = false;
+                MineChainRadius[entityId] = 0f;
+                MineChainDamageMult[entityId] = 0f;
+                MineChainDepth[entityId] = 0;
                 // Round 145 Direction 3 — Per-Tower Modifier reset (recycled slot must not
                 // carry the previous occupant's modifier — would cause a freshly-placed
                 // tower to inherit a random modifier it never rolled)

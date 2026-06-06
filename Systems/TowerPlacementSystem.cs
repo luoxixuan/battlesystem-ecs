@@ -589,6 +589,12 @@ namespace BattleSystemECS.Systems
                 store.MineMaxStacks[towerId] = MineConfig.DefaultMaxStacks;
                 store.MineStacksRemaining[towerId] = MineConfig.DefaultMaxStacks;
                 store.MineTriggeredThisFrame[towerId] = false;
+                // Round 172 — Chain Detonation defaults (inert; can be overridden via per-tower
+                // MineDef lookup if/when the placement path resolves a mine config id).
+                store.MineCanChain[towerId] = false;
+                store.MineChainRadius[towerId] = 0f;
+                store.MineChainDamageMult[towerId] = 0f;
+                store.MineChainDepth[towerId] = 0;
                 logger.Log($"[MINE] Tower #{towerId} at ({x},{y}): triggerR={store.MineTriggerRadius[towerId]}, arm={store.MineArmTime[towerId]}s, dmg={store.MineDamage[towerId]}, explR={store.MineExplosionRadius[towerId]}, stacks={store.MineMaxStacks[towerId]}");
             }
 

@@ -46,6 +46,13 @@ namespace BattleSystemECS.Systems
         // Destroyed at the end of Update() in a single pass.
         private readonly List<int> _pendingDestroy = new List<int>(16);
 
+        // Round 172 — Chain Detonation: tower IDs that should be force-triggered this frame
+        // as a result of chain propagation from another mine's detonation. Each entry records
+        // (mineId, damageMultiplier, currentHop) so a chain-of-chains correctly decays damage
+        // per hop and respects the per-tower MineChainDepth limit. (FIFO within a single
+        // Update() pass; consumed by the chain-resolution loop below.)
+        private readonly List<(int mineId, float dmgMult, int hop)> _chainQueue = new List<(int, float, int)>(16);
+
         // ── Per-tower mine config (loaded from Data/Configs/mine_towers.json) ──
         public class MineDef
         {
@@ -57,6 +64,13 @@ namespace BattleSystemECS.Systems
             public float ExplosionRadius { get; set; } = 0f;
             public int MaxStacks { get; set; } = 1;
             public float Cost { get; set; } = 0f;
+            // Round 172 — Chain Detonation fields. When CanChain=true, this mine propagates
+            // its explosion to any chain-capable neighbor within ChainRadius. Chained neighbors
+            // detonate at ChainDamageMult× their base damage (decays per hop).
+            public bool CanChain { get; set; } = false;
+            public float ChainRadius { get; set; } = 0f;
+            public float ChainDamageMult { get; set; } = 0.7f; // 70% of neighbor's base damage per hop
+            public int ChainDepth { get; set; } = 1; // 1 = direct neighbors only
         }
 
         private readonly Dictionary<int, MineDef> _mines = new Dictionary<int, MineDef>();
@@ -180,9 +194,33 @@ namespace BattleSystemECS.Systems
                 {
                     _pendingDestroy.Add(tid);
                 }
+
+                // 5) Round 172 — Chain Detonation: if this mine is chain-capable, search
+                //    for chain-capable neighbors within MineChainRadius. Enqueue each as
+                //    a "force trigger" for later in the same Update() pass. The chain
+                //    queue is processed AFTER the main pass so newly-queued chained mines
+                //    can themselves propagate (bounded by MineChainDepth).
+                if (store.MineCanChain[tid])
+                {
+                    float chainRadius = store.MineChainRadius[tid];
+                    if (chainRadius > 0f)
+                    {
+                        // Source detonates at full damage (mult=1.0); first-hop neighbors
+                        // get their own ChainDamageMult × 1.0. The depth is incremented
+                        // by ProcessChainQueue when a chained mine propagates further.
+                        EnqueueChainNeighbors(tid, mx, my, chainRadius, 1f, 1, store.MineChainDepth[tid]);
+                    }
+                }
             }
 
-            // 5) Apply queued explosion damage (serial pass after parallel-unsafe enqueue).
+            // 6) Process the chain queue. Each chained mine detonates with damage = its base
+            //    damage × propagated multiplier. When it itself is chain-capable, it can
+            //    propagate further (depth decremented). This produces a BFS-style chain
+            //    reaction that decays per hop. The whole pass is serial (single-threaded)
+            //    to keep damage ordering deterministic and to match the rest of MineSystem.
+            ProcessChainQueue();
+
+            // 7) Apply queued explosion damage (serial pass after parallel-unsafe enqueue).
             //    Note: MineSystem is already serial so the queue is a thin abstraction —
             //    we still ping-pong for consistency with BleedSystem.
             ResolveMineDamage();
@@ -198,6 +236,114 @@ namespace BattleSystemECS.Systems
                 // here was removed to avoid double-decrementing (destroy would drop the counter
                 // twice and drive it negative).
                 store.DestroyEntity(tid);
+            }
+        }
+
+        /// <summary>
+        /// Round 172 — Chain Detonation: when a chain-capable mine detonates, search for
+        /// chain-capable neighbor mines within <paramref name="chainRadius"/> of the
+        /// blast center. Each neighbor is enqueued for chain-trigger with damage
+        /// <paramref name="parentMult"/> × neighbor's own ChainDamageMult (per-hop decay).
+        /// The hop count starts at <paramref name="currentHop"/> and stops at
+        /// <paramref name="maxHop"/>; this allows nested chains where each mine's
+        /// MineChainDepth is independently consulted.
+        ///
+        /// SAFETY: bounds-check all tower IDs against MAX_ENTITIES; skip already-destroyed,
+        /// already-triggered-this-frame, or chain-incapable mines.
+        /// </summary>
+        private void EnqueueChainNeighbors(int sourceTid, float mx, float my, float chainRadius, float parentMult, int currentHop, int maxHop)
+        {
+            if (currentHop > maxHop) return;
+            float chainSq = chainRadius * chainRadius;
+            var activeTowerIds = store.ActiveTowerIds;
+            for (int i = 0; i < activeTowerIds.Count; i++)
+            {
+                int otherTid = activeTowerIds[i];
+                if (otherTid < 0 || otherTid >= ComponentStore.MAX_ENTITIES) continue;
+                if (otherTid == sourceTid) continue; // don't chain to self
+                if (!store.TowerIsMine[otherTid]) continue;
+                if (!store.TowerActive[otherTid]) continue;
+                if (store.MineStacksRemaining[otherTid] <= 0) continue;
+                if (store.MineTriggeredThisFrame[otherTid]) continue; // already fired this frame
+                if (!store.MineCanChain[otherTid]) continue; // neighbor must also be chain-capable
+                float ox = store.PositionX[otherTid];
+                float oy = store.PositionY[otherTid];
+                float dx = ox - mx;
+                float dy = oy - my;
+                float dSq = dx * dx + dy * dy;
+                if (dSq > chainSq) continue;
+                // This hop's damage multiplier: parent multiplier × the NEIGHBOR's own chainMult.
+                // Using the neighbor's mult (not the source's) is the correct interpretation
+                // of "each chained mine detonates with ×ChainDamageMult its own base damage".
+                float thisMult = parentMult * store.MineChainDamageMult[otherTid];
+                _chainQueue.Add((otherTid, thisMult, currentHop));
+            }
+        }
+
+        /// <summary>
+        /// Round 172 — Process the chain queue populated by EnqueueChainNeighbors.
+        /// Each entry detonates a chain-reaction mine: deals its explosion damage
+        /// (scaled by the propagated multiplier) and decrements its stack. If that mine
+        /// can chain further (and its own MineChainDepth allows more hops), it propagates
+        /// to its neighbors with the next-hop multiplier.
+        ///
+        /// We snapshot the queue at the start of each pass and re-iterate until empty.
+        /// This handles chains-of-chains correctly: a chained mine that itself chains
+        /// will append to _chainQueue, and the outer while-loop picks them up.
+        /// </summary>
+        private void ProcessChainQueue()
+        {
+            // Loop until the queue drains. The snapshot/clear pattern prevents index-shift
+            // hazards when chained mines append new neighbors.
+            while (_chainQueue.Count > 0)
+            {
+                var snapshot = new List<(int mineId, float dmgMult, int hop)>(_chainQueue);
+                _chainQueue.Clear();
+                for (int i = 0; i < snapshot.Count; i++)
+                {
+                    var (tid, dmgMult, hop) = snapshot[i];
+                    if (tid < 0 || tid >= ComponentStore.MAX_ENTITIES) continue;
+                    if (!store.TowerActive[tid]) continue; // destroyed in main pass?
+                    if (store.MineStacksRemaining[tid] <= 0) continue; // already exhausted?
+                    if (store.MineTriggeredThisFrame[tid]) continue; // raced with main pass
+
+                    // Trigger chained mine. Latch the per-frame flag and consume one stack.
+                    store.MineTriggeredThisFrame[tid] = true;
+                    store.MineStacksRemaining[tid] -= 1;
+
+                    float baseDamage = store.MineDamage[tid];
+                    float explosionRadius = store.MineExplosionRadius[tid];
+                    float chainDamage = baseDamage * dmgMult;
+                    if (chainDamage > 0f && explosionRadius > 0f)
+                    {
+                        float mx = store.PositionX[tid];
+                        float my = store.PositionY[tid];
+                        EnqueueExplosionDamage(mx, my, explosionRadius, chainDamage);
+                    }
+
+                    // Schedule destroy if this was the last stack.
+                    if (store.MineStacksRemaining[tid] <= 0)
+                    {
+                        _pendingDestroy.Add(tid);
+                    }
+
+                    // Propagate: this chained mine may itself chain further. Respect its
+                    // own MineChainDepth — the queue entry's hop is incremented and
+                    // capped at the neighbor's per-tower limit.
+                    if (store.MineCanChain[tid])
+                    {
+                        float chainRadius = store.MineChainRadius[tid];
+                        if (chainRadius > 0f)
+                        {
+                            int nextHop = hop + 1;
+                            int maxHop = store.MineChainDepth[tid];
+                            if (nextHop <= maxHop)
+                            {
+                                EnqueueChainNeighbors(tid, store.PositionX[tid], store.PositionY[tid], chainRadius, dmgMult, nextHop, maxHop);
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -292,6 +438,11 @@ namespace BattleSystemECS.Systems
                         ExplosionRadius = elem.TryGetProperty("explosionRadius", out var er) ? er.GetSingle() : MineConfig.DefaultExplosionRadius,
                         MaxStacks = elem.TryGetProperty("maxStacks", out var ms) ? ms.GetInt32() : MineConfig.DefaultMaxStacks,
                         Cost = elem.TryGetProperty("cost", out var c) ? c.GetSingle() : MineConfig.DefaultCost,
+                        // Round 172 — Chain Detonation config (per-tower JSON overrides)
+                        CanChain = elem.TryGetProperty("canChain", out var cc) && cc.ValueKind == System.Text.Json.JsonValueKind.True,
+                        ChainRadius = elem.TryGetProperty("chainRadius", out var cr) ? cr.GetSingle() : 0f,
+                        ChainDamageMult = elem.TryGetProperty("chainDamageMult", out var cdm) ? Math.Clamp(cdm.GetSingle(), 0f, 1f) : 0.7f,
+                        ChainDepth = elem.TryGetProperty("chainDepth", out var cd) ? Math.Max(1, cd.GetInt32()) : 1,
                     };
                     _mines[id] = def;
                 }

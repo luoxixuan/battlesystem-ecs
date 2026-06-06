@@ -313,6 +313,275 @@ namespace BattleSystemECS.Tests
             Assert.Null(system.GetMineDef(99999));
         }
 
+        // ── Round 172 — Chain Detonation (Direction 5) ────────────────────
+
+        [Fact]
+        public void Chain_DefaultState_AllFieldsInert()
+        {
+            var store = new ComponentStore();
+            // Default state: all chain fields must be inert (zero-overhead fast path)
+            Assert.False(store.MineCanChain[0]);
+            Assert.Equal(0f, store.MineChainRadius[0]);
+            Assert.Equal(0f, store.MineChainDamageMult[0]);
+            Assert.Equal(0, store.MineChainDepth[0]);
+        }
+
+        [Fact]
+        public void Chain_PlaceTower_DefaultsToInert()
+        {
+            var (system, store, placement) = MakeSystem();
+            int tid = placement.PlaceTower(5, 5, TowerType.Mine, 0, 0, 0, 0);
+            // PlaceTower does NOT auto-enable chain — designers must opt in via
+            // setting the fields directly (or future config-resolution path).
+            Assert.False(store.MineCanChain[tid]);
+            Assert.Equal(0f, store.MineChainRadius[tid]);
+            Assert.Equal(0f, store.MineChainDamageMult[tid]);
+            Assert.Equal(0, store.MineChainDepth[tid]);
+        }
+
+        [Fact]
+        public void Chain_DestroyEntity_ResetsChainFields()
+        {
+            var (system, store, placement) = MakeSystem();
+            int tid = placement.PlaceTower(5, 5, TowerType.Mine, 0, 0, 0, 0);
+            // Activate chain on this mine
+            store.MineCanChain[tid] = true;
+            store.MineChainRadius[tid] = 5f;
+            store.MineChainDamageMult[tid] = 0.7f;
+            store.MineChainDepth[tid] = 2;
+            // Destroy and verify all fields are reset
+            store.DestroyEntity(tid);
+            Assert.False(store.MineCanChain[tid]);
+            Assert.Equal(0f, store.MineChainRadius[tid]);
+            Assert.Equal(0f, store.MineChainDamageMult[tid]);
+            Assert.Equal(0, store.MineChainDepth[tid]);
+        }
+
+        [Fact]
+        public void Chain_TwoChainMines_TriggersBothOnEnemyProximity()
+        {
+            var (system, store, placement) = MakeSystem();
+            int t1 = PlaceMine(placement, store, x: 5, y: 5, maxStacks: 1);
+            // t2 is distance 2 from t1, outside natural trigger radius (1.5).
+            // It must fire ONLY via chain.
+            int t2 = PlaceMine(placement, store, x: 7, y: 5, maxStacks: 1);
+            // Enable chain on BOTH t1 and t2. t1 is the source (CanChain=true means
+            // t1 can chain-propagate when it detonates). t2 is the target — the
+            // EnqueueChainNeighbors filter requires MineCanChain[otherTid]=true on
+            // the neighbor for it to be eligible.
+            store.MineCanChain[t1] = true;
+            store.MineCanChain[t2] = true;
+            store.MineChainRadius[t1] = 4f;
+            store.MineChainRadius[t2] = 4f;
+            store.MineChainDamageMult[t1] = 0.7f;
+            store.MineChainDamageMult[t2] = 0.7f;
+            store.MineChainDepth[t1] = 2;
+            store.MineChainDepth[t2] = 1;
+
+            // Enemy with HP=1000 so it survives both detonations:
+            // t1 (80 dmg) + t2 chain (80 × 0.7 = 56 dmg) = 136 dmg, leaves 864 HP.
+            int eid = store.AddEnemy(5, 5, 1f, 1000f, 1000f, 5f, 10, 1, "E");
+            for (int i = 0; i < 60; i++) system.Update(DeltaTime);
+            // t1 detonates at full damage (80) AND chains to t2 (56 dmg).
+            // Enemy should have HP 1000 - 80 - 56 = 864.
+            Assert.Equal(864f, store.EnemyHealth[eid], 1);
+            // Both mines should be destroyed (each had 1 stack and detonated)
+            Assert.False(store.TowerActive[t1]);
+            Assert.False(store.TowerActive[t2]);
+        }
+
+        [Fact]
+        public void Chain_NoTriggerWhenNoEnemyInTriggerRange_ChainStaysDormant()
+        {
+            var (system, store, placement) = MakeSystem();
+            int t1 = PlaceMine(placement, store, x: 5, y: 5, maxStacks: 1);
+            int t2 = PlaceMine(placement, store, x: 7, y: 5, maxStacks: 1); // 2 cells from t1
+            // Configure t1 to chain with 50% mult
+            store.MineCanChain[t1] = true;
+            store.MineChainRadius[t1] = 5f;
+            store.MineChainDamageMult[t1] = 0.5f;
+            store.MineChainDepth[t1] = 1;
+            // Place an enemy FAR from both t1 and t2's trigger radii
+            // t1 trigger=1.5, t2 trigger=1.5, enemy at (10,5) is 5 cells from t1
+            int eid = store.AddEnemy(10, 5, 1f, 1000f, 1000f, 5f, 10, 1, "E");
+            for (int i = 0; i < 60; i++) system.Update(DeltaTime);
+            // t1 should NOT trigger (enemy out of trigger range)
+            // Therefore no chain should happen either
+            Assert.Equal(1000f, store.EnemyHealth[eid]);
+            Assert.Equal(1, store.MineStacksRemaining[t1]);
+            Assert.Equal(1, store.MineStacksRemaining[t2]);
+        }
+
+        [Fact]
+        public void Chain_OutOfRangeNeighbor_DoesNotChain()
+        {
+            var (system, store, placement) = MakeSystem();
+            int t1 = PlaceMine(placement, store, x: 5, y: 5, maxStacks: 1);
+            // Place t2 outside the 10x20 map → invalid. We need t2 valid but outside chain radius.
+            // The map is 10x20, so the farthest valid position from t1 is (0, 19). Distance = sqrt(25+196) ≈ 14.9.
+            int t2 = PlaceMine(placement, store, x: 0, y: 19, maxStacks: 1);
+            store.MineCanChain[t1] = true;
+            store.MineChainRadius[t1] = 4f; // 4 cells, t2 is 14.9 cells away
+            store.MineChainDamageMult[t1] = 0.5f;
+            store.MineChainDepth[t1] = 3;
+
+            int eid = store.AddEnemy(5, 5, 1f, 1000f, 1000f, 5f, 10, 1, "E");
+            for (int i = 0; i < 60; i++) system.Update(DeltaTime);
+            // t1 triggers, t2 is out of chain radius — only t1 explodes
+            Assert.False(store.TowerActive[t1]);
+            Assert.True(store.TowerActive[t2]); // t2 should still be active
+            Assert.Equal(1, store.MineStacksRemaining[t2]); // t2 never detonated
+        }
+
+        [Fact]
+        public void Chain_NonChainCapableNeighbor_DoesNotChain()
+        {
+            var (system, store, placement) = MakeSystem();
+            // Place t2 OUTSIDE natural trigger range so we can isolate the chain effect.
+            // t1 at (5,5), t2 at (9,5) — distance 4 cells. Both within chainRadius=5 if set.
+            // t2's natural trigger radius is 1.5 — enemy at (5,5) is 4 cells from t2 → out of trigger.
+            int t1 = PlaceMine(placement, store, x: 5, y: 5, maxStacks: 1);
+            int t2 = PlaceMine(placement, store, x: 9, y: 5, maxStacks: 1);
+            // t1 is chain-capable; t2 is NOT (MineCanChain=false)
+            store.MineCanChain[t1] = true;
+            store.MineChainRadius[t1] = 5f;
+            store.MineChainDamageMult[t1] = 0.7f;
+            store.MineChainDepth[t1] = 2;
+            // t2.MineCanChain stays false
+
+            int eid = store.AddEnemy(5, 5, 1f, 1000f, 1000f, 5f, 10, 1, "E");
+            for (int i = 0; i < 60; i++) system.Update(DeltaTime);
+            // Only t1 detonates (t2 not chain-capable → no chain propagation; t2 also out of natural trigger)
+            Assert.False(store.TowerActive[t1]);
+            Assert.True(store.TowerActive[t2]); // t2 should still be active
+            Assert.Equal(1, store.MineStacksRemaining[t2]); // untouched
+        }
+
+        [Fact]
+        public void Chain_DepthLimit_StopsAtMaxHop()
+        {
+            var (system, store, placement) = MakeSystem();
+            // Linear chain: t1 → t2 → t3, with depth=1 means only t1 → t2 (not t3).
+            // t2 and t3 must be OUTSIDE natural trigger range from the enemy at (5,5)
+            // so they only fire via chain propagation, not naturally.
+            // t1 at (5,5), t2 at (7,5) distance 2 > 1.5 trigger. t3 at (9,5) distance 4 > 1.5.
+            // chainRadius=2.5: t1 reaches t2 (dist 2) but NOT t3 (dist 4).
+            int t1 = PlaceMine(placement, store, x: 5, y: 5, maxStacks: 1);
+            int t2 = PlaceMine(placement, store, x: 7, y: 5, maxStacks: 1);
+            int t3 = PlaceMine(placement, store, x: 9, y: 5, maxStacks: 1);
+            store.MineCanChain[t1] = true;
+            store.MineCanChain[t2] = true;
+            store.MineCanChain[t3] = true;
+            store.MineChainRadius[t1] = 2.5f; // 1-hop reach: t1→t2 only
+            store.MineChainRadius[t2] = 2.5f;
+            store.MineChainRadius[t3] = 2.5f;
+            store.MineChainDamageMult[t1] = 0.7f;
+            store.MineChainDamageMult[t2] = 0.7f;
+            store.MineChainDamageMult[t3] = 0.7f;
+            store.MineChainDepth[t1] = 1; // t1 → t2 only, not t3
+            store.MineChainDepth[t2] = 1;
+            store.MineChainDepth[t3] = 1;
+
+            int eid = store.AddEnemy(5, 5, 1f, 1000f, 1000f, 5f, 10, 1, "E");
+            for (int i = 0; i < 60; i++) system.Update(DeltaTime);
+            // t1 detonates (triggered by enemy at distance 0), chains to t2 (hop 1).
+            // t2 detonates (chain-triggered) but next propagation from t2 is hop=2 > maxHop=1
+            // → t3 should remain untouched (no chain reaches t3).
+            Assert.False(store.TowerActive[t1]);
+            Assert.False(store.TowerActive[t2]);
+            Assert.True(store.TowerActive[t3]); // t3 should NOT detonate
+            Assert.Equal(1, store.MineStacksRemaining[t3]);
+        }
+
+        [Fact]
+        public void Chain_ChainOfChains_Depth2_Propagates()
+        {
+            var (system, store, placement) = MakeSystem();
+            // 3 mines in a line, depth=2 means t1→t2→t3 (t3 at hop=2 <= maxHop=2).
+            // t2 and t3 must be outside natural trigger from the enemy.
+            // chainRadius=2.5: t1 reaches t2 (dist 2), t2 reaches t3 (dist 2).
+            int t1 = PlaceMine(placement, store, x: 5, y: 5, maxStacks: 1);
+            int t2 = PlaceMine(placement, store, x: 7, y: 5, maxStacks: 1);
+            int t3 = PlaceMine(placement, store, x: 9, y: 5, maxStacks: 1);
+            store.MineCanChain[t1] = true;
+            store.MineCanChain[t2] = true;
+            store.MineCanChain[t3] = true;
+            store.MineChainRadius[t1] = 2.5f;
+            store.MineChainRadius[t2] = 2.5f;
+            store.MineChainRadius[t3] = 2.5f;
+            store.MineChainDamageMult[t1] = 0.7f;
+            store.MineChainDamageMult[t2] = 0.7f;
+            store.MineChainDamageMult[t3] = 0.7f;
+            store.MineChainDepth[t1] = 2; // t1 chains 2 hops: t1 → t2 → t3
+            store.MineChainDepth[t2] = 2;
+            store.MineChainDepth[t3] = 2;
+
+            int eid = store.AddEnemy(5, 5, 1f, 1000f, 1000f, 5f, 10, 1, "E");
+            for (int i = 0; i < 60; i++) system.Update(DeltaTime);
+            // All three should detonate
+            Assert.False(store.TowerActive[t1]);
+            Assert.False(store.TowerActive[t2]);
+            Assert.False(store.TowerActive[t3]);
+        }
+
+        [Fact]
+        public void Chain_DecayMultipliesPerHop()
+        {
+            var (system, store, placement) = MakeSystem();
+            // 2 chain mines; check that the chained neighbor's damage is reduced
+            int t1 = PlaceMine(placement, store, x: 5, y: 5, maxStacks: 1);
+            int t2 = PlaceMine(placement, store, x: 6, y: 5, maxStacks: 1);
+            store.MineCanChain[t1] = true;
+            store.MineCanChain[t2] = true; // t2 also chain-capable, but at depth=1 it won't propagate
+            store.MineChainRadius[t1] = 4f;
+            store.MineChainDamageMult[t1] = 0.5f; // 50% decay
+            store.MineChainDamageMult[t2] = 0.5f;
+            store.MineChainDepth[t1] = 1;
+            store.MineChainDepth[t2] = 1;
+
+            // Place an enemy in t1's explosion radius but not in t2's trigger range
+            // (t1 expl=2.0, t1 at (5,5), t2 at (6,5), enemy at (5,6) — within 2.0 of t1, 1.0 from t2's trigger)
+            // Wait, t2's trigger radius is 1.5 by default. Enemy at (5,6) is 1.0 from t2 → IN trigger range
+            // Let's put enemy at (5,8): 3.0 from t1 (out of expl 2.0) and 2.24 from t2 (out of trigger 1.5)
+            // Better: place enemy at (4,6) — 1.0 from t1 (in trigger 1.5), 2.24 from t2 (out of trigger 1.5),
+            // 1.41 from t1 (in expl 2.0).
+            int eid = store.AddEnemy(4, 6, 1f, 1000f, 1000f, 5f, 10, 1, "E");
+            for (int i = 0; i < 60; i++) system.Update(DeltaTime);
+            // t1 triggers (enemy in trigger range 1.0 < 1.5)
+            //   → t1 deals 80 damage to enemy (in expl 2.0)
+            //   → t1 chains to t2 (t2 is chain-capable, in range 4.0)
+            //   → t2 detonates at 0.5 × 80 = 40 damage
+            //   → t2 explosion radius 2.0; distance from t2 to enemy = sqrt((4-6)^2 + (6-5)^2) = sqrt(5) ≈ 2.24 → OUT of t2's explosion range
+            //   → enemy only took 80 damage from t1
+            Assert.Equal(1000f - 80f, store.EnemyHealth[eid], 1);
+        }
+
+        [Fact]
+        public void Chain_StackedMines_ChainedNeighborAlsoConsumesStack()
+        {
+            var (system, store, placement) = MakeSystem();
+            int t1 = PlaceMine(placement, store, x: 5, y: 5, maxStacks: 1);
+            // t2 at distance 2 (out of natural trigger 1.5) so it fires ONLY via chain.
+            int t2 = PlaceMine(placement, store, x: 7, y: 5, maxStacks: 3); // 3 stacks
+            // Both must be CanChain for t2 to be a valid chain target.
+            store.MineCanChain[t1] = true;
+            store.MineCanChain[t2] = true;
+            store.MineChainRadius[t1] = 4f;
+            store.MineChainRadius[t2] = 4f;
+            store.MineChainDamageMult[t1] = 0.5f;
+            store.MineChainDamageMult[t2] = 0.5f;
+            store.MineChainDepth[t1] = 1;
+            store.MineChainDepth[t2] = 1;
+
+            int eid = store.AddEnemy(5, 5, 1f, 1000f, 1000f, 5f, 10, 1, "E");
+            for (int i = 0; i < 60; i++) system.Update(DeltaTime);
+            // t1 (1 stack) detonates, destroys itself
+            // t2 (3 stacks) chain-detonates once, now has 2 stacks left
+            Assert.False(store.TowerActive[t1]);
+            Assert.True(store.TowerActive[t2]);
+            Assert.Equal(2, store.MineStacksRemaining[t2]);
+        }
+
         // ── Helpers ──────────────────────────────────────────────────────
 
         private static (MineSystem sys, ComponentStore store, TowerPlacementSystem placement) MakeSystem()

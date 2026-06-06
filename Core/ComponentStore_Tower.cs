@@ -114,6 +114,20 @@ namespace BattleSystemECS.Core
         // detonated in the current frame. Prevents the same mine from firing multiple times
         // per frame (re-armed only next frame after stacks decrement).
         public bool[] MineTriggeredThisFrame = new bool[MAX_ENTITIES];
+        // ── Round 172 — Chain Detonation (Direction 5) ───────────────────────
+        // MineCanChain: when true, this mine can chain-react to nearby mines within MineChainRadius.
+        // Each chained neighbor detonates with MineChainDamageMult × its base damage (decays per hop).
+        // Default false = inert (no chain propagation, zero-overhead fast path).
+        public bool[] MineCanChain = new bool[MAX_ENTITIES];
+        // MineChainRadius: distance (in cells) at which a detonating mine searches for chained neighbors.
+        // 0 = no chain search (effectively disabled even if MineCanChain=true).
+        public float[] MineChainRadius = new float[MAX_ENTITIES];
+        // MineChainDamageMult: per-hop damage multiplier applied to chained neighbor's explosion damage.
+        // Example: 0.7 = 70% of neighbor's base damage, 0.5 = 50%. Capped at 1.0.
+        public float[] MineChainDamageMult = new float[MAX_ENTITIES];
+        // MineChainDepth: how many chain hops a single trigger can propagate through (1 = single hop,
+        // 2 = chain-of-chains, etc.). Default 1 = direct neighbors only.
+        public int[] MineChainDepth = new int[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
         // Tower cooldown reduction: per-tower CDR (0 = no reduction, 0.3 = 30% faster cooldowns)
@@ -1033,6 +1047,11 @@ namespace BattleSystemECS.Core
             MineMaxStacks[entityId] = 1;
             MineStacksRemaining[entityId] = 0;
             MineTriggeredThisFrame[entityId] = false;
+            // Round 172 — Chain Detonation defaults: no chain propagation (zero-overhead fast path)
+            MineCanChain[entityId] = false;
+            MineChainRadius[entityId] = 0f;
+            MineChainDamageMult[entityId] = 0f;
+            MineChainDepth[entityId] = 0;
             // Fog of War: default to no fog restriction (visionRadius=0 means see all)
             TowerVisionRadius[entityId] = 0f;
             // Arc projectile fields: default to straight trajectory (0=straight, 1=homing, 2=arc)
@@ -1301,6 +1320,11 @@ namespace BattleSystemECS.Core
             MineMaxStacks[entityId] = 1;
             MineStacksRemaining[entityId] = 0;
             MineTriggeredThisFrame[entityId] = false;
+            // Round 172 — Chain Detonation reset (recycled slot must not leak chain state)
+            MineCanChain[entityId] = false;
+            MineChainRadius[entityId] = 0f;
+            MineChainDamageMult[entityId] = 0f;
+            MineChainDepth[entityId] = 0;
             // Heat/overheat fields reset
             TowerHeat[entityId] = 0f;
             TowerMaxHeat[entityId] = 0f;
