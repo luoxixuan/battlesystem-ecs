@@ -695,6 +695,18 @@ namespace BattleSystemECS.Config
             tower.OverkillType = ExtractInt(json, "OverkillType");
             tower.OverkillRatio = ExtractFloat(json, "OverkillRatio");
             tower.OverkillRadius = ExtractFloat(json, "OverkillRadius");
+            // Round 184 Direction 7 — Volley / Multi-Pellet Tower (scatter/shotgun mechanics).
+            //   All 3 default to inert single-shot values (1 / 1.0 / 0.0), so legacy towers are
+            //   unaffected. Designers opt in by setting ProjectileCount > 1.
+            //   Note: ExtractInt/ExtractFloat return 0 when the JSON key is missing, which would
+            //   override the C# defaults (= 1 / = 1f) for legacy towers. Explicit fallback here
+            //   means a future guard relax (e.g. `if (projCount >= 1)`) cannot silently break
+            //   every pre-184 tower. Negative values are also clamped to safe minimums.
+            int projCount = ExtractInt(json, "ProjectileCount");
+            tower.ProjectileCount = projCount > 0 ? projCount : 1;
+            float pelletMult = ExtractFloat(json, "PelletDamageMult");
+            tower.PelletDamageMult = pelletMult > 0f ? pelletMult : 1f;
+            tower.PelletConeRadius = ExtractFloat(json, "PelletConeRadius");
             return tower;
         }
 

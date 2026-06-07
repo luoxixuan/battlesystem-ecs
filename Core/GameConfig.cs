@@ -478,6 +478,21 @@ namespace BattleSystemECS.Config
         //   dispatch is the responsibility of TowerActiveSkillSystem on TriggerTowerActive() input.
         public int ActiveSkillId { get; set; } = -1;
         public float ActiveCooldown { get; set; } = 0f;
+        // ── Volley / Multi-Pellet Tower (Round 184 Direction 7) ────────────────
+        // ProjectileCount: number of pellets fired per attack (1 = single shot, 5 = classic shotgun).
+        //   Each pellet seeks its OWN target within PelletConeRadius (see TowerAttackSystem).
+        //   Default 1 = backward-compatible single-shot behavior (zero-overhead fast path).
+        //   Recommended range: 3..8 for shotguns, 2..4 for sidearms.
+        public int ProjectileCount { get; set; } = 1;
+        // PelletDamageMult: per-pellet damage multiplier (1.0 = full damage each, 0.4 = classic shotgun
+        //   where 5 pellets each deal 40% → 2.0x total concentrated damage at point-blank).
+        //   Default 1.0 keeps existing scatter towers (if any) at full per-pellet damage.
+        public float PelletDamageMult { get; set; } = 1f;
+        // PelletConeRadius: world-units radius around primary target within which extra pellets
+        //   search for additional targets. 0 = auto fallback to TowerRange (existing behavior).
+        //   Designers set this SMALLER than TowerRange for shotguns (e.g. 2 cells for close-range scatter)
+        //   to prevent pellets from picking up distant stragglers.
+        public float PelletConeRadius { get; set; } = 0f;
     }
 
     /// <summary>

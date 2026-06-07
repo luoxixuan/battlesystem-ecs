@@ -945,8 +945,8 @@ namespace BattleSystemECS.Core
                 TowerReloadProgress[entityId] = 0f;
                 TowerIsReloading[entityId] = false;
                 TowerProjectileHoming[entityId] = false;
-                // Scatter/multicast fields
-                TowerProjectileCount[entityId] = 0;
+                // Scatter/multicast fields (ProjectileCount reset to 1 matches AddTower default — legacy single-shot path)
+                TowerProjectileCount[entityId] = 1;
                 TowerScatterAngle[entityId] = 0f;
                 // Round 114 — Lead Aim: recycled slot starts at 0 (no lead, zero-overhead fast path)
                 TowerLeadAimFactor[entityId] = 0f;

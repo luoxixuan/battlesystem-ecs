@@ -338,9 +338,16 @@ namespace BattleSystemECS.Systems
                     store.TowerElementalAffinity[towerId] = tc.ElementalAffinity;
                     store.TowerElementalAffinityBonus[towerId] = tc.ElementalAffinityBonus;
                     // Apply on-hit lifesteal (Vampire tower family). Both default 0 in
-                    // TowerConfig, so non-vampire towers never enter the active path.
+                    // TowerConfig, so non-vampire towers are unaffected.
                     store.TowerLifestealFraction[towerId] = tc.LifestealFraction;
                     store.TowerLifestealMaxPerFrame[towerId] = tc.LifestealMaxPerFrame;
+                    // Round 184 Direction 7 — Volley / Multi-Pellet Tower (scatter/shotgun).
+                    //   Apply ProjectileCount + PelletDamageMult + PelletConeRadius to the store
+                    //   so TowerAttackSystem's scatter branch fires N pellets per attack.
+                    //   All 3 default to inert (1 / 1.0 / 0.0) → single-shot, zero-overhead path.
+                    store.TowerProjectileCount[towerId] = tc.ProjectileCount;
+                    store.TowerPelletDamageMult[towerId] = tc.PelletDamageMult;
+                    store.TowerPelletConeRadius[towerId] = tc.PelletConeRadius;
                     // Apply taunt tower properties (force-enemy-target-this-tower aura)
                     // Both default false/0 in TowerConfig, so non-taunt towers are inert.
                     store.TowerIsTaunt[towerId] = tc.IsTauntTower;

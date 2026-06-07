@@ -4263,6 +4263,42 @@
                        "Cost":  169,
                        "AttackSpeed":  0.5,
                        "Range":  15
+                   },
+                   {
+                       "UpgradeCost":  35,
+                       "Name":  "Scatter Gun #151",
+                       "Damage":  8,
+                       "Type":  "Pulse",
+                       "Cost":  60,
+                       "AttackSpeed":  1.0,
+                       "Range":  3,
+                       "ProjectileCount":  5,
+                       "PelletDamageMult":  0.4,
+                       "PelletConeRadius":  2.0
+                   },
+                   {
+                       "UpgradeCost":  45,
+                       "Name":  "Scorch Cannon #152",
+                       "Damage":  14,
+                       "Type":  "Plasma",
+                       "Cost":  80,
+                       "AttackSpeed":  0.8,
+                       "Range":  4,
+                       "ProjectileCount":  3,
+                       "PelletDamageMult":  0.55,
+                       "PelletConeRadius":  3.0
+                   },
+                   {
+                       "UpgradeCost":  55,
+                       "Name":  "Storm Salvo #153",
+                       "Damage":  20,
+                       "Type":  "Tesla",
+                       "Cost":  110,
+                       "AttackSpeed":  0.6,
+                       "Range":  5,
+                       "ProjectileCount":  6,
+                       "PelletDamageMult":  0.3,
+                       "PelletConeRadius":  4.0
                    }
                ],
     "Player":  {
