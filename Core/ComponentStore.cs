@@ -332,6 +332,15 @@ namespace BattleSystemECS.Core
                 // O(active_towers) per frame; for the 200-tower cap this is one extra
                 // write per tower per frame — negligible.
                 TowerSapperSlowMult[tid] = 0f;
+                // Round 187 Direction 4 — Rally per-frame atk-spd bonus reset.
+                // RallySystem runs in SkillBuffGroup and writes the additive atk-spd
+                // bonus from the active PlayerRallyActive players into this array. The
+                // next frame's BeginFrame() wipes the value to 0 so RallySystem must
+                // re-derive the current rally bonus from the live player set (no drift
+                // if a rally expires or is overridden). O(active_towers) per frame; for
+                // the 200-tower cap this is one extra write per tower per frame — same
+                // negligible cost as Sapper/Smokescreen resets above.
+                TowerRallyAtkSpdBonus[tid] = 0f;
             }
             CurrentFrame++;
         }

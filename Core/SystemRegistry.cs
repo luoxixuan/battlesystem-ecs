@@ -69,6 +69,8 @@ namespace BattleSystemECS.Core
         public HealAuraSystem? HealAura { get; private set; }
         // Round 126 Direction 4 — Thorns Aura System (passive tower-centered damage aura on enemies).
         public ThornsAuraSystem? ThornsAura { get; private set; }
+        // Round 187 Direction 4 — Rally Buff (player-damage → tower atk-spd buff).
+        public RallySystem? Rally { get; private set; }
         // Round 138 — Per-Tower Active Skill System (manual cast, cooldown-tick + public API).
         //   Constructed in the same block as the other tower systems; CombatGroup wires
         //   it after Taunt. Pure state machine — no per-tower field writes when
@@ -365,6 +367,12 @@ namespace BattleSystemECS.Core
             // the field (IsThornsTower==false fast path). Runs in SkillBuffGroup like
             // HealAura, but deals damage to enemies instead of healing friendly towers.
             ThornsAura = new ThornsAuraSystem(store);
+
+            // Round 187 Direction 4 — Rally Buff. Subscribes to PlayerDamaged event
+            // in its constructor; the event bus is shared with EnemyAbility / EnemyAI
+            // (created at the top of CreateAll). Runs in SkillBuffGroup; per-frame
+            // cost is O(active_towers) only when at least one PlayerRallyActive is true.
+            Rally = new RallySystem(store, logger, eventBus);
 
             // Round 138 — Per-Tower Active Skill System. Pure state machine that ticks
             //   per-tower cooldowns and exposes TriggerTowerActive(towerId) for the
@@ -760,6 +768,10 @@ namespace BattleSystemECS.Core
             // the only place the id is in scope) is now propagated to the SkillBuffGroup
             // so ThornsAuraSystem.Update can attribute QueueEnemyDeath to the killing player.
             scheduler.SkillBuff.ThornsAuraPlayerId = _thornsAuraPlayerId;
+            // Round 187 Direction 4 — Rally Buff wiring. Per-frame tick lives at the
+            // tail of SkillBuffGroup.Execute so the recomputed TowerRallyAtkSpdBonus
+            // is observable to TowerAttackSystem on the next combat-phase read.
+            scheduler.SkillBuff.Rally = Rally;
 
             // ── Post-death ──
             scheduler.PostDeath.EnemyFission = EnemyFission;

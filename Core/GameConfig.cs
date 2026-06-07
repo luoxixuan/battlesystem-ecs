@@ -3417,4 +3417,34 @@ namespace BattleSystemECS.Config
         /// <summary>Additive attack-speed bonus at tier 2 (0.20 = +20% attack speed).</summary>
         public const float FortressT2AtkSpdBonus = 0.20f;
     }
+
+    /// <summary>
+    /// Rally Buff — Round 187 Direction 4 (Player-Tower Linkage).
+    ///
+    /// When the player takes damage, all friendly towers within <c>RallyRadius</c>
+    /// tiles receive a temporary <c>RallyAtkSpdBonus</c> for <c>RallyDuration</c>
+    /// seconds. Cooldown <c>RallyCooldown</c> prevents spam-stacking on every hit.
+    ///
+    /// Defaults reflect the niche: small radius (5 tiles = adjacent towers only),
+    /// modest bonus (+30% atk spd = one strong "burst" feel), short duration (3s)
+    /// with a matching cooldown (5s) to prevent continuous re-trigger.
+    /// </summary>
+    public static class RallyConfig
+    {
+        /// <summary>Radius (tiles) around the player that receives the rally buff
+        /// when the player takes damage. Default 5.0 = "adjacent tower" range.</summary>
+        public const float RallyRadius = 5.0f;
+
+        /// <summary>Additive attack-speed bonus applied to each affected tower
+        /// (0.30 = +30% attack speed). Default 0.30f = noticeable burst.</summary>
+        public const float RallyAtkSpdBonus = 0.30f;
+
+        /// <summary>Duration in seconds the rally buff remains active. Default 3.0f.</summary>
+        public const float RallyDuration = 3.0f;
+
+        /// <summary>Cooldown in seconds after a rally expires before another
+        /// rally can be triggered. Default 5.0f = prevents continuous re-trigger
+        /// on multi-hit waves.</summary>
+        public const float RallyCooldown = 5.0f;
+    }
 }

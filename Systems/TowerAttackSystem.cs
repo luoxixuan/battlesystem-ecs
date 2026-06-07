@@ -465,9 +465,13 @@ namespace BattleSystemECS.Systems
                 // SapperSystem.RecomputeTowerSlows, then BeginFrame resets it to 0 — so we
                 // apply the multiplier that was rolled up for THIS frame). 0f fast path for
                 // non-targeted towers.
+                // Round 187 Direction 4: TowerRallyAtkSpdBonus is the additive attack-speed
+                // bonus contributed by any active Rally buffs on this tower. 0f fast path
+                // when no rally is active. Layered additively with HotZone/Fortress/Desperation.
                 float fortressAtkSpdBonus = store.GetTowerFortressAtkSpdBonus(towerId);
+                float rallyAtkSpdBonus = store.TowerRallyAtkSpdBonus[towerId];
                 float sapperAtkSpdMult = Math.Max(0f, 1f - store.TowerSapperSlowMult[towerId]);
-                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus) * sapperAtkSpdMult);
+                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus + rallyAtkSpdBonus) * sapperAtkSpdMult);
 
                 // ── Burst Fire / Salvo Mode check ─────────────────────────────────────
                 int burstCount = store.TowerBurstCount[towerId];

@@ -31,6 +31,11 @@ namespace BattleSystemECS.Core
         // to the killing player.
         public Systems.ThornsAuraSystem? ThornsAura { get; set; }
         public int ThornsAuraPlayerId { get; set; } = 0;
+        // Round 187 Direction 4 — Rally Buff. Per-frame tick: decrement PlayerRallyCooldown
+        // and PlayerRallyDurationLeft, recompute per-tower TowerRallyAtkSpdBonus from
+        // the live PlayerRallyActive set. Subscribes to PlayerDamaged in its constructor
+        // (via SystemRegistry) to activate the rally on player damage.
+        public Systems.RallySystem? Rally { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -59,6 +64,11 @@ namespace BattleSystemECS.Core
             ThornsAura?.Update(deltaTime, ThornsAuraPlayerId);
             Skill?.Update(deltaTime);
             Wisp?.Update(deltaTime);
+            // Round 187 Direction 4 — Rally Buff. Runs at the end of SkillBuffGroup
+            // (after all other time-based buffs have ticked this frame) so the
+            // recomputed TowerRallyAtkSpdBonus is observable to TowerAttackSystem
+            // on the next frame's hot-path read. (Same gate order as Bleed/Frostbite.)
+            Rally?.Update(deltaTime);
         }
     }
 }

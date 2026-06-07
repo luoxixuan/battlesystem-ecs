@@ -293,6 +293,20 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Default 0f = no buff active.
         public float[] PlayerChainKillBuffTimer = new float[MAX_PLAYERS];
 
+        // ==================== Rally Buff (SOA) — Round 187 Direction 4 ====================
+        // PlayerRallyActive: true if this player has an active Rally buff (player was hit, nearby
+        // towers are getting +atk speed). Default false = no rally. Decremented each frame in
+        // RallySystem.Update. The hot path in TowerAttackSystem reads TowerRallyAtkSpdBonus which
+        // is re-derived every frame from the live player set.
+        public bool[] PlayerRallyActive = new bool[MAX_PLAYERS];
+        // PlayerRallyDurationLeft: seconds remaining on the active rally. Decremented by deltaTime
+        // in RallySystem.Update; when it reaches 0, PlayerRallyActive is set to false. Default 0f.
+        public float[] PlayerRallyDurationLeft = new float[MAX_PLAYERS];
+        // PlayerRallyCooldown: seconds until the next rally can be triggered (after the previous one
+        // expires). Decremented by deltaTime in RallySystem.Update; gated at 0f in the PlayerDamaged
+        // event handler. Default 0f = "off cooldown, can trigger immediately".
+        public float[] PlayerRallyCooldown = new float[MAX_PLAYERS];
+
         #endregion
 
         // ==================== 玩家组件访问 ====================

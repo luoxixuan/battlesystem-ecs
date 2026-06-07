@@ -498,6 +498,19 @@ namespace BattleSystemECS.Core
         // the current slow each frame from the active Sapper's stack count).
         public float[] TowerSapperSlowMult = new float[MAX_ENTITIES];
 
+        // ==================== Rally Buff (SOA) — Round 187 Direction 4 ====================
+        // TowerRallyAtkSpdBonus: per-tower current additive attack-speed bonus from
+        // active Rally buffs (0 = no rally buff, 0.30 = +30% attack speed).
+        // Written by RallySystem.ApplyRallyBonusesForPlayer each frame the rally
+        // is active; read by TowerAttackSystem on the attack-interval formula
+        // (additive with HotZone/Fortress/Desperation bonuses). Default 0f =
+        // zero-overhead fast path; a tower that was never in a rally never
+        // contributes any cost in the hot path. BeginFrame() resets it to 0 each
+        // frame; RallySystem re-derives the value from the live PlayerRallyActive
+        // set, so towers that lose rally mid-frame cleanly revert on the next
+        // frame's BeginFrame — no drift if the rally expires.
+        public float[] TowerRallyAtkSpdBonus = new float[MAX_ENTITIES];
+
         // ==================== 治疗光环塔 (Heal Aura Tower — 塔-塔主动治疗链接) ====================
         // TowerHealAuraRadius: world-units radius within which this tower heals friendly towers
         //   each TowerHealAuraInterval seconds. 0 = no heal aura (zero-overhead fast path on hot
