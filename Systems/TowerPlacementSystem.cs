@@ -445,6 +445,14 @@ namespace BattleSystemECS.Systems
                         store.TowerBleedDuration[towerId] = tc.BleedDuration;
                         logger.Log($"[TOWER] {tc.Name} 流血塔: 每击 {tc.BleedStacksPerHit} 层, 伤害 {tc.BleedDmgPct * 100}% HP/层, 间隔 {tc.BleedTickInterval}s, 最大 {tc.BleedMaxStacks} 层");
                     }
+                    // Apply Death Mark tower properties (Round 200 Direction 5 — counter + execute)
+                    if (tc.IsDeathMarkTower)
+                    {
+                        store.TowerIsDeathMarkTower[towerId] = true;
+                        store.TowerDeathMarkChance[towerId] = tc.DeathMarkChance;
+                        store.TowerDeathMarkStacksPerHit[towerId] = tc.DeathMarkStacksPerHit > 0 ? tc.DeathMarkStacksPerHit : 1;
+                        logger.Log($"[TOWER] {tc.Name} 死亡印记塔: 概率 {tc.DeathMarkChance * 100}%, 每击 {tc.DeathMarkStacksPerHit} 层");
+                    }
                     // Apply chrono tower properties (time dilation field)
                     if (tc.IsChronoTower)
                     {

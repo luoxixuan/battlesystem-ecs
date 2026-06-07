@@ -865,6 +865,12 @@ namespace BattleSystemECS.Core
                 EnemyMarkStacks[entityId] = 0;
                 EnemyMarkDecayTimer[entityId] = 0f;
                 EnemyMarkMaxThreshold[entityId] = 0;
+                // Round 200 Direction 5 — Death Mark: reset on entity destroy to prevent
+                // ID-reuse leakage (a recycled ID carrying stale stacks/timer/maxStacks/bonus).
+                EnemyDeathMarkStacks[entityId] = 0;
+                EnemyDeathMarkTimer[entityId] = 0f;
+                EnemyDeathMarkMaxStacks[entityId] = 0;
+                EnemyDeathMarkBonusPerStack[entityId] = 0f;
                 // Round 142 方向5 — Aggro / Focus Fire: reset on entity destroy to prevent
                 // ID-reuse leakage (a recycled ID carrying stale focus tower id / duration).
                 EnemyFocusTowerId[entityId] = -1;
@@ -1314,6 +1320,9 @@ namespace BattleSystemECS.Core
             EnemyPhaseElementAffinityFlat = null!;
             // Round 107 Direction 6 — Target Mark Clear registration
             EnemyMarkStacks = null!; EnemyMarkDecayTimer = null!; EnemyMarkMaxThreshold = null!;
+            // Round 200 Direction 5 — Death Mark Clear registration
+            EnemyDeathMarkStacks = null!; EnemyDeathMarkTimer = null!; EnemyDeathMarkMaxStacks = null!;
+            EnemyDeathMarkBonusPerStack = null!;
             EnemyIsInvulnerable = null!; EnemyInvulnerablePhaseName = null!;
             EnemyFissionDefId = null!; EnemyFissionGeneration = null!;
             EnemyMorphDefId = null!; EnemyIsMorphed = null!; EnemyMorphTriggered = null!;
@@ -1403,6 +1412,8 @@ namespace BattleSystemECS.Core
             TowerIsPullTower = null!; TowerPullStrength = null!; TowerPullRadius = null!;
             TowerIsBleedTower = null!; TowerBleedStacksPerHit = null!; TowerBleedDmgPct = null!;
             TowerBleedTickInterval = null!; TowerBleedMaxStacks = null!; TowerBleedDuration = null!;
+            // Round 200 Direction 5 — Death Mark tower Clear registration
+            TowerIsDeathMarkTower = null!; TowerDeathMarkChance = null!; TowerDeathMarkStacksPerHit = null!;
             TowerIsIncomeTower = null!; TowerGoldPerSecond = null!;
             TowerIsConstructing = null!; TowerConstructionProgress = null!; TowerConstructionTime = null!;
             TowerConstructionHP = null!; TowerConstructionMaxHP = null!;

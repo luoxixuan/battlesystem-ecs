@@ -383,6 +383,15 @@ namespace BattleSystemECS.Config
         public float BleedMaxStacks { get; set; } = 0f;
         // BleedDuration: total duration in seconds for bleed effect
         public float BleedDuration { get; set; } = 0f;
+        // Round 200 Direction 5 — Death Mark tower: if true, tower applies stacking Death Mark on hit.
+        // Each successful hit rolls DeathMarkChance; on success, adds DeathMarkStacksPerHit stacks.
+        // Stacks decay 1-per-interval when no new hits land; at full stacks (per-enemy
+        // EnemyDeathMarkMaxStacks cap) the enemy is auto-executed (gold bonus + death queue).
+        public bool IsDeathMarkTower { get; set; } = false;
+        // DeathMarkChance: probability per successful hit of applying Death Mark stacks (0-1)
+        public float DeathMarkChance { get; set; } = 0f;
+        // DeathMarkStacksPerHit: number of Death Mark stacks applied per successful procced hit
+        public int DeathMarkStacksPerHit { get; set; } = 1;
         // Chrono tower: if true, tower creates a time dilation field that slows enemies within radius
         public bool IsChronoTower { get; set; } = false;
         // TimeFieldRadius: radius of the time dilation field (in grid units)
@@ -3441,14 +3450,53 @@ namespace BattleSystemECS.Config
         /// 10 stacks at 0.5s decay = ~5 seconds to fully stack.</summary>
         public const int RecommendedScorchThreshold = 10;
 
-        /// <summary>Recommended threshold for "电能标记 Volt Mark" (slow decay, low threshold).
+        /// Recommended threshold for "电能标记 Volt Mark" (slow decay, low threshold).
         /// 3 stacks at 2.0s decay = ~6 seconds to fully stack.</summary>
         public const int RecommendedVoltThreshold = 3;
     }
 
     /// <summary>
-    /// Fortress Aura (Round 180 Direction 5) — "clustered tower defense/offense" subsystem.
+    /// Death Mark Subsystem (Round 200 Direction 5) — stack-based execute counter applied
+    /// by tower attacks. Each procced hit increments <c>EnemyDeathMarkStacks</c> by +N
+    /// (N = TowerDeathMarkStacksPerHit, default 1) and resets <c>EnemyDeathMarkTimer</c>.
+    /// When the timer expires, one stack is consumed. When stacks reach the per-enemy
+    /// <c>EnemyDeathMarkMaxStacks</c> cap, the system fires <see cref="Systems.DeathMarkSystem.OnDeathMarkFull"/>
+    /// and auto-executes the target (queues enemy death + bonus gold).
     ///
+    /// Distinct from <see cref="MarkSubsystemConfig"/>:
+    ///   - Target Mark is a binary threshold tracker (one-shot OnMarkThreshold event).
+    ///   - Death Mark is a *linear-scaling* damage bonus (each stack adds
+    ///     <c>EnemyDeathMarkBonusPerStack</c> fraction to incoming damage) + an auto-execute
+    ///     payoff when stacks hit the cap. Stacks decay gracefully 1-per-interval.
+    /// </summary>
+    public static class DeathMarkSubsystemConfig
+    {
+        /// <summary>Default decay interval (seconds) for one stack's expiration.
+        /// Reset on every AddDeathMark() call. Mirrors MarkSubsystemConfig.DefaultDecayInterval.</summary>
+        public const float DefaultDecayInterval = 1.0f;
+
+        /// <summary>Hard upper cap on total Death Mark stacks per enemy (per-enemy EnemyDeathMarkMaxStacks
+        /// further constrains this). Prevents runaway stack accumulation in long fights.
+        /// 50 = enough for ~50 second fights at 1 stack/sec, with the typical 5-20 max threshold.</summary>
+        public const int DefaultMaxStackCap = 50;
+
+        /// <summary>Default per-stack additive damage multiplier when an enemy is Death Marked.
+        /// 0.05 = +5% damage per stack. At 10 stacks with this bonus, the enemy takes
+        /// 1.0 + 10*0.05 = 1.5x damage (50% bonus). Designers override per-enemy via
+        /// <c>EnemyDeathMarkBonusPerStack</c>.</summary>
+        public const float DefaultBonusPerStack = 0.05f;
+
+        /// <summary>Recommended cap for "暗影刺客 / Shadow Assassin" Death Mark (5 stacks to execute).
+        /// With 5 stacks × 5% = +25% damage taken at full stacks. Quick payoff window.</summary>
+        public const int RecommendedAssassinCap = 5;
+
+        /// <summary>Recommended cap for "死神 / Reaper" Death Mark (10 stacks to execute).
+        /// Longer buildup = +50% damage taken at full stacks. Slower but more rewarding.</summary>
+        public const int RecommendedReaperCap = 10;
+    }
+
+    /// <summary>
+    /// Fortress Aura (Round 180 Direction 5) — "clustered tower defense/offense" subsystem.
     /// When ≥<c>FortressT1NeighborCount</c> same-type towers cluster within
     /// <c>FortressRadius</c> of a given tower, that tower gains:
     ///   - <c>FortressT1DmgBonus</c> additive damage multiplier (multiplicative on baseDmg)

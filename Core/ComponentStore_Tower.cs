@@ -578,6 +578,17 @@ namespace BattleSystemECS.Core
         // TowerBleedDuration: total duration in seconds for bleed effect
         public float[] TowerBleedDuration = new float[MAX_ENTITIES];
 
+        // ==================== 死亡印记塔 (Death Mark Towers, Round 200 Direction 5) ====================
+        // TowerIsDeathMarkTower: true if this tower applies stacking Death Mark on hit (Assassin/Reaper type).
+        // Each successful hit rolls TowerDeathMarkChance; on success adds TowerDeathMarkStacksPerHit stacks.
+        // Distinct from bleed: Death Mark is a counter + damage bonus + auto-execute on full stacks,
+        // not a damage-over-time. See Systems/DeathMarkSystem.cs for full semantics.
+        public bool[] TowerIsDeathMarkTower = new bool[MAX_ENTITIES];
+        // TowerDeathMarkChance: probability per successful hit of applying Death Mark stacks (0-1)
+        public float[] TowerDeathMarkChance = new float[MAX_ENTITIES];
+        // TowerDeathMarkStacksPerHit: number of Death Mark stacks applied per successful procced hit
+        public int[] TowerDeathMarkStacksPerHit = new int[MAX_ENTITIES];
+
         // ==================== 塔被动资源生产（Income Tower）====================
         // TowerIsIncomeTower: true if this tower generates gold passively instead of attacking
         public bool[] TowerIsIncomeTower = new bool[MAX_ENTITIES];
@@ -1085,6 +1096,10 @@ namespace BattleSystemECS.Core
             TowerBleedTickInterval[entityId] = 1f;
             TowerBleedMaxStacks[entityId] = 0f;
             TowerBleedDuration[entityId] = 0f;
+            // Round 200 Direction 5 — Death Mark tower fields: default to non-deathmark (false/0)
+            TowerIsDeathMarkTower[entityId] = false;
+            TowerDeathMarkChance[entityId] = 0f;
+            TowerDeathMarkStacksPerHit[entityId] = 1;
             // Ammo fields: default to unlimited (maxAmmo=0 means infinite)
             TowerCurrentAmmo[entityId] = 0;
             TowerMaxAmmo[entityId] = 0;
@@ -1401,6 +1416,10 @@ namespace BattleSystemECS.Core
             TowerBleedTickInterval[entityId] = 1f;
             TowerBleedMaxStacks[entityId] = 0f;
             TowerBleedDuration[entityId] = 0f;
+            // Round 200 Direction 5 — Death Mark tower fields reset
+            TowerIsDeathMarkTower[entityId] = false;
+            TowerDeathMarkChance[entityId] = 0f;
+            TowerDeathMarkStacksPerHit[entityId] = 1;
             // Ammo fields reset
             TowerCurrentAmmo[entityId] = 0;
             TowerMaxAmmo[entityId] = 0;

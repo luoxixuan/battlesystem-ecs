@@ -19,6 +19,10 @@ namespace BattleSystemECS.Core
         // resolution) but before Skill cooldown update, so mark events triggered by
         // a hit this frame are observable to SkillSystem in the same frame.
         public Systems.MarkSystem? Mark { get; set; }
+        // Round 200 Direction 5 — Death Mark decay. Runs after Mark so Death Mark
+        // events are processed in the same frame as Target Mark events (both are
+        // hit-counter debuffs; Death Mark additionally fires the auto-execute).
+        public Systems.DeathMarkSystem? DeathMark { get; set; }
         // Round 122 Direction 2 — Heal Aura System (passive tower-to-tower healing).
         // Runs after Bleed and HealingZone (other healing/debuff systems) so heal ticks
         // are layered on top of any other heal effects in the same frame. SetTurn first
@@ -49,6 +53,10 @@ namespace BattleSystemECS.Core
             Frostbite?.ResolveFrostbiteDamage();
             HealingZone?.Update(deltaTime);
             Mark?.Update(deltaTime);
+            // Round 200 Direction 5 — Death Mark decay (after Mark). Auto-execute payoff
+            // queues enemy death in the same frame as the final stack hit, which the
+            // death-resolution pass handles cleanly at frame boundary.
+            DeathMark?.Update(deltaTime);
             // Heal aura: cache healer tower IDs first, then fire heal ticks. Both calls
             // are zero-cost when no heal-aura tower is on the field (SetTurn filter early
             // returns, Update early returns on empty healer cache).

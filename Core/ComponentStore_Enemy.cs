@@ -1038,6 +1038,30 @@ namespace BattleSystemECS.Core
         // Towers/enemies opt in by setting this > 0; default 0 keeps all enemies backward-compatible.
         public int[] EnemyMarkMaxThreshold = new int[MAX_ENTITIES];
 
+        // ==================== Death Mark (死亡印记叠加/处决标记, Round 200 Direction 5) ====================
+        // EnemyDeathMarkStacks: current stack count of the Death Mark debuff on this enemy.
+        // Each tower hit that opts into DeathMark (TowerDeathMarkChance > 0) adds +1 (or +stacks-per-hit).
+        // 0 = no Death Mark active. Default 0 (no opt-in). Distinct from EnemyMarkStacks (Round 107):
+        //   - EnemyMarkStacks is a binary threshold tracker with a one-shot threshold event.
+        //   - EnemyDeathMarkStacks is a *linear-scaling* damage bonus: each stack adds
+        //     EnemyDeathMarkBonusPerStack fraction to incoming damage. At full stacks (per-enemy
+        //     EnemyDeathMarkMaxStacks cap) the system auto-executes the enemy (gold bonus).
+        public int[] EnemyDeathMarkStacks = new int[MAX_ENTITIES];
+        // EnemyDeathMarkTimer: seconds remaining before the stack count decays by 1.
+        // Resets to DeathMarkSubsystemConfig.DefaultDecayInterval each time AddDeathMark() is called.
+        // When it reaches 0, decrement EnemyDeathMarkStacks by 1 and reset timer.
+        // 0 = no decay timer (only refreshed by hits).
+        public float[] EnemyDeathMarkTimer = new float[MAX_ENTITIES];
+        // EnemyDeathMarkMaxStacks: per-enemy cap on Death Mark stacks. 0 = no Death Mark opt-in
+        // (default; backward-compatible). Towers opt in via TowerDeathMarkChance > 0; enemies opt in
+        // by setting EnemyDeathMarkMaxStacks > 0 in the spawn config. At stacks == MaxStacks, the
+        // system fires the OnDeathMarkFull event and auto-executes the enemy (calls QueueEnemyDeath).
+        public int[] EnemyDeathMarkMaxStacks = new int[MAX_ENTITIES];
+        // EnemyDeathMarkBonusPerStack: per-stack additive damage multiplier (e.g. 0.05 = +5% damage
+        // per stack). Stored per-enemy so designers can scale boss resistance vs trash mobs.
+        // 0 = no damage bonus (Death Mark is pure counter, no payoff). Default 0.05 (5%).
+        public float[] EnemyDeathMarkBonusPerStack = new float[MAX_ENTITIES];
+
         // ==================== 诱饵 (Decoy) ====================
         // EnemyIsDecoy: when true, this enemy is a non-aggressive target dummy spawned by the player
         //   (e.g. a Hologram Decoy tower). Decoys do not move, do not attack, and cannot use abilities.

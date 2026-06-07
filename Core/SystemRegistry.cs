@@ -41,6 +41,8 @@ namespace BattleSystemECS.Core
         public GlobalSkillSystem? GlobalSkill { get; private set; }
         // Round 107 Direction 6 — Target Mark subsystem (stack-based debuff counter)
         public MarkSystem? Mark { get; private set; }
+        // Round 200 Direction 5 — Death Mark subsystem (stack-based execute counter + damage bonus)
+        public DeathMarkSystem? DeathMark { get; private set; }
         // Round 109 Direction 5 — Time Rewind snapshot ring (HP / Mana / Shield restore)
         public TimeRewindSnapshotSystem? TimeRewind { get; private set; }
 
@@ -501,6 +503,9 @@ namespace BattleSystemECS.Core
             // ── Round 107 Direction 6 — Target Mark subsystem ──
             Mark = new MarkSystem(store, playerId);
 
+            // ── Round 200 Direction 5 — Death Mark subsystem (stack + execute + damage bonus) ──
+            DeathMark = new DeathMarkSystem(store, playerId);
+
             // ── Round 109 Direction 5 — Time Rewind snapshot ring ──
             TimeRewind = new TimeRewindSnapshotSystem(store);
 
@@ -552,6 +557,9 @@ namespace BattleSystemECS.Core
             // ── Mark wiring: subscribe to OnEnemyKilled to free the per-entity
             //    threshold-fired latch on enemy destroy (avoids ID-reuse leakage). ──
             store.OnEnemyKilled += (enemyId, pid) => Mark?.OnEnemyDestroyed(enemyId);
+
+            // ── Round 200 Direction 5 — Death Mark wiring: same OnEnemyKilled latch reset. ──
+            store.OnEnemyKilled += (enemyId, pid) => DeathMark?.OnEnemyDestroyed(enemyId);
 
             // ── OnEnemyKilled → Combo + Necromancer ──
             store.OnEnemyKilled += (enemyId, pid) => Combo?.HandleComboIncrement(pid);
@@ -777,6 +785,8 @@ namespace BattleSystemECS.Core
             scheduler.SkillBuff.Wisp = Wisp;
             // Round 107 Direction 6 — Target Mark decay tick (between HealingZone and Skill cd)
             scheduler.SkillBuff.Mark = Mark;
+            // Round 200 Direction 5 — Death Mark decay tick (after Mark so event ordering matches)
+            scheduler.SkillBuff.DeathMark = DeathMark;
             // Round 122 Direction 2 — Heal Aura System wiring (passive tower-to-tower healing)
             scheduler.SkillBuff.HealAura = HealAura;
             // Round 126 Direction 4 — Thorns Aura System wiring (passive tower-centered damage on enemies).

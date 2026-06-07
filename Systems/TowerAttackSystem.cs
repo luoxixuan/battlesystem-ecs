@@ -19,6 +19,7 @@ namespace BattleSystemECS.Systems
         private TechTreeSystem techTreeSystem;
         private BuffSystem buffSystem;
         private BleedSystem bleedSystem;
+        private DeathMarkSystem deathMarkSystem; // injected for stack-based execute counter
         private TowerExperienceSystem towerExperienceSystem;
         private ProjectileSystem projectileSystem;
         private WeatherSystem _weatherSystem; // injected for weather effects
@@ -203,6 +204,16 @@ namespace BattleSystemECS.Systems
         public void SetBleedSystem(BleedSystem bleedSystem)
         {
             this.bleedSystem = bleedSystem;
+        }
+
+        /// <summary>
+        /// Round 200 Direction 5 — Inject DeathMarkSystem reference for stacking execute counter
+        /// on tower hits. Late-bound like BleedSystem (no-op when null, which is the default for
+        /// pre-existing test harnesses).
+        /// </summary>
+        public void SetDeathMarkSystem(DeathMarkSystem deathMarkSystem)
+        {
+            this.deathMarkSystem = deathMarkSystem;
         }
 
         /// <summary>
