@@ -188,6 +188,14 @@ namespace BattleSystemECS.Core
         // penalty doesn't stack into 100% miss. Kept as float[] rather than bool[] so future
         // tuning (e.g. dense-fog variants at 0.5) can read from the same field.
         public float[] TowerSmokeMissChance = new float[MAX_ENTITIES];
+        // ── Round 183 Direction 8 — Scorched Earth (per-frame, multiplicative range penalty) ──
+        // TowerVisionReduction: per-tower per-frame vision reduction set by CorpseEffectSystem
+        // when a ScorchedEarth corpse-effect zone (effectType=10) is within range. Reset to 0
+        // each frame by BeginFrame(). Consumed by TowerAttackSystem as a multiplier on the
+        // tower's effective range (e.g. 0.5 → range × 0.5). Default 0 = no penalty (inert
+        // fast path). Multiple overlapping scorched-earth zones use max() so the penalty
+        // doesn't compound into 100% blind.
+        public float[] TowerVisionReduction = new float[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
         // Tower cooldown reduction: per-tower CDR (0 = no reduction, 0.3 = 30% faster cooldowns)

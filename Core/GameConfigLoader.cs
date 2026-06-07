@@ -1724,6 +1724,11 @@ namespace BattleSystemECS.Config
                         // and 1f so existing effect types are unaffected).
                         c.MissChance = elem.TryGetProperty("missChance", out var mc) ? (float)mc.GetDouble() : 0f;
                         c.EnemySpeedBoost = elem.TryGetProperty("enemySpeedBoost", out var esb) ? (float)esb.GetDouble() : 1f;
+                        // Round 183 Direction 8 — Scorched Earth fields (optional in JSON,
+                        // default 0 so existing effect types are unaffected). DamageType
+                        // 0=Physical / 1=Fire. VisionReduction 0..1 multiplicative penalty.
+                        c.DamageType = elem.TryGetProperty("damageType", out var dt) ? dt.GetInt32() : 0;
+                        c.VisionReduction = elem.TryGetProperty("visionReduction", out var vr) ? (float)vr.GetDouble() : 0f;
                         if (elem.TryGetProperty("monsterTypes", out var mtElem) && mtElem.ValueKind == System.Text.Json.JsonValueKind.Array)
                         {
                             c.MonsterTypes = new List<string>();

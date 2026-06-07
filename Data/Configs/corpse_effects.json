@@ -90,5 +90,18 @@
     "missChance": 0.30,
     "enemySpeedBoost": 1.20,
     "monsterTypes": ["SmokeImp", "ShadowStalker", "PhaseWraith"]
+  },
+  {
+    "id": "scorched_earth",
+    "name": "Scorched Earth",
+    "effectType": 10,
+    "duration": 8.0,
+    "radius": 2.5,
+    "damagePerTick": 30.0,
+    "tickInterval": 1.0,
+    "slowAmount": 1.0,
+    "damageType": 1,
+    "visionReduction": 0.50,
+    "monsterTypes": ["InfernoLord", "FlameCannon", "Pyroclast"]
   }
 ]

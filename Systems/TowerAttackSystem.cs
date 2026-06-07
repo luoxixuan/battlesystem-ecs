@@ -563,6 +563,18 @@ namespace BattleSystemECS.Systems
                 var candidates = _towerCandidateBuffers[ti];
                 int candidateCount = 0;
                 int effectiveRange = (int)(range * _weatherRangeMult * _dayNightRangeMult);
+                // Round 183 Direction 8 — Scorched Earth vision reduction: a ScorchedEarth
+                // corpse-effect zone (effectType=10) under this tower adds a multiplicative
+                // range penalty. The CorpseEffectSystem writes max(zone.VisionReduction) into
+                // TowerVisionReduction[towerId] each frame; ComponentStore.BeginFrame() zeroes
+                // it at frame start so a tower that walks out of the fire regains full range.
+                // Guard: only apply when > 0 (0 = no penalty fast path, JIT folds the multiply
+                // to no-op). Applied as (1 - visionRed) so a 0.5 reduction = range × 0.5.
+                float visionRed = store.TowerVisionReduction[towerId];
+                if (visionRed > 0f)
+                {
+                    effectiveRange = (int)(effectiveRange * (1f - visionRed));
+                }
                 store.SpatialGrid.GetEnemiesInRange(store, tx, ty, effectiveRange, candidates, ref candidateCount);
                 _towerCandidateCounts[ti] = candidateCount;
 

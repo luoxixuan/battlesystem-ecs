@@ -19,6 +19,7 @@ namespace BattleSystemECS.Systems
     ///   7 = ThornyBramble (DoT + slow combo — Round 169 Direction 10)
     ///   8 = BlightedGround (DoT + armor/speed debuff — Round 171 Direction 4)
     ///   9 = Smokescreen (tower miss chance + enemy speed boost — Round 175 Direction 9)
+    ///  10 = ScorchedEarth (DoT + tower vision reduction — Round 183 Direction 8)
     ///
     /// Integration points:
     ///   - FrameScheduler.Tick() Phase 9.6 calls CorpseEffectSystem.Update()
@@ -136,9 +137,10 @@ namespace BattleSystemECS.Systems
 
                 // Tick timer for DoT effects
                 int curEffectType = _store.CorpseEffectType[zoneId];
-                if (curEffectType == 0 || curEffectType == 3 || curEffectType == 6 || curEffectType == 7 || curEffectType == 8)
+                if (curEffectType == 0 || curEffectType == 3 || curEffectType == 6 || curEffectType == 7 || curEffectType == 8 || curEffectType == 10)
                 {
-                    // Poison (0), Fire (3), HallowedGround (6), ThornyBramble (7), BlightedGround (8) — all DoT effects
+                    // Poison (0), Fire (3), HallowedGround (6), ThornyBramble (7), BlightedGround (8),
+                    // ScorchedEarth (10) — all DoT effects.
                     // NOTE: Smokescreen (9) is NOT a DoT — it has no DamagePerTick and is handled purely
                     // in ApplyContinuousEffect (per-frame miss + speed buff). Including it here would
                     // queue a 0-damage DoT pulse every tickInterval for no reason.
@@ -220,12 +222,17 @@ namespace BattleSystemECS.Systems
             float slowAmount = _store.CorpseEffectSlowAmount[zoneId];
 
             // Slow (1), Ice (2), ThornyBramble (7), BlightedGround (8) need per-frame enemy pass.
-            // Smokescreen (9) needs per-frame enemy AND tower pass (added below).
+            // Smokescreen (9) and ScorchedEarth (10) have their own dedicated passes; do not
+            // enter the enemy-only loop.
             if (effectType != 1 && effectType != 2 && effectType != 7 && effectType != 8) {
                 // Smokescreen has its own dedicated pass; do not enter the enemy-only loop
                 if (effectType == 9)
                 {
                     ApplySmokescreenEffects(zoneId);
+                }
+                else if (effectType == 10)
+                {
+                    ApplyScorchedEarthEffects(zoneId);
                 }
                 return;
             }
@@ -354,6 +361,48 @@ namespace BattleSystemECS.Systems
                     float dy = _store.PositionY[eid] - cy;
                     if (dx * dx + dy * dy > radiusSq) continue;
                     _store.EnemyTerrainMoveSpeedMult[eid] *= speedBoost;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Round 183 Direction 8 — Scorched Earth per-frame application.
+        /// - Towers in radius: write max(zone.VisionReduction, existing) into
+        ///   TowerVisionReduction[]. ComponentStore.BeginFrame() zeroes this array at the
+        ///   start of every frame, so this write fully describes "this frame's range penalty"
+        ///   for the tower. Multiple overlapping scorched-earth zones use max() (not +=) so
+        ///   they don't compound into 100% blind. The TowerAttackSystem then multiplies the
+        ///   tower's effectiveRange by (1 - TowerVisionReduction[tid]) before target selection.
+        ///
+        /// - Enemies in radius: the actual DoT damage is applied by ApplyDoTTick (the
+        ///   CorpseEffectTickTimer-driven pulse), so this method only handles the tower-side
+        ///   vision reduction. Bounds-checked: zone center is compared against ActiveTowerIds
+        ///   (only iterates live towers, zero waste). Each per-tower write is O(1) with no
+        ///   allocations.
+        /// </summary>
+        private void ApplyScorchedEarthEffects(int zoneId)
+        {
+            float cx = _store.CorpseEffectX[zoneId];
+            float cy = _store.CorpseEffectY[zoneId];
+            float radius = _store.CorpseEffectRadius[zoneId];
+            float visionRed = _store.CorpseEffectVisionReduction[zoneId];
+            if (visionRed <= 0f) return; // inert zone — no-op fast path
+
+            float radiusSq = radius * radius;
+
+            var towers = _store.ActiveTowerIds;
+            for (int i = 0; i < towers.Count; i++)
+            {
+                int tid = towers[i];
+                if (!_store.TowerActive[tid]) continue;
+                // Towers use the shared PositionX/PositionY arrays (same as enemies/players).
+                float dx = _store.PositionX[tid] - cx;
+                float dy = _store.PositionY[tid] - cy;
+                if (dx * dx + dy * dy > radiusSq) continue;
+                // max-merge so overlapping scorched-earth zones don't compound into 100% blind
+                if (visionRed > _store.TowerVisionReduction[tid])
+                {
+                    _store.TowerVisionReduction[tid] = visionRed;
                 }
             }
         }

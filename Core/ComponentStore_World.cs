@@ -286,6 +286,13 @@ namespace BattleSystemECS.Core
         // Round 175 Direction 9 — Smokescreen enemy move-speed boost (per-zone, multiplicative
         // into EnemyTerrainMoveSpeedMult[]; 1.0 = no boost, 1.2 = +20% speed).
         public float[] CorpseEffectEnemySpeedBoost = new float[MAX_CORPSE_EFFECTS];
+        // Round 183 Direction 8 — Scorched Earth (CorpseEffectType=10) DoT + tower vision
+        // reduction. DamageType: 0=Physical, 1=Fire (default 0 keeps all other zones unchanged).
+        public int[] CorpseEffectDamageType = new int[MAX_CORPSE_EFFECTS];
+        // Vision reduction applied to towers inside the zone (0..1, e.g. 0.5 = -50% range).
+        // Mirrored into TowerVisionReduction[] (tower-side per-frame cache, max-merge across
+        // overlapping zones) and consumed by TowerAttackSystem. Default 0 = inert.
+        public float[] CorpseEffectVisionReduction = new float[MAX_CORPSE_EFFECTS];
         private List<int> _activeCorpseEffectIds = new List<int>();
         private int _nextCorpseEffectId = 0;
 
@@ -426,7 +433,7 @@ namespace BattleSystemECS.Core
         /// Called from EnemyFissionSystem or ResolveEnemiesKilledThisFrame.
         /// Returns zone ID or -1 if no free slots.
         /// </summary>
-        public int AddCorpseEffect(float x, float y, int effectType, float radius, float duration, float damagePerTick = 0f, float slowAmount = 1f, float tickInterval = 1f, float armorReduction = 0f, float speedReduction = 0f, float missChance = 0f, float enemySpeedBoost = 1f)
+        public int AddCorpseEffect(float x, float y, int effectType, float radius, float duration, float damagePerTick = 0f, float slowAmount = 1f, float tickInterval = 1f, float armorReduction = 0f, float speedReduction = 0f, float missChance = 0f, float enemySpeedBoost = 1f, int damageType = 0, float visionReduction = 0f)
         {
             int zoneId = -1;
             for (int i = 0; i < MAX_CORPSE_EFFECTS; i++)
@@ -458,6 +465,10 @@ namespace BattleSystemECS.Core
             // because their MissChance/EnemySpeedBoost default to 0/1f respectively).
             CorpseEffectMissChance[zoneId] = missChance;
             CorpseEffectEnemySpeedBoost[zoneId] = enemySpeedBoost;
+            // Round 183 Direction 8 — Scorched Earth (damageType 0=Physical / 1=Fire,
+            // visionReduction 0..1, both default 0 so existing zone types are inert).
+            CorpseEffectDamageType[zoneId] = damageType;
+            CorpseEffectVisionReduction[zoneId] = visionReduction;
             _activeCorpseEffectIds.Add(zoneId);
             return zoneId;
         }
@@ -483,6 +494,9 @@ namespace BattleSystemECS.Core
             // Round 175 Direction 9 — Smokescreen fields
             CorpseEffectMissChance[zoneId] = 0f;
             CorpseEffectEnemySpeedBoost[zoneId] = 1f;
+            // Round 183 Direction 8 — Scorched Earth fields (default 0 / 0 = inert)
+            CorpseEffectDamageType[zoneId] = 0;
+            CorpseEffectVisionReduction[zoneId] = 0f;
             _activeCorpseEffectIds.Remove(zoneId);
         }
 

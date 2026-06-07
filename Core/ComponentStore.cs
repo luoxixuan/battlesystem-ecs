@@ -317,6 +317,12 @@ namespace BattleSystemECS.Core
                 // smoke would keep missing). Note: this is O(active_towers) per frame;
                 // for the 200-tower cap this is 200 writes/frame — negligible.
                 TowerSmokeMissChance[tid] = 0f;
+                // Round 183 Direction 8 — Scorched Earth per-frame vision reduction reset.
+                // CorpseEffectSystem writes max(zone.VisionReduction, existing) into this
+                // array each frame for active ScorchedEarth zones. Without the per-frame
+                // wipe, a tower that walked out of the fire would keep its range penalty
+                // for the rest of the game. Same O(active_towers) cost as smoke.
+                TowerVisionReduction[tid] = 0f;
             }
             CurrentFrame++;
         }
@@ -1010,6 +1016,11 @@ namespace BattleSystemECS.Core
                 // must not carry the previous occupant's stale smoke miss chance — would
                 // cause a freshly-placed tower to inherit a phantom miss debuff).
                 TowerSmokeMissChance[entityId] = 0f;
+                // Round 183 Direction 8 — Scorched Earth per-frame vision reduction
+                // (recycled slot must not carry the previous occupant's stale vision
+                // penalty — would cause a freshly-placed tower to inherit a phantom
+                // range debuff).
+                TowerVisionReduction[entityId] = 0f;
                 // Round 145 Direction 3 — Per-Tower Modifier reset (recycled slot must not
                 // carry the previous occupant's modifier — would cause a freshly-placed
                 // tower to inherit a random modifier it never rolled)

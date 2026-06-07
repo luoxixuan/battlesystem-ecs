@@ -2840,6 +2840,20 @@ namespace BattleSystemECS.Config
         /// Multiplies into EnemyTerrainMoveSpeedMult[] for enemies in range.
         /// </summary>
         public float EnemySpeedBoost { get; set; } = 1f;
+        /// <summary>
+        /// Round 183 Direction 8 — Scorched Earth damage type tag (0=Physical, 1=Fire).
+        /// Only consumed by effectType=10 (ScorchedEarth). 0 = physical (default for all other
+        /// types). Used by the resistance pipeline; "fire" allows the zone damage to be reduced
+        /// by EnemyFireResist on enemies that have it configured.
+        /// </summary>
+        public int DamageType { get; set; } = 0;
+        /// <summary>
+        /// Round 183 Direction 8 — Scorched Earth tower vision reduction (0..1, e.g. 0.5 = -50%
+        /// tower effective range). Only consumed by effectType=10 (ScorchedEarth). 0 = no vision
+        /// penalty (default for all other types). Mirrored into TowerVisionReduction[] via max-merge
+        /// across overlapping zones.
+        /// </summary>
+        public float VisionReduction { get; set; } = 0f;
         /// <summary>Enemy types that leave this corpse effect (comma-separated in JSON).</summary>
         public List<string> MonsterTypes { get; set; } = new List<string>();
     }
