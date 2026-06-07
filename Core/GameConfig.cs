@@ -2565,6 +2565,8 @@ namespace BattleSystemECS.Config
         public const int Rain = 1;
         public const int Fog = 2;
         public const int Storm = 3;
+        // Round 185 Direction 1: Sandstorm — persistent DoT on enemies + tower range reduction
+        public const int Sandstorm = 4;
 
         // Global config
         public float GlobalEnemySpeedMult { get; set; } = 1.0f;
@@ -2588,6 +2590,9 @@ namespace BattleSystemECS.Config
         // Intensity range for random selection
         public float MinIntensity { get; set; } = 0.5f;
         public float MaxIntensity { get; set; } = 1.0f;
+        // Round 185: DoT as fraction of EnemyMaxHealth per second (0 = no DoT, e.g. 0.005 = 0.5%/s).
+        // Used by Sandstorm. Other weather types leave this at 0 (no-op on the hot path).
+        public float EnemyDotPct { get; set; } = 0f;
     }
 
     /// <summary>

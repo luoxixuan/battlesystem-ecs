@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="89368f2a-2386-47da-ac3f-64e230801073" name="mono@SH-WUJUN04 2026-06-07 17:48:23" runUser="SH-WUJUN04\mono" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-06-07T17:48:23.1947838+08:00" queuing="2026-06-07T17:48:23.1947839+08:00" start="2026-06-07T17:48:22.2329057+08:00" finish="2026-06-07T17:48:23.1991935+08:00" />
+  <TestSettings name="default" id="acddb207-3f01-47bc-ad1e-1b6f12d54326">
+    <Deployment runDeploymentRoot="mono_SH-WUJUN04_2026-06-07_17_48_23" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="be540f9f-ec44-4bfe-a1b8-1f76966b8838" testId="72cebdd5-2203-d533-6f31-bdc3a900a3d5" testName="BattleSystemECS.Tests.SandstormWeatherTests.Sandstorm_Update_AppliesDotToActiveEnemies" computerName="SH-WUJUN04" duration="00:00:00.0390951" startTime="2026-06-07T17:48:23.1110798+08:00" endTime="2026-06-07T17:48:23.1110966+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="be540f9f-ec44-4bfe-a1b8-1f76966b8838">
+      <Output>
+        <ErrorInfo>
+          <Message>DEBUG eA=2 eB=3 hpA=99 maxA=100 hpB=198 maxB=200</Message>
+          <StackTrace>   at BattleSystemECS.Tests.SandstormWeatherTests.Sandstorm_Update_AppliesDotToActiveEnemies() in F:\AI\BattleSystem-ECS\BattleSystemECS.Tests\SandstormWeatherTests.cs:line 132&#xD;
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="BattleSystemECS.Tests.SandstormWeatherTests.Sandstorm_Update_AppliesDotToActiveEnemies" storage="f:\ai\battlesystem-ecs\battlesystemecs.tests\bin\release\net9.0\battlesystemecs.tests.dll" id="72cebdd5-2203-d533-6f31-bdc3a900a3d5">
+      <Execution id="be540f9f-ec44-4bfe-a1b8-1f76966b8838" />
+      <TestMethod codeBase="F:\AI\BattleSystem-ECS\BattleSystemECS.Tests\bin\Release\net9.0\BattleSystemECS.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="BattleSystemECS.Tests.SandstormWeatherTests" name="Sandstorm_Update_AppliesDotToActiveEnemies" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="72cebdd5-2203-d533-6f31-bdc3a900a3d5" executionId="be540f9f-ec44-4bfe-a1b8-1f76966b8838" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="列表中未列出的结果" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="所有已加载的结果" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="1" executed="1" passed="0" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 9.0.0)&#xD;
+[xUnit.net 00:00:00.40]   Discovering: BattleSystemECS.Tests&#xD;
+[xUnit.net 00:00:00.49]   Discovered:  BattleSystemECS.Tests&#xD;
+[xUnit.net 00:00:00.49]   Starting:    BattleSystemECS.Tests&#xD;
+DEBUG_DOT_ENTRY: dotPct=0.005 dt=1 playerId=0&#xD;
+DEBUG_LOOP: eid=2 maxHp=100 dotPct=0.005 dt=1 rawDmg=0.5 dmg=0.5&#xD;
+DEBUG_LOOP: eid=2 maxHp=100 dotPct=0.005 dt=1 rawDmg=0.5 dmg=0.5&#xD;
+DEBUG_LOOP: eid=3 maxHp=200 dotPct=0.005 dt=1 rawDmg=1 dmg=1&#xD;
+DEBUG_LOOP: eid=3 maxHp=200 dotPct=0.005 dt=1 rawDmg=1 dmg=1&#xD;
+[xUnit.net 00:00:00.57]       DEBUG eA=2 eB=3 hpA=99 maxA=100 hpB=198 maxB=200&#xD;
+[xUnit.net 00:00:00.57]       Stack Trace:&#xD;
+[xUnit.net 00:00:00.57]         F:\AI\BattleSystem-ECS\BattleSystemECS.Tests\SandstormWeatherTests.cs(132,0): at BattleSystemECS.Tests.SandstormWeatherTests.Sandstorm_Update_AppliesDotToActiveEnemies()&#xD;
+[xUnit.net 00:00:00.57]            at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)&#xD;
+[xUnit.net 00:00:00.57]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)&#xD;
+[xUnit.net 00:00:00.57]   Finished:    BattleSystemECS.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="SH-WUJUN04" outcome="Error" timestamp="2026-06-07T17:48:23.1093497+08:00">
+        <Text>[xUnit.net 00:00:00.57]     BattleSystemECS.Tests.SandstormWeatherTests.Sandstorm_Update_AppliesDotToActiveEnemies [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

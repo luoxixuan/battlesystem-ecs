@@ -29,6 +29,8 @@ namespace BattleSystemECS.Systems
         private float _cachedEnemySpeedMult = 1.0f;
         private float _cachedTowerRangeMult = 1.0f;
         private float _cachedTowerDamageMult = 1.0f;
+        // Round 185 Direction 1: cached DoT fraction (0 for non-damaging weather types, e.g. 0.005 for Sandstorm)
+        private float _cachedEnemyDotPct = 0f;
 
         // Frame counter for weather transitions
         private int _turnCount = 0;
@@ -70,6 +72,43 @@ namespace BattleSystemECS.Systems
 
                 // Update cached multipliers when weather changes
                 UpdateCachedMultipliers(playerId, currentWeather, intensity);
+
+                // Round 185 Direction 1 (Sandstorm): if this weather type has a non-zero
+                // EnemyDotPct, apply per-frame DoT to every active enemy. Sentinel-gated:
+                // _cachedEnemyDotPct == 0 short-circuits the entire loop (zero overhead for
+                // Clear/Rain/Fog/Storm, which is 4/5 of all weather types).
+                ApplyWeatherDot(playerId, deltaTime);
+            }
+        }
+
+        /// <summary>
+        /// Round 185 Direction 1 (Sandstorm): per-frame DoT = dotPct * EnemyMaxHealth * deltaTime,
+        /// gated by _cachedEnemyDotPct > 0. Skips inactive / dead enemies via EnemyHealth check.
+        /// Applies MinHealthFloor (Round 132) so the floor gate still works for sandstorm damage.
+        /// </summary>
+        private void ApplyWeatherDot(int playerId, float deltaTime)
+        {
+            if (_cachedEnemyDotPct <= 0f) return;
+            if (deltaTime <= 0f) return;
+
+            // Sandstorm convention: intensity=1 = full effect, intensity=0 = no effect.
+            float intensity = _store.WeatherIntensity[playerId];
+            float scaledDotPct = _cachedEnemyDotPct * intensity;
+            if (scaledDotPct <= 0f) return;
+
+            var enemyIds = _store.ActiveEnemyIds;
+            for (int i = 0; i < enemyIds.Count; i++)
+            {
+                int eid = enemyIds[i];
+                if (eid < 0 || eid >= ComponentStore.MAX_ENTITIES) continue;
+                if (_store.EnemyHealth[eid] <= 0f) continue;
+                float maxHp = _store.EnemyMaxHealth[eid];
+                if (maxHp <= 0f) continue;
+                // Round 185: per-frame DoT = maxHp * dotPct * intensity * deltaTime.
+                float rawDmg = maxHp * scaledDotPct * deltaTime;
+                float dmg = _store.ClampDamageToHealthFloor(eid, rawDmg);
+                if (dmg <= 0f) continue;
+                _store.EnemyHealth[eid] -= dmg;
             }
         }
 
@@ -88,6 +127,7 @@ namespace BattleSystemECS.Systems
                 _cachedEnemySpeedMult = 1.0f;
                 _cachedTowerRangeMult = 1.0f;
                 _cachedTowerDamageMult = 1.0f;
+                _cachedEnemyDotPct = 0f;
                 return;
             }
 
@@ -123,6 +163,7 @@ namespace BattleSystemECS.Systems
                     _cachedEnemySpeedMult = chosenConfig.EnemySpeedMult;
                     _cachedTowerRangeMult = chosenConfig.TowerRangeMult;
                     _cachedTowerDamageMult = chosenConfig.TowerDamageMult;
+                    _cachedEnemyDotPct = chosenConfig.EnemyDotPct;
                 }
             }
             else
@@ -134,6 +175,7 @@ namespace BattleSystemECS.Systems
                 _cachedEnemySpeedMult = 1.0f;
                 _cachedTowerRangeMult = 1.0f;
                 _cachedTowerDamageMult = 1.0f;
+                _cachedEnemyDotPct = 0f;
             }
         }
 
@@ -173,6 +215,20 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// Round 185 Direction 1 (Sandstorm): returns the per-second enemy DoT fraction
+        /// (multiplied by intensity) for the current weather. Returns 0 for non-damaging
+        /// weather (Clear/Rain/Fog/Storm). Callers should multiply by EnemyMaxHealth and
+        /// deltaTime to compute per-frame damage.
+        /// </summary>
+        public float GetEnemyDotPct(int playerId)
+        {
+            if (_cachedEnemyDotPct <= 0f) return 0f;
+            float intensity = _store.WeatherIntensity[playerId];
+            // Sandstorm convention: intensity=1 = full effect, intensity=0 = no effect.
+            return _cachedEnemyDotPct * intensity;
+        }
+
+        /// <summary>
         /// Forces a specific weather type (e.g., from a special event or boss ability).
         /// </summary>
         public void ForceWeather(int playerId, int weatherType, float intensity, float duration)
@@ -194,12 +250,14 @@ namespace BattleSystemECS.Systems
                 _cachedEnemySpeedMult = typeConfig.EnemySpeedMult;
                 _cachedTowerRangeMult = typeConfig.TowerRangeMult;
                 _cachedTowerDamageMult = typeConfig.TowerDamageMult;
+                _cachedEnemyDotPct = typeConfig.EnemyDotPct;
             }
             else
             {
                 _cachedEnemySpeedMult = 1.0f;
                 _cachedTowerRangeMult = 1.0f;
                 _cachedTowerDamageMult = 1.0f;
+                _cachedEnemyDotPct = 0f;
             }
         }
 
@@ -211,6 +269,7 @@ namespace BattleSystemECS.Systems
                 "rain" => WeatherConfig.Rain,
                 "fog" => WeatherConfig.Fog,
                 "storm" => WeatherConfig.Storm,
+                "sandstorm" => WeatherConfig.Sandstorm,
                 _ => WeatherConfig.Clear
             };
         }
@@ -223,6 +282,7 @@ namespace BattleSystemECS.Systems
                 WeatherConfig.Rain => "Rain",
                 WeatherConfig.Fog => "Fog",
                 WeatherConfig.Storm => "Storm",
+                WeatherConfig.Sandstorm => "Sandstorm",
                 _ => "Clear"
             };
         }

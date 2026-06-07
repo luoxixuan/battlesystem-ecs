@@ -38,6 +38,16 @@
       "defaultDuration": 8,
       "minIntensity": 0.7,
       "maxIntensity": 1.0
+    },
+    {
+      "type": "Sandstorm",
+      "enemySpeedMult": 0.95,
+      "towerRangeMult": 0.8,
+      "towerDamageMult": 1.0,
+      "defaultDuration": 12,
+      "minIntensity": 0.5,
+      "maxIntensity": 1.0,
+      "enemyDotPct": 0.005
     }
   ]
 }

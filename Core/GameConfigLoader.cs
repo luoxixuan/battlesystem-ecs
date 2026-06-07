@@ -1346,6 +1346,8 @@ namespace BattleSystemECS.Config
                             typeConfig.DefaultDuration = ExtractFloat(obj, "defaultDuration", -1f);
                             typeConfig.MinIntensity = ExtractFloat(obj, "minIntensity", 0.5f);
                             typeConfig.MaxIntensity = ExtractFloat(obj, "maxIntensity", 1.0f);
+                            // Round 185: parse enemyDotPct for Sandstorm-style weather (default 0 = no DoT)
+                            typeConfig.EnemyDotPct = ExtractFloat(obj, "enemyDotPct", 0f);
                             if (!string.IsNullOrEmpty(typeConfig.Name))
                                 config.Types[typeConfig.Name] = typeConfig;
                             pos = objEnd + 1;
