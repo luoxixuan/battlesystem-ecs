@@ -35,6 +35,11 @@ namespace BattleSystemECS.Core
         public int[] EnemyGoldReward = new int[MAX_ENTITIES];
         public int[] EnemyWaveNumber = new int[MAX_ENTITIES];
         public bool[] EnemyActive = new bool[MAX_ENTITIES];
+        // ── Round 196 Direction 3 — Soul Harvest: per-enemy soul reward on kill.
+        // Default 1f (= 1 soul per non-boss kill). Boss/Elite enemies should be set
+        // higher (e.g. 100f) via SetEnemySoulValue() right after AddEnemy. Read by
+        // SoulHarvestSystem.HandleEnemyKilled() and added to PlayerSoulCount.
+        public float[] EnemySoulValue = new float[MAX_ENTITIES];
         public float[] EnemyChargeParam = new float[MAX_ENTITIES]; // SOA: replaces ConcurrentDictionary in EnemyAISystem
         // EnemyBuffDamageBonus: tracks buff damage bonus applied by buff_allies ability — separate from EnemyChargeParam
         public float[] EnemyBuffDamageBonus = new float[MAX_ENTITIES];
@@ -1231,6 +1236,11 @@ namespace BattleSystemECS.Core
             EnemyGoldReward[entityId] = goldReward;
             EnemyWaveNumber[entityId] = waveNumber;
             EnemyActive[entityId] = true;
+            // Round 196 Direction 3 — Soul Harvest default: 1 soul per kill. Boss/Elite
+            // overrides are applied via SetEnemySoulValue() right after AddEnemy. The
+            // default keeps the feature fully backward compatible (every kill grants
+            // ≥ 1 soul automatically).
+            EnemySoulValue[entityId] = 1f;
             // Path/waypoint: default -1 = no path (use straight Y-axis movement)
             EnemyPathId[entityId] = -1;
             EnemyPathNodeIndex[entityId] = 0;
@@ -1759,6 +1769,31 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(enemyId)) return;
             EnemyIsBounty[enemyId] = true;
             EnemyBountyGoldMult[enemyId] = System.Math.Clamp(goldMult, 1.0f, 20.0f);
+        }
+
+        /// <summary>
+        /// Round 196 Direction 3 — Set per-enemy soul reward value (Soul Harvest). Default
+        /// is 1f (set in AddEnemy). Boss / Elite monsters should override with a much
+        /// higher value (e.g. 100f). Clamped to [0, 10000] to prevent config mistakes
+        /// from granting absurd soul counts. Safe to call on inactive / non-enemy slots
+        /// (IsValidEntity short-circuits).
+        /// </summary>
+        /// <param name="enemyId">Target enemy entity ID (must be valid).</param>
+        /// <param name="soulValue">Souls granted on kill (clamped to [0, 10000]).</param>
+        public void SetEnemySoulValue(int enemyId, float soulValue)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemySoulValue[enemyId] = System.Math.Clamp(soulValue, 0f, 10000f);
+        }
+
+        /// <summary>
+        /// Round 196 Direction 3 — Read-only accessor for per-enemy soul reward. Returns
+        /// 0f for invalid / inactive entities. Used by SoulHarvestSystem and tests.
+        /// </summary>
+        public float GetEnemySoulValue(int enemyId)
+        {
+            if (!IsValidEntity(enemyId)) return 0f;
+            return EnemySoulValue[enemyId];
         }
 
         /// <summary>

@@ -169,6 +169,13 @@ namespace BattleSystemECS.Core
         // Round 110 Direction 10 — DoomClock countdown + final-score helper.
         public DoomClockSystem? DoomClock { get; private set; }
 
+        // Round 196 Direction 3 — Soul Harvest (kill → soul currency; soul-cost skills).
+        //   Per-kill harvesting wires via store.OnEnemyKilled; per-frame regen tick
+        //   lives in PostDeathGroup (so it shares the same cadence as Combo / DoomClock).
+        //   Public API: TrySpendSouls / AddSouls / SetSoulCap / SetSoulRegen / GetSoulCount
+        //   — invoked from skill cast paths and quest/level-up reward paths.
+        public SoulHarvestSystem? SoulHarvest { get; private set; }
+
         // ── Replay / Recording ──
         public ReplaySystem? Replay { get; private set; }
 
@@ -412,6 +419,13 @@ namespace BattleSystemECS.Core
             // by PostDeathGroup.DoomClock.Update(...) each WavePhase frame.
             DoomClock = new DoomClockSystem(store, playerId);
 
+            // Round 196 Direction 3 — Soul Harvest System. Per-kill harvesting wires
+            // via store.OnEnemyKilled in WireDependencies below; per-frame regen
+            // tick is invoked by PostDeathGroup. Stateless beyond ComponentStore
+            // reads (no per-frame state) — zero cost when no enemies are killed
+            // and no regen is configured.
+            SoulHarvest = new SoulHarvestSystem(store, config.SoulHarvest, logger);
+
             // ── Replay / Recording (per-frame telemetry, opt-in via GameConfig.Replay.Enabled) ──
             Replay = new ReplaySystem(store, config, playerId);
 
@@ -542,6 +556,12 @@ namespace BattleSystemECS.Core
             // ── OnEnemyKilled → Combo + Necromancer ──
             store.OnEnemyKilled += (enemyId, pid) => Combo?.HandleComboIncrement(pid);
             store.OnEnemyKilled += (enemyId, pid) => Necromancer?.OnEnemyKilled(enemyId, pid);
+
+            // Round 196 Direction 3 — Soul Harvest subscribes to OnEnemyKilled to
+            // credit per-kill soul reward. The regen tick is invoked from
+            // PostDeathGroup. Update() — per-frame cost is O(MAX_PLAYERS) when at
+            // least one player has PlayerSoulRegen > 0, zero otherwise (sentinel).
+            SoulHarvest?.SubscribeToEvents();
 
             // ── OnTowerKill → TowerExperience ──
             store.OnTowerKill += (enemyId, pid, towerId) => TowerExperience?.HandleEnemyKilled(enemyId, pid, towerId);
@@ -787,6 +807,11 @@ namespace BattleSystemECS.Core
             // Zero overhead when not active (Update() short-circuits on
             // DoomClockActive[playerId] == false).
             scheduler.PostDeath.DoomClock = DoomClock;
+            // Round 196 Direction 3 — Soul Harvest per-frame regen tick. Lives
+            // alongside DoomClock in PostDeath (zero-overhead when no player
+            // has PlayerSoulRegen > 0). OnEnemyKilled credit is event-driven
+            // (synchronous in ResolveEnemiesKilledThisFrame, no frame delay).
+            scheduler.PostDeath.SoulHarvest = SoulHarvest;
         }
     }
 }

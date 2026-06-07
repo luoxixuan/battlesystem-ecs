@@ -1395,6 +1395,27 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
+    /// Round 196 Direction 3 — Soul Harvest system configuration. Controls base soul reward
+    /// per kill, soul cap, and passive regen rate. JSON-loaded from
+    /// Data/Configs/soul_harvest.json (a future round can add the loader; current round
+    /// uses hardcoded defaults via `new SoulHarvestConfig()`). All values are clamped
+    /// at runtime to safe ranges; this config just provides the defaults.
+    /// </summary>
+    public class SoulHarvestConfig
+    {
+        /// <summary>Default soul cap for any player without an explicit cap set.
+        /// Default: 999f (≈ 1k souls = enough for ~10 Soul Bomb casts at cost 100).</summary>
+        public float DefaultCap { get; set; } = 999f;
+        /// <summary>Default passive soul regen per second (0 = no regen).
+        /// Default: 0f. Set to e.g. 0.5f for a slow trickle in long levels.</summary>
+        public float DefaultRegenPerSecond { get; set; } = 0f;
+        /// <summary>Default base soul reward per kill (added to EnemySoulValue on top).
+        /// Most enemies grant 1 base + their EnemySoulValue. Default: 0f (rely on
+        /// per-enemy EnemySoulValue only).</summary>
+        public float BaseSoulPerKill { get; set; } = 0f;
+    }
+
+    /// <summary>
     /// Enemy Tile Stacking Penalty configuration — when N enemies occupy the same cell,
     /// each enemy gets a move-speed slow proportional to its stack count.
     /// PenaltyPerStack is applied per additional enemy (so 3 enemies in one cell ⇒
@@ -1640,6 +1661,10 @@ namespace BattleSystemECS.Config
 
         // Combo Kill configuration
         public ComboConfig Combo { get; set; } = new ComboConfig();
+
+        // Round 196 Direction 3 — Soul Harvest configuration. Loaded from defaults
+        // (SoulHarvestConfig ctor) until a future round adds soul_harvest.json loader.
+        public SoulHarvestConfig SoulHarvest { get; set; } = new SoulHarvestConfig();
 
         // Enemy tile-stacking penalty configuration (move-speed slow when N enemies share a cell)
         public StackingConfig Stacking { get; set; } = new StackingConfig();

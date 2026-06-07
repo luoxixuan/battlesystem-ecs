@@ -18,6 +18,14 @@ namespace BattleSystemECS.Core
         // cleared counter and the cycle index when a wave completes.
         public Systems.DoomClockSystem? DoomClock { get; set; }
 
+        // Round 196 Direction 3 — Soul Harvest per-frame regen tick. Lives in
+        // PostDeath (alongside DoomClock) so the regen cadence matches combo /
+        // objective bookkeeping. Sentinel-gated fast path: zero overhead when
+        // every player has PlayerSoulRegen == 0. OnEnemyKilled credit is
+        // event-driven (synchronous in ResolveEnemiesKilledThisFrame) so kills
+        // are visible to the next Update's regen check.
+        public Systems.SoulHarvestSystem? SoulHarvest { get; set; }
+
         /// <summary>Current game phase, set by FrameScheduler before Execute.</summary>
         public GameState Phase { get; set; } = GameState.WavePhase;
 
@@ -34,6 +42,11 @@ namespace BattleSystemECS.Core
             // as the objective score / wave completion bookkeeping. The timer
             // short-circuits to 0 in Update when the run ends.
             DoomClock?.Update(deltaTime, Phase);
+
+            // Round 196 Direction 3 — Soul Harvest per-frame regen tick. Sentinels
+            // short-circuit on PlayerSoulRegen == 0, so cost is O(MAX_PLAYERS) with
+            // a single float compare per slot when no player has regen configured.
+            SoulHarvest?.Update(deltaTime);
 
             // Wave branch: pause combat if branch selection is active
             if (WaveBranch?.IsBranchActive == true)

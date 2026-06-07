@@ -293,7 +293,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Default 0f = no buff active.
         public float[] PlayerChainKillBuffTimer = new float[MAX_PLAYERS];
 
-        // ==================== Rally Buff (SOA) — Round 187 Direction 4 ====================
+        // ── Round 187 Direction 4 — Rally Buff (SOA) — Round 187 Direction 4 ====================
         // PlayerRallyActive: true if this player has an active Rally buff (player was hit, nearby
         // towers are getting +atk speed). Default false = no rally. Decremented each frame in
         // RallySystem.Update. The hot path in TowerAttackSystem reads TowerRallyAtkSpdBonus which
@@ -306,6 +306,28 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // expires). Decremented by deltaTime in RallySystem.Update; gated at 0f in the PlayerDamaged
         // event handler. Default 0f = "off cooldown, can trigger immediately".
         public float[] PlayerRallyCooldown = new float[MAX_PLAYERS];
+
+        // ==================== Soul Harvest System (SOA) — Round 196 Direction 3 ====================
+        // PlayerSoulCount: current accumulated soul currency. Each enemy kill adds EnemySoulValue
+        // souls (Boss kills add 100× via EnemySoulValue on the Boss config). Decremented when the
+        // player spends souls to cast a soul-cost skill. Clamped to [0, PlayerSoulCap] on every
+        // add and per-frame regen tick. Default 0f = no soul balance.
+        public float[] PlayerSoulCount = new float[MAX_PLAYERS];
+        // PlayerSoulCap: per-player soul cap (default 999f). Souls cannot exceed this value.
+        // Configurable via GameConfig.SoulHarvest.DefaultCap (loaded from soul_harvest.json
+        // in a future round; currently hardcoded constant in SoulHarvestSystem).
+        public float[] PlayerSoulCap = new float[MAX_PLAYERS];
+        // PlayerSoulRegen: passive souls regenerated per second. Default 0f = no regen.
+        // Decremented toward 0 by SoulHarvestSystem.Update via deltaTime. Useful for
+        // "soul-drain towers" or level-up rewards that grant a slow trickle of souls.
+        public float[] PlayerSoulRegen = new float[MAX_PLAYERS];
+        // PlayerSoulSpentTotal: lifetime cumulative souls spent by this player (telemetry /
+        // achievements). Incremented only on successful spend (when SoulCost was actually
+        // deducted). Default 0f = no spending yet. Reset on AddPlayer.
+        public float[] PlayerSoulSpentTotal = new float[MAX_PLAYERS];
+        // PlayerSoulEarnedTotal: lifetime cumulative souls earned (telemetry / achievements).
+        // Mirrors PlayerSoulSpentTotal but on the income side. Default 0f.
+        public float[] PlayerSoulEarnedTotal = new float[MAX_PLAYERS];
 
         #endregion
 
@@ -347,6 +369,20 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             // Combo Chain: reset both fields to 0 so a new game starts with no chain active.
             PlayerChainKillCount[entityId] = 0;
             PlayerChainKillBuffTimer[entityId] = 0f;
+
+            // Round 196 Direction 3 — Soul Harvest: reset all soul state to defaults
+            // so a recycled player entity (AddPlayer on the same slot) doesn't
+            // inherit a stale soul balance / cap / regen from a prior game.
+            // The SoulHarvestConfig defaults (DefaultCap / DefaultRegenPerSecond) are
+            // applied by SoulHarvestSystem.ResetPlayer() — called from GameManager
+            // initialization if the SoulHarvest system is wired. Here we defensively
+            // zero the per-slot fields so a game without SoulHarvest wired still
+            // starts with all soul arrays at 0.
+            PlayerSoulCount[entityId] = 0f;
+            PlayerSoulCap[entityId] = 0f; // 0 sentinel → SoulHarvestSystem uses config.DefaultCap
+            PlayerSoulRegen[entityId] = 0f;
+            PlayerSoulSpentTotal[entityId] = 0f;
+            PlayerSoulEarnedTotal[entityId] = 0f;
 
             // Round 130 Inventory: reset all slots to empty (-1 item, 0 count).
             ResetInventory(entityId);
