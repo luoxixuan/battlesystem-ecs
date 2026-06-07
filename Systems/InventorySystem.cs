@@ -49,6 +49,12 @@ namespace BattleSystemECS.Systems
         private readonly GameConfig gameConfig;
         private readonly IRenderer renderer;
 
+        // Round 199 Direction 6 — optional CraftingSystem dependency. When set,
+        // TryCraft() forwards to it. Lazy binding so InventorySystem can still be
+        // constructed without crafting support (back-compat with existing test
+        // scaffolding and GameManager wire-up).
+        private CraftingSystem craftingSystem;
+
         // O(1) telemetry counters
         public int TotalAddCalls = 0;
         public int TotalUseCalls = 0;
@@ -60,6 +66,16 @@ namespace BattleSystemECS.Systems
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this.gameConfig = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));
             this.renderer = renderer;
+        }
+
+        /// <summary>
+        /// Round 199 Direction 6 — bind a CraftingSystem so TryCraft() can forward to it.
+        /// Idempotent: a second call replaces the binding. Tests can leave this unset
+        /// and TryCraft() returns BadRecipe cleanly (no null-ref crash).
+        /// </summary>
+        public void BindCraftingSystem(CraftingSystem crafting)
+        {
+            craftingSystem = crafting;
         }
 
         /// <summary>
@@ -189,6 +205,19 @@ namespace BattleSystemECS.Systems
         {
             if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) return 0;
             return store.PlayerInventoryUsedTotal[playerId];
+        }
+
+        /// <summary>
+        /// Round 199 Direction 6 — Crafting entry point. Forwards to the bound CraftingSystem
+        /// when one is registered; returns BadRecipe cleanly when crafting is not wired
+        /// (e.g. tests that don't exercise the recipe system). Single indirection so the
+        /// crafting code path is reachable from UI / hotkey / quest handlers without
+        /// needing a direct CraftingSystem reference.
+        /// </summary>
+        public CraftingSystem.CraftingResult TryCraft(int playerId, int recipeId)
+        {
+            if (craftingSystem == null) return CraftingSystem.CraftingResult.BadRecipe;
+            return craftingSystem.TryCraft(playerId, recipeId);
         }
 
         // ── internal dispatch ────────────────────────────────────────────

@@ -1944,6 +1944,13 @@ namespace BattleSystemECS.Config
         // and Value (magnitude); InventorySystem dispatches by ItemType.
         public ItemDef[] ItemDefs { get; set; } = Array.Empty<ItemDef>();
 
+        // Round 199 Direction 6 — Crafting recipe definitions (loaded from crafting_recipes.json).
+        // Each recipe consumes N input items and produces M output items. SuccessRate in [0,1]
+        // governs deterministic success (1.0 = guaranteed). RareBonusRate in [0,1] grants a
+        // double-yield (rare bonus) on top of base outputs. CraftingSystem.TryCraft() is the
+        // single entry point and is reachable from InventorySystem.TryCraft().
+        public CraftingRecipeDef[] CraftingRecipes { get; set; } = Array.Empty<CraftingRecipeDef>();
+
         // Obstacle definitions (loaded from obstacles.json)
         public ObstacleDef[] ObstacleDefs { get; set; } = Array.Empty<ObstacleDef>();
 
@@ -2765,6 +2772,43 @@ namespace BattleSystemECS.Config
         public float BuffDuration { get; set; } = 0f;   // seconds (for buff-type items)
         public float Radius { get; set; } = 0f;         // world units (for AoE items)
         public int MaxStack { get; set; } = 1;          // per-slot max count (default 1 = single-use)
+    }
+
+    /// <summary>
+    /// Round 199 Direction 6 — Crafting recipe definition. A recipe consumes a list of input
+    /// items (matched by Type id against InventorySystem slots) and produces output items.
+    ///
+    /// Semantics:
+    ///   - SuccessRate: probability in [0, 1] that the craft consumes inputs AND produces outputs.
+    ///                  1.0 = guaranteed success, 0.0 = always fails (recipe still consumes inputs).
+    ///   - On failure, RefundRate (default 0.5) governs how much of each consumed input is
+    ///                  returned to the player (rounded down to integer count).
+    ///   - RareBonusRate: probability in [0, 1] that a SUCCESSFUL craft ALSO produces a bonus
+    ///                  double-output on top of base outputs. The bonus uses RareBonusOutputs
+    ///                  if present, else duplicates the base Outputs list.
+    ///   - Inputs / Outputs / RareBonusOutputs: parallel arrays of (ItemTypeId, Count) tuples
+    ///                  using the array index of GameConfig.ItemDefs (same indexing as inventory).
+    /// </summary>
+    public class CraftingRecipeDef
+    {
+        public string Type { get; set; } = "";                  // unique id (e.g. "healing_potion_combine")
+        public string Name { get; set; } = "";                  // display name (e.g. "Healing Potion Combine")
+        public CraftingItemStack[] Inputs { get; set; } = Array.Empty<CraftingItemStack>();
+        public CraftingItemStack[] Outputs { get; set; } = Array.Empty<CraftingItemStack>();
+        public CraftingItemStack[] RareBonusOutputs { get; set; } = Array.Empty<CraftingItemStack>();
+        public float SuccessRate { get; set; } = 1f;             // 0..1
+        public float RefundRate { get; set; } = 0.5f;            // 0..1 (fraction of inputs returned on failure)
+        public float RareBonusRate { get; set; } = 0f;          // 0..1
+    }
+
+    /// <summary>
+    /// Round 199 Direction 6 — (itemId, count) tuple used in CraftingRecipeDef.Inputs/Outputs.
+    /// itemId is the index into GameConfig.ItemDefs (the same indexing InventorySystem uses).
+    /// </summary>
+    public class CraftingItemStack
+    {
+        public int ItemId { get; set; } = -1;     // index into GameConfig.ItemDefs; -1 = invalid/unset
+        public int Count { get; set; } = 1;      // how many of this item the recipe needs/produces
     }
 
     /// <summary>

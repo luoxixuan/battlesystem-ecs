@@ -56,6 +56,7 @@ namespace BattleSystemECS.Config
 
                 // Load inventory item definitions (Round 130)
                 LoadItemDefs(gameConfig, renderer);
+                LoadCraftingRecipes(gameConfig, renderer);
 
                 // Load enemy fission definitions
                 LoadFissionDefs(gameConfig, renderer);
@@ -1623,6 +1624,100 @@ namespace BattleSystemECS.Config
                 case "cleanse": return InventoryItemType.Cleanse;
                 default: return InventoryItemType.Unknown;
             }
+        }
+
+        // ── Round 199 Direction 6 — Crafting recipe loading ────────────────────────
+        // Load crafting recipes from crafting_recipes.json. Each recipe declares its
+        // input/output stacks by ItemId (index into GameConfig.ItemDefs), plus three
+        // probability knobs: SuccessRate, RefundRate (failure), RareBonusRate.
+        //
+        // Defensive: parse failures leave CraftingRecipes empty so CraftingSystem
+        // fast-paths on the empty array (no crashes, no auto-success). ItemId and Count
+        // are clamped to safe ranges so a malformed config can't craft a -1 stack or
+        // produce billions of items.
+        private static void LoadCraftingRecipes(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string recipeFile = "Data/Configs/crafting_recipes.json";
+            try
+            {
+                if (!File.Exists(recipeFile))
+                {
+                    renderer.Log("[CRAFTING] Recipe file not found: " + recipeFile + ", crafting disabled");
+                    return;
+                }
+                string json = File.ReadAllText(recipeFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    renderer.Log("[CRAFTING] Recipe file is empty: " + recipeFile);
+                    return;
+                }
+
+                // using var so the JsonDocument's rented buffer is returned to the
+                // pool deterministically; LoadItemDefs and similar methods in this
+                // file follow the older "var" pattern (potential leak), but for new
+                // methods we follow the dispose-correct pattern.
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                int maxItemId = gameConfig.ItemDefs != null ? gameConfig.ItemDefs.Length : 0;
+                var recipes = new List<CraftingRecipeDef>();
+                foreach (var elem in root.EnumerateArray())
+                {
+                    var rec = new CraftingRecipeDef();
+                    rec.Type = elem.TryGetProperty("Type", out var t) ? t.GetString() ?? "" : "";
+                    rec.Name = elem.TryGetProperty("Name", out var n) ? n.GetString() ?? "" : "";
+                    rec.Inputs = ParseCraftingStacks(elem, "Inputs", maxItemId, renderer);
+                    rec.Outputs = ParseCraftingStacks(elem, "Outputs", maxItemId, renderer);
+                    rec.RareBonusOutputs = ParseCraftingStacks(elem, "RareBonusOutputs", maxItemId, renderer);
+                    rec.SuccessRate = Clamp01(elem.TryGetProperty("SuccessRate", out var sr) ? (float)sr.GetDouble() : 1f);
+                    rec.RefundRate = Clamp01(elem.TryGetProperty("RefundRate", out var rr) ? (float)rr.GetDouble() : 0.5f);
+                    rec.RareBonusRate = Clamp01(elem.TryGetProperty("RareBonusRate", out var rb) ? (float)rb.GetDouble() : 0f);
+                    recipes.Add(rec);
+                }
+
+                gameConfig.CraftingRecipes = recipes.ToArray();
+                renderer.Log("[CRAFTING] Loaded " + recipes.Count + " recipes from " + recipeFile);
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[CRAFTING] Failed to load recipes: " + ex.Message);
+            }
+        }
+
+        // Parse a JSON array of { ItemId, Count } objects from a recipe field. ItemId
+        // is clamped to [-1, maxItemId) — -1 is kept as a sentinel meaning "skip this
+        // entry" so a recipe author can leave a bonus output blank and still ship the
+        // file. Count is clamped to [0, 999] to prevent runaway crafting yields.
+        private static CraftingItemStack[] ParseCraftingStacks(System.Text.Json.JsonElement parent, string fieldName, int maxItemId, IRenderer renderer)
+        {
+            if (!parent.TryGetProperty(fieldName, out var arr) || arr.ValueKind != System.Text.Json.JsonValueKind.Array)
+            {
+                return Array.Empty<CraftingItemStack>();
+            }
+            var stacks = new List<CraftingItemStack>();
+            foreach (var el in arr.EnumerateArray())
+            {
+                var s = new CraftingItemStack();
+                s.ItemId = el.TryGetProperty("ItemId", out var id) ? id.GetInt32() : -1;
+                s.Count = el.TryGetProperty("Count", out var c) ? c.GetInt32() : 1;
+                // Clamp ItemId to valid range. -1 means "skip / unset" and is preserved.
+                if (s.ItemId < -1 || s.ItemId >= maxItemId) s.ItemId = -1;
+                if (s.Count < 0) s.Count = 0;
+                if (s.Count > 999) s.Count = 999;
+                if (s.ItemId == -1 || s.Count == 0) continue; // drop invalid/empty entries
+                stacks.Add(s);
+            }
+            return stacks.ToArray();
+        }
+
+        // Clamp a float to the [0, 1] probability range. NaN gets mapped to 0 (failure
+        // is the safe default for an indeterminate rate).
+        private static float Clamp01(float v)
+        {
+            if (float.IsNaN(v)) return 0f;
+            if (v < 0f) return 0f;
+            if (v > 1f) return 1f;
+            return v;
         }
 
         private static void LoadFissionDefs(GameConfig gameConfig, IRenderer renderer)

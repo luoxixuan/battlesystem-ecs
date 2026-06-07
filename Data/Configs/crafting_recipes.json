@@ -1,0 +1,78 @@
+[
+  {
+    "Type": "healing_potion_combine",
+    "Name": "Healing Potion Combine",
+    "Inputs": [
+      { "ItemId": 0, "Count": 2 }
+    ],
+    "Outputs": [
+      { "ItemId": 0, "Count": 1 }
+    ],
+    "RareBonusOutputs": [
+      { "ItemId": 0, "Count": 1 }
+    ],
+    "SuccessRate": 1.0,
+    "RefundRate": 0.5,
+    "RareBonusRate": 0.10
+  },
+  {
+    "Type": "mana_potion_combine",
+    "Name": "Mana Potion Combine",
+    "Inputs": [
+      { "ItemId": 1, "Count": 2 }
+    ],
+    "Outputs": [
+      { "ItemId": 1, "Count": 1 }
+    ],
+    "RareBonusOutputs": [
+      { "ItemId": 1, "Count": 1 }
+    ],
+    "SuccessRate": 1.0,
+    "RefundRate": 0.5,
+    "RareBonusRate": 0.10
+  },
+  {
+    "Type": "shield_to_damage",
+    "Name": "Shield Sigil → Rage Draught",
+    "Inputs": [
+      { "ItemId": 2, "Count": 1 }
+    ],
+    "Outputs": [
+      { "ItemId": 4, "Count": 1 }
+    ],
+    "SuccessRate": 0.7,
+    "RefundRate": 0.5,
+    "RareBonusRate": 0.05
+  },
+  {
+    "Type": "tonic_elixir",
+    "Name": "Tonic Elixir",
+    "Inputs": [
+      { "ItemId": 3, "Count": 1 },
+      { "ItemId": 1, "Count": 1 }
+    ],
+    "Outputs": [
+      { "ItemId": 0, "Count": 2 }
+    ],
+    "SuccessRate": 0.6,
+    "RefundRate": 0.0,
+    "RareBonusRate": 0.05
+  },
+  {
+    "Type": "grenade_crate",
+    "Name": "Grenade Crate",
+    "Inputs": [
+      { "ItemId": 5, "Count": 1 },
+      { "ItemId": 5, "Count": 1 }
+    ],
+    "Outputs": [
+      { "ItemId": 5, "Count": 1 }
+    ],
+    "RareBonusOutputs": [
+      { "ItemId": 5, "Count": 1 }
+    ],
+    "SuccessRate": 0.8,
+    "RefundRate": 0.0,
+    "RareBonusRate": 0.20
+  }
+]
