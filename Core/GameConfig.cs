@@ -3279,4 +3279,45 @@ namespace BattleSystemECS.Config
         /// 3 stacks at 2.0s decay = ~6 seconds to fully stack.</summary>
         public const int RecommendedVoltThreshold = 3;
     }
+
+    /// <summary>
+    /// Fortress Aura (Round 180 Direction 5) — "clustered tower defense/offense" subsystem.
+    ///
+    /// When ≥<c>FortressT1NeighborCount</c> same-type towers cluster within
+    /// <c>FortressRadius</c> of a given tower, that tower gains:
+    ///   - <c>FortressT1DmgBonus</c> additive damage multiplier (multiplicative on baseDmg)
+    ///   - <c>FortressT1AtkSpdBonus</c> additive attack-speed bonus (additive with HotZone/Desperation)
+    ///
+    /// At <c>FortressT2NeighborCount</c> neighbors the bonuses step up to T2 values.
+    /// At fewer than T1 neighbors, the cached bonus is 0 (zero overhead on isolated towers).
+    ///
+    /// Hot-path design: the per-frame scan is O(N²) over ActiveTowerIds (typically N ≤ 200,
+    /// gated by the same "any fortress-eligible tower" check used by BuffShare's fast path).
+    /// Towers are bailed out of the inner loop the moment they exceed T2 (cap reached).
+    /// </summary>
+    public static class FortressConfig
+    {
+        /// <summary>Neighbor-cluster radius in cells. Same type towers within this radius
+        /// (Chebyshev distance ≤ Radius) count as fortress neighbors.</summary>
+        public const float FortressRadius = 2.0f;
+
+        /// <summary>Tier 1 threshold: ≥ this many neighbors → tier 1 bonus applies.</summary>
+        public const int FortressT1NeighborCount = 3;
+
+        /// <summary>Tier 2 threshold: ≥ this many neighbors → tier 2 bonus applies
+        /// (replaces tier 1, no stacking). Set above 32 to disable T2 in practice.</summary>
+        public const int FortressT2NeighborCount = 5;
+
+        /// <summary>Additive damage multiplier at tier 1 (0.15 = +15% damage).</summary>
+        public const float FortressT1DmgBonus = 0.15f;
+
+        /// <summary>Additive attack-speed bonus at tier 1 (0.10 = +10% attack speed).</summary>
+        public const float FortressT1AtkSpdBonus = 0.10f;
+
+        /// <summary>Additive damage multiplier at tier 2 (0.25 = +25% damage).</summary>
+        public const float FortressT2DmgBonus = 0.25f;
+
+        /// <summary>Additive attack-speed bonus at tier 2 (0.20 = +20% attack speed).</summary>
+        public const float FortressT2AtkSpdBonus = 0.20f;
+    }
 }

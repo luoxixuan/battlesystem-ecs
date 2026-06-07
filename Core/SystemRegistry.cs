@@ -50,6 +50,10 @@ namespace BattleSystemECS.Core
         public TowerUpgradeSystem? TowerUpgrade { get; private set; }
         public TowerExperienceSystem? TowerExperience { get; private set; }
         public TowerSynergySystem? TowerSynergy { get; private set; }
+        // Round 180 Direction 5 — Fortress Aura (clustered-tower damage/speed bonus).
+        //   Same-type neighbors within FortressRadius → cached dmg/atk-spd bonuses.
+        //   SetTurn runs a single O(N²) pass; consumers (TowerAttackSystem) read cached fields.
+        public TowerFortressSystem? TowerFortress { get; private set; }
         public KillCooldownResetSystem? KillCooldownReset { get; private set; }
         // ── Kill-Triggered Player Sustain (HealOnKill / ManaOnKill) ───────────
         public HealOnKillSystem? HealOnKill { get; private set; }
@@ -229,6 +233,8 @@ namespace BattleSystemECS.Core
             TowerExperience = new TowerExperienceSystem(store, config);
             TowerSynergy = new TowerSynergySystem(store, logger);
             TowerSynergy.LoadSynergyConfig();
+            // Round 180 Direction 5 — Fortress Aura (no JSON config, all thresholds in FortressConfig).
+            TowerFortress = new TowerFortressSystem(store, logger);
             // Kill-triggered cooldown reset (ARPG/Roguelike mechanic)
             KillCooldownReset = new KillCooldownResetSystem(store, config, playerId);
             // Kill-triggered player sustain (heal / mana on tower kill)
@@ -659,6 +665,8 @@ namespace BattleSystemECS.Core
             scheduler.CombatSetup.TowerAttack = TowerAttack;
             scheduler.CombatSetup.TowerOvercharge = null;
             scheduler.CombatSetup.TowerSynergy = TowerSynergy;
+            // Round 180 Direction 5 — Fortress cluster scan lives in CombatSetup (frame cache).
+            scheduler.CombatSetup.TowerFortress = TowerFortress;
             scheduler.CombatSetup.TowerLink = null;
             scheduler.CombatSetup.Skill = Skill;
             scheduler.CombatSetup.AuraTower = AuraTower;
@@ -694,6 +702,9 @@ namespace BattleSystemECS.Core
             scheduler.Combat.TowerMorph = TowerMorph;
             scheduler.Combat.TowerStealth = TowerStealth;
             scheduler.Combat.TowerSynergy = TowerSynergy;
+            // Round 180 Direction 5 — Fortress reference exposed in Combat group for
+            //   future per-frame hooks (currently Update is a no-op; SetTurn does the work).
+            scheduler.Combat.TowerFortress = TowerFortress;
             scheduler.Combat.TowerLink = null;
             scheduler.Combat.AuraTower = AuraTower;
             scheduler.Combat.Curse = Curse;

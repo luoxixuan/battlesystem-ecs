@@ -453,7 +453,10 @@ namespace BattleSystemECS.Systems
 
                 store.TowerLastAttackTime[towerId] += deltaTime;
 
-                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus));
+                // Round 180 Direction 5: Fortress atk-speed bonus (additive with HotZone + Desperation).
+                // 0f when tower has no fortress cluster (zero overhead for isolated towers).
+                float fortressAtkSpdBonus = store.GetTowerFortressAtkSpdBonus(towerId);
+                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus));
 
                 // ── Burst Fire / Salvo Mode check ─────────────────────────────────────
                 int burstCount = store.TowerBurstCount[towerId];
@@ -463,7 +466,7 @@ namespace BattleSystemECS.Systems
                     if (shotsFired >= burstCount)
                     {
                         // In cooldown phase: use burst cooldown (scaled by attack speed)
-                        float burstCooldown = store.TowerBurstCooldown[towerId] / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus));
+                        float burstCooldown = store.TowerBurstCooldown[towerId] / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus));
                         if (store.TowerLastAttackTime[towerId] < burstCooldown) return;
                         // Cooldown complete — reset burst counter
                         store.TowerBurstShotsFired[towerId] = 0;
@@ -999,6 +1002,11 @@ namespace BattleSystemECS.Systems
                     // Apply tower synergy multiplier (e.g. bonus damage when combo towers are placed together)
                     float synergyMult = store.GetTowerSynergyMultiplier(towerId);
                     if (synergyMult > 1.0f) baseDmg *= synergyMult;
+
+                    // Round 180 Direction 5: Fortress damage bonus (cluster of same-type towers in range).
+                    // Applied multiplicatively on baseDmg, after synergy multiplier, before weather/zone bonuses.
+                    float fortressDmgBonus = store.GetTowerFortressDmgBonus(towerId);
+                    if (fortressDmgBonus > 0f) baseDmg *= (1f + fortressDmgBonus);
 
                     // Apply weather damage multiplier (e.g. Storm gives towers +10% damage)
                     if (_weatherDamageMult != 1f) baseDmg *= _weatherDamageMult;

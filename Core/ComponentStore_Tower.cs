@@ -965,6 +965,19 @@ namespace BattleSystemECS.Core
         //   for UI display and for the designer's "min rarity" roll gate.
         public int[] TowerModifierRarity = new int[MAX_ENTITIES];
 
+        // ==================== Fortress Aura (Round 180 Direction 5) ====================
+        // Per-tower cached count of friendly same-type neighbors within FortressRadius
+        //   (excluding self). Written by TowerFortressSystem.SetTurn, consumed by
+        //   TowerAttackSystem for damage bonus and (future) defense hook.
+        public int[] TowerFortressNeighborCount = new int[MAX_ENTITIES];
+        // Cached additive damage multiplier from cluster bonus (0 / 0.15 / 0.25, etc.).
+        //   Read by TowerAttackSystem just after the synergy multiplier and applied
+        //   multiplicatively on baseDmg.
+        public float[] TowerFortressCachedDmgBonus = new float[MAX_ENTITIES];
+        // Cached additive attack-speed bonus (0 / 0.10). Read by TowerAttackSystem
+        //   inside the attackInterval denominator (additive with HotZone + Desperation).
+        public float[] TowerFortressCachedAtkSpdBonus = new float[MAX_ENTITIES];
+
         // ==================== 塔组件访问 ====================
 
         /// <summary>
@@ -1260,6 +1273,14 @@ namespace BattleSystemECS.Core
             TowerFrostZoneDuration[entityId] = 0f;
             // Player-disabled flag: default false (active). ToggleTower() flips to true on player request.
             TowerPlayerDisabled[entityId] = false;
+            // Round 180 Direction 5 — Fortress Aura: default to no fortress bonus (0 neighbors, 0 dmg/atkSpd bonus).
+            //   TowerFortressSystem will overwrite these on the next SetTurn tick. Reset is required because
+            //   AddTower() can be called on a slot that was previously occupied by a tower with cached bonuses
+            //   (slot reuse via EntityManager.RecycleId) — the new tower must NOT inherit the prior tower's
+            //   fortress cache (Claude bug scan fix #1: stale cache on ID reuse).
+            TowerFortressNeighborCount[entityId] = 0;
+            TowerFortressCachedDmgBonus[entityId] = 0f;
+            TowerFortressCachedAtkSpdBonus[entityId] = 0f;
             // Round 98 — Tower Windup / Pre-cast: default to no windup (0 frames = instant fire, zero-overhead path)
             TowerWindupFrames[entityId] = 0;
             TowerWindupCountdown[entityId] = 0;
@@ -2080,6 +2101,49 @@ namespace BattleSystemECS.Core
             TowerModifierId[towerId] = modifierIndex;
             TowerModifierMagnitude[towerId] = magnitude;
             TowerModifierRarity[towerId] = rarity < 0 ? 0 : (rarity > 4 ? 4 : rarity);
+        }
+
+        // ==================== Fortress Aura (Round 180 Direction 5) ====================
+        /// <summary>Gets the cached fortress neighbor count for a tower (0 = no neighbors in range).</summary>
+        public int GetTowerFortressNeighborCount(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0;
+            return TowerFortressNeighborCount[towerId];
+        }
+
+        /// <summary>Sets the cached fortress neighbor count for a tower. Clamped to [0, 32] for safety.</summary>
+        public void SetTowerFortressNeighborCount(int towerId, int count)
+        {
+            if (!IsValidEntity(towerId)) return;
+            TowerFortressNeighborCount[towerId] = count < 0 ? 0 : (count > 32 ? 32 : count);
+        }
+
+        /// <summary>Gets the cached fortress damage bonus (additive multiplier, 0.15 = +15%).</summary>
+        public float GetTowerFortressDmgBonus(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0f;
+            return TowerFortressCachedDmgBonus[towerId];
+        }
+
+        /// <summary>Sets the cached fortress damage bonus. Clamped to [0, 1.0] (capped at +100%).</summary>
+        public void SetTowerFortressDmgBonus(int towerId, float bonus)
+        {
+            if (!IsValidEntity(towerId)) return;
+            TowerFortressCachedDmgBonus[towerId] = bonus < 0f ? 0f : (bonus > 1f ? 1f : bonus);
+        }
+
+        /// <summary>Gets the cached fortress attack-speed bonus (additive, 0.10 = +10%).</summary>
+        public float GetTowerFortressAtkSpdBonus(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0f;
+            return TowerFortressCachedAtkSpdBonus[towerId];
+        }
+
+        /// <summary>Sets the cached fortress attack-speed bonus. Clamped to [0, 1.0].</summary>
+        public void SetTowerFortressAtkSpdBonus(int towerId, float bonus)
+        {
+            if (!IsValidEntity(towerId)) return;
+            TowerFortressCachedAtkSpdBonus[towerId] = bonus < 0f ? 0f : (bonus > 1f ? 1f : bonus);
         }
     }
 }

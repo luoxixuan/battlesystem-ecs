@@ -11,6 +11,11 @@ namespace BattleSystemECS.Core
         public Systems.TowerDemolishSystem? Demolish { get; set; }
         public Systems.TowerAttackSystem? TowerAttack { get; set; }
         public Systems.TowerSynergySystem? TowerSynergy { get; set; }
+        // Round 180 Direction 5 — Fortress Aura. SetTurn happens in CombatSetupGroup
+        //   so the cached bonuses are already populated when TowerAttackSystem reads
+        //   them. No per-frame Update needed (Fortress is a placement-time stat, not
+        //   a tick-based effect).
+        public Systems.TowerFortressSystem? TowerFortress { get; set; }
         public Systems.TowerLinkSystem? TowerLink { get; set; }
         public Systems.AuraTowerSystem? AuraTower { get; set; }
         // Round 173 Direction 1 — Shrine Tower System. Persistent pure-buff aura on

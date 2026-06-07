@@ -10,6 +10,10 @@ namespace BattleSystemECS.Core
         public Systems.TowerOverchargeSystem? TowerOvercharge { get; set; }
         public Systems.HeatSystem? Heat { get; set; }
         public Systems.TowerSynergySystem? TowerSynergy { get; set; }
+        // Round 180 Direction 5 — Fortress Aura. SetTurn runs the O(N²) cluster scan
+        //   and writes cached dmg/atk-spd bonuses. Must be set up in this group so
+        //   the cache is fresh for TowerAttackSystem reads in the same frame.
+        public Systems.TowerFortressSystem? TowerFortress { get; set; }
         public Systems.TowerLinkSystem? TowerLink { get; set; }
         public Systems.SkillSystem? Skill { get; set; }
         public Systems.AuraTowerSystem? AuraTower { get; set; }
@@ -31,6 +35,10 @@ namespace BattleSystemECS.Core
             TowerOvercharge?.SetTurn(turn);
             Heat?.SetTurn(turn);
             TowerSynergy?.SetTurn();
+            // Round 180 Direction 5 — Fortress cluster scan. Runs after Synergy
+            //   (independent; both only read ActiveTowerIds) so the cached bonuses
+            //   are visible to TowerAttackSystem the same frame.
+            TowerFortress?.SetTurn();
             TowerLink?.SetTurn();
             Skill?.SetTurn(turn);
             AuraTower?.SetTurn();
