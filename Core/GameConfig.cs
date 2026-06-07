@@ -160,6 +160,15 @@ namespace BattleSystemECS.Config
         public float PathDeviationAmplitude { get; set; } = 0f;
         // GoldOnReturn: bonus gold awarded when player kills thief after it escapes
         public float GoldOnReturn { get; set; } = 0f;
+        // Round 179 Direction 3 — Bounty Enemy Marker ────────────────────────
+        // IsBounty: true if this enemy pays EnemyBountyGoldMult × gold on death (high-value
+        // high-risk target). When true, WaveSpawningSystem calls SetEnemyBounty() to wire
+        // the multiplier into the ComponentStore. Default false = inert fast path.
+        public bool IsBounty { get; set; } = false;
+        // BountyGoldMult: gold reward multiplier on death (e.g. 5.0 = 5× reward). Wired to
+        // EnemyBountyGoldMult via SetEnemyBounty(). Clamped to [1.0, 20.0] at the store
+        // level so malformed JSON can't spike the economy. 1.0 = no bonus (inert).
+        public float BountyGoldMult { get; set; } = 1f;
         // DrainRatio: max fraction of tower damage this enemy can drain (0-1, 0 = no drain).
         // Example: 0.5 = can reduce a nearby tower's damage by up to 50%.
         public float DrainRatio { get; set; } = 0f;

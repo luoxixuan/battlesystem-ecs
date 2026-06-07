@@ -299,6 +299,18 @@ namespace BattleSystemECS.Core
         // Used by ResolveEnemiesKilledThisFrame to correctly award GoldOnEliteKill instead of
         // the broken EnemyTypeName == "Elite" check (EnemyTypeName stores base type names).
         public bool[] EnemyIsElite = new bool[MAX_ENTITIES];
+        // Round 179 Direction 3 — Bounty Enemy Fields ────────────────────────
+        // EnemyIsBounty: true if this enemy is a "Bounty" (high-value high-risk target). On
+        // death the gold reward is multiplied by EnemyBountyGoldMult so killing it is a
+        // meaningful economy spike. Default false = inert zero-overhead fast path. Set at
+        // AddEnemy + SetEnemyBounty() when MonsterDef.IsBounty. Stays false for normal
+        // enemies so the gold-award hot path pays one bool read + branch.
+        public bool[] EnemyIsBounty = new bool[MAX_ENTITIES];
+        // EnemyBountyGoldMult: gold multiplier applied to EnemyGoldReward on death. Multiplied
+        // ON TOP of _goldKillMultiplier / _allIncomeMultKill / decayMult / comboMult so it
+        // stacks with all existing economy modifiers. 1.0 = inert (no bonus). Clamped to
+        // [1.0, 20.0] in SetEnemyBounty() so a malformed config can't wipe the reward.
+        public float[] EnemyBountyGoldMult = new float[MAX_ENTITIES];
         // EnemyIsFlying: true if this enemy is a flying unit (can only be hit by anti-air towers)
         public bool[] EnemyIsFlying = new bool[MAX_ENTITIES];
         // EnemyFlightHeight: flight altitude level (0=ground, 1=low altitude, 2=high altitude)
@@ -1159,6 +1171,11 @@ namespace BattleSystemECS.Core
             EnemyIsSiege[entityId] = false;
             EnemySiegeArmorBonus[entityId] = 0f;
             EnemySiegeSpeedMult[entityId] = 1f;
+            // Round 179 Direction 3 — Bounty default state at AddEnemy. Each new spawn
+            // starts as a non-bounty enemy (zero-overhead fast path). Callers that want
+            // the Bounty economy spike must invoke SetEnemyBounty() right after AddEnemy.
+            EnemyIsBounty[entityId] = false;
+            EnemyBountyGoldMult[entityId] = 1f;
             // Round 174 Direction 8 — Stalker default state at AddEnemy. Each new spawn
             // starts as a non-stalker (zero-overhead fast path). Callers that want the
             // stalker behavior must invoke SetEnemyStalker() right after AddEnemy.
@@ -1600,6 +1617,22 @@ namespace BattleSystemECS.Core
             EnemyIsSiege[enemyId] = true;
             EnemySiegeArmorBonus[enemyId] = System.Math.Clamp(armorBonus, 0f, 0.95f);
             EnemySiegeSpeedMult[enemyId] = System.Math.Clamp(speedMult, 0.1f, 1.0f);
+        }
+
+        /// <summary>
+        /// Round 179 Direction 3 — Marks an enemy as a Bounty (high-value high-risk target).
+        /// On death the gold reward is multiplied by goldMult (stacks with every other economy
+        /// modifier). Bounty enemies themselves are not tougher — the multiplier is the entire
+        /// value proposition (the risk is the player's attention being diverted from the wave).
+        /// </summary>
+        /// <param name="enemyId">Target enemy entity ID (must be valid).</param>
+        /// <param name="goldMult">Gold reward multiplier on death (e.g. 5.0 = 5× reward;
+        /// clamped to [1.0, 20.0] so a malformed config can't spike the economy).</param>
+        public void SetEnemyBounty(int enemyId, float goldMult)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyIsBounty[enemyId] = true;
+            EnemyBountyGoldMult[enemyId] = System.Math.Clamp(goldMult, 1.0f, 20.0f);
         }
 
 

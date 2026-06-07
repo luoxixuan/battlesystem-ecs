@@ -837,6 +837,11 @@ namespace BattleSystemECS.Config
             // index is out of range.
             monster.HealthRegenPerSec = ExtractFloat(json, "HealthRegenPerSec");
             monster.PhaseRegenMult = ParseFloatArray(json, "PhaseRegenMult");
+            // Round 179 Direction 3 — Bounty enemy marker. Default false = inert; when
+            // IsBounty=true, WaveSpawningSystem calls SetEnemyBounty() to wire the multiplier
+            // into the ComponentStore. BountyGoldMult clamped at the store level to [1.0, 20.0].
+            monster.IsBounty = ExtractBool(json, "IsBounty");
+            monster.BountyGoldMult = ExtractFloat(json, "BountyGoldMult");
 
             return monster;
         }

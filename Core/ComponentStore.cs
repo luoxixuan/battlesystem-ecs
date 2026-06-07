@@ -390,6 +390,15 @@ namespace BattleSystemECS.Core
                     goldReward = EnemyGoldReward[enemyId] * _goldKillMultiplier * _allIncomeMultKill;
                 }
                 goldReward *= PlayerComboGoldMult[playerId];
+                // Bounty enemies (IsBounty=true) pay EnemyBountyGoldMult × base reward. Multiplied
+                // on top of _goldKillMultiplier / _allIncomeMultKill / PlayerComboGoldMult (commutative
+                // with the post-multiplier decay / elite / mark / execute bonuses that follow). The
+                // multiplier is the entire value proposition. Non-bounty enemies pay only a
+                // one-bool read + branch (inert fast path).
+                if (EnemyIsBounty[enemyId])
+                {
+                    goldReward *= EnemyBountyGoldMult[enemyId];
+                }
                 // ── Decaying Wave Bounty: subsequent kills in the same wave pay less. ──
                 // Formula: mult = max(DecayFloor, 1.0 - kills * DecayRate)
                 // DecayRate=0.02 → 5 kills = 90%, 10 = 80%, 20 = 60%, floor at 0.3 (30%) after 35 kills.
