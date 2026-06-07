@@ -323,6 +323,15 @@ namespace BattleSystemECS.Core
                 // wipe, a tower that walked out of the fire would keep its range penalty
                 // for the rest of the game. Same O(active_towers) cost as smoke.
                 TowerVisionReduction[tid] = 0f;
+                // Round 186 Direction 2 — Sapper per-frame slow multiplier reset.
+                // SapperSystem runs in the AI phase and writes the cumulative atk-spd
+                // slow from all active sappers targeting this tower into this array. The
+                // next frame's BeginFrame() wipes the value to 0 so the SapperSystem
+                // must re-derive the current slow from the live sapper set (no drift if
+                // a sapper dies, target retargets, or the slow is otherwise cancelled).
+                // O(active_towers) per frame; for the 200-tower cap this is one extra
+                // write per tower per frame — negligible.
+                TowerSapperSlowMult[tid] = 0f;
             }
             CurrentFrame++;
         }
@@ -658,6 +667,18 @@ namespace BattleSystemECS.Core
                 EnemyBlinkTimer[entityId] = 0f;
                 EnemyBlinkDistance[entityId] = 0f;
                 EnemyBlinkIFramesLeft[entityId] = 0f;
+                // Round 186 Direction 2 — Sapper reset (recycled slot must not leak sapper
+                // state — a freshly-spawned enemy must start as a non-sapper, never inherit
+                // a target tower id or accumulated slow stacks from the prior slot occupant)
+                EnemyIsSapper[entityId] = false;
+                EnemySapperTargetTowerId[entityId] = -1;
+                EnemySapperAttackTimer[entityId] = 0f;
+                EnemySapperDamage[entityId] = 0f;
+                EnemySapperAttackInterval[entityId] = 0f;
+                EnemySapperAtkSpdSlow[entityId] = 0f;
+                EnemySapperAtkSpdSlowPerStack[entityId] = 0f;
+                EnemySapperMaxSlowStacks[entityId] = 0;
+                EnemySapperRange[entityId] = 0f;
                 EnemyArmorShredStacks[entityId] = 0f;
                 EnemyArmorShredDuration[entityId] = 0f;
                 // Fear / Taunt / Charm fields

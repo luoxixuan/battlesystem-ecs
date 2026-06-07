@@ -202,6 +202,33 @@ namespace BattleSystemECS.Config
         // DrainRatio: max fraction of tower damage this enemy can drain (0-1, 0 = no drain).
         // Example: 0.5 = can reduce a nearby tower's damage by up to 50%.
         public float DrainRatio { get; set; } = 0f;
+        // Round 186 Direction 2 — Sapper Enemy Marker ────────────────────────
+        // IsSapper: true if this enemy is a "Sapper" (engineer that attacks the nearest
+        // tower on the path, dealing SapperDamage per swing + applying attack-speed slow
+        // stacks). When true, WaveSpawningSystem calls SetEnemySapper() to wire damage
+        // / interval / slow / range into the ComponentStore. Default false = inert
+        // fast path; the SapperSystem hot path short-circuits on EnemyIsSapper==false.
+        public bool IsSapper { get; set; } = false;
+        // SapperDamage: HP damage per swing to the targeted tower (e.g. 5 = 5 damage per
+        // hit). Wired to EnemySapperDamage via SetEnemySapper(). Clamped to [0.1, 1000.0]
+        // at store level so malformed JSON can't one-shot any tower.
+        public float SapperDamage { get; set; } = 0f;
+        // SapperAttackInterval: seconds between swings (e.g. 1.0 = one swing per second).
+        // Wired to EnemySapperAttackInterval via SetEnemySapper(). Clamped to [0.25, 30.0]
+        // at store level (4Hz max swing rate, 30s max for slow Sappers).
+        public float SapperAttackInterval { get; set; } = 0f;
+        // SapperAtkSpdSlowPerStack: attack-speed slow applied per swing stack (e.g. 0.10
+        // = 10% slow per hit, stacks 3 times = 30% slow). Wired to
+        // EnemySapperAtkSpdSlowPerStack via SetEnemySapper(). Clamped to [0, 0.5].
+        public float SapperAtkSpdSlowPerStack { get; set; } = 0f;
+        // SapperMaxSlowStacks: maximum number of slow stacks this sapper can apply to a
+        // single tower (e.g. 3 = max 30% slow per Sapper per tower). Wired to
+        // EnemySapperMaxSlowStacks via SetEnemySapper(). Clamped to [0, 10].
+        public int SapperMaxSlowStacks { get; set; } = 0;
+        // SapperRange: search radius for the target tower (e.g. 3.0 = find any tower
+        // within 3 tiles). Wired to EnemySapperRange via SetEnemySapper(). Clamped to
+        // [0.5, 20.0] at store level.
+        public float SapperRange { get; set; } = 0f;
         // DrainRadius: world-unit radius within which this enemy can drain a tower.
         public float DrainRadius { get; set; } = 0f;
         // DrainRate: fraction of base tower damage drained per second until DrainRatio cap is reached.
@@ -395,6 +422,12 @@ namespace BattleSystemECS.Config
         public int TrapEffectType { get; set; } = 0;
         // TrapEffectValue: magnitude of the effect (stun seconds / damage HP / slow factor)
         public float TrapEffectValue { get; set; } = 0f;
+        // Round 186 Direction 2 — Sapper-vulnerable HP pool. 0 = indestructible
+        // legacy path (default; matches pre-186 behavior for all existing towers).
+        // When > 0, the tower has a finite HP pool that Sapper enemies can chip
+        // away at, and SapperSystem will target it. TowerCurrentHp is set to
+        // MaxHp at PlaceTower time and decremented by SapperSystem swings.
+        public float MaxHp { get; set; } = 0f;
         // ── Burst Fire / Salvo Mode ────────────────────────────────────────────────
         // BurstCount: number of shots fired per burst cycle (0 = no burst fire, standard single-shot)
         public int BurstCount { get; set; } = 0;

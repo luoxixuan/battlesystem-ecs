@@ -18,6 +18,9 @@ namespace BattleSystemECS.Core
         public Systems.EnemyStrafeSystem? EnemyStrafe { get; set; }
         public Systems.ReflectTowerSystem? ReflectTower { get; set; }
         public Systems.MagnetizeSystem? Magnetize { get; set; }
+        // Round 186 Direction 2 — Sapper (engineer) enemies that attack the nearest
+        // tower and apply a stackable attack-speed slow. Optional, lazy-initialized.
+        public Systems.SapperSystem? Sapper { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -70,6 +73,26 @@ namespace BattleSystemECS.Core
 
             Fear?.SetTurn(turn);
             Fear?.Update(deltaTime);
+
+            // Round 186 Direction 2 — Sapper attacks (tower-damage + slow stacks).
+            // Runs at the end of the AI group, AFTER all enemy-side abilities have
+            // queued their effects but BEFORE movement applies path-derivative
+            // damage. The two-phase split (Update = decide & damage, RecomputeTowerSlows
+            // = roll up TowerSapperSlowMult) keeps the per-tower slow multiplier
+            // consistent with the same frame's swing decisions.
+            if (Sapper == null)
+            {
+                // Lazy-init: the AIGroup is constructed in FrameScheduler without
+                // a logger or config reference, so we fall back to a ConsoleLogger
+                // for log output. SapperSystem tolerates any IRenderer, and the
+                // hot path doesn't need GameConfig (all per-sapper stats live on
+                // the ComponentStore). Tests can pre-wire a real logger via
+                // SystemRegistry if they need to assert log output.
+                Sapper = new Systems.SapperSystem(store, new ConsoleLogger());
+            }
+            Sapper.SetTurn(turn, deltaTime);
+            Sapper.Update(deltaTime);
+            Sapper.RecomputeTowerSlows();
         }
     }
 }

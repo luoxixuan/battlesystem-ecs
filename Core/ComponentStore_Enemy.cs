@@ -370,6 +370,48 @@ namespace BattleSystemECS.Core
         // (0.2s = 0.2s of damage immunity post-blink so towers can't get free damage during
         // the visual blink animation). Decremented by FrameScheduler.TickBlinkerCycle.
         public float[] EnemyBlinkIFramesLeft = new float[MAX_ENTITIES];
+        // Round 186 Direction 2 — Sapper Enemy Fields ──────────────────────────
+        // EnemyIsSapper: true if this enemy is a "Sapper" (engineer that attacks the nearest
+        // tower on the path). On death the gold reward is unaffected; the value is the
+        // tower-pressure mechanic (Sappers chip tower HP and slow their attack speed).
+        // Default false = inert fast path. Set at AddEnemy + SetEnemySapper() when
+        // MonsterDef.IsSapper. Stays false for normal enemies so the Sapper system hot
+        // path pays one bool read + branch.
+        public bool[] EnemyIsSapper = new bool[MAX_ENTITIES];
+        // EnemySapperTargetTowerId: cached target tower id the sapper is currently
+        // attacking (-1 = no target / searching). Set/cleared by SapperSystem during
+        // target selection. -1 sentinel keeps the attack loop's `if (target < 0) skip`
+        // check trivially cheap. Default -1 = no-target inert fast path.
+        public int[] EnemySapperTargetTowerId = new int[MAX_ENTITIES];
+        // EnemySapperAttackTimer: seconds elapsed in the current "between attacks" gap.
+        // When it reaches EnemySapperAttackInterval, the sapper deals EnemySapperDamage
+        // to its target tower, applies EnemySapperAtkSpdSlow stacks (up to
+        // EnemySapperMaxSlowStacks), and resets to 0. Decremented/cleared by SapperSystem
+        // tick loop. Default 0 = "fire next frame" for interval>0 sappers.
+        public float[] EnemySapperAttackTimer = new float[MAX_ENTITIES];
+        // EnemySapperDamage: damage applied to the targeted tower per attack (e.g. 5
+        // damage per swing). Set by SetEnemySapper() from MonsterDef.SapperDamage.
+        // Clamped to [0.1, 1000.0] so a malformed config can't deal 0 (no-op) or
+        // 10000 (one-shot any tower).
+        public float[] EnemySapperDamage = new float[MAX_ENTITIES];
+        // EnemySapperAttackInterval: seconds between attacks (e.g. 1.0 = one swing per
+        // second). Set by SetEnemySapper() from MonsterDef.SapperAttackInterval.
+        // Clamped to [0.25, 30.0] (min 0.25s = 4Hz max swing rate, max 30s = once every
+        // 30s for the slowest Sapper).
+        public float[] EnemySapperAttackInterval = new float[MAX_ENTITIES];
+        // EnemySapperAtkSpdSlow: current cumulative attack-speed slow applied to the
+        // target tower (0.0 to EnemySapperMaxSlowStacks × EnemySapperAtkSpdSlowPerStack).
+        // 0.0 = no slow. Removed when the target tower dies or the sapper is killed.
+        public float[] EnemySapperAtkSpdSlow = new float[MAX_ENTITIES];
+        // EnemySapperAtkSpdSlowPerStack: amount of attack-speed slow applied per swing
+        // (e.g. 0.10 = 10% slow per hit, stacks 3 times = 30% slow). Set by SetEnemySapper().
+        public float[] EnemySapperAtkSpdSlowPerStack = new float[MAX_ENTITIES];
+        // EnemySapperMaxSlowStacks: maximum number of slow stacks a sapper can apply to
+        // a single tower (e.g. 3 = max 30% slow per Sapper per tower). Set by SetEnemySapper().
+        public int[] EnemySapperMaxSlowStacks = new int[MAX_ENTITIES];
+        // EnemySapperRange: search radius for target tower (e.g. 3.0 = find any tower
+        // within 3 tiles). Set by SetEnemySapper(). Clamped to [0.5, 20.0].
+        public float[] EnemySapperRange = new float[MAX_ENTITIES];
 
         // ==================== 钻地/潜行敌人组件 (Burrow / Underground Enemies, SOA) ====================
         // EnemyIsBurrowed: true when enemy is underground (cannot be targeted by towers)
@@ -1254,6 +1296,20 @@ namespace BattleSystemECS.Core
             EnemyBlinkTimer[entityId] = 0f;
             EnemyBlinkDistance[entityId] = 0f;
             EnemyBlinkIFramesLeft[entityId] = 0f;
+            // Round 186 Direction 2 — Sapper default state at AddEnemy. Each new spawn
+            // starts as a non-sapper (zero-overhead fast path). Callers that want the
+            // tower-attacking behavior must invoke SetEnemySapper() right after AddEnemy.
+            // Default state: no target (-1), no damage, no slow — the SapperSystem hot
+            // path short-circuits on EnemyIsSapper==false so non-sappers pay zero overhead.
+            EnemyIsSapper[entityId] = false;
+            EnemySapperTargetTowerId[entityId] = -1;
+            EnemySapperAttackTimer[entityId] = 0f;
+            EnemySapperDamage[entityId] = 0f;
+            EnemySapperAttackInterval[entityId] = 0f;
+            EnemySapperAtkSpdSlow[entityId] = 0f;
+            EnemySapperAtkSpdSlowPerStack[entityId] = 0f;
+            EnemySapperMaxSlowStacks[entityId] = 0;
+            EnemySapperRange[entityId] = 0f;
             // Damage Saturation (Round 92): default 0 rolling sum + 0 last-touched frame. Lazily used by
             // TowerAttackSystem and PlayerTowerAttackSystem — the (currentFrame - lastFrame) > window
             // check naturally expires the rolling window for any enemy that hasn't been hit recently.
@@ -1759,6 +1815,44 @@ namespace BattleSystemECS.Core
             // blink fires after the first interval elapses.
             EnemyBlinkTimer[enemyId] = 0f;
             EnemyBlinkIFramesLeft[enemyId] = 0f;
+        }
+
+
+        /// <summary>
+        /// Round 186 Direction 2 — Configures a Sapper (engineer) enemy. Sappers periodically
+        /// attack the nearest tower on the path, dealing <paramref name="damage"/> per swing
+        /// and applying <paramref name="atkSpdSlowPerStack"/> attack-speed slow per stack
+        /// (capped at <paramref name="maxSlowStacks"/> stacks, so the max slow is
+        /// atkSpdSlowPerStack × maxSlowStacks). Sentinel-gated: only EnemyIsSapper==true
+        /// enemies pay the per-frame work; non-sappers pay zero overhead. All numeric args
+        /// are clamped to safe ranges to prevent malformed JSON from one-shotting towers
+        /// or freezing the SapperSystem loop.
+        /// </summary>
+        /// <param name="enemyId">Target enemy entity ID (must be valid).</param>
+        /// <param name="damage">Damage per swing to the target tower. Clamped to
+        /// [0.1, 1000.0] (prevents 0=no-op, 10000=one-shot any tower).</param>
+        /// <param name="attackInterval">Seconds between swings. Clamped to [0.25, 30.0]
+        /// (4Hz max swing rate, 30s max for slow Sappers).</param>
+        /// <param name="atkSpdSlowPerStack">Attack-speed slow per stack (e.g. 0.10 = 10%
+        /// slow per hit). Clamped to [0.0, 0.5] (0.5 = 50% slow per stack max).</param>
+        /// <param name="maxSlowStacks">Max number of slow stacks per tower per Sapper
+        /// (e.g. 3 = max 30% slow per Sapper per tower). Clamped to [0, 10].</param>
+        /// <param name="searchRange">Search radius for target tower. Clamped to [0.5, 20.0].</param>
+        public void SetEnemySapper(int enemyId, float damage, float attackInterval, float atkSpdSlowPerStack, int maxSlowStacks, float searchRange)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyIsSapper[enemyId] = true;
+            EnemySapperDamage[enemyId] = System.Math.Clamp(damage, 0.1f, 1000.0f);
+            EnemySapperAttackInterval[enemyId] = System.Math.Clamp(attackInterval, 0.25f, 30.0f);
+            EnemySapperAtkSpdSlowPerStack[enemyId] = System.Math.Clamp(atkSpdSlowPerStack, 0f, 0.5f);
+            EnemySapperMaxSlowStacks[enemyId] = System.Math.Clamp(maxSlowStacks, 0, 10);
+            EnemySapperRange[enemyId] = System.Math.Clamp(searchRange, 0.5f, 20.0f);
+            // Start the cycle in the "between attacks" gap: timer at 0, no target yet.
+            // The first attack fires after the first EnemySapperAttackInterval elapses
+            // (SapperSystem will pick a target on the first eligible tick).
+            EnemySapperAttackTimer[enemyId] = 0f;
+            EnemySapperTargetTowerId[enemyId] = -1;
+            EnemySapperAtkSpdSlow[enemyId] = 0f;
         }
 
 

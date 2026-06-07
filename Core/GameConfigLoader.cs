@@ -707,6 +707,13 @@ namespace BattleSystemECS.Config
             float pelletMult = ExtractFloat(json, "PelletDamageMult");
             tower.PelletDamageMult = pelletMult > 0f ? pelletMult : 1f;
             tower.PelletConeRadius = ExtractFloat(json, "PelletConeRadius");
+            // Round 186 Direction 2 — Sapper-vulnerable HP pool. Default 0 = indestructible
+            // legacy path; designers opt in by setting MaxHp > 0. The store-level
+            // initialization in PlaceTower sets TowerCurrentHp = TowerMaxHp so a freshly
+            // placed tower always starts at full HP. Clamped to [0, 10000] so a typo
+            // (e.g. 99999999) doesn't balloon memory or trivialize the Sapper threat.
+            float maxHp = ExtractFloat(json, "MaxHp");
+            tower.MaxHp = maxHp < 0f ? 0f : (maxHp > 10000f ? 10000f : maxHp);
             return tower;
         }
 
@@ -869,6 +876,17 @@ namespace BattleSystemECS.Config
             monster.IsBlinker = ExtractBool(json, "IsBlinker");
             monster.BlinkInterval = ExtractFloat(json, "BlinkInterval");
             monster.BlinkDistance = ExtractFloat(json, "BlinkDistance");
+            // Round 186 Direction 2 — Sapper enemy marker. Default false = inert; when
+            // IsSapper=true, WaveSpawningSystem calls SetEnemySapper() to wire damage
+            // / interval / slow / range into the ComponentStore. All 5 fields are clamped
+            // at the store level to safe ranges (damage [0.1, 1000.0], interval
+            // [0.25, 30.0], slow per stack [0, 0.5], max stacks [0, 10], range [0.5, 20.0]).
+            monster.IsSapper = ExtractBool(json, "IsSapper");
+            monster.SapperDamage = ExtractFloat(json, "SapperDamage");
+            monster.SapperAttackInterval = ExtractFloat(json, "SapperAttackInterval");
+            monster.SapperAtkSpdSlowPerStack = ExtractFloat(json, "SapperAtkSpdSlowPerStack");
+            monster.SapperMaxSlowStacks = ExtractInt(json, "SapperMaxSlowStacks");
+            monster.SapperRange = ExtractFloat(json, "SapperRange");
 
             return monster;
         }

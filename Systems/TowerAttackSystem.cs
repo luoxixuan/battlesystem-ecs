@@ -453,10 +453,21 @@ namespace BattleSystemECS.Systems
 
                 store.TowerLastAttackTime[towerId] += deltaTime;
 
+                // Round 186 Direction 2 — Sapper-destroyed towers skip combat. Legacy
+                // indestructible towers have TowerMaxHp == 0, so the check is a no-op
+                // for them; only towers with a non-zero MaxHp opt in to Sapper damage.
+                if (store.TowerMaxHp[towerId] > 0f && store.TowerCurrentHp[towerId] <= 0f) return;
+
                 // Round 180 Direction 5: Fortress atk-speed bonus (additive with HotZone + Desperation).
                 // 0f when tower has no fortress cluster (zero overhead for isolated towers).
+                // Round 186 Direction 2: TowerSapperSlowMult is the cumulative attack-speed slow
+                // applied by all Sappers targeting this tower (re-derived each frame in
+                // SapperSystem.RecomputeTowerSlows, then BeginFrame resets it to 0 — so we
+                // apply the multiplier that was rolled up for THIS frame). 0f fast path for
+                // non-targeted towers.
                 float fortressAtkSpdBonus = store.GetTowerFortressAtkSpdBonus(towerId);
-                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus));
+                float sapperAtkSpdMult = Math.Max(0f, 1f - store.TowerSapperSlowMult[towerId]);
+                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus) * sapperAtkSpdMult);
 
                 // ── Burst Fire / Salvo Mode check ─────────────────────────────────────
                 int burstCount = store.TowerBurstCount[towerId];

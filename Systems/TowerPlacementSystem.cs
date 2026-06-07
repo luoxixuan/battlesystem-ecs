@@ -471,6 +471,19 @@ namespace BattleSystemECS.Systems
                         store.TowerTrapEffectValue[towerId] = tc.TrapEffectValue;
                         logger.Log($"[TOWER] {tc.Name} 陷阱塔: 触发半径 {tc.TrapTriggerRadius}, 充能 {tc.TrapCharges}, 效果 {tc.TrapEffectType} 值 {tc.TrapEffectValue}");
                     }
+                    // Round 186 Direction 2 — Sapper-vulnerable HP pool. 0 = indestructible
+                    // (default; legacy path). When tc.MaxHp > 0, the tower has a finite
+                    // HP pool that Sapper enemies can damage, and the TowerAttackSystem
+                    // hot path skips towers with TowerCurrentHp <= 0. The slow multiplier
+                    // (TowerSapperSlowMult) is reset to 0 in BeginFrame each tick and
+                    // re-derived by SapperSystem.RecomputeTowerSlows after attacks.
+                    if (tc.MaxHp > 0f)
+                    {
+                        store.TowerMaxHp[towerId] = tc.MaxHp;
+                        store.TowerCurrentHp[towerId] = tc.MaxHp;
+                        store.TowerSapperSlowMult[towerId] = 0f;
+                        logger.Log($"[TOWER] {tc.Name} 启用血量池: {tc.MaxHp:F0} HP (Sapper 可破坏)");
+                    }
                     // Apply construction delay if configured (tower starts building, cannot attack)
                     if (tc.ConstructionTime > 0f)
                     {

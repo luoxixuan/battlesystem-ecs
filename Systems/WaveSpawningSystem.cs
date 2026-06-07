@@ -831,6 +831,20 @@ namespace BattleSystemECS.Systems
                         store.SetEnemyBlinker(enemyId, monsterConfig.BlinkInterval, monsterConfig.BlinkDistance);
                     }
 
+                    // Initialize Sapper enemy properties (Round 186 Direction 2) — Engineer
+                    // archetype that periodically attacks the nearest tower on its path,
+                    // dealing SapperDamage per swing and applying an attack-speed slow
+                    // (stacks, capped at SapperMaxSlowStacks × SapperAtkSpdSlowPerStack).
+                    // Slow is stored on the tower's TowerSapperSlowMult and re-derived each
+                    // frame in BeginFrame, so no incremental drift bugs. Range bounds the
+                    // tower search radius. Clamps inside SetEnemySapper() defend against
+                    // malformed JSON (damage [0.1, 1000], interval [0.25, 30], slow
+                    // per stack [0, 0.5], max stacks [0, 10], range [0.5, 20]).
+                    if (monsterConfig.IsSapper)
+                    {
+                        store.SetEnemySapper(enemyId, monsterConfig.SapperDamage, monsterConfig.SapperAttackInterval, monsterConfig.SapperAtkSpdSlowPerStack, monsterConfig.SapperMaxSlowStacks, monsterConfig.SapperRange);
+                    }
+
                     // Initialize burrow/underground enemy properties
                     if (monsterConfig.CanBurrow)
                     {

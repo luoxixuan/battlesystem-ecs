@@ -478,6 +478,25 @@ namespace BattleSystemECS.Core
         public float[] TowerThornsDps = new float[MAX_ENTITIES];
         public float[] TowerThornsInterval = new float[MAX_ENTITIES];
         public float[] TowerThornsTimer = new float[MAX_ENTITIES];
+        // Round 186 Direction 2 — Sapper-damageable Tower HP Fields ────────────────────────
+        // TowerCurrentHp: current HP of this tower (0..TowerMaxHp). 0 = destroyed (no
+        // attacks fire, tower is removed from active list). Default 0 means a freshly-
+        // placed tower must be initialized to MaxHp (or "indestructible" semantics —
+        // maxHp=0 → HP check disabled for legacy towers). Sapper enemies chip this
+        // value; SapperSystem.Update applies EnemySapperDamage to it per swing.
+        public float[] TowerCurrentHp = new float[MAX_ENTITIES];
+        // TowerMaxHp: maximum HP for this tower (0 = indestructible legacy path, 100 =
+        // standard tower). Sapper attacks apply damage but never heal. Set by
+        // PlaceTower when designer opts in via JSON. Default 0 = legacy "infinite HP"
+        // path so existing towers are unaffected by Sapper pressure.
+        public float[] TowerMaxHp = new float[MAX_ENTITIES];
+        // TowerSapperSlowMult: per-tower current attack-speed slow multiplier from
+        // Sapper stacks (0 = no slow, 0.3 = 30% slow = attack speed × 0.7).
+        // Cumulatively applied in TowerAttackSystem hot path on the attack-interval
+        // formula (slow → larger interval → fewer shots). Default 0 = no slow
+        // fast path. BeginFrame resets it to 0 each frame (SapperSystem re-derives
+        // the current slow each frame from the active Sapper's stack count).
+        public float[] TowerSapperSlowMult = new float[MAX_ENTITIES];
 
         // ==================== 治疗光环塔 (Heal Aura Tower — 塔-塔主动治疗链接) ====================
         // TowerHealAuraRadius: world-units radius within which this tower heals friendly towers
@@ -1308,6 +1327,14 @@ namespace BattleSystemECS.Core
             TowerThornsDps[entityId] = 0f;
             TowerThornsInterval[entityId] = 0f;
             TowerThornsTimer[entityId] = 0f;
+            // Round 186 Direction 2 — Sapper-damageable Tower HP defaults: 0 HP / 0 max
+            // = indestructible legacy path. PlaceTower will opt-in to vulnerability by
+            // setting a non-zero TowerMaxHp (and TowerCurrentHp = TowerMaxHp). Default
+            // 0 / 0 / 0 = no-sapper-effect fast path: the SapperSystem hot path skips
+            // towers with maxHp==0 and the TowerAttackSystem HP check is a no-op.
+            TowerCurrentHp[entityId] = 0f;
+            TowerMaxHp[entityId] = 0f;
+            TowerSapperSlowMult[entityId] = 0f;
             // M-race fix: lock Add to match Remove in DestroyEntity which uses lock(activeIdsLock)
             lock (activeIdsLock) { _activeTowerIds.Add(entityId); _towerIndexInList[entityId] = _activeTowerIds.Count - 1; }
             // Round 103 — Buff Share: notify per-system caches that a fresh tower occupies
@@ -1581,6 +1608,13 @@ namespace BattleSystemECS.Core
             TowerThornsDps[entityId] = 0f;
             TowerThornsInterval[entityId] = 0f;
             TowerThornsTimer[entityId] = 0f;
+            // Round 186 Direction 2 — Sapper-damageable Tower HP fields reset. Reset is
+            // critical: a recycled tower slot must not retain a stale HP value or sapper
+            // slow from the previous occupant (would cause a fresh tower to start with
+            // partial HP, or a non-targeted tower to inherit a slow multiplier).
+            TowerCurrentHp[entityId] = 0f;
+            TowerMaxHp[entityId] = 0f;
+            TowerSapperSlowMult[entityId] = 0f;
             lock (activeIdsLock) { RemoveTowerFromList(entityId); }
             // Round 103 — Buff Share: drop any cached base-speed entry for the removed tower
             // (Claude bug scan fix #2: stale cache on ID reuse).
