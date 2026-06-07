@@ -303,6 +303,13 @@ namespace BattleSystemECS.Core
                 TowerShrineCachedManaRegen[tid] = 0f;
                 TowerShrineCachedDmgBonus[tid] = 0f;
                 TowerShrineCachedAtkSpdBonus[tid] = 0f;
+                // Round 177 Direction 2 — Beacon per-frame damage/atk-spd bonus reset.
+                // TowerBeaconSystem then += accumulates into these during the combat
+                // phase; the next frame's BeginFrame() wipes them so downstream consumers
+                // always see "this frame's contribution" (no drift). O(active_towers) × 2
+                // fields = 400 writes/frame for the 200-tower cap.
+                TowerBeaconCachedDmgBonus[tid] = 0f;
+                TowerBeaconCachedAtkSpdBonus[tid] = 0f;
                 // Round 175 Direction 9 — Smokescreen per-frame miss chance reset.
                 // CorpseEffectSystem.ApplyContinuousEffect runs each frame for active
                 // smokescreen zones and writes the miss chance into this array. Without
@@ -963,6 +970,14 @@ namespace BattleSystemECS.Core
                 TowerShrineCachedManaRegen[entityId] = 0f;
                 TowerShrineCachedDmgBonus[entityId] = 0f;
                 TowerShrineCachedAtkSpdBonus[entityId] = 0f;
+                // Round 177 Direction 2 — Beacon Tower reset (recycled slot must not leak beacon state)
+                TowerIsBeacon[entityId] = false;
+                TowerBeaconRadius[entityId] = 0f;
+                TowerBeaconDmgBonus[entityId] = 0f;
+                TowerBeaconAtkSpdBonus[entityId] = 0f;
+                // Round 177 — Beacon per-frame caches reset (no carry-over from recycled slot)
+                TowerBeaconCachedDmgBonus[entityId] = 0f;
+                TowerBeaconCachedAtkSpdBonus[entityId] = 0f;
                 // Round 175 Direction 9 — Smokescreen per-frame miss chance (recycled slot
                 // must not carry the previous occupant's stale smoke miss chance — would
                 // cause a freshly-placed tower to inherit a phantom miss debuff).

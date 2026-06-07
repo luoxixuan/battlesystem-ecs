@@ -613,6 +613,20 @@ namespace BattleSystemECS.Systems
                 logger.Log($"[SHRINE] Tower #{towerId} at ({x},{y}): aura=Gold, radius={store.TowerShrineRadius[towerId]}, potency={store.TowerShrinePotency[towerId]}");
             }
 
+            // Round 177 Direction 2 — Beacon Tower post-place init. Sets the SOA fields
+            // that drive TowerBeaconSystem. Default 3-beacon template values here are
+            // balanced: a single broadcast beacon that gives +10% damage and +10%
+            // attack-speed to every friendly tower in 3 cells. Designers can
+            // overwrite the SOA fields directly after this block for different stats.
+            if (type == TowerType.Beacon)
+            {
+                store.TowerIsBeacon[towerId] = true;
+                store.TowerBeaconRadius[towerId] = 3.0f;
+                store.TowerBeaconDmgBonus[towerId] = 0.10f;   // +10% damage to neighbors
+                store.TowerBeaconAtkSpdBonus[towerId] = 0.10f; // +10% attack speed to neighbors
+                logger.Log($"[BEACON] Tower #{towerId} at ({x},{y}): radius={store.TowerBeaconRadius[towerId]}, dmg=+{store.TowerBeaconDmgBonus[towerId]:P0}, spd=+{store.TowerBeaconAtkSpdBonus[towerId]:P0}");
+            }
+
             // Increment tower count for cap enforcement
             store.PlayerTowerCount[playerId]++;
             // Round 139 — Per-Type Placement Cap: bump the per-type counter on successful

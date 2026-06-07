@@ -19,6 +19,12 @@ namespace BattleSystemECS.Core
         //   cached damage / attack-speed bonuses are visible to downstream consumers
         //   this same frame.
         public Systems.TowerShrineSystem? TowerShrine { get; set; }
+        // Round 177 Direction 2 — Beacon Tower System. Active command-post broadcast
+        //   buff (damage + attack-speed) to friendly towers; no auto-attack, no
+        //   projectile, no enemy targeting. Runs alongside Shrine/ResolveShrineBuffs
+        //   in the serial aura phase so the cached bonuses are visible to downstream
+        //   consumers this same frame.
+        public Systems.TowerBeaconSystem? TowerBeacon { get; set; }
         public Systems.CurseAuraSystem? Curse { get; set; }
         public Systems.PullTowerSystem? PullTower { get; set; }
         public Systems.TowerSilenceSystem? TowerSilence { get; set; }
@@ -76,6 +82,12 @@ namespace BattleSystemECS.Core
             //   the per-frame cache for downstream consumers.
             TowerShrine?.SetTurn();
             TowerShrine?.ResolveShrineBuffs();
+            // Round 177 Direction 2 — Beacon aura resolve. SetTurn/Resolve pair mirrors
+            //   Shrine's pattern: SetTurn collects beacon IDs, Resolve accumulates the
+            //   per-frame damage + atk-spd cache for downstream consumers. Same wiring
+            //   cost as Shrine (one SetTurn + one Resolve per frame, sentinel-gated).
+            TowerBeacon?.SetTurn();
+            TowerBeacon?.ResolveBeaconBuffs();
             Curse?.ResolveCurseDebuffs();
             PullTower?.Update(deltaTime);
             TowerSilence?.Update(deltaTime);

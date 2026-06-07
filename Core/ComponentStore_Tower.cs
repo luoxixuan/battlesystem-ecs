@@ -153,6 +153,32 @@ namespace BattleSystemECS.Core
         public float[] TowerShrineCachedManaRegen = new float[MAX_ENTITIES];
         public float[] TowerShrineCachedDmgBonus = new float[MAX_ENTITIES];
         public float[] TowerShrineCachedAtkSpdBonus = new float[MAX_ENTITIES];
+        // ── Round 177 Direction 2 — Beacon Tower Fields ────────────────────
+        // TowerIsBeacon: true if this tower is a Beacon (active broadcast-aura support tower
+        // with no auto-attack). Default false = inert zero-overhead fast path. Set at
+        // PlaceTower when TowerType == Beacon. Distinct from TowerIsShrine (which has
+        // a single typed aura) and from TowerIsAuraTower (which uses the legacy SOACopy
+        // AuraTower pattern). Beacon ALWAYS applies both a damage and attack-speed
+        // bonus to every friendly tower in range, with additive stacking.
+        public bool[] TowerIsBeacon = new bool[MAX_ENTITIES];
+        // TowerBeaconRadius: range (in cells) at which this beacon broadcasts its buff.
+        // 0 = no broadcast (effectively inert even if TowerIsBeacon=true).
+        public float[] TowerBeaconRadius = new float[MAX_ENTITIES];
+        // TowerBeaconDmgBonus: additive damage bonus fraction contributed by this beacon
+        // to every friendly tower in range. Example: 0.10 = +10% damage. 0 = inert.
+        // Multiple overlapping beacons stack additively (so 3 beacons at 0.10 = +0.30).
+        public float[] TowerBeaconDmgBonus = new float[MAX_ENTITIES];
+        // TowerBeaconAtkSpdBonus: additive attack-speed bonus fraction contributed by this
+        // beacon to every friendly tower in range. Example: 0.10 = +10% attack speed.
+        // 0 = inert. Stacks additively across multiple beacons.
+        public float[] TowerBeaconAtkSpdBonus = new float[MAX_ENTITIES];
+        // Round 177 — Beacon "this frame" cache arrays. Populated by TowerBeaconSystem
+        // every frame, then consumed by downstream systems (TowerAttackSystem reads the
+        // damage cache, TowerAttackSystem/TowerSynergySystem read the atk-spd cache).
+        // Reset to 0 at the start of every frame by ComponentStore.BeginFrame() to
+        // avoid accumulation drift across frames.
+        public float[] TowerBeaconCachedDmgBonus = new float[MAX_ENTITIES];
+        public float[] TowerBeaconCachedAtkSpdBonus = new float[MAX_ENTITIES];
         // ── Round 175 Direction 9 — Smokescreen (per-frame, additive miss chance) ──
         // TowerSmokeMissChance: per-tower per-frame miss chance set by CorpseEffectSystem when
         // a Smokescreen corpse-effect zone (effectType=9) is within range. Reset to 0 each
@@ -1096,6 +1122,16 @@ namespace BattleSystemECS.Core
             TowerShrineCachedManaRegen[entityId] = 0f;
             TowerShrineCachedDmgBonus[entityId] = 0f;
             TowerShrineCachedAtkSpdBonus[entityId] = 0f;
+            // Round 177 Direction 2 — Beacon Tower defaults: not a beacon (PlaceTower will opt in via TowerType.Beacon).
+            //   Recycle slot must not inherit the previous occupant's beacon state (would
+            //   cause a freshly-placed non-beacon tower to silently broadcast buffs).
+            TowerIsBeacon[entityId] = false;
+            TowerBeaconRadius[entityId] = 0f;
+            TowerBeaconDmgBonus[entityId] = 0f;
+            TowerBeaconAtkSpdBonus[entityId] = 0f;
+            // Round 177 — Beacon per-frame caches default to 0 (no carry-over from recycled slot)
+            TowerBeaconCachedDmgBonus[entityId] = 0f;
+            TowerBeaconCachedAtkSpdBonus[entityId] = 0f;
             // Fog of War: default to no fog restriction (visionRadius=0 means see all)
             TowerVisionRadius[entityId] = 0f;
             // Arc projectile fields: default to straight trajectory (0=straight, 1=homing, 2=arc)
@@ -1379,6 +1415,14 @@ namespace BattleSystemECS.Core
             TowerShrineCachedManaRegen[entityId] = 0f;
             TowerShrineCachedDmgBonus[entityId] = 0f;
             TowerShrineCachedAtkSpdBonus[entityId] = 0f;
+            // Round 177 Direction 2 — Beacon Tower reset (recycled slot must not leak beacon state)
+            TowerIsBeacon[entityId] = false;
+            TowerBeaconRadius[entityId] = 0f;
+            TowerBeaconDmgBonus[entityId] = 0f;
+            TowerBeaconAtkSpdBonus[entityId] = 0f;
+            // Round 177 — Beacon per-frame caches reset (no carry-over from recycled slot)
+            TowerBeaconCachedDmgBonus[entityId] = 0f;
+            TowerBeaconCachedAtkSpdBonus[entityId] = 0f;
             // Heat/overheat fields reset
             TowerHeat[entityId] = 0f;
             TowerMaxHeat[entityId] = 0f;

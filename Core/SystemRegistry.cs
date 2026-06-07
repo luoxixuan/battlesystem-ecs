@@ -98,6 +98,13 @@ namespace BattleSystemECS.Core
         //   systems can consume (GoldSystem / ManaSystem / TowerAttackSystem in v2).
         //   Cost: O(activeShrines × activeTowers) when ≥1 shrine on field, O(1) otherwise.
         public TowerShrineSystem? TowerShrine { get; private set; }
+        // Round 177 Direction 2 — Beacon Tower (active command-post broadcast buff, no attack).
+        //   Reads TowerIsBeacon / TowerBeaconRadius / TowerBeaconDmgBonus / TowerBeaconAtkSpdBonus
+        //   on every active tower and writes per-frame cache arrays that downstream systems
+        //   can consume (TowerAttackSystem reads dmg cache, TowerSynergySystem reads atk-spd cache).
+        //   Always applies BOTH damage and attack-speed bonuses together. Stacks additively.
+        //   Cost: O(activeBeacons × activeTowers) when ≥1 beacon on field, O(1) otherwise.
+        public TowerBeaconSystem? TowerBeacon { get; private set; }
 
         // ── Player ──
         public PlayerTowerAttackSystem? PlayerTowerAttack { get; private set; }
@@ -456,6 +463,13 @@ namespace BattleSystemECS.Core
             // shrine is on the field.
             TowerShrine = new TowerShrineSystem(store);
 
+            // ── Round 177 Direction 2 — Beacon Tower (active command-post broadcast buff) ──
+            //   Created alongside Shrine (both are non-attack "support" tower-flavor systems
+            //   with their own TowerType enum value and per-frame additive cache arrays).
+            //   Sentinel-gated fast path when no beacon is on the field. Always broadcasts
+            //   BOTH damage and attack-speed bonuses together to every friendly tower in range.
+            TowerBeacon = new TowerBeaconSystem(store);
+
             // ── Round 107 Direction 6 — Target Mark subsystem ──
             Mark = new MarkSystem(store, playerId);
 
@@ -708,6 +722,12 @@ namespace BattleSystemECS.Core
             //   passes) and before the projectile/buff downstream consumers, so
             //   any v2 wiring that consumes the cached bonuses sees fresh values.
             scheduler.Combat.TowerShrine = TowerShrine;
+            // Round 177 Direction 2 — Beacon Tower: resolve active broadcast buffs.
+            //   Runs immediately after Shrine.ResolveShrineBuffs (both are serial
+            //   aura-phase passes) and before the projectile/buff downstream consumers.
+            //   Both beacon damage and atk-spd cache arrays are written to per-tower
+            //   additive slots and consumed by TowerAttackSystem in v2.
+            scheduler.Combat.TowerBeacon = TowerBeacon;
 
             // ── Skill / Buff / Bleed ──
             scheduler.SkillBuff.Buff = Buff;

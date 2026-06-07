@@ -1,0 +1,36 @@
+{
+  "comment": "Round 177 Direction 2: Beacon Tower definitions. A Beacon is an ACTIVE 'command post' tower with NO auto-attack, NO projectile, and NO enemy targeting. Its only role is to broadcast BOTH a damage bonus and an attack-speed bonus to ALL friendly towers in radius. Distinct from Shrine (which has a single typed aura: gold/mana/dmg/atk-spd only) and from AuraTower (legacy SOACopy pattern with TowerAura* fields). Beacons stack additively across multiple instances. PlaceTower post-init defaults to a +10% damage/+10% atk-spd beacon (radius=3); this JSON documents the v1 template values designers can override.",
+  "version": 1,
+  "beacons": [
+    {
+      "id": 1,
+      "name": "Outpost Beacon",
+      "radius": 3.0,
+      "damageBonus": 0.10,
+      "attackSpeedBonus": 0.10,
+      "cost": 75,
+      "maxHp": 60.0,
+      "description": "+10% damage and +10% attack speed on friendly towers in 3 cells"
+    },
+    {
+      "id": 2,
+      "name": "Battle Beacon",
+      "radius": 2.5,
+      "damageBonus": 0.18,
+      "attackSpeedBonus": 0.12,
+      "cost": 120,
+      "maxHp": 60.0,
+      "description": "+18% damage and +12% attack speed on friendly towers in 2.5 cells"
+    },
+    {
+      "id": 3,
+      "name": "Command Beacon",
+      "radius": 4.0,
+      "damageBonus": 0.08,
+      "attackSpeedBonus": 0.20,
+      "cost": 150,
+      "maxHp": 60.0,
+      "description": "+8% damage and +20% attack speed on friendly towers in 4 cells"
+    }
+  ]
+}
