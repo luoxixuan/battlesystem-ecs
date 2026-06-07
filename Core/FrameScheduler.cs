@@ -32,10 +32,26 @@ namespace BattleSystemECS.Core
 
         public event Action<int, int>? OnEnemyKilled;
 
+        // Round 182 Direction 6 — PathfindingSystem reference (optional). Set via property;
+        // required by TickBlinkerCycle to validate path waypoint count before advancing
+        // the node index. Injected lazily so construction order doesn't matter.
+        private Systems.PathfindingSystem? _pathfinding;
+
         public FrameScheduler(ComponentStore store, GameConfig gameConfig)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             _ = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));
+        }
+
+        /// <summary>
+        /// Round 182 Direction 6 — Inject the PathfindingSystem so the Blink-Dash cycle
+        /// ticker can look up waypoint counts before advancing node indices. Optional:
+        /// TickBlinkerCycle falls back to a no-advance behavior when pathfinding is null
+        /// (the timer still ticks and i-frames still decrement, but no teleport happens).
+        /// </summary>
+        public void SetPathfindingSystem(Systems.PathfindingSystem pathfinding)
+        {
+            _pathfinding = pathfinding;
         }
 
         /// <summary>
@@ -61,6 +77,15 @@ namespace BattleSystemECS.Core
             // remain ticking even during BuildPhase so the visual phase state and
             // damage immunity stay continuous across phases.
             TickPhaserCycle(deltaTime);
+
+            // ── Blinker cycle ticker (Round 182 Direction 6) ─────────────────────
+            // Advances each blinker's "between blinks" timer; when the timer reaches
+            // EnemyBlinkInterval, snap the enemy forward along its current path by
+            // EnemyBlinkDistance tiles and grant 0.2s of i-frames. Decrement
+            // EnemyBlinkIFramesLeft each frame so towers can re-target after the brief
+            // i-frame window expires. Sentinel-gated on EnemyIsBlinker (non-blinkers
+            // pay zero overhead).
+            TickBlinkerCycle(deltaTime);
 
             UpdateTimeScale(ref deltaTime);
 
@@ -288,6 +313,84 @@ namespace BattleSystemECS.Core
                     {
                         store.EnemyPhaserCycleTimer[eid] = t;
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Round 182 Direction 6 — Blink-Dash cycle ticker. Advances each blinker's
+        /// per-frame state machine:
+        ///   - Decrement EnemyBlinkIFramesLeft (active i-frame window decays each frame)
+        ///   - Increment EnemyBlinkTimer; when it reaches EnemyBlinkInterval:
+        ///       * Advance EnemyPathNodeIndex by ceil(EnemyBlinkDistance) tiles, clamped
+        ///         to [0, path.Waypoints.Count - 1] (PathfindingSystem guards the count).
+        ///         This effectively teleports the enemy forward along its current path;
+        ///         the next movement tick will start moving toward the new waypoint.
+        ///       * Reset EnemyBlinkTimer to 0 (next blink fires after another interval).
+        ///       * Set EnemyBlinkIFramesLeft = 0.2f (post-blink invulnerability).
+        ///   - When pathfinding is null (not yet injected), skip the node-index advance
+        ///     (timer still ticks but no teleport happens — graceful degradation).
+        /// Sentinel-gated on EnemyIsBlinker; non-blinkers pay zero overhead. O(activeEnemies)
+        /// per tick, cheap (1 bool + a few float/int ops per slot).
+        /// </summary>
+        private void TickBlinkerCycle(float deltaTime)
+        {
+            if (deltaTime <= 0f) return;
+            var activeEnemies = store.ActiveEnemyIds;
+            // Constant for the post-blink i-frame window: 0.2s = 12 frames at 60Hz. Short
+            // enough to keep the enemy vulnerable (player can damage it normally for the
+            // vast majority of its lifespan) but long enough to give a visual "blink" feel.
+            const float BLINK_IFRAME_DURATION = 0.2f;
+            for (int i = 0; i < activeEnemies.Count; i++)
+            {
+                int eid = activeEnemies[i];
+                if (!store.EnemyIsBlinker[eid]) continue;
+
+                // Step 1: Decrement i-frames first (so the i-frame window shrinks
+                // symmetrically with the cooldown, not the other way around).
+                float ifr = store.EnemyBlinkIFramesLeft[eid];
+                if (ifr > 0f)
+                {
+                    float newIfr = ifr - deltaTime;
+                    store.EnemyBlinkIFramesLeft[eid] = newIfr > 0f ? newIfr : 0f;
+                }
+
+                // Step 2: Tick the between-blinks timer; trigger blink when ready.
+                float timer = store.EnemyBlinkTimer[eid] + deltaTime;
+                float interval = store.EnemyBlinkInterval[eid];
+                if (interval > 0f && timer >= interval)
+                {
+                    // Trigger blink: advance path node index by BlinkDistance tiles
+                    // (rounded up so even a 0.5-tile blink actually moves the enemy
+                    // one node forward). Clamp to last waypoint so we don't overshoot
+                    // the end of the path (which would leak the enemy through).
+                    if (_pathfinding != null)
+                    {
+                        int pathId = store.EnemyPathId[eid];
+                        int totalNodes = _pathfinding.GetPathWaypointCount(pathId);
+                        if (totalNodes > 0)
+                        {
+                            int curNode = store.EnemyPathNodeIndex[eid];
+                            // Only advance if the enemy is still on a valid path
+                            // (curNode < 0 = at goal / leaked / never-pathed; skip the warp
+                            // so a finished enemy can't be teleported to a stale node).
+                            if (curNode >= 0)
+                            {
+                                int distance = (int)MathF.Ceiling(store.EnemyBlinkDistance[eid]);
+                                if (distance < 1) distance = 1;
+                                int newNode = curNode + distance;
+                                if (newNode >= totalNodes) newNode = totalNodes - 1;
+                                store.EnemyPathNodeIndex[eid] = newNode;
+                            }
+                        }
+                    }
+                    // Reset cycle: timer to 0, grant 0.2s i-frames
+                    store.EnemyBlinkTimer[eid] = 0f;
+                    store.EnemyBlinkIFramesLeft[eid] = BLINK_IFRAME_DURATION;
+                }
+                else
+                {
+                    store.EnemyBlinkTimer[eid] = timer;
                 }
             }
         }

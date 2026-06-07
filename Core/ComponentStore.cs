@@ -643,6 +643,15 @@ namespace BattleSystemECS.Core
                 EnemyPhaserPhaseActive[entityId] = false;
                 EnemyPhaserCycleTimer[entityId] = 0f;
                 EnemyPhaserPhaseDuration[entityId] = 0f;
+                // Round 182 Direction 6 — Blinker reset (recycled slot must not leak blink
+                // state — a freshly-spawned enemy must start in the between-blinks gap,
+                // never inherit an advanced timer or post-blink i-frames from the prior
+                // slot occupant)
+                EnemyIsBlinker[entityId] = false;
+                EnemyBlinkInterval[entityId] = 0f;
+                EnemyBlinkTimer[entityId] = 0f;
+                EnemyBlinkDistance[entityId] = 0f;
+                EnemyBlinkIFramesLeft[entityId] = 0f;
                 EnemyArmorShredStacks[entityId] = 0f;
                 EnemyArmorShredDuration[entityId] = 0f;
                 // Fear / Taunt / Charm fields

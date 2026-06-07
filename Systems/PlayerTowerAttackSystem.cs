@@ -285,6 +285,11 @@ public void SetWaveNumber(int waveNumber)
                 if (_hitShieldSystem != null && _hitShieldSystem.ConsumeHitShield(enemyId)) continue;
                 // I-frames check (Round 118): skip damage while EnemyInvulnFramesLeft > 0
                 if (store.EnemyInvulnFramesLeft[enemyId] > 0) continue;
+                // Round 182 Direction 6 — Blinker i-frames: a Blinker enemy that just
+                // blinked forward (within the last 0.2s) is briefly invulnerable. Skip
+                // damage while EnemyBlinkIFramesLeft > 0 (read-only check; the timer is
+                // owned by FrameScheduler.TickBlinkerCycle and decrements independently).
+                if (store.EnemyBlinkIFramesLeft[enemyId] > 0f) continue;
                 // I-frames write-back (Round 118): after this hit lands, set invuln counter
                 // to the configured per-monster value. Mirrors TowerAttackSystem's behavior so
                 // Boss/Elite I-frames apply uniformly to BOTH tower and player attacks.

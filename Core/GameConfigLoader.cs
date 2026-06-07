@@ -849,6 +849,14 @@ namespace BattleSystemECS.Config
             monster.IsPhaser = ExtractBool(json, "IsPhaser");
             monster.PhaserInterval = ExtractFloat(json, "PhaserInterval");
             monster.PhaserPhaseDuration = ExtractFloat(json, "PhaserPhaseDuration");
+            // Round 182 Direction 6 — Blinker enemy marker. Default false = inert; when
+            // IsBlinker=true, WaveSpawningSystem calls SetEnemyBlinker() to wire the
+            // interval + distance into the ComponentStore. Both clamped at the store
+            // level to [0.5, 30.0] and [0.5, 5.0] respectively (min interval prevents
+            // runaway 60Hz spam, max distance prevents skipping tower layers).
+            monster.IsBlinker = ExtractBool(json, "IsBlinker");
+            monster.BlinkInterval = ExtractFloat(json, "BlinkInterval");
+            monster.BlinkDistance = ExtractFloat(json, "BlinkDistance");
 
             return monster;
         }

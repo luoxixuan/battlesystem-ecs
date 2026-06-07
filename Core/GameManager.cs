@@ -116,6 +116,11 @@ namespace BattleSystemECS.Core
 
             scheduler = new FrameScheduler(store, gameConfig);
             registry.AssignToGroups(scheduler);
+            // Round 182 Direction 6 — Inject PathfindingSystem so FrameScheduler's
+            // TickBlinkerCycle can look up path waypoint counts before advancing node
+            // indices on a blink. Optional dependency; TickBlinkerCycle gracefully
+            // degrades to a no-advance when pathfinding is null.
+            scheduler.SetPathfindingSystem(registry.Pathfinding);
 
             // 初始化地形网格
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)

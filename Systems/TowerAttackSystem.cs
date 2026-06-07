@@ -1078,6 +1078,15 @@ namespace BattleSystemECS.Systems
                     {
                         return;
                     }
+                    // Round 182 Direction 6 — Blinker i-frames (post-blink invulnerability).
+                    // A Blinker that just warped forward (within the last 0.2s) is briefly
+                    // invulnerable. Skip damage while EnemyBlinkIFramesLeft > 0. Mirrors the
+                    // existing I-frames check above; the Blinker timer is owned by
+                    // FrameScheduler.TickBlinkerCycle and decrements independently each frame.
+                    if (store.EnemyBlinkIFramesLeft[bestTarget] > 0f)
+                    {
+                        return;
+                    }
 
                     // ── Round 143 Direction 1: Tower-vs-enemy type effectiveness multiplier ──
                     // Applied AFTER armor / resist / ramp / falloff / wave / synergy / weather
@@ -1477,6 +1486,12 @@ namespace BattleSystemECS.Systems
                 if (_hitShieldSystem != null && _hitShieldSystem.ConsumeHitShield(enemyId)) continue;
                 // I-frames check (Round 118): skip damage while EnemyInvulnFramesLeft > 0
                 if (store.EnemyInvulnFramesLeft[enemyId] > 0) continue;
+                // Round 182 Direction 6 — Blinker i-frames (post-blink invulnerability).
+                // A Blinker that just warped forward (within the last 0.2s) is briefly
+                // invulnerable. Skip damage while EnemyBlinkIFramesLeft > 0. Mirrors the
+                // existing I-frames check above; the Blinker timer is owned by
+                // FrameScheduler.TickBlinkerCycle and decrements independently each frame.
+                if (store.EnemyBlinkIFramesLeft[enemyId] > 0f) continue;
                 // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
                 float resist = store.EnemyDamageResistance[enemyId];
                 // Stalker ambush multiplier (Round 174 Dir 8) is applied AFTER damage resistance

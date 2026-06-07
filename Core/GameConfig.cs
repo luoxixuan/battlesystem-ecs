@@ -183,6 +183,22 @@ namespace BattleSystemECS.Config
         // is immune to physical damage). e.g. 1.5s. Wired to EnemyPhaserPhaseDuration
         // via SetEnemyPhaser(). Clamped to [0.1, 10.0] at store level.
         public float PhaserPhaseDuration { get; set; } = 0f;
+        // Round 182 Direction 6 — Blink-Dash Enemy Marker ──────────────────────────
+        // IsBlinker: true if this enemy periodically teleports forward along its path
+        // (ignoring tile collision), gaining 0.2s of invulnerability post-blink. When
+        // true, WaveSpawningSystem calls SetEnemyBlinker() to wire interval / distance
+        // into the ComponentStore. Default false = inert fast path.
+        public bool IsBlinker { get; set; } = false;
+        // BlinkInterval: seconds between blinks. e.g. 3.0 = every 3 seconds the enemy
+        // warps forward BlinkDistance tiles. Wired to EnemyBlinkInterval via
+        // SetEnemyBlinker(). Clamped to [0.5, 30.0] at store level (min 0.5s prevents
+        // runaway 60Hz spam that would teleport the enemy across the whole map).
+        public float BlinkInterval { get; set; } = 0f;
+        // BlinkDistance: tiles to advance per blink. e.g. 2 = jumps 2 tiles ahead.
+        // Wired to EnemyBlinkDistance via SetEnemyBlinker(). Clamped to [0.5, 5.0] at
+        // store level (max 5 tiles per blink so the enemy can't skip multiple tower
+        // layers in one jump).
+        public float BlinkDistance { get; set; } = 0f;
         // DrainRatio: max fraction of tower damage this enemy can drain (0-1, 0 = no drain).
         // Example: 0.5 = can reduce a nearby tower's damage by up to 50%.
         public float DrainRatio { get; set; } = 0f;

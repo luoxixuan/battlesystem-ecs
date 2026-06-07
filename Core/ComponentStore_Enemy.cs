@@ -350,6 +350,26 @@ namespace BattleSystemECS.Core
         // EnemyPhaserPhaseDuration: how long each phase window lasts (seconds). Default
         // 1.5s per design. Set by SetEnemyPhaser() from MonsterDef.PhaserPhaseDuration.
         public float[] EnemyPhaserPhaseDuration = new float[MAX_ENTITIES];
+        // Round 182 Direction 6 — Blink-Dash Enemy Fields ──────────────────────────
+        // EnemyIsBlinker: true if this enemy periodically "blinks forward" along the path
+        // (ignoring tile collision), gaining 0.2s invulnerability during the blink. Default
+        // false = inert fast path. Set at AddEnemy + SetEnemyBlinker() when MonsterDef.IsBlinker.
+        public bool[] EnemyIsBlinker = new bool[MAX_ENTITIES];
+        // EnemyBlinkInterval: seconds between blinks (e.g. 3.0 = blinks forward every 3
+        // seconds). 0 = never auto-blink. Set by SetEnemyBlinker() from MonsterDef.BlinkInterval.
+        public float[] EnemyBlinkInterval = new float[MAX_ENTITIES];
+        // EnemyBlinkTimer: seconds elapsed in the current "between blinks" gap. When it
+        // reaches EnemyBlinkInterval, the enemy teleports forward EnemyBlinkDistance
+        // tiles along its path and resets to 0. Decremented/cleared indirectly via the
+        // FrameScheduler.TickBlinkerCycle tick loop.
+        public float[] EnemyBlinkTimer = new float[MAX_ENTITIES];
+        // EnemyBlinkDistance: how many tiles the enemy warps forward on each blink
+        // (e.g. 2 = jumps 2 tiles ahead). Set by SetEnemyBlinker() from MonsterDef.BlinkDistance.
+        public float[] EnemyBlinkDistance = new float[MAX_ENTITIES];
+        // EnemyBlinkIFramesLeft: seconds of invulnerability remaining after a blink fires
+        // (0.2s = 0.2s of damage immunity post-blink so towers can't get free damage during
+        // the visual blink animation). Decremented by FrameScheduler.TickBlinkerCycle.
+        public float[] EnemyBlinkIFramesLeft = new float[MAX_ENTITIES];
 
         // ==================== 钻地/潜行敌人组件 (Burrow / Underground Enemies, SOA) ====================
         // EnemyIsBurrowed: true when enemy is underground (cannot be targeted by towers)
@@ -1225,6 +1245,15 @@ namespace BattleSystemECS.Core
             EnemyPhaserPhaseActive[entityId] = false;
             EnemyPhaserCycleTimer[entityId] = 0f;
             EnemyPhaserPhaseDuration[entityId] = 0f;
+            // Round 182 Direction 6 — Blinker default state at AddEnemy. Each new spawn
+            // starts as a non-blinker (zero-overhead fast path). Callers that want the
+            // periodic forward-blink behavior must invoke SetEnemyBlinker() right after
+            // AddEnemy. The first blink fires after the first EnemyBlinkInterval seconds.
+            EnemyIsBlinker[entityId] = false;
+            EnemyBlinkInterval[entityId] = 0f;
+            EnemyBlinkTimer[entityId] = 0f;
+            EnemyBlinkDistance[entityId] = 0f;
+            EnemyBlinkIFramesLeft[entityId] = 0f;
             // Damage Saturation (Round 92): default 0 rolling sum + 0 last-touched frame. Lazily used by
             // TowerAttackSystem and PlayerTowerAttackSystem — the (currentFrame - lastFrame) > window
             // check naturally expires the rolling window for any enemy that hasn't been hit recently.
@@ -1701,6 +1730,35 @@ namespace BattleSystemECS.Core
             EnemyPhaserPhaseActive[enemyId] = false;
             EnemyPhaserDurationLeft[enemyId] = 0f;
             EnemyPhaserCycleTimer[enemyId] = 0f;
+        }
+
+        /// <summary>
+        /// Round 182 Direction 6 — Configure an enemy as a "Blinker" (periodic forward dash).
+        /// Sentinel-gated: only EnemyIsBlinker==true enemies pay the per-frame work. After
+        /// calling, the FrameScheduler.TickBlinkerCycle will:
+        ///   - Tick EnemyBlinkTimer up by deltaTime each frame
+        ///   - When timer >= interval: snap the enemy EnemyBlinkDistance tiles forward along
+        ///     its current path (EnemyPathNodeIndex += distance), reset timer to 0, and
+        ///     grant 0.2s of invulnerability (EnemyBlinkIFramesLeft)
+        ///   - Decrement EnemyBlinkIFramesLeft each frame so towers can re-target after the
+        ///     brief i-frame window expires
+        /// All 5 fields are sentinel-gated: non-blinkers pay zero overhead.
+        /// </summary>
+        /// <param name="enemyId">Target enemy entity ID (must be valid).</param>
+        /// <param name="interval">Seconds between blinks. Clamped to [0.5, 30.0] (min 0.5s
+        /// prevents a runaway 60Hz spam that would teleport the enemy across the whole map).</param>
+        /// <param name="distance">Tiles to advance per blink. Clamped to [0.5, 5.0] (max 5
+        /// tiles per blink so the enemy can't skip multiple tower layers per blink).</param>
+        public void SetEnemyBlinker(int enemyId, float interval, float distance)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyIsBlinker[enemyId] = true;
+            EnemyBlinkInterval[enemyId] = System.Math.Clamp(interval, 0.5f, 30.0f);
+            EnemyBlinkDistance[enemyId] = System.Math.Clamp(distance, 0.5f, 5.0f);
+            // Start the cycle in the "between blinks" gap: timer at 0, no i-frames. The first
+            // blink fires after the first interval elapses.
+            EnemyBlinkTimer[enemyId] = 0f;
+            EnemyBlinkIFramesLeft[enemyId] = 0f;
         }
 
 

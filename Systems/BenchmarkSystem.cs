@@ -404,6 +404,10 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             map.SetMapSize(10, 20);
             var pathfinding   = new PathfindingSystem(store);
             enemyMovement.SetPathfindingSystem(pathfinding);
+            // Round 182 Direction 6 — No FrameScheduler in this benchmark path (mode 4
+            // stress-test calls systems directly); TickBlinkerCycle is not invoked here,
+            // so the optional pathfinding injection is deferred to the mode 5 path
+            // below where the FrameScheduler is actually constructed.
             var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
 
             long tWaveSpawn = 0, tEnemyAI = 0, tMoveAttack = 0;
@@ -510,6 +514,11 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
             scheduler.Combat.TowerShrine = towerShrine;
             var pathfinding   = new PathfindingSystem(store);
             enemyMovement.SetPathfindingSystem(pathfinding);
+            // Round 182 Direction 6 — Inject PathfindingSystem into FrameScheduler so
+            // TickBlinkerCycle can validate path waypoint counts before advancing node
+            // indices on a blink. Optional dependency; TickBlinkerCycle gracefully
+            // degrades to a no-advance when pathfinding is null.
+            scheduler.SetPathfindingSystem(pathfinding);
 
             // 布线 FrameScheduler — 按 Phase 分组注入
             scheduler.Spawning.WaveSpawning   = waveSpawning;

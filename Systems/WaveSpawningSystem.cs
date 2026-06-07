@@ -820,6 +820,17 @@ namespace BattleSystemECS.Systems
                         store.SetEnemyPhaser(enemyId, monsterConfig.PhaserInterval, monsterConfig.PhaserPhaseDuration);
                     }
 
+                    // Initialize Blinker enemy properties (Round 182 Direction 6) — periodically
+                    // teleports forward along its current path (ignoring tile collision),
+                    // gaining 0.2s of invulnerability post-blink. Cycle: vulnerable for
+                    // BlinkInterval seconds, then snap forward BlinkDistance tiles + 0.2s
+                    // i-frames, then repeat. The blink skips past tower layers so the player
+                    // must position towers to cover the post-blink landing zone.
+                    if (monsterConfig.IsBlinker)
+                    {
+                        store.SetEnemyBlinker(enemyId, monsterConfig.BlinkInterval, monsterConfig.BlinkDistance);
+                    }
+
                     // Initialize burrow/underground enemy properties
                     if (monsterConfig.CanBurrow)
                     {
