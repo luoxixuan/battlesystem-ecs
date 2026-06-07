@@ -1,19 +1,7 @@
 # 塔防游戏 ECS + GAS 知识库
-> 自动生成 · 2026-06-07 01:04 · v3
+> 自动生成 · 2026-06-08 01:05 · v3
 
-已分析 75 个仓库
-
-## 📋 待办任务（下一轮研究/同步前请先看）
-
-来自 Codex review pass（commit `2d6bb6b`）的 5 条 doc 同步任务，详见 [`Research/codereview-doc-sync-round172.md`](./handoff-doc-sync-round172.md)：
-
-1. 同步 `docs/architecture.md`（13 阶段 + SystemRegistry 文档化）
-2. 同步 `docs/design-and-bugs.md`（48 Bug 范围界定 + Round 100+ 增量）
-3. 同步 `README.md` 性能数字（bench + 测试数 946）
-4. 加 U+FFFD doc-quality guardrail（防 350 处 GBK→UTF-8 残留再现）
-5. 确认/拒绝新的硬/相对门禁框架（`AGENTS.md §7`）
-
-**作用域提醒**：本 handoff 限 doc 同步；`CHANGLLOG.md` / `docs/philosophy.md` / `.csproj` 升级不在范围。
+已分析 76 个仓库
 
 ## 塔防专项模式
 
@@ -21,13 +9,13 @@
 > GAS 风格 Ability + Modifier 分离
 来源：[felipeggrod/gasify](https://github.com/felipeggrod/gasify), [intrxx/Obsidian](https://github.com/intrxx/Obsidian), [Pantong51/GASContent](https://github.com/Pantong51/GASContent)
 
-### 实体管理器
-> ECS 风格：实体创建/销毁/查询
-来源：[sebas77/Svelto.ECS](https://github.com/sebas77/Svelto.ECS), [Gornhoth/Unity-Smoothed-Particle-Hydrodynamics](https://github.com/Gornhoth/Unity-Smoothed-Particle-Hydrodynamics), [areilly711/unity_ecs](https://github.com/areilly711/unity_ecs)
-
 ### 分裂/克隆
 > 敌人死后分裂为多个小怪，或主动克隆
 来源：[MaiKuraki/UnityStarter](https://github.com/MaiKuraki/UnityStarter), [pshenok/server-survival](https://github.com/pshenok/server-survival), [ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template)
+
+### 实体管理器
+> ECS 风格：实体创建/销毁/查询
+来源：[sebas77/Svelto.ECS](https://github.com/sebas77/Svelto.ECS), [Gornhoth/Unity-Smoothed-Particle-Hydrodynamics](https://github.com/Gornhoth/Unity-Smoothed-Particle-Hydrodynamics), [areilly711/unity_ecs](https://github.com/areilly711/unity_ecs)
 
 ### N击护盾/屏障
 > 需N次命中击破的护盾，或伤害阈值盾
@@ -65,13 +53,13 @@
 > A*/BFS/网格寻路，敌人沿路径移动
 来源：[killop/anything_about_game](https://github.com/killop/anything_about_game), [zulfajuniadi/unity-ecs-navmesh](https://github.com/zulfajuniadi/unity-ecs-navmesh), [chromealex/ecs](https://github.com/chromealex/ecs)
 
-### 拉扯/吸引
-> 将敌人拉向塔或特定位置
-来源：[Antoshidza/NSprites](https://github.com/Antoshidza/NSprites), [ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template), [danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
-
 ### 失衡/破防/击退
 > 累积伤害触发硬直/击退/打断施法
 来源：[pshenok/server-survival](https://github.com/pshenok/server-survival), [techwithtim/Tower-Defense-Game](https://github.com/techwithtim/Tower-Defense-Game), [danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
+
+### 拉扯/吸引
+> 将敌人拉向塔或特定位置
+来源：[Antoshidza/NSprites](https://github.com/Antoshidza/NSprites), [ape1121/Godot-4-Tower-Defense-Template](https://github.com/ape1121/Godot-4-Tower-Defense-Template), [danderfer/Comp_Sci_Sem_2](https://github.com/danderfer/Comp_Sci_Sem_2)
 
 ### 攻击间隔
 > 攻速属性、独立冷却管理
