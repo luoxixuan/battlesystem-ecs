@@ -946,6 +946,9 @@ namespace BattleSystemECS.Config
             level.DoomClockHealthBonusPerPercent = (int)ExtractFloat(json, "DoomClockHealthBonusPerPercent", level.DoomClockHealthBonusPerPercent);
             level.DoomClockWaveScaling = ExtractFloat(json, "DoomClockWaveScaling", level.DoomClockWaveScaling);
             level.DoomClockInitialWaves = ParseDoomClockInitialWaves(json, "DoomClockInitialWaves");
+ // Round201 Direction7 — side quest bonus objectives. Empty list = no side
+ // quests; ObjectiveSystem fast-paths zero-overhead when list is empty.
+ level.SideQuests = ParseSideQuests(json, "SideQuests");
 
             return level;
         }
@@ -993,10 +996,56 @@ namespace BattleSystemECS.Config
                 }
             }
             return list;
-        }
+ }
 
-        /// <summary>
-        /// Parse a flat array of destructible placement entries from a JSON object string.
+ /// <summary>
+ /// Parse a flat array of side quest definitions from a JSON object string.
+ /// Round201 Direction7. Each entry is expected to have {Id, Type, Threshold,
+ /// TimeLimit?, GoldReward?, SoulReward?}. Missing or malformed entries are
+ /// silently skipped (side quests are opt-in, no required fields). When the
+ /// "SideQuests" key is absent or empty, returns an empty list.
+ /// </summary>
+ private static List<SideQuestDef> ParseSideQuests(string json, string key)
+ {
+ var list = new List<SideQuestDef>();
+ string keyPattern = "\"" + key + "\":";
+ int keyIndex = json.IndexOf(keyPattern);
+ if (keyIndex == -1) return list;
+ int arrayStart = json.IndexOf("[", keyIndex);
+ if (arrayStart == -1) return list;
+ int arrayEnd = FindMatchingBrace(json, arrayStart);
+ if (arrayEnd == -1) return list;
+ string arrayContent = json.Substring(arrayStart +1, arrayEnd - arrayStart -1);
+ int pos =0;
+ while (pos < arrayContent.Length)
+ {
+ while (pos < arrayContent.Length && (char.IsWhiteSpace(arrayContent[pos]) || arrayContent[pos] == ',')) pos++;
+ if (pos >= arrayContent.Length) break;
+ if (arrayContent[pos] == '{')
+ {
+ int objEnd = FindMatchingBrace(arrayContent, pos);
+ if (objEnd == -1) break;
+ string objJson = arrayContent.Substring(pos, objEnd - pos +1);
+ var entry = new SideQuestDef
+ {
+ Id = ExtractString(objJson, "Id"),
+ Type = ExtractInt(objJson, "Type"),
+ Threshold = ExtractInt(objJson, "Threshold"),
+ TimeLimit = ExtractFloat(objJson, "TimeLimit",0f),
+ GoldReward = ExtractInt(objJson, "GoldReward"),
+ SoulReward = ExtractInt(objJson, "SoulReward"),
+ };
+ if (!string.IsNullOrEmpty(entry.Id))
+ list.Add(entry);
+ pos = objEnd +1;
+ }
+ else { pos++; }
+ }
+ return list;
+ }
+
+ /// <summary>
+ /// Parse a flat array of destructible placement entries from a JSON object string.
         /// Round 95 Direction 5. Each entry is expected to have {DefId, X, Y}. DefId is a
         /// string referencing a DestructibleDef.Id; X and Y are floats for grid coordinates.
         /// Missing or malformed entries are silently skipped (an opt-in feature with no

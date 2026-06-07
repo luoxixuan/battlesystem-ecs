@@ -807,20 +807,47 @@ namespace BattleSystemECS.Config
         // Cycle = one full pass through DoomClockInitialWaves. Default 1.10f.
         public float DoomClockWaveScaling { get; set; } = 1.10f;
         // For DoomClock mode: initial wave templates (re-used in cycle when waves exhausted).
-        // Each entry is a (MonsterType, EnemyCount) pair. If empty, falls back to level.Waves.
-        public List<DoomClockWaveTemplate> DoomClockInitialWaves { get; set; } = new List<DoomClockWaveTemplate>();
-    }
+ // Each entry is a (MonsterType, EnemyCount) pair. If empty, falls back to level.Waves.
+ public List<DoomClockWaveTemplate> DoomClockInitialWaves { get; set; } = new List<DoomClockWaveTemplate>();
+ // ── Side Quests (Round201 Direction7) ────────────────────────────────
+ // Optional bonus objectives per level. Each entry defines a quest type,
+ // a threshold to reach, and a gold/soul reward on completion. Completion
+ // does not affect the main objective — main failure does not stop side
+ // quest progress either. Empty list = no side quests, zero overhead.
+ public List<SideQuestDef> SideQuests { get; set; } = new List<SideQuestDef>();
+ }
 
     /// <summary>
-    /// Wave template used by DoomClock mode (Round 110 Direction 10).
-    /// After the initial pool is exhausted, DoomClockSystem cycles back to wave 0 with
-    /// stat scaling applied. Each template defines a monster type and a spawn count.
-    /// </summary>
-    public class DoomClockWaveTemplate
-    {
-        public string MonsterType { get; set; } = "Normal";
-        public int EnemyCount { get; set; } = 10;
-    }
+ /// Wave template used by DoomClock mode (Round110 Direction10).
+ /// After the initial pool is exhausted, DoomClockSystem cycles back to wave0 with
+ /// stat scaling applied. Each template defines a monster type and a spawn count.
+ /// </summary>
+ public class DoomClockWaveTemplate
+ {
+ public string MonsterType { get; set; } = "Normal";
+ public int EnemyCount { get; set; } =10;
+ }
+
+ /// <summary>
+ /// Side quest definition — optional bonus objective on a level.
+ /// Round201 Direction7. The ObjectiveSystem tracks progress independently
+ /// of the main objective. Side quest types:
+ ///0 = KillCount — kill at least Threshold enemies this run
+ ///1 = NoDeath — finish the level with PlayerLives intact (Threshold =1 means ≥1 life left)
+ ///2 = Speed — finish within TimeLimit seconds (ObjectiveTimer at level end ≤ TimeLimit)
+ ///3 = MinimalTowers — finish with at most Threshold towers placed
+ ///4 = NoHeal — finish without spending any healing (gold on heals =0)
+ /// Completion fires SideQuestCompleted event and grants GoldReward / SoulReward.
+ /// </summary>
+ public class SideQuestDef
+ {
+ public string Id { get; set; } = "";
+ public int Type { get; set; } =0; //0..4 above
+ public int Threshold { get; set; } =0;
+ public float TimeLimit { get; set; } =0f; // only for Type=Speed
+ public int GoldReward { get; set; } =0;
+ public int SoulReward { get; set; } =0;
+ }
 
     /// <summary>
     /// Placement entry for a destructible object on a level map. Round 95 Direction 5.

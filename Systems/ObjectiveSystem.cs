@@ -18,19 +18,23 @@ namespace BattleSystemECS.Systems
     ///   WavePhase:  update objective progress, check win/lose conditions
     /// </summary>
     public class ObjectiveSystem
-    {
-        private readonly ComponentStore _store;
-        private readonly int _playerId;
-        // Round 110 Direction 10 — cached LevelConfig so CheckObjective can
-        // compute DoomClock final score (needs DoomClockWaveScore / TimeBonusPerSec
-        // / HealthBonusPerPercent tunables) without a separate parameter.
-        private Config.LevelConfig? _currentLevel;
+ {
+ private readonly ComponentStore _store;
+ private readonly int _playerId;
+ // Round110 Direction10 — cached LevelConfig so CheckObjective can
+ // compute DoomClock final score (needs DoomClockWaveScore / TimeBonusPerSec
+ // / HealthBonusPerPercent tunables) without a separate parameter.
+ private Config.LevelConfig? _currentLevel;
+ // Round201 Direction7 — optional EventBus for SideQuestCompleted publish.
+ // Null is OK (no subscribers → no publish cost).
+ private readonly Core.EventBus? _eventBus;
 
-        public ObjectiveSystem(ComponentStore store, int playerId = 0)
-        {
-            _store = store ?? throw new ArgumentNullException(nameof(store));
-            _playerId = playerId;
-        }
+ public ObjectiveSystem(ComponentStore store, int playerId =0, Core.EventBus? eventBus = null)
+ {
+ _store = store ?? throw new ArgumentNullException(nameof(store));
+ _playerId = playerId;
+ _eventBus = eventBus;
+ }
 
         /// <summary>
         /// Initialize objective state from level config. Called once per level load.
@@ -99,11 +103,17 @@ namespace BattleSystemECS.Systems
                 _store.DoomClockFinalScore[_playerId] = 0;
             }
             else
-            {
-                _store.DoomClockActive[_playerId] = false;
-                _store.DoomClockFinalScore[_playerId] = 0;
-            }
-        }
+ {
+ _store.DoomClockActive[_playerId] = false;
+ _store.DoomClockFinalScore[_playerId] =0;
+ }
+
+ // Round201 Direction7 — subscribe to kill events for side quest kill-counting.
+ // The handler is stored as a field so it can be unsubscribed on the next
+ // InitializeFromLevel call (defensive: level reload shouldn't double-subscribe).
+ _store.OnEnemyKilled -= OnEnemyKilledForSideQuest;
+ _store.OnEnemyKilled += OnEnemyKilledForSideQuest;
+ }
 
         /// <summary>
         /// Per-frame tick — update escort movement and objective timers.
@@ -113,24 +123,33 @@ namespace BattleSystemECS.Systems
         /// is what actually fires the win condition (timer=0 && player alive).
         /// </summary>
         public void Update(float deltaTime, GameState phase)
-        {
-            var objType = (ObjectiveType)_store.CurrentObjectiveType[_playerId];
+ {
+ var objType = (ObjectiveType)_store.CurrentObjectiveType[_playerId];
 
-            if (objType == ObjectiveType.Escort)
-            {
-                UpdateEscort(deltaTime);
-            }
+ if (objType == ObjectiveType.Escort)
+ {
+ UpdateEscort(deltaTime);
+ }
 
-            if (objType == ObjectiveType.Timed && phase == GameState.WavePhase)
-            {
-                UpdateTimed(deltaTime);
-            }
+ if (objType == ObjectiveType.Timed && phase == GameState.WavePhase)
+ {
+ UpdateTimed(deltaTime);
+ }
 
-            if (objType == ObjectiveType.DoomClock && phase == GameState.WavePhase)
-            {
-                UpdateDoomClock(deltaTime);
-            }
-        }
+ if (objType == ObjectiveType.DoomClock && phase == GameState.WavePhase)
+ {
+ UpdateDoomClock(deltaTime);
+ }
+
+ // Round201 Direction7 — accumulate run-elapsed time during WavePhase so the
+ // Speed side quest can read it at run end. Only counts wave-active time so
+ // build phases don't pad the clock (matches the player-visible "objective
+ // clock" intuition).
+ if (phase == GameState.WavePhase)
+ {
+ _store.PlayerRunElapsedTime[_playerId] += deltaTime;
+ }
+ }
 
         /// <summary>
         /// WavePhase-specific update — check conditions and advance progress.
@@ -206,77 +225,96 @@ namespace BattleSystemECS.Systems
             var objType = (ObjectiveType)_store.CurrentObjectiveType[_playerId];
 
             switch (objType)
-            {
-                case ObjectiveType.KillAll:
-                    // Win when all waves done and no enemies remain
-                    if (currentWave > totalWaves && activeEnemyCount == 0)
-                        return 1;
-                    break;
+ {
+ case ObjectiveType.KillAll:
+ // Win when all waves done and no enemies remain
+ if (currentWave > totalWaves && activeEnemyCount ==0)
+ {
+ EvaluateSideQuestsOnRunEnd();
+ return 1;
+ }
+ break;
 
-                case ObjectiveType.Escort:
-                    // Lose if NPC dies
-                    if (!_store.EscortNpcActive[_playerId])
-                        return -1;
-                    // Win if NPC reaches far side of map (x >= map width)
-                    // We don't have map width here — check health is > 0 and wave complete
-                    if (_store.EscortNpcActive[_playerId] && currentWave > totalWaves && activeEnemyCount == 0)
-                        return 1;
-                    break;
+ case ObjectiveType.Escort:
+ // Lose if NPC dies
+ if (!_store.EscortNpcActive[_playerId])
+ {
+ EvaluateSideQuestsOnRunEnd();
+ return -1;
+ }
+ // Win if NPC reaches far side of map (x >= map width)
+ // We don't have map width here — check health is >0 and wave complete
+ if (_store.EscortNpcActive[_playerId] && currentWave > totalWaves && activeEnemyCount ==0)
+ {
+ EvaluateSideQuestsOnRunEnd();
+ return 1;
+ }
+ break;
 
-                case ObjectiveType.Survival:
-                    // Win when all survival waves cleared (no kill requirement)
-                    if (currentWave > totalWaves && activeEnemyCount == 0)
-                        return 1;
-                    break;
+ case ObjectiveType.Survival:
+ // Win when all survival waves cleared (no kill requirement)
+ if (currentWave > totalWaves && activeEnemyCount ==0)
+ {
+ EvaluateSideQuestsOnRunEnd();
+ return 1;
+ }
+ break;
 
-                case ObjectiveType.Timed:
-                    // Win when timer expires with enemies remaining
-                    // Lose if all enemies killed before timer expires
-                    if (activeEnemyCount == 0)
-                        return 1; // cleared early = win
-                    if (_store.ObjectiveTimer[_playerId] <= 0f && activeEnemyCount > 0)
-                        return -1; // time ran out with enemies still alive
-                    break;
+ case ObjectiveType.Timed:
+ // Win when timer expires with enemies remaining
+ // Lose if all enemies killed before timer expires
+ if (activeEnemyCount ==0)
+ {
+ EvaluateSideQuestsOnRunEnd();
+ return 1; // cleared early = win
+ }
+ if (_store.ObjectiveTimer[_playerId] <=0f && activeEnemyCount >0)
+ {
+ EvaluateSideQuestsOnRunEnd();
+ return -1; // time ran out with enemies still alive
+ }
+ break;
 
-                case ObjectiveType.Endless:
-                    // No win condition — runs until player loses (lives = 0 or escort dies)
-                    // Score is tracked in ObjectiveWaveScore
-                    break;
+ case ObjectiveType.Endless:
+ // No win condition — runs until player loses (lives =0 or escort dies)
+ // Score is tracked in ObjectiveWaveScore
+ break;
 
-                case ObjectiveType.DoomClock:
-                    // Round 110 Direction 10:
-                    // - Win when the countdown hits 0 AND no enemies remain on the field.
-                    //   (We require the wave to be cleared, not just the timer to expire,
-                    //   so the player actually finishes the current fight cleanly.)
-                    // - If the timer hits 0 but enemies are still alive, we keep waiting
-                    //   (return 0) — the wave is still winnable. The clock already expired
-                    //   and the score bonus for time-remaining will simply be 0.
-                    // - Lose is reported by the game-over path (lives = 0) before this
-                    //   function is reached, so we don't need to handle a -1 here.
-                    if (!_store.DoomClockActive[_playerId]) break;  // run already ended
-                    if (_store.DoomClockTimer[_playerId] <= 0f && activeEnemyCount == 0)
-                    {
-                        // Round 110 Direction 10 — compute and persist final score
-                        // before returning win. Uses cached _currentLevel tunables;
-                        // playerHealthFraction is read from the store. EndRun also
-                        // flips DoomClockActive=false so subsequent calls no-op.
-                        float maxHp = _store.PlayerMaxHealth[_playerId];
-                        float curHp = _store.PlayerCurrentHealth[_playerId];
-                        float frac = maxHp > 0f ? (curHp / maxHp) : 0f;
-                        if (frac < 0f) frac = 0f;
-                        if (frac > 1f) frac = 1f;
-                        int waveBonus = _store.DoomClockWavesCleared[_playerId] * (_currentLevel?.DoomClockWaveScore ?? 100);
-                        int timeBonus = (int)(_store.DoomClockTimer[_playerId] * (_currentLevel?.DoomClockTimeBonusPerSec ?? 10));
-                        int healthBonus = (int)(frac * 100f) * (_currentLevel?.DoomClockHealthBonusPerPercent ?? 5);
-                        _store.DoomClockFinalScore[_playerId] = waveBonus + timeBonus + healthBonus;
-                        _store.DoomClockActive[_playerId] = false;
-                        return 1; // survived the clock + cleared the wave = win
-                    }
-                    break;
-            }
+ case ObjectiveType.DoomClock:
+ // Round110 Direction10:
+ // - Win when the countdown hits0 AND no enemies remain on the field.
+ // (We require the wave to be cleared, not just the timer to expire,
+ // so the player actually finishes the current fight cleanly.)
+ // - If the timer hits0 but enemies are still alive, we keep waiting
+ // (return 0;) — the wave is still winnable. The clock already expired
+ // and the score bonus for time-remaining will simply be0.
+ // - Lose is reported by the game-over path (lives =0) before this
+ // function is reached, so we don't need to handle a -1 here.
+ if (!_store.DoomClockActive[_playerId]) break; // run already ended
+ if (_store.DoomClockTimer[_playerId] <=0f && activeEnemyCount ==0)
+ {
+ // Round110 Direction10 — compute and persist final score
+ // before returning win. Uses cached _currentLevel tunables;
+ // playerHealthFraction is read from the store. EndRun also
+ // flips DoomClockActive=false so subsequent calls no-op.
+ float maxHp = _store.PlayerMaxHealth[_playerId];
+ float curHp = _store.PlayerCurrentHealth[_playerId];
+ float frac = maxHp >0f ? (curHp / maxHp) :0f;
+ if (frac <0f) frac =0f;
+ if (frac >1f) frac =1f;
+ int waveBonus = _store.DoomClockWavesCleared[_playerId] * (_currentLevel?.DoomClockWaveScore ??100);
+ int timeBonus = (int)(_store.DoomClockTimer[_playerId] * (_currentLevel?.DoomClockTimeBonusPerSec ??10));
+ int healthBonus = (int)(frac *100f) * (_currentLevel?.DoomClockHealthBonusPerPercent ??5);
+ _store.DoomClockFinalScore[_playerId] = waveBonus + timeBonus + healthBonus;
+ _store.DoomClockActive[_playerId] = false;
+ EvaluateSideQuestsOnRunEnd();
+ return 1; // survived the clock + cleared the wave = win
+ }
+ break;
+ }
 
-            return 0; // ongoing
-        }
+ return 0; // ongoing
+ }
 
         /// <summary>
         /// Get current objective progress as a formatted string for UI.
@@ -339,23 +377,153 @@ namespace BattleSystemECS.Systems
         }
 
         private void UpdateTimed(float deltaTime)
-        {
-            if (_store.ObjectiveTimer[_playerId] > 0f)
-            {
-                _store.ObjectiveTimer[_playerId] -= deltaTime;
-                if (_store.ObjectiveTimer[_playerId] < 0f)
-                    _store.ObjectiveTimer[_playerId] = 0f;
-            }
-        }
+ {
+ if (_store.ObjectiveTimer[_playerId] >0f)
+ {
+ _store.ObjectiveTimer[_playerId] -= deltaTime;
+ if (_store.ObjectiveTimer[_playerId] <0f)
+ _store.ObjectiveTimer[_playerId] =0f;
+ }
+ }
 
-        /// <summary>
-        /// DoomClock countdown — Round 110 Direction 10. Decrements the global
-        /// timer each frame during WavePhase. Stops at 0 (the win check in
-        /// CheckObjective is what actually fires the win). Mirror of UpdateTimed
-        /// but on the DoomClock-specific timer field, with an `Active` guard so
-        /// the loop short-circuits once the run is over.
-        /// </summary>
-        private void UpdateDoomClock(float deltaTime)
+ // ── Side Quest evaluation (Round201 Direction7) ─────────────────────
+ // Called once when the main objective transitions to a terminal state (won/lost).
+ // Walks the level's SideQuests list and checks each quest against current state.
+ // Completes any quest that crosses its threshold, latches it, credits rewards,
+ // and publishes SideQuestCompleted via EventBus. Main objective outcome does not
+ // affect side quest eligibility — e.g. a player who loses (lives=0) still gets
+ // their kill-count or no-heal quest if they crossed the threshold.
+ private void EvaluateSideQuestsOnRunEnd()
+ {
+ var level = _currentLevel;
+ if (level == null) return;
+ var quests = level.SideQuests;
+ if (quests == null || quests.Count ==0) return; // fast path
+
+ int lives = _store.PlayerBaseLives != null && _playerId < _store.PlayerBaseLives.Length
+ ? _store.PlayerBaseLives[_playerId]
+ :0;
+ int towersPlaced = _store.PlayerTowerCount != null && _playerId < _store.PlayerTowerCount.Length
+ ? _store.PlayerTowerCount[_playerId]
+ :0;
+ float elapsed = _store.PlayerRunElapsedTime[_playerId];
+
+ for (int i =0; i < quests.Count && i < ComponentStore.MAX_SIDE_QUESTS; i++)
+ {
+ if (_store.PlayerSideQuestCompleted[_playerId * ComponentStore.MAX_SIDE_QUESTS + i])
+ continue; // already done — latch prevents re-fire
+
+ var quest = quests[i];
+ bool done = false;
+ switch (quest.Type)
+ {
+  case 0: // KillCount
+  done = _store.PlayerSideQuestProgress[_playerId * ComponentStore.MAX_SIDE_QUESTS + i] >= quest.Threshold;
+  break;
+  case 1: // NoDeath — Threshold >=1 means ≥1 life remaining
+  done = lives >= Math.Max(1, quest.Threshold);
+  break;
+  case 2: // Speed — finished within TimeLimit seconds
+  done = elapsed <= quest.TimeLimit && quest.TimeLimit >0f;
+  break;
+  case 3: // MinimalTowers — at most Threshold towers placed
+  done = towersPlaced <= quest.Threshold;
+  break;
+  case 4: // NoHeal — placeholder (healing spending tracker TBD; treat as no-op for now)
+  done = false;
+  break;
+ }
+
+ if (!done) continue;
+ _store.PlayerSideQuestCompleted[_playerId * ComponentStore.MAX_SIDE_QUESTS + i] = true;
+ if (quest.GoldReward >0)
+ _store.PlayerGold[_playerId] += quest.GoldReward;
+ if (quest.SoulReward >0 && _store.PlayerSoulCount != null && _playerId < _store.PlayerSoulCount.Length)
+ _store.PlayerSoulCount[_playerId] += quest.SoulReward;
+
+ _eventBus?.Publish(GameEvents.SideQuestCompleted, new SideQuestCompletedEvent
+ {
+ PlayerId = _playerId,
+ QuestId = quest.Id,
+ Type = quest.Type,
+ GoldReward = quest.GoldReward,
+ SoulReward = quest.SoulReward,
+ });
+ }
+ }
+
+ /// <summary>
+ /// Side-quest kill-event handler (Round201 Direction7). Increments the per-slot
+ /// progress counter for any KillCount (Type=0) quest, then evaluates completion.
+ /// PlayerId filter: only advance progress for our player to avoid cross-player
+ /// quest pollution in multi-player tests.
+ /// </summary>
+ private void OnEnemyKilledForSideQuest(int enemyId, int playerId)
+ {
+ if (playerId != _playerId) return;
+ var level = _currentLevel;
+ if (level == null) return;
+ var quests = level.SideQuests;
+ if (quests == null || quests.Count ==0) return;
+
+ for (int i =0; i < quests.Count && i < ComponentStore.MAX_SIDE_QUESTS; i++)
+ {
+ if (quests[i].Type !=0) continue; // only KillCount tracks via per-kill hook
+ if (_store.PlayerSideQuestCompleted[_playerId * ComponentStore.MAX_SIDE_QUESTS + i]) continue;
+ // Cap progress at int.MaxValue-1 to mirror PlayerWaveKillCount overflow safety.
+ int slot = _playerId * ComponentStore.MAX_SIDE_QUESTS + i;
+ int cur = _store.PlayerSideQuestProgress[slot];
+ if (cur < int.MaxValue -1)
+ _store.PlayerSideQuestProgress[slot] = cur +1;
+ // Don't check threshold here — let the next OnWaveCompleted / CheckObjective
+ // call handle the completion (publishes the event in a single canonical place).
+ }
+ }
+
+ /// <summary>
+ /// Get the completion progress for a side quest slot (0..count-1).
+ /// Returns (current, threshold, completed) for HUD display.
+ /// </summary>
+ public (int current, int threshold, bool completed) GetSideQuestProgress(int questIndex)
+ {
+ var level = _currentLevel;
+ if (level == null || questIndex <0 || questIndex >= level.SideQuests.Count)
+ return (0,0, false);
+ int slot = _playerId * ComponentStore.MAX_SIDE_QUESTS + questIndex;
+ return (
+ _store.PlayerSideQuestProgress[slot],
+ level.SideQuests[questIndex].Threshold,
+ _store.PlayerSideQuestCompleted[slot]
+ );
+ }
+
+ /// <summary>
+ /// Public hook to evaluate side quests at any time (Round201 Direction7).
+ /// CheckObjective calls this internally when the main objective transitions
+ /// to a terminal state; tests can call it directly to evaluate without
+ /// driving a full wave-completion flow. Idempotent — completed quests are
+ /// latched so a second call is a no-op.
+ /// </summary>
+ public void EvaluateSideQuestsNow() => EvaluateSideQuestsOnRunEnd();
+
+/// <summary>
+/// Unsubscribe from ComponentStore.OnEnemyKilled — Round201 Direction7.
+/// Call before discarding an ObjectiveSystem instance to prevent the event
+/// delegate from holding a stale reference (memory leak / ghost handler).
+/// </summary>
+public void Unsubscribe()
+{
+ _store.OnEnemyKilled -= OnEnemyKilledForSideQuest;
+}
+
+ /// <summary>
+ /// DoomClock countdown — Round110 Direction10. Decrements the global
+ /// timer each frame during WavePhase. Stops at0 (the win check in
+ /// CheckObjective is what actually fires the win). Mirror of UpdateTimed
+ /// but on the DoomClock-specific timer field, with an `Active` guard so
+ /// the loop short-circuits once the run is over.
+ /// </summary>
+ private void UpdateDoomClock(float deltaTime)
         {
             if (!_store.DoomClockActive[_playerId]) return;
             float t = _store.DoomClockTimer[_playerId];

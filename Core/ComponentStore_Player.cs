@@ -326,10 +326,32 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // deducted). Default 0f = no spending yet. Reset on AddPlayer.
         public float[] PlayerSoulSpentTotal = new float[MAX_PLAYERS];
         // PlayerSoulEarnedTotal: lifetime cumulative souls earned (telemetry / achievements).
-        // Mirrors PlayerSoulSpentTotal but on the income side. Default 0f.
-        public float[] PlayerSoulEarnedTotal = new float[MAX_PLAYERS];
+ // Mirrors PlayerSoulSpentTotal but on the income side. Default0f.
+ public float[] PlayerSoulEarnedTotal = new float[MAX_PLAYERS];
 
-        #endregion
+ // ==================== Side Quest System (SOA) — Round201 Direction7 ====================
+ // Side quests are optional bonus objectives per level. Up to MAX_SIDE_QUESTS (8) per player.
+ // Progress is tracked PER quest (by index in LevelConfig.SideQuests) so multiple quests can
+ // advance simultaneously. All arrays default0/false → ObjectiveSystem fast-paths to zero
+ // overhead when the level has no side quests (level.SideQuests.Count ==0).
+ // ── MAX_SIDE_QUESTS =8: enough for the documented design ("1-3 per level" + buffer for
+ // future quest types). Indexing is by LevelConfig.SideQuests list position, not by Id —
+ // the system reads the definition list at InitializeFromLevel time and tracks progress
+ // in the same order. Stable across levels because we reset on AddPlayer.
+ public const int MAX_SIDE_QUESTS =8;
+ // PlayerSideQuestProgress[i] = current accumulated progress for quest slot i.
+ // For Type=KillCount, this is the kill count; for Type=Speed it's the elapsed seconds;
+ // for Type=MinimalTowers it's the towers placed; for Type=NoDeath/NoHeal it's0/1.
+ public int[] PlayerSideQuestProgress = new int[MAX_PLAYERS * MAX_SIDE_QUESTS];
+ // PlayerSideQuestCompleted[i] = whether quest slot i has been completed (latch).
+ // Once set to true, the quest never re-triggers SideQuestCompleted event.
+ public bool[] PlayerSideQuestCompleted = new bool[MAX_PLAYERS * MAX_SIDE_QUESTS];
+ // PlayerRunElapsedTime: total seconds elapsed since AddPlayer (for Speed
+ // side quest + future "time bonus" calculations). Incremented by
+ // ObjectiveSystem.Update during WavePhase. Default0f = start of run.
+ public float[] PlayerRunElapsedTime = new float[MAX_PLAYERS];
+
+ #endregion
 
         // ==================== 玩家组件访问 ====================
 
@@ -382,9 +404,20 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             PlayerSoulCap[entityId] = 0f; // 0 sentinel → SoulHarvestSystem uses config.DefaultCap
             PlayerSoulRegen[entityId] = 0f;
             PlayerSoulSpentTotal[entityId] = 0f;
-            PlayerSoulEarnedTotal[entityId] = 0f;
+            PlayerSoulEarnedTotal[entityId] =0f;
 
-            // Round 130 Inventory: reset all slots to empty (-1 item, 0 count).
+ // Round201 Direction7 — Side Quest progress + completed mask reset for this
+ // player slot. Without this, a recycled player entity would inherit stale
+ // quest state from the previous game. Defensive zero-out even when the
+ // new level has no side quests (zero-cost1-write loop, MAX_SIDE_QUESTS=8).
+ for (int q =0; q < MAX_SIDE_QUESTS; q++)
+ {
+ PlayerSideQuestProgress[entityId * MAX_SIDE_QUESTS + q] =0;
+ PlayerSideQuestCompleted[entityId * MAX_SIDE_QUESTS + q] = false;
+ }
+ PlayerRunElapsedTime[entityId] =0f;
+
+ // Round130 Inventory: reset all slots to empty (-1 item,0 count).
             ResetInventory(entityId);
             // Round 130 DamageBoost timer + multiplier must be zeroed; otherwise a recycled
             // player entity would inherit a stale attack buff (BUG scan finding).

@@ -24,7 +24,13 @@ namespace BattleSystemECS.Core
         // EnemyId, BossTypeName, OldPhase, NewPhase, HealthFraction, Turn. Subscribers can drive
         // boss mechanic changes (music swap, AoE warning, dialogue, telemetry, etc) without
         // tightly coupling to EnemyAISystem internals.
-        public const string BossPhaseChanged      = "boss_phase_changed";
+        public const string BossPhaseChanged = "boss_phase_changed";
+ // Side quest completion event — Round201 Direction7. Published by ObjectiveSystem
+ // whenever a side quest flips from in-progress to completed (one-shot per quest,
+ // gated by PlayerSideQuestCompleted latch). Payload fields: PlayerId, QuestId,
+ // Type (0..4, see SideQuestDef), GoldReward, SoulReward. Subscribers can drive
+ // reward VFX, sound, achievement telemetry, etc without coupling to the system.
+ public const string SideQuestCompleted = "side_quest_completed";
     }
 
     // ── Event Data Transfer Objects ──
@@ -82,12 +88,27 @@ namespace BattleSystemECS.Core
     // fraction AT THE TIME OF TRANSITION (i.e. just below the threshold). Turn is the
     // current frame/turn counter from EnemyAISystem.SetTurn.
     public class BossPhaseChangedEvent
-    {
-        public int EnemyId;
-        public string BossTypeName;   // monsterConfig.Type for the boss (e.g. "Dragon", "Lich")
-        public int OldPhase;          // 0-indexed; phase 1 = 0
-        public int NewPhase;          // 0-indexed; NewPhase > OldPhase
-        public float HealthFraction;  // enemyHealth / enemyMaxHealth at transition
-        public int Turn;              // game turn when transition fired
-    }
+ {
+ public int EnemyId;
+ public string BossTypeName; // monsterConfig.Type for the boss (e.g. "Dragon", "Lich")
+ public int OldPhase; //0-indexed; phase1 =0
+ public int NewPhase; //0-indexed; NewPhase > OldPhase
+ public float HealthFraction; // enemyHealth / enemyMaxHealth at transition
+ public int Turn; // game turn when transition fired
+ }
+
+ // SideQuestCompleted event DTO (Round201 Direction7). Published by ObjectiveSystem
+ // on quest completion. QuestId is the string Id from SideQuestDef (e.g. "kill_30");
+ // Type is the numeric quest type (0..4) for subscribers that key on type rather
+ // than Id. GoldReward / SoulReward are the values granted to the player; subscribers
+ // can replay them on UI but the system itself has already credited PlayerGold +
+ // PlayerSoulCount at publish time.
+ public class SideQuestCompletedEvent
+ {
+ public int PlayerId;
+ public string QuestId;
+ public int Type;
+ public int GoldReward;
+ public int SoulReward;
+ }
 }
