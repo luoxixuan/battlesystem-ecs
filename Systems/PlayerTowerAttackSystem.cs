@@ -472,17 +472,30 @@ public void SetWaveNumber(int waveNumber)
             }
             else  // Physical (default) — uses armor + armor pen
             {
-                float enemyArmor = store.EnemyArmor[enemyId];
-                // Round 176 Direction 7 — Siege armor bonus (additive on top of
-                // EnemyArmor). 0.95 max combined so no enemy is unkillable.
-                // siegeBonus>0 also enters the branch so pure-siege monsters
-                // (EnemyArmor=0, SiegeArmorBonus=0.8) still get reduced.
-                float siegeBonus = store.EnemySiegeArmorBonus[enemyId];
-                if (enemyArmor > 0f || siegeBonus > 0f)
+                // Round 181 Direction 9 — Phaser gate: if the target is currently in its
+                // phase window, zero the damage and skip the rest of the post-armor
+                // processing. Magic / True branches above are untouched so the player
+                // still benefits from magic / true damage types. We still enqueue the
+                // 0-damage hit for the same reason immunity-mask skips enqueue it: the
+                // downstream consumer (ApplyQueuedDamage) just no-ops on 0-damage entries.
+                if (store.EnemyPhaserPhaseActive[enemyId])
                 {
-                    enemyArmor += siegeBonus;
-                    if (enemyArmor > 0.95f) enemyArmor = 0.95f;
-                    finalDamage *= Math.Max(0.01f, 1f - enemyArmor * (1f - _armorPenetration));
+                    finalDamage = 0f;
+                }
+                else
+                {
+                    float enemyArmor = store.EnemyArmor[enemyId];
+                    // Round 176 Direction 7 — Siege armor bonus (additive on top of
+                    // EnemyArmor). 0.95 max combined so no enemy is unkillable.
+                    // siegeBonus>0 also enters the branch so pure-siege monsters
+                    // (EnemyArmor=0, SiegeArmorBonus=0.8) still get reduced.
+                    float siegeBonus = store.EnemySiegeArmorBonus[enemyId];
+                    if (enemyArmor > 0f || siegeBonus > 0f)
+                    {
+                        enemyArmor += siegeBonus;
+                        if (enemyArmor > 0.95f) enemyArmor = 0.95f;
+                        finalDamage *= Math.Max(0.01f, 1f - enemyArmor * (1f - _armorPenetration));
+                    }
                 }
             }
 

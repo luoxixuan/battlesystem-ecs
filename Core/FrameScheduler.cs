@@ -54,6 +54,14 @@ namespace BattleSystemECS.Core
             // (no negative). O(MAX_ENEMIES) per tick but cheap (1 int cmp/sub per slot).
             DecrementInvulnFramesLeft();
 
+            // ── Phaser cycle ticker (Round 181 Direction 9) ──────────────────────
+            // Advances each phaser's phase→vulnerable→phase state machine. Runs once
+            // per tick (both BuildPhase and WavePhase) right after the I-frames
+            // countdown so the phase windows stay frame-rate independent. Phasers
+            // remain ticking even during BuildPhase so the visual phase state and
+            // damage immunity stay continuous across phases.
+            TickPhaserCycle(deltaTime);
+
             UpdateTimeScale(ref deltaTime);
 
             if (Phase == GameState.BuildPhase)
@@ -224,6 +232,62 @@ namespace BattleSystemECS.Core
                 if (store.EnemyInvulnFramesLeft[eid] > 0)
                 {
                     store.EnemyInvulnFramesLeft[eid]--;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Round 181 Direction 9 — Phase-Through enemy cycle ticker. Advances each
+        /// phaser's per-frame state machine:
+        ///   - If currently in phase (EnemyPhaserPhaseActive=true): decrement
+        ///     EnemyPhaserDurationLeft by deltaTime; when it hits ≤ 0, clear the phase
+        ///     flag and reset the cycle timer to start counting toward the next phase.
+        ///   - If currently vulnerable (EnemyPhaserPhaseActive=false): increment
+        ///     EnemyPhaserCycleTimer by deltaTime; when it reaches EnemyPhaserInterval,
+        ///     enter the phase state with EnemyPhaserDurationLeft = EnemyPhaserPhaseDuration.
+        /// Sentinel-gated: only EnemyIsPhaser==true enemies pay the cycle work; the
+        /// hot path fast-returns on the first bool read. O(activeEnemies) per tick,
+        /// cheap (1 bool + 1-2 float ops per slot).
+        /// </summary>
+        private void TickPhaserCycle(float deltaTime)
+        {
+            if (deltaTime <= 0f) return;
+            var activeEnemies = store.ActiveEnemyIds;
+            for (int i = 0; i < activeEnemies.Count; i++)
+            {
+                int eid = activeEnemies[i];
+                if (!store.EnemyIsPhaser[eid]) continue;
+                if (store.EnemyPhaserPhaseActive[eid])
+                {
+                    float dur = store.EnemyPhaserDurationLeft[eid] - deltaTime;
+                    if (dur <= 0f)
+                    {
+                        // Phase window expired → re-enter vulnerable gap
+                        store.EnemyPhaserPhaseActive[eid] = false;
+                        store.EnemyPhaserDurationLeft[eid] = 0f;
+                        store.EnemyPhaserCycleTimer[eid] = 0f;
+                    }
+                    else
+                    {
+                        store.EnemyPhaserDurationLeft[eid] = dur;
+                    }
+                }
+                else
+                {
+                    // In vulnerable gap — count up toward next phase trigger
+                    float t = store.EnemyPhaserCycleTimer[eid] + deltaTime;
+                    float interval = store.EnemyPhaserInterval[eid];
+                    if (interval > 0f && t >= interval)
+                    {
+                        // Trigger next phase
+                        store.EnemyPhaserPhaseActive[eid] = true;
+                        store.EnemyPhaserDurationLeft[eid] = store.EnemyPhaserPhaseDuration[eid];
+                        store.EnemyPhaserCycleTimer[eid] = 0f;
+                    }
+                    else
+                    {
+                        store.EnemyPhaserCycleTimer[eid] = t;
+                    }
                 }
             }
         }

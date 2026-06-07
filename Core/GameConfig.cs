@@ -169,6 +169,20 @@ namespace BattleSystemECS.Config
         // EnemyBountyGoldMult via SetEnemyBounty(). Clamped to [1.0, 20.0] at the store
         // level so malformed JSON can't spike the economy. 1.0 = no bonus (inert).
         public float BountyGoldMult { get; set; } = 1f;
+        // Round 181 Direction 9 — Phase-Through Enemy Marker ────────────────────────
+        // IsPhaser: true if this enemy periodically phases out of physical damage.
+        // When true, WaveSpawningSystem calls SetEnemyPhaser() to wire interval /
+        // phaseDuration into the ComponentStore. Default false = inert fast path.
+        public bool IsPhaser { get; set; } = false;
+        // PhaserInterval: seconds between phase cycles. e.g. 4.0 = every 4 seconds the
+        // phaser enters phase for PhaserPhaseDuration seconds. Wired to
+        // EnemyPhaserInterval via SetEnemyPhaser(). Clamped to [0.1, 30.0] at store
+        // level. 0.1 = rapid-fire phases; 30.0 = nearly always vulnerable.
+        public float PhaserInterval { get; set; } = 0f;
+        // PhaserPhaseDuration: seconds each phase window lasts (during which the enemy
+        // is immune to physical damage). e.g. 1.5s. Wired to EnemyPhaserPhaseDuration
+        // via SetEnemyPhaser(). Clamped to [0.1, 10.0] at store level.
+        public float PhaserPhaseDuration { get; set; } = 0f;
         // DrainRatio: max fraction of tower damage this enemy can drain (0-1, 0 = no drain).
         // Example: 0.5 = can reduce a nearby tower's damage by up to 50%.
         public float DrainRatio { get; set; } = 0f;

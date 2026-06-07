@@ -842,6 +842,13 @@ namespace BattleSystemECS.Config
             // into the ComponentStore. BountyGoldMult clamped at the store level to [1.0, 20.0].
             monster.IsBounty = ExtractBool(json, "IsBounty");
             monster.BountyGoldMult = ExtractFloat(json, "BountyGoldMult");
+            // Round 181 Direction 9 — Phaser enemy marker. Default false = inert; when
+            // IsPhaser=true, WaveSpawningSystem calls SetEnemyPhaser() to wire the cycle
+            // interval + phase duration into the ComponentStore. Both clamped at the store
+            // level to [0.1, 30.0] and [0.1, 10.0] respectively.
+            monster.IsPhaser = ExtractBool(json, "IsPhaser");
+            monster.PhaserInterval = ExtractFloat(json, "PhaserInterval");
+            monster.PhaserPhaseDuration = ExtractFloat(json, "PhaserPhaseDuration");
 
             return monster;
         }

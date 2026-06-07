@@ -633,6 +633,16 @@ namespace BattleSystemECS.Core
                 EnemyStalkRevealRadius[entityId] = 0f;
                 EnemyStalkAmbushMult[entityId] = 1f;
                 EnemyStalkConsumed[entityId] = false;
+                // Round 181 Direction 9 — Phaser reset (recycled slot must not leak phase
+                // state — a freshly-spawned enemy must start in the vulnerable gap, never
+                // inherit an active phase window or advanced cycle timer from the prior
+                // slot occupant)
+                EnemyIsPhaser[entityId] = false;
+                EnemyPhaserInterval[entityId] = 0f;
+                EnemyPhaserDurationLeft[entityId] = 0f;
+                EnemyPhaserPhaseActive[entityId] = false;
+                EnemyPhaserCycleTimer[entityId] = 0f;
+                EnemyPhaserPhaseDuration[entityId] = 0f;
                 EnemyArmorShredStacks[entityId] = 0f;
                 EnemyArmorShredDuration[entityId] = 0f;
                 // Fear / Taunt / Charm fields

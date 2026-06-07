@@ -809,6 +809,17 @@ namespace BattleSystemECS.Systems
                         store.SetEnemyBounty(enemyId, monsterConfig.BountyGoldMult);
                     }
 
+                    // Initialize Phaser enemy properties (Round 181 Direction 9) — periodically
+                    // immune to physical damage. Cycle: vulnerable for PhaserInterval seconds,
+                    // then immune for PhaserPhaseDuration seconds, then repeat. Magic / True
+                    // damage bypass the immunity entirely, so magic-heavy compositions shred
+                    // phasers while physical-only compositions have to time their burst windows
+                    // to the vulnerable gaps.
+                    if (monsterConfig.IsPhaser)
+                    {
+                        store.SetEnemyPhaser(enemyId, monsterConfig.PhaserInterval, monsterConfig.PhaserPhaseDuration);
+                    }
+
                     // Initialize burrow/underground enemy properties
                     if (monsterConfig.CanBurrow)
                     {

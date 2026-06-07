@@ -890,6 +890,12 @@ namespace BattleSystemECS.Systems
                                 d *= Math.Max(0.01f, 1f - store.EnemyMagicResist[bestTarget]) * _damageTakenMult;
                             else
                             {
+                                // Round 181 Direction 9 — Phaser gate (conversion path): if the
+                                // target is currently in its phase window, zero the physical
+                                // portion BEFORE armor math. True/Magic portions above are
+                                // untouched so a tower with physical+true conversion still hits
+                                // for the true portion.
+                                if (store.EnemyPhaserPhaseActive[bestTarget]) d = 0f;
                                 float ea = store.EnemyArmor[bestTarget] * (1f - _armorPenetration);
                                 float shred = store.EnemyArmorShredStacks[bestTarget];
                                 if (shred > 0f && _armorShredPerStack > 0f)
@@ -917,6 +923,9 @@ namespace BattleSystemECS.Systems
                                 d *= Math.Max(0.01f, 1f - store.EnemyMagicResist[bestTarget]) * _damageTakenMult;
                             else
                             {
+                                // Round 181 Direction 9 — Phaser gate (conversion path, mirror
+                                // of the primary portion above).
+                                if (store.EnemyPhaserPhaseActive[bestTarget]) d = 0f;
                                 float ea = store.EnemyArmor[bestTarget] * (1f - _armorPenetration);
                                 float shred = store.EnemyArmorShredStacks[bestTarget];
                                 if (shred > 0f && _armorShredPerStack > 0f)
@@ -983,6 +992,15 @@ namespace BattleSystemECS.Systems
                         }
                         else  // Physical (default) — uses armor + armor shred + pen
                         {
+                            // Round 181 Direction 9 — Phaser gate: if the target is currently in
+                            // its phase window, zero out physical damage BEFORE armor math.
+                            // Magic / True damage (handled in the branches above) bypass this
+                            // gate entirely, so magic-heavy compositions shred phasers.
+                            if (store.EnemyPhaserPhaseActive[bestTarget])
+                            {
+                                baseDmg = 0f;
+                                return;  // skip the rest of the inner attack block (we're inside a Parallel.For lambda)
+                            }
                             // Step 1: apply armor penetration (attacker's penetration ratio)
                             float effectiveArmor = store.EnemyArmor[bestTarget] * (1f - _armorPenetration);
                             // Step 2: apply flat armor shred stacks (debuff applied by attacker, e.g. AcidTower)

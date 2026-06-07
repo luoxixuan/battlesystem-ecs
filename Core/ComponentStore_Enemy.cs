@@ -321,6 +321,35 @@ namespace BattleSystemECS.Core
         // EnemyStealthMultiplier: per-entity stealth attack damage multiplier.
         // Set by stealth_attack ability, consumed and reset by EnemyAISystem attack methods.
         public float[] EnemyStealthMultiplier = new float[MAX_ENTITIES];
+        // Round 181 Direction 9 — Phase-Through Enemy Fields ────────────────────────
+        // EnemyIsPhaser: true if this enemy periodically "phases out" and becomes immune
+        // to PHYSICAL damage (Magic / True damage still hits). Default false = inert
+        // fast path. Set at AddEnemy + SetEnemyPhaser() when MonsterDef.IsPhaser. Stays
+        // false for normal enemies so the damage hot path pays one bool read + branch.
+        public bool[] EnemyIsPhaser = new bool[MAX_ENTITIES];
+        // EnemyPhaserInterval: seconds between phase cycles (e.g. 4.0 = every 4 seconds
+        // the phaser enters phase for EnemyPhaserPhaseDuration). 0 = never auto-phase.
+        // Set by SetEnemyPhaser() from MonsterDef.PhaserInterval JSON.
+        public float[] EnemyPhaserInterval = new float[MAX_ENTITIES];
+        // EnemyPhaserDurationLeft: seconds remaining in current phase state (0 = not
+        // currently phased, > 0 = currently immune to physical damage). Decremented
+        // by FrameScheduler.Tick every frame. When it hits 0, EnemyPhaserPhaseActive
+        // is cleared and the cycle restarts after EnemyPhaserInterval seconds elapse.
+        public float[] EnemyPhaserDurationLeft = new float[MAX_ENTITIES];
+        // EnemyPhaserPhaseActive: true if this phaser is CURRENTLY immune to physical
+        // damage. Set to true when the cycle starts (after the initial interval), set
+        // to false when EnemyPhaserDurationLeft hits 0. Sentinel-gated: only the
+        // EnemyIsPhaser==true branch reads it, so non-phasers pay zero overhead.
+        public bool[] EnemyPhaserPhaseActive = new bool[MAX_ENTITIES];
+        // EnemyPhaserCycleTimer: seconds elapsed in the current "between phases" gap.
+        // When EnemyPhaserPhaseActive==false, this counts up from 0 to EnemyPhaserInterval;
+        // when it reaches the interval, the phaser enters phase state and
+        // EnemyPhaserDurationLeft is set to EnemyPhaserPhaseDuration. Decremented
+        // indirectly via the FrameScheduler tick loop.
+        public float[] EnemyPhaserCycleTimer = new float[MAX_ENTITIES];
+        // EnemyPhaserPhaseDuration: how long each phase window lasts (seconds). Default
+        // 1.5s per design. Set by SetEnemyPhaser() from MonsterDef.PhaserPhaseDuration.
+        public float[] EnemyPhaserPhaseDuration = new float[MAX_ENTITIES];
 
         // ==================== 钻地/潜行敌人组件 (Burrow / Underground Enemies, SOA) ====================
         // EnemyIsBurrowed: true when enemy is underground (cannot be targeted by towers)
@@ -1184,6 +1213,18 @@ namespace BattleSystemECS.Core
             EnemyStalkRevealRadius[entityId] = 0f;
             EnemyStalkAmbushMult[entityId] = 1f;
             EnemyStalkConsumed[entityId] = false;
+            // Round 181 Direction 9 — Phaser default state at AddEnemy. Each new spawn
+            // starts as a non-phaser (zero-overhead fast path). Callers that want the
+            // phase-through behavior must invoke SetEnemyPhaser() right after AddEnemy.
+            // The cycle starts in the "vulnerable" gap (not phased) so the first attack
+            // window is the natural EnemyPhaserInterval seconds of gameplay before the
+            // first phase triggers.
+            EnemyIsPhaser[entityId] = false;
+            EnemyPhaserInterval[entityId] = 0f;
+            EnemyPhaserDurationLeft[entityId] = 0f;
+            EnemyPhaserPhaseActive[entityId] = false;
+            EnemyPhaserCycleTimer[entityId] = 0f;
+            EnemyPhaserPhaseDuration[entityId] = 0f;
             // Damage Saturation (Round 92): default 0 rolling sum + 0 last-touched frame. Lazily used by
             // TowerAttackSystem and PlayerTowerAttackSystem — the (currentFrame - lastFrame) > window
             // check naturally expires the rolling window for any enemy that hasn't been hit recently.
@@ -1633,6 +1674,33 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(enemyId)) return;
             EnemyIsBounty[enemyId] = true;
             EnemyBountyGoldMult[enemyId] = System.Math.Clamp(goldMult, 1.0f, 20.0f);
+        }
+
+        /// <summary>
+        /// Round 181 Direction 9 — Configures a Phase-Through enemy. Phasers alternate
+        /// between "vulnerable" (EnemyPhaserPhaseActive=false) and "immune to physical
+        /// damage" (EnemyPhaserPhaseActive=true). The cycle is: vulnerable for
+        /// <paramref name="interval"/> seconds, then immune for <paramref name="phaseDuration"/>
+        /// seconds, then repeat. Magic / True damage bypass the immunity entirely.
+        /// interval clamped to [0.1, 30.0] (so the phaser is never permanently phased
+        /// and never spams phases faster than 3Hz). phaseDuration clamped to [0.1, 10.0]
+        /// (longer than 10s would be a soft-immune enemy). Safe to call on a non-phaser
+        /// enemy — IsPhaser stays true but the cycle never advances if interval==0.
+        /// </summary>
+        /// <param name="enemyId">Target enemy entity ID (must be valid).</param>
+        /// <param name="interval">Seconds between phase cycles. Clamped to [0.1, 30.0].</param>
+        /// <param name="phaseDuration">Seconds each phase window lasts. Clamped to [0.1, 10.0].</param>
+        public void SetEnemyPhaser(int enemyId, float interval, float phaseDuration)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyIsPhaser[enemyId] = true;
+            EnemyPhaserInterval[enemyId] = System.Math.Clamp(interval, 0.1f, 30.0f);
+            EnemyPhaserPhaseDuration[enemyId] = System.Math.Clamp(phaseDuration, 0.1f, 10.0f);
+            // Start the cycle in the "vulnerable" gap: phase inactive, cycle timer at 0.
+            // The first phase triggers after the first interval elapses.
+            EnemyPhaserPhaseActive[enemyId] = false;
+            EnemyPhaserDurationLeft[enemyId] = 0f;
+            EnemyPhaserCycleTimer[enemyId] = 0f;
         }
 
 
