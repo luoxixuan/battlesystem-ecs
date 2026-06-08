@@ -78,6 +78,11 @@ namespace BattleSystemECS.Core
         // cached damage / speed bonuses are stamped onto every active tower.
         // Sentinel-gated: Enabled=false / degenerate config → force-clear cache.
         public MomentumSystem? Momentum { get; private set; }
+        // Round 178+ Direction 5 — Crest / Tide System. Wave-indexed periodic
+        // enemy / player buffs. Reads GameConfig.Crest + ComponentStore and
+        // stamps the per-enemy / per-player cache fields on OnWaveStart /
+        // OnWaveComplete.
+        public CrestSystem? Crest { get; private set; }
         public TowerMorphSystem? TowerMorph { get; private set; }
         public AuraTowerSystem? AuraTower { get; private set; }
         public CurseAuraSystem? Curse { get; private set; }
@@ -291,6 +296,11 @@ namespace BattleSystemECS.Core
             // + ComponentStore). WaveSpawningSystem is passed in via
             // SubscribeToWaveEvents below in WireDependencies.
             Momentum = new MomentumSystem(store, config);
+            // Round 178+ Direction 5 — Crest / Tide System. No
+            // construction-time external dependencies (reads GameConfig.Crest
+            // + ComponentStore). WaveSpawningSystem is passed in via
+            // SetWaveSpawningSystem below in WireDependencies.
+            Crest = new CrestSystem(store, config);
             TowerMorph = new TowerMorphSystem(store);
 
             // ── Player attack ──
@@ -649,6 +659,13 @@ namespace BattleSystemECS.Core
             // (optionally) resets the per-player timer at wave start. ──
             Momentum?.SubscribeToWaveEvents(WaveSpawning);
 
+            // Round 178+ Direction 5 — Crest / Tide System. Inject the
+            // WaveSpawningSystem so HandleWaveStart can read the current
+            // wave index, then subscribe to OnWaveStart / OnWaveComplete
+            // to stamp + clear the per-enemy / per-player crest caches.
+            Crest?.SetWaveSpawningSystem(WaveSpawning);
+            Crest?.SubscribeToWaveEvents();
+
             // ── CorpseEffect subscribes to OnEnemyKilled ──
             CorpseEffect?.SubscribeToOnEnemyKilled();
 
@@ -853,6 +870,11 @@ namespace BattleSystemECS.Core
             // per frame so cost is bounded by the deployed tower count and
             // the player count (typically 1, capped at MAX_PLAYERS).
             scheduler.Combat.Momentum = Momentum;
+            // Round 178+ Direction 5 — Crest System. Wired last in the
+            // combat phase, after Momentum. Per-frame Update() is a no-op
+            // (event-driven system); the work happens in
+            // OnWaveStart / OnWaveComplete handlers.
+            scheduler.Combat.Crest = Crest;
             // Round 144 方向4 — Hero Active Skill Set per-frame cooldown tick. Wired
             //   last in the combat phase, after Aggro. O(1) when no skill is
             //   configured (sentinel _anySkillConfigured in the system).

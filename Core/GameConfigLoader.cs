@@ -111,6 +111,14 @@ namespace BattleSystemECS.Config
  // =0.01, ResetOnWave=true). All knobs are optional.
  LoadMomentumConfig(gameConfig, renderer);
 
+ // Round 178+ Direction 5 — Tide / Crest (wave-indexed periodic buffs).
+ // Reads Data/Configs/crests.json if present; otherwise the GameConfig
+ // keeps its coded CrestConfig defaults (Enabled=true, Crests=Array.Empty
+ // <CrestDef>()). The JSON file ships a small default roster (CrestOfFury
+ // / CrestOfBounty / TideOfHealing / CrestOfFortitude) that gets the
+ // system working out of the box.
+ LoadCrestConfig(gameConfig, renderer);
+
  // Load damage saturation tunables (Round92 Direction1: per-enemy diminishing returns
  // on incoming damage within a short rolling window). All three knobs are optional —
  // missing fields fall back to the safe defaults in DamageSaturationConfig.
@@ -2693,6 +2701,48 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[MANASHIELD] Failed to load mana_shield config: " + ex.Message + " — using coded defaults");
+            }
+        }
+
+        /// <summary>
+        /// Round 178+ Direction 5 — Tide / Crest config. Reads from
+        /// Data/Configs/crests.json if present; otherwise the GameConfig
+        /// keeps its coded CrestConfig defaults (Enabled=true,
+        /// Crests=Array.Empty<CrestDef>()). The JSON file ships a default
+        /// roster (CrestOfFury / CrestOfBounty / TideOfHealing /
+        /// CrestOfFortitude) that gets the system working out of the box.
+        /// All knobs are optional — missing fields fall back to the coded
+        /// property defaults so the file can be partial without breaking
+        /// the loader.
+        /// </summary>
+        private static void LoadCrestConfig(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string file = "Data/Configs/crests.json";
+            try
+            {
+                if (!File.Exists(file))
+                {
+                    renderer.Log("[CREST] crests.json not found, using coded defaults (empty crest roster)");
+                    return;
+                }
+                string json = File.ReadAllText(file);
+                var opts = new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+                var cfg = System.Text.Json.JsonSerializer.Deserialize<CrestConfig>(json, opts);
+                if (cfg == null)
+                {
+                    renderer.Log("[CREST] crests.json deserialized to null, using coded defaults");
+                    return;
+                }
+                gameConfig.Crest = cfg;
+                int crestCount = cfg.Crests != null ? cfg.Crests.Length : 0;
+                renderer.Log("[CREST] Loaded crests config from " + file + " (enabled=" + cfg.Enabled + ", crests=" + crestCount + ")");
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[CREST] Failed to load crests config: " + ex.Message + " — using coded defaults");
             }
         }
     }

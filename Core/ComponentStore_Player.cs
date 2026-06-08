@@ -112,6 +112,38 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         //   for tests + UI / debug overlays. Indexing parallels PlayerId.
         public int[] PlayerMomentumCurrentTier = new int[MAX_PLAYERS];
 
+        // ==================== Tide / Crest (Round 178+ Direction 5) ====================
+        // PlayerCrestDamageMult: cached multiplicative damage bonus from the
+        //   active Crest (1f = no buff). Stamped by CrestSystem.HandleWaveStart
+        //   on each OnWaveStart when the current wave matches a CrestDef's
+        //   TriggerWaves list AND TargetScope includes "player" or "both".
+        //   Read by the tower-attack damage path so a Crest-of-Speed / Crest-
+        //   of-Bounty wave feels "buffed". Default1f = no buff (fast path).
+        //   Backed by a static readonly template (1f-filled) that is cloned
+        //   per ComponentStore instance, matching the pattern used for
+        //   EnemyCrestDamageMult — naive `new float[MAX_PLAYERS]` would
+        //   zero-init and silently zero out all player damage.
+        public float[] PlayerCrestDamageMult = (float[])_playerCrestOneTemplate.Clone();
+        // PlayerCrestGoldMult: cached multiplicative gold-reward bonus from
+        //   the active Crest.1f = no buff. Read by GoldSystem when awarding
+        //   per-kill gold (or per-wave gold). Default1f = no buff.
+        public float[] PlayerCrestGoldMult = (float[])_playerCrestOneTemplate.Clone();
+        // PlayerCrestActiveId: string id of the crest currently active for
+        //   the player. Empty string when no crest is active. Exposed for
+        //   HUD / debug overlay. Parallel indexing (PlayerId).
+        public string[] PlayerCrestActiveId = new string[MAX_PLAYERS];
+        // Shared readonly 1f template — cloned on every new ComponentStore()
+        // so writes stay per-instance and the 10-element fill runs only once
+        // across the process lifetime (MAX_PLAYERS is small so the cost is
+        // trivial; this matches the EnemyCrestDamageMult pattern).
+        private static readonly float[] _playerCrestOneTemplate = PlayerCrestOne_BuildDefault();
+        private static float[] PlayerCrestOne_BuildDefault()
+        {
+            var a = new float[MAX_PLAYERS];
+            for (int i = 0; i < MAX_PLAYERS; i++) a[i] = 1f;
+            return a;
+        }
+
         // ====================玩家全局技能/终极技能 (Global Skills / Ultimates) ====================
  // PlayerGlobalSkillUnlocked: bit-flag of which global skills are unlocked per player (indexed by playerId * MAX_GLOBAL_SKILLS + skillIdx)
  public bool[] PlayerGlobalSkillUnlocked = new bool[MAX_PLAYERS *8];
@@ -500,11 +532,17 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
  PlayerPreFightOptionsRolled[entityId] = false;
  PlayerPreFightCritBonus[entityId] =0f;
  PlayerPreFightMaxHpMult[entityId] =1f;
- // Round174+ Direction3 — Momentum: fresh player starts at tier 0 / timer 0.
- // MomentumSystem will accumulate the timer as wave-time elapses.
- PlayerMomentumTimer[entityId] =0f;
- PlayerMomentumCurrentTier[entityId] =0;
- }
+// Round174+ Direction3 — Momentum: fresh player starts at tier 0 / timer 0.
+// MomentumSystem will accumulate the timer as wave-time elapses.
+PlayerMomentumTimer[entityId] =0f;
+PlayerMomentumCurrentTier[entityId] =0;
+// Round 178+ Direction 5 — Crest / Tide System. Reset crest caches on
+// player init.1f = no damage / gold buff. CrestSystem.HandleWaveStart
+// overwrites these on each OnWaveStart.
+PlayerCrestDamageMult[entityId] =1f;
+PlayerCrestGoldMult[entityId] =1f;
+PlayerCrestActiveId[entityId] = "";
+}
 
         public float GetPlayerAttackRange(int playerId)
         {

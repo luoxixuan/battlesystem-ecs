@@ -105,6 +105,28 @@ namespace BattleSystemECS.Core
         // fill loop runs only once across the process lifetime.
         private static readonly float[] _bossRegenMultTemplate = BossRegen_BuildDefaultMult();
         public float[] EnemyHealthRegenMult = (float[])_bossRegenMultTemplate.Clone();
+        // EnemyCrestDamageMult: cached multiplicative damage bonus from the
+        // active Crest (Round 178+ Direction 5). 1f = no crest buff on this
+        // enemy. Stamped by CrestSystem.HandleWaveStart. Read by the
+        // tower-attack damage path so crest-of-fury waves feel "tanky".
+        // Default-initialized to 1f (no buff) so the hot path takes the
+        // no-bonus branch when no crest is active. MAX_ENTITIES-wide so we
+        // pay the O(N) per-frame clear only on the wave that ends.
+        public float[] EnemyCrestDamageMult = (float[])_crestOneTemplate.Clone();
+        // EnemyCrestRegenPerSec: additive per-second HP regen from the active
+        // Crest. 0f = no crest regen. Stamped by CrestSystem.HandleWaveStart.
+        // Read by the per-enemy regen tick (alongside EnemyHealthRegenPerSec).
+        public float[] EnemyCrestRegenPerSec = new float[MAX_ENTITIES];
+        // Shared readonly template for crest default (1f) — copied on every
+        // new ComponentStore() so writes stay per-instance and the per-cctor
+        // 100k fill loop runs only once across the process lifetime.
+        private static readonly float[] _crestOneTemplate = CrestOne_BuildDefault();
+        private static float[] CrestOne_BuildDefault()
+        {
+            var a = new float[MAX_ENTITIES];
+            for (int i = 0; i < MAX_ENTITIES; i++) a[i] = 1f;
+            return a;
+        }
         private static float[] BossRegen_BuildDefaultMult()
         {
             var arr = new float[MAX_ENTITIES];
@@ -1384,6 +1406,13 @@ namespace BattleSystemECS.Core
             // Boss HP regen (Round 134 Dir 3) — default 0 regen / 1.0× mult (legacy zero overhead)
             EnemyHealthRegenPerSec[entityId] = 0f;
             EnemyHealthRegenMult[entityId] = 1f;
+            // Round 178+ Direction 5 — Crest / Tide System. Reset crest
+            // caches on spawn so an enemy that spawns in the middle of a
+            // crest wave still receives the buff when CrestSystem stamps it
+            // next (AddEnemy is called by WaveSpawningSystem right after the
+            // OnWaveStart handler runs). 1f = no damage buff, 0f = no regen.
+            EnemyCrestDamageMult[entityId] = 1f;
+            EnemyCrestRegenPerSec[entityId] = 0f;
             EnemyEvasion[entityId] = 0f;  // default to no evasion
             // Tile-stacking penalty: default 0 stack, 1.0 slow ratio (no penalty until first frame of crowding)
             EnemyStackCount[entityId] = 0;

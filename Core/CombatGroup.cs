@@ -90,6 +90,11 @@ namespace BattleSystemECS.Core
         //   Combat (after Bloodlust) so the next frame's hot path sees the
         //   freshly-computed values.
         public Systems.MomentumSystem? Momentum { get; set; }
+        // Round 178+ Direction 5 — Crest / Tide System. Event-driven (no
+        // per-frame Update needed), but exposed in CombatGroup so the
+        // scheduler tick-list can include it uniformly. The per-frame
+        // Update() is a no-op (sentinel).
+        public Systems.CrestSystem? Crest { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -178,6 +183,11 @@ namespace BattleSystemECS.Core
             // activeTowers) per tick. Sentinel fast path: disabled or
             // degenerate config → single O(activeTowers) clear-pass.
             Momentum?.Update(deltaTime);
+            // Round 178+ Direction 5 — Crest per-frame tick. Event-driven
+            // (no work done here), so Update() is a no-op. Exposed in
+            // CombatGroup so the scheduler can call it uniformly. Real
+            // work happens in HandleWaveStart / HandleWaveComplete.
+            Crest?.Update(deltaTime);
         }
     }
 }

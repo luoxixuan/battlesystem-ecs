@@ -1,0 +1,45 @@
+{
+  "Enabled": true,
+  "Crests": [
+    {
+      "Id": "CrestOfFury",
+      "Name": "Crest of Fury",
+      "TriggerWaves": [1, 4, 7, 10],
+      "TargetScope": "enemy",
+      "EnemyDamageMult": 1.20,
+      "EnemyRegenPerSec": 0.0,
+      "PlayerGoldMult": 1.0,
+      "PlayerDamageMult": 1.0
+    },
+    {
+      "Id": "CrestOfBounty",
+      "Name": "Crest of Bounty",
+      "TriggerWaves": [2, 5, 8, 11],
+      "TargetScope": "player",
+      "EnemyDamageMult": 1.0,
+      "EnemyRegenPerSec": 0.0,
+      "PlayerGoldMult": 1.50,
+      "PlayerDamageMult": 1.0
+    },
+    {
+      "Id": "TideOfHealing",
+      "Name": "Tide of Healing",
+      "TriggerWaves": [3, 6, 9, 12],
+      "TargetScope": "enemy",
+      "EnemyDamageMult": 1.0,
+      "EnemyRegenPerSec": 5.0,
+      "PlayerGoldMult": 1.0,
+      "PlayerDamageMult": 1.0
+    },
+    {
+      "Id": "CrestOfFortitude",
+      "Name": "Crest of Fortitude",
+      "TriggerWaves": [5, 10, 15, 20],
+      "TargetScope": "both",
+      "EnemyDamageMult": 1.10,
+      "EnemyRegenPerSec": 2.0,
+      "PlayerGoldMult": 1.20,
+      "PlayerDamageMult": 1.10
+    }
+  ]
+}

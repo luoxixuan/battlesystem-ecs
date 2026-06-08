@@ -2226,6 +2226,13 @@ namespace BattleSystemECS.Config
         // for all active towers once per frame so the TowerAttack hot path is branch-cheap.
         // Sentinel-gated: Enabled=false → Update is a no-op and cache fields stay at0f fast path.
         public MomentumConfig Momentum { get; set; } = new MomentumConfig();
+        // Round 178+ Direction 5 — Tide / Crest System. Wave-indexed periodic
+        // buffs (CrestOfFury / TideOfHealing / CrestOfBounty / etc.) that
+        // multiply enemy damage / regen or player gold / damage during the
+        // matching wave. Sentinel-gated: Enabled=false → Update is a no-op
+        // and the per-enemy / per-player cache fields stay at default (1f
+        // for mults, 0f for regen) so the hot path takes the no-bonus branch.
+        public CrestConfig Crest { get; set; } = new CrestConfig();
         // Player global skills / ultimates (direction 5)
         public List<GlobalSkillDef> GlobalSkills { get; set; } = new List<GlobalSkillDef>();
 
@@ -2986,6 +2993,84 @@ namespace BattleSystemECS.Config
         // accumulates across waves (within the same player session).
         // Default true (matches "per-wave" design intent).
         public bool ResetOnWave { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Tide / Crest (Round 178+ Direction 5) — wave-indexed periodic buffs.
+    ///
+    /// Each Crest definition has a list of wave indices it triggers on
+    /// (TriggerWaves, 1-based) and four optional multiplier fields:
+    ///   - EnemyDamageMult — multiplicative damage bonus applied to ALL
+    ///     enemies during the matching wave (default 1f, e.g. 1.20 = +20%)
+    ///   - EnemyRegenPerSec — additive per-second HP regen applied to ALL
+    ///     enemies during the matching wave (default 0f, e.g. 5.0 = +5 hp/s)
+    ///   - PlayerGoldMult — multiplicative gold-reward bonus applied during
+    ///     the matching wave (default 1f, e.g. 1.50 = +50% gold bounty)
+    ///   - PlayerDamageMult — multiplicative damage bonus applied to ALL
+    ///     player towers during the matching wave (default 1f, e.g. 1.15 = +15%)
+    ///
+    /// TargetScope controls which entity kinds the crest touches:
+    ///   "enemy"   → only enemy fields populated
+    ///   "player"  → only player fields populated
+    ///   "both"    → both enemy and player fields populated
+    ///
+    /// Sentinel-gated: when CrestConfig.Enabled == false OR the Crests array
+    /// is empty, CrestSystem.Update is a no-op and all per-enemy / per-player
+    /// cache fields stay at default (1f for mults, 0f for regen) so the
+    /// TowerAttack / EnemyHealer / GoldSystem hot paths take the no-bonus branch.
+    /// </summary>
+    public class CrestConfig
+    {
+        // Master switch. When false, CrestSystem.Update is a no-op and the
+        // per-enemy / per-player cache fields stay at default (1f for mults,
+        // 0f for regen) — zero-overhead fast path.
+        public bool Enabled { get; set; } = true;
+
+        // Crests: array of periodic buff definitions. Each crest is matched
+        // against the current wave index on OnWaveStart. Empty array → system
+        // is inert even when Enabled = true.
+        public CrestDef[] Crests { get; set; } = Array.Empty<CrestDef>();
+    }
+
+    /// <summary>
+    /// One Crest / Tide definition. Identified by Id and contains the wave
+    /// trigger list plus the four optional multiplier fields.
+    /// </summary>
+    public class CrestDef
+    {
+        // Stable string id ("CrestOfFury", "TideOfHealing", "CrestOfBounty",
+        // "CrestOfFortitude", "TideOfShadows", "CrestOfSpeed") — used as the
+        // value cached in WorldActiveCrestId for HUD / debug.
+        public string Id { get; set; } = "";
+
+        // Display name (UI). Defaults to Id when not set.
+        public string Name { get; set; } = "";
+
+        // TriggerWaves: 1-based wave indices this crest activates on.
+        // Example: {1, 4, 7, 10} → crest fires on waves 1, 4, 7, and 10.
+        // Empty array → crest never fires (silent no-op).
+        public int[] TriggerWaves { get; set; } = Array.Empty<int>();
+
+        // TargetScope: "enemy" / "player" / "both". Controls which entity
+        // kinds receive this crest's bonuses. Default "both" for
+        // "all-sides feel" crests.
+        public string TargetScope { get; set; } = "both";
+
+        // EnemyDamageMult: multiplicative damage bonus for ALL enemies
+        // during the matching wave. 1f = no change. > 1f = stronger.
+        public float EnemyDamageMult { get; set; } = 1f;
+
+        // EnemyRegenPerSec: additive per-second HP regen for ALL enemies
+        // during the matching wave. 0f = no regen. 5f = +5 hp/s.
+        public float EnemyRegenPerSec { get; set; } = 0f;
+
+        // PlayerGoldMult: multiplicative gold-reward bonus during the
+        // matching wave. 1f = no change. 1.50 = +50% gold bounty.
+        public float PlayerGoldMult { get; set; } = 1f;
+
+        // PlayerDamageMult: multiplicative damage bonus for ALL player
+        // towers during the matching wave. 1f = no change.
+        public float PlayerDamageMult { get; set; } = 1f;
     }
 
     /// <summary>
