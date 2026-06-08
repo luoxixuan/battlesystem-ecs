@@ -112,6 +112,15 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         //   for tests + UI / debug overlays. Indexing parallels PlayerId.
         public int[] PlayerMomentumCurrentTier = new int[MAX_PLAYERS];
 
+        // ==================== Culling 玩家叠层 (Round 206 Direction 1) ====================
+        // PlayerCullingStacks: per-player culling kill counter. Increments by +1 every
+        //   time CullingSystem fires OnCullingKilled (an enemy was culled). Resets to 0
+        //   on OnWaveStart. Drives the per-stack bonus gold payout on subsequent culls
+        //   (gold = baseCullingBonus * (1 + stacks * PlayerStackBonusGoldPct)). Designers
+        //   can use this as a "combo" / "streak" reward for high-skill culling play.
+        //   Default 0 = no stacks.
+        public int[] PlayerCullingStacks = new int[MAX_PLAYERS];
+
         // ==================== Tide / Crest (Round 178+ Direction 5) ====================
         // PlayerCrestDamageMult: cached multiplicative damage bonus from the
         //   active Crest (1f = no buff). Stamped by CrestSystem.HandleWaveStart
@@ -536,6 +545,9 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
 // MomentumSystem will accumulate the timer as wave-time elapses.
 PlayerMomentumTimer[entityId] =0f;
 PlayerMomentumCurrentTier[entityId] =0;
+// Round 206 Direction 1 — Culling: fresh player starts with 0 stacks. CullingSystem
+// increments on every cull and resets to 0 on OnWaveStart (latch-driven).
+PlayerCullingStacks[entityId] =0;
 // Round 178+ Direction 5 — Crest / Tide System. Reset crest caches on
 // player init.1f = no damage / gold buff. CrestSystem.HandleWaveStart
 // overwrites these on each OnWaveStart.

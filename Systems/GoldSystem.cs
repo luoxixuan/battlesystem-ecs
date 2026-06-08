@@ -198,5 +198,24 @@ namespace BattleSystemECS.Systems
             renderer.Log($"[GOLD] 花费 {amount} 金币");
             return true;
         }
+
+        /// <summary>
+        /// Round 206 Direction 1 — Subscribe to CullingSystem.OnCullingKilled to pay the
+        /// per-kill bonus gold (BaseBonusGold * (1 + stacks * PlayerStackBonusGoldPct)).
+        /// Per-frame cost: zero. The event is fired only when a culling kill actually
+        /// lands, which is rare (HP-threshold + damage-gate gated).
+        /// </summary>
+        public void SubscribeToCulling(CullingSystem cullingSystem)
+        {
+            if (cullingSystem == null) return;
+            cullingSystem.OnCullingKilled += (enemyId, towerId, playerId, bonusGold) =>
+            {
+                if (bonusGold <= 0f) return;
+                if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) return;
+                float currentGold = store.GetPlayerGold(playerId);
+                store.SetPlayerGold(playerId, currentGold + bonusGold);
+                renderer.Log($"[CULL] Tower {towerId} executed Enemy {enemyId} (Player {playerId}): +{bonusGold:F0} gold");
+            };
+        }
     }
 }

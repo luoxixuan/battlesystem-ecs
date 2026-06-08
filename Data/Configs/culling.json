@@ -1,0 +1,35 @@
+{
+  "culling": {
+    "enabled": true,
+    "defaultThresholdPct": 0.10,
+    "defaultDamagePct": 0.05,
+    "baseBonusGold": 10.0,
+    "playerStackBonusGoldPct": 0.05,
+    "maxPlayerStacks": 50,
+    "towers": {
+      "executioner_basic": {
+        "towerIsCullingTower": true,
+        "towerCullingDamagePct": 0.10
+      },
+      "sniper_cull": {
+        "towerIsCullingTower": true,
+        "towerCullingDamagePct": 0.25
+      },
+      "mortar_cull": {
+        "towerIsCullingTower": true,
+        "towerCullingDamagePct": 0.40
+      }
+    },
+    "enemies": {
+      "boss_default": {
+        "enemyCullingThresholdPct": 0.10
+      },
+      "elite_default": {
+        "enemyCullingThresholdPct": 0.15
+      },
+      "trash_default": {
+        "enemyCullingThresholdPct": 0.05
+      }
+    }
+  }
+}

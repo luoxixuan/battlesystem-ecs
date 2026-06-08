@@ -95,6 +95,11 @@ namespace BattleSystemECS.Core
         // scheduler tick-list can include it uniformly. The per-frame
         // Update() is a no-op (sentinel).
         public Systems.CrestSystem? Crest { get; set; }
+        // Round 206 Direction 1 — Culling System. Per-frame Update is a no-op
+        // (event-driven; the hot path is invoked from TowerAttackSystem via the
+        // injected CullingSystem reference). Exposed in CombatGroup so the
+        // scheduler can call it uniformly. OnWaveStart resets per-player stacks.
+        public Systems.CullingSystem? Culling { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -188,6 +193,11 @@ namespace BattleSystemECS.Core
             // CombatGroup so the scheduler can call it uniformly. Real
             // work happens in HandleWaveStart / HandleWaveComplete.
             Crest?.Update(deltaTime);
+            // Round 206 Direction 1 — Culling per-frame tick. No-op (event-driven;
+            // the per-hit hot path is invoked from TowerAttackSystem via the
+            // injected CullingSystem reference). Exposed in CombatGroup so the
+            // scheduler can call it uniformly.
+            Culling?.Update(deltaTime);
         }
     }
 }

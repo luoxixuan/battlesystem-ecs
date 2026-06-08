@@ -1084,6 +1084,20 @@ namespace BattleSystemECS.Core
         // 0 = no damage bonus (Death Mark is pure counter, no payoff). Default 0.05 (5%).
         public float[] EnemyDeathMarkBonusPerStack = new float[MAX_ENTITIES];
 
+        // ==================== Culling 低血量斩杀阈值 (HP-threshold instant execute, Round 206 Direction 1) ====================
+        // EnemyCullingThresholdPct: HP fraction (0-1) of MaxHealth at which the enemy becomes
+        //   culling-eligible. When the attacker's TowerIsCullingTower flag is set, a successful
+        //   single-hit damage that drives EnemyHealth/EnemyMaxHealth <= this threshold AND
+        //   the hit damage is large enough to satisfy TowerCullingDamageMult, triggers a
+        //   culling execution (instant death, optional bonus gold payout).
+        //   Default 0 = no opt-in (sentinel: culling cannot fire on this enemy). Designers
+        //   can lower the threshold (e.g. 0.05) to make the kill window tighter, or raise it
+        //   (e.g. 0.30) for a more generous culling window on trash mobs.
+        //   Distinct from EnemyExecuteImmune: ExecuteImmune is a hard opt-out flag, while
+        //   CullingThresholdPct is a per-enemy tunable. A boss can be CullingThresholdPct=0.10
+        //   but still EnemyExecuteImmune=true (immune opt-out wins, see CullingSystem.TryCull).
+        public float[] EnemyCullingThresholdPct = new float[MAX_ENTITIES];
+
         // ==================== Elemental Terrain Zone Stacks (Direction 2 — Round 200) ====================
         // Per-enemy stack counts for player-spawned elemental terrain zones (Frozen Lake / Burning
         // Ground / Toxic Swamp / Holy Sanctum). Multiple zones can stack additively on the same enemy
@@ -1555,6 +1569,9 @@ namespace BattleSystemECS.Core
             // prevent ID-reuse leakage (a recycled ID carrying stale floor/immune from a Boss).
             EnemyMinHealthFloor[entityId] = 0f;
             EnemyExecuteImmune[entityId] = false;
+            // Round 206 Direction 1 — Culling: default 0 = opt-out (no culling threshold). Reset
+            // on entity add to prevent ID-reuse leakage of a recycled Boss threshold.
+            EnemyCullingThresholdPct[entityId] = 0f;
             // Round 107 Direction 6 — Target Mark: opt-in via EnemyMarkMaxThreshold > 0.
             // 0 = no mark subsystem participation. Reset on entity add to prevent ID-reuse leakage.
             EnemyMarkStacks[entityId] = 0;

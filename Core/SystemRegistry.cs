@@ -45,6 +45,13 @@ namespace BattleSystemECS.Core
         public MarkSystem? Mark { get; private set; }
         // Round 200 Direction 5 — Death Mark subsystem (stack-based execute counter + damage bonus)
         public DeathMarkSystem? DeathMark { get; private set; }
+        // Round 206 Direction 1 — Culling subsystem (HP-threshold instant execute for high-burst towers).
+        //   Per-hit hot path: TowerAttackSystem calls CullingSystem.TryCull(towerId, enemyId, hitDamage)
+        //   after a successful hit lands. The system fires OnCullingKilled on threshold/damage-gate
+        //   match, increments PlayerCullingStacks, and queues the enemy for death. Per-frame Update is
+        //   a no-op (event-driven). OnWaveStart resets per-player stacks. Sentinel-gated: Enabled=false
+        //   → TryCull returns false and no event fires.
+        public CullingSystem? Culling { get; private set; }
         // Round 109 Direction 5 — Time Rewind snapshot ring (HP / Mana / Shield restore)
         public TimeRewindSnapshotSystem? TimeRewind { get; private set; }
 
@@ -572,6 +579,12 @@ namespace BattleSystemECS.Core
             // ── Round 200 Direction 5 — Death Mark subsystem (stack + execute + damage bonus) ──
             DeathMark = new DeathMarkSystem(store, playerId);
 
+            // ── Round 206 Direction 1 — Culling subsystem (HP-threshold instant execute) ──
+            // Event-driven system. Per-hit TryCull is called from TowerAttackSystem after
+            // each successful hit. Per-frame Update is a no-op. OnWaveStart resets the
+            // per-player culling stacks (combo reset). Sentinel-gated via CullingConfig.
+            Culling = new CullingSystem(store, playerId);
+
             // ── Round 109 Direction 5 — Time Rewind snapshot ring ──
             TimeRewind = new TimeRewindSnapshotSystem(store);
 
@@ -626,6 +639,19 @@ namespace BattleSystemECS.Core
 
             // ── Round 200 Direction 5 — Death Mark wiring: same OnEnemyKilled latch reset. ──
             store.OnEnemyKilled += (enemyId, pid) => DeathMark?.OnEnemyDestroyed(enemyId);
+
+            // ── Round 206 Direction 1 — Culling wiring: inject the CullingSystem into
+            //   TowerAttackSystem so it can call TryCull on every successful hit. Also
+            //   subscribe to OnWaveStart (latch-driven via WaveSpawningSystem) so the
+            //   per-player stacks reset to 0 on every new wave (combo reset). ──
+            TowerAttack?.SetCullingSystem(Culling);
+            if (WaveSpawning != null)
+            {
+                WaveSpawning.OnWaveStart += () => Culling?.OnWaveStart();
+            }
+            // ── Round 206 Direction 1 — Wire GoldSystem → CullingSystem event for the
+            //   per-kill bonus gold payout (BaseBonusGold * (1 + stacks * pct)). ──
+            Gold?.SubscribeToCulling(Culling);
 
             // ── OnEnemyKilled → Combo + Necromancer ──
             store.OnEnemyKilled += (enemyId, pid) => Combo?.HandleComboIncrement(pid);
@@ -875,6 +901,10 @@ namespace BattleSystemECS.Core
             // (event-driven system); the work happens in
             // OnWaveStart / OnWaveComplete handlers.
             scheduler.Combat.Crest = Crest;
+            // Round 206 Direction 1 — Culling system. Wired in the combat phase after
+            //   Crest (sentinel-gated, no per-frame work; the per-hit hot path is
+            //   invoked from TowerAttackSystem via the injected CullingSystem reference).
+            scheduler.Combat.Culling = Culling;
             // Round 144 方向4 — Hero Active Skill Set per-frame cooldown tick. Wired
             //   last in the combat phase, after Aggro. O(1) when no skill is
             //   configured (sentinel _anySkillConfigured in the system).

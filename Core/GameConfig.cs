@@ -2226,6 +2226,12 @@ namespace BattleSystemECS.Config
         // for all active towers once per frame so the TowerAttack hot path is branch-cheap.
         // Sentinel-gated: Enabled=false → Update is a no-op and cache fields stay at0f fast path.
         public MomentumConfig Momentum { get; set; } = new MomentumConfig();
+        // Round 206 Direction 1 — Culling: HP-threshold instant execute for high-burst towers.
+        // Per-tower / per-enemy flags are the primary opt-in mechanism; CullingConfig provides
+        // the defaults (threshold pct, damage pct, gold payout). Sentinel-gated: Enabled=false
+        // → CullingSystem.TryCull is a no-op (and the per-tower / per-enemy cache fields stay
+        // at default). Per-player stacks cap is enforced by CullingSystem on every increment.
+        public CullingConfig Culling { get; set; } = new CullingConfig();
         // Round 178+ Direction 5 — Tide / Crest System. Wave-indexed periodic
         // buffs (CrestOfFury / TideOfHealing / CrestOfBounty / etc.) that
         // multiply enemy damage / regen or player gold / damage during the
@@ -2993,6 +2999,54 @@ namespace BattleSystemECS.Config
         // accumulates across waves (within the same player session).
         // Default true (matches "per-wave" design intent).
         public bool ResetOnWave { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Culling (Round 206 Direction 1) — HP-threshold instant execute for high-burst towers.
+    ///
+    /// Design: when a tower with TowerIsCullingTower=true lands a hit that drives the
+    /// target's HP/MAXHP &lt;= EnemyCullingThresholdPct AND the hit damage is &gt;=
+    /// enemy.MaxHealth * TowerCullingDamagePct, CullingSystem.TryCull fires OnCullingKilled
+    /// and instant-kills the target. Culling is the "executioner" path that complements
+    /// DeathMark (stack-based execute over many hits) for single high-burst hits.
+    ///
+    /// Sentinel-gated: Enabled=false → TryCull is a no-op and the per-tower / per-enemy
+    /// cache fields stay at default (TowerIsCullingTower=false, EnemyCullingThresholdPct=0).
+    /// PlayerStackBonusGoldPct drives the per-stack gold reward for culling kills.
+    /// </summary>
+    public class CullingConfig
+    {
+        // Master switch. When false, CullingSystem.TryCull is a no-op and no events fire.
+        // Default true (subsystem is opt-in via per-tower / per-enemy flags, but when those
+        // flags are set the subsystem is expected to honor them).
+        public bool Enabled { get; set; } = true;
+
+        // DefaultThresholdPct: HP fraction (0-1) of MaxHealth at which an enemy becomes
+        // culling-eligible, applied to enemies that have EnemyCullingThresholdPct=0
+        // (i.e. didn't set an explicit threshold). Default 0.10 = cull at 10% HP. Sentinel:
+        // <= 0 disables the default-fallback path; only enemies with explicit threshold
+        // can be culled.
+        public float DefaultThresholdPct { get; set; } = 0.10f;
+
+        // DefaultDamagePct: minimum hit damage as a fraction of enemy MaxHealth required
+        // to qualify for culling, applied to towers that have TowerCullingDamagePct=0
+        // (i.e. didn't set an explicit threshold). Default 0.05 = 5% of MaxHP hit. Sentinel:
+        // <= 0 disables the default-fallback path; only towers with explicit threshold
+        // can cull.
+        public float DefaultDamagePct { get; set; } = 0.05f;
+
+        // BaseBonusGold: flat gold reward paid on a culling kill (in addition to normal
+        // kill gold). Default 10. Sentinel: 0 = no bonus, just the normal kill gold.
+        public float BaseBonusGold { get; set; } = 10f;
+
+        // PlayerStackBonusGoldPct: per-stack multiplicative gold bonus on culling kills.
+        // Each PlayerCullingStacks point adds this fraction to BaseBonusGold. Default 0.05
+        // = +5% per stack. Sentinel: 0 = no stack scaling.
+        public float PlayerStackBonusGoldPct { get; set; } = 0.05f;
+
+        // MaxPlayerStacks: cap on PlayerCullingStacks. Default 50 (sane upper bound on
+        // streak reward). Sentinel: 0 or negative = no cap.
+        public int MaxPlayerStacks { get; set; } = 50;
     }
 
     /// <summary>

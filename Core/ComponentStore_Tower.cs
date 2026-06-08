@@ -730,6 +730,20 @@ namespace BattleSystemECS.Core
         // TowerDeathMarkStacksPerHit: number of Death Mark stacks applied per successful procced hit
         public int[] TowerDeathMarkStacksPerHit = new int[MAX_ENTITIES];
 
+        // ==================== Culling 斩杀塔 (HP-threshold execute, Round 206 Direction 1) ====================
+        // TowerIsCullingTower: true if this tower is a "culling" tower. Each successful hit that drives
+        //   the target's HP/MAXHP <= EnemyCullingThresholdPct AND the hit damage is >= enemy MaxHealth *
+        //   TowerCullingDamagePct triggers a CullingSystem.OnCullingKilled event and instant-kills
+        //   the target (CullingSystem.TryCull). Designed for high-burst single-target towers (Mortar /
+        //   Sniper / Executioner) that can't "chip down" bosses but can one-shot cull low-HP targets.
+        //   Default false = opt-out (zero-overhead fast path on the TowerAttackSystem hot path).
+        public bool[] TowerIsCullingTower = new bool[MAX_ENTITIES];
+        // TowerCullingDamagePct: minimum hit damage as a fraction of target MaxHealth required to
+        //   qualify for the culling trigger. E.g. 0.20 = hit must deal >= 20% of enemy MaxHP. Default
+        //   0.05 = even modest hits qualify (lenient); 0.50 = only true "executioner" hits qualify.
+        //   0 = opt-out (sentinel: culling will never fire for this tower even if the flag is set).
+        public float[] TowerCullingDamagePct = new float[MAX_ENTITIES];
+
         // ==================== 塔被动资源生产（Income Tower）====================
         // TowerIsIncomeTower: true if this tower generates gold passively instead of attacking
         public bool[] TowerIsIncomeTower = new bool[MAX_ENTITIES];
@@ -1254,6 +1268,11 @@ namespace BattleSystemECS.Core
             TowerIsDeathMarkTower[entityId] = false;
             TowerDeathMarkChance[entityId] = 0f;
             TowerDeathMarkStacksPerHit[entityId] = 1;
+            // Round 206 Direction 1 — Culling tower fields: default opt-out (false/0). Culling
+            // never fires when the flag is false; the 0.05 default is a "safe" damagePct in case
+            // designers enable the flag without setting an explicit threshold.
+            TowerIsCullingTower[entityId] = false;
+            TowerCullingDamagePct[entityId] = 0.05f;
             // Ammo fields: default to unlimited (maxAmmo=0 means infinite)
             TowerCurrentAmmo[entityId] = 0;
             TowerMaxAmmo[entityId] = 0;
@@ -1618,6 +1637,9 @@ namespace BattleSystemECS.Core
             TowerIsDeathMarkTower[entityId] = false;
             TowerDeathMarkChance[entityId] = 0f;
             TowerDeathMarkStacksPerHit[entityId] = 1;
+            // Round 206 Direction 1 — Culling tower fields reset (consistent with add-tower default)
+            TowerIsCullingTower[entityId] = false;
+            TowerCullingDamagePct[entityId] = 0.05f;
             // Ammo fields reset
             TowerCurrentAmmo[entityId] = 0;
             TowerMaxAmmo[entityId] = 0;

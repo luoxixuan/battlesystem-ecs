@@ -20,6 +20,7 @@ namespace BattleSystemECS.Systems
         private BuffSystem buffSystem;
         private BleedSystem bleedSystem;
         private DeathMarkSystem deathMarkSystem; // injected for stack-based execute counter
+        private CullingSystem cullingSystem; // Round 206 Direction 1 — injected for HP-threshold instant execute
         private TowerExperienceSystem towerExperienceSystem;
         private ProjectileSystem projectileSystem;
         private WeatherSystem _weatherSystem; // injected for weather effects
@@ -219,6 +220,15 @@ namespace BattleSystemECS.Systems
         public void SetDeathMarkSystem(DeathMarkSystem deathMarkSystem)
         {
             this.deathMarkSystem = deathMarkSystem;
+        }
+
+        /// <summary>
+        /// Round 206 Direction 1 — Inject CullingSystem reference for HP-threshold instant
+        /// execute. Late-bound; null = culling subsystem not wired (TryCull is a no-op).
+        /// </summary>
+        public void SetCullingSystem(CullingSystem cullingSystem)
+        {
+            this.cullingSystem = cullingSystem;
         }
 
         /// <summary>
@@ -2101,6 +2111,16 @@ namespace BattleSystemECS.Systems
             if (bleedSystem != null)
             {
                 ApplyBleedStacks();
+            }
+
+            // Phase 3c.5 (serial): apply culling kills (Round 206 Direction 1)
+            // After all damage has been applied this frame, walk each active enemy and check
+            // whether any TowerIsCullingTower can cull it. CullingSystem.TryCull handles the
+            // threshold/damage gates and fires OnCullingKilled. Per-frame cost is O(active
+            // enemies) and is sentinel-gated (no-op when no culling tower is on the field).
+            if (cullingSystem != null)
+            {
+                cullingSystem.ScanAndCull(this);
             }
 
             // Phase 3d (serial): resolve tower knockback — push enemies backward
