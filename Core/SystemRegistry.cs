@@ -61,6 +61,10 @@ namespace BattleSystemECS.Core
         public KillCooldownResetSystem? KillCooldownReset { get; private set; }
         // ── Kill-Triggered Player Sustain (HealOnKill / ManaOnKill) ───────────
         public HealOnKillSystem? HealOnKill { get; private set; }
+        // Round 176 Direction 2 — Bloodlust: per-tower kill-stacking attack-speed / damage buff.
+        //   OnTowerKill handler increments stacks; per-frame Update sheds decayed stacks
+        //   and re-derives the cached damage / speed mults for the TowerAttack hot path.
+        public BloodlustSystem? Bloodlust { get; private set; }
         public TowerMorphSystem? TowerMorph { get; private set; }
         public AuraTowerSystem? AuraTower { get; private set; }
         public CurseAuraSystem? Curse { get; private set; }
@@ -262,6 +266,8 @@ namespace BattleSystemECS.Core
             KillCooldownReset = new KillCooldownResetSystem(store, config, playerId);
             // Kill-triggered player sustain (heal / mana on tower kill)
             HealOnKill = new HealOnKillSystem(store);
+            // Round 176 Direction 2 — Bloodlust: per-tower kill-stacking buff
+            Bloodlust = new BloodlustSystem(store, config);
             TowerMorph = new TowerMorphSystem(store);
 
             // ── Player attack ──
@@ -607,6 +613,9 @@ namespace BattleSystemECS.Core
             // ── OnTowerKill → HealOnKill (player heal / mana restore on tower kill) ──
             HealOnKill?.SubscribeToEvents();
 
+            // ── OnTowerKill → Bloodlust (per-tower kill-stacking attack-speed / damage buff) ──
+            Bloodlust?.SubscribeToEvents();
+
             // ── CorpseEffect subscribes to OnEnemyKilled ──
             CorpseEffect?.SubscribeToOnEnemyKilled();
 
@@ -794,9 +803,13 @@ namespace BattleSystemECS.Core
             //   active focus assignment.
             scheduler.Combat.Aggro = Aggro;
             // Round 201 Direction 8 — Echo Clone per-frame tick. Wired last in
-            //   the combat phase, after HeroSkill. O(1) when no opt-in parent
-            //   is on the field (sentinel _hasAnyEchoCapableParent in the system).
+            // the combat phase, after HeroSkill. O(1) when no opt-in parent
+            // is on the field (sentinel _hasAnyEchoCapableParent in the system).
             scheduler.Combat.EchoClone = EchoClone;
+            // Round 176 Direction 2 — Bloodlust per-frame tick. Wired last in
+            // the combat phase, after EchoClone. O(activeTowers) per frame so
+            // cost is bounded by the deployed tower count (typically <20).
+            scheduler.Combat.Bloodlust = Bloodlust;
             // Round 144 方向4 — Hero Active Skill Set per-frame cooldown tick. Wired
             //   last in the combat phase, after Aggro. O(1) when no skill is
             //   configured (sentinel _anySkillConfigured in the system).

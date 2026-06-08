@@ -2207,6 +2207,11 @@ namespace BattleSystemECS.Config
         public BackstabConfig Backstab { get; set; } = new BackstabConfig();
         // Round 175 Direction 1 — Mana Shield: mana → shield conversion + decay
         public ManaShieldConfig ManaShield { get; set; } = new ManaShieldConfig();
+        // Round 176 Direction 2 — Bloodlust: per-tower kill-stacking attack-speed / damage buff.
+        //   Each kill grants +SpeedPerStack / +DamagePerStack (additive), capped at MaxStacks.
+        //   Stacks decay by 1 every DecayTurns frames the tower goes without a kill.
+        //   Sentinel-gated: Enabled = false → all stacks / multipliers stay at 0 fast path.
+        public BloodlustConfig Bloodlust { get; set; } = new BloodlustConfig();
         // Player global skills / ultimates (direction 5)
         public List<GlobalSkillDef> GlobalSkills { get; set; } = new List<GlobalSkillDef>();
 
@@ -2815,6 +2820,46 @@ namespace BattleSystemECS.Config
         // only fills when player is at 70%+ mana (encourages saving mana for
         // emergencies). 0 = always-converting (no threshold, no decay gating).
         public float TriggerThresholdPercent { get; set; } = 0.7f;
+    }
+
+    /// <summary>
+    /// Bloodlust (Round 176 Direction 2) — per-tower kill-stacking attack-speed / damage buff.
+    ///
+    /// Design: each time a tower scores a kill (via store.OnTowerKill), it gains
+    /// one Bloodlust stack. Stacks contribute additively to:
+    ///   - TowerBloodlustSpeedMult = stacks * SpeedPerStack (additive on top of the
+    ///     existing atk-spd bonus chain — HotZone, Fortress, Desperation, Rally, Sapper).
+    ///   - TowerBloodlustDamageMult = stacks * DamagePerStack (multiplicative on
+    ///     baseDmg alongside Desperation, RampUp, Backstab, etc.).
+    /// Both cap at MaxStacks (default 10). Stacks decay by 1 every DecayTurns frames
+    /// the tower goes without scoring a kill (turn-based, not time-based — matches
+    /// the existing Combo / PostDeath cadence).
+    ///
+    /// All fields default to safe values: Enabled=true, MaxStacks=10, SpeedPerStack=0.05,
+    /// DamagePerStack=0.04, DecayTurns=300 (5 seconds at 60 FPS). Sentinel-gated fast
+    /// path: when Enabled = false, both multiplier fields are forced to 0 so the
+    /// TowerAttack hot path stays branch-cheap on legacy saves.
+    /// </summary>
+    public class BloodlustConfig
+    {
+        // Master switch. When false, the per-frame Update forces every tower's
+        // cached damage/speed mult to 0 and skips the OnTowerKill stack bump.
+        public bool Enabled { get; set; } = true;
+        // MaxStacks: hard cap on stack count (10 = at most 10 fresh kills contribute).
+        // Must be >= 1; <= 0 silently disables the system.
+        public int MaxStacks { get; set; } = 10;
+        // SpeedPerStack: additive attack-speed bonus per stack (0.05 = +5% per stack,
+        // 10 stacks = +50%). Layered with HotZone/Fortress/Desperation/Rally in the
+        // TowerAttackSystem hot path.
+        public float SpeedPerStack { get; set; } = 0.05f;
+        // DamagePerStack: multiplicative damage bonus per stack (0.04 = +4% per stack,
+        // 10 stacks = +40%). Layered multiplicatively in TowerAttackSystem.Update
+        // right after the Desperation bonus.
+        public float DamagePerStack { get; set; } = 0.04f;
+        // DecayTurns: number of frames without a kill before a stack is shed. 300
+        // frames = 5s @ 60 FPS. Turn-based so the cadence matches Combo / DoomClock.
+        // 0 = no decay (stacks persist until the tower dies or wave ends).
+        public int DecayTurns { get; set; } = 300;
     }
 
     /// <summary>

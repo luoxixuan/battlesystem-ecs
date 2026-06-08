@@ -75,6 +75,12 @@ namespace BattleSystemECS.Core
         //   to spawn echoes. Runs last in Combat so the spawn roll sees the
         //   parent's freshly-cached damage / attack-speed (aura phase done).
         public Systems.EchoCloneSystem? EchoClone { get; set; }
+        // Round 176 Direction 2 — Bloodlust System. Per-frame tick that walks
+        //   every active tower, sheds stacks past the decay window, and re-derives
+        //   the cached damage / speed mults that TowerAttackSystem reads inline.
+        //   Sentinel-gated: when BloodlustConfig.Enabled = false the body is
+        //   a single O(activeTowers) clear-pass that forces mults to 0.
+        public Systems.BloodlustSystem? Bloodlust { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -145,10 +151,17 @@ namespace BattleSystemECS.Core
             //   is O(1) when no skill is configured (sentinel _anySkillConfigured).
             HeroSkill?.Update(deltaTime);
             // Round 201 Direction 8 — Echo Clone per-frame tick. Runs last in
-            //   the combat phase so the spawn roll sees parent's current damage
-            //   (aura caches resolved above). O(1) when no echo-capable parent
-            //   is on the field (sentinel _hasAnyEchoCapableParent).
+            // the combat phase so the spawn roll sees parent's current damage
+            // (aura caches resolved above). O(1) when no echo-capable parent
+            // is on the field (sentinel _hasAnyEchoCapableParent).
             EchoClone?.Update(deltaTime);
+            // Round 176 Direction 2 — Bloodlust per-frame tick. Runs last in
+            // the combat phase so the cached damage / speed mults are visible
+            // to TowerAttackSystem on the *next* frame (the same-frame kill
+            // already produced its damage this turn, so the mult lift applies
+            // to the *next* shot). O(activeTowers) when Enabled = true,
+            // O(activeTowers) clear-pass when Enabled = false.
+            Bloodlust?.Update(turn);
         }
     }
 }

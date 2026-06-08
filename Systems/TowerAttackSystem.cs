@@ -490,10 +490,14 @@ namespace BattleSystemECS.Systems
                 // Round 187 Direction 4: TowerRallyAtkSpdBonus is the additive attack-speed
                 // bonus contributed by any active Rally buffs on this tower. 0f fast path
                 // when no rally is active. Layered additively with HotZone/Fortress/Desperation.
+                // Round 176 Direction 2: TowerBloodlustSpeedMult is the additive attack-speed
+                // bonus contributed by per-tower kill-stacking (Bloodlust). 0f fast path
+                // when no stacks are active. Layered additively with the same chain.
                 float fortressAtkSpdBonus = store.GetTowerFortressAtkSpdBonus(towerId);
                 float rallyAtkSpdBonus = store.TowerRallyAtkSpdBonus[towerId];
                 float sapperAtkSpdMult = Math.Max(0f, 1f - store.TowerSapperSlowMult[towerId]);
-                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus + rallyAtkSpdBonus) * sapperAtkSpdMult);
+                float bloodlustSpeedBonus = store.TowerBloodlustSpeedMult[towerId];
+                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus + rallyAtkSpdBonus + bloodlustSpeedBonus) * sapperAtkSpdMult);
 
                 // ── Burst Fire / Salvo Mode check ─────────────────────────────────────
                 int burstCount = store.TowerBurstCount[towerId];
@@ -503,7 +507,10 @@ namespace BattleSystemECS.Systems
                     if (shotsFired >= burstCount)
                     {
                         // In cooldown phase: use burst cooldown (scaled by attack speed)
-                        float burstCooldown = store.TowerBurstCooldown[towerId] / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus));
+                        // Round 176 Direction 2: include TowerBloodlustSpeedMult so a tower
+                        // stacking Bloodlust fires its burst cooldowns faster (matches the
+                        // outer attackInterval formula). 0f fast path for towers with no stacks.
+                        float burstCooldown = store.TowerBurstCooldown[towerId] / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus + bloodlustSpeedBonus));
                         if (store.TowerLastAttackTime[towerId] < burstCooldown) return;
                         // Cooldown complete — reset burst counter
                         store.TowerBurstShotsFired[towerId] = 0;
@@ -876,6 +883,12 @@ namespace BattleSystemECS.Systems
 
                     // ── Desperation / Last Stand damage bonus ──────────────────────────
                     if (_desperationDmgBonus > 0f) baseDmg *= (1f + _desperationDmgBonus);
+
+                    // ── Round 176 Direction 2 — Bloodlust damage bonus (kill-stacking) ──
+                    //   Multiplicative on baseDmg, layered after Desperation / RampUp.
+                    //   0f fast path when no stacks are active (default for non-Bloodlust towers).
+                    float bloodlustDmgMult = store.TowerBloodlustDamageMult[towerId];
+                    if (bloodlustDmgMult > 0f) baseDmg *= (1f + bloodlustDmgMult);
 
                     // ── Ramp-Up / Spool-Up Damage ──────────────────────────────────────────
                     // Each consecutive hit on the same target increases damage by RampUpRate,

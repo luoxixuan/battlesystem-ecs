@@ -604,6 +604,29 @@ namespace BattleSystemECS.Core
         // frame's BeginFrame — no drift if the rally expires.
         public float[] TowerRallyAtkSpdBonus = new float[MAX_ENTITIES];
 
+        // ==================== Bloodlust (SOA) — Round 176 Direction 2 ====================
+        // TowerBloodlustStacks: per-tower current Bloodlust stack count. 0 = no stacks.
+        //   Incremented by 1 in BloodlustSystem.HandleTowerKill, capped at MaxStacks.
+        //   Decays by 1 every DecayTurns frames the tower goes without a kill.
+        //   All towers default to 0 (sentinel 0 = no bonus fast path on the hot
+        //   TowerAttack path — the cached multiplier fields stay 0).
+        public int[] TowerBloodlustStacks = new int[MAX_ENTITIES];
+        // TowerBloodlustLastKillTurn: turn (frame counter) of this tower's most recent
+        //   kill. Initialized to 0 = the moment the player joined. Used by
+        //   BloodlustSystem.Update to decide when to shed stacks. Turn 0 sentinel
+        //   means "no kill ever" which is fine — the decay formula is the same.
+        public int[] TowerBloodlustLastKillTurn = new int[MAX_ENTITIES];
+        // TowerBloodlustDamageMult: cached multiplicative damage bonus (0.40 at 10 stacks
+        //   with default 0.04 per stack). Written by BloodlustSystem.Update each frame
+        //   from the live stack count. Read by TowerAttackSystem in the damage hot path
+        //   right after the Desperation bonus. 0f = disabled / no stacks.
+        public float[] TowerBloodlustDamageMult = new float[MAX_ENTITIES];
+        // TowerBloodlustSpeedMult: cached additive attack-speed bonus (0.50 at 10 stacks
+        //   with default 0.05 per stack). Written by BloodlustSystem.Update each frame.
+        //   Read by TowerAttackSystem in the attack-interval hot path alongside
+        //   HotZone/Fortress/Desperation/Rally. 0f = no bonus.
+        public float[] TowerBloodlustSpeedMult = new float[MAX_ENTITIES];
+
         // ==================== 治疗光环塔 (Heal Aura Tower — 塔-塔主动治疗链接) ====================
         // TowerHealAuraRadius: world-units radius within which this tower heals friendly towers
         //   each TowerHealAuraInterval seconds. 0 = no heal aura (zero-overhead fast path on hot
@@ -1471,6 +1494,12 @@ namespace BattleSystemECS.Core
             // Round 98 — Tower Windup / Pre-cast: default to no windup (0 frames = instant fire, zero-overhead path)
             TowerWindupFrames[entityId] = 0;
             TowerWindupCountdown[entityId] = 0;
+            // Round 176 Direction 2 — Bloodlust: default to 0 stacks, 0 last-kill turn, 0 cached mults.
+            //   Sentinel 0 path: a fresh tower contributes nothing to the hot path until it scores a kill.
+            TowerBloodlustStacks[entityId] = 0;
+            TowerBloodlustLastKillTurn[entityId] = 0;
+            TowerBloodlustDamageMult[entityId] = 0f;
+            TowerBloodlustSpeedMult[entityId] = 0f;
             // Round 122 Direction 2 — Heal Aura Tower: default to no heal aura (radius=0, amount=0, interval=0, timer=0)
             //   Designers opt-in by setting non-zero radius+amount. Timer=0 means "fire next frame" for
             //   interval=0 healers; for interval>0 healers the timer is reset to interval on first tick.
@@ -1774,6 +1803,12 @@ namespace BattleSystemECS.Core
             // Round 98 — Windup fields reset (frames=0 = no windup, countdown=0 = not in windup)
             TowerWindupFrames[entityId] = 0;
             TowerWindupCountdown[entityId] = 0;
+            // Round 176 Direction 2 — Bloodlust field reset (0 stacks, 0 mults, 0 last-kill turn).
+            //   Recycled tower slots must not retain Bloodlust stacks from a prior occupant.
+            TowerBloodlustStacks[entityId] = 0;
+            TowerBloodlustLastKillTurn[entityId] = 0;
+            TowerBloodlustDamageMult[entityId] = 0f;
+            TowerBloodlustSpeedMult[entityId] = 0f;
             // Phasing field reset (false = no phasing, zero-overhead)
             TowerIsPhasing[entityId] = false;
             // Round 122 Direction 2 — Heal Aura Tower fields reset (radius=0=inactive, amount=0, interval=0, timer=0=ready)
