@@ -1071,6 +1071,11 @@ namespace BattleSystemECS.Core
                 // penalty — would cause a freshly-placed tower to inherit a phantom
                 // range debuff).
                 TowerVisionReduction[entityId] = 0f;
+                // Round 174 Direction 4 — Backstab fields reset (recycled slot must not
+                // carry the previous occupant's rogue config — would cause a freshly-
+                // placed non-rogue tower to inherit a phantom 2.0x backstab bonus).
+                TowerBackstabDamageMult[entityId] = 1.0f;
+                TowerBackstabAngleDeg[entityId] = 0f;
                 // Round 145 Direction 3 — Per-Tower Modifier reset (recycled slot must not
                 // carry the previous occupant's modifier — would cause a freshly-placed
                 // tower to inherit a random modifier it never rolled)

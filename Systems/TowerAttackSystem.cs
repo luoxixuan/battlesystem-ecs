@@ -37,6 +37,11 @@ namespace BattleSystemECS.Systems
         // (the file was missing or had no entries). Saves the string-allocation per hit
         // in the common case where designers haven't configured effectiveness yet.
         private bool _hasEffectiveness;
+        // Round 174 Direction 4 — Backstab master switch (cached at SetGameConfig time so
+        // the hot path doesn't re-read the config object on every attack). When false, the
+        // backstab block is fully skipped (zero overhead) even if a tower has a non-1.0
+        // TowerBackstabDamageMult — designers get a single global kill-switch.
+        private bool _backstabEnabled;
         // Cached desperation bonuses (updated each SetTurn from DesperationSystem)
         private float _desperationDmgBonus = 0f;
         private float _desperationSpeedBonus = 0f;
@@ -228,6 +233,12 @@ namespace BattleSystemECS.Systems
             _hasEffectiveness = config != null
                 && config.TowerEffectivenessMatrix != null
                 && config.TowerEffectivenessMatrix.Count > 0;
+            // Round 174 Direction 4 — cache the backstab master switch. When the
+            // BackstabConfig is missing or disabled, the hot path skips the entire
+            // backstab block, including the two float reads.
+            _backstabEnabled = config != null
+                && config.Backstab != null
+                && config.Backstab.Enabled;
         }
 
         /// <summary>
@@ -1137,6 +1148,73 @@ namespace BattleSystemECS.Systems
                     {
                         float effMult = GetEffectivenessMultiplier((int)towerType, bestTarget);
                         if (effMult != 1.0f) baseDmg *= effMult;
+                    }
+
+                    // ── Round 174 Direction 4: Backstab positional damage bonus ────────
+                    // When the tower has a non-1.0 backstab multiplier (rogue / assassin
+                    // archetype) and the target enemy has a non-zero movement direction
+                    // (EnemyMoveDirX/Y, written by movement systems), check whether the
+                    // tower sits in the enemy's rear hemisphere. If so, multiply damage
+                    // by the configured multiplier. The check is two float reads, one
+                    // dot product, and one float compare — zero overhead for non-rogue
+                    // towers (1.0x mult) and zero overhead globally when the master
+                    // BackstabConfig.Enabled switch is off.
+                    //
+                    // Math: enemy "facing" is its motion vector (dirX, dirY). The tower
+                    // is "directly behind" the enemy when the (tower→enemy) direction
+                    // points the same way the enemy is moving — i.e. dot((tower→enemy),
+                    // facing) = 1. As the tower moves around to the side, dot → 0; in
+                    // front of the enemy, dot → -1. A tower is inside the rear cone
+                    // (half-angle θ) when deviation from "directly behind" is < θ, i.e.
+                    // dot > cos(θ). For the default 90° cone, cos(90°)=0, so any tower
+                    // with dot > 0 (anywhere in the rear hemisphere) gets the bonus.
+                    if (_backstabEnabled)
+                    {
+                        float backstabMult = store.TowerBackstabDamageMult[towerId];
+                        // Fast path: skip the math entirely for non-rogue towers (1.0x).
+                        if (backstabMult > 1.0001f)
+                        {
+                            float enemyDirX = store.EnemyMoveDirX[bestTarget];
+                            float enemyDirY = store.EnemyMoveDirY[bestTarget];
+                            float dirLenSq = enemyDirX * enemyDirX + enemyDirY * enemyDirY;
+                            if (dirLenSq > 0.0001f)
+                            {
+                                float angleDeg = store.TowerBackstabAngleDeg[towerId];
+                                // cos(angleDeg) of the half-cone. The tower is in the
+                                // rear cone when dot((tower→enemy unit), (enemy facing unit))
+                                // > cos(angleDeg). For 0° (strict): cos=1, so dot>1 is
+                                // impossible (test never triggers). For 180° (full rear
+                                // hemisphere): cos=-1, so dot>-1 is always true for any
+                                // non-antiparallel position. Both endpoints handled.
+                                // MathF.Cos avoids the (float) cast Math.Cos requires.
+                                float cosAngle = MathF.Cos(angleDeg * MathF.PI / 180f);
+                                // Normalize the enemy direction vector to a unit (so dot
+                                // is bounded by [-1, 1] regardless of motion-vector length).
+                                float invDirLen = 1.0f / MathF.Sqrt(dirLenSq);
+                                float unitDirX = enemyDirX * invDirLen;
+                                float unitDirY = enemyDirY * invDirLen;
+                                // tower→enemy direction (tx,ty) → (ex,ey)
+                                float ex = store.PositionX[bestTarget];
+                                float ey = store.PositionY[bestTarget];
+                                float dx = ex - tx;
+                                float dy = ey - ty;
+                                float distSq = dx * dx + dy * dy;
+                                if (distSq > 0.0001f)
+                                {
+                                    float invDist = 1.0f / MathF.Sqrt(distSq);
+                                    float unitDx = dx * invDist;
+                                    float unitDy = dy * invDist;
+                                    // Dot of (tower→enemy unit) · (enemy facing unit).
+                                    // dot=1 → tower is directly behind. dot=-1 → tower is
+                                    // directly in front. Rear-cone test: dot > cos(angleDeg).
+                                    float dot = unitDx * unitDirX + unitDy * unitDirY;
+                                    if (dot > cosAngle)
+                                    {
+                                        baseDmg *= backstabMult;
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     switch (towerType)

@@ -1,0 +1,11 @@
+{
+  "Name": "Assassin Tower",
+  "Type": "Basic",
+  "Damage": 18,
+  "Range": 3,
+  "AttackSpeed": 1.4,
+  "Cost": 120,
+  "UpgradeCost": 75,
+  "BackstabDamageMult": 2.5,
+  "BackstabAngleDeg": 90
+}

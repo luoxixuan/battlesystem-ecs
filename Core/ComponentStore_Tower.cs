@@ -743,6 +743,19 @@ namespace BattleSystemECS.Core
         // TowerTurnRate: maximum angular change per second in radians (e.g. PI = 180°/sec, 0 = instant/snap)
         public float[] TowerTurnRate = new float[MAX_ENTITIES];
 
+        // ==================== 塔背刺倍率 (Backstab) — Round 174 Direction 4 ====================
+        // TowerBackstabDamageMult: damage multiplier applied when the tower attacks an enemy
+        // from behind. 1.0 = inert (no bonus, default fast path for non-rogue towers).
+        // 2.0 = +200% damage on back hits (Rogue / Assassin archetype). 0 (sentinel) means
+        // "use BackstabConfig.DefaultDamageMult" (resolved at PlaceTower time so the hot
+        // path only reads the resolved value, not a config lookup). See BackstabConfig and
+        // TowerAttackSystem damage calc for the rear-cone dot-product test.
+        public float[] TowerBackstabDamageMult = new float[MAX_ENTITIES];
+        // TowerBackstabAngleDeg: rear-cone half-angle in degrees. 90 = ±90° behind the enemy
+        // (default). 45 = strict rear 90° cone (only direct rear). 180 = full rear hemisphere.
+        // 0 (sentinel) means "use BackstabConfig.DefaultAngleDeg" (resolved at PlaceTower).
+        public float[] TowerBackstabAngleDeg = new float[MAX_ENTITIES];
+
         // ==================== 塔经验/熟练度系统 (Tower XP & Mastery) ====================
         // TowerExperience: accumulated experience points for each tower (kills grant XP)
         public float[] TowerExperience = new float[MAX_ENTITIES];
@@ -1266,6 +1279,11 @@ namespace BattleSystemECS.Core
             TowerManaDrainPct[entityId] = 0f;
             TowerManaDrainCap[entityId] = 0f; // 0 = use global cap
             TowerTurnRate[entityId] = turnRate;
+            // Round 174 Direction 4 — Backstab defaults: 1.0x mult (inert) and 0°
+            // (sentinel: resolve from BackstabConfig.DefaultAngleDeg at PlaceTower time).
+            // 1.0 is the opt-out value — non-rogue towers pay one float read per attack.
+            TowerBackstabDamageMult[entityId] = 1.0f;
+            TowerBackstabAngleDeg[entityId] = 0f;
             // Round 100 — Palisade defaults: indestructible (HP=0) until PlaceTower overrides
             TowerIsPalisade[entityId] = false;
             PalisadeStunFrames[entityId] = 0;

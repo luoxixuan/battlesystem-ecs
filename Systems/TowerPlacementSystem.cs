@@ -382,6 +382,32 @@ namespace BattleSystemECS.Systems
                     store.TowerProjectileCount[towerId] = tc.ProjectileCount;
                     store.TowerPelletDamageMult[towerId] = tc.PelletDamageMult;
                     store.TowerPelletConeRadius[towerId] = tc.PelletConeRadius;
+                    // Round 174 Direction 4 — Backstab positional damage bonus. Apply at
+                    // PlaceTower time so the TowerAttackSystem hot path only reads two
+                    // resolved floats (no config lookup, no default substitution per shot).
+                    // Sentinel policy: 0 = "inert / opt out" (1.0x mult, 0° angle). The hot
+                    // path fast-returns on 1.0x. Rogue / Assassin towers opt in by setting
+                    // tc.BackstabDamageMult > 1.0 explicitly; the angle inherits the global
+                    // default (90°) when 0, since 0° (strict) means "never fires" and is
+                    // almost never what a designer wants.
+                    {
+                        // Per-tower mult: 0 → 1.0 (inert). Negative → 1.0 (defensive). > 1.0
+                        // means the tower is a rogue and the hot path runs the dot test.
+                        float backstabMult = tc.BackstabDamageMult > 1.0001f
+                            ? tc.BackstabDamageMult
+                            : 1.0f;
+                        // Per-tower angle: 0 → global default (90°). > 0 → use as-is.
+                        // 0 is a "not set" sentinel; using it raw would mean cos(0°)=1 and
+                        // the rear test would never fire (silent dead config).
+                        float backstabAngle = tc.BackstabAngleDeg > 0f
+                            ? tc.BackstabAngleDeg
+                            : (gameConfig.Backstab != null ? gameConfig.Backstab.DefaultAngleDeg : 90f);
+                        // Hard cap: >180° would make "rear" wrap to the front. Clamp to (0, 180].
+                        if (backstabAngle > 180f) backstabAngle = 180f;
+                        if (backstabAngle <= 0f) backstabAngle = 90f;
+                        store.TowerBackstabDamageMult[towerId] = backstabMult;
+                        store.TowerBackstabAngleDeg[towerId] = backstabAngle;
+                    }
                     // Apply taunt tower properties (force-enemy-target-this-tower aura)
                     // Both default false/0 in TowerConfig, so non-taunt towers are inert.
                     store.TowerIsTaunt[towerId] = tc.IsTauntTower;

@@ -368,6 +368,16 @@ namespace BattleSystemECS.Config
         // GoldPerSecond: gold generated per second (only meaningful if IsIncomeTower = true)
         public float GoldPerSecond { get; set; } = 0f;
         // Curse tower: if true, tower applies curse aura debuff to nearby enemies
+        // (continuation — see below)
+        // Round 174 Direction 4 — Backstab positional damage bonus. When a tower
+        // attacks an enemy from behind (tower→enemy direction in the enemy's rear
+        // hemisphere per EnemyMoveDirX/Y), damage is multiplied by BackstabDamageMult.
+        // 1.0 = inert (no bonus, default). 2.0 = +200% damage on back hits (Rogue
+        // archetype). BackstabAngleDeg controls the rear-cone half-angle in degrees
+        // (90 = ±90° behind; 45 = strict rear 90° cone; 180 = full rear hemisphere).
+        // Both fields are sentinel-gated: 0 / ≤0 = use BackstabConfig default.
+        public float BackstabDamageMult { get; set; } = 0f;
+        public float BackstabAngleDeg { get; set; } = 0f;
         public bool IsCurseTower { get; set; } = false;
         // CurseRadius: radius within which the curse effect applies (in grid units)
         public float CurseRadius { get; set; } = 0f;
@@ -2193,6 +2203,8 @@ namespace BattleSystemECS.Config
         public BankConfig Bank { get; set; } = new BankConfig();
         // Mana/Energy pool system (direction 5)
         public ManaConfig Mana { get; set; } = new ManaConfig();
+        // Round 174 Direction 4 — Backstab positional damage bonus (rear-cone multiplier)
+        public BackstabConfig Backstab { get; set; } = new BackstabConfig();
         // Player global skills / ultimates (direction 5)
         public List<GlobalSkillDef> GlobalSkills { get; set; } = new List<GlobalSkillDef>();
 
@@ -2737,6 +2749,29 @@ namespace BattleSystemECS.Config
         public float ManaRegenBuildPhase { get; set; } = 10f;
         // Multiplier on all mana costs (buff/debuff from tech tree)
         public float ManaCostMultiplier { get; set; } = 1f;
+    }
+
+    /// <summary>
+    /// Backstab (Round 174 Direction 4) — positional damage bonus when tower attacks
+    /// from behind the enemy's movement direction. EnemyMoveDirX/Y (set by movement
+    /// systems) is treated as the "facing" direction. If the tower→enemy direction
+    /// has a negative dot product with the enemy's facing (i.e. the tower is on the
+    /// enemy's rear hemisphere), the configured backstab damage multiplier applies.
+    /// Default: 1.0x (no bonus). Rogue / Assassin towers opt in via tower config
+    /// (BackstabDamageMult 2.0 = +200% damage on back hits).
+    /// </summary>
+    public class BackstabConfig
+    {
+        // Master switch. When false, all backstab multipliers short-circuit to 1.0x
+        // and the per-tower fields become inert (zero-overhead path).
+        public bool Enabled { get; set; } = true;
+        // Default damage multiplier used when a tower opts in via the per-tower field
+        // but the field is 0 (legacy configs). Typical 2.0 = +200% damage on back hits.
+        public float DefaultDamageMult { get; set; } = 2.0f;
+        // Default rear-cone half-angle in degrees. 90 = ±90° behind the enemy.
+        // Smaller angle = stricter (only direct rear hits count). Larger = wider
+        // side-flank attacks. Must be in (0, 180].
+        public float DefaultAngleDeg { get; set; } = 90f;
     }
 
     /// <summary>
