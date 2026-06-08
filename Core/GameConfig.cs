@@ -317,6 +317,14 @@ namespace BattleSystemECS.Config
         public float BounceRange { get; set; } = 0f;
         // BounceDamageFalloff: damage multiplier per bounce (1.0 = full damage, 0.7 = 70%)
         public float BounceDamageFalloff { get; set; } = 1f;
+        // Multi-Strike (Round 201 Direction 1): number of extra targets per attack (0 = single-target only).
+        // Distinct from Bounce (which chains with damage falloff through hops). Multi-Strike applies
+        // damage to N+1 targets (1 primary + N extras) within MultiStrikeRange of the primary target.
+        public int MultiStrikeCount { get; set; } = 0;
+        // MultiStrikeRange: search radius around primary target for extra multi-strike targets (0 = use TowerRange)
+        public float MultiStrikeRange { get; set; } = 0f;
+        // MultiStrikeDamageMult: damage multiplier applied to each extra multi-strike target (1.0 = full damage)
+        public float MultiStrikeDamageMult { get; set; } = 1f;
         // Piercing projectile: number of enemies the projectile can pierce through (0 = no pierce)
         public int PierceCount { get; set; } = 0;
         // PierceDmgFalloff: damage multiplier after each pierce (1.0 = full damage, 0.7 = 70%)

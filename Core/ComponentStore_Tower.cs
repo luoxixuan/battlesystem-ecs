@@ -366,6 +366,20 @@ namespace BattleSystemECS.Core
         public float[] TowerBounceDamageFalloff = new float[MAX_ENTITIES];
         public int[] TowerBounceHitsRemaining = new int[MAX_ENTITIES];
 
+        // ==================== 塔多重打击 (Multi-Strike) ====================
+        // TowerMultiStrikeCount: number of extra targets per attack beyond the primary (0 = single-target only).
+        // Each attack applies baseDmg to primary AND (TowerMultiStrikeCount) additional nearest enemies
+        // within TowerMultiStrikeRange. Distinct from Bounce (which carries damage falloff through chained hops).
+        // Default 0 = backward compatible zero-overhead path; designers opt-in per-tower via TowerConfig.MultiStrikeCount.
+        public int[] TowerMultiStrikeCount = new int[MAX_ENTITIES];
+        // TowerMultiStrikeRange: search radius in tiles around the primary target for finding extra multi-strike targets.
+        // 0 = use TowerRange as fallback. Distinct from TowerBounceRange because multi-strike operates on the primary
+        // target's neighborhood rather than the bounce target's neighborhood.
+        public float[] TowerMultiStrikeRange = new float[MAX_ENTITIES];
+        // TowerMultiStrikeDamageMult: damage multiplier applied to each extra target (1.0 = full damage, 0.7 = 70%).
+        // Default 1f = backward compatible (multi-strike deals full damage when this field is unconfigured).
+        public float[] TowerMultiStrikeDamageMult = new float[MAX_ENTITIES];
+
         // ==================== 塔穿透弹道系统（Piercing Projectile）====================
         // TowerProjectilePierceCount: number of enemies the projectile can pierce through (0 = no pierce)
         // TowerProjectilePierceDmgFalloff: damage multiplier after each pierce (1.0 = full damage, 0.7 = 70%)
@@ -1120,6 +1134,10 @@ namespace BattleSystemECS.Core
             TowerBounceRange[entityId] = 0f;
             TowerBounceDamageFalloff[entityId] = 1f;
             TowerBounceHitsRemaining[entityId] = 0;
+            // Multi-Strike fields: default to no multi-strike (single-target only)
+            TowerMultiStrikeCount[entityId] = 0;
+            TowerMultiStrikeRange[entityId] = 0f;
+            TowerMultiStrikeDamageMult[entityId] = 1f;
             // Piercing projectile fields: default to no pierce
             TowerProjectilePierceCount[entityId] = 0;
             TowerProjectilePierceDmgFalloff[entityId] = 1f;
@@ -1428,6 +1446,9 @@ namespace BattleSystemECS.Core
             TowerIsReloading[entityId] = false;
             TowerProjectileHoming[entityId] = false;
             TowerBouncesRemaining[entityId] = 0;
+            TowerMultiStrikeCount[entityId] = 0;
+            TowerMultiStrikeRange[entityId] = 0f;
+            TowerMultiStrikeDamageMult[entityId] = 1f;
             TowerProjectileFragmentCount[entityId] = 0;
             TowerProjectileFragmentRange[entityId] = 0f;
             TowerProjectileFragmentDmgMult[entityId] = 1f;

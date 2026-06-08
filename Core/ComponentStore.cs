@@ -994,6 +994,11 @@ namespace BattleSystemECS.Core
                 // Shotgun pellet fields (reset on recycle so stale values don't leak)
                 TowerPelletDamageMult[entityId] = 1f;
                 TowerPelletConeRadius[entityId] = 0f;
+                // Round 201 Direction 1 — Multi-Strike reset (recycled slot must start
+                // without multi-strike — no extras; zero-overhead single-target path).
+                TowerMultiStrikeCount[entityId] = 0;
+                TowerMultiStrikeRange[entityId] = 0f;
+                TowerMultiStrikeDamageMult[entityId] = 1f;
                 // Overcharge fields
                 TowerIsOvercharged[entityId] = false;
                 TowerOverchargeDuration[entityId] = 0f;

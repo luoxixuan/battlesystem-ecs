@@ -1334,6 +1334,63 @@ namespace BattleSystemECS.Systems
                                 // Queue primary target for bounce resolution
                                 lock (bounceLock) { bounceBag.Add((0, bestTarget, baseDmg, store.PlayerEntityId, towerId)); }
                             }
+                            // Multi-Strike (Round 201 Direction 1): if MultiStrikeCount > 0, hit N nearest extra
+                            // enemies within MultiStrikeRange of the primary target. Distinct from Bounce (which
+                            // chains with falloff) and Scatter (which fires N pellets at the same target).
+                            // Each extra target takes (baseDmg * MultiStrikeDamageMult). Same-target damage
+                            // event flows through _damageQueue so on-hit effects (lifesteal/cleave) fire per hit.
+                            int multiStrikeCount = store.TowerMultiStrikeCount[towerId];
+                            if (multiStrikeCount > 0)
+                            {
+                                float msRange = store.TowerMultiStrikeRange[towerId];
+                                if (msRange <= 0f) msRange = store.TowerRange[towerId];
+                                if (msRange < 1f) msRange = 1f;
+                                float msMult = store.TowerMultiStrikeDamageMult[towerId];
+                                if (msMult <= 0f) msMult = 1f;
+                                // Cap multi-strike extras at 16 to bound per-frame cost (large AoE towers rarely exceed 8).
+                                int extrasToHit = multiStrikeCount;
+                                if (extrasToHit > 16) extrasToHit = 16;
+
+                                // Reuse the per-tower candidate buffer populated earlier in Update() (range-filtered),
+                                // but filter to msRange around the primary target and mark enemies as taken as we pick.
+                                int[] localBuf = _towerCandidateBuffers[ti];
+                                int localCount = _towerCandidateCounts[ti];
+                                int[] takenScratch = new int[localCount];
+                                for (int k = 0; k < localCount; k++) takenScratch[k] = localBuf[k];
+                                int scratchCount = localCount;
+
+                                float primaryX = store.PositionX[bestTarget];
+                                float primaryY = store.PositionY[bestTarget];
+                                float msRangeSq = msRange * msRange;
+
+                                for (int sc = 0; sc < extrasToHit; sc++)
+                                {
+                                    int found = -1;
+                                    float bestDist2 = float.MaxValue;
+                                    for (int k = 0; k < scratchCount; k++)
+                                    {
+                                        int eid = takenScratch[k];
+                                        if (eid < 0) continue; // already taken by an earlier extra hit
+                                        if (eid == bestTarget) continue; // skip primary (already damaged)
+                                        if (!store.EnemyActive[eid]) continue;
+                                        if (store.EnemyHealth[eid] <= 0f) continue;
+                                        float ddx = store.PositionX[eid] - primaryX;
+                                        float ddy = store.PositionY[eid] - primaryY;
+                                        float d2 = ddx * ddx + ddy * ddy;
+                                        if (d2 > msRangeSq) continue;
+                                        if (d2 < bestDist2) { bestDist2 = d2; found = eid; }
+                                    }
+                                    if (found < 0) break; // no more valid extra targets within range
+                                    // Mark this enemy as taken so the next extra hit picks a different one
+                                    for (int k = 0; k < scratchCount; k++)
+                                    {
+                                        if (takenScratch[k] == found) { takenScratch[k] = -1; break; }
+                                    }
+                                    float multiDmg = baseDmg * msMult;
+                                    if (multiDmg > 0f)
+                                        lock (damageLock) { bag.Add((found, multiDmg, store.PlayerEntityId, towerId)); }
+                                }
+                            }
                             // Special ability: freeze AOE (from upgrade)
                             if (store.TowerHasFreezeAoe[towerId])
                             {

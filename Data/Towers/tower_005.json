@@ -5,5 +5,8 @@
   "Range": 4,
   "AttackSpeed": 1.0,
   "Cost": 140,
-  "UpgradeCost": 70
+  "UpgradeCost": 70,
+  "MultiStrikeCount": 2,
+  "MultiStrikeRange": 3.0,
+  "MultiStrikeDamageMult": 0.7
 }

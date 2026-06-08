@@ -330,6 +330,11 @@ namespace BattleSystemECS.Systems
                     store.TowerBouncesRemaining[towerId] = tc.Bounces;
                     store.TowerBounceRange[towerId] = tc.BounceRange;
                     store.TowerBounceDamageFalloff[towerId] = tc.BounceDamageFalloff;
+                    // Apply Multi-Strike settings (Round 201 Direction 1) — each attack also hits
+                    // N+1 nearest enemies within MultiStrikeRange of the primary target.
+                    store.TowerMultiStrikeCount[towerId] = tc.MultiStrikeCount;
+                    store.TowerMultiStrikeRange[towerId] = tc.MultiStrikeRange;
+                    store.TowerMultiStrikeDamageMult[towerId] = tc.MultiStrikeDamageMult;
                     // Apply kill-triggered player sustain (Leech/Vampiric/Soul-Drain tower family)
                     // Both default to 0 in TowerConfig, so non-leech towers are unaffected.
                     store.TowerHealOnKillAmount[towerId] = tc.HealOnKillAmount;
