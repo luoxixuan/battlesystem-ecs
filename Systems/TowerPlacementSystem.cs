@@ -335,6 +335,35 @@ namespace BattleSystemECS.Systems
                     store.TowerMultiStrikeCount[towerId] = tc.MultiStrikeCount;
                     store.TowerMultiStrikeRange[towerId] = tc.MultiStrikeRange;
                     store.TowerMultiStrikeDamageMult[towerId] = tc.MultiStrikeDamageMult;
+                    // Round 201 Direction 8 — Echo Clone settings. The clone is spawned on
+                    // hit by TowerAttackSystem (or EchoCloneSystem) and inherits these fields.
+                    // 0/0f/0.6f/5f defaults mean non-echo towers pay one write per field but
+                    // EchoCloneSystem.Update fast-returns on no echo parents.
+                    // Note: TowerEchoDamageMult defaults to 1f in the store (matches parent),
+                    // but the config default 0.6f is applied here for consistency with designers'
+                    // intuition. TowerEchoSpawnCooldown is reset to 0 (ready to fire) on placement.
+                    // We deliberately do NOT touch TowerIsEcho (false unless echo is active)
+                    // or TowerEchoExpireTurn (-1 sentinel) here — those are owned by EchoCloneSystem.
+                    // TowerEchoParentId is initialized to -1 (sentinel: not an echo).
+                    store.TowerEchoDamageMult[towerId] = tc.EchoDamageMult;
+                    // The remaining echo fields (SpawnsEcho chance + duration + cooldown) are
+                    // tower-config inputs — stored on the parent tower for the echo system to
+                    // read at spawn time. We add them as new SOA fields below.
+                    // Round 201 Direction 8 — Echo spawn-config (read at attack time by TowerAttackSystem
+                    //   to roll the dice on each fired shot). Defaults to all-zero (no echo), so non-echo
+                    //   towers pay a single bool+float read per attack. TowerCanSpawnEcho is the sentinel
+                    //   for the hot-path fast-return; TowerEchoChance and TowerEchoDuration are the
+                    //   per-shot roll probability and per-clone lifetime, respectively.
+                    store.TowerCanSpawnEcho[towerId] = tc.SpawnsEcho > 0f && tc.EchoDuration > 0f;
+                    store.TowerEchoChance[towerId] = tc.SpawnsEcho;
+                    store.TowerEchoDuration[towerId] = tc.EchoDuration;
+                    // SpawnCooldown field is the per-parent minimum seconds between echoes. Copied
+                    //   here at placement; reset to 0 (=ready) so the first attack can spawn immediately.
+                    //   EchoCloneSystem.Update decrements this each frame; when 0, a successful echo
+                    //   roll will spawn and reset the cooldown to tc.EchoSpawnCooldown.
+                    store.TowerEchoSpawnCooldown[towerId] = 0f;
+                    // MaxCooldown is the upper bound the counter resets to after a successful spawn.
+                    store.TowerEchoMaxCooldown[towerId] = tc.EchoSpawnCooldown;
                     // Apply kill-triggered player sustain (Leech/Vampiric/Soul-Drain tower family)
                     // Both default to 0 in TowerConfig, so non-leech towers are unaffected.
                     store.TowerHealOnKillAmount[towerId] = tc.HealOnKillAmount;

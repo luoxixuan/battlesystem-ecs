@@ -63,6 +63,12 @@ namespace BattleSystemECS.Core
         //   4-slot skill set bound to each deployed hero. O(1) when no skill is
         //   configured (sentinel _anySkillConfigured in the system).
         public Systems.HeroSkillSystem? HeroSkill { get; set; }
+        // Round 201 Direction 8 — Echo Clone System. Per-frame cooldown tick +
+        //   spawn roll + lifetime expiry for transient phantom-tower clones.
+        //   Sentinel-gated: O(1) when no parent tower on the field is configured
+        //   to spawn echoes. Runs last in Combat so the spawn roll sees the
+        //   parent's freshly-cached damage / attack-speed (aura phase done).
+        public Systems.EchoCloneSystem? EchoClone { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -127,6 +133,11 @@ namespace BattleSystemECS.Core
             //   player sees in the HUD this frame (no half-frame drift). HeroSkill
             //   is O(1) when no skill is configured (sentinel _anySkillConfigured).
             HeroSkill?.Update(deltaTime);
+            // Round 201 Direction 8 — Echo Clone per-frame tick. Runs last in
+            //   the combat phase so the spawn roll sees parent's current damage
+            //   (aura caches resolved above). O(1) when no echo-capable parent
+            //   is on the field (sentinel _hasAnyEchoCapableParent).
+            EchoClone?.Update(deltaTime);
         }
     }
 }

@@ -396,6 +396,68 @@ namespace BattleSystemECS.Core
         public float[] TowerProjectileFragmentRange = new float[MAX_ENTITIES];
         public float[] TowerProjectileFragmentDmgMult = new float[MAX_ENTITIES];
 
+        // ==================== 塔幻影 / 召唤复制（Spectral Echo / Clone Tower）====================
+        // Round 201 / Direction 8 — Tower Echo / Spectral Clone. When a parent tower with
+        // SpawnsEcho > 0 fires, it spawns a transient phantom tower at its position that
+        // mirrors the parent's damage × EchoDamageMult for EchoDuration seconds. The echo
+        // is an ordinary tower slot (reused via EntityManager) with TowerActive = true,
+        // but cannot be upgraded, cannot be sold, and expires when the lifetime elapses.
+        // Distinction from existing systems:
+        //   - SummonCircle: summons enemy mobs (enemy-side), not player towers
+        //   - TowerShrine/TowerBeacon: persistent aura emitters, never expire, share cache
+        //   - Echo tower: transient (time-bounded), inherits parent damage, expires cleanly
+        //
+        // Sentinel-gated: all four fields default to 0/0f/false so the per-frame Update is
+        // O(1) when no echo-spawning parent is on the field. Designers opt in per-tower
+        // via TowerConfig.SpawnsEcho (chance per attack) + EchoDuration + EchoDamageMult.
+
+        // TowerIsEcho: true if this tower slot is currently a spectral echo clone. Echo
+        // towers do not call back into SpawnEcho (preventing recursive phantom-of-phantom
+        // spawn chains). The TowerAttack hot path branches on this flag to skip the echo
+        // spawn block entirely on the clone's own attacks.
+        public bool[] TowerIsEcho = new bool[MAX_ENTITIES];
+        // TowerEchoParentId: parent tower id of the echo (-1 if not an echo). Used so the
+        // clone can re-inherit any parent stat buffs applied between spawn and expiry
+        // (e.g. if a Beacon adds damage to the parent, the clone gets it next frame).
+        public int[] TowerEchoParentId = new int[MAX_ENTITIES];
+        // TowerEchoDamageMult: damage multiplier applied to the clone's outgoing damage
+        // (1.0 = full parent damage, 0.6 = 60%). Default 1f keeps the clone's damage in
+        // sync with the parent unless designers opt for a weaker echo via config.
+        public float[] TowerEchoDamageMult = new float[MAX_ENTITIES];
+        // TowerEchoExpireTurn: turn number at which this echo expires. -1 = not an echo
+        // or expiry disabled. EchoCloneSystem.Update compares Time.TurnNumber against
+        // this value; on cross, sets TowerActive[echoId] = false (no EntityManager.Destroy
+        // since the slot will be reused for the next spawn). Default -1 = never expires
+        // (sentinel for "not an echo", even if TowerIsEcho somehow becomes true).
+        public int[] TowerEchoExpireTurn = new int[MAX_ENTITIES];
+        // TowerEchoSpawnCooldown: minimum seconds between consecutive echo spawns from the
+        // same parent tower. Prevents a fast-attack tower from spamming echoes every
+        // frame and exhausting the entity pool. Decremented in EchoCloneSystem.Update.
+        public float[] TowerEchoSpawnCooldown = new float[MAX_ENTITIES];
+        // TowerCanSpawnEcho: true if this tower's TowerConfig.SpawnsEcho > 0, meaning
+        // every attack has a chance to spawn an echo clone. false = the tower never
+        // spawns echoes (zero-overhead fast path in TowerAttack hot loop). The flag
+        // is set at PlaceTower time based on tc.SpawnsEcho and never changes at runtime
+        // (designers must upgrade to opt in).
+        public bool[] TowerCanSpawnEcho = new bool[MAX_ENTITIES];
+        // TowerEchoChance: per-attack probability (0..1) of spawning an echo. Copied
+        // from tc.SpawnsEcho at PlaceTower time. 0 = never spawns, 1.0 = always spawns
+        // (clamped at runtime to [0, 1] to keep RNG safe). Used by TowerAttackSystem
+        // to roll the dice on every fired shot.
+        public float[] TowerEchoChance = new float[MAX_ENTITIES];
+        // TowerEchoDuration: lifetime in seconds of the spawned echo. Copied from
+        // tc.EchoDuration at PlaceTower time. 0 = sentinel (no spawn — but the parent
+        // still has TowerCanSpawnEcho = true if SpawnsEcho > 0, so duration is required
+        // for the echo to actually appear). EchoCloneSystem.Update computes the expire
+        // turn as (currentTurn + ceil(duration / turnInterval)) at spawn time.
+        public float[] TowerEchoDuration = new float[MAX_ENTITIES];
+        // TowerEchoMaxCooldown: maximum cooldown (seconds) between consecutive echo
+        // spawns from the same parent. Copied from tc.EchoSpawnCooldown at PlaceTower
+        // time. 0 = no cooldown (echo on every successful roll). TowerEchoSpawnCooldown
+        // (the dynamic counter) is decremented in EchoCloneSystem.Update; when it hits 0
+        // AND the spawn roll succeeds, the echo spawns and the counter resets to this max.
+        public float[] TowerEchoMaxCooldown = new float[MAX_ENTITIES];
+
         // ==================== 塔弹药系统（Ammo）====================
         // TowerCurrentAmmo: current ammo count (0 = empty)
         public int[] TowerCurrentAmmo = new int[MAX_ENTITIES];
@@ -1146,6 +1208,16 @@ namespace BattleSystemECS.Core
             TowerProjectileFragmentCount[entityId] = 0;
             TowerProjectileFragmentRange[entityId] = 0f;
             TowerProjectileFragmentDmgMult[entityId] = 1f;
+            // Round 201 Direction 8 — Echo Clone fields reset (recycled slot must not leak echo state)
+            TowerIsEcho[entityId] = false;
+            TowerEchoParentId[entityId] = -1;
+            TowerEchoDamageMult[entityId] = 1f;
+            TowerEchoExpireTurn[entityId] = -1;
+            TowerEchoSpawnCooldown[entityId] = 0f;
+            TowerCanSpawnEcho[entityId] = false;
+            TowerEchoChance[entityId] = 0f;
+            TowerEchoDuration[entityId] = 0f;
+            TowerEchoMaxCooldown[entityId] = 0f;
             // Overcharge fields: default to inactive (no overcharge, cooldown=0)
             TowerIsOvercharged[entityId] = false;
             TowerOverchargeDuration[entityId] = 0f;
@@ -1452,6 +1524,16 @@ namespace BattleSystemECS.Core
             TowerProjectileFragmentCount[entityId] = 0;
             TowerProjectileFragmentRange[entityId] = 0f;
             TowerProjectileFragmentDmgMult[entityId] = 1f;
+            // Round 201 Direction 8 — Echo Clone fields reset (recycled slot must not leak echo state)
+            TowerIsEcho[entityId] = false;
+            TowerEchoParentId[entityId] = -1;
+            TowerEchoDamageMult[entityId] = 1f;
+            TowerEchoExpireTurn[entityId] = -1;
+            TowerEchoSpawnCooldown[entityId] = 0f;
+            TowerCanSpawnEcho[entityId] = false;
+            TowerEchoChance[entityId] = 0f;
+            TowerEchoDuration[entityId] = 0f;
+            TowerEchoMaxCooldown[entityId] = 0f;
             // Round 114 — Lead Aim: default to 0 (no lead, zero-overhead fast path on hot fire path)
             TowerLeadAimFactor[entityId] = 0f;
             // Round 115 — Anti-Summon: recycled slot starts at 0 (no bonus, fast path)

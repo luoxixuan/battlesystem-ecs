@@ -84,6 +84,12 @@ namespace BattleSystemECS.Core
         //   GetFocusTowerId read helpers + OnEnemyDestroyed lifecycle hook. Per-frame
         //   Update() is O(1) when no focus is active (sentinel-gated fast path).
         public AggroSystem? Aggro { get; private set; }
+        // Round 201 Direction 8 — Echo Clone System. Public API:
+        //   ForceSpawnEcho(parentId) for tests / scripted spawns + IsEcho / DestroyEcho
+        //   read-write helpers. Per-frame Update() is O(1) when no opt-in parent
+        //   is on the field (sentinel-gated). WireEchoClone in scheduler wires it
+        //   into CombatGroup last (so the spawn roll sees parent's resolved auras).
+        public EchoCloneSystem? EchoClone { get; private set; }
         // Round 145 Direction 3 — Per-Tower Modifier Pool (塔类型专精重随).
         //   Rolls ONE modifier per tower from a weighted pool at placement time.
         //   BuildPhase-only public API (RollAtPlacement / RerollModifier / ClearModifier);
@@ -395,6 +401,11 @@ namespace BattleSystemECS.Core
             //   (which is also a passive system). Wired into CombatGroup.Update()
             //   last in the combat phase, after TowerActiveSkill.
             Aggro = new AggroSystem(store);
+
+            // Round 201 Direction 8 — Echo Clone System. Sentinel-gated per-frame
+            //   tick (O(1) when no parent opts in). Wired last in Combat. Stateless
+            //   beyond the store, so no BuildPhase wiring needed.
+            EchoClone = new EchoCloneSystem(store);
 
             // Round 145 Direction 3 — Per-Tower Modifier Pool. Constructed early so
             //   TowerPlacementSystem can call RollAtPlacement() right after AddTower.
@@ -760,6 +771,10 @@ namespace BattleSystemECS.Core
             //   focus is active; O(n_enemies) when at least one enemy has an
             //   active focus assignment.
             scheduler.Combat.Aggro = Aggro;
+            // Round 201 Direction 8 — Echo Clone per-frame tick. Wired last in
+            //   the combat phase, after HeroSkill. O(1) when no opt-in parent
+            //   is on the field (sentinel _hasAnyEchoCapableParent in the system).
+            scheduler.Combat.EchoClone = EchoClone;
             // Round 144 方向4 — Hero Active Skill Set per-frame cooldown tick. Wired
             //   last in the combat phase, after Aggro. O(1) when no skill is
             //   configured (sentinel _anySkillConfigured in the system).

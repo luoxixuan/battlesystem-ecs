@@ -325,6 +325,27 @@ namespace BattleSystemECS.Config
         public float MultiStrikeRange { get; set; } = 0f;
         // MultiStrikeDamageMult: damage multiplier applied to each extra multi-strike target (1.0 = full damage)
         public float MultiStrikeDamageMult { get; set; } = 1f;
+        // Round 201 Direction 8 — Echo Clone (Spectral Tower). When this tower fires an
+        // attack, it has a chance per attack (SpawnsEcho) to spawn a transient phantom
+        // clone at its own position. The clone mirrors the parent's damage × EchoDamageMult
+        // for EchoDuration seconds, then expires. Distinct from Multi-Strike (Round 201
+        // Direction 1) which is multi-target damage on a single attack; this is a separate
+        // *tower* slot that appears for a finite lifetime. Sentinel-gated: SpawnsEcho = 0
+        // = no echo possible.
+        public float SpawnsEcho { get; set; } = 0f;
+        // EchoDuration: lifetime in seconds of the spawned echo clone. 0 = sentinel
+        // (no echo allowed). Typical: 5-15 seconds. Designers tune this for the desired
+        // power budget: short-lived echoes are safe power, long-lived echoes are risky.
+        public float EchoDuration { get; set; } = 0f;
+        // EchoDamageMult: damage multiplier applied to the clone's outgoing damage relative
+        // to the parent's base damage. 0.6 = 60% damage. 1.0 = full parent damage. Designers
+        // usually set this < 1.0 so the echo is a "weaker" version of the parent.
+        public float EchoDamageMult { get; set; } = 0.6f;
+        // EchoSpawnCooldown: minimum seconds between consecutive echo spawns from the same
+        // parent. Prevents a fast-firing tower from spawning one echo per attack and
+        // saturating the entity pool. 0 = no cooldown (echo on every successful attack that
+        // passes the SpawnsEcho roll). Typical: 3-8 seconds.
+        public float EchoSpawnCooldown { get; set; } = 5f;
         // Piercing projectile: number of enemies the projectile can pierce through (0 = no pierce)
         public int PierceCount { get; set; } = 0;
         // PierceDmgFalloff: damage multiplier after each pierce (1.0 = full damage, 0.7 = 70%)
