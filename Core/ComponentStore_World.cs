@@ -296,6 +296,33 @@ namespace BattleSystemECS.Core
         private List<int> _activeCorpseEffectIds = new List<int>();
         private int _nextCorpseEffectId = 0;
 
+        // ==================== Direction 2 — Elemental Terrain Zones (Round 200) ====================
+        // Player-spawned elemental terrain (Frozen Lake / Burning Ground / Toxic Swamp / Holy Sanctum).
+        // Distinct from HazardZone (tower-spawned single-effect DoT) and map-baked HotZone (placement
+        // bonus). Each zone has element type, per-stack slow + DoT, stacks up on enemies that linger
+        // inside, and expires after Lifetime. Default 0 in every field keeps the system inert when no
+        // zone is active.
+        public const int MAX_TERRAIN_ZONES = 200;
+        public bool[] TerrainZoneActive = new bool[MAX_TERRAIN_ZONES];
+        public float[] TerrainZoneX = new float[MAX_TERRAIN_ZONES];
+        public float[] TerrainZoneY = new float[MAX_TERRAIN_ZONES];
+        public float[] TerrainZoneRadius = new float[MAX_TERRAIN_ZONES];
+        public float[] TerrainZoneMaxRadius = new float[MAX_TERRAIN_ZONES];
+        public float[] TerrainZoneBaseRadius = new float[MAX_TERRAIN_ZONES];  // starting radius (used for expand calc)
+        public float[] TerrainZoneLifetime = new float[MAX_TERRAIN_ZONES];  // seconds remaining
+        public float[] TerrainZoneTotalLifetime = new float[MAX_TERRAIN_ZONES];  // initial lifetime (for end-of-life scaling)
+        public float[] TerrainZoneTickInterval = new float[MAX_TERRAIN_ZONES];
+        public float[] TerrainZoneTickTimer = new float[MAX_TERRAIN_ZONES];  // accumulator
+        public int[] TerrainZoneElement = new int[MAX_TERRAIN_ZONES];  // 0=Fire, 1=Ice, 2=Toxic, 3=Holy
+        public float[] TerrainZoneBaseDps = new float[MAX_TERRAIN_ZONES];
+        public float[] TerrainZoneSlowPerStack = new float[MAX_TERRAIN_ZONES];
+        public int[] TerrainZoneMaxStacks = new int[MAX_TERRAIN_ZONES];
+        public int[] TerrainZoneOwnerPlayerId = new int[MAX_TERRAIN_ZONES];  // -1 = none
+        public bool[] TerrainZoneExpandOverTime = new bool[MAX_TERRAIN_ZONES];
+        public string[] TerrainZoneId = new string[MAX_TERRAIN_ZONES];  // for tooltips / logs
+        private List<int> _activeTerrainZoneIds = new List<int>();
+        private int _nextTerrainZoneId = 0;
+
         // ==================== 亡灵法师尸体队列（Necromancer Corpse Queue）====================
         // Tracks recently-killed enemy corpses for necromancer resurrection.
         // MAX_CORPSE_AGE_SEC = corpses expire after this many seconds (e.g. 30s window).
@@ -424,6 +451,85 @@ namespace BattleSystemECS.Core
         public List<int> GetCachedActiveHazardZoneIds()
         {
             return _activeHazardZoneIds;
+        }
+
+        // ==================== Direction 2 — Elemental Terrain Zone 管理 API ====================
+        /// <summary>
+        /// Add a player-spawned elemental terrain zone. Returns zone id, or -1 if no free slots.
+        /// Distinct from AddHazardZone (tower-spawned single-effect) — this carries element,
+        /// per-stack slow, stacks up on enemies, and uses tick interval.
+        /// </summary>
+        public int AddTerrainZone(float x, float y, float radius, int element,
+                                   float baseDps, float slowPerStack, int maxStacks,
+                                   float lifetime, float tickInterval, bool expandOverTime,
+                                   int ownerPlayerId = -1, string id = "")
+        {
+            int zoneId = -1;
+            lock (activeIdsLock)
+            {
+                for (int i = 0; i < MAX_TERRAIN_ZONES; i++)
+                {
+                    int candidateId = (_nextTerrainZoneId + i) % MAX_TERRAIN_ZONES;
+                    if (!TerrainZoneActive[candidateId])
+                    {
+                        zoneId = candidateId;
+                        _nextTerrainZoneId = (candidateId + 1) % MAX_TERRAIN_ZONES;
+                        break;
+                    }
+                }
+            }
+            if (zoneId < 0) return -1;
+
+            TerrainZoneActive[zoneId] = true;
+            TerrainZoneX[zoneId] = x;
+            TerrainZoneY[zoneId] = y;
+            TerrainZoneRadius[zoneId] = radius;
+            TerrainZoneMaxRadius[zoneId] = radius * 1.5f;  // hard cap (expand-over-time ceiling)
+            TerrainZoneBaseRadius[zoneId] = radius;
+            TerrainZoneLifetime[zoneId] = lifetime;
+            TerrainZoneTotalLifetime[zoneId] = lifetime;
+            TerrainZoneTickInterval[zoneId] = tickInterval;
+            TerrainZoneTickTimer[zoneId] = 0f;
+            TerrainZoneElement[zoneId] = element;
+            TerrainZoneBaseDps[zoneId] = baseDps;
+            TerrainZoneSlowPerStack[zoneId] = slowPerStack;
+            TerrainZoneMaxStacks[zoneId] = maxStacks;
+            TerrainZoneOwnerPlayerId[zoneId] = ownerPlayerId;
+            TerrainZoneExpandOverTime[zoneId] = expandOverTime;
+            TerrainZoneId[zoneId] = id;
+            _activeTerrainZoneIds.Add(zoneId);
+            return zoneId;
+        }
+
+        /// <summary>Remove a terrain zone by id. Resets all fields to defaults.</summary>
+        public void RemoveTerrainZone(int zoneId)
+        {
+            if (zoneId < 0 || zoneId >= MAX_TERRAIN_ZONES) return;
+            if (!TerrainZoneActive[zoneId]) return;
+            TerrainZoneActive[zoneId] = false;
+            TerrainZoneX[zoneId] = 0f;
+            TerrainZoneY[zoneId] = 0f;
+            TerrainZoneRadius[zoneId] = 0f;
+            TerrainZoneMaxRadius[zoneId] = 0f;
+            TerrainZoneBaseRadius[zoneId] = 0f;
+            TerrainZoneLifetime[zoneId] = 0f;
+            TerrainZoneTotalLifetime[zoneId] = 0f;
+            TerrainZoneTickInterval[zoneId] = 0f;
+            TerrainZoneTickTimer[zoneId] = 0f;
+            TerrainZoneElement[zoneId] = 0;
+            TerrainZoneBaseDps[zoneId] = 0f;
+            TerrainZoneSlowPerStack[zoneId] = 0f;
+            TerrainZoneMaxStacks[zoneId] = 0;
+            TerrainZoneOwnerPlayerId[zoneId] = -1;
+            TerrainZoneExpandOverTime[zoneId] = false;
+            TerrainZoneId[zoneId] = null;
+            _activeTerrainZoneIds.Remove(zoneId);
+        }
+
+        /// <summary>List of currently active terrain zone ids (snapshot list, do not mutate).</summary>
+        public List<int> GetCachedActiveTerrainZoneIds()
+        {
+            return _activeTerrainZoneIds;
         }
 
         // ==================== 尸体残留效果（CorpseEffect）管理 API ====================

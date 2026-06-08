@@ -189,6 +189,10 @@ namespace BattleSystemECS.Core
 
         // ── Hot Zone / Terrain Bonus ──
         public HotZoneSystem? HotZone { get; private set; }
+        // Round 200 / Direction 2 — Elemental Terrain Zone (Frozen Lake / Burning Ground /
+        // Toxic Swamp / Holy Sanctum). Player-spawned per-element ground effects with stacks,
+        // DoT, and slow. Distinct from HotZone (placement bonus) and HazardZone (single-effect DoT).
+        public TerrainZoneSystem? TerrainZone { get; private set; }
 
         // ── Frost Zone (Round 82 Direction 1) ── tower-positioned AoE slow
         public FrostZoneSystem? FrostZone { get; private set; }
@@ -444,6 +448,11 @@ namespace BattleSystemECS.Core
 
             // ── Hot Zone ──
             HotZone = new HotZoneSystem(store, config, playerId);
+
+            // ── Round 200 Direction 2 — Elemental Terrain Zone ──
+            // Distinct from HotZone (placement bonus) and HazardZone (single-effect DoT):
+            // player-spawned per-element ground effects with stacks + slow + DoT.
+            TerrainZone = new TerrainZoneSystem(store, config, playerId, Buff);
 
             // ── Frost Zone (Round 82 Direction 1) — instantiates per registry
             FrostZone = new FrostZoneSystem(store);
@@ -724,6 +733,7 @@ namespace BattleSystemECS.Core
             scheduler.CombatSetup.HitShield = HitShield;
             scheduler.CombatSetup.HotZone = HotZone;
             scheduler.CombatSetup.FrostZone = FrostZone;
+            scheduler.CombatSetup.TerrainZone = TerrainZone;
             scheduler.CombatSetup.WanderRoam = WanderRoam;
             scheduler.CombatSetup.Taunt = Taunt;
 

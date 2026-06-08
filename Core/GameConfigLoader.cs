@@ -67,6 +67,9 @@ namespace BattleSystemECS.Config
                 // Load corpse ground effect definitions (direction 9)
                 LoadCorpseEffectDefs(gameConfig, renderer);
 
+                // Load elemental terrain zone definitions (Direction 2 — Round 200)
+                LoadTerrainZoneDefs(gameConfig, renderer);
+
                 // Load tower affix (reforge) definitions (Round 34, Reforge — Split A)
                 LoadTowerAffixDefs(gameConfig, renderer);
 
@@ -1922,6 +1925,55 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[CORPSE] Failed to load corpse effect defs: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Load elemental terrain zone definitions from Data/Configs/terrain_zones.json.
+        /// Direction 2 — Round 200 Elemental Terrain Zones (Frozen Lake / Burning Ground / Toxic Swamp).
+        /// Each zone carries element type, base DPS, slow-per-stack, max stacks, lifetime, radius,
+        /// tick interval, expand-over-time. Defaults to safe empty list on missing file.
+        /// </summary>
+        private static void LoadTerrainZoneDefs(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string file = "Data/Configs/terrain_zones.json";
+            try
+            {
+                if (!File.Exists(file))
+                {
+                    renderer.Log("[TERRAIN_ZONE] Terrain zone defs file not found: " + file + ", using defaults (no terrain zones)");
+                    return;
+                }
+                string json = File.ReadAllText(file);
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var defs = new List<GameConfig.TerrainZoneDef>();
+                if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var elem in root.EnumerateArray())
+                    {
+                        var tz = new GameConfig.TerrainZoneDef();
+                        tz.Id = elem.TryGetProperty("id", out var id) ? id.GetString() ?? "" : "";
+                        tz.Name = elem.TryGetProperty("name", out var nm) ? nm.GetString() ?? "" : "";
+                        tz.Element = elem.TryGetProperty("element", out var el) ? el.GetInt32() : 0;
+                        tz.BaseDps = elem.TryGetProperty("baseDps", out var bd) ? (float)bd.GetDouble() : 0f;
+                        tz.SlowPerStack = elem.TryGetProperty("slowPerStack", out var sp) ? (float)sp.GetDouble() : 0f;
+                        tz.MaxStacks = elem.TryGetProperty("maxStacks", out var ms) ? ms.GetInt32() : 1;
+                        tz.Lifetime = elem.TryGetProperty("lifetime", out var lf) ? (float)lf.GetDouble() : 8f;
+                        tz.Radius = elem.TryGetProperty("radius", out var rd) ? (float)rd.GetDouble() : 3f;
+                        tz.TickInterval = elem.TryGetProperty("tickInterval", out var ti) ? (float)ti.GetDouble() : 1f;
+                        tz.ExpandOverTime = elem.TryGetProperty("expandOverTime", out var eot) && eot.GetBoolean();
+                        tz.Description = elem.TryGetProperty("description", out var desc) ? desc.GetString() ?? "" : "";
+                        defs.Add(tz);
+                    }
+                }
+                gameConfig.TerrainZoneDefs = defs;
+                renderer.Log("[TERRAIN_ZONE] Loaded " + defs.Count + " terrain zone defs from " + file);
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[TERRAIN_ZONE] Failed to load terrain zone defs: " + ex.Message);
             }
         }
 

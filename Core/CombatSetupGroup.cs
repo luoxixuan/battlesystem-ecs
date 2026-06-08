@@ -24,6 +24,8 @@ namespace BattleSystemECS.Core
         public Systems.HitShieldSystem? HitShield { get; set; }
         public Systems.HotZoneSystem? HotZone { get; set; }
         public Systems.FrostZoneSystem? FrostZone { get; set; }
+        // Round 200 / Direction 2 — Elemental Terrain Zone (player-spawned per-element ground effects).
+        public Systems.TerrainZoneSystem? TerrainZone { get; set; }
         public Systems.WanderRoamSystem? WanderRoam { get; set; }
         public Systems.TauntSystem? Taunt { get; set; }
 
@@ -52,6 +54,11 @@ namespace BattleSystemECS.Core
             // Runs after HotZone (placement pre-computed) and before Taunt (independent).
             FrostZone?.SetTurn(turn);
             FrostZone?.Update();
+            // Round 200 Direction 2 — Elemental Terrain Zone: per-frame tick (lifetime decay +
+            // radius expansion + DoT/slow application). Sentinel-gated fast path when no zone is
+            // active. Runs after Frost Zone (independent — both write per-enemy slow arrays).
+            TerrainZone?.SetTurn(turn);
+            TerrainZone?.Update(deltaTime);
             // Wander Roam (Round 84 Direction 6): resolves per-free-roam-enemy target
             // cell. Writes EnemyWanderTargetX/Y which EnemyMovementSystem reads in its
             // Wandering branch. Must run BEFORE Movement (which happens in a later phase),

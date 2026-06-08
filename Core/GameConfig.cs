@@ -2038,6 +2038,60 @@ namespace BattleSystemECS.Config
         /// </summary>
         public List<HotZoneDef> HotZoneDefs { get; set; } = new List<HotZoneDef>();
 
+        /// <summary>
+        /// Round 200 / Direction 2 — Elemental Terrain Zone definition (player-spawned).
+        /// Distinct from map-baked HotZone (placement bonus) and tower-spawned HazardZone
+        /// (single-effect DoT): a TerrainZone carries an element type (fire/ice/toxic/holy),
+        /// stacks up on enemies that linger inside, and applies per-stack damage + a slow
+        /// factor. Loaded from Data/Configs/terrain_zones.json.
+        /// </summary>
+        public class TerrainZoneDef
+        {
+            /// <summary>Unique identifier (e.g. "frozen_lake", "burning_ground", "toxic_swamp").</summary>
+            public string Id { get; set; } = "";
+            /// <summary>Display name for UI / logs.</summary>
+            public string Name { get; set; } = "";
+            /// <summary>Element type: 0=Fire, 1=Ice, 2=Toxic, 3=Holy. Drives damage-type routing.</summary>
+            public int Element { get; set; } = 0;
+            /// <summary>Base DPS applied per stack on enemies inside the zone.</summary>
+            public float BaseDps { get; set; } = 0f;
+            /// <summary>Slow factor applied additively per stack (0.05 = -5% speed per stack).</summary>
+            public float SlowPerStack { get; set; } = 0f;
+            /// <summary>Hard cap on stacks per enemy (0 = no stacks, single-effect only).</summary>
+            public int MaxStacks { get; set; } = 1;
+            /// <summary>Total lifetime of the zone in seconds.</summary>
+            public float Lifetime { get; set; } = 8f;
+            /// <summary>Initial radius in cells when the zone spawns (expand-by-tick is optional).</summary>
+            public float Radius { get; set; } = 3f;
+            /// <summary>Tick interval in seconds (1.0 = once per second).</summary>
+            public float TickInterval { get; set; } = 1f;
+            /// <summary>If true, radius grows over time (e.g. spreading fire); otherwise static.</summary>
+            public bool ExpandOverTime { get; set; } = false;
+            /// <summary>Description for UI display.</summary>
+            public string Description { get; set; } = "";
+        }
+
+        /// <summary>
+        /// Terrain zone definitions (loaded from Data/Configs/terrain_zones.json).
+        /// Indexed by name from SkillSystem when EffectType=Terrain is cast.
+        /// </summary>
+        public List<TerrainZoneDef> TerrainZoneDefs { get; set; } = new List<TerrainZoneDef>();
+
+        /// <summary>
+        /// Look up a terrain zone definition by Id. Returns null if not found.
+        /// </summary>
+        public TerrainZoneDef GetTerrainZoneDef(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            if (TerrainZoneDefs == null) return null;
+            for (int i = 0; i < TerrainZoneDefs.Count; i++)
+            {
+                if (TerrainZoneDefs[i] != null && TerrainZoneDefs[i].Id == id)
+                    return TerrainZoneDefs[i];
+            }
+            return null;
+        }
+
         // Pickup item definitions (loaded from pickup_defs.json)
         public PickupDef[] PickupDefs { get; set; } = Array.Empty<PickupDef>();
 

@@ -871,6 +871,15 @@ namespace BattleSystemECS.Core
                 EnemyDeathMarkTimer[entityId] = 0f;
                 EnemyDeathMarkMaxStacks[entityId] = 0;
                 EnemyDeathMarkBonusPerStack[entityId] = 0f;
+                // Direction 2 — Elemental Terrain Zone: reset on entity destroy to prevent ID-reuse
+                // leakage (a recycled ID carrying stale elemental stacks / aggregate slow+DPS).
+                EnemyTerrainZoneFireStacks[entityId] = 0;
+                EnemyTerrainZoneIceStacks[entityId] = 0;
+                EnemyTerrainZoneToxicStacks[entityId] = 0;
+                EnemyTerrainZoneHolyStacks[entityId] = 0;
+                EnemyTerrainZoneSlowTotal[entityId] = 0f;
+                EnemyTerrainZoneDpsTotal[entityId] = 0f;
+                EnemyInTerrainZone[entityId] = 0;
                 // Round 142 方向5 — Aggro / Focus Fire: reset on entity destroy to prevent
                 // ID-reuse leakage (a recycled ID carrying stale focus tower id / duration).
                 EnemyFocusTowerId[entityId] = -1;

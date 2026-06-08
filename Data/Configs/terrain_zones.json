@@ -1,0 +1,54 @@
+[
+  {
+    "id": "frozen_lake",
+    "name": "Frozen Lake",
+    "element": 1,
+    "baseDps": 8.0,
+    "slowPerStack": 0.12,
+    "maxStacks": 5,
+    "lifetime": 10.0,
+    "radius": 3.5,
+    "tickInterval": 1.0,
+    "expandOverTime": false,
+    "description": "Glacial surface that slows enemies and chips HP per stack."
+  },
+  {
+    "id": "burning_ground",
+    "name": "Burning Ground",
+    "element": 0,
+    "baseDps": 15.0,
+    "slowPerStack": 0.0,
+    "maxStacks": 8,
+    "lifetime": 8.0,
+    "radius": 3.0,
+    "tickInterval": 1.0,
+    "expandOverTime": true,
+    "description": "Spreading fire that ramps DoT damage while enemies linger."
+  },
+  {
+    "id": "toxic_swamp",
+    "name": "Toxic Swamp",
+    "element": 2,
+    "baseDps": 6.0,
+    "slowPerStack": 0.08,
+    "maxStacks": 6,
+    "lifetime": 12.0,
+    "radius": 4.0,
+    "tickInterval": 1.0,
+    "expandOverTime": false,
+    "description": "Stagnant poison that stacks slow and HP loss on enemies."
+  },
+  {
+    "id": "holy_sanctum",
+    "name": "Holy Sanctum",
+    "element": 3,
+    "baseDps": 4.0,
+    "slowPerStack": 0.0,
+    "maxStacks": 3,
+    "lifetime": 15.0,
+    "radius": 5.0,
+    "tickInterval": 1.0,
+    "expandOverTime": false,
+    "description": "Sacred ground that radiates damage to undead/fiend and grants ally regen."
+  }
+]

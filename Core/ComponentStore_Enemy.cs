@@ -1062,6 +1062,30 @@ namespace BattleSystemECS.Core
         // 0 = no damage bonus (Death Mark is pure counter, no payoff). Default 0.05 (5%).
         public float[] EnemyDeathMarkBonusPerStack = new float[MAX_ENTITIES];
 
+        // ==================== Elemental Terrain Zone Stacks (Direction 2 — Round 200) ====================
+        // Per-enemy stack counts for player-spawned elemental terrain zones (Frozen Lake / Burning
+        // Ground / Toxic Swamp / Holy Sanctum). Multiple zones can stack additively on the same enemy
+        // (e.g. 1 ice stack + 2 toxic stacks). Each zone element maintains its own counter so that
+        // element-specific stacking rules can be enforced independently. Decremented by TerrainZoneSystem
+        // when the enemy leaves the zone (per TickInterval).
+        public int[] EnemyTerrainZoneFireStacks = new int[MAX_ENTITIES];      // element 0 (fire)
+        public int[] EnemyTerrainZoneIceStacks = new int[MAX_ENTITIES];       // element 1 (ice)
+        public int[] EnemyTerrainZoneToxicStacks = new int[MAX_ENTITIES];     // element 2 (toxic)
+        public int[] EnemyTerrainZoneHolyStacks = new int[MAX_ENTITIES];      // element 3 (holy)
+        // Aggregate slow applied by all active terrain zones on this enemy (additive: -0.05 = -5%).
+        // Reset to 0 at the start of each frame's TerrainZoneSystem tick, then re-summed. Consumed by
+        // EnemyMovementSystem. 0 = no terrain slow.
+        public float[] EnemyTerrainZoneSlowTotal = new float[MAX_ENTITIES];
+        // Aggregate DPS being applied to this enemy by all active terrain zones (per second). Set by
+        // TerrainZoneSystem once per tick (TickInterval). 0 = no terrain DoT. Consumed by damage
+        // pipeline (applied each tick via QueueEnemyDeath with damageType routed by element).
+        public float[] EnemyTerrainZoneDpsTotal = new float[MAX_ENTITIES];
+        // Per-enemy flag: this enemy is currently inside at least one terrain zone (any element).
+        // Reset to false each frame in TerrainZoneSystem.Update, then set true if any zone contains it.
+        // 0/1 default; sentinel-gated by element stack arrays to keep fast paths branch-free when no
+        // zones exist.
+        public byte[] EnemyInTerrainZone = new byte[MAX_ENTITIES];
+
         // ==================== 诱饵 (Decoy) ====================
         // EnemyIsDecoy: when true, this enemy is a non-aggressive target dummy spawned by the player
         //   (e.g. a Hologram Decoy tower). Decoys do not move, do not attack, and cannot use abilities.
