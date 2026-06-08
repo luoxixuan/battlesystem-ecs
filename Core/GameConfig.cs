@@ -2218,6 +2218,14 @@ namespace BattleSystemECS.Config
  // 的 TowerPreFightDamageMult[] / TowerPreFightSpeedMult[] cache → wave结束清空。
  // Sentinel-gated: Enabled = false → Update no-op，cache字段保持0f fast path。
  public PreFightBuffConfig PreFight { get; set; } = new PreFightBuffConfig();
+        // Round174+ Direction3 — Momentum: global per-(wave-time) ramping damage / speed buff.
+        // Per-player momentumTimer accumulates during wave. Every TierDuration seconds the
+        // current tier advances; each tier grants DamageBonusPerTier (multiplicative) and
+        // SpeedBonusPerTier (additive, stacks on top of HotZone/Bloodlust/PreFight chain).
+        // MomentumSystem writes the cached TowerMomentumBonusDamage / TowerMomentumBonusSpeed
+        // for all active towers once per frame so the TowerAttack hot path is branch-cheap.
+        // Sentinel-gated: Enabled=false → Update is a no-op and cache fields stay at0f fast path.
+        public MomentumConfig Momentum { get; set; } = new MomentumConfig();
         // Player global skills / ultimates (direction 5)
         public List<GlobalSkillDef> GlobalSkills { get; set; } = new List<GlobalSkillDef>();
 
@@ -2928,6 +2936,57 @@ namespace BattleSystemECS.Config
  // wave start.1.0 = no change.
  public float MaxHpMult { get; set; } =1f;
  }
+
+    /// <summary>
+    /// Momentum (Round174+ Direction3) — global per-(wave-time) ramping damage / speed buff.
+    ///
+    /// Design: when a wave is in progress, every player's PlayerMomentumTimer accumulates
+    /// seconds. Every <see cref="TierDuration"/> seconds the player's current tier advances
+    /// by 1 (capped at <see cref="MaxTiers"/>). Each tier grants:
+    ///   - DamageBonusPerTier  → multiplicative damage bonus (stacks multiplicatively
+    ///     inside TowerAttackSystem, alongside Bloodlust / PreFight).
+    ///   - SpeedBonusPerTier   → additive attack-speed bonus (stacks additively on top
+    ///     of the HotZone / Fortress / Desperation / Bloodlust / PreFight chain).
+    ///
+    /// The MomentumSystem (Round174+) writes the cached
+    /// TowerMomentumBonusDamage / TowerMomentumBonusSpeed for every active tower once
+    /// per frame. The TowerAttack hot path reads these caches.
+    ///
+    /// Sentinel-gated: Enabled=false → Update is a no-op and the tower cache fields
+    /// stay at 0f fast path. ResetOnWave = true → timer resets to 0 on OnWaveStart.
+    /// </summary>
+    public class MomentumConfig
+    {
+        // Master switch. When false, MomentumSystem.Update is a no-op and the
+        // tower cache fields stay at 0 (zero-overhead fast path on the
+        // TowerAttackSystem hot path).
+        public bool Enabled { get; set; } = true;
+
+        // TierDuration: seconds of wave-time per tier. Default 30s. Must
+        // be > 0 for the timer to advance (sentinel: 0 or negative → tier
+        // stays at 0 forever, no bonus awarded).
+        public float TierDuration { get; set; } = 30f;
+
+        // MaxTiers: cap on the per-player tier count. Default 10 (≈ 5 minutes
+        // of wave at TierDuration=30). Sentinel: <= 0 → tier never advances.
+        public int MaxTiers { get; set; } = 10;
+
+        // DamageBonusPerTier: damage bonus per tier (additive on tier, then
+        // applied multiplicatively in TowerAttackSystem). Default 0.02 = +2%
+        // damage per tier → 5 minutes (10 tiers) = +20% damage.
+        public float DamageBonusPerTier { get; set; } = 0.02f;
+
+        // SpeedBonusPerTier: attack-speed bonus per tier (applied additively
+        // on the atk-spd bonus chain). Default 0.01 = +1% speed per tier →
+        // 5 minutes (10 tiers) = +10% speed.
+        public float SpeedBonusPerTier { get; set; } = 0.01f;
+
+        // ResetOnWave: when true, the per-player timer resets to 0 on
+        // OnWaveStart so each wave starts at tier 0. When false, the timer
+        // accumulates across waves (within the same player session).
+        // Default true (matches "per-wave" design intent).
+        public bool ResetOnWave { get; set; } = true;
+    }
 
     /// <summary>
     /// Skill type IDs for player global skills (ultimates).

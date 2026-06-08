@@ -100,7 +100,19 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
  // from the selected buff.1.0 = no change (fast path). Default1f.
  public float[] PlayerPreFightMaxHpMult = new float[MAX_PLAYERS];
 
- // ====================玩家全局技能/终极技能 (Global Skills / Ultimates) ====================
+        // ==================== Momentum (Round174+ Direction 3) ====================
+        // PlayerMomentumTimer: per-player accumulated wave-time in seconds. Default 0f.
+        //   Incremented by MomentumSystem.Update each frame while a wave is in
+        //   progress. Read by MomentumSystem to compute the current tier
+        //   (floor(timer / TierDuration), capped at MaxTiers). Reset to 0 on
+        //   OnWaveStart when MomentumConfig.ResetOnWave == true.
+        public float[] PlayerMomentumTimer = new float[MAX_PLAYERS];
+        // PlayerMomentumCurrentTier: cached current tier (0..MaxTiers) per player.
+        //   Default 0 = no bonus. Updated by MomentumSystem.Update. Exposed
+        //   for tests + UI / debug overlays. Indexing parallels PlayerId.
+        public int[] PlayerMomentumCurrentTier = new int[MAX_PLAYERS];
+
+        // ====================玩家全局技能/终极技能 (Global Skills / Ultimates) ====================
  // PlayerGlobalSkillUnlocked: bit-flag of which global skills are unlocked per player (indexed by playerId * MAX_GLOBAL_SKILLS + skillIdx)
  public bool[] PlayerGlobalSkillUnlocked = new bool[MAX_PLAYERS *8];
         // PlayerGlobalSkillCooldown: remaining cooldown in seconds per global skill
@@ -488,6 +500,10 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
  PlayerPreFightOptionsRolled[entityId] = false;
  PlayerPreFightCritBonus[entityId] =0f;
  PlayerPreFightMaxHpMult[entityId] =1f;
+ // Round174+ Direction3 — Momentum: fresh player starts at tier 0 / timer 0.
+ // MomentumSystem will accumulate the timer as wave-time elapses.
+ PlayerMomentumTimer[entityId] =0f;
+ PlayerMomentumCurrentTier[entityId] =0;
  }
 
         public float GetPlayerAttackRange(int playerId)

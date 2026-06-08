@@ -81,6 +81,15 @@ namespace BattleSystemECS.Core
         //   Sentinel-gated: when BloodlustConfig.Enabled = false the body is
         //   a single O(activeTowers) clear-pass that forces mults to 0.
         public Systems.BloodlustSystem? Bloodlust { get; set; }
+        // Round174+ Direction3 — Momentum System. Per-frame tick that advances
+        //   the per-player wave-time timer (only while _waveRunning is true),
+        //   recomputes the current tier, and re-derives the cached damage /
+        //   speed bonuses that TowerAttackSystem reads inline. Sentinel-gated:
+        //   when MomentumConfig.Enabled = false the body is a single
+        //   O(activeTowers) clear-pass that forces bonuses to 0. Runs last in
+        //   Combat (after Bloodlust) so the next frame's hot path sees the
+        //   freshly-computed values.
+        public Systems.MomentumSystem? Momentum { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
@@ -162,6 +171,13 @@ namespace BattleSystemECS.Core
             // to the *next* shot). O(activeTowers) when Enabled = true,
             // O(activeTowers) clear-pass when Enabled = false.
             Bloodlust?.Update(turn);
+            // Round174+ Direction3 — Momentum per-frame tick. Runs last in
+            // the combat phase (after Bloodlust) so the freshly-computed
+            // tier-derived damage / speed bonuses are visible to
+            // TowerAttackSystem on the *next* frame. O(MAX_PLAYERS +
+            // activeTowers) per tick. Sentinel fast path: disabled or
+            // degenerate config → single O(activeTowers) clear-pass.
+            Momentum?.Update(deltaTime);
         }
     }
 }

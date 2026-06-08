@@ -497,6 +497,12 @@ namespace BattleSystemECS.Systems
                 float rallyAtkSpdBonus = store.TowerRallyAtkSpdBonus[towerId];
                 float sapperAtkSpdMult = Math.Max(0f, 1f - store.TowerSapperSlowMult[towerId]);
                 float bloodlustSpeedBonus = store.TowerBloodlustSpeedMult[towerId];
+                // Round174+ Direction3 — Momentum: additive atk-spd bonus from the
+                // global per-(wave-time) ramp. 0f fast path when no tier is
+                // active (tier 0 / BuildPhase / disabled config). Layered
+                // additively with the HotZone / Fortress / Desperation / Rally /
+                // Bloodlust chain.
+                float momentumSpeedBonus = store.TowerMomentumBonusSpeed[towerId];
                 // Round178 Direction6 — Pre-fight Buff: multiplicative atk-spd bonus from the
                 // player's selected pre-fight buff for the current wave. 1f fast path when
                 // no buff selected. Layered multiplicatively AFTER the additive chain.
@@ -504,7 +510,7 @@ namespace BattleSystemECS.Systems
                 // (no buff) to avoid collapsing the denominator to Math.Max(0.1f, ...).
                 float preFightSpeedMult = store.TowerPreFightSpeedMult[towerId];
                 if (preFightSpeedMult <= 0f) preFightSpeedMult = 1f;
-                float attackInterval =1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus + rallyAtkSpdBonus + bloodlustSpeedBonus) * sapperAtkSpdMult * preFightSpeedMult);
+                float attackInterval =1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus + rallyAtkSpdBonus + bloodlustSpeedBonus + momentumSpeedBonus) * sapperAtkSpdMult * preFightSpeedMult);
 
                 // ── Burst Fire / Salvo Mode check ─────────────────────────────────────
                 int burstCount = store.TowerBurstCount[towerId];
@@ -520,9 +526,11 @@ namespace BattleSystemECS.Systems
                         // Round178 Direction6: also include TowerPreFightSpeedMult so a wave-scoped
                         // pre-fight buff scales burst cooldowns identically.1f fast path.
                         // R178 bug-scan guard: 0f -> 1f (no buff), mirrors outer attackInterval.
+                        // Round174+ Direction3: include TowerMomentumBonusSpeed so the global
+                        // Momentum ramp scales burst cooldowns identically. 0f fast path.
                         float preFightBurstSpeedMult = store.TowerPreFightSpeedMult[towerId];
                         if (preFightBurstSpeedMult <= 0f) preFightBurstSpeedMult = 1f;
-                        float burstCooldown = store.TowerBurstCooldown[towerId] / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus + bloodlustSpeedBonus) * preFightBurstSpeedMult);
+                        float burstCooldown = store.TowerBurstCooldown[towerId] / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus + bloodlustSpeedBonus + momentumSpeedBonus) * preFightBurstSpeedMult);
                         if (store.TowerLastAttackTime[towerId] < burstCooldown) return;
                         // Cooldown complete — reset burst counter
                         store.TowerBurstShotsFired[towerId] = 0;
@@ -907,6 +915,11 @@ namespace BattleSystemECS.Systems
                     // defends against uninitialized-slot 0f traps (R178 bug scan).
                     float preFightDmgMult = store.TowerPreFightDamageMult[towerId];
                     if (preFightDmgMult > 0f && preFightDmgMult != 1f) baseDmg *= preFightDmgMult;
+                    // ── Round174+ Direction3 — Momentum damage bonus (per-tier ramp) ──
+                    // Multiplicative on baseDmg, layered after PreFight Buff. 0f fast path
+                    // when no tier is active (default for tier-0 / BuildPhase towers).
+                    float momentumDmgBonus = store.TowerMomentumBonusDamage[towerId];
+                    if (momentumDmgBonus >0f) baseDmg *= (1f + momentumDmgBonus);
 
                     // ── Ramp-Up / Spool-Up Damage ──────────────────────────────────────────
                     // Each consecutive hit on the same target increases damage by RampUpRate,

@@ -1,0 +1,8 @@
+{
+ "Enabled": true,
+ "TierDuration": 30.0,
+ "MaxTiers": 10,
+ "DamageBonusPerTier": 0.02,
+ "SpeedBonusPerTier": 0.01,
+ "ResetOnWave": true
+}

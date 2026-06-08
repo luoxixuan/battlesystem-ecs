@@ -626,6 +626,21 @@ namespace BattleSystemECS.Core
         // Read by TowerAttackSystem in the attack-interval hot path alongside
         // HotZone/Fortress/Desperation/Rally.0f = no bonus.
         public float[] TowerBloodlustSpeedMult = new float[MAX_ENTITIES];
+        // ==================== Momentum (SOA) — Round174+ Direction 3 ====================
+        // TowerMomentumBonusDamage: cached multiplicative damage bonus from the
+        //   global Momentum ramp (Round174+ Direction 3). When tier > 0, the
+        //   cached value is (tier * DamageBonusPerTier) and the TowerAttack hot
+        //   path multiplies baseDmg by (1 + bonus). 0f = tier 0 sentinel → no
+        //   bonus fast path. Written by MomentumSystem.Update each frame; reset
+        //   to 0f in AddTower/RecycleTower paths so a freshly placed tower does
+        //   not inherit a stale bonus from a prior occupant of the slot.
+        public float[] TowerMomentumBonusDamage = new float[MAX_ENTITIES];
+        // TowerMomentumBonusSpeed: cached additive attack-speed bonus from the
+        //   global Momentum ramp. When tier > 0, the cached value is
+        //   (tier * SpeedBonusPerTier) and the TowerAttack hot path adds it
+        //   onto the atk-spd bonus chain. 0f = tier 0 sentinel → no bonus
+        //   fast path. Same write/reset contract as the damage variant above.
+        public float[] TowerMomentumBonusSpeed = new float[MAX_ENTITIES];
         // ==================== Pre-fight Buff Tower Cache (Round178 Direction6) ====================
         // TowerPreFightDamageMult: cached multiplicative damage bonus from the
         // player's selected pre-fight buff for the current wave. Default1f
@@ -1510,6 +1525,12 @@ namespace BattleSystemECS.Core
             TowerBloodlustLastKillTurn[entityId] =0;
             TowerBloodlustDamageMult[entityId] =0f;
             TowerBloodlustSpeedMult[entityId] =0f;
+            // Round174+ Direction3 — Momentum tower cache: default to0f (tier 0 = no bonus).
+            // MomentumSystem.Update overwrites these each frame for active towers based on
+            // the player's current tier. A recycled slot must not leak a stale bonus from
+            // the prior occupant (which could be a higher tier → artificially over-buffed).
+            TowerMomentumBonusDamage[entityId] =0f;
+            TowerMomentumBonusSpeed[entityId] =0f;
             // Round178 Direction6 — Pre-fight Buff tower cache: default to1f (no change, fast path).
             // The PreFightBuffSystem.ApplyToTowers writes non-1f values on OnWaveStart and clears
             // them back to1f on OnWaveComplete, so a recycled tower slot always starts wave-scoped
@@ -1825,6 +1846,12 @@ namespace BattleSystemECS.Core
             TowerBloodlustLastKillTurn[entityId] =0;
             TowerBloodlustDamageMult[entityId] =0f;
             TowerBloodlustSpeedMult[entityId] =0f;
+            // Round174+ Direction3 — Momentum tower cache: default to0f (tier 0 = no bonus).
+            // MomentumSystem.Update overwrites these each frame for active towers based on
+            // the player's current tier. A recycled slot must not leak a stale bonus from
+            // the prior occupant (which could be a higher tier → artificially over-buffed).
+            TowerMomentumBonusDamage[entityId] =0f;
+            TowerMomentumBonusSpeed[entityId] =0f;
             // Round178 Direction6 — Pre-fight Buff tower cache: default to1f (no change, fast path).
             // The PreFightBuffSystem.ApplyToTowers writes non-1f values on OnWaveStart and clears
             // them back to1f on OnWaveComplete, so a recycled tower slot always starts wave-scoped

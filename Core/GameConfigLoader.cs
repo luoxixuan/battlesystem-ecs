@@ -104,6 +104,13 @@ namespace BattleSystemECS.Config
  // Pool=Array.Empty<PreFightBuffOptionDef>()). All knobs are optional.
  LoadPreFightBuffConfig(gameConfig, renderer);
 
+ // Round174+ Direction3 — Momentum (global per-(wave-time) ramping damage /
+ // attack-speed buff). Reads Data/Configs/momentum.json if present; otherwise
+ // the GameConfig keeps its coded MomentumConfig defaults (Enabled=true,
+ // TierDuration=30s, MaxTiers=10, DamageBonusPerTier=0.02, SpeedBonusPerTier
+ // =0.01, ResetOnWave=true). All knobs are optional.
+ LoadMomentumConfig(gameConfig, renderer);
+
  // Load damage saturation tunables (Round92 Direction1: per-enemy diminishing returns
  // on incoming damage within a short rolling window). All three knobs are optional —
  // missing fields fall back to the safe defaults in DamageSaturationConfig.
@@ -2608,6 +2615,48 @@ namespace BattleSystemECS.Config
          renderer.Log("[PREFIGHT] Failed to load prefight_buffs config: " + ex.Message + " — using coded defaults");
      }
  }
+
+        /// <summary>
+        /// Round174+ Direction3 — Momentum config. Reads from
+        /// Data/Configs/momentum.json if present; otherwise the GameConfig
+        /// keeps its coded MomentumConfig defaults (Enabled=true,
+        /// TierDuration=30s, MaxTiers=10, DamageBonusPerTier=0.02,
+        /// SpeedBonusPerTier=0.01, ResetOnWave=true). All five knobs are
+        /// optional — missing fields fall back to those defaults so the
+        /// file can be partial without breaking the loader.
+        /// </summary>
+        private static void LoadMomentumConfig(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string file = "Data/Configs/momentum.json";
+            try
+            {
+                if (!File.Exists(file))
+                {
+                    renderer.Log("[MOMENTUM] momentum.json not found, using coded defaults");
+                    return;
+                }
+                string json = File.ReadAllText(file);
+                // Sentinel-tolerant: System.Text.Json is happy with missing
+                // fields, they fall back to the coded property defaults
+                // (Enabled=true, TierDuration=30f, MaxTiers=10, etc).
+                var opts = new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+                var cfg = System.Text.Json.JsonSerializer.Deserialize<MomentumConfig>(json, opts);
+                if (cfg == null)
+                {
+                    renderer.Log("[MOMENTUM] momentum.json deserialized to null, using coded defaults");
+                    return;
+                }
+                gameConfig.Momentum = cfg;
+                renderer.Log("[MOMENTUM] Loaded momentum config from " + file + " (tierDuration=" + cfg.TierDuration + "s, maxTiers=" + cfg.MaxTiers + ", dmg/tier=" + cfg.DamageBonusPerTier + ", spd/tier=" + cfg.SpeedBonusPerTier + ", resetOnWave=" + cfg.ResetOnWave + ")");
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[MOMENTUM] Failed to load momentum config: " + ex.Message + " — using coded defaults");
+            }
+        }
 
  /// <summary>
  /// Round175 Direction1 — Mana Shield config. Reads from

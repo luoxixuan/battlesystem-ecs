@@ -71,6 +71,13 @@ namespace BattleSystemECS.Core
         // chosen buff's DamageMult/SpeedMult to every active tower's cache.
         // OnWaveComplete clears cache + player selection. Sentinel-gated.
         public PreFightBuffSystem? PreFightBuff { get; private set; }
+        // Round174+ Direction3 — Momentum: global per-(wave-time) ramping damage /
+        // attack-speed buff shared by all active towers. Per-player timer advances
+        // only while a wave is running (latch driven by WaveSpawningSystem
+        // OnWaveStart/OnWaveComplete); tier is recomputed each frame and the
+        // cached damage / speed bonuses are stamped onto every active tower.
+        // Sentinel-gated: Enabled=false / degenerate config → force-clear cache.
+        public MomentumSystem? Momentum { get; private set; }
         public TowerMorphSystem? TowerMorph { get; private set; }
         public AuraTowerSystem? AuraTower { get; private set; }
         public CurseAuraSystem? Curse { get; private set; }
@@ -279,6 +286,11 @@ namespace BattleSystemECS.Core
             // WaveSpawningSystem is passed in via SubscribeToWaveEvents below in
             // WireDependencies (after WaveSpawning is constructed).
             PreFightBuff = new PreFightBuffSystem(store, config);
+            // Round174+ Direction3 — Momentum: per-(wave-time) ramping global buff.
+            // No construction-time external dependencies (reads GameConfig.Momentum
+            // + ComponentStore). WaveSpawningSystem is passed in via
+            // SubscribeToWaveEvents below in WireDependencies.
+            Momentum = new MomentumSystem(store, config);
             TowerMorph = new TowerMorphSystem(store);
 
             // ── Player attack ──
@@ -632,6 +644,11 @@ namespace BattleSystemECS.Core
             // applies / clears the per-tower cache automatically. ──
             PreFightBuff?.SubscribeToWaveEvents(WaveSpawning);
 
+            // ── Round174+ Direction3 — Momentum: subscribe to OnWaveStart /
+            // OnWaveComplete so the system flips its wave-running latch and
+            // (optionally) resets the per-player timer at wave start. ──
+            Momentum?.SubscribeToWaveEvents(WaveSpawning);
+
             // ── CorpseEffect subscribes to OnEnemyKilled ──
             CorpseEffect?.SubscribeToOnEnemyKilled();
 
@@ -831,6 +848,11 @@ namespace BattleSystemECS.Core
             // the combat phase, after EchoClone. O(activeTowers) per frame so
             // cost is bounded by the deployed tower count (typically <20).
             scheduler.Combat.Bloodlust = Bloodlust;
+            // Round174+ Direction3 — Momentum per-frame tick. Wired last in
+            // the combat phase, after Bloodlust. O(MAX_PLAYERS + activeTowers)
+            // per frame so cost is bounded by the deployed tower count and
+            // the player count (typically 1, capped at MAX_PLAYERS).
+            scheduler.Combat.Momentum = Momentum;
             // Round 144 方向4 — Hero Active Skill Set per-frame cooldown tick. Wired
             //   last in the combat phase, after Aggro. O(1) when no skill is
             //   configured (sentinel _anySkillConfigured in the system).
