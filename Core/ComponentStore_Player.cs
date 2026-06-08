@@ -76,9 +76,33 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         //   damage this game. Used by tests to verify the path was hit. Stays true
         //   until AddPlayer resets it. Default false.
         public bool[] PlayerManaShieldTriggered = new bool[MAX_PLAYERS];
-        // ==================== 玩家全局技能/终极技能 (Global Skills / Ultimates) ====================
-        // PlayerGlobalSkillUnlocked: bit-flag of which global skills are unlocked per player (indexed by playerId * MAX_GLOBAL_SKILLS + skillIdx)
-        public bool[] PlayerGlobalSkillUnlocked = new bool[MAX_PLAYERS * 8];
+ // ==================== Pre-fight Buff (Round178 Direction6) ====================
+ // PlayerPreFightSelectedBuffId: the buff option Id the player picked for
+ // the current wave. Empty string = no selection yet. Reset on
+ // AddPlayer (game start) and on WaveComplete (wave-scoped, no
+ // cross-wave carry).
+ public string[] PlayerPreFightSelectedBuffId = new string[MAX_PLAYERS];
+ // PlayerPreFightOption{1,2,3}Id: the three buff Ids offered this
+ // BuildPhase (one slot per UI card). Empty strings until the next
+ // PreFightBuffSystem.Update rolls. Read by UI / tests via the
+ // public GetPreFightOptions API.
+ public string[] PlayerPreFightOption1Id = new string[MAX_PLAYERS];
+ public string[] PlayerPreFightOption2Id = new string[MAX_PLAYERS];
+ public string[] PlayerPreFightOption3Id = new string[MAX_PLAYERS];
+ // PlayerPreFightOptionsRolled: latch set true after the first
+ // BuildPhase tick of a new wave-pending state. Read by tests to
+ // verify the roll happened; cleared on WaveComplete.
+ public bool[] PlayerPreFightOptionsRolled = new bool[MAX_PLAYERS];
+ // PlayerPreFightCritBonus: cached additive crit-chance from the
+ // selected buff.0 = no crit bonus (fast path). Default0f.
+ public float[] PlayerPreFightCritBonus = new float[MAX_PLAYERS];
+ // PlayerPreFightMaxHpMult: cached multiplicative max-HP bonus
+ // from the selected buff.1.0 = no change (fast path). Default1f.
+ public float[] PlayerPreFightMaxHpMult = new float[MAX_PLAYERS];
+
+ // ====================玩家全局技能/终极技能 (Global Skills / Ultimates) ====================
+ // PlayerGlobalSkillUnlocked: bit-flag of which global skills are unlocked per player (indexed by playerId * MAX_GLOBAL_SKILLS + skillIdx)
+ public bool[] PlayerGlobalSkillUnlocked = new bool[MAX_PLAYERS *8];
         // PlayerGlobalSkillCooldown: remaining cooldown in seconds per global skill
         public float[] PlayerGlobalSkillCooldown = new float[MAX_PLAYERS * 8];
         // PlayerGlobalSkillPressed: hotkey pressed signal this frame (consumed by GlobalSkillSystem)
@@ -445,15 +469,26 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             PlayerDamageBoostMultiplier[entityId] = 0f;
 
             PlayerEntityId = entityId;
-            // Round 175 Direction 1 — Mana Shield: zero out the mana-shield pool,
-            //   cap and absorb ratio on game start. The ManaShieldSystem.Update()
-            //   will populate the cap from PlayerMaxMana on the first frame; the
-            //   pool and trigger latch stay at 0 / false until mana flows in.
-            PlayerManaShield[entityId] = 0f;
-            PlayerManaShieldCap[entityId] = 0f;
-            PlayerManaShieldAbsorbRatio[entityId] = 1f; // 1.0 = full-conversion baseline
-            PlayerManaShieldTriggered[entityId] = false;
-        }
+            // Round175 Direction1 — Mana Shield: zero out the mana-shield pool,
+ // cap and absorb ratio on game start. The ManaShieldSystem.Update()
+ // will populate the cap from PlayerMaxMana on the first frame; the
+ // pool and trigger latch stay at0 / false until mana flows in.
+ PlayerManaShield[entityId] =0f;
+ PlayerManaShieldCap[entityId] =0f;
+ PlayerManaShieldAbsorbRatio[entityId] =1f; //1.0 = full-conversion baseline
+ PlayerManaShieldTriggered[entityId] = false;
+ // Round178 Direction6 — Pre-fight Buff: clear all selection state and
+ // option slots so a recycled player entity does not inherit a stale
+ // choice from the previous game. The PreFightBuffSystem.Update() will
+ // re-roll options on the next BuildPhase tick.
+ PlayerPreFightSelectedBuffId[entityId] = "";
+ PlayerPreFightOption1Id[entityId] = "";
+ PlayerPreFightOption2Id[entityId] = "";
+ PlayerPreFightOption3Id[entityId] = "";
+ PlayerPreFightOptionsRolled[entityId] = false;
+ PlayerPreFightCritBonus[entityId] =0f;
+ PlayerPreFightMaxHpMult[entityId] =1f;
+ }
 
         public float GetPlayerAttackRange(int playerId)
         {

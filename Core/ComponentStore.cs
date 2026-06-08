@@ -1082,6 +1082,12 @@ namespace BattleSystemECS.Core
                 TowerModifierId[entityId] = -1;
                 TowerModifierMagnitude[entityId] = 0f;
                 TowerModifierRarity[entityId] = 0;
+                // Round 178 Direction 6 — Pre-fight Buff tower cache: reset to 1f (no change
+                // fast path) so a freshly-placed tower does not inherit the previous
+                // occupant's wave-scoped buff multiplier. 1f is the sentinel "no buff"
+                // value read by TowerAttackSystem (gated by `if (preFightDmgMult != 1f)`).
+                TowerPreFightDamageMult[entityId] = 1f;
+                TowerPreFightSpeedMult[entityId] = 1f;
             }
 
             // ── Phase 4: recycle ID ────────────────────────────────────────────────

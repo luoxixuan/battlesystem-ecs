@@ -497,7 +497,14 @@ namespace BattleSystemECS.Systems
                 float rallyAtkSpdBonus = store.TowerRallyAtkSpdBonus[towerId];
                 float sapperAtkSpdMult = Math.Max(0f, 1f - store.TowerSapperSlowMult[towerId]);
                 float bloodlustSpeedBonus = store.TowerBloodlustSpeedMult[towerId];
-                float attackInterval = 1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus + rallyAtkSpdBonus + bloodlustSpeedBonus) * sapperAtkSpdMult);
+                // Round178 Direction6 — Pre-fight Buff: multiplicative atk-spd bonus from the
+                // player's selected pre-fight buff for the current wave. 1f fast path when
+                // no buff selected. Layered multiplicatively AFTER the additive chain.
+                // R178 bug-scan guard: if the slot is uninitialized (0f default), treat as 1f
+                // (no buff) to avoid collapsing the denominator to Math.Max(0.1f, ...).
+                float preFightSpeedMult = store.TowerPreFightSpeedMult[towerId];
+                if (preFightSpeedMult <= 0f) preFightSpeedMult = 1f;
+                float attackInterval =1.0f / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus + rallyAtkSpdBonus + bloodlustSpeedBonus) * sapperAtkSpdMult * preFightSpeedMult);
 
                 // ── Burst Fire / Salvo Mode check ─────────────────────────────────────
                 int burstCount = store.TowerBurstCount[towerId];
@@ -507,10 +514,15 @@ namespace BattleSystemECS.Systems
                     if (shotsFired >= burstCount)
                     {
                         // In cooldown phase: use burst cooldown (scaled by attack speed)
-                        // Round 176 Direction 2: include TowerBloodlustSpeedMult so a tower
+                        // Round176 Direction2: include TowerBloodlustSpeedMult so a tower
                         // stacking Bloodlust fires its burst cooldowns faster (matches the
-                        // outer attackInterval formula). 0f fast path for towers with no stacks.
-                        float burstCooldown = store.TowerBurstCooldown[towerId] / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus + bloodlustSpeedBonus));
+                        // outer attackInterval formula).0f fast path for towers with no stacks.
+                        // Round178 Direction6: also include TowerPreFightSpeedMult so a wave-scoped
+                        // pre-fight buff scales burst cooldowns identically.1f fast path.
+                        // R178 bug-scan guard: 0f -> 1f (no buff), mirrors outer attackInterval.
+                        float preFightBurstSpeedMult = store.TowerPreFightSpeedMult[towerId];
+                        if (preFightBurstSpeedMult <= 0f) preFightBurstSpeedMult = 1f;
+                        float burstCooldown = store.TowerBurstCooldown[towerId] / Math.Max(0.1f, store.TowerAttackSpeed[towerId] * (1f + store.TowerHotZoneSpeedBonus[towerId] + _desperationSpeedBonus + fortressAtkSpdBonus + bloodlustSpeedBonus) * preFightBurstSpeedMult);
                         if (store.TowerLastAttackTime[towerId] < burstCooldown) return;
                         // Cooldown complete — reset burst counter
                         store.TowerBurstShotsFired[towerId] = 0;
@@ -878,17 +890,23 @@ namespace BattleSystemECS.Systems
 
                     // ── Random Damage Variance (Gambling / RNG Damage Range) ──────────────
                     float dmgVariance = store.TowerDamageVariance[towerId];
-                    if (dmgVariance > 0f)
-                        baseDmg *= (float)(1.0 - dmgVariance + _rand.NextDouble() * dmgVariance * 2.0);
+                    if (dmgVariance >0f)
+                    baseDmg *= (float)(1.0 - dmgVariance + _rand.NextDouble() * dmgVariance *2.0);
 
                     // ── Desperation / Last Stand damage bonus ──────────────────────────
-                    if (_desperationDmgBonus > 0f) baseDmg *= (1f + _desperationDmgBonus);
+                    if (_desperationDmgBonus >0f) baseDmg *= (1f + _desperationDmgBonus);
 
-                    // ── Round 176 Direction 2 — Bloodlust damage bonus (kill-stacking) ──
-                    //   Multiplicative on baseDmg, layered after Desperation / RampUp.
-                    //   0f fast path when no stacks are active (default for non-Bloodlust towers).
+                    // ── Round176 Direction2 — Bloodlust damage bonus (kill-stacking) ──
+                    // Multiplicative on baseDmg, layered after Desperation / RampUp.
+                    //0f fast path when no stacks are active (default for non-Bloodlust towers).
                     float bloodlustDmgMult = store.TowerBloodlustDamageMult[towerId];
-                    if (bloodlustDmgMult > 0f) baseDmg *= (1f + bloodlustDmgMult);
+                    if (bloodlustDmgMult >0f) baseDmg *= (1f + bloodlustDmgMult);
+                    // ── Round178 Direction6 — Pre-fight Buff damage bonus (wave-scoped mult) ──
+                    // Multiplicative on baseDmg, layered after Bloodlust. 1f fast path when
+                    // no buff selected (default for un-selected towers). > 0f guard
+                    // defends against uninitialized-slot 0f traps (R178 bug scan).
+                    float preFightDmgMult = store.TowerPreFightDamageMult[towerId];
+                    if (preFightDmgMult > 0f && preFightDmgMult != 1f) baseDmg *= preFightDmgMult;
 
                     // ── Ramp-Up / Spool-Up Damage ──────────────────────────────────────────
                     // Each consecutive hit on the same target increases damage by RampUpRate,

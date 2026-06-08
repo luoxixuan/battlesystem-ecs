@@ -1,0 +1,78 @@
+{
+ "Enabled": true,
+ "OptionsPerWave":3,
+ "Pool": [
+ {
+ "Id": "AttackFury",
+ "Name": "Fury of Battle",
+ "Weight":1.0,
+ "DamageMult":1.15,
+ "SpeedMult":1.0,
+ "CritChance":0.0,
+ "MaxHpMult":1.0
+ },
+ {
+ "Id": "SwiftCasting",
+ "Name": "Swift Casting",
+ "Weight":1.0,
+ "DamageMult":1.0,
+ "SpeedMult":1.15,
+ "CritChance":0.0,
+ "MaxHpMult":1.0
+ },
+ {
+ "Id": "CritEye",
+ "Name": "Critter's Eye",
+ "Weight":0.8,
+ "DamageMult":1.05,
+ "SpeedMult":1.0,
+ "CritChance":0.10,
+ "MaxHpMult":1.0
+ },
+ {
+ "Id": "Fortified",
+ "Name": "Fortified",
+ "Weight":1.0,
+ "DamageMult":0.95,
+ "SpeedMult":0.95,
+ "CritChance":0.0,
+ "MaxHpMult":1.25
+ },
+ {
+ "Id": "Vampiric",
+ "Name": "Vampiric Aura",
+ "Weight":0.7,
+ "DamageMult":1.10,
+ "SpeedMult":1.05,
+ "CritChance":0.05,
+ "MaxHpMult":0.95
+ },
+ {
+ "Id": "Berserker",
+ "Name": "Berserker Rage",
+ "Weight":0.6,
+ "DamageMult":1.30,
+ "SpeedMult":1.20,
+ "CritChance":0.0,
+ "MaxHpMult":0.80
+ },
+ {
+ "Id": "GlassCannon",
+ "Name": "Glass Cannon",
+ "Weight":0.5,
+ "DamageMult":1.50,
+ "SpeedMult":1.10,
+ "CritChance":0.0,
+ "MaxHpMult":0.70
+ },
+ {
+ "Id": "Balanced",
+ "Name": "Balanced Stance",
+ "Weight":1.2,
+ "DamageMult":1.05,
+ "SpeedMult":1.05,
+ "CritChance":0.0,
+ "MaxHpMult":1.05
+ }
+ ]
+}

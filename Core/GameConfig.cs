@@ -2207,11 +2207,17 @@ namespace BattleSystemECS.Config
         public BackstabConfig Backstab { get; set; } = new BackstabConfig();
         // Round 175 Direction 1 — Mana Shield: mana → shield conversion + decay
         public ManaShieldConfig ManaShield { get; set; } = new ManaShieldConfig();
-        // Round 176 Direction 2 — Bloodlust: per-tower kill-stacking attack-speed / damage buff.
-        //   Each kill grants +SpeedPerStack / +DamagePerStack (additive), capped at MaxStacks.
-        //   Stacks decay by 1 every DecayTurns frames the tower goes without a kill.
-        //   Sentinel-gated: Enabled = false → all stacks / multipliers stay at 0 fast path.
-        public BloodlustConfig Bloodlust { get; set; } = new BloodlustConfig();
+        // Round176 Direction2 — Bloodlust: per-tower kill-stacking attack-speed / damage buff.
+ // Each kill grants +SpeedPerStack / +DamagePerStack (additive), capped at MaxStacks.
+ // Stacks decay by1 every DecayTurns frames the tower goes without a kill.
+ // Sentinel-gated: Enabled = false → all stacks / multipliers stay at0 fast path.
+ public BloodlustConfig Bloodlust { get; set; } = new BloodlustConfig();
+ // Round178 Direction6 — Pre-fight Buff Selection (BuildPhase末3-选-1 出战 buff).
+ // BuildPhase tick抽3 个 weighted random 选项 → PlayerPreFightOption{1,2,3}Id[]
+ // →玩家 SelectPreFightBuff(playerId, idx)选1 → OnWaveStart 时写入所有 active tower
+ // 的 TowerPreFightDamageMult[] / TowerPreFightSpeedMult[] cache → wave结束清空。
+ // Sentinel-gated: Enabled = false → Update no-op，cache字段保持0f fast path。
+ public PreFightBuffConfig PreFight { get; set; } = new PreFightBuffConfig();
         // Player global skills / ultimates (direction 5)
         public List<GlobalSkillDef> GlobalSkills { get; set; } = new List<GlobalSkillDef>();
 
@@ -2841,26 +2847,87 @@ namespace BattleSystemECS.Config
     /// TowerAttack hot path stays branch-cheap on legacy saves.
     /// </summary>
     public class BloodlustConfig
-    {
-        // Master switch. When false, the per-frame Update forces every tower's
-        // cached damage/speed mult to 0 and skips the OnTowerKill stack bump.
-        public bool Enabled { get; set; } = true;
-        // MaxStacks: hard cap on stack count (10 = at most 10 fresh kills contribute).
-        // Must be >= 1; <= 0 silently disables the system.
-        public int MaxStacks { get; set; } = 10;
-        // SpeedPerStack: additive attack-speed bonus per stack (0.05 = +5% per stack,
-        // 10 stacks = +50%). Layered with HotZone/Fortress/Desperation/Rally in the
-        // TowerAttackSystem hot path.
-        public float SpeedPerStack { get; set; } = 0.05f;
-        // DamagePerStack: multiplicative damage bonus per stack (0.04 = +4% per stack,
-        // 10 stacks = +40%). Layered multiplicatively in TowerAttackSystem.Update
-        // right after the Desperation bonus.
-        public float DamagePerStack { get; set; } = 0.04f;
-        // DecayTurns: number of frames without a kill before a stack is shed. 300
-        // frames = 5s @ 60 FPS. Turn-based so the cadence matches Combo / DoomClock.
-        // 0 = no decay (stacks persist until the tower dies or wave ends).
-        public int DecayTurns { get; set; } = 300;
-    }
+ {
+ // Master switch. When false, the per-frame Update forces every tower's
+ // cached damage/speed mult to0 and skips the OnTowerKill stack bump.
+ public bool Enabled { get; set; } = true;
+ // MaxStacks: hard cap on stack count (10 = at most10 fresh kills contribute).
+ // Must be >=1; <=0 silently disables the system.
+ public int MaxStacks { get; set; } =10;
+ // SpeedPerStack: additive attack-speed bonus per stack (0.05 = +5% per stack,
+ //10 stacks = +50%). Layered with HotZone/Fortress/Desperation/Rally in the
+ // TowerAttackSystem hot path.
+ public float SpeedPerStack { get; set; } =0.05f;
+ // DamagePerStack: multiplicative damage bonus per stack (0.04 = +4% per stack,
+ //10 stacks = +40%). Layered multiplicatively in TowerAttackSystem.Update
+ // right after the Desperation bonus.
+ public float DamagePerStack { get; set; } =0.04f;
+ // DecayTurns: number of frames without a kill before a stack is shed.300
+ // frames =5s @60 FPS. Turn-based so the cadence matches Combo / DoomClock.
+ //0 = no decay (stacks persist until the tower dies or wave ends).
+ public int DecayTurns { get; set; } =300;
+ }
+
+ /// <summary>
+ /// PreFightBuff (Round178 Direction6) — BuildPhase末「3选1」出战 buff.
+ ///
+ /// Design: at the end of each BuildPhase the PreFightBuffSystem rolls
+ /// <see cref="OptionsPerWave"/> weighted-random buff choices from the
+ /// <see cref="Pool"/> array (no duplicates within one roll). The player
+ /// calls SelectPreFightBuff(playerId, idx) to pick ONE. On the next
+ /// OnWaveStart, the chosen buff's DamageMult / SpeedMult / CritChance /
+ /// MaxHpMult are written to every active tower's
+ /// TowerPreFightDamageMult[] / TowerPreFightSpeedMult[] cache. Wave
+ /// completion clears the cache (wave-scoped buff, no cross-wave carry).
+ /// Sentinel-gated: Enabled=false → Update is a no-op and the tower cache
+ /// stays at0f fast path.
+ /// </summary>
+ public class PreFightBuffConfig
+ {
+ // Master switch. When false, the per-frame Update is a no-op and the
+ // tower cache fields stay at0 (zero-overhead fast path on the
+ // TowerAttackSystem hot path).
+ public bool Enabled { get; set; } = true;
+ // OptionsPerWave: number of buff choices offered to the player each
+ // BuildPhase. Default3 (classic3-choose-1). Must be >=1 and
+ // <= Pool.Length, else capped silently.
+ public int OptionsPerWave { get; set; } =3;
+ // Pool: weighted-random pool of buff options. Each entry has a
+ // relative weight (higher = more likely). Empty pool = system inert
+ // even when Enabled=true.
+ public PreFightBuffOptionDef[] Pool { get; set; } = Array.Empty<PreFightBuffOptionDef>();
+ }
+
+ /// <summary>
+ /// One PreFightBuff option definition. Identified by Id (string) and
+ /// exposes the multiplicative / additive bonuses applied to active
+ /// towers for the duration of one wave.
+ /// </summary>
+ public class PreFightBuffOptionDef
+ {
+ // Stable string id ("AttackFury", "SwiftCasting", "Berserker", ...)
+ // used as the value stored in PlayerPreFightSelectedBuffId and the
+ // three Option{1,2,3}Id slots.
+ public string Id { get; set; } = "";
+ // Display name (UI). Defaults to Id when not set.
+ public string Name { get; set; } = "";
+ // Relative weight for the weighted-random roll. Must be >0 to be
+ // pickable. Default1.0 = equal weight.
+ public float Weight { get; set; } =1f;
+ // DamageMult: multiplicative damage bonus (1.15 = +15% damage).
+ // Layered in TowerAttackSystem alongside Bloodlust/Momentum/etc.
+ public float DamageMult { get; set; } =1f;
+ // SpeedMult: multiplicative attack-speed bonus (1.10 = +10% speed,
+ //0.90 = -10% speed, e.g. Glass Cannon).1.0 = no change.
+ public float SpeedMult { get; set; } =1f;
+ // CritChance: additive crit chance bonus (0.05 = +5% crit).0 = no
+ // crit. Layered in TowerAttackSystem's crit roll.
+ public float CritChance { get; set; } =0f;
+ // MaxHpMult: multiplicative max-HP bonus (1.20 = +20% max HP, e.g.
+ // Fortified). Applied to PlayerCurrentHealth/PlayerMaxHealth at
+ // wave start.1.0 = no change.
+ public float MaxHpMult { get; set; } =1f;
+ }
 
     /// <summary>
     /// Skill type IDs for player global skills (ultimates).

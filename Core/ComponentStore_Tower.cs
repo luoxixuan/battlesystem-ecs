@@ -621,11 +621,21 @@ namespace BattleSystemECS.Core
         //   from the live stack count. Read by TowerAttackSystem in the damage hot path
         //   right after the Desperation bonus. 0f = disabled / no stacks.
         public float[] TowerBloodlustDamageMult = new float[MAX_ENTITIES];
-        // TowerBloodlustSpeedMult: cached additive attack-speed bonus (0.50 at 10 stacks
-        //   with default 0.05 per stack). Written by BloodlustSystem.Update each frame.
-        //   Read by TowerAttackSystem in the attack-interval hot path alongside
-        //   HotZone/Fortress/Desperation/Rally. 0f = no bonus.
+        // TowerBloodlustSpeedMult: cached additive attack-speed bonus (0.50 at10 stacks
+        // with default0.05 per stack). Written by BloodlustSystem.Update each frame.
+        // Read by TowerAttackSystem in the attack-interval hot path alongside
+        // HotZone/Fortress/Desperation/Rally.0f = no bonus.
         public float[] TowerBloodlustSpeedMult = new float[MAX_ENTITIES];
+        // ==================== Pre-fight Buff Tower Cache (Round178 Direction6) ====================
+        // TowerPreFightDamageMult: cached multiplicative damage bonus from the
+        // player's selected pre-fight buff for the current wave. Default1f
+        // (= no change, fast path). Written by PreFightBuffSystem.ApplyToTowers
+        // on OnWaveStart; cleared on OnWaveComplete.
+        public float[] TowerPreFightDamageMult = new float[MAX_ENTITIES];
+        // TowerPreFightSpeedMult: cached multiplicative attack-speed bonus
+        // from the selected pre-fight buff. Default1f (fast path). Same
+        // lifecycle as DamageMult.
+        public float[] TowerPreFightSpeedMult = new float[MAX_ENTITIES];
 
         // ==================== 治疗光环塔 (Heal Aura Tower — 塔-塔主动治疗链接) ====================
         // TowerHealAuraRadius: world-units radius within which this tower heals friendly towers
@@ -1494,12 +1504,18 @@ namespace BattleSystemECS.Core
             // Round 98 — Tower Windup / Pre-cast: default to no windup (0 frames = instant fire, zero-overhead path)
             TowerWindupFrames[entityId] = 0;
             TowerWindupCountdown[entityId] = 0;
-            // Round 176 Direction 2 — Bloodlust: default to 0 stacks, 0 last-kill turn, 0 cached mults.
-            //   Sentinel 0 path: a fresh tower contributes nothing to the hot path until it scores a kill.
-            TowerBloodlustStacks[entityId] = 0;
-            TowerBloodlustLastKillTurn[entityId] = 0;
-            TowerBloodlustDamageMult[entityId] = 0f;
-            TowerBloodlustSpeedMult[entityId] = 0f;
+            // Round176 Direction2 — Bloodlust: default to0 stacks,0 last-kill turn,0 cached mults.
+            // Sentinel0 path: a fresh tower contributes nothing to the hot path until it scores a kill.
+            TowerBloodlustStacks[entityId] =0;
+            TowerBloodlustLastKillTurn[entityId] =0;
+            TowerBloodlustDamageMult[entityId] =0f;
+            TowerBloodlustSpeedMult[entityId] =0f;
+            // Round178 Direction6 — Pre-fight Buff tower cache: default to1f (no change, fast path).
+            // The PreFightBuffSystem.ApplyToTowers writes non-1f values on OnWaveStart and clears
+            // them back to1f on OnWaveComplete, so a recycled tower slot always starts wave-scoped
+            // inert until the player has selected a buff for the new wave.
+            TowerPreFightDamageMult[entityId] =1f;
+            TowerPreFightSpeedMult[entityId] =1f;
             // Round 122 Direction 2 — Heal Aura Tower: default to no heal aura (radius=0, amount=0, interval=0, timer=0)
             //   Designers opt-in by setting non-zero radius+amount. Timer=0 means "fire next frame" for
             //   interval=0 healers; for interval>0 healers the timer is reset to interval on first tick.
@@ -1803,12 +1819,18 @@ namespace BattleSystemECS.Core
             // Round 98 — Windup fields reset (frames=0 = no windup, countdown=0 = not in windup)
             TowerWindupFrames[entityId] = 0;
             TowerWindupCountdown[entityId] = 0;
-            // Round 176 Direction 2 — Bloodlust field reset (0 stacks, 0 mults, 0 last-kill turn).
-            //   Recycled tower slots must not retain Bloodlust stacks from a prior occupant.
-            TowerBloodlustStacks[entityId] = 0;
-            TowerBloodlustLastKillTurn[entityId] = 0;
-            TowerBloodlustDamageMult[entityId] = 0f;
-            TowerBloodlustSpeedMult[entityId] = 0f;
+            // Round176 Direction2 — Bloodlust: default to0 stacks,0 last-kill turn,0 cached mults.
+            // Sentinel0 path: a fresh tower contributes nothing to the hot path until it scores a kill.
+            TowerBloodlustStacks[entityId] =0;
+            TowerBloodlustLastKillTurn[entityId] =0;
+            TowerBloodlustDamageMult[entityId] =0f;
+            TowerBloodlustSpeedMult[entityId] =0f;
+            // Round178 Direction6 — Pre-fight Buff tower cache: default to1f (no change, fast path).
+            // The PreFightBuffSystem.ApplyToTowers writes non-1f values on OnWaveStart and clears
+            // them back to1f on OnWaveComplete, so a recycled tower slot always starts wave-scoped
+            // inert until the player has selected a buff for the new wave.
+            TowerPreFightDamageMult[entityId] =1f;
+            TowerPreFightSpeedMult[entityId] =1f;
             // Phasing field reset (false = no phasing, zero-overhead)
             TowerIsPhasing[entityId] = false;
             // Round 122 Direction 2 — Heal Aura Tower fields reset (radius=0=inactive, amount=0, interval=0, timer=0=ready)

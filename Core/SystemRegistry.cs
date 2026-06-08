@@ -61,10 +61,16 @@ namespace BattleSystemECS.Core
         public KillCooldownResetSystem? KillCooldownReset { get; private set; }
         // ── Kill-Triggered Player Sustain (HealOnKill / ManaOnKill) ───────────
         public HealOnKillSystem? HealOnKill { get; private set; }
-        // Round 176 Direction 2 — Bloodlust: per-tower kill-stacking attack-speed / damage buff.
-        //   OnTowerKill handler increments stacks; per-frame Update sheds decayed stacks
-        //   and re-derives the cached damage / speed mults for the TowerAttack hot path.
+        // Round176 Direction2 — Bloodlust: per-tower kill-stacking attack-speed / damage buff.
+        // OnTowerKill handler increments stacks; per-frame Update sheds decayed stacks
+        // and re-derives the cached damage / speed mults for the TowerAttack hot path.
         public BloodlustSystem? Bloodlust { get; private set; }
+        // Round178 Direction6 — Pre-fight Buff: BuildPhase末「3-选-1」出战 buff.
+        // System reads PreFight config Pool, rolls N weighted-random options into
+        // per-player option slots on BuildPhase start. OnWaveStart writes the
+        // chosen buff's DamageMult/SpeedMult to every active tower's cache.
+        // OnWaveComplete clears cache + player selection. Sentinel-gated.
+        public PreFightBuffSystem? PreFightBuff { get; private set; }
         public TowerMorphSystem? TowerMorph { get; private set; }
         public AuraTowerSystem? AuraTower { get; private set; }
         public CurseAuraSystem? Curse { get; private set; }
@@ -266,8 +272,13 @@ namespace BattleSystemECS.Core
             KillCooldownReset = new KillCooldownResetSystem(store, config, playerId);
             // Kill-triggered player sustain (heal / mana on tower kill)
             HealOnKill = new HealOnKillSystem(store);
-            // Round 176 Direction 2 — Bloodlust: per-tower kill-stacking buff
+            // Round176 Direction2 — Bloodlust: per-tower kill-stacking buff
             Bloodlust = new BloodlustSystem(store, config);
+            // Round178 Direction6 — Pre-fight Buff: BuildPhase末「3-选-1」出战 buff.
+            // No external dependencies (reads GameConfig.PreFight + ComponentStore).
+            // WaveSpawningSystem is passed in via SubscribeToWaveEvents below in
+            // WireDependencies (after WaveSpawning is constructed).
+            PreFightBuff = new PreFightBuffSystem(store, config);
             TowerMorph = new TowerMorphSystem(store);
 
             // ── Player attack ──
@@ -616,6 +627,11 @@ namespace BattleSystemECS.Core
             // ── OnTowerKill → Bloodlust (per-tower kill-stacking attack-speed / damage buff) ──
             Bloodlust?.SubscribeToEvents();
 
+            // ── Round178 Direction6 — Pre-fight Buff: subscribe to OnWaveStart /
+            // OnWaveComplete so the system flips its wave-pending latch and
+            // applies / clears the per-tower cache automatically. ──
+            PreFightBuff?.SubscribeToWaveEvents(WaveSpawning);
+
             // ── CorpseEffect subscribes to OnEnemyKilled ──
             CorpseEffect?.SubscribeToOnEnemyKilled();
 
@@ -682,6 +698,11 @@ namespace BattleSystemECS.Core
             scheduler.Build.Mana = Mana;
             // Round 175 Direction 1 — Mana Shield ticks in both Build and Combat phases
             scheduler.Build.ManaShield = ManaShield;
+ // Round178 Direction6 — Pre-fight Buff: BuildPhase tick rolls options at
+ // the WaveRunning→WavePending transition (wave just ended, BuildPhase
+ // just began). O(MAX_PLAYERS) per tick when _wavePending==true,
+ // otherwise sentinel-gated no-op.
+ scheduler.Build.PreFightBuff = PreFightBuff;
             scheduler.Build.Objective = Objective;
             scheduler.Build.ResourceNode = ResourceNode;
             scheduler.Build.GlobalSkill = GlobalSkill;

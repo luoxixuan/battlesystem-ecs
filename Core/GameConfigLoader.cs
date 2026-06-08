@@ -95,13 +95,19 @@ namespace BattleSystemECS.Config
                 LoadDailyModifierPool(gameConfig, renderer);
                 ResolveDailyChallenge(gameConfig, renderer);
 
-                // Round 175 Direction 1 — Mana Shield config (mana → damage shield)
-                LoadManaShieldConfig(gameConfig, renderer);
+                // Round175 Direction1 — Mana Shield config (mana → damage shield)
+ LoadManaShieldConfig(gameConfig, renderer);
 
-                // Load damage saturation tunables (Round 92 Direction 1: per-enemy diminishing returns
-                // on incoming damage within a short rolling window). All three knobs are optional —
-                // missing fields fall back to the safe defaults in DamageSaturationConfig.
-                LoadDamageSaturationConfig(gameConfig, renderer);
+ // Round178 Direction6 — Pre-fight Buff Selection (BuildPhase末「3选1」出战 buff)
+ // Reads Data/Configs/prefight_buffs.json if present; otherwise the GameConfig
+ // keeps its coded PreFightBuffConfig defaults (Enabled=true, OptionsPerWave=3,
+ // Pool=Array.Empty<PreFightBuffOptionDef>()). All knobs are optional.
+ LoadPreFightBuffConfig(gameConfig, renderer);
+
+ // Load damage saturation tunables (Round92 Direction1: per-enemy diminishing returns
+ // on incoming damage within a short rolling window). All three knobs are optional —
+ // missing fields fall back to the safe defaults in DamageSaturationConfig.
+ LoadDamageSaturationConfig(gameConfig, renderer);
 
                 // Load destructible object definitions (Round 95 Direction 5: tower-attackable objects
                 // with on-destroy effects like gold drop or AoE explosion).
@@ -2545,14 +2551,73 @@ namespace BattleSystemECS.Config
         }
 
         /// <summary>
-        /// Round 175 Direction 1 — Mana Shield config. Reads from
-        ///   Data/Configs/mana_shield.json if present; otherwise the GameConfig
-        ///   keeps its coded ManaShieldConfig defaults (Enabled=true, ratio=1.0,
-        ///   MaxShieldPercent=0.5, Decay=5.0/s, TriggerThreshold=0.7). All five
-        ///   knobs are optional — missing fields fall back to those defaults so
-        ///   the file can be partial without breaking the loader.
-        /// </summary>
-        private static void LoadManaShieldConfig(GameConfig gameConfig, IRenderer renderer)
+ /// Round178 Direction6 — Pre-fight Buff config. Reads from
+ /// Data/Configs/prefight_buffs.json if present; otherwise the GameConfig
+ /// keeps its coded PreFightBuffConfig defaults (Enabled=true,
+ /// OptionsPerWave=3, Pool=Array.Empty). The Pool array is parsed
+ /// into PreFightBuffOptionDef entries; missing fields fall back to
+ /// per-field defaults so the file can be partial without breaking.
+ /// </summary>
+ private static void LoadPreFightBuffConfig(GameConfig gameConfig, IRenderer renderer)
+ {
+     const string file = "Data/Configs/prefight_buffs.json";
+     try
+     {
+         if (!File.Exists(file))
+         {
+             renderer.Log("[PREFIGHT] prefight_buffs.json not found, using coded defaults");
+             return;
+         }
+         string json = File.ReadAllText(file);
+         if (string.IsNullOrWhiteSpace(json)) return;
+         using var doc = System.Text.Json.JsonDocument.Parse(json);
+         var root = doc.RootElement;
+
+         var cfg = gameConfig.PreFight ?? new PreFightBuffConfig();
+         if (root.TryGetProperty("Enabled", out var en)) cfg.Enabled = en.GetBoolean();
+         if (root.TryGetProperty("OptionsPerWave", out var opw)) cfg.OptionsPerWave = opw.GetInt32();
+
+         if (root.TryGetProperty("Pool", out var poolEl) && poolEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+         {
+             var pool = new List<PreFightBuffOptionDef>();
+             foreach (var item in poolEl.EnumerateArray())
+             {
+                 if (item.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                 var def = new PreFightBuffOptionDef();
+                 if (item.TryGetProperty("Id", out var idEl)) def.Id = idEl.GetString() ?? "";
+                 // Round178 bug-scan fix: if "Name" is missing from JSON, fall back to Id (not empty string).
+                 if (item.TryGetProperty("Name", out var nameEl)) def.Name = nameEl.GetString() ?? def.Id;
+                 if (string.IsNullOrEmpty(def.Name)) def.Name = def.Id;
+                 if (item.TryGetProperty("Weight", out var wEl)) def.Weight = (float)wEl.GetDouble();
+                 if (item.TryGetProperty("DamageMult", out var dmEl)) def.DamageMult = (float)dmEl.GetDouble();
+                 if (item.TryGetProperty("SpeedMult", out var smEl)) def.SpeedMult = (float)smEl.GetDouble();
+                 if (item.TryGetProperty("CritChance", out var ccEl)) def.CritChance = (float)ccEl.GetDouble();
+                 if (item.TryGetProperty("MaxHpMult", out var mhEl)) def.MaxHpMult = (float)mhEl.GetDouble();
+                 // Round178 bug-scan fix: skip entries without an Id or with non-positive weight.
+                 if (string.IsNullOrEmpty(def.Id) || def.Weight <= 0f) continue;
+                 pool.Add(def);
+             }
+             cfg.Pool = pool.ToArray();
+         }
+
+         gameConfig.PreFight = cfg;
+         renderer.Log("[PREFIGHT] Loaded prefight_buffs config from " + file + " (pool=" + cfg.Pool.Length + ")");
+     }
+     catch (Exception ex)
+     {
+         renderer.Log("[PREFIGHT] Failed to load prefight_buffs config: " + ex.Message + " — using coded defaults");
+     }
+ }
+
+ /// <summary>
+ /// Round175 Direction1 — Mana Shield config. Reads from
+ /// Data/Configs/mana_shield.json if present; otherwise the GameConfig
+ /// keeps its coded ManaShieldConfig defaults (Enabled=true, ratio=1.0,
+ /// MaxShieldPercent=0.5, Decay=5.0/s, TriggerThreshold=0.7). All five
+ /// knobs are optional — missing fields fall back to those defaults so
+ /// the file can be partial without breaking the loader.
+ /// </summary>
+ private static void LoadManaShieldConfig(GameConfig gameConfig, IRenderer renderer)
         {
             const string file = "Data/Configs/mana_shield.json";
             try
@@ -2564,7 +2629,7 @@ namespace BattleSystemECS.Config
                 }
                 string json = File.ReadAllText(file);
                 if (string.IsNullOrWhiteSpace(json)) return;
-                var doc = System.Text.Json.JsonDocument.Parse(json);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
                 var cfg = gameConfig.ManaShield ?? new ManaShieldConfig();
