@@ -346,6 +346,17 @@ namespace BattleSystemECS.Config
         // saturating the entity pool. 0 = no cooldown (echo on every successful attack that
         // passes the SpawnsEcho roll). Typical: 3-8 seconds.
         public float EchoSpawnCooldown { get; set; } = 5f;
+        // Round 203 Direction 4 — Tower Form / Stance Switch.
+        // A tower may expose 1..8 optional "forms" (e.g. Frost → Frostbite / Blizzard) that the
+        // player can switch between during combat. Each form overrides one or more stats
+        // (damage / range / attackSpeed / multiStrikeCount / bounceCount) and may apply a
+        // unique effect (e.g. slow chance). When Forms is null/empty the tower is single-form
+        // (backward compatible — zero-overhead fast path). When non-empty, the first entry
+        // is the default form and indices 1..N are alternate stances.
+        public List<TowerFormDef> Forms { get; set; } = new List<TowerFormDef>();
+        // FormSwitchCooldown: seconds between consecutive form switches (0 = no cooldown).
+        // Applied per-tower via SetTowerForms when the tower is placed.
+        public float FormSwitchCooldown { get; set; } = 0f;
         // Piercing projectile: number of enemies the projectile can pierce through (0 = no pierce)
         public int PierceCount { get; set; } = 0;
         // PierceDmgFalloff: damage multiplier after each pierce (1.0 = full damage, 0.7 = 70%)
@@ -625,6 +636,36 @@ namespace BattleSystemECS.Config
         public float DemolishDotInterval { get; set; } = 1f;
         /// <summary>Stun duration in turns for ice/lightning demolish effects (0 = no stun).</summary>
         public int DemolishStunDuration { get; set; } = 0;
+    }
+
+    /// <summary>
+    /// Round 203 Direction 4 — Tower Form / Stance configuration.
+    /// Each entry represents one stance the tower can switch into. When the player
+    /// switches forms, the indexed fields below override the base TowerConfig values.
+    /// Leave fields at default (0) to use the base tower value for that stat.
+    /// </summary>
+    public class TowerFormDef
+    {
+        /// <summary>Display name shown in UI when the player selects this form (e.g. "Frostbite", "Blizzard").</summary>
+        public string Name { get; set; }
+        /// <summary>Damage override for this form. 0 = use TowerConfig.Damage (no override).</summary>
+        public float Damage { get; set; } = 0f;
+        /// <summary>Range override in tiles. 0 = use TowerConfig.Range.</summary>
+        public int Range { get; set; } = 0;
+        /// <summary>Attack-speed override (shots/sec). 0 = use TowerConfig.AttackSpeed.</summary>
+        public float AttackSpeed { get; set; } = 0f;
+        /// <summary>Multi-strike count override. -1 = use TowerConfig.MultiStrikeCount (no override).</summary>
+        public int MultiStrikeCount { get; set; } = -1;
+        /// <summary>Bounce count override. -1 = use TowerConfig.Bounces.</summary>
+        public int BounceCount { get; set; } = -1;
+        /// <summary>Slow chance override per hit. -1 = use TowerConfig.SlowChance.</summary>
+        public float SlowChance { get; set; } = -1f;
+        /// <summary>Slow amount override. -1 = use TowerConfig.SlowAmount.</summary>
+        public float SlowAmount { get; set; } = -1f;
+        /// <summary>Stun chance override. -1 = use TowerConfig.StunChance.</summary>
+        public float StunChance { get; set; } = -1f;
+        /// <summary>Optional flavor tag for analytics (e.g. "frost", "fire"). Empty = none.</summary>
+        public string ElementTag { get; set; } = "";
     }
 
     public class EnemyTypeEntry

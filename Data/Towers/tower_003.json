@@ -5,5 +5,11 @@
   "Range": 3,
   "AttackSpeed": 1.2,
   "Cost": 220,
-  "UpgradeCost": 132
+  "UpgradeCost": 132,
+  "FormSwitchCooldown": 4.0,
+  "Forms": [
+    { "Name": "Burst", "Damage": 55, "Range": 3, "AttackSpeed": 1.2, "MultiStrikeCount": 0, "BounceCount": -1, "SlowChance": -1, "SlowAmount": -1, "StunChance": -1, "ElementTag": "plasma" },
+    { "Name": "Lance", "Damage": 95, "Range": 6, "AttackSpeed": 0.6, "MultiStrikeCount": -1, "BounceCount": -1, "SlowChance": -1, "SlowAmount": -1, "StunChance": -1, "ElementTag": "plasma" },
+    { "Name": "Storm", "Damage": 35, "Range": 4, "AttackSpeed": 1.6, "MultiStrikeCount": 3, "BounceCount": -1, "SlowChance": -1, "SlowAmount": -1, "StunChance": -1, "ElementTag": "plasma" }
+  ]
 }

@@ -8,5 +8,11 @@
   "UpgradeCost": 70,
   "MultiStrikeCount": 2,
   "MultiStrikeRange": 3.0,
-  "MultiStrikeDamageMult": 0.7
+  "MultiStrikeDamageMult": 0.7,
+  "FormSwitchCooldown": 3.0,
+  "Forms": [
+    { "Name": "Spray", "Damage": 30, "Range": 4, "AttackSpeed": 1.0, "MultiStrikeCount": 2, "BounceCount": -1, "SlowChance": 0.25, "SlowAmount": 0.3, "StunChance": -1, "ElementTag": "acid" },
+    { "Name": "Jet", "Damage": 65, "Range": 5, "AttackSpeed": 0.7, "MultiStrikeCount": 4, "BounceCount": -1, "SlowChance": 0.4, "SlowAmount": 0.4, "StunChance": -1, "ElementTag": "acid" },
+    { "Name": "Mist", "Damage": 18, "Range": 3, "AttackSpeed": 1.4, "MultiStrikeCount": 6, "BounceCount": -1, "SlowChance": 0.6, "SlowAmount": 0.5, "StunChance": -1, "ElementTag": "acid" }
+  ]
 }

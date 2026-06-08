@@ -214,6 +214,23 @@ namespace BattleSystemECS.Core
         public string[] TowerUpgradePathId = new string[MAX_ENTITIES];
         // Tower fusion tier: incremented each time this tower is merged (0 = never merged)
         public int[] TowerFusionTier = new int[MAX_ENTITIES];
+        // ── Tower Form / Stance Switch (Round 203 Direction 4) ──────────────
+        // TowerActiveForm: 0-based index into the configured forms[] array on TowerConfig.
+        // Default 0 = first form (always valid). -1 sentinel = "no forms configured" (use base config).
+        // Sentinel-gated: if FormCount == 0, the form switch path is zero-overhead.
+        public int[] TowerActiveForm = new int[MAX_ENTITIES];
+        // TowerFormSwitchCooldown: configured cooldown in seconds between consecutive
+        // form switches. 0 = no cooldown (instant switch). Default 0 = backward compatible.
+        public float[] TowerFormSwitchCooldown = new float[MAX_ENTITIES];
+        // TowerFormLastSwitchTurn: turn count when the tower last switched forms. -1 = never.
+        // Used together with TowerFormSwitchCooldown + a turn source to gate rapid switching.
+        public int[] TowerFormLastSwitchTurn = new int[MAX_ENTITIES];
+        // TowerFormCount: number of forms configured for this tower (snapshot from config).
+        // 0 = no forms configured, the form switch path is zero-overhead fast path.
+        public int[] TowerFormCount = new int[MAX_ENTITIES];
+        // TowerFormSwitchCooldownRemaining: remaining cooldown in seconds until the tower
+        // may switch forms again. Decremented each tick; floors at 0 (no drift negative).
+        public float[] TowerFormSwitchCooldownRemaining = new float[MAX_ENTITIES];
         // ── Tower Morph / Mode Switch ──────────────────────────────────────
         // TowerCurrentMorph: index of the currently active morph (0 = first form, 1 = second form, ...)
         public int[] TowerCurrentMorph = new int[MAX_ENTITIES];
@@ -1310,6 +1327,13 @@ namespace BattleSystemECS.Core
             TowerLuck[entityId] = 0f;
             // Path-Hug filter: default to false (no path restriction, backward compatible)
             TowerPathHugOnly[entityId] = false;
+            // Round 203 Direction 4 — Form Switch: defaults to no forms configured.
+            // FormCount=0 is the opt-out sentinel: the form switch fast path stays zero-overhead.
+            TowerActiveForm[entityId] = 0;
+            TowerFormSwitchCooldown[entityId] = 0f;
+            TowerFormLastSwitchTurn[entityId] = -1;
+            TowerFormCount[entityId] = 0;
+            TowerFormSwitchCooldownRemaining[entityId] = 0f;
             // Lock-On filter: default to false (no lock-on, backward compatible) + -1 = no cached target
             TowerIsLockOn[entityId] = false;
             TowerLockedTargetId[entityId] = -1;
@@ -1640,6 +1664,13 @@ namespace BattleSystemECS.Core
             TowerEnchantExpiresAtTurn[entityId] = -1;
             // Path-Hug filter reset
             TowerPathHugOnly[entityId] = false;
+            // Round 203 Direction 4 — Form Switch: recycled slot must not leak form state.
+            // FormCount=0 → opt-out sentinel (zero-overhead fast path).
+            TowerActiveForm[entityId] = 0;
+            TowerFormSwitchCooldown[entityId] = 0f;
+            TowerFormLastSwitchTurn[entityId] = -1;
+            TowerFormCount[entityId] = 0;
+            TowerFormSwitchCooldownRemaining[entityId] = 0f;
             // Tower energy fields reset
             TowerEnergy[entityId] = 0f;
             TowerMaxEnergy[entityId] = 0f;
@@ -2321,6 +2352,104 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(towerId)) return;
             TowerFortressCachedAtkSpdBonus[towerId] = bonus < 0f ? 0f : (bonus > 1f ? 1f : bonus);
+        }
+
+        // ════════════════════════════════════════════════════════════════════════
+        // Round 203 Direction 4 — Tower Form / Stance Switch accessors.
+        // Sentinel-gated: if TowerFormCount[towerId] == 0, no forms are configured
+        // (zero-overhead fast path). Switching returns false on cooldown or out-of-range.
+        // ════════════════════════════════════════════════════════════════════════
+
+        /// <summary>Returns the currently active form index (0..FormCount-1). Returns 0 if no forms are configured.</summary>
+        public int GetTowerActiveForm(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0;
+            int active = TowerActiveForm[towerId];
+            int count = TowerFormCount[towerId];
+            if (count <= 0) return 0;
+            // Clamp to valid range in case the active index was left out-of-range by config drift
+            return active < 0 ? 0 : (active >= count ? count - 1 : active);
+        }
+
+        /// <summary>Returns the configured form count (0 = no forms, fast path).</summary>
+        public int GetTowerFormCount(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0;
+            return TowerFormCount[towerId];
+        }
+
+        /// <summary>Returns true if the tower has any forms configured (i.e. opt-in path is live).</summary>
+        public bool HasTowerForms(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return false;
+            return TowerFormCount[towerId] > 0;
+        }
+
+        /// <summary>Returns the remaining cooldown in seconds before the tower may switch forms again (0 = ready).</summary>
+        public float GetTowerFormSwitchCooldownRemaining(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return 0f;
+            float cd = TowerFormSwitchCooldownRemaining[towerId];
+            return cd < 0f ? 0f : cd;
+        }
+
+        /// <summary>Returns true when the tower is currently allowed to switch forms (count > 0 and cooldown == 0).</summary>
+        public bool CanTowerSwitchForm(int towerId)
+        {
+            if (!IsValidEntity(towerId)) return false;
+            if (TowerFormCount[towerId] <= 0) return false;
+            return TowerFormSwitchCooldownRemaining[towerId] <= 0f;
+        }
+
+        /// <summary>
+        /// Try to switch the tower to the requested form index. Returns true on success.
+        /// Failure modes: towerId invalid, tower inactive, no forms configured, target index out of range,
+        /// cooldown not yet expired.
+        /// </summary>
+        public bool TrySwitchTowerForm(int towerId, int targetForm)
+        {
+            if (!IsValidEntity(towerId)) return false;
+            if (!TowerActive[towerId]) return false;
+            int count = TowerFormCount[towerId];
+            if (count <= 0) return false;
+            if (targetForm < 0 || targetForm >= count) return false;
+            // Same-form is a no-op: succeeds without cooldown tick.
+            // Same-form is checked BEFORE cooldown so it stays available even mid-cooldown.
+            if (TowerActiveForm[towerId] == targetForm) return true;
+            // Cross-form switch: gated by cooldown
+            if (TowerFormSwitchCooldownRemaining[towerId] > 0f) return false;
+            TowerActiveForm[towerId] = targetForm;
+            // Reset cooldown to configured value (0 = no cooldown, so no-op)
+            float cd = TowerFormSwitchCooldown[towerId];
+            if (cd > 0f) TowerFormSwitchCooldownRemaining[towerId] = cd;
+            // Track turn of switch (-1 sentinel for "never switched before")
+            if (TowerFormLastSwitchTurn[towerId] < 0)
+                TowerFormLastSwitchTurn[towerId] = 0;
+            return true;
+        }
+
+        /// <summary>Tick the cooldown remaining toward 0 (called by TowerFormSwitchSystem each frame).</summary>
+        public void TickTowerFormSwitchCooldown(int towerId, float dt)
+        {
+            if (!IsValidEntity(towerId)) return;
+            if (TowerFormSwitchCooldownRemaining[towerId] <= 0f) return;
+            TowerFormSwitchCooldownRemaining[towerId] -= dt;
+            if (TowerFormSwitchCooldownRemaining[towerId] < 0f) TowerFormSwitchCooldownRemaining[towerId] = 0f;
+        }
+
+        /// <summary>Configure the form array for a tower (PlaceTower helper). count must be in [0, 8].
+        /// If count == 0, the form switch path is opt-out (zero-overhead fast path).
+        /// cooldown: seconds between switches (0 = no cooldown).</summary>
+        public void SetTowerForms(int towerId, int count, float cooldown, int currentTurn)
+        {
+            if (!IsValidEntity(towerId)) return;
+            int clamped = count < 0 ? 0 : (count > 8 ? 8 : count);
+            TowerFormCount[towerId] = clamped;
+            TowerFormSwitchCooldown[towerId] = cooldown < 0f ? 0f : cooldown;
+            TowerFormSwitchCooldownRemaining[towerId] = 0f;
+            // Default active form is 0 (first form) when at least one form is configured
+            TowerActiveForm[towerId] = clamped > 0 ? 0 : 0;
+            TowerFormLastSwitchTurn[towerId] = currentTurn;
         }
     }
 }
