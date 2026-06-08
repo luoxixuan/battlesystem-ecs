@@ -2205,6 +2205,8 @@ namespace BattleSystemECS.Config
         public ManaConfig Mana { get; set; } = new ManaConfig();
         // Round 174 Direction 4 — Backstab positional damage bonus (rear-cone multiplier)
         public BackstabConfig Backstab { get; set; } = new BackstabConfig();
+        // Round 175 Direction 1 — Mana Shield: mana → shield conversion + decay
+        public ManaShieldConfig ManaShield { get; set; } = new ManaShieldConfig();
         // Player global skills / ultimates (direction 5)
         public List<GlobalSkillDef> GlobalSkills { get; set; } = new List<GlobalSkillDef>();
 
@@ -2772,6 +2774,47 @@ namespace BattleSystemECS.Config
         // Smaller angle = stricter (only direct rear hits count). Larger = wider
         // side-flank attacks. Must be in (0, 180].
         public float DefaultAngleDeg { get; set; } = 90f;
+    }
+
+    /// <summary>
+    /// Mana Shield (Round 175 Direction 1) — mana-fueled damage absorption shield.
+    ///
+    /// Design: while the player's mana pool is above TriggerThresholdPercent of
+    /// PlayerMaxMana, excess mana continuously flows into PlayerManaShield up to
+    /// MaxShieldPercent of PlayerMaxMana. The shield decays at DecayPerSecond
+    /// when below the trigger threshold, so it acts as a "bursty" defensive layer
+    /// during high-mana moments (e.g. between wave transitions) and goes dormant
+    /// during mana droughts. Damage always applies to the mana shield first (before
+    /// PlayerShield and PlayerCurrentHealth), making mana-rich builds dramatically
+    /// tankier.
+    /// </summary>
+    public class ManaShieldConfig
+    {
+        // Master switch. When false, ManaShieldSystem.Update is a no-op and the
+        // per-player absorb ratio is forced to 0 (so the damage hot-path stays
+        // branch-cheap on the default 0 path).
+        public bool Enabled { get; set; } = true;
+        // ConversionRatio: mana points consumed per 1 shield point generated. 1.0
+        // = 1 mana → 1 shield (default). Higher = more mana-expensive (slower
+        // fill). Lower = mana-rich builds fill shield faster. Must be > 0 when
+        // Enabled = true; <= 0 disables the system silently.
+        public float ConversionRatio { get; set; } = 1.0f;
+        // MaxShieldPercent: cap on PlayerManaShield as a fraction of PlayerMaxMana.
+        // 0.5 = shield can grow up to half of the player's max mana. Default 0.5
+        // (defensive) — values > 1.0 let shield outgrow max mana, which is
+        // mathematically valid but produces a "super-shield" feel.
+        public float MaxShieldPercent { get; set; } = 0.5f;
+        // DecayPerSecond: shield point loss per second when mana is below the
+        // trigger threshold. 0 = no decay (shield persists indefinitely once
+        // filled). Default 5.0 (matches the default mana regen rate, so filling
+        // and leaking balance out near equilibrium when mana hovers around the
+        // trigger threshold).
+        public float DecayPerSecond { get; set; } = 5.0f;
+        // TriggerThresholdPercent: only when current mana is above this fraction
+        // of PlayerMaxMana does excess mana convert into shield. 0.7 = shield
+        // only fills when player is at 70%+ mana (encourages saving mana for
+        // emergencies). 0 = always-converting (no threshold, no decay gating).
+        public float TriggerThresholdPercent { get; set; } = 0.7f;
     }
 
     /// <summary>

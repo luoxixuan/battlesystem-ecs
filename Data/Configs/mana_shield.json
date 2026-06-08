@@ -1,0 +1,7 @@
+{
+  "Enabled": true,
+  "ConversionRatio": 1.0,
+  "MaxShieldPercent": 0.5,
+  "DecayPerSecond": 5.0,
+  "TriggerThresholdPercent": 0.7
+}

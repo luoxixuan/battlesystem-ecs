@@ -38,6 +38,8 @@ namespace BattleSystemECS.Core
         public ComboSystem? Combo { get; private set; }
         public AutoSkillSystem? AutoSkill { get; private set; }
         public ManaSystem? Mana { get; private set; }
+        // Round 175 Direction 1 — Mana Shield: mana → damage-absorption shield
+        public ManaShieldSystem? ManaShield { get; private set; }
         public GlobalSkillSystem? GlobalSkill { get; private set; }
         // Round 107 Direction 6 — Target Mark subsystem (stack-based debuff counter)
         public MarkSystem? Mark { get; private set; }
@@ -290,6 +292,11 @@ namespace BattleSystemECS.Core
             Combo = new ComboSystem(store, config.Combo);
             Mana = new ManaSystem(store, logger, config, playerId, TechTree);
             Mana.Initialize();
+            // Round 175 Direction 1 — Mana Shield (mana → damage-absorption shield).
+            //   One per player slot; reads PlayerManaShieldCap / AbsorbRatio from
+            //   the store so the damage hot-path stays branch-cheap.
+            ManaShield = new ManaShieldSystem(store, config, playerId);
+            ManaShield.Initialize();
             AutoSkill = new AutoSkillSystem(store, logger, playerId, Skill, config.AutoSkill);
             GlobalSkill = new GlobalSkillSystem(store, config, logger, playerId, TechTree);
 
@@ -664,6 +671,8 @@ namespace BattleSystemECS.Core
             scheduler.Build.TowerRelocate = null;
             scheduler.Build.Interest = Interest;
             scheduler.Build.Mana = Mana;
+            // Round 175 Direction 1 — Mana Shield ticks in both Build and Combat phases
+            scheduler.Build.ManaShield = ManaShield;
             scheduler.Build.Objective = Objective;
             scheduler.Build.ResourceNode = ResourceNode;
             scheduler.Build.GlobalSkill = GlobalSkill;
@@ -772,6 +781,9 @@ namespace BattleSystemECS.Core
             scheduler.Combat.EnemyProjectile = null;
             scheduler.Combat.Pickup = Pickup;
             scheduler.Combat.Mana = Mana;
+            // Round 175 Direction 1 — Mana Shield runs in the combat phase right
+            //   after Mana so it sees the freshly-regenerated mana pool.
+            scheduler.Combat.ManaShield = ManaShield;
             scheduler.Combat.GlobalSkill = GlobalSkill;
             scheduler.Combat.Taunt = Taunt;
             // Round 138 — Per-tower active skill (cooldown tick).

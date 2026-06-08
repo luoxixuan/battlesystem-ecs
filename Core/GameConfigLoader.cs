@@ -95,6 +95,9 @@ namespace BattleSystemECS.Config
                 LoadDailyModifierPool(gameConfig, renderer);
                 ResolveDailyChallenge(gameConfig, renderer);
 
+                // Round 175 Direction 1 — Mana Shield config (mana → damage shield)
+                LoadManaShieldConfig(gameConfig, renderer);
+
                 // Load damage saturation tunables (Round 92 Direction 1: per-enemy diminishing returns
                 // on incoming damage within a short rolling window). All three knobs are optional —
                 // missing fields fall back to the safe defaults in DamageSaturationConfig.
@@ -2538,6 +2541,44 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[MARK] Failed to load mark config: " + ex.Message + " — using MarkSubsystemConfig defaults");
+            }
+        }
+
+        /// <summary>
+        /// Round 175 Direction 1 — Mana Shield config. Reads from
+        ///   Data/Configs/mana_shield.json if present; otherwise the GameConfig
+        ///   keeps its coded ManaShieldConfig defaults (Enabled=true, ratio=1.0,
+        ///   MaxShieldPercent=0.5, Decay=5.0/s, TriggerThreshold=0.7). All five
+        ///   knobs are optional — missing fields fall back to those defaults so
+        ///   the file can be partial without breaking the loader.
+        /// </summary>
+        private static void LoadManaShieldConfig(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string file = "Data/Configs/mana_shield.json";
+            try
+            {
+                if (!File.Exists(file))
+                {
+                    renderer.Log("[MANASHIELD] mana_shield.json not found, using coded defaults");
+                    return;
+                }
+                string json = File.ReadAllText(file);
+                if (string.IsNullOrWhiteSpace(json)) return;
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var cfg = gameConfig.ManaShield ?? new ManaShieldConfig();
+                if (root.TryGetProperty("Enabled", out var en)) cfg.Enabled = en.GetBoolean();
+                if (root.TryGetProperty("ConversionRatio", out var cr)) cfg.ConversionRatio = (float)cr.GetDouble();
+                if (root.TryGetProperty("MaxShieldPercent", out var ms)) cfg.MaxShieldPercent = (float)ms.GetDouble();
+                if (root.TryGetProperty("DecayPerSecond", out var dp)) cfg.DecayPerSecond = (float)dp.GetDouble();
+                if (root.TryGetProperty("TriggerThresholdPercent", out var tp)) cfg.TriggerThresholdPercent = (float)tp.GetDouble();
+                gameConfig.ManaShield = cfg;
+                renderer.Log("[MANASHIELD] Loaded mana_shield config from " + file);
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[MANASHIELD] Failed to load mana_shield config: " + ex.Message + " — using coded defaults");
             }
         }
     }

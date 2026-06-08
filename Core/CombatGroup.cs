@@ -38,6 +38,12 @@ namespace BattleSystemECS.Core
         public Systems.EnemyProjectileSystem? EnemyProjectile { get; set; }
         public Systems.PickupSystem? Pickup { get; set; }
         public Systems.ManaSystem? Mana { get; set; }
+        // Round 175 Direction 1 — Mana Shield System. Runs immediately after Mana
+        //   so it can read the freshly-regenerated PlayerMana and decide whether
+        //   to convert excess into PlayerManaShield. Sentinel-gated: when
+        //   ManaShieldConfig.Enabled = false the system only forces the per-player
+        //   absorb ratio to 0 (so the damage hot-path stays cheap).
+        public Systems.ManaShieldSystem? ManaShield { get; set; }
         public Systems.GlobalSkillSystem? GlobalSkill { get; set; }
         public Systems.BeamTowerSystem? BeamTower { get; set; }
         public Systems.HitShieldSystem? HitShield { get; set; }
@@ -107,6 +113,11 @@ namespace BattleSystemECS.Core
             EnemyProjectile?.Update(deltaTime);
             Pickup?.Update(deltaTime);
             Mana?.Update(deltaTime, isBuildPhase: false);
+            // Round 175 Direction 1 — Mana Shield per-frame tick. Runs after Mana
+            //   regen so it can read the just-clamped PlayerMana. Per-player system,
+            //   one instance per player slot, so each frame the Combat scheduler
+            //   drives at most 4 Update() calls (MAX_PLAYERS).
+            ManaShield?.Update(deltaTime);
             GlobalSkill?.Update(deltaTime, isBuildPhase: false);
             BeamTower?.Update(deltaTime);
             Hero?.Update(deltaTime);

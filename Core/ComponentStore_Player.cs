@@ -56,6 +56,26 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // PlayerMaxMana initialized to default value (can be configured via GameConfig)
         private float _playerMaxManaDefault = 100f;
         public float PlayerMaxManaDefault { get => _playerMaxManaDefault; set => _playerMaxManaDefault = value; }
+        // ==================== 法力护盾 (Mana Shield) ====================
+        // PlayerManaShield: current mana-shield points. Absorbs damage BEFORE PlayerShield
+        //   and PlayerCurrentHealth. Replenished continuously from excess mana when the
+        //   player mana pool is above PlayerManaShield[playerId]'s `triggerThresholdPercent`
+        //   of PlayerMaxMana (Round 175 Direction 1: Mana Shield — see ManaShieldSystem).
+        //   Defaults to 0 (no shield) and only fills when ManaShieldConfig.Enabled = true.
+        public float[] PlayerManaShield = new float[MAX_PLAYERS];
+        // PlayerManaShieldCap: maximum mana-shield cap, recomputed each frame as
+        //   PlayerMaxMana * ManaShieldConfig.MaxShieldPercent. Stored per-player so
+        //   the cap is cheap to read in the damage hot-path.
+        public float[] PlayerManaShieldCap = new float[MAX_PLAYERS];
+        // PlayerManaShieldAbsorbRatio: how much of the current mana-shield is consumed
+        //   per 1 point of damage absorbed. 1.0 = full damage converted to shield-pool
+        //   loss; 2.0 = shield is twice as efficient (1 shield = 2 HP absorbed).
+        //   Default 1.0. 0 / negative = mana shield inert (backward compatible).
+        public float[] PlayerManaShieldAbsorbRatio = new float[MAX_PLAYERS];
+        // PlayerManaShieldTriggered: latches true once mana shield has ever absorbed
+        //   damage this game. Used by tests to verify the path was hit. Stays true
+        //   until AddPlayer resets it. Default false.
+        public bool[] PlayerManaShieldTriggered = new bool[MAX_PLAYERS];
         // ==================== 玩家全局技能/终极技能 (Global Skills / Ultimates) ====================
         // PlayerGlobalSkillUnlocked: bit-flag of which global skills are unlocked per player (indexed by playerId * MAX_GLOBAL_SKILLS + skillIdx)
         public bool[] PlayerGlobalSkillUnlocked = new bool[MAX_PLAYERS * 8];
@@ -425,6 +445,14 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             PlayerDamageBoostMultiplier[entityId] = 0f;
 
             PlayerEntityId = entityId;
+            // Round 175 Direction 1 — Mana Shield: zero out the mana-shield pool,
+            //   cap and absorb ratio on game start. The ManaShieldSystem.Update()
+            //   will populate the cap from PlayerMaxMana on the first frame; the
+            //   pool and trigger latch stay at 0 / false until mana flows in.
+            PlayerManaShield[entityId] = 0f;
+            PlayerManaShieldCap[entityId] = 0f;
+            PlayerManaShieldAbsorbRatio[entityId] = 1f; // 1.0 = full-conversion baseline
+            PlayerManaShieldTriggered[entityId] = false;
         }
 
         public float GetPlayerAttackRange(int playerId)
@@ -774,6 +802,22 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public void DecreasePlayerHealth(int playerId, float damage)
         {
             if (!IsValidPlayer(playerId)) return;
+            // Mana Shield (Round 175 Direction 1) absorbs damage BEFORE PlayerShield
+            //   and PlayerCurrentHealth. Sentinel-gated: ratio ≤ 0 / shield ≤ 0 → inert
+            //   (zero-cost path for the default 0 state, full backward compatibility).
+            //   Effective damage taken from the pool is damage / ratio (so ratio = 2.0
+            //   means 1 shield point absorbs 2 HP of damage).
+            float manaShield = PlayerManaShield[playerId];
+            float ratio = PlayerManaShieldAbsorbRatio[playerId];
+            if (manaShield > 0f && ratio > 0f)
+            {
+                float poolDrain = damage / ratio;
+                float absorbed = System.Math.Min(manaShield, poolDrain);
+                PlayerManaShield[playerId] = manaShield - absorbed;
+                damage -= absorbed * ratio;
+                PlayerManaShieldTriggered[playerId] = true;
+                if (damage <= 0f) return;
+            }
             // Shield absorbs damage before health (independent of armor)
             float shield = PlayerShield[playerId];
             if (shield > 0f)
