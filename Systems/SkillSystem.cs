@@ -252,7 +252,22 @@ namespace BattleSystemECS.Systems
                     // effectiveRate = 1 + cdr, so deltaTime is scaled up by (1 + cdr)
                     float cdr = store.PlayerCooldownReduction[playerId];
                     float cdrClamped = Math.Min(cdr, 0.6f); // cap at 60% to avoid near-zero cooldowns
-                    inst.CurrentCooldown = Math.Max(0f, inst.CurrentCooldown - deltaTime * (1f + cdrClamped));
+                    // Round 207 Direction 2 — Adrenaline cooldown multiplier layered on top
+                    // of the existing CDR. When the player is in tier 1 (low HP) the mult
+                    // drops to LowTierCooldownMult (default 0.80 = -20% cooldown) and in
+                    // tier 2 to CriticalTierCooldownMult (default 0.50 = -50% cooldown).
+                    // A mult < 1 reduces deltaTime (slower cooldown decay), which is the
+                    // opposite of what we want — so we INVERT here: 1/mult. Sentinel: when
+                    // AdrenalineConfig is disabled the mult stays at 1f, and a degenerate
+                    // mult (<= 0) falls back to 1f so we never get a divide-by-zero or
+                    // negative cooldown decay.
+                    float adrMult = store.PlayerAdrenalineCooldownMult[playerId];
+                    if (adrMult <= 0f) adrMult = 1f;
+                    float adrEffectiveRate = (1f / adrMult) - 1f;
+                    // Clamp to avoid a degenerate config making cooldowns go negative
+                    // (e.g. CriticalTierCooldownMult=0.0 would give 1/0 = Infinity).
+                    adrEffectiveRate = Math.Min(adrEffectiveRate, 4f);
+                    inst.CurrentCooldown = Math.Max(0f, inst.CurrentCooldown - deltaTime * (1f + cdrClamped) * (1f + adrEffectiveRate));
                     store.SetAbility(playerId, slot, inst);
                 }
 

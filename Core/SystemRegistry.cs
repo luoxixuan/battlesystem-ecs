@@ -85,6 +85,15 @@ namespace BattleSystemECS.Core
         // cached damage / speed bonuses are stamped onto every active tower.
         // Sentinel-gated: Enabled=false / degenerate config → force-clear cache.
         public MomentumSystem? Momentum { get; private set; }
+        // Round 207 Direction 2 — Adrenaline: low-HP / critical-HP player-side buff plus
+        // one-shot Rush state on tier 1 → 2 entry. Per-frame Update() walks the
+        // MAX_PLAYERS slots, derives the tier from the live HP ratio, and stamps the
+        // cached attack-speed bonus (additive) + cooldown mult (multiplicative) into
+        // the per-player cache arrays. The rush window is detected on tier change and
+        // force-fires player towers for RushDurationFrames (read by
+        // PlayerTowerAttackSystem). Sentinel-gated: Enabled=false / degenerate
+        // thresholds → single O(MAX_PLAYERS) clear-pass.
+        public AdrenalineSystem? Adrenaline { get; private set; }
         // Round 178+ Direction 5 — Crest / Tide System. Wave-indexed periodic
         // enemy / player buffs. Reads GameConfig.Crest + ComponentStore and
         // stamps the per-enemy / per-player cache fields on OnWaveStart /
@@ -303,6 +312,12 @@ namespace BattleSystemECS.Core
             // + ComponentStore). WaveSpawningSystem is passed in via
             // SubscribeToWaveEvents below in WireDependencies.
             Momentum = new MomentumSystem(store, config);
+            // Round 207 Direction 2 — Adrenaline: low-HP / critical-HP player-side
+            // buff + one-shot Rush. No construction-time external dependencies
+            // (reads GameConfig.Adrenaline + ComponentStore). WaveSpawningSystem
+            // is NOT required (Adrenaline is purely per-frame; no wave-event
+            // hooks). Per-frame tick walks MAX_PLAYERS slots in O(MAX_PLAYERS).
+            Adrenaline = new AdrenalineSystem(store, config);
             // Round 178+ Direction 5 — Crest / Tide System. No
             // construction-time external dependencies (reads GameConfig.Crest
             // + ComponentStore). WaveSpawningSystem is passed in via
@@ -896,6 +911,13 @@ namespace BattleSystemECS.Core
             // per frame so cost is bounded by the deployed tower count and
             // the player count (typically 1, capped at MAX_PLAYERS).
             scheduler.Combat.Momentum = Momentum;
+            // Round 207 Direction 2 — Adrenaline per-frame tick. Wired last in
+            // the combat phase (after Momentum, before Culling) so the freshly-
+            // computed tier-derived attack-speed bonus and rush-frame count are
+            // visible to PlayerTowerAttackSystem on the *next* frame. O(MAX_PLAYERS)
+            // per tick. Sentinel fast path: disabled or degenerate thresholds →
+            // single O(MAX_PLAYERS) clear-pass.
+            scheduler.Combat.Adrenaline = Adrenaline;
             // Round 178+ Direction 5 — Crest System. Wired last in the
             // combat phase, after Momentum. Per-frame Update() is a no-op
             // (event-driven system); the work happens in

@@ -1,0 +1,31 @@
+{
+  "adrenaline": {
+    "enabled": true,
+    "lowHpThreshold": 0.30,
+    "criticalHpThreshold": 0.10,
+    "lowTierAttackSpeedBonus": 0.25,
+    "criticalTierAttackSpeedBonus": 0.50,
+    "lowTierCooldownMult": 0.80,
+    "criticalTierCooldownMult": 0.50,
+    "rushDurationFrames": 60,
+    "tiers": {
+      "tier0_normal": {
+        "tier": 0,
+        "description": "HP > 30% — no Adrenaline buff active."
+      },
+      "tier1_low": {
+        "tier": 1,
+        "description": "HP in [10%, 30%] — +25% attack speed, -20% skill cooldowns."
+      },
+      "tier2_critical": {
+        "tier": 2,
+        "description": "HP <= 10% — +50% attack speed, -50% skill cooldowns, one-shot Rush (1s of free tower shots)."
+      }
+    },
+    "rush": {
+      "id": "adrenaline_rush",
+      "name": "Adrenaline Rush",
+      "description": "One-shot burst window: all active player towers fire once per frame for RushDurationFrames. Triggered on tier 1 -> 2 entry, NOT refreshable on every critical frame."
+    }
+  }
+}

@@ -90,6 +90,16 @@ namespace BattleSystemECS.Core
         //   Combat (after Bloodlust) so the next frame's hot path sees the
         //   freshly-computed values.
         public Systems.MomentumSystem? Momentum { get; set; }
+        // Round 207 Direction 2 — Adrenaline System. Per-frame tick that walks
+        // the MAX_PLAYERS slots, derives the tier from the live HP ratio, and
+        // stamps the cached attack-speed bonus (additive) + cooldown mult
+        // (multiplicative) into the per-player cache arrays. The rush window is
+        // detected on tier change (1 → 2 entry) and force-fires player towers
+        // for RushDurationFrames (read by PlayerTowerAttackSystem). Wired after
+        // Momentum so the cache fields it writes are visible on the *next*
+        // frame's PlayerTowerAttackSystem call. Sentinel-gated: Enabled=false /
+        // degenerate thresholds → single O(MAX_PLAYERS) clear-pass.
+        public Systems.AdrenalineSystem? Adrenaline { get; set; }
         // Round 178+ Direction 5 — Crest / Tide System. Event-driven (no
         // per-frame Update needed), but exposed in CombatGroup so the
         // scheduler tick-list can include it uniformly. The per-frame
@@ -188,6 +198,13 @@ namespace BattleSystemECS.Core
             // activeTowers) per tick. Sentinel fast path: disabled or
             // degenerate config → single O(activeTowers) clear-pass.
             Momentum?.Update(deltaTime);
+            // Round 207 Direction 2 — Adrenaline per-frame tick. Runs after
+            // Momentum (and before Crest / Culling) so the freshly-computed
+            // tier-derived attack-speed bonus and rush-frame count are visible
+            // to PlayerTowerAttackSystem on the *next* frame. O(MAX_PLAYERS) per
+            // tick. Sentinel fast path: disabled or degenerate thresholds →
+            // single O(MAX_PLAYERS) clear-pass.
+            Adrenaline?.Update(deltaTime);
             // Round 178+ Direction 5 — Crest per-frame tick. Event-driven
             // (no work done here), so Update() is a no-op. Exposed in
             // CombatGroup so the scheduler can call it uniformly. Real

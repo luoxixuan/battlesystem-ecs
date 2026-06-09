@@ -2232,6 +2232,16 @@ namespace BattleSystemECS.Config
         // → CullingSystem.TryCull is a no-op (and the per-tower / per-enemy cache fields stay
         // at default). Per-player stacks cap is enforced by CullingSystem on every increment.
         public CullingConfig Culling { get; set; } = new CullingConfig();
+        // Round 207 Direction 2 — Adrenaline: low-HP / critical-HP player-side attack-speed
+        // and cooldown-reduction buffs plus a one-shot Rush state (free tower shots for
+        // RushDurationFrames) when tier transitions from 1 to 2. The per-player tier is
+        // derived from the live HP ratio every frame by AdrenalineSystem.Update; the
+        // cache fields it writes (PlayerAdrenalineTier / RushActiveFrames / AtkSpdMult /
+        // CooldownMult) are read by PlayerTowerAttackSystem and SkillSystem. Tower-side
+        // multipliers are NOT applied — Adrenaline is a player-side buff, and the Rush
+        // window is the only mechanism that lets low-HP players force-fire their existing
+        // towers without adding per-tower cache fields.
+        public AdrenalineConfig Adrenaline { get; set; } = new AdrenalineConfig();
         // Round 178+ Direction 5 — Tide / Crest System. Wave-indexed periodic
         // buffs (CrestOfFury / TideOfHealing / CrestOfBounty / etc.) that
         // multiply enemy damage / regen or player gold / damage during the
@@ -3047,6 +3057,76 @@ namespace BattleSystemECS.Config
         // MaxPlayerStacks: cap on PlayerCullingStacks. Default 50 (sane upper bound on
         // streak reward). Sentinel: 0 or negative = no cap.
         public int MaxPlayerStacks { get; set; } = 50;
+    }
+
+    /// <summary>
+    /// Adrenaline (Round 207 Direction 2) — low-HP / critical-HP player-side buff plus
+    /// a one-shot Rush state on tier-2 entry.
+    ///
+    /// Design: AdrenalineSystem.Update runs every frame and derives the player's current
+    /// tier from the live HP ratio:
+    ///   tier 0 — HP &gt; LowHpThreshold            (normal, no buff)
+    ///   tier 1 — LowHpThreshold &gt;= HP/MAX &gt; CriticalHpThreshold
+    ///             → PlayerAdrenalineAttackSpeedMult = LowTierAttackSpeedBonus (additive on
+    ///               the existing HotZone / Bloodlust / Momentum chain)
+    ///             → PlayerAdrenalineCooldownMult    = LowTierCooldownMult (multiplicative;
+    ///               0.80 = -20% skill cooldowns)
+    ///   tier 2 — HP/MAX &lt;= CriticalHpThreshold
+    ///             → PlayerAdrenalineAttackSpeedMult = CriticalTierAttackSpeedBonus
+    ///             → PlayerAdrenalineCooldownMult    = CriticalTierCooldownMult
+    ///             → On tier transition 1 → 2: PlayerAdrenalineRushActiveFrames is set to
+    ///               RushDurationFrames (one-shot, NOT refreshable) so the player gets a
+    ///               "Nano Boost"-style burst window where PlayerTowerAttackSystem
+    ///               force-fires every active tower once per frame.
+    ///
+    /// Sentinel-gated: Enabled=false → AdrenalineSystem.Update is a no-op and the cache
+    /// fields stay at default (tier 0, no rush, 0f attack-speed bonus, 1f cooldown mult).
+    /// Rush transition is detected on tier-change (0/1 → 2) so the burst window does NOT
+    /// re-trigger every frame the player stays critical — it fires once on entry and
+    /// decays via frame countdown.
+    /// </summary>
+    public class AdrenalineConfig
+    {
+        // Master switch. When false, AdrenalineSystem.Update is a no-op and all four
+        // per-player cache fields stay at default (tier 0, 0 rush frames, 0f atk-spd
+        // bonus, 1f cooldown mult). Default true (opt-in via global flag rather than
+        // per-player flag — Adrenaline is a system-level design intent, not a per-build
+        // opt-in like Culling).
+        public bool Enabled { get; set; } = true;
+
+        // LowHpThreshold: HP ratio (0-1) at which the player transitions to tier 1
+        // (low-HP buff). Default 0.30 = 30% HP. Sentinel: <= 0 disables tier 1 entirely
+        // (player jumps directly from tier 0 to tier 2 if CriticalHpThreshold is reached).
+        public float LowHpThreshold { get; set; } = 0.30f;
+
+        // CriticalHpThreshold: HP ratio (0-1) at which the player transitions to tier 2
+        // (critical-HP buff + one-shot Rush). Default 0.10 = 10% HP. Sentinel: <= 0
+        // disables tier 2 entirely (no Rush window; tier 1 caps the buff strength).
+        public float CriticalHpThreshold { get; set; } = 0.10f;
+
+        // LowTierAttackSpeedBonus: additive attack-speed bonus applied in tier 1.
+        // Default 0.25 = +25% attack speed (additive on the atk-spd bonus chain).
+        // Sentinel: 0 = no attack-speed buff in tier 1 (cooldown mult still applies).
+        public float LowTierAttackSpeedBonus { get; set; } = 0.25f;
+
+        // CriticalTierAttackSpeedBonus: additive attack-speed bonus applied in tier 2.
+        // Default 0.50 = +50% attack speed. Sentinel: 0 = no attack-speed buff in tier 2.
+        public float CriticalTierAttackSpeedBonus { get; set; } = 0.50f;
+
+        // LowTierCooldownMult: multiplicative skill-cooldown multiplier in tier 1.
+        // Default 0.80 = -20% cooldowns. Sentinel: >= 1 = no cooldown reduction.
+        public float LowTierCooldownMult { get; set; } = 0.80f;
+
+        // CriticalTierCooldownMult: multiplicative skill-cooldown multiplier in tier 2.
+        // Default 0.50 = -50% cooldowns. Sentinel: >= 1 = no cooldown reduction.
+        public float CriticalTierCooldownMult { get; set; } = 0.50f;
+
+        // RushDurationFrames: number of frames the one-shot Adrenaline Rush state stays
+        // active after the tier 1 → 2 transition. While > 0, PlayerTowerAttackSystem
+        // force-fires every active tower once per frame. Default 60 = 1 second at 60fps.
+        // Sentinel: 0 = no Rush window (tier 2 still applies atk-spd + cooldown buffs but
+        // no free tower shots).
+        public int RushDurationFrames { get; set; } = 60;
     }
 
     /// <summary>

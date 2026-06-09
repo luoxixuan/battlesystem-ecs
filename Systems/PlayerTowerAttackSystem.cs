@@ -186,6 +186,22 @@ public void SetWaveNumber(int waveNumber)
             // Apply combo kill damage multiplier (min(1 + ComboCount * bonus, maxMult))
             baseDamage *= store.PlayerComboDamageMult[playerId];
 
+            // Round 207 Direction 2 — Adrenaline Rush window. While the player is in
+            // the one-shot Rush state (PlayerAdrenalineRushActiveFrames > 0), the player's
+            // per-frame damage is doubled (2.0x). This is the primary "adrenaline moment"
+            // payoff: low-HP players get a 1-second burst of double-damage output. The
+            // field is a pure per-frame read — AdrenalineSystem owns the frame-countdown
+            // decrement and the one-shot transition (tier 1 → 2 only). Sentinel: 0 frames
+            // → multiplier stays 1.0 (no bonus) so the hot path takes the no-bonus branch.
+            // The 2.0x constant is intentionally hard-coded (not a config knob) — the
+            // "double damage" framing is part of the buff's visual / readability contract
+            // and shouldn't be a designer-tweakable scalar that quietly erodes the buff's
+            // identity.
+            if (store.PlayerAdrenalineRushActiveFrames[playerId] > 0)
+            {
+                baseDamage *= 2.0f;
+            }
+
             var activeEnemyIds = _activeEnemyList;
 
             // Phase 1 (parallel): collect damage events only — no structural mutations

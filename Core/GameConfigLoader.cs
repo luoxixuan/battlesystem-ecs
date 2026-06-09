@@ -111,6 +111,11 @@ namespace BattleSystemECS.Config
  // =0.01, ResetOnWave=true). All knobs are optional.
  LoadMomentumConfig(gameConfig, renderer);
 
+// Round 207 Direction 2 — Adrenaline (low-HP / critical-HP player-side buff +
+// one-shot Rush). Reads Data/Configs/adrenaline.json if present; otherwise
+// the GameConfig keeps its coded AdrenalineConfig defaults. All knobs are optional.
+LoadAdrenalineConfig(gameConfig, renderer);
+
  // Round 178+ Direction 5 — Tide / Crest (wave-indexed periodic buffs).
  // Reads Data/Configs/crests.json if present; otherwise the GameConfig
  // keeps its coded CrestConfig defaults (Enabled=true, Crests=Array.Empty
@@ -2663,6 +2668,48 @@ namespace BattleSystemECS.Config
             catch (Exception ex)
             {
                 renderer.Log("[MOMENTUM] Failed to load momentum config: " + ex.Message + " — using coded defaults");
+            }
+        }
+
+        /// <summary>
+        /// Round 207 Direction 2 — Adrenaline config. Reads from
+        /// Data/Configs/adrenaline.json if present; otherwise the GameConfig
+        /// keeps its coded AdrenalineConfig defaults (Enabled=true,
+        /// LowHpThreshold=0.30, CriticalHpThreshold=0.10, LowTierAtkSpd=0.25,
+        /// CriticalTierAtkSpd=0.50, LowTierCdMult=0.80, CriticalTierCdMult=0.50,
+        /// RushDurationFrames=60). All eight knobs are optional — missing fields
+        /// fall back to those defaults so the file can be partial without breaking
+        /// the loader (System.Text.Json is happy with missing properties).
+        /// </summary>
+        private static void LoadAdrenalineConfig(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string file = "Data/Configs/adrenaline.json";
+            try
+            {
+                if (!File.Exists(file))
+                {
+                    renderer.Log("[ADRENALINE] adrenaline.json not found, using coded defaults");
+                    return;
+                }
+                string json = File.ReadAllText(file);
+                // Sentinel-tolerant: System.Text.Json is happy with missing fields,
+                // they fall back to the coded property defaults.
+                var opts = new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+                var cfg = System.Text.Json.JsonSerializer.Deserialize<AdrenalineConfig>(json, opts);
+                if (cfg == null)
+                {
+                    renderer.Log("[ADRENALINE] adrenaline.json deserialized to null, using coded defaults");
+                    return;
+                }
+                gameConfig.Adrenaline = cfg;
+                renderer.Log("[ADRENALINE] Loaded adrenaline config from " + file + " (lowHp=" + cfg.LowHpThreshold + ", criticalHp=" + cfg.CriticalHpThreshold + ", lowAtkSpdBonus=" + cfg.LowTierAttackSpeedBonus + ", critAtkSpdBonus=" + cfg.CriticalTierAttackSpeedBonus + ", lowCdMult=" + cfg.LowTierCooldownMult + ", critCdMult=" + cfg.CriticalTierCooldownMult + ", rushFrames=" + cfg.RushDurationFrames + ")");
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[ADRENALINE] Failed to load adrenaline config: " + ex.Message + " — using coded defaults");
             }
         }
 

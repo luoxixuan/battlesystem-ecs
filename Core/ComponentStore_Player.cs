@@ -121,6 +121,54 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         //   Default 0 = no stacks.
         public int[] PlayerCullingStacks = new int[MAX_PLAYERS];
 
+        // ==================== Adrenaline (Round 207 Direction 2) ====================
+        // PlayerAdrenalineTier: per-player current Adrenaline tier (0/1/2) derived
+        //   from the live HP ratio every frame by AdrenalineSystem.Update.
+        //   0 = normal (HP > LowHpThreshold), 1 = low-HP (HP <= LowHpThreshold),
+        //   2 = critical (HP <= CriticalHpThreshold). Default 0 = no bonus fast
+        //   path on the hot attack / skill read sites.
+        public int[] PlayerAdrenalineTier = new int[MAX_PLAYERS];
+        // PlayerAdrenalineRushActiveFrames: remaining frames of the one-shot
+        //   Adrenaline Rush state (tier=2). Decremented by AdrenalineSystem
+        //   each frame; while > 0 PlayerTowerAttackSystem force-fires all
+        //   active towers once per frame. Default 0 = no rush active.
+        public int[] PlayerAdrenalineRushActiveFrames = new int[MAX_PLAYERS];
+        // PlayerAdrenalineAttackSpeedMult: cached additive attack-speed bonus
+        //   (additive on the HotZone/Bloodlust/Momentum chain) derived from
+        //   the player's current Adrenaline tier. Backed by a static readonly
+        //   0f template cloned per-instance — the multiplier-defaulting-to-1f
+        //   trap is irrelevant here because we add (not multiply) the bonus.
+        //   Default 0 = no bonus fast path. Read by PlayerTowerAttackSystem
+        //   alongside HotZone / Fortress / Desperation / Bloodlust / Momentum.
+        public float[] PlayerAdrenalineAttackSpeedMult = (float[])_playerAdrenalineZeroTemplate.Clone();
+        // PlayerAdrenalineCooldownMult: cached multiplicative skill-cooldown
+        //   multiplier (0.80 = -20% cooldown, 0.50 = -50% cooldown) derived
+        //   from the player's current Adrenaline tier. 1f = no change (the
+        //   SkillSystem hot path multiplies baseCd by this). Backed by a
+        //   1f template + Clone so naive `new float[]` would silently make
+        //   all skills instantly recharge when AdrenalineConfig is disabled.
+        public float[] PlayerAdrenalineCooldownMult = (float[])_playerAdrenalineOneTemplate.Clone();
+        // Shared readonly 0f / 1f templates — cloned on every new ComponentStore()
+        // so writes stay per-instance and the MAX_PLAYERS fill runs only once
+        // across the process lifetime. Matches the pattern used for
+        // PlayerCrestDamageMult / PlayerCrestGoldMult.
+        private static readonly float[] _playerAdrenalineZeroTemplate = PlayerAdrenalineZero_BuildDefault();
+        private static readonly float[] _playerAdrenalineOneTemplate = PlayerAdrenalineOne_BuildDefault();
+        private static float[] PlayerAdrenalineZero_BuildDefault()
+        {
+            var a = new float[MAX_PLAYERS];
+            // 0f is the default of new float[] already; explicit loop kept for parity
+            // with the 1f template so the intent is obvious to readers.
+            for (int i = 0; i < MAX_PLAYERS; i++) a[i] = 0f;
+            return a;
+        }
+        private static float[] PlayerAdrenalineOne_BuildDefault()
+        {
+            var a = new float[MAX_PLAYERS];
+            for (int i = 0; i < MAX_PLAYERS; i++) a[i] = 1f;
+            return a;
+        }
+
         // ==================== Tide / Crest (Round 178+ Direction 5) ====================
         // PlayerCrestDamageMult: cached multiplicative damage bonus from the
         //   active Crest (1f = no buff). Stamped by CrestSystem.HandleWaveStart
@@ -548,6 +596,14 @@ PlayerMomentumCurrentTier[entityId] =0;
 // Round 206 Direction 1 — Culling: fresh player starts with 0 stacks. CullingSystem
 // increments on every cull and resets to 0 on OnWaveStart (latch-driven).
 PlayerCullingStacks[entityId] =0;
+// Round 207 Direction 2 — Adrenaline: fresh player starts at tier 0 (normal HP),
+// no rush active, no attack-speed bonus, no cooldown reduction. AdrenalineSystem
+// recomputes all four every frame from the live HP ratio so per-tick reset
+// isn't strictly required — the init just gives a deterministic baseline.
+PlayerAdrenalineTier[entityId] =0;
+PlayerAdrenalineRushActiveFrames[entityId] =0;
+PlayerAdrenalineAttackSpeedMult[entityId] =0f;
+PlayerAdrenalineCooldownMult[entityId] =1f;
 // Round 178+ Direction 5 — Crest / Tide System. Reset crest caches on
 // player init.1f = no damage / gold buff. CrestSystem.HandleWaveStart
 // overwrites these on each OnWaveStart.
