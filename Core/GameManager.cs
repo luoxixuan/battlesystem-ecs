@@ -40,6 +40,7 @@ namespace BattleSystemECS.Core
 
         // 渲染器
         private IRenderer logger;
+        private IBattleEventBus _eventBus;
 
         // 游戏配置
         private GameConfig gameConfig;
@@ -63,6 +64,7 @@ namespace BattleSystemECS.Core
 
             // 初始化渲染器
             logger = new ConsoleLogger();
+            _eventBus = new ConsoleEventBus();
         }
 
         /// <summary>
@@ -111,10 +113,10 @@ namespace BattleSystemECS.Core
             //  将所有系统创建/依赖注入/分组赋值委托给 SystemRegistry
             // ══════════════════════════════════════════════════════════
             registry = new SystemRegistry();
-            registry.CreateAll(store, gameConfig, logger, playerId, stateMachine);
+            registry.CreateAll(store, gameConfig, logger, playerId, stateMachine, _eventBus);
             registry.WireDependencies(store, playerId);
 
-            scheduler = new FrameScheduler(store, gameConfig);
+            scheduler = new FrameScheduler(store, gameConfig, _eventBus);
             registry.AssignToGroups(scheduler);
             // Round 182 Direction 6 — Inject PathfindingSystem so FrameScheduler's
             // TickBlinkerCycle can look up path waypoint counts before advancing node

@@ -12,7 +12,7 @@ namespace BattleSystemECS.Systems
     /// </summary>
     public class UpgradeSystem
     {
-        private static readonly System.Random _sharedRandom = System.Random.Shared;
+        private static readonly System.Random _sharedRandom = Rng.Shared;
 
         private Core.ComponentStore store;
         private IRenderer renderer;

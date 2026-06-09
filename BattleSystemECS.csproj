@@ -11,14 +11,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Core files (includes EnemyActionType, BuffType, GameConfig, GAS, etc.) -->
-    <Compile Include="Core\*.cs" />
-    <Compile Include="Core\GAS\*.cs" />
+    <ProjectReference Include="BattleSystemECS.Core\BattleSystemECS.Core.csproj" />
+  </ItemGroup>
 
-    <!-- Systems -->
-    <Compile Include="Systems\*.cs" />
-
-    <!-- Main program -->
+  <ItemGroup>
     <Compile Include="Program.cs" />
   </ItemGroup>
 

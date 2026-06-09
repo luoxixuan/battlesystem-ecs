@@ -23,6 +23,7 @@ namespace BattleSystemECS.Systems
         // Round 67: EventBus for On-Hit / On-Crit trigger event publication.
         // Always non-null after construction (ctor falls back to a fresh EventBus instance).
         private readonly IEventBus _eventBus;
+        private IBattleEventBus _battleEventBus;
 
         // BUG-1 fix: deterministic hash-based RNG — no shared state, fully reproducible per (frame, enemyId, attackerId)
         // Replaces Random.Shared which caused non-determinism across runs.
@@ -96,7 +97,7 @@ namespace BattleSystemECS.Systems
 
         // Round 67: IEventBus injection for On-Hit / On-Crit trigger event publication.
         // Optional parameter keeps existing call-sites (tests, partial ctor) compiling.
-        public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem, IEventBus eventBus)
+        public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem, IEventBus eventBus, IBattleEventBus battleEventBus = null)
         {
             this.store = store;
             this.renderer = renderer;
@@ -104,6 +105,7 @@ namespace BattleSystemECS.Systems
             this.techTreeSystem = techTreeSystem;
             this.gameConfig = gameConfig;
             this._eventBus = eventBus ?? new EventBus();
+            _battleEventBus = battleEventBus ?? NullEventBus.Instance;
             _damageQueue[0] = new List<(int, float, bool, DamageType)>(256);
             _damageQueue[1] = new List<(int, float, bool, DamageType)>(256);
             _thornsQueue[0] = new List<float>(64);
@@ -355,6 +357,7 @@ public void SetWaveNumber(int waveNumber)
                 }
 
                 store.ApplyEnemyDamage(enemyId, finalDamage);
+                if (finalDamage > 0f) _battleEventBus.OnDamageDealt(enemyId, finalDamage, damageType.ToString(), wasCrit);
 
                 // Life Link: apply shared damage to linked enemy
                 if (linkedEnemyId >= 0 && linkedDamage > 0f)

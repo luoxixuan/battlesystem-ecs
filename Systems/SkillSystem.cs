@@ -921,7 +921,7 @@ namespace BattleSystemECS.Systems
 
                     if (def.FreezeDuration > 0f && def.FreezeChance > 0f)
                     {
-                        float roll = (float)Random.Shared.NextDouble();
+                        float roll = (float)Rng.Shared.NextDouble();
                         if (roll < def.FreezeChance)
                         {
                             int freezeTurns = Math.Max(1, (int)Math.Ceiling(def.FreezeDuration * (1f - _enemyFreezeResistance)));

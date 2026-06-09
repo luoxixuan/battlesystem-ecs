@@ -66,6 +66,7 @@ namespace BattleSystemECS.Systems
         private IRenderer renderer;
         private GameConfig gameConfig;
         private WaveSpawnConfig spawnConfig;
+        private IBattleEventBus _eventBus;
 
         private int currentWave = 1;
         private int currentLevel = 1;
@@ -97,13 +98,14 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public event System.Action OnWaveStart;
 
-        public WaveSpawningSystem(Core.ComponentStore store, IRenderer renderer, GameConfig gameConfig, EnemyAffixSystem enemyAffixSystem = null)
+        public WaveSpawningSystem(Core.ComponentStore store, IRenderer renderer, GameConfig gameConfig, EnemyAffixSystem enemyAffixSystem = null, IBattleEventBus eventBus = null)
         {
             this.store = store;
             this.renderer = renderer;
             this.gameConfig = gameConfig;
             this.spawnConfig = LoadWaveSpawnConfig();
             this._enemyAffixSystem = enemyAffixSystem;
+            _eventBus = eventBus ?? NullEventBus.Instance;
             // Round 127 Dir 1 — lazy-load the global curve registry. Idempotent and
             // thread-safe; a missing curves.json is logged but never throws, so the
             // spawn loop falls back to the legacy linear formulas.
@@ -335,6 +337,7 @@ namespace BattleSystemECS.Systems
                 string enemyName = $"[AMBUSH] NormalL{currentLevel}W{currentWave}";
                 int enemyId = store.AddEnemy(startX, startY, scaledSpeed, scaledHealth, scaledMaxHealth, scaledDamage, monsterConfig.GoldReward, currentWave, enemyName, scaledArmor, monsterConfig.Shield, monsterConfig.MagicResist);
                 if (enemyId < 0) continue;
+                _eventBus.OnEntityCreated(enemyId, startX, startY, "Enemy");
                 store.SetEntityName(enemyId, enemyName);
                 store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
                 // Elemental Resistance (Round 117): apply per-element fractional reduction.
@@ -378,6 +381,7 @@ namespace BattleSystemECS.Systems
             string enemyName = $"[BOSS RUSH] NormalL{currentLevel}W{currentWave}";
             int enemyId = store.AddEnemy(startX, startY, scaledSpeed, scaledHealth, scaledMaxHealth, scaledDamage, monsterConfig.GoldReward * 3, currentWave, enemyName, scaledArmor, monsterConfig.Shield, monsterConfig.MagicResist);
             if (enemyId < 0) return;
+            _eventBus.OnEntityCreated(enemyId, startX, startY, "Enemy");
             store.SetEntityName(enemyId, enemyName);
             store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
             // Elemental Resistance (Round 117): apply per-element fractional reduction.
@@ -504,6 +508,7 @@ namespace BattleSystemECS.Systems
                     scaledMagicResist
                 );
                 if (enemyId < 0) continue; // pool exhausted; bail out for this slot
+                _eventBus.OnEntityCreated(enemyId, spawnX, spawnY, "Enemy");
                 store.SetEntityName(enemyId, enemyName);
                 store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
                 store.SetElementalResist(enemyId, monsterConfig.FireResist, monsterConfig.IceResist, monsterConfig.LightningResist, monsterConfig.HolyResist);
@@ -547,6 +552,7 @@ namespace BattleSystemECS.Systems
             _performanceSpawnMultiplier = 1.0f;
             ClearMultiTypeState();
             OnWaveStart?.Invoke();
+            _eventBus.OnWaveStarted(currentWave);
         }
 
         private void ClearMultiTypeState()
@@ -609,6 +615,7 @@ namespace BattleSystemECS.Systems
                 InitMultiTypeState(waveConfig);
                 enemiesSpawnedInWave = 0;
                 OnWaveStart?.Invoke();
+                _eventBus.OnWaveStarted(currentWave);
             }
 
             if (enemiesSpawnedInWave < waveConfig.GetTotalEnemyCount())
@@ -744,6 +751,7 @@ namespace BattleSystemECS.Systems
                         renderer.Log($"[SPAWN] Failed to spawn enemy (entity pool exhausted)");
                         continue;
                     }
+                    _eventBus.OnEntityCreated(enemyId, startX, startY, "Enemy");
                     store.SetEntityName(enemyId, enemyName);
                     store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
                     // Elemental Resistance (Round 117): apply per-element fractional reduction.

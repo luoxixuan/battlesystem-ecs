@@ -24,7 +24,7 @@ namespace BattleSystemECS.Systems
         private readonly int playerId;
         private readonly ReflectTowerSystem? _reflectTowerSystem;
         private readonly TowerStealthSystem? _towerStealthSystem;
-        private readonly Random _retaliateRng = Random.Shared;
+        private readonly Random _retaliateRng = Rng.Shared;
         
         // Thread-safe collection for explosion events (phase 1 parallel collect → phase 2 serial apply)
         private readonly ConcurrentBag<SuicideExplosionEvent> _explosionEvents = new();

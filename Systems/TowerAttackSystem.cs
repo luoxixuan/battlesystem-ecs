@@ -70,6 +70,7 @@ namespace BattleSystemECS.Systems
         private readonly HashSet<long> _critFiredThisFrame = new HashSet<long>(32);
         // Round 67: EventBus for On-Hit / On-Crit trigger publication.
         private readonly IEventBus _eventBus;
+        private IBattleEventBus _battleEventBus;
 
         // Ping-pong double-buffer for tower debuff events (collected parallel, applied serial)
         private List<(int enemyId, int towerId)>[] _debuffQueue = new List<(int, int)>[2];
@@ -104,7 +105,7 @@ namespace BattleSystemECS.Systems
         private float _armorShredPerStack = 0f;
 
         // Shared random for debuff chance rolls — uses Random.Shared (.NET 6+ thread-safe)
-        private static readonly Random _rand = Random.Shared;
+        private static readonly Random _rand = Rng.Shared;
 
         // Map width minus one (used for knockback bound clamping)
         private readonly float _mapWidthMinusOne;
@@ -160,14 +161,15 @@ namespace BattleSystemECS.Systems
         {
         }
 
-        // Round 67: IEventBus optional injection for On-Hit / On-Crit publication.
-        public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem, int mapWidth, IEventBus eventBus)
+        // Round 67: IBattleEventBus optional injection for On-Hit / On-Crit publication.
+        public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem, int mapWidth, IEventBus eventBus, IBattleEventBus battleEventBus = null)
         {
             this.store = store;
             this.logger = logger;
             this.techTreeSystem = techTreeSystem;
             this._mapWidthMinusOne = mapWidth - 1f;
             this._eventBus = eventBus ?? new EventBus();
+            _battleEventBus = battleEventBus ?? NullEventBus.Instance;
             _damageQueue[0] = new List<(int, float, int, int)>(256);
             _damageQueue[1] = new List<(int, float, int, int)>(256);
             _debuffQueue[0] = new List<(int, int)>(256);
@@ -1889,6 +1891,12 @@ namespace BattleSystemECS.Systems
                     (finalDmg, linkedDamage, linkedEnemyId) = _lifeLinkSystem.ComputeLinkedDamage(enemyId, finalDmg);
                 }
                 store.EnemyHealth[enemyId] -= finalDmg;
+                if (finalDmg > 0f)
+                {
+                    long critKey = ((long)enemyId << 32) | (uint)towerId;
+                    bool wasCrit = _critFiredThisFrame.Contains(critKey);
+                    _battleEventBus.OnDamageDealt(enemyId, finalDmg, "Physical", wasCrit);
+                }
                 // Round 132 Dir 8 — honor Boss Min-Health Floor (TowerAttackSystem primary hot
                 // path bypasses ApplyEnemyDamage's shield+floor route, so we re-clamp here).
                 store.ApplyMinHealthFloorInPlace(enemyId);

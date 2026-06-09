@@ -335,7 +335,7 @@ namespace BattleSystemECS.Systems
         {
             if (p <= 0f) return false;
             if (p >= 1f) return true;
-            return Random.Shared.NextDouble() < p;
+            return Rng.Shared.NextDouble() < p;
         }
 
         private bool IsValidParent(int parentTowerId)

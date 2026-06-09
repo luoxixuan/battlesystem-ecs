@@ -14,6 +14,7 @@ namespace BattleSystemECS.Core
     public class FrameScheduler
     {
         private readonly ComponentStore store;
+        private readonly IBattleEventBus _eventBus;
 
         public GameState Phase { get; set; } = GameState.WavePhase;
 
@@ -37,10 +38,16 @@ namespace BattleSystemECS.Core
         // the node index. Injected lazily so construction order doesn't matter.
         private Systems.PathfindingSystem? _pathfinding;
 
-        public FrameScheduler(ComponentStore store, GameConfig gameConfig)
+        public FrameScheduler(ComponentStore store, GameConfig gameConfig, IBattleEventBus eventBus = null)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             _ = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));
+            _eventBus = eventBus ?? NullEventBus.Instance;
+            store.OnEnemyKilled += (enemyId, killerId) =>
+            {
+                _eventBus.OnEntityKilled(enemyId, killerId);
+                _eventBus.OnEntityDestroyed(enemyId);
+            };
         }
 
         /// <summary>
@@ -151,6 +158,9 @@ namespace BattleSystemECS.Core
 
             // Phase 4: Movement (wound, pathfinding, modifiers, healer, summons) — ENEMY side
             Movement.Execute(store, enemyDt, turn);
+
+            // ── Emit position events after movement ──
+            EmitPositionEvents();
 
             // Phase 5: Terrain + Mutators + Morph — ENEMY side
             Terrain.Execute(store, enemyDt, turn);
@@ -392,6 +402,20 @@ namespace BattleSystemECS.Core
                 {
                     store.EnemyBlinkTimer[eid] = timer;
                 }
+            }
+        }
+        /// <summary>
+        /// Emit OnPositionChanged for every active enemy after the movement phase.
+        /// </summary>
+        private void EmitPositionEvents()
+        {
+            var activeEnemies = store.ActiveEnemyIds;
+            for (int i = 0; i < activeEnemies.Count; i++)
+            {
+                int eid = activeEnemies[i];
+                float x = store.PositionX[eid];
+                float y = store.PositionY[eid];
+                _eventBus.OnPositionChanged(eid, x, y);
             }
         }
     }

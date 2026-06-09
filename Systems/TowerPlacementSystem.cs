@@ -17,6 +17,7 @@ namespace BattleSystemECS.Systems
         // Round 145 Direction 3 — Per-Tower Modifier Pool reference. Optional injection;
         // when null, PlaceTower() skips the modifier roll and towers keep ModifierId=-1.
         private TowerModifierSystem? towerModifierSystem;
+        private IBattleEventBus _eventBus;
 
         // Sell ratio: fraction of upgrade cost refunded (0.5 = 50%)
         private float sellRatio = 0.5f;
@@ -57,11 +58,12 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Overload accepting GameConfig so debuff fields can be looked up from TowerConfig.
         /// </summary>
-        public TowerPlacementSystem(ComponentStore store, IRenderer logger, GameConfig gameConfig)
+        public TowerPlacementSystem(ComponentStore store, IRenderer logger, GameConfig gameConfig, IBattleEventBus eventBus = null)
         {
             this.store = store;
             this.logger = logger;
             this.gameConfig = gameConfig;
+            _eventBus = eventBus ?? NullEventBus.Instance;
             for (int i = 0; i < sellRatioOverrideByType.Length; i++) sellRatioOverrideByType[i] = -1f;
             LoadSellConfig();
             LoadPerTypeCaps();
@@ -627,11 +629,13 @@ namespace BattleSystemECS.Systems
                 else
                 {
                     store.AddTower(towerId, type, damage, range, speed, 1, cost);
+                    _eventBus.OnEntityCreated(towerId, x, y, "Tower");
                 }
             }
             else
             {
                 store.AddTower(towerId, type, damage, range, speed, 1, cost);
+                _eventBus.OnEntityCreated(towerId, x, y, "Tower");
             }
 
             // Record placement timestamp for sell-back value decay (sellDecayPerSecond > 0).

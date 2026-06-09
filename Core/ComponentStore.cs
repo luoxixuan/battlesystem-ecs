@@ -1236,7 +1236,7 @@ namespace BattleSystemECS.Core
         /// </summary>
         public ReadOnlySpan<int> GetActiveEnemySpan()
         {
-            return System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_activeEnemyIds);
+            return _activeEnemyIds.AsSpan();
         }
 
         /// <summary>
@@ -1244,7 +1244,7 @@ namespace BattleSystemECS.Core
         /// </summary>
         public ReadOnlySpan<int> GetActiveTowerSpan()
         {
-            return System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_activeTowerIds);
+            return _activeTowerIds.AsSpan();
         }
 
         // ==================== IDisposable ====================

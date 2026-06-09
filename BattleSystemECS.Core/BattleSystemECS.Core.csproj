@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>BattleSystemECS</RootNamespace>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>BattleSystemECS.Core</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
+    <Compile Include="..\Core\GAS\*.cs" Link="Core\GAS\%(Filename)%(Extension)" />
+    <Compile Include="..\Systems\*.cs" Link="Systems\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\game_config.json" Link="game_config.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Data\Configs\*.json" Link="Data\Configs\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Data\Towers\*.json" Link="Data\Towers\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Data\Monsters\*.json" Link="Data\Monsters\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Data\Levels\*.json" Link="Data\Levels\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Data\Saves\*.json" Link="Data\Saves\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

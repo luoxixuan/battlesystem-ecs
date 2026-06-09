@@ -17,7 +17,7 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore store;
         private readonly int playerId;
-        private readonly Random _rand = Random.Shared;
+        private readonly Random _rand = Rng.Shared;
 
         // Teleport type constants
         public const int TYPE_NONE = 0;

@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BattleSystemECS.csproj" />
+    <ProjectReference Include="..\BattleSystemECS.Core\BattleSystemECS.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,7 +27,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Round 139: Test placement cap matrix from tower_placement.json -->
     <None Include="..\Data\Configs\tower_placement.json" Link="Data\Configs\tower_placement.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

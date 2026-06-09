@@ -53,11 +53,13 @@ namespace BattleSystemECS.Systems
         // RNG used for projectile deflection roll (serial path, no thread-safety needed).
         // Kept here rather than in store so ProjectileSystem is self-contained and testable in isolation.
         private readonly System.Random _deflectRng = new System.Random(0xDEFE17);
+        private IBattleEventBus _eventBus;
 
-        public ProjectileSystem(ComponentStore store, IRenderer logger)
+        public ProjectileSystem(ComponentStore store, IRenderer logger, IBattleEventBus eventBus = null)
         {
             this.store = store;
             this.logger = logger;
+            _eventBus = eventBus ?? NullEventBus.Instance;
             _damageQueue[0] = new List<(int, float, int)>(256);
             _damageQueue[1] = new List<(int, float, int)>(256);
             for (int i = 0; i < MAX_PROJ; i++)
@@ -163,10 +165,14 @@ namespace BattleSystemECS.Systems
             }
             _projActive[projId] = true;
             _activeProjectileCount++;
+            // Emit projectile event for Unity rendering
+            if (targetId >= 0)
+                _eventBus.OnProjectileFired(store.PositionX[towerId], store.PositionY[towerId],
+                    store.PositionX[targetId], store.PositionY[targetId], speed);
         }
 
         /// <summary>
-        /// Spawn a projectile from a tower toward a target enemy with arc trajectory.
+        /// Spawn a projectile with an arcing
         /// </summary>
         /// <param name="towerId">Source tower ID</param>
         /// <param name="targetId">Target enemy ID</param>

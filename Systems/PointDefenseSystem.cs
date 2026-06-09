@@ -87,7 +87,7 @@ namespace BattleSystemECS.Systems
             // Scan enemy projectile slots — this is a simple linear scan of MAX_ENEMY_PROJ
             // In practice enemy projectiles are sparse and short-lived, so this is acceptable.
             // For future optimization: maintain a list of active enemy projectile IDs.
-            var rng = Random.Shared;
+            var rng = Rng.Shared;
 
             // TODO: We need access to _eprojActive[] from EnemyProjectileSystem.
             // Since EnemyProjectileSystem is a sibling system, we expose GetProjectilesInRange.

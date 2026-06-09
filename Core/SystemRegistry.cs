@@ -263,8 +263,10 @@ namespace BattleSystemECS.Core
         //  Creation — one system per block, in dependency order
         // ═══════════════════════════════════════════════════════════════════
 
-        public void CreateAll(ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine)
+        public void CreateAll(ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus battleEventBus = null)
         {
+            var battleEb = battleEventBus ?? NullEventBus.Instance;
+
             // ── EventBus (needed early by several systems) ──
             var eventBus = new EventBus();
 
@@ -286,8 +288,8 @@ namespace BattleSystemECS.Core
             EnemyMovement.SetBossTrailSystem(BossTrailAoe);
 
             // ── Tower core systems ──
-            TowerPlacement = new TowerPlacementSystem(store, logger, config);
-            TowerAttack = new TowerAttackSystem(store, logger, TechTree);
+            TowerPlacement = new TowerPlacementSystem(store, logger, config, battleEb);
+            TowerAttack = new TowerAttackSystem(store, logger, TechTree, 10, eventBus, battleEb);
             // Round 143 Direction 1 — inject the effectiveness matrix for tower-vs-enemy damage
             TowerAttack.SetGameConfig(config);
             TowerUpgrade = new TowerUpgradeSystem(store, logger, config);
@@ -326,7 +328,7 @@ namespace BattleSystemECS.Core
             TowerMorph = new TowerMorphSystem(store);
 
             // ── Player attack ──
-            PlayerTowerAttack = new PlayerTowerAttackSystem(store, logger, playerId, config, TechTree);
+            PlayerTowerAttack = new PlayerTowerAttackSystem(store, logger, playerId, config, TechTree, eventBus, battleEb);
             Hero = new HeroSystem(store, playerId);
             // Round 144 方向4 — Hero Active Skill Set. Constructed alongside Hero
             //   and Skill (it needs config to resolve SkillName → SkillDef id).
@@ -337,7 +339,7 @@ namespace BattleSystemECS.Core
             HeroSkill.Initialize();
 
             // ── Spawning ──
-            WaveSpawning = new WaveSpawningSystem(store, logger, config);
+            WaveSpawning = new WaveSpawningSystem(store, logger, config, eventBus: battleEb);
             Nest = new NestSystem(store, config, logger, playerId);
             Nest.Initialize();
 
@@ -491,7 +493,7 @@ namespace BattleSystemECS.Core
             FireTrail = new FireTrailSystem(store);
 
             // ── Projectile ──
-            Projectile = new ProjectileSystem(store, logger);
+            Projectile = new ProjectileSystem(store, logger, battleEb);
 
             // ── Objective / Branch / Resource ──
             Objective = new ObjectiveSystem(store, playerId);
