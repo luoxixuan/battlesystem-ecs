@@ -630,12 +630,14 @@ namespace BattleSystemECS.Systems
                 {
                     store.AddTower(towerId, type, damage, range, speed, 1, cost);
                     _eventBus.OnEntityCreated(towerId, x, y, "Tower");
+                    _eventBus.OnTowerCreated(towerId, x, y, type);
                 }
             }
             else
             {
                 store.AddTower(towerId, type, damage, range, speed, 1, cost);
                 _eventBus.OnEntityCreated(towerId, x, y, "Tower");
+                _eventBus.OnTowerCreated(towerId, x, y, type);
             }
 
             // Record placement timestamp for sell-back value decay (sellDecayPerSecond > 0).

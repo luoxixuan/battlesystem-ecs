@@ -1,3 +1,5 @@
+using BattleSystemECS.Components;
+
 namespace BattleSystemECS.Core
 {
     /// <summary>
@@ -8,6 +10,7 @@ namespace BattleSystemECS.Core
     public sealed class ConsoleEventBus : IBattleEventBus
     {
         public void OnEntityCreated(int entityId, float x, float y, string entityType) { }
+        public void OnTowerCreated(int entityId, float x, float y, TowerType towerType) { }
         public void OnEntityDestroyed(int entityId) { }
         public void OnPositionChanged(int entityId, float x, float y) { }
         public void OnDamageDealt(int targetId, float amount, string damageType, bool isCritical) { }

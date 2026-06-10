@@ -1,3 +1,5 @@
+using BattleSystemECS.Components;
+
 namespace BattleSystemECS.Core
 {
     /// <summary>
@@ -9,6 +11,8 @@ namespace BattleSystemECS.Core
     {
         // ── 实体生命周期 ──
         void OnEntityCreated(int entityId, float x, float y, string entityType);
+        /// <summary>Called when a tower entity is created. Passes TowerType for rendering differentiation.</summary>
+        void OnTowerCreated(int entityId, float x, float y, TowerType towerType);
         void OnEntityDestroyed(int entityId);
 
         // ── 位置变化（移动阶段结束后批量发射）──
@@ -35,6 +39,7 @@ namespace BattleSystemECS.Core
         public static readonly NullEventBus Instance = new NullEventBus();
 
         public void OnEntityCreated(int entityId, float x, float y, string entityType) { }
+        public void OnTowerCreated(int entityId, float x, float y, TowerType towerType) { }
         public void OnEntityDestroyed(int entityId) { }
         public void OnPositionChanged(int entityId, float x, float y) { }
         public void OnDamageDealt(int targetId, float amount, string damageType, bool isCritical) { }
