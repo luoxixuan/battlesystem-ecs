@@ -406,17 +406,19 @@ namespace BattleSystemECS.Core
         }
         /// <summary>
         /// Emit OnPositionChanged for every active enemy after the movement phase.
+        /// Uses batch API to reduce cross-boundary call overhead.
         /// </summary>
         private void EmitPositionEvents()
         {
             var activeEnemies = store.ActiveEnemyIds;
+            var changes = new System.Collections.Generic.List<(int, float, float)>(activeEnemies.Count);
             for (int i = 0; i < activeEnemies.Count; i++)
             {
                 int eid = activeEnemies[i];
-                float x = store.PositionX[eid];
-                float y = store.PositionY[eid];
-                _eventBus.OnPositionChanged(eid, x, y);
+                changes.Add((eid, store.PositionX[eid], store.PositionY[eid]));
             }
+            if (changes.Count > 0)
+                _eventBus.OnPositionsChanged(changes);
         }
     }
 }

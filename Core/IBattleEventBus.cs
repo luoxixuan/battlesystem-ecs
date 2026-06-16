@@ -11,12 +11,13 @@ namespace BattleSystemECS.Core
     {
         // ── 实体生命周期 ──
         void OnEntityCreated(int entityId, float x, float y, string entityType);
-        /// <summary>Called when a tower entity is created. Passes TowerType for rendering differentiation.</summary>
         void OnTowerCreated(int entityId, float x, float y, TowerType towerType);
         void OnEntityDestroyed(int entityId);
 
         // ── 位置变化（移动阶段结束后批量发射）──
         void OnPositionChanged(int entityId, float x, float y);
+        /// <summary>Batch version — called once per frame with all position changes.</summary>
+        void OnPositionsChanged(System.Collections.Generic.List<(int entityId, float x, float y)> changes);
 
         // ── 战斗 ──
         void OnDamageDealt(int targetId, float amount, string damageType, bool isCritical);
@@ -42,6 +43,7 @@ namespace BattleSystemECS.Core
         public void OnTowerCreated(int entityId, float x, float y, TowerType towerType) { }
         public void OnEntityDestroyed(int entityId) { }
         public void OnPositionChanged(int entityId, float x, float y) { }
+        public void OnPositionsChanged(System.Collections.Generic.List<(int entityId, float x, float y)> changes) { }
         public void OnDamageDealt(int targetId, float amount, string damageType, bool isCritical) { }
         public void OnEntityKilled(int entityId, int killerId) { }
         public void OnProjectileFired(float fromX, float fromY, float toX, float toY, float speed) { }

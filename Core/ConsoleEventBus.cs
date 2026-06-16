@@ -13,6 +13,7 @@ namespace BattleSystemECS.Core
         public void OnTowerCreated(int entityId, float x, float y, TowerType towerType) { }
         public void OnEntityDestroyed(int entityId) { }
         public void OnPositionChanged(int entityId, float x, float y) { }
+        public void OnPositionsChanged(System.Collections.Generic.List<(int entityId, float x, float y)> changes) { }
         public void OnDamageDealt(int targetId, float amount, string damageType, bool isCritical) { }
         public void OnEntityKilled(int entityId, int killerId) { }
         public void OnProjectileFired(float fromX, float fromY, float toX, float toY, float speed) { }
