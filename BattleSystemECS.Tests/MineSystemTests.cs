@@ -303,7 +303,7 @@ namespace BattleSystemECS.Tests
             var def1 = system.GetMineDef(1);
             // We can't assert non-null here because the file may not be copied to
             // the test bin folder. But the call must not throw.
-            Assert.Null(def1); // Most likely null in unit test env — file not in bin
+            Assert.NotNull(def1); // File exists in test env — verify it loaded
         }
 
         [Fact]

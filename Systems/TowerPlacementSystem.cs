@@ -48,6 +48,7 @@ namespace BattleSystemECS.Systems
         {
             this.store = store;
             this.logger = logger;
+            _eventBus = NullEventBus.Instance;
             // Initialize all per-type overrides to -1f (use global). LoadSellConfig / LoadSellRatioOverrides
             // then populates any explicit entries from JSON.
             for (int i = 0; i < sellRatioOverrideByType.Length; i++) sellRatioOverrideByType[i] = -1f;

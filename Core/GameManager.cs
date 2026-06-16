@@ -53,6 +53,10 @@ namespace BattleSystemECS.Core
         private int turn;
         private const int maxTurns = 20;
 
+        // ── Fixed timestep logic (Unity / external caller integration) ──
+        private float _accumulatedTime = 0f;
+        private const float FIXED_TIMESTEP = 1f; // 1 second per logic tick, matching Thread.Sleep(1000)
+
         /// <summary>
         /// 初始化游戏管理器
         /// </summary>
@@ -401,6 +405,65 @@ namespace BattleSystemECS.Core
             Console.WriteLine();
             logger.Log("Game Over! Completed " + (currentLevel - 1) + " levels.");
             Console.WriteLine();
+        }
+
+        /// <summary>
+        /// Fixed-timestep update for Unity / external caller integration.
+        /// Accumulates deltaTime and advances logic at FIXED_TIMESTEP (1s) intervals.
+        /// Call this from Unity's Update() with Time.deltaTime to decouple render FPS from logic FPS.
+        /// </summary>
+        public void FixedUpdate(float deltaTime)
+        {
+            if (!gameRunning) return;
+            if (turn >= maxTurns) return;
+
+            _accumulatedTime += deltaTime;
+
+            while (_accumulatedTime >= FIXED_TIMESTEP)
+            {
+                turn++;
+                _accumulatedTime -= FIXED_TIMESTEP;
+
+                logger.Log("[INFO] --- Turn " + turn + " ---");
+
+                // ── 帧调度（统一入口）──
+                scheduler.TickGameTurn(FIXED_TIMESTEP, turn);
+
+                // ── 游戏级逻辑 ───────────────────────────────
+                if (!store.IsPlayerAlive(playerId))
+                {
+                    if (techTreeSystem.TryRespawn())
+                    {
+                        logger.Log("[INFO] 不朽科技触发！玩家复活，继续游戏...");
+                        logger.Log("[HEALTH] Player Health: " + store.GetPlayerCurrentHealth(playerId) + " / " + store.GetPlayerMaxHealth(playerId));
+                    }
+                    else
+                    {
+                        logger.Log("[INFO] Player died! Game Over.");
+                        gameRunning = false;
+                        break;
+                    }
+                }
+
+                // 低血量回血科技（喘息）生效
+                float healed = techTreeSystem.TickLowHpRegen();
+                if (healed > 0f)
+                    logger.Log("[TECH] 喘息触发，回复 " + healed.ToString("F1") + " 生命");
+
+                // 渲染地图（SOA）
+                registry.Map?.Update();
+
+                // 显示玩家血量
+                logger.Log("[HEALTH] Player Health: " + store.GetPlayerCurrentHealth(playerId) + " / " + store.GetPlayerMaxHealth(playerId));
+
+                // 检查敌人是否到达底部
+                if (CheckEnemiesAtBottom())
+                {
+                    gameRunning = false;
+                    logger.Log("[INFO] Game Over! Enemy reached bottom.");
+                    break;
+                }
+            }
         }
 
         /// <summary>
