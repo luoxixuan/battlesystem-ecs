@@ -1,0 +1,2759 @@
+{
+  "tower_patterns": {
+    "攻击间隔": {
+      "title": "攻击间隔",
+      "content": "攻速属性、独立冷却管理",
+      "sources": [
+        {
+          "repo": "felipeggrod/gasify",
+          "url": "https://github.com/felipeggrod/gasify",
+          "stars": 79
+        },
+        {
+          "repo": "ape1121/Godot-4-Tower-Defense-Template",
+          "url": "https://github.com/ape1121/Godot-4-Tower-Defense-Template",
+          "stars": 64
+        },
+        {
+          "repo": "Rangerz132/gas-unity",
+          "url": "https://github.com/Rangerz132/gas-unity",
+          "stars": 16
+        },
+        {
+          "repo": "sjai013/unity-gameplay-ability-system",
+          "url": "https://github.com/sjai013/unity-gameplay-ability-system",
+          "stars": 1081
+        }
+      ]
+    },
+    "技能系统": {
+      "title": "技能系统",
+      "content": "GAS 风格 Ability + Modifier 分离",
+      "sources": [
+        {
+          "repo": "felipeggrod/gasify",
+          "url": "https://github.com/felipeggrod/gasify",
+          "stars": 79
+        },
+        {
+          "repo": "intrxx/Obsidian",
+          "url": "https://github.com/intrxx/Obsidian",
+          "stars": 55
+        },
+        {
+          "repo": "Pantong51/GASContent",
+          "url": "https://github.com/Pantong51/GASContent",
+          "stars": 756
+        },
+        {
+          "repo": "Narxim/Narxim-GAS-Example",
+          "url": "https://github.com/Narxim/Narxim-GAS-Example",
+          "stars": 445
+        },
+        {
+          "repo": "vahabahmadvand/ActionRPG_UE5",
+          "url": "https://github.com/vahabahmadvand/ActionRPG_UE5",
+          "stars": 371
+        },
+        {
+          "repo": "realchrisparker/ParagonGAS",
+          "url": "https://github.com/realchrisparker/ParagonGAS",
+          "stars": 35
+        },
+        {
+          "repo": "sajad0131/Unity-Gameplay-Ability-System",
+          "url": "https://github.com/sajad0131/Unity-Gameplay-Ability-System",
+          "stars": 34
+        },
+        {
+          "repo": "seiko-dev/GAS_Combo",
+          "url": "https://github.com/seiko-dev/GAS_Combo",
+          "stars": 77
+        },
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "No78Vino/gameplay-ability-system-for-unity",
+          "url": "https://github.com/No78Vino/gameplay-ability-system-for-unity",
+          "stars": 812
+        },
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        },
+        {
+          "repo": "v1vendi/minimal_ue5_GAS_demo",
+          "url": "https://github.com/v1vendi/minimal_ue5_GAS_demo",
+          "stars": 18
+        },
+        {
+          "repo": "LordWake/Unreal-2021-GameplayAbilitySystem",
+          "url": "https://github.com/LordWake/Unreal-2021-GameplayAbilitySystem",
+          "stars": 17
+        },
+        {
+          "repo": "PhysaliaStudio/Flexi",
+          "url": "https://github.com/PhysaliaStudio/Flexi",
+          "stars": 235
+        },
+        {
+          "repo": "MaiKuraki/UnityGameplayAbilitySystemSample",
+          "url": "https://github.com/MaiKuraki/UnityGameplayAbilitySystemSample",
+          "stars": 23
+        },
+        {
+          "repo": "Rangerz132/gas-unity",
+          "url": "https://github.com/Rangerz132/gas-unity",
+          "stars": 16
+        },
+        {
+          "repo": "dsavosin/SimpleGAS",
+          "url": "https://github.com/dsavosin/SimpleGAS",
+          "stars": 23
+        },
+        {
+          "repo": "make-live/multiplayer",
+          "url": "https://github.com/make-live/multiplayer",
+          "stars": 142
+        },
+        {
+          "repo": "strayTrain/SimpleGameplayAbilitySystem",
+          "url": "https://github.com/strayTrain/SimpleGameplayAbilitySystem",
+          "stars": 98
+        },
+        {
+          "repo": "sjai013/unity-gameplay-ability-system",
+          "url": "https://github.com/sjai013/unity-gameplay-ability-system",
+          "stars": 1081
+        },
+        {
+          "repo": "imnazake/Unify",
+          "url": "https://github.com/imnazake/Unify",
+          "stars": 19
+        },
+        {
+          "repo": "archangel4031/Myra",
+          "url": "https://github.com/archangel4031/Myra",
+          "stars": 81
+        }
+      ]
+    },
+    "实体管理器": {
+      "title": "实体管理器",
+      "content": "ECS 风格：实体创建/销毁/查询",
+      "sources": [
+        {
+          "repo": "sebas77/Svelto.ECS",
+          "url": "https://github.com/sebas77/Svelto.ECS",
+          "stars": 1363
+        },
+        {
+          "repo": "Gornhoth/Unity-Smoothed-Particle-Hydrodynamics",
+          "url": "https://github.com/Gornhoth/Unity-Smoothed-Particle-Hydrodynamics",
+          "stars": 85
+        },
+        {
+          "repo": "areilly711/unity_ecs",
+          "url": "https://github.com/areilly711/unity_ecs",
+          "stars": 17
+        },
+        {
+          "repo": "keijiro/Voxelman",
+          "url": "https://github.com/keijiro/Voxelman",
+          "stars": 1974
+        },
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "phpgl/php-towerdefense",
+          "url": "https://github.com/phpgl/php-towerdefense",
+          "stars": 86
+        },
+        {
+          "repo": "zulfajuniadi/unity-ecs-navmesh",
+          "url": "https://github.com/zulfajuniadi/unity-ecs-navmesh",
+          "stars": 486
+        },
+        {
+          "repo": "Antoshidza/NSprites",
+          "url": "https://github.com/Antoshidza/NSprites",
+          "stars": 654
+        },
+        {
+          "repo": "keijiro/Firefly",
+          "url": "https://github.com/keijiro/Firefly",
+          "stars": 576
+        },
+        {
+          "repo": "AkanshDivker/Simple-ECS",
+          "url": "https://github.com/AkanshDivker/Simple-ECS",
+          "stars": 53
+        },
+        {
+          "repo": "Leopotam/ecslite",
+          "url": "https://github.com/Leopotam/ecslite",
+          "stars": 521
+        },
+        {
+          "repo": "scellecs/morpeh",
+          "url": "https://github.com/scellecs/morpeh",
+          "stars": 645
+        },
+        {
+          "repo": "annulusgames/MagicTween",
+          "url": "https://github.com/annulusgames/MagicTween",
+          "stars": 499
+        }
+      ]
+    },
+    "unity_dots_archetype": {
+      "title": "Unity DOTS Archetype",
+      "content": "DOTS 模式：chunk data layout + entity query",
+      "sources": [
+        {
+          "repo": "sebas77/Svelto.ECS",
+          "url": "https://github.com/sebas77/Svelto.ECS",
+          "stars": 1363
+        },
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "zulfajuniadi/unity-ecs-navmesh",
+          "url": "https://github.com/zulfajuniadi/unity-ecs-navmesh",
+          "stars": 486
+        },
+        {
+          "repo": "chromealex/ecs",
+          "url": "https://github.com/chromealex/ecs",
+          "stars": 557
+        },
+        {
+          "repo": "Antoshidza/NSprites",
+          "url": "https://github.com/Antoshidza/NSprites",
+          "stars": 654
+        },
+        {
+          "repo": "scellecs/morpeh",
+          "url": "https://github.com/scellecs/morpeh",
+          "stars": 645
+        }
+      ]
+    },
+    "状态机_ai": {
+      "title": "状态机 AI",
+      "content": "敌怪状态机：移动/攻击/死亡",
+      "sources": [
+        {
+          "repo": "sebas77/Svelto.ECS",
+          "url": "https://github.com/sebas77/Svelto.ECS",
+          "stars": 1363
+        },
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        },
+        {
+          "repo": "quiver-dev/tower-defense-tutorial",
+          "url": "https://github.com/quiver-dev/tower-defense-tutorial",
+          "stars": 73
+        },
+        {
+          "repo": "quiver-dev/tower-defense-godot4",
+          "url": "https://github.com/quiver-dev/tower-defense-godot4",
+          "stars": 88
+        },
+        {
+          "repo": "MaiKuraki/UnityGameplayAbilitySystemSample",
+          "url": "https://github.com/MaiKuraki/UnityGameplayAbilitySystemSample",
+          "stars": 23
+        },
+        {
+          "repo": "ATHellboy/SampleProject-FightingGame",
+          "url": "https://github.com/ATHellboy/SampleProject-FightingGame",
+          "stars": 35
+        }
+      ]
+    },
+    "unity_桥接": {
+      "title": "Unity 桥接",
+      "content": "纯 ECS 逻辑与 GameObject 渲染层桥接方案",
+      "sources": [
+        {
+          "repo": "Gornhoth/Unity-Smoothed-Particle-Hydrodynamics",
+          "url": "https://github.com/Gornhoth/Unity-Smoothed-Particle-Hydrodynamics",
+          "stars": 85
+        },
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "No78Vino/gameplay-ability-system-for-unity",
+          "url": "https://github.com/No78Vino/gameplay-ability-system-for-unity",
+          "stars": 812
+        }
+      ]
+    },
+    "塔升级系统": {
+      "title": "塔升级系统",
+      "content": "塔等级/星级/进阶，属性成长曲线配置化",
+      "sources": [
+        {
+          "repo": "rparrett/taipo",
+          "url": "https://github.com/rparrett/taipo",
+          "stars": 88
+        },
+        {
+          "repo": "prabdhal/Tower-Defence-3D",
+          "url": "https://github.com/prabdhal/Tower-Defence-3D",
+          "stars": 23
+        },
+        {
+          "repo": "rickylai248/Bloons-Tower-Defense",
+          "url": "https://github.com/rickylai248/Bloons-Tower-Defense",
+          "stars": 12
+        }
+      ]
+    },
+    "伤害计算": {
+      "title": "伤害计算",
+      "content": "攻击/防御/暴击/属性缩放公式",
+      "sources": [
+        {
+          "repo": "intrxx/Obsidian",
+          "url": "https://github.com/intrxx/Obsidian",
+          "stars": 55
+        },
+        {
+          "repo": "Pantong51/GASContent",
+          "url": "https://github.com/Pantong51/GASContent",
+          "stars": 756
+        },
+        {
+          "repo": "Narxim/Narxim-GAS-Example",
+          "url": "https://github.com/Narxim/Narxim-GAS-Example",
+          "stars": 445
+        }
+      ]
+    },
+    "敌怪属性": {
+      "title": "敌怪属性",
+      "content": "敌怪血量/攻击/速度随波次成长",
+      "sources": [
+        {
+          "repo": "intrxx/Obsidian",
+          "url": "https://github.com/intrxx/Obsidian",
+          "stars": 55
+        },
+        {
+          "repo": "prabdhal/Tower-Defence-3D",
+          "url": "https://github.com/prabdhal/Tower-Defence-3D",
+          "stars": 23
+        }
+      ]
+    },
+    "行为树": {
+      "title": "行为树",
+      "content": "行为树节点：Sequence/Selector/Condition/Action",
+      "sources": [
+        {
+          "repo": "Pantong51/GASContent",
+          "url": "https://github.com/Pantong51/GASContent",
+          "stars": 756
+        },
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        }
+      ]
+    },
+    "性能优化": {
+      "title": "性能优化",
+      "content": "Burst 编译、NativeArray、JobSystem",
+      "sources": [
+        {
+          "repo": "keijiro/Voxelman",
+          "url": "https://github.com/keijiro/Voxelman",
+          "stars": 1974
+        },
+        {
+          "repo": "reeseschultz/ReeseUnityDemos",
+          "url": "https://github.com/reeseschultz/ReeseUnityDemos",
+          "stars": 525
+        },
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        }
+      ]
+    },
+    "系统更新": {
+      "title": "系统更新",
+      "content": "SystemBase 按组排序更新，数据逻辑分离",
+      "sources": [
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "AkanshDivker/Simple-ECS",
+          "url": "https://github.com/AkanshDivker/Simple-ECS",
+          "stars": 53
+        },
+        {
+          "repo": "annulusgames/MagicTween",
+          "url": "https://github.com/annulusgames/MagicTween",
+          "stars": 499
+        }
+      ]
+    },
+    "空间分区": {
+      "title": "空间分区",
+      "content": "GridSpatialHash O(1) 邻域查询，避免全量遍历",
+      "sources": [
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        }
+      ]
+    },
+    "寻路系统": {
+      "title": "寻路系统",
+      "content": "A*/BFS/网格寻路，敌人沿路径移动",
+      "sources": [
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "zulfajuniadi/unity-ecs-navmesh",
+          "url": "https://github.com/zulfajuniadi/unity-ecs-navmesh",
+          "stars": 486
+        },
+        {
+          "repo": "chromealex/ecs",
+          "url": "https://github.com/chromealex/ecs",
+          "stars": 557
+        },
+        {
+          "repo": "quiver-dev/tower-defense-tutorial",
+          "url": "https://github.com/quiver-dev/tower-defense-tutorial",
+          "stars": 73
+        },
+        {
+          "repo": "quiver-dev/tower-defense-godot4",
+          "url": "https://github.com/quiver-dev/tower-defense-godot4",
+          "stars": 88
+        },
+        {
+          "repo": "bartofzo/NativeTrees",
+          "url": "https://github.com/bartofzo/NativeTrees",
+          "stars": 478
+        }
+      ]
+    },
+    "路径点系统": {
+      "title": "路径点系统",
+      "content": "预定义路径点序列，支持分支路径",
+      "sources": [
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        }
+      ]
+    },
+    "渲染系统": {
+      "title": "渲染系统",
+      "content": "ECS 数据到 Unity 渲染的同步方案",
+      "sources": [
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        }
+      ]
+    },
+    "资源加载": {
+      "title": "资源加载",
+      "content": "Addressables 动态加载塔/敌怪/技能资源",
+      "sources": [
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        }
+      ]
+    },
+    "诱饵_吸引塔": {
+      "title": "诱饵/吸引塔",
+      "content": "吸引敌人偏离路径或攻击诱饵而非基地",
+      "sources": [
+        {
+          "repo": "zulfajuniadi/unity-ecs-navmesh",
+          "url": "https://github.com/zulfajuniadi/unity-ecs-navmesh",
+          "stars": 486
+        },
+        {
+          "repo": "pshenok/server-survival",
+          "url": "https://github.com/pshenok/server-survival",
+          "stars": 5760
+        }
+      ]
+    },
+    "踩踏_冲锋": {
+      "title": "踩踏/冲锋",
+      "content": "Boss 直线冲锋伤害路径上的单位",
+      "sources": [
+        {
+          "repo": "zulfajuniadi/unity-ecs-navmesh",
+          "url": "https://github.com/zulfajuniadi/unity-ecs-navmesh",
+          "stars": 486
+        },
+        {
+          "repo": "pshenok/server-survival",
+          "url": "https://github.com/pshenok/server-survival",
+          "stars": 5760
+        },
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        },
+        {
+          "repo": "ATHellboy/SampleProject-FightingGame",
+          "url": "https://github.com/ATHellboy/SampleProject-FightingGame",
+          "stars": 35
+        }
+      ]
+    },
+    "n击护盾_屏障": {
+      "title": "N击护盾/屏障",
+      "content": "需N次命中击破的护盾，或伤害阈值盾",
+      "sources": [
+        {
+          "repo": "FlameskyDexive/Legends-Of-Heroes",
+          "url": "https://github.com/FlameskyDexive/Legends-Of-Heroes",
+          "stars": 895
+        },
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        },
+        {
+          "repo": "PixeyeHQ/actors.unity",
+          "url": "https://github.com/PixeyeHQ/actors.unity",
+          "stars": 761
+        },
+        {
+          "repo": "chromealex/ecs",
+          "url": "https://github.com/chromealex/ecs",
+          "stars": 557
+        },
+        {
+          "repo": "mjaun/android-anuto",
+          "url": "https://github.com/mjaun/android-anuto",
+          "stars": 235
+        },
+        {
+          "repo": "pshenok/server-survival",
+          "url": "https://github.com/pshenok/server-survival",
+          "stars": 5760
+        },
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        },
+        {
+          "repo": "PhysaliaStudio/Flexi",
+          "url": "https://github.com/PhysaliaStudio/Flexi",
+          "stars": 235
+        },
+        {
+          "repo": "scellecs/morpeh",
+          "url": "https://github.com/scellecs/morpeh",
+          "stars": 645
+        },
+        {
+          "repo": "EcsRx/ecsrx.unity",
+          "url": "https://github.com/EcsRx/ecsrx.unity",
+          "stars": 421
+        },
+        {
+          "repo": "annulusgames/MagicTween",
+          "url": "https://github.com/annulusgames/MagicTween",
+          "stars": 499
+        },
+        {
+          "repo": "Alex-Rachel/TEngine",
+          "url": "https://github.com/Alex-Rachel/TEngine",
+          "stars": 2175
+        },
+        {
+          "repo": "archangel4031/Myra",
+          "url": "https://github.com/archangel4031/Myra",
+          "stars": 81
+        }
+      ]
+    },
+    "范围溅射": {
+      "title": "范围溅射",
+      "content": "命中目标后对周围敌人造成范围伤害",
+      "sources": [
+        {
+          "repo": "prabdhal/Tower-Defence-3D",
+          "url": "https://github.com/prabdhal/Tower-Defence-3D",
+          "stars": 23
+        },
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        },
+        {
+          "repo": "maciej-trebacz/tower-of-time-game",
+          "url": "https://github.com/maciej-trebacz/tower-of-time-game",
+          "stars": 368
+        },
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        },
+        {
+          "repo": "CompleteUnityDeveloper/07-Glitch-Garden",
+          "url": "https://github.com/CompleteUnityDeveloper/07-Glitch-Garden",
+          "stars": 27
+        },
+        {
+          "repo": "rickylai248/Bloons-Tower-Defense",
+          "url": "https://github.com/rickylai248/Bloons-Tower-Defense",
+          "stars": 12
+        },
+        {
+          "repo": "Alex-Rachel/TEngine",
+          "url": "https://github.com/Alex-Rachel/TEngine",
+          "stars": 2175
+        }
+      ]
+    },
+    "锁链_连接": {
+      "title": "锁链/连接",
+      "content": "两个敌人生命/伤害共享，强制绑定",
+      "sources": [
+        {
+          "repo": "prabdhal/Tower-Defence-3D",
+          "url": "https://github.com/prabdhal/Tower-Defence-3D",
+          "stars": 23
+        },
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        },
+        {
+          "repo": "PixeyeHQ/actors.unity",
+          "url": "https://github.com/PixeyeHQ/actors.unity",
+          "stars": 761
+        },
+        {
+          "repo": "chromealex/ecs",
+          "url": "https://github.com/chromealex/ecs",
+          "stars": 557
+        },
+        {
+          "repo": "ape1121/Godot-4-Tower-Defense-Template",
+          "url": "https://github.com/ape1121/Godot-4-Tower-Defense-Template",
+          "stars": 64
+        },
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        },
+        {
+          "repo": "MNoya/Element-TD",
+          "url": "https://github.com/MNoya/Element-TD",
+          "stars": 66
+        },
+        {
+          "repo": "Casmo/tower-defense",
+          "url": "https://github.com/Casmo/tower-defense",
+          "stars": 124
+        },
+        {
+          "repo": "annulusgames/MagicTween",
+          "url": "https://github.com/annulusgames/MagicTween",
+          "stars": 499
+        },
+        {
+          "repo": "DrFlower/TowerDefense-GameFramework-Demo",
+          "url": "https://github.com/DrFlower/TowerDefense-GameFramework-Demo",
+          "stars": 2072
+        }
+      ]
+    },
+    "恐惧_混乱": {
+      "title": "恐惧/混乱",
+      "content": "敌人反向逃跑或随机移动，CC 状态",
+      "sources": [
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        },
+        {
+          "repo": "PixeyeHQ/actors.unity",
+          "url": "https://github.com/PixeyeHQ/actors.unity",
+          "stars": 761
+        },
+        {
+          "repo": "pshenok/server-survival",
+          "url": "https://github.com/pshenok/server-survival",
+          "stars": 5760
+        },
+        {
+          "repo": "ape1121/Godot-4-Tower-Defense-Template",
+          "url": "https://github.com/ape1121/Godot-4-Tower-Defense-Template",
+          "stars": 64
+        },
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        },
+        {
+          "repo": "CompleteUnityDeveloper/07-Glitch-Garden",
+          "url": "https://github.com/CompleteUnityDeveloper/07-Glitch-Garden",
+          "stars": 27
+        },
+        {
+          "repo": "annulusgames/MagicTween",
+          "url": "https://github.com/annulusgames/MagicTween",
+          "stars": 499
+        },
+        {
+          "repo": "sjai013/unity-gameplay-ability-system",
+          "url": "https://github.com/sjai013/unity-gameplay-ability-system",
+          "stars": 1081
+        }
+      ]
+    },
+    "分裂_克隆": {
+      "title": "分裂/克隆",
+      "content": "敌人死后分裂为多个小怪，或主动克隆",
+      "sources": [
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        },
+        {
+          "repo": "pshenok/server-survival",
+          "url": "https://github.com/pshenok/server-survival",
+          "stars": 5760
+        },
+        {
+          "repo": "ape1121/Godot-4-Tower-Defense-Template",
+          "url": "https://github.com/ape1121/Godot-4-Tower-Defense-Template",
+          "stars": 64
+        },
+        {
+          "repo": "quiver-dev/tower-defense-tutorial",
+          "url": "https://github.com/quiver-dev/tower-defense-tutorial",
+          "stars": 73
+        },
+        {
+          "repo": "quiver-dev/tower-defense-godot4",
+          "url": "https://github.com/quiver-dev/tower-defense-godot4",
+          "stars": 88
+        },
+        {
+          "repo": "SanderMertens/tower_defense",
+          "url": "https://github.com/SanderMertens/tower_defense",
+          "stars": 96
+        },
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        },
+        {
+          "repo": "OctoD/godot-gameplay-abilities",
+          "url": "https://github.com/OctoD/godot-gameplay-abilities",
+          "stars": 70
+        },
+        {
+          "repo": "MaiKuraki/UnityGameplayAbilitySystemSample",
+          "url": "https://github.com/MaiKuraki/UnityGameplayAbilitySystemSample",
+          "stars": 23
+        },
+        {
+          "repo": "rickylai248/Bloons-Tower-Defense",
+          "url": "https://github.com/rickylai248/Bloons-Tower-Defense",
+          "stars": 12
+        },
+        {
+          "repo": "EcsRx/ecsrx.unity",
+          "url": "https://github.com/EcsRx/ecsrx.unity",
+          "stars": 421
+        },
+        {
+          "repo": "Alex-Rachel/TEngine",
+          "url": "https://github.com/Alex-Rachel/TEngine",
+          "stars": 2175
+        },
+        {
+          "repo": "dgkanatsios/TowerDefense",
+          "url": "https://github.com/dgkanatsios/TowerDefense",
+          "stars": 196
+        },
+        {
+          "repo": "Groundbreakers/Groundbreakers",
+          "url": "https://github.com/Groundbreakers/Groundbreakers",
+          "stars": 12
+        },
+        {
+          "repo": "sjai013/unity-gameplay-ability-system",
+          "url": "https://github.com/sjai013/unity-gameplay-ability-system",
+          "stars": 1081
+        },
+        {
+          "repo": "imnazake/Unify",
+          "url": "https://github.com/imnazake/Unify",
+          "stars": 19
+        }
+      ]
+    },
+    "施法可打断": {
+      "title": "施法可打断",
+      "content": "敌人施法有前摇，可被CC打断",
+      "sources": [
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        },
+        {
+          "repo": "chromealex/ecs",
+          "url": "https://github.com/chromealex/ecs",
+          "stars": 557
+        },
+        {
+          "repo": "EcsRx/ecsrx.unity",
+          "url": "https://github.com/EcsRx/ecsrx.unity",
+          "stars": 421
+        }
+      ]
+    },
+    "弧线弹道": {
+      "title": "弧线弹道",
+      "content": "迫击炮/抛射弹道，无视地形障碍",
+      "sources": [
+        {
+          "repo": "PixeyeHQ/actors.unity",
+          "url": "https://github.com/PixeyeHQ/actors.unity",
+          "stars": 761
+        },
+        {
+          "repo": "chromealex/ecs",
+          "url": "https://github.com/chromealex/ecs",
+          "stars": 557
+        },
+        {
+          "repo": "Antoshidza/NSprites",
+          "url": "https://github.com/Antoshidza/NSprites",
+          "stars": 654
+        },
+        {
+          "repo": "v1vendi/minimal_ue5_GAS_demo",
+          "url": "https://github.com/v1vendi/minimal_ue5_GAS_demo",
+          "stars": 18
+        },
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        },
+        {
+          "repo": "MNoya/Element-TD",
+          "url": "https://github.com/MNoya/Element-TD",
+          "stars": 66
+        },
+        {
+          "repo": "scellecs/morpeh",
+          "url": "https://github.com/scellecs/morpeh",
+          "stars": 645
+        },
+        {
+          "repo": "annulusgames/MagicTween",
+          "url": "https://github.com/annulusgames/MagicTween",
+          "stars": 499
+        },
+        {
+          "repo": "DrFlower/TowerDefense-GameFramework-Demo",
+          "url": "https://github.com/DrFlower/TowerDefense-GameFramework-Demo",
+          "stars": 2072
+        },
+        {
+          "repo": "ATHellboy/SampleProject-FightingGame",
+          "url": "https://github.com/ATHellboy/SampleProject-FightingGame",
+          "stars": 35
+        },
+        {
+          "repo": "archangel4031/Myra",
+          "url": "https://github.com/archangel4031/Myra",
+          "stars": 81
+        }
+      ]
+    },
+    "处决_死亡标记": {
+      "title": "处决/死亡标记",
+      "content": "目标血量低于阈值自动处决，额外金币",
+      "sources": [
+        {
+          "repo": "PixeyeHQ/actors.unity",
+          "url": "https://github.com/PixeyeHQ/actors.unity",
+          "stars": 761
+        },
+        {
+          "repo": "Antoshidza/NSprites",
+          "url": "https://github.com/Antoshidza/NSprites",
+          "stars": 654
+        },
+        {
+          "repo": "v1vendi/minimal_ue5_GAS_demo",
+          "url": "https://github.com/v1vendi/minimal_ue5_GAS_demo",
+          "stars": 18
+        },
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        },
+        {
+          "repo": "PhysaliaStudio/Flexi",
+          "url": "https://github.com/PhysaliaStudio/Flexi",
+          "stars": 235
+        },
+        {
+          "repo": "MaiKuraki/UnityGameplayAbilitySystemSample",
+          "url": "https://github.com/MaiKuraki/UnityGameplayAbilitySystemSample",
+          "stars": 23
+        },
+        {
+          "repo": "scellecs/morpeh",
+          "url": "https://github.com/scellecs/morpeh",
+          "stars": 645
+        },
+        {
+          "repo": "CompleteUnityDeveloper/07-Glitch-Garden",
+          "url": "https://github.com/CompleteUnityDeveloper/07-Glitch-Garden",
+          "stars": 27
+        },
+        {
+          "repo": "annulusgames/MagicTween",
+          "url": "https://github.com/annulusgames/MagicTween",
+          "stars": 499
+        },
+        {
+          "repo": "sjai013/unity-gameplay-ability-system",
+          "url": "https://github.com/sjai013/unity-gameplay-ability-system",
+          "stars": 1081
+        }
+      ]
+    },
+    "拉扯_吸引": {
+      "title": "拉扯/吸引",
+      "content": "将敌人拉向塔或特定位置",
+      "sources": [
+        {
+          "repo": "Antoshidza/NSprites",
+          "url": "https://github.com/Antoshidza/NSprites",
+          "stars": 654
+        },
+        {
+          "repo": "ape1121/Godot-4-Tower-Defense-Template",
+          "url": "https://github.com/ape1121/Godot-4-Tower-Defense-Template",
+          "stars": 64
+        },
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        },
+        {
+          "repo": "EcsRx/ecsrx.unity",
+          "url": "https://github.com/EcsRx/ecsrx.unity",
+          "stars": 421
+        },
+        {
+          "repo": "Alex-Rachel/TEngine",
+          "url": "https://github.com/Alex-Rachel/TEngine",
+          "stars": 2175
+        }
+      ]
+    },
+    "塔变形_形态切换": {
+      "title": "塔变形/形态切换",
+      "content": "塔可在多种形态间切换（对单/对群/控制）",
+      "sources": [
+        {
+          "repo": "pshenok/server-survival",
+          "url": "https://github.com/pshenok/server-survival",
+          "stars": 5760
+        }
+      ]
+    },
+    "失衡_破防_击退": {
+      "title": "失衡/破防/击退",
+      "content": "累积伤害触发硬直/击退/打断施法",
+      "sources": [
+        {
+          "repo": "pshenok/server-survival",
+          "url": "https://github.com/pshenok/server-survival",
+          "stars": 5760
+        },
+        {
+          "repo": "techwithtim/Tower-Defense-Game",
+          "url": "https://github.com/techwithtim/Tower-Defense-Game",
+          "stars": 399
+        },
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        },
+        {
+          "repo": "Rangerz132/gas-unity",
+          "url": "https://github.com/Rangerz132/gas-unity",
+          "stars": 16
+        },
+        {
+          "repo": "annulusgames/MagicTween",
+          "url": "https://github.com/annulusgames/MagicTween",
+          "stars": 499
+        },
+        {
+          "repo": "Groundbreakers/Groundbreakers",
+          "url": "https://github.com/Groundbreakers/Groundbreakers",
+          "stars": 12
+        },
+        {
+          "repo": "archangel4031/Myra",
+          "url": "https://github.com/archangel4031/Myra",
+          "stars": 81
+        }
+      ]
+    },
+    "穿透弹道": {
+      "title": "穿透弹道",
+      "content": "子弹穿过敌人继续飞行，线性伤害",
+      "sources": [
+        {
+          "repo": "ape1121/Godot-4-Tower-Defense-Template",
+          "url": "https://github.com/ape1121/Godot-4-Tower-Defense-Template",
+          "stars": 64
+        }
+      ]
+    },
+    "塔能量_法力": {
+      "title": "塔能量/法力",
+      "content": "塔消耗法力攻击，法力恢复/消耗管理",
+      "sources": [
+        {
+          "repo": "maciej-trebacz/tower-of-time-game",
+          "url": "https://github.com/maciej-trebacz/tower-of-time-game",
+          "stars": 368
+        },
+        {
+          "repo": "Rangerz132/gas-unity",
+          "url": "https://github.com/Rangerz132/gas-unity",
+          "stars": 16
+        }
+      ]
+    },
+    "相位_幽灵敌人": {
+      "title": "相位/幽灵敌人",
+      "content": "敌人可穿越塔/障碍，免疫物理伤害",
+      "sources": [
+        {
+          "repo": "maciej-trebacz/tower-of-time-game",
+          "url": "https://github.com/maciej-trebacz/tower-of-time-game",
+          "stars": 368
+        },
+        {
+          "repo": "v1vendi/minimal_ue5_GAS_demo",
+          "url": "https://github.com/v1vendi/minimal_ue5_GAS_demo",
+          "stars": 18
+        },
+        {
+          "repo": "archangel4031/Myra",
+          "url": "https://github.com/archangel4031/Myra",
+          "stars": 81
+        }
+      ]
+    },
+    "敌怪_ai": {
+      "title": "敌怪 AI",
+      "content": "AI 决策：追踪/逃跑/施法/躲避",
+      "sources": [
+        {
+          "repo": "quiver-dev/tower-defense-tutorial",
+          "url": "https://github.com/quiver-dev/tower-defense-tutorial",
+          "stars": 73
+        },
+        {
+          "repo": "quiver-dev/tower-defense-godot4",
+          "url": "https://github.com/quiver-dev/tower-defense-godot4",
+          "stars": 88
+        }
+      ]
+    },
+    "弹跳弹道": {
+      "title": "弹跳弹道",
+      "content": "子弹碰到目标后弹向下一目标",
+      "sources": [
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        }
+      ]
+    },
+    "光束_激光塔": {
+      "title": "光束/激光塔",
+      "content": "持续照射敌人，每帧 tick 伤害。预热/过热机制",
+      "sources": [
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        }
+      ]
+    },
+    "巡逻_移动塔": {
+      "title": "巡逻/移动塔",
+      "content": "塔可沿路径移动，动态调整防守位置",
+      "sources": [
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        }
+      ]
+    },
+    "钻地_潜行": {
+      "title": "钻地/潜行",
+      "content": "敌人钻入地下躲避攻击，然后冒出",
+      "sources": [
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        }
+      ]
+    },
+    "伤害反弹_反击": {
+      "title": "伤害反弹/反击",
+      "content": "受到攻击时反弹百分比伤害给攻击者",
+      "sources": [
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        },
+        {
+          "repo": "scellecs/morpeh",
+          "url": "https://github.com/scellecs/morpeh",
+          "stars": 645
+        }
+      ]
+    },
+    "过量伤害_溢出": {
+      "title": "过量伤害/溢出",
+      "content": "伤害超过目标血量时溢出给周围敌人",
+      "sources": [
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        },
+        {
+          "repo": "bartofzo/NativeTrees",
+          "url": "https://github.com/bartofzo/NativeTrees",
+          "stars": 478
+        }
+      ]
+    },
+    "子弹时间": {
+      "title": "子弹时间",
+      "content": "全局/局部时间减速，仅敌人受影响",
+      "sources": [
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "url": "https://github.com/danderfer/Comp_Sci_Sem_2",
+          "stars": 180
+        }
+      ]
+    },
+    "成长曲线": {
+      "title": "成长曲线",
+      "content": "经验/等级/敌人强度曲线配置化",
+      "sources": [
+        {
+          "repo": "CompleteUnityDeveloper/07-Glitch-Garden",
+          "url": "https://github.com/CompleteUnityDeveloper/07-Glitch-Garden",
+          "stars": 27
+        }
+      ]
+    }
+  },
+  "generic_patterns": {
+    "状态机模式": {
+      "title": "状态机模式",
+      "content": "状态转换清晰，可视化",
+      "sources": [
+        {
+          "repo": "sebas77/Svelto.ECS",
+          "url": "https://github.com/sebas77/Svelto.ECS",
+          "stars": 1363
+        },
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        },
+        {
+          "repo": "quiver-dev/tower-defense-tutorial",
+          "url": "https://github.com/quiver-dev/tower-defense-tutorial",
+          "stars": 73
+        },
+        {
+          "repo": "quiver-dev/tower-defense-godot4",
+          "url": "https://github.com/quiver-dev/tower-defense-godot4",
+          "stars": 88
+        },
+        {
+          "repo": "MaiKuraki/UnityGameplayAbilitySystemSample",
+          "url": "https://github.com/MaiKuraki/UnityGameplayAbilitySystemSample",
+          "stars": 23
+        },
+        {
+          "repo": "ATHellboy/SampleProject-FightingGame",
+          "url": "https://github.com/ATHellboy/SampleProject-FightingGame",
+          "stars": 35
+        }
+      ]
+    },
+    "缓存友好": {
+      "title": "缓存友好",
+      "content": "数据连续布局，缓存命中优先",
+      "sources": [
+        {
+          "repo": "sebas77/Svelto.ECS",
+          "url": "https://github.com/sebas77/Svelto.ECS",
+          "stars": 1363
+        }
+      ]
+    },
+    "scriptableobject": {
+      "title": "ScriptableObject",
+      "content": "数据资产化，配置与代码分离",
+      "sources": [
+        {
+          "repo": "sajad0131/Unity-Gameplay-Ability-System",
+          "url": "https://github.com/sajad0131/Unity-Gameplay-Ability-System",
+          "stars": 34
+        },
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "No78Vino/gameplay-ability-system-for-unity",
+          "url": "https://github.com/No78Vino/gameplay-ability-system-for-unity",
+          "stars": 812
+        },
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        },
+        {
+          "repo": "Rangerz132/gas-unity",
+          "url": "https://github.com/Rangerz132/gas-unity",
+          "stars": 16
+        },
+        {
+          "repo": "scellecs/morpeh",
+          "url": "https://github.com/scellecs/morpeh",
+          "stars": 645
+        },
+        {
+          "repo": "ATHellboy/SampleProject-FightingGame",
+          "url": "https://github.com/ATHellboy/SampleProject-FightingGame",
+          "stars": 35
+        },
+        {
+          "repo": "sjai013/unity-gameplay-ability-system",
+          "url": "https://github.com/sjai013/unity-gameplay-ability-system",
+          "stars": 1081
+        }
+      ]
+    },
+    "事件总线": {
+      "title": "事件总线",
+      "content": "解耦系统通信，Publish/Subscribe",
+      "sources": [
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "PixeyeHQ/actors.unity",
+          "url": "https://github.com/PixeyeHQ/actors.unity",
+          "stars": 761
+        }
+      ]
+    },
+    "结构体优先": {
+      "title": "结构体优先",
+      "content": "小型固定数据用 struct，避免 GC",
+      "sources": [
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        },
+        {
+          "repo": "scellecs/morpeh",
+          "url": "https://github.com/scellecs/morpeh",
+          "stars": 645
+        }
+      ]
+    },
+    "gc_优化": {
+      "title": "GC 优化",
+      "content": "对象池、数组复用、避免每帧 new",
+      "sources": [
+        {
+          "repo": "killop/anything_about_game",
+          "url": "https://github.com/killop/anything_about_game",
+          "stars": 3922
+        }
+      ]
+    },
+    "serializefield": {
+      "title": "SerializeField",
+      "content": "Inspector 调试，保留封装",
+      "sources": [
+        {
+          "repo": "No78Vino/gameplay-ability-system-for-unity",
+          "url": "https://github.com/No78Vino/gameplay-ability-system-for-unity",
+          "stars": 812
+        },
+        {
+          "repo": "sjai013/unity-gameplay-ability-system",
+          "url": "https://github.com/sjai013/unity-gameplay-ability-system",
+          "stars": 1081
+        }
+      ]
+    },
+    "对象池模式": {
+      "title": "对象池模式",
+      "content": "复用对象，减少 Instantiate/Destroy",
+      "sources": [
+        {
+          "repo": "MaiKuraki/UnityStarter",
+          "url": "https://github.com/MaiKuraki/UnityStarter",
+          "stars": 574
+        },
+        {
+          "repo": "PixeyeHQ/actors.unity",
+          "url": "https://github.com/PixeyeHQ/actors.unity",
+          "stars": 761
+        },
+        {
+          "repo": "ATHellboy/SampleProject-FightingGame",
+          "url": "https://github.com/ATHellboy/SampleProject-FightingGame",
+          "stars": 35
+        }
+      ]
+    }
+  },
+  "dir_patterns": {
+    "ecs_架构": {
+      "label": "ECS 架构",
+      "sources": [
+        {
+          "repo": "sebas77/Svelto.ECS",
+          "path": "com.sebaslab.svelto.ecs",
+          "stars": 1363
+        },
+        {
+          "repo": "Gornhoth/Unity-Smoothed-Particle-Hydrodynamics",
+          "path": "DOTS_ECS",
+          "stars": 85
+        },
+        {
+          "repo": "scellecs/morpeh",
+          "path": "Scellecs.Morpeh",
+          "stars": 645
+        }
+      ]
+    },
+    "配置数据": {
+      "label": "配置数据",
+      "sources": [
+        {
+          "repo": "DruidMech/GameplayAbilitySystem_Aura",
+          "path": "Config",
+          "stars": 776
+        },
+        {
+          "repo": "DruidMech/GameplayAbilitySystem_Aura",
+          "path": "Data",
+          "stars": 776
+        },
+        {
+          "repo": "intrxx/Obsidian",
+          "path": "Config",
+          "stars": 55
+        },
+        {
+          "repo": "intrxx/Obsidian",
+          "path": "Data",
+          "stars": 55
+        },
+        {
+          "repo": "Narxim/Narxim-GAS-Example",
+          "path": "Config",
+          "stars": 445
+        },
+        {
+          "repo": "vahabahmadvand/ActionRPG_UE5",
+          "path": "Config",
+          "stars": 371
+        },
+        {
+          "repo": "hangge1/GAS_Dura",
+          "path": "Config",
+          "stars": 44
+        },
+        {
+          "repo": "hangge1/GAS_Dura",
+          "path": "Data",
+          "stars": 44
+        },
+        {
+          "repo": "realchrisparker/ParagonGAS",
+          "path": "Config",
+          "stars": 35
+        },
+        {
+          "repo": "genxium/BuildingAndCraftingAndTowerDefenseGame",
+          "path": "database",
+          "stars": 378
+        },
+        {
+          "repo": "channingallen/tower-defense",
+          "path": "config",
+          "stars": 608
+        },
+        {
+          "repo": "seiko-dev/GAS_Combo",
+          "path": "Config",
+          "stars": 77
+        },
+        {
+          "repo": "v1vendi/minimal_ue5_GAS_demo",
+          "path": "Config",
+          "stars": 18
+        },
+        {
+          "repo": "LordWake/Unreal-2021-GameplayAbilitySystem",
+          "path": "Config",
+          "stars": 17
+        },
+        {
+          "repo": "danderfer/Comp_Sci_Sem_2",
+          "path": "100_DataScience",
+          "stars": 180
+        },
+        {
+          "repo": "bp-shirai/ue5-warrior",
+          "path": "Config",
+          "stars": 54
+        },
+        {
+          "repo": "Alex-Rachel/TEngine",
+          "path": "Configs",
+          "stars": 2175
+        },
+        {
+          "repo": "Alex-Rachel/TEngine",
+          "path": "GameConfig",
+          "stars": 2175
+        },
+        {
+          "repo": "dsavosin/SimpleGAS",
+          "path": "Config",
+          "stars": 23
+        },
+        {
+          "repo": "make-live/multiplayer",
+          "path": "Config",
+          "stars": 142
+        },
+        {
+          "repo": "strayTrain/SimpleGameplayAbilitySystem",
+          "path": "Config",
+          "stars": 98
+        },
+        {
+          "repo": "sjai013/unity-gameplay-ability-system",
+          "path": "AddressableAssetsData",
+          "stars": 1081
+        },
+        {
+          "repo": "imnazake/Unify",
+          "path": "Config",
+          "stars": 19
+        },
+        {
+          "repo": "archangel4031/Myra",
+          "path": "Config",
+          "stars": 81
+        },
+        {
+          "repo": "fpwong/FPGameplayAbilities",
+          "path": "Config",
+          "stars": 33
+        }
+      ]
+    },
+    "性能优化": {
+      "label": "性能优化",
+      "sources": [
+        {
+          "repo": "needle-mirror/com.unity.entities.graphics",
+          "path": "Unity.Entities.Graphics.PerformanceTests",
+          "stars": 27
+        },
+        {
+          "repo": "scellecs/morpeh",
+          "path": "Benchmarks",
+          "stars": 645
+        },
+        {
+          "repo": "annulusgames/MagicTween",
+          "path": "MagicTween.Benchmarks",
+          "stars": 499
+        }
+      ]
+    },
+    "ai_行为树": {
+      "label": "AI/行为树",
+      "sources": [
+        {
+          "repo": "pshenok/server-survival",
+          "path": "campaign",
+          "stars": 5760
+        },
+        {
+          "repo": "ape1121/Godot-4-Tower-Defense-Template",
+          "path": "main",
+          "stars": 64
+        },
+        {
+          "repo": "techwithtim/Tower-Defense-Game",
+          "path": "main_menu",
+          "stars": 399
+        },
+        {
+          "repo": "DrFlower/TowerDefense-GameFramework-Demo",
+          "path": "GameMain",
+          "stars": 2072
+        },
+        {
+          "repo": "dsavosin/SimpleGAS",
+          "path": "ParagonWraith",
+          "stars": 23
+        }
+      ]
+    },
+    "弹道系统": {
+      "label": "弹道系统",
+      "sources": [
+        {
+          "repo": "ape1121/Godot-4-Tower-Defense-Template",
+          "path": "bullets",
+          "stars": 64
+        },
+        {
+          "repo": "quiver-dev/tower-defense-tutorial",
+          "path": "projectiles",
+          "stars": 73
+        },
+        {
+          "repo": "quiver-dev/tower-defense-godot4",
+          "path": "projectiles",
+          "stars": 88
+        }
+      ]
+    },
+    "敌怪系统": {
+      "label": "敌怪系统",
+      "sources": [
+        {
+          "repo": "ape1121/Godot-4-Tower-Defense-Template",
+          "path": "enemies",
+          "stars": 64
+        },
+        {
+          "repo": "quiver-dev/tower-defense-tutorial",
+          "path": "enemies",
+          "stars": 73
+        },
+        {
+          "repo": "techwithtim/Tower-Defense-Game",
+          "path": "enemies",
+          "stars": 399
+        },
+        {
+          "repo": "quiver-dev/tower-defense-godot4",
+          "path": "enemies",
+          "stars": 88
+        },
+        {
+          "repo": "Casmo/tower-defense",
+          "path": "enemies",
+          "stars": 124
+        },
+        {
+          "repo": "rickylai248/Bloons-Tower-Defense",
+          "path": "enemies",
+          "stars": 12
+        }
+      ]
+    },
+    "系统_组件分离": {
+      "label": "系统/组件分离",
+      "sources": [
+        {
+          "repo": "maciej-trebacz/tower-of-time-game",
+          "path": "components",
+          "stars": 368
+        },
+        {
+          "repo": "maciej-trebacz/tower-of-time-game",
+          "path": "systems",
+          "stars": 368
+        },
+        {
+          "repo": "Daivuk/tddod",
+          "path": "components",
+          "stars": 61
+        },
+        {
+          "repo": "Daivuk/tddod",
+          "path": "systems",
+          "stars": 61
+        }
+      ]
+    },
+    "塔系统": {
+      "label": "塔系统",
+      "sources": [
+        {
+          "repo": "quiver-dev/tower-defense-tutorial",
+          "path": "towers",
+          "stars": 73
+        },
+        {
+          "repo": "techwithtim/Tower-Defense-Game",
+          "path": "towers",
+          "stars": 399
+        },
+        {
+          "repo": "SanderMertens/tower_defense",
+          "path": "tower_defense",
+          "stars": 96
+        },
+        {
+          "repo": "Casmo/tower-defense",
+          "path": "towers",
+          "stars": 124
+        },
+        {
+          "repo": "Casmo/tower-defense",
+          "path": "TowerDefense",
+          "stars": 124
+        },
+        {
+          "repo": "rickylai248/Bloons-Tower-Defense",
+          "path": "towers",
+          "stars": 12
+        },
+        {
+          "repo": "Brackeys/Tower-Defense-Tutorial",
+          "path": "Tower Defense Unity Project",
+          "stars": 524
+        }
+      ]
+    },
+    "波次系统": {
+      "label": "波次系统",
+      "sources": [
+        {
+          "repo": "quiver-dev/tower-defense-tutorial",
+          "path": "spawner",
+          "stars": 73
+        }
+      ]
+    },
+    "gas_技能系统": {
+      "label": "GAS 技能系统",
+      "sources": [
+        {
+          "repo": "v1vendi/minimal_ue5_GAS_demo",
+          "path": "MinimalGASDemo",
+          "stars": 18
+        },
+        {
+          "repo": "MaiKuraki/UnityGameplayAbilitySystemSample",
+          "path": "GASSample",
+          "stars": 23
+        },
+        {
+          "repo": "Rangerz132/gas-unity",
+          "path": "gas-unity_BurstDebugInformation_DoNotShip",
+          "stars": 16
+        },
+        {
+          "repo": "Rangerz132/gas-unity",
+          "path": "gas-unity_Data",
+          "stars": 16
+        },
+        {
+          "repo": "dsavosin/SimpleGAS",
+          "path": "Abilities",
+          "stars": 23
+        },
+        {
+          "repo": "dsavosin/SimpleGAS",
+          "path": "SimpleGAS",
+          "stars": 23
+        },
+        {
+          "repo": "fpwong/FPGameplayAbilities",
+          "path": "FPGameplayAbilities",
+          "stars": 33
+        }
+      ]
+    },
+    "技能_能力系统": {
+      "label": "技能/能力系统",
+      "sources": [
+        {
+          "repo": "LordWake/Unreal-2021-GameplayAbilitySystem",
+          "path": "AbilitySystem",
+          "stars": 17
+        },
+        {
+          "repo": "strayTrain/SimpleGameplayAbilitySystem",
+          "path": "SimpleGameplayAbilitySystem",
+          "stars": 98
+        },
+        {
+          "repo": "strayTrain/SimpleGameplayAbilitySystem",
+          "path": "SimpleGameplayAbilitySystemEditor",
+          "stars": 98
+        },
+        {
+          "repo": "sjai013/unity-gameplay-ability-system",
+          "path": "My Gameplay Ability System",
+          "stars": 1081
+        },
+        {
+          "repo": "sjai013/unity-gameplay-ability-system",
+          "path": "com.sjai013.abilitysystem",
+          "stars": 1081
+        },
+        {
+          "repo": "imnazake/Unify",
+          "path": "AbilitySystem",
+          "stars": 19
+        }
+      ]
+    },
+    "事件系统": {
+      "label": "事件系统",
+      "sources": [
+        {
+          "repo": "Alex-Rachel/TEngine",
+          "path": "GameEventSourceGenerator",
+          "stars": 2175
+        },
+        {
+          "repo": "imnazake/Unify",
+          "path": "GameplayMessageRouter",
+          "stars": 19
+        }
+      ]
+    }
+  },
+  "insights": [
+    {
+      "text": "While other frameworks typically limit user freedom to avoid exposing flaws in the archetype-based concept, Svelto.",
+      "repo": "sebas77/Svelto.ECS",
+      "date": "2026-05-31"
+    },
+    {
+      "text": "That's a best practice (Based on working experience), that's not only for Attributes Sets, but for any C++ class that might get reference by another object.",
+      "repo": "Narxim/Narxim-GAS-Example",
+      "date": "2026-06-01"
+    },
+    {
+      "text": "The reason is simple: a game should avoid rubber-banding death.",
+      "repo": "Narxim/Narxim-GAS-Example",
+      "date": "2026-06-01"
+    },
+    {
+      "text": "It allows you to avoid using third-party services such as Playful, PAN, or Smartfox server.",
+      "repo": "killop/anything_about_game",
+      "date": "2026-06-03"
+    },
+    {
+      "text": "This is a very powerful concept and I don't recommend to use it until you really understand what are you doing.",
+      "repo": "PixeyeHQ/actors.unity",
+      "date": "2026-06-03"
+    },
+    {
+      "text": "Recommend to have experienced programming skill.",
+      "repo": "PhysaliaStudio/Flexi",
+      "date": "2026-06-04"
+    },
+    {
+      "text": "- Increases a character's ability to avoid incoming attacks.",
+      "repo": "Rangerz132/gas-unity",
+      "date": "2026-06-05"
+    },
+    {
+      "text": "> We recommend that in places where you are in doubt about using this attribute, you check everything for null yourself.",
+      "repo": "scellecs/morpeh",
+      "date": "2026-06-05"
+    },
+    {
+      "text": "* `MORPEH_NON_SERIALIZED` Define to avoid serialization of Morpeh core parts.",
+      "repo": "scellecs/morpeh",
+      "date": "2026-06-05"
+    },
+    {
+      "text": "It's recommended to use extension methods when available.",
+      "repo": "annulusgames/MagicTween",
+      "date": "2026-06-05"
+    },
+    {
+      "text": "In most cases, the impact on performance is minimal, but it's recommended to avoid using callbacks when creating a large number of tweens.",
+      "repo": "annulusgames/MagicTween",
+      "date": "2026-06-05"
+    },
+    {
+      "text": "It is not recommended to use Myra in production just yet.",
+      "repo": "archangel4031/Myra",
+      "date": "2026-06-10"
+    }
+  ],
+  "repos": [
+    "felipeggrod/gasify",
+    "sebas77/Svelto.ECS",
+    "Gornhoth/Unity-Smoothed-Particle-Hydrodynamics",
+    "DruidMech/GameplayAbilitySystem_Aura",
+    "rparrett/taipo",
+    "areilly711/unity_ecs",
+    "WispSnow/MonsterWar",
+    "maxartz15/VertexAnimation",
+    "brokenrockstudios/RockGameplayEvents",
+    "dudu502/LittleBee",
+    "intrxx/Obsidian",
+    "Pantong51/GASContent",
+    "keijiro/Voxelman",
+    "reeseschultz/ReeseUnityDemos",
+    "Narxim/Narxim-GAS-Example",
+    "vahabahmadvand/ActionRPG_UE5",
+    "hangge1/GAS_Dura",
+    "realchrisparker/ParagonGAS",
+    "sajad0131/Unity-Gameplay-Ability-System",
+    "genxium/BuildingAndCraftingAndTowerDefenseGame",
+    "Rion5/2D-TowerDefense",
+    "channingallen/tower-defense",
+    "seiko-dev/GAS_Combo",
+    "ochadenas/cpudefense",
+    "killop/anything_about_game",
+    "Anuken/Mindustry",
+    "No78Vino/gameplay-ability-system-for-unity",
+    "proepkes/UnityLockstep",
+    "Unity-Technologies/ECS-Network-Racing-Sample",
+    "needle-mirror/com.unity.entities.graphics",
+    "phpgl/php-towerdefense",
+    "rictic/processing-tower-defense",
+    "zulfajuniadi/unity-ecs-navmesh",
+    "FlameskyDexive/Legends-Of-Heroes",
+    "LTHCTheMaster/Tower-Defense",
+    "prabdhal/Tower-Defence-3D",
+    "MaiKuraki/UnityStarter",
+    "PixeyeHQ/actors.unity",
+    "chromealex/ecs",
+    "kisence-mian/UnityLockStepDemo",
+    "Antoshidza/NSprites",
+    "keijiro/Firefly",
+    "mjaun/android-anuto",
+    "pshenok/server-survival",
+    "ape1121/Godot-4-Tower-Defense-Template",
+    "maciej-trebacz/tower-of-time-game",
+    "quiver-dev/tower-defense-tutorial",
+    "AkanshDivker/Simple-ECS",
+    "techwithtim/Tower-Defense-Game",
+    "mwbryant/bevy-tower-defense-tutorial",
+    "Daivuk/tddod",
+    "quiver-dev/tower-defense-godot4",
+    "v1vendi/minimal_ue5_GAS_demo",
+    "oldj/html5-tower-defense",
+    "LordWake/Unreal-2021-GameplayAbilitySystem",
+    "SanderMertens/tower_defense",
+    "danderfer/Comp_Sci_Sem_2",
+    "OctoD/godot-gameplay-abilities",
+    "MNoya/Element-TD",
+    "Casmo/tower-defense",
+    "bp-shirai/ue5-warrior",
+    "PhysaliaStudio/Flexi",
+    "MaiKuraki/UnityGameplayAbilitySystemSample",
+    "Rangerz132/gas-unity",
+    "Leopotam/ecslite",
+    "scellecs/morpeh",
+    "CompleteUnityDeveloper/07-Glitch-Garden",
+    "bartofzo/NativeTrees",
+    "rickylai248/Bloons-Tower-Defense",
+    "EcsRx/ecsrx.unity",
+    "annulusgames/MagicTween",
+    "Alex-Rachel/TEngine",
+    "DrFlower/TowerDefense-GameFramework-Demo",
+    "dgkanatsios/TowerDefense",
+    "Brackeys/Tower-Defense-Tutorial",
+    "Groundbreakers/Groundbreakers",
+    "dsavosin/SimpleGAS",
+    "make-live/multiplayer",
+    "ATHellboy/SampleProject-FightingGame",
+    "strayTrain/SimpleGameplayAbilitySystem",
+    "sjai013/unity-gameplay-ability-system",
+    "imnazake/Unify",
+    "urbanyoung/Phasor",
+    "archangel4031/Myra",
+    "fpwong/FPGameplayAbilities"
+  ],
+  "file_trees": {
+    "sebas77/Svelto.ECS": {
+      "dirs": [
+        {
+          "name": "com.sebaslab.svelto.ecs",
+          "label": "ECS 架构"
+        }
+      ],
+      "key_files": [],
+      "stars": 1363,
+      "date": "2026-05-31"
+    },
+    "Gornhoth/Unity-Smoothed-Particle-Hydrodynamics": {
+      "dirs": [
+        {
+          "name": "DOTS_ECS",
+          "label": "ECS 架构"
+        }
+      ],
+      "key_files": [],
+      "stars": 85,
+      "date": "2026-05-31"
+    },
+    "DruidMech/GameplayAbilitySystem_Aura": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据"
+        },
+        {
+          "name": "Data",
+          "label": "配置数据"
+        }
+      ],
+      "key_files": [],
+      "stars": 776,
+      "date": "2026-05-31"
+    },
+    "intrxx/Obsidian": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据"
+        },
+        {
+          "name": "Data",
+          "label": "配置数据"
+        }
+      ],
+      "key_files": [],
+      "stars": 55,
+      "date": "2026-06-01"
+    },
+    "Narxim/Narxim-GAS-Example": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据"
+        }
+      ],
+      "key_files": [],
+      "stars": 445,
+      "date": "2026-06-01"
+    },
+    "vahabahmadvand/ActionRPG_UE5": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据"
+        }
+      ],
+      "key_files": [],
+      "stars": 371,
+      "date": "2026-06-01"
+    },
+    "hangge1/GAS_Dura": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据"
+        },
+        {
+          "name": "Data",
+          "label": "配置数据"
+        }
+      ],
+      "key_files": [],
+      "stars": 44,
+      "date": "2026-06-02"
+    },
+    "realchrisparker/ParagonGAS": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据"
+        }
+      ],
+      "key_files": [],
+      "stars": 35,
+      "date": "2026-06-02"
+    },
+    "genxium/BuildingAndCraftingAndTowerDefenseGame": {
+      "dirs": [
+        {
+          "name": "database",
+          "label": "配置数据"
+        }
+      ],
+      "key_files": [],
+      "stars": 378,
+      "date": "2026-06-02"
+    },
+    "channingallen/tower-defense": {
+      "dirs": [
+        {
+          "name": "config",
+          "label": "配置数据"
+        }
+      ],
+      "key_files": [],
+      "stars": 608,
+      "date": "2026-06-02"
+    },
+    "seiko-dev/GAS_Combo": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据"
+        }
+      ],
+      "key_files": [],
+      "stars": 77,
+      "date": "2026-06-02"
+    },
+    "needle-mirror/com.unity.entities.graphics": {
+      "dirs": [
+        {
+          "name": "Unity.Entities.Graphics.PerformanceTests",
+          "label": "性能优化"
+        }
+      ],
+      "key_files": [],
+      "stars": 27,
+      "date": "2026-06-03"
+    },
+    "pshenok/server-survival": {
+      "dirs": [
+        {
+          "name": "campaign",
+          "label": "AI/行为树",
+          "path": "src/campaign"
+        }
+      ],
+      "key_files": [],
+      "stars": 5760,
+      "date": "2026-06-03"
+    },
+    "ape1121/Godot-4-Tower-Defense-Template": {
+      "dirs": [
+        {
+          "name": "bullets",
+          "label": "弹道系统",
+          "path": "Assets/bullets"
+        },
+        {
+          "name": "enemies",
+          "label": "敌怪系统",
+          "path": "Assets/enemies"
+        },
+        {
+          "name": "enemies",
+          "label": "敌怪系统",
+          "path": "Scenes/enemies"
+        },
+        {
+          "name": "main",
+          "label": "AI/行为树",
+          "path": "Scenes/main"
+        }
+      ],
+      "key_files": [],
+      "stars": 64,
+      "date": "2026-06-03"
+    },
+    "maciej-trebacz/tower-of-time-game": {
+      "dirs": [
+        {
+          "name": "components",
+          "label": "系统/组件分离",
+          "path": "src/components"
+        },
+        {
+          "name": "systems",
+          "label": "系统/组件分离",
+          "path": "src/systems"
+        }
+      ],
+      "key_files": [],
+      "stars": 368,
+      "date": "2026-06-03"
+    },
+    "quiver-dev/tower-defense-tutorial": {
+      "dirs": [
+        {
+          "name": "enemies",
+          "label": "敌怪系统",
+          "path": "assets/enemies"
+        },
+        {
+          "name": "projectiles",
+          "label": "弹道系统",
+          "path": "assets/projectiles"
+        },
+        {
+          "name": "towers",
+          "label": "塔系统",
+          "path": "assets/towers"
+        },
+        {
+          "name": "enemies",
+          "label": "敌怪系统",
+          "path": "entities/enemies"
+        },
+        {
+          "name": "projectiles",
+          "label": "弹道系统",
+          "path": "entities/projectiles"
+        },
+        {
+          "name": "towers",
+          "label": "塔系统",
+          "path": "entities/towers"
+        },
+        {
+          "name": "spawner",
+          "label": "波次系统",
+          "path": "maps/spawner"
+        }
+      ],
+      "key_files": [],
+      "stars": 73,
+      "date": "2026-06-03"
+    },
+    "techwithtim/Tower-Defense-Game": {
+      "dirs": [
+        {
+          "name": "enemies",
+          "label": "敌怪系统",
+          "path": "enemies"
+        },
+        {
+          "name": "main_menu",
+          "label": "AI/行为树",
+          "path": "main_menu"
+        },
+        {
+          "name": "towers",
+          "label": "塔系统",
+          "path": "towers"
+        }
+      ],
+      "key_files": [
+        "enemies/club.py",
+        "enemies/enemy.py",
+        "enemies/scorpion.py",
+        "enemies/sword.py",
+        "enemies/wizard.py",
+        "game.py",
+        "main_menu/main_menu.py",
+        "menu/menu.py",
+        "run.py",
+        "towers/archerTower.py",
+        "towers/supportTower.py",
+        "towers/tower.py"
+      ],
+      "stars": 399,
+      "date": "2026-06-03"
+    },
+    "Daivuk/tddod": {
+      "dirs": [
+        {
+          "name": "components",
+          "label": "系统/组件分离",
+          "path": "src/components"
+        },
+        {
+          "name": "systems",
+          "label": "系统/组件分离",
+          "path": "src/systems"
+        }
+      ],
+      "key_files": [
+        "src/constants.h",
+        "src/data.h",
+        "src/ecs.h",
+        "src/game.cpp",
+        "src/game.h",
+        "src/main.cpp",
+        "src/tags.h"
+      ],
+      "stars": 61,
+      "date": "2026-06-03"
+    },
+    "quiver-dev/tower-defense-godot4": {
+      "dirs": [
+        {
+          "name": "enemies",
+          "label": "敌怪系统",
+          "path": "entities/enemies"
+        },
+        {
+          "name": "projectiles",
+          "label": "弹道系统",
+          "path": "entities/projectiles"
+        }
+      ],
+      "key_files": [],
+      "stars": 88,
+      "date": "2026-06-03"
+    },
+    "v1vendi/minimal_ue5_GAS_demo": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据",
+          "path": "Config"
+        },
+        {
+          "name": "MinimalGASDemo",
+          "label": "GAS 技能系统",
+          "path": "Source/MinimalGASDemo"
+        }
+      ],
+      "key_files": [
+        "Source/MinimalGASDemo.Target.cs",
+        "Source/MinimalGASDemoEditor.Target.cs"
+      ],
+      "stars": 18,
+      "date": "2026-06-04"
+    },
+    "LordWake/Unreal-2021-GameplayAbilitySystem": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据",
+          "path": "Config"
+        },
+        {
+          "name": "AbilitySystem",
+          "label": "技能/能力系统",
+          "path": "Source/AbilitySystem"
+        }
+      ],
+      "key_files": [
+        "Source/AbilitySystem.Target.cs",
+        "Source/AbilitySystemEditor.Target.cs"
+      ],
+      "stars": 17,
+      "date": "2026-06-04"
+    },
+    "SanderMertens/tower_defense": {
+      "dirs": [
+        {
+          "name": "tower_defense",
+          "label": "塔系统",
+          "path": "include/tower_defense"
+        }
+      ],
+      "key_files": [
+        "deps/cglm.h",
+        "deps/flecs.h",
+        "deps/flecs_components_cglm.h",
+        "deps/flecs_components_geometry.h",
+        "deps/flecs_components_graphics.h",
+        "deps/flecs_components_gui.h",
+        "deps/flecs_components_input.h",
+        "deps/flecs_components_physics.h",
+        "deps/flecs_components_transform.h",
+        "deps/flecs_game.h",
+        "deps/flecs_systems_physics.h",
+        "deps/flecs_systems_sokol.h",
+        "deps/flecs_systems_transform.h",
+        "etc/httpserver.py",
+        "include/tower_defense.h"
+      ],
+      "stars": 96,
+      "date": "2026-06-04"
+    },
+    "danderfer/Comp_Sci_Sem_2": {
+      "dirs": [
+        {
+          "name": "100_DataScience",
+          "label": "配置数据",
+          "path": "Python/100_DataScience"
+        }
+      ],
+      "key_files": [],
+      "stars": 180,
+      "date": "2026-06-04"
+    },
+    "Casmo/tower-defense": {
+      "dirs": [
+        {
+          "name": "enemies",
+          "label": "敌怪系统",
+          "path": "assets/enemies"
+        },
+        {
+          "name": "towers",
+          "label": "塔系统",
+          "path": "assets/towers"
+        },
+        {
+          "name": "TowerDefense",
+          "label": "塔系统",
+          "path": "js/TowerDefense"
+        }
+      ],
+      "key_files": [],
+      "stars": 124,
+      "date": "2026-06-04"
+    },
+    "bp-shirai/ue5-warrior": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据",
+          "path": "Config"
+        }
+      ],
+      "key_files": [
+        "Source/Warrior.Target.cs",
+        "Source/WarriorEditor.Target.cs"
+      ],
+      "stars": 54,
+      "date": "2026-06-04"
+    },
+    "MaiKuraki/UnityGameplayAbilitySystemSample": {
+      "dirs": [
+        {
+          "name": "GASSample",
+          "label": "GAS 技能系统",
+          "path": "GASSample"
+        }
+      ],
+      "key_files": [
+        "GASSample/unity_project_full_clean.go"
+      ],
+      "stars": 23,
+      "date": "2026-06-05"
+    },
+    "Rangerz132/gas-unity": {
+      "dirs": [
+        {
+          "name": "gas-unity_BurstDebugInformation_DoNotShip",
+          "label": "GAS 技能系统",
+          "path": "BuildApp/gas-unity_BurstDebugInformation_DoNotShip"
+        },
+        {
+          "name": "gas-unity_Data",
+          "label": "GAS 技能系统",
+          "path": "BuildApp/gas-unity_Data"
+        }
+      ],
+      "key_files": [],
+      "stars": 16,
+      "date": "2026-06-05"
+    },
+    "scellecs/morpeh": {
+      "dirs": [
+        {
+          "name": "Benchmarks",
+          "label": "性能优化",
+          "path": "Benchmarks"
+        },
+        {
+          "name": "Scellecs.Morpeh",
+          "label": "ECS 架构",
+          "path": "Scellecs.Morpeh"
+        }
+      ],
+      "key_files": [
+        "Layout~/Program.cs",
+        "StaticGenerators~/PinnedArrayGenerator.cs",
+        "StaticGenerators~/Program.cs",
+        "StaticGenerators~/Utilities.cs"
+      ],
+      "stars": 645,
+      "date": "2026-06-05"
+    },
+    "rickylai248/Bloons-Tower-Defense": {
+      "dirs": [
+        {
+          "name": "enemies",
+          "label": "敌怪系统",
+          "path": "enemies"
+        },
+        {
+          "name": "towers",
+          "label": "塔系统",
+          "path": "towers"
+        }
+      ],
+      "key_files": [
+        "main.py"
+      ],
+      "stars": 12,
+      "date": "2026-06-05"
+    },
+    "annulusgames/MagicTween": {
+      "dirs": [
+        {
+          "name": "MagicTween.Benchmarks",
+          "label": "性能优化",
+          "path": "MagicTween.Benchmarks"
+        }
+      ],
+      "key_files": [
+        "MagicTween.SourceGenerator/SourceGeneratorHelper.cs",
+        "MagicTween.SourceGenerator/TweenPluginGenerator.cs"
+      ],
+      "stars": 499,
+      "date": "2026-06-05"
+    },
+    "Alex-Rachel/TEngine": {
+      "dirs": [
+        {
+          "name": "Configs",
+          "label": "配置数据",
+          "path": "Configs"
+        },
+        {
+          "name": "GameConfig",
+          "label": "配置数据",
+          "path": "Configs/GameConfig"
+        },
+        {
+          "name": "GameEventSourceGenerator",
+          "label": "事件系统",
+          "path": "Tools/GameEventSourceGenerator"
+        }
+      ],
+      "key_files": [],
+      "stars": 2175,
+      "date": "2026-06-05"
+    },
+    "DrFlower/TowerDefense-GameFramework-Demo": {
+      "dirs": [
+        {
+          "name": "GameMain",
+          "label": "AI/行为树",
+          "path": "Assets/GameMain"
+        }
+      ],
+      "key_files": [],
+      "stars": 2072,
+      "date": "2026-06-06"
+    },
+    "Brackeys/Tower-Defense-Tutorial": {
+      "dirs": [
+        {
+          "name": "Tower Defense Unity Project",
+          "label": "塔系统",
+          "path": "Tower Defense Unity Project"
+        }
+      ],
+      "key_files": [],
+      "stars": 524,
+      "date": "2026-06-06"
+    },
+    "dsavosin/SimpleGAS": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据",
+          "path": "Config"
+        },
+        {
+          "name": "Abilities",
+          "label": "GAS 技能系统",
+          "path": "Content/Abilities"
+        },
+        {
+          "name": "ParagonWraith",
+          "label": "AI/行为树",
+          "path": "Content/ParagonWraith"
+        },
+        {
+          "name": "SimpleGAS",
+          "label": "GAS 技能系统",
+          "path": "Source/SimpleGAS"
+        }
+      ],
+      "key_files": [
+        "Source/SimpleGAS.Target.cs",
+        "Source/SimpleGASEditor.Target.cs"
+      ],
+      "stars": 23,
+      "date": "2026-06-10"
+    },
+    "make-live/multiplayer": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据",
+          "path": "Project/Config"
+        }
+      ],
+      "key_files": [],
+      "stars": 142,
+      "date": "2026-06-10"
+    },
+    "strayTrain/SimpleGameplayAbilitySystem": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据",
+          "path": "Config"
+        },
+        {
+          "name": "SimpleGameplayAbilitySystem",
+          "label": "技能/能力系统",
+          "path": "Source/SimpleGameplayAbilitySystem"
+        },
+        {
+          "name": "SimpleGameplayAbilitySystemEditor",
+          "label": "技能/能力系统",
+          "path": "Source/SimpleGameplayAbilitySystemEditor"
+        }
+      ],
+      "key_files": [],
+      "stars": 98,
+      "date": "2026-06-10"
+    },
+    "sjai013/unity-gameplay-ability-system": {
+      "dirs": [
+        {
+          "name": "AddressableAssetsData",
+          "label": "配置数据",
+          "path": "Assets/AddressableAssetsData"
+        },
+        {
+          "name": "My Gameplay Ability System",
+          "label": "技能/能力系统",
+          "path": "Assets/My Gameplay Ability System"
+        },
+        {
+          "name": "com.sjai013.abilitysystem",
+          "label": "技能/能力系统",
+          "path": "Packages/com.sjai013.abilitysystem"
+        }
+      ],
+      "key_files": [],
+      "stars": 1081,
+      "date": "2026-06-10"
+    },
+    "imnazake/Unify": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据",
+          "path": "Config"
+        },
+        {
+          "name": "AbilitySystem",
+          "label": "技能/能力系统",
+          "path": "Content/AbilitySystem"
+        },
+        {
+          "name": "GameplayMessageRouter",
+          "label": "事件系统",
+          "path": "Plugins/GameplayMessageRouter"
+        }
+      ],
+      "key_files": [
+        "Source/Unify.Target.cs",
+        "Source/UnifyEditor.Target.cs"
+      ],
+      "stars": 19,
+      "date": "2026-06-10"
+    },
+    "archangel4031/Myra": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据",
+          "path": "Config"
+        }
+      ],
+      "key_files": [
+        "Source/MyraStarter.Target.cs",
+        "Source/MyraStarterEditor.Target.cs"
+      ],
+      "stars": 81,
+      "date": "2026-06-10"
+    },
+    "fpwong/FPGameplayAbilities": {
+      "dirs": [
+        {
+          "name": "Config",
+          "label": "配置数据",
+          "path": "Config"
+        },
+        {
+          "name": "FPGameplayAbilities",
+          "label": "GAS 技能系统",
+          "path": "Source/FPGameplayAbilities"
+        }
+      ],
+      "key_files": [],
+      "stars": 33,
+      "date": "2026-06-10"
+    }
+  },
+  "version": 2,
+  "code_snippets": {
+    "Leopotam/ecslite": {
+      "snippets": [
+        {
+          "path": "src/components.cs",
+          "patterns": [
+            {
+              "label": "SOA 整型数组",
+              "match": "_sparseItems"
+            },
+            {
+              "label": "SOA 整型数组",
+              "match": "_recycledItems"
+            }
+          ]
+        },
+        {
+          "path": "src/filters.cs",
+          "patterns": [
+            {
+              "label": "SOA 整型数组",
+              "match": "_denseEntities"
+            },
+            {
+              "label": "SOA 整型数组",
+              "match": "SparseEntities"
+            },
+            {
+              "label": "SOA 整型数组",
+              "match": "GetRawEntities"
+            }
+          ]
+        },
+        {
+          "path": "src/worlds.cs",
+          "patterns": [
+            {
+              "label": "SOA 整型数组",
+              "match": "_recycledEntities"
+            }
+          ]
+        }
+      ],
+      "stars": 521,
+      "date": "2026-06-05"
+    }
+  }
+}
