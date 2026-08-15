@@ -1,7 +1,7 @@
 using System;
 using Xunit;
-using BattleSystemECS.Components;
 using BattleSystemECS.Core;
+using BattleSystemECS.Tests.Infrastructure;
 
 namespace BattleSystemECS.Tests
 {
@@ -10,7 +10,7 @@ namespace BattleSystemECS.Tests
     /// Formulas are applied upstream by TowerAttackSystem/PlayerTowerAttack.
     /// These tests verify the mathematical contracts.
     /// </summary>
-    public class DamageFormulaTests
+    public class DamageFormulaTests : BattleTestBase
     {
         // ══════════════════════════════════════════════════════════════
         //  Direct damage & shield
@@ -19,127 +19,98 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void ApplyEnemyDamage_DirectDamage_ReducesHealth()
         {
-            var store = new ComponentStore();
-            int eid = store.CreateEntity();
-            store.EnemyActive[eid] = true;
-            store.EnemyHealth[eid] = 100f;
-            store.EnemyShield[eid] = 0f;
+            int eid = Enemy();
 
-            store.ApplyEnemyDamage(eid, 30f);
-            Assert.Equal(70f, store.EnemyHealth[eid]);
+            Store.ApplyEnemyDamage(eid, 30f);
+            Assert.Equal(70f, Store.EnemyHealth[eid]);
         }
 
         [Fact]
         public void ApplyEnemyDamage_ShieldAbsorbsFirst()
         {
-            var store = new ComponentStore();
-            int eid = store.CreateEntity();
-            store.EnemyActive[eid] = true;
-            store.EnemyHealth[eid] = 100f;
-            store.EnemyShield[eid] = 25f;
+            int eid = Enemy();
+            Store.EnemyShield[eid] = 25f;
 
-            store.ApplyEnemyDamage(eid, 20f);
-            Assert.Equal(100f, store.EnemyHealth[eid]);
-            Assert.Equal(5f, store.EnemyShield[eid]);
+            Store.ApplyEnemyDamage(eid, 20f);
+            Assert.Equal(100f, Store.EnemyHealth[eid]);
+            Assert.Equal(5f, Store.EnemyShield[eid]);
         }
 
         [Fact]
         public void ApplyEnemyDamage_ShieldPartial()
         {
-            var store = new ComponentStore();
-            int eid = store.CreateEntity();
-            store.EnemyActive[eid] = true;
-            store.EnemyHealth[eid] = 100f;
-            store.EnemyShield[eid] = 10f;
+            int eid = Enemy();
+            Store.EnemyShield[eid] = 10f;
 
-            store.ApplyEnemyDamage(eid, 40f);
-            Assert.Equal(70f, store.EnemyHealth[eid]);
-            Assert.Equal(0f, store.EnemyShield[eid]);
+            Store.ApplyEnemyDamage(eid, 40f);
+            Assert.Equal(70f, Store.EnemyHealth[eid]);
+            Assert.Equal(0f, Store.EnemyShield[eid]);
         }
 
         [Fact]
         public void ApplyEnemyDamage_ZeroDamage_NoEffect()
         {
-            var store = new ComponentStore();
-            int eid = store.CreateEntity();
-            store.EnemyActive[eid] = true;
-            store.EnemyHealth[eid] = 100f;
-            store.EnemyShield[eid] = 50f;
+            int eid = Enemy();
+            Store.EnemyShield[eid] = 50f;
 
-            store.ApplyEnemyDamage(eid, 0f);
-            Assert.Equal(100f, store.EnemyHealth[eid]);
-            Assert.Equal(50f, store.EnemyShield[eid]);
+            Store.ApplyEnemyDamage(eid, 0f);
+            Assert.Equal(100f, Store.EnemyHealth[eid]);
+            Assert.Equal(50f, Store.EnemyShield[eid]);
         }
 
         [Fact]
         public void ApplyEnemyDamage_NegativeDamage_Ignored()
         {
-            var store = new ComponentStore();
-            int eid = store.CreateEntity();
-            store.EnemyActive[eid] = true;
-            store.EnemyHealth[eid] = 100f;
+            int eid = Enemy();
 
-            store.ApplyEnemyDamage(eid, -10f);
-            Assert.Equal(100f, store.EnemyHealth[eid]);
+            Store.ApplyEnemyDamage(eid, -10f);
+            Assert.Equal(100f, Store.EnemyHealth[eid]);
         }
 
         [Fact]
         public void ApplyEnemyDamage_ExactKill()
         {
-            var store = new ComponentStore();
-            int eid = store.CreateEntity();
-            store.EnemyActive[eid] = true;
-            store.EnemyHealth[eid] = 50f;
+            int eid = Enemy(e => e.Health = 50f);
 
-            store.ApplyEnemyDamage(eid, 50f);
-            Assert.Equal(0f, store.EnemyHealth[eid]);
+            Store.ApplyEnemyDamage(eid, 50f);
+            Assert.Equal(0f, Store.EnemyHealth[eid]);
         }
 
         [Fact]
         public void ApplyEnemyDamage_Overkill()
         {
-            var store = new ComponentStore();
-            int eid = store.CreateEntity();
-            store.EnemyActive[eid] = true;
-            store.EnemyHealth[eid] = 30f;
+            int eid = Enemy(e => e.Health = 30f);
 
-            store.ApplyEnemyDamage(eid, 100f);
-            Assert.Equal(-70f, store.EnemyHealth[eid]);
+            Store.ApplyEnemyDamage(eid, 100f);
+            Assert.Equal(-70f, Store.EnemyHealth[eid]);
         }
 
         [Fact]
         public void ApplyEnemyDamage_IgnoresArmor_RawDamage()
         {
-            var store = new ComponentStore();
-            int eid = store.CreateEntity();
-            store.EnemyActive[eid] = true;
-            store.EnemyHealth[eid] = 100f;
-            store.EnemyArmor[eid] = 0.3f;
-            store.EnemyShield[eid] = 0f;
+            int eid = Enemy();
+            Store.EnemyArmor[eid] = 0.3f;
 
-            store.ApplyEnemyDamage(eid, 100f);
-            Assert.Equal(0f, store.EnemyHealth[eid]);
+            Store.ApplyEnemyDamage(eid, 100f);
+            Assert.Equal(0f, Store.EnemyHealth[eid]);
         }
 
         [Fact]
         public void Shield_BreakAndDamage_HandlesMultipleApplications()
         {
-            var store = new ComponentStore();
-            int eid = store.CreateEntity();
-            store.EnemyActive[eid] = true;
-            store.EnemyHealth[eid] = 100f;
-            store.EnemyShield[eid] = 30f;
+            int eid = Enemy();
+            Store.EnemyShield[eid] = 30f;
 
-            store.ApplyEnemyDamage(eid, 20f);
-            Assert.Equal(100f, store.EnemyHealth[eid]);
-            Assert.Equal(10f, store.EnemyShield[eid]);
+            Store.ApplyEnemyDamage(eid, 20f);
+            Assert.Equal(100f, Store.EnemyHealth[eid]);
+            Assert.Equal(10f, Store.EnemyShield[eid]);
 
-            store.ApplyEnemyDamage(eid, 15f);
-            Assert.Equal(95f, store.EnemyHealth[eid]);
-            Assert.Equal(0f, store.EnemyShield[eid]);
+            Store.ApplyEnemyDamage(eid, 15f);
+            Assert.Equal(95f, Store.EnemyHealth[eid]);
+            Assert.Equal(0f, Store.EnemyShield[eid]);
 
-            store.ApplyEnemyDamage(eid, 20f);
-            Assert.Equal(75f, store.EnemyHealth[eid]);
+            Store.ApplyEnemyDamage(eid, 20f);
+            Assert.Equal(75f, Store.EnemyHealth[eid]);
         }
 
         // ══════════════════════════════════════════════════════════════
@@ -276,43 +247,35 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void Weather_DefaultIsClear()
         {
-            var store = new ComponentStore();
-            int pid = store.CreateEntity();
-            store.AddPlayer(pid, 5f, 5f, 10f, 1);
+            int pid = Player();
 
-            Assert.Equal(0, store.GetCurrentWeather(pid)); // 0 = Clear
+            Assert.Equal(0, Store.GetCurrentWeather(pid)); // 0 = Clear
         }
 
         [Fact]
         public void Weather_SetAndGet_RoundTrip()
         {
-            var store = new ComponentStore();
-            int pid = store.CreateEntity();
-            store.AddPlayer(pid, 5f, 5f, 10f, 1);
+            int pid = Player();
 
-            store.SetCurrentWeather(pid, 1); // Rain
-            Assert.Equal(1, store.GetCurrentWeather(pid));
+            Store.SetCurrentWeather(pid, 1); // Rain
+            Assert.Equal(1, Store.GetCurrentWeather(pid));
         }
 
         [Fact]
         public void DayNight_DefaultPhase()
         {
-            var store = new ComponentStore();
-            int pid = store.CreateEntity();
-            store.AddPlayer(pid, 5f, 5f, 10f, 1);
+            int pid = Player();
 
-            Assert.Equal(0, store.GetDayNightPhase(pid)); // 0 = Day
+            Assert.Equal(0, Store.GetDayNightPhase(pid)); // 0 = Day
         }
 
         [Fact]
         public void DayNight_SetAndGet_RoundTrip()
         {
-            var store = new ComponentStore();
-            int pid = store.CreateEntity();
-            store.AddPlayer(pid, 5f, 5f, 10f, 1);
+            int pid = Player();
 
-            store.SetDayNightPhase(pid, 1); // Night
-            Assert.Equal(1, store.GetDayNightPhase(pid));
+            Store.SetDayNightPhase(pid, 1); // Night
+            Assert.Equal(1, Store.GetDayNightPhase(pid));
         }
 
         // ══════════════════════════════════════════════════════════════
@@ -322,21 +285,17 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void EnemyHealth_GetSet_RoundTrip()
         {
-            var store = new ComponentStore();
-            int eid = store.CreateEntity();
-            store.EnemyActive[eid] = true;
-            store.SetEnemyHealth(eid, 75f);
-            Assert.Equal(75f, store.GetEnemyHealth(eid));
+            int eid = Enemy();
+            Store.SetEnemyHealth(eid, 75f);
+            Assert.Equal(75f, Store.GetEnemyHealth(eid));
         }
 
         [Fact]
         public void EnemyArmor_GetSet_RoundTrip()
         {
-            var store = new ComponentStore();
-            int eid = store.CreateEntity();
-            store.EnemyActive[eid] = true;
-            store.SetEnemyArmor(eid, 0.5f);
-            Assert.Equal(0.5f, store.GetEnemyArmor(eid));
+            int eid = Enemy();
+            Store.SetEnemyArmor(eid, 0.5f);
+            Assert.Equal(0.5f, Store.GetEnemyArmor(eid));
         }
     }
 }

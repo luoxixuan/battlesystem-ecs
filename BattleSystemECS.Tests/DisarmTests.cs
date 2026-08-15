@@ -1,6 +1,7 @@
 using Xunit;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Tests.Infrastructure;
 
 namespace BattleSystemECS.Tests
 {
@@ -17,22 +18,16 @@ namespace BattleSystemECS.Tests
     ///   - ComponentStore can be constructed, the disarm field allocated to MAX_ENTITIES,
     ///     and disposed without crash
     /// </summary>
-    public class DisarmTests
+    public class DisarmTests : BattleTestBase
     {
-        private static int SpawnPlainEnemy(ComponentStore store)
-        {
-            return store.AddEnemy(0, 0, 5f, 100f, 100f, 5f, 10, 1, "TestEnemy");
-        }
-
         // ─── Default (no disarm applied) — backward compat ───────────────
 
         [Fact]
         public void DefaultDisarm_NoDisarmApplied()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            Assert.Equal(0f, store.EnemyDisarmDurationLeft[e]);
-            Assert.False(store.IsEnemyDisarmed(e));
+            int e = Enemy();
+            Assert.Equal(0f, Store.EnemyDisarmDurationLeft[e]);
+            Assert.False(Store.IsEnemyDisarmed(e));
         }
 
         // ─── ApplyDisarm sets duration and flips IsEnemyDisarmed ──────────
@@ -40,13 +35,12 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void ApplyDisarm_SetsDuration_AndFlipsFlag()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
+            int e = Enemy();
 
-            store.ApplyEnemyDisarm(e, 3);
+            Store.ApplyEnemyDisarm(e, 3);
 
-            Assert.True(store.IsEnemyDisarmed(e));
-            Assert.Equal(3f, store.EnemyDisarmDurationLeft[e]);
+            Assert.True(Store.IsEnemyDisarmed(e));
+            Assert.Equal(3f, Store.EnemyDisarmDurationLeft[e]);
         }
 
         // ─── Refresh: longer duration wins ────────────────────────────────
@@ -54,13 +48,12 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void ApplyDisarm_RefreshTakesLongerDuration()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
+            int e = Enemy();
 
-            store.ApplyEnemyDisarm(e, 5);
-            store.ApplyEnemyDisarm(e, 2); // shorter, should be ignored
+            Store.ApplyEnemyDisarm(e, 5);
+            Store.ApplyEnemyDisarm(e, 2); // shorter, should be ignored
 
-            Assert.Equal(5f, store.EnemyDisarmDurationLeft[e]);
+            Assert.Equal(5f, Store.EnemyDisarmDurationLeft[e]);
         }
 
         // ─── Unstoppable enemies ignore disarm ────────────────────────────
@@ -68,14 +61,13 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void UnstoppableEnemy_IgnoresDisarm()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.EnemyIsUnstoppable[e] = true;
+            int e = Enemy();
+            Store.EnemyIsUnstoppable[e] = true;
 
-            store.ApplyEnemyDisarm(e, 5);
+            Store.ApplyEnemyDisarm(e, 5);
 
-            Assert.False(store.IsEnemyDisarmed(e));
-            Assert.Equal(0f, store.EnemyDisarmDurationLeft[e]);
+            Assert.False(Store.IsEnemyDisarmed(e));
+            Assert.Equal(0f, Store.EnemyDisarmDurationLeft[e]);
         }
 
         // ─── Mask_Disarm blocks disarm ────────────────────────────────────
@@ -83,14 +75,13 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void MaskDisarm_BlocksDisarm()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Disarm);
+            int e = Enemy();
+            Store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Disarm);
 
-            store.ApplyEnemyDisarm(e, 5);
+            Store.ApplyEnemyDisarm(e, 5);
 
-            Assert.False(store.IsEnemyDisarmed(e));
-            Assert.Equal(0f, store.EnemyDisarmDurationLeft[e]);
+            Assert.False(Store.IsEnemyDisarmed(e));
+            Assert.Equal(0f, Store.EnemyDisarmDurationLeft[e]);
         }
 
         // ─── Disarm resistance reduces duration ───────────────────────────
@@ -98,15 +89,14 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void DisarmResistance_ReducesDuration()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.EnemyDisarmResistance[e] = 0.5f; // 50% reduction
+            int e = Enemy();
+            Store.EnemyDisarmResistance[e] = 0.5f; // 50% reduction
 
-            store.ApplyEnemyDisarm(e, 4);
+            Store.ApplyEnemyDisarm(e, 4);
 
             // 4 * (1 - 0.5) = 2 turns
-            Assert.Equal(2f, store.EnemyDisarmDurationLeft[e]);
-            Assert.True(store.IsEnemyDisarmed(e));
+            Assert.Equal(2f, Store.EnemyDisarmDurationLeft[e]);
+            Assert.True(Store.IsEnemyDisarmed(e));
         }
 
         // ─── Full disarm resistance is a no-op ────────────────────────────
@@ -114,14 +104,13 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void FullDisarmResistance_NoOp()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.EnemyDisarmResistance[e] = 1.0f;
+            int e = Enemy();
+            Store.EnemyDisarmResistance[e] = 1.0f;
 
-            store.ApplyEnemyDisarm(e, 4);
+            Store.ApplyEnemyDisarm(e, 4);
 
-            Assert.False(store.IsEnemyDisarmed(e));
-            Assert.Equal(0f, store.EnemyDisarmDurationLeft[e]);
+            Assert.False(Store.IsEnemyDisarmed(e));
+            Assert.Equal(0f, Store.EnemyDisarmDurationLeft[e]);
         }
 
         // ─── Zero duration is a no-op ─────────────────────────────────────
@@ -129,13 +118,12 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void ZeroDuration_IsNoOp()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
+            int e = Enemy();
 
-            store.ApplyEnemyDisarm(e, 0);
+            Store.ApplyEnemyDisarm(e, 0);
 
-            Assert.False(store.IsEnemyDisarmed(e));
-            Assert.Equal(0f, store.EnemyDisarmDurationLeft[e]);
+            Assert.False(Store.IsEnemyDisarmed(e));
+            Assert.Equal(0f, Store.EnemyDisarmDurationLeft[e]);
         }
 
         // ─── Invalid enemy id is a no-op ──────────────────────────────────
@@ -143,14 +131,12 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void InvalidEnemyId_IsNoOp()
         {
-            var store = new ComponentStore();
-
             // Negative id should be silently ignored (no exception)
-            store.ApplyEnemyDisarm(-1, 5);
+            Store.ApplyEnemyDisarm(-1, 5);
 
             // After invalid id, no crash, no field touched on real entities
-            int e = SpawnPlainEnemy(store);
-            Assert.False(store.IsEnemyDisarmed(e));
+            int e = Enemy();
+            Assert.False(Store.IsEnemyDisarmed(e));
         }
 
         // ─── Disarm does not affect stun/slow (orthogonal CC) ─────────────
@@ -158,17 +144,16 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void Disarm_DoesNotInterfereWithStunOrSlow()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
+            int e = Enemy();
 
-            store.ApplyEnemyDisarm(e, 3);
-            store.ApplyEnemyStun(e, 2);
-            store.ApplyEnemySlow(e, 0.5f, 5);
+            Store.ApplyEnemyDisarm(e, 3);
+            Store.ApplyEnemyStun(e, 2);
+            Store.ApplyEnemySlow(e, 0.5f, 5);
 
             // All three CCs are independent
-            Assert.True(store.IsEnemyDisarmed(e));
-            Assert.True(store.IsEnemyStunned(e));
-            Assert.Equal(0.5f, store.EnemySlowFactor[e]);
+            Assert.True(Store.IsEnemyDisarmed(e));
+            Assert.True(Store.IsEnemyStunned(e));
+            Assert.Equal(0.5f, Store.EnemySlowFactor[e]);
         }
 
         // ─── ComponentStore with disarm fields can be constructed and disposed ─
@@ -176,17 +161,16 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void ComponentStore_DisarmFields_ConstructAndDispose()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
+            int e = Enemy();
 
             // Verify the array exists and is the right size (ComponentStore.MAX_ENTITIES)
-            Assert.NotNull(store.EnemyDisarmDurationLeft);
-            Assert.Equal(ComponentStore.MAX_ENTITIES, store.EnemyDisarmDurationLeft.Length);
+            Assert.NotNull(Store.EnemyDisarmDurationLeft);
+            Assert.Equal(ComponentStore.MAX_ENTITIES, Store.EnemyDisarmDurationLeft.Length);
 
-            store.ApplyEnemyDisarm(e, 2);
-            Assert.True(store.IsEnemyDisarmed(e));
+            Store.ApplyEnemyDisarm(e, 2);
+            Assert.True(Store.IsEnemyDisarmed(e));
 
-            store.Dispose();
+            Store.Dispose();
         }
     }
 }

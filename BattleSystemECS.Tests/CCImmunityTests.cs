@@ -1,6 +1,7 @@
 using Xunit;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Tests.Infrastructure;
 
 namespace BattleSystemECS.Tests
 {
@@ -18,33 +19,27 @@ namespace BattleSystemECS.Tests
     ///   - SetCCImmuneBit / ClearCCImmuneBit are OR-merge / bit-clear
     ///   - DestroyEntity resets the mask (no ID-reuse leakage)
     /// </summary>
-    public class CCImmunityTests
+    public class CCImmunityTests : BattleTestBase
     {
-        private static int SpawnPlainEnemy(ComponentStore store)
-        {
-            return store.AddEnemy(0, 0, 5f, 100f, 100f, 5f, 10, 1, "TestEnemy");
-        }
-
         // ─── Default (no immunity) — backward compat ──────────────────────
 
         [Fact]
         public void DefaultMask_NoImmunity_AllCCApply()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            Assert.Equal(0, store.EnemyCCImmuneMask[e]);
+            int e = Enemy();
+            Assert.Equal(0, Store.EnemyCCImmuneMask[e]);
 
-            store.ApplyEnemyStun(e, 2);
-            Assert.True(store.IsEnemyStunned(e));
+            Store.ApplyEnemyStun(e, 2);
+            Assert.True(Store.IsEnemyStunned(e));
 
-            store.ApplyEnemyFreeze(e, 3);
-            Assert.True(store.IsEnemyFrozen(e));
+            Store.ApplyEnemyFreeze(e, 3);
+            Assert.True(Store.IsEnemyFrozen(e));
 
-            store.ApplyEnemySlow(e, 0.5f, 5);
-            Assert.Equal(0.5f, store.EnemySlowFactor[e]);
+            Store.ApplyEnemySlow(e, 0.5f, 5);
+            Assert.Equal(0.5f, Store.EnemySlowFactor[e]);
 
-            store.ApplyPolymorph(e, 4, 1.5f);
-            Assert.True(store.EnemyIsPolymorphed[e]);
+            Store.ApplyPolymorph(e, 4, 1.5f);
+            Assert.True(Store.EnemyIsPolymorphed[e]);
         }
 
         // ─── Mask_Stun blocks stun but not freeze (independent bits) ───────
@@ -52,29 +47,27 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void Mask_Stun_BlocksStun_NotFreeze()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Stun);
+            int e = Enemy();
+            Store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Stun);
 
-            store.ApplyEnemyStun(e, 2);
-            Assert.False(store.IsEnemyStunned(e));
+            Store.ApplyEnemyStun(e, 2);
+            Assert.False(Store.IsEnemyStunned(e));
 
-            store.ApplyEnemyFreeze(e, 3);
-            Assert.True(store.IsEnemyFrozen(e));
+            Store.ApplyEnemyFreeze(e, 3);
+            Assert.True(Store.IsEnemyFrozen(e));
         }
 
         [Fact]
         public void Mask_Freeze_BlocksFreeze_NotStun()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Freeze);
+            int e = Enemy();
+            Store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Freeze);
 
-            store.ApplyEnemyFreeze(e, 3);
-            Assert.False(store.IsEnemyFrozen(e));
+            Store.ApplyEnemyFreeze(e, 3);
+            Assert.False(Store.IsEnemyFrozen(e));
 
-            store.ApplyEnemyStun(e, 2);
-            Assert.True(store.IsEnemyStunned(e));
+            Store.ApplyEnemyStun(e, 2);
+            Assert.True(Store.IsEnemyStunned(e));
         }
 
         // ─── Mask_Slow blocks slow even with no resistance ─────────────────
@@ -82,13 +75,12 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void Mask_Slow_BlocksSlow()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Slow);
+            int e = Enemy();
+            Store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Slow);
 
-            store.ApplyEnemySlow(e, 0.5f, 5);
-            Assert.Equal(0f, store.EnemySlowFactor[e]);
-            Assert.Equal(5f, store.EnemyMoveSpeed[e]); // base speed, untouched
+            Store.ApplyEnemySlow(e, 0.5f, 5);
+            Assert.Equal(0f, Store.EnemySlowFactor[e]);
+            Assert.Equal(5f, Store.EnemyMoveSpeed[e]); // base speed, untouched
         }
 
         // ─── Mask_Polymorph blocks polymorph ──────────────────────────────
@@ -96,13 +88,12 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void Mask_Polymorph_BlocksPolymorph()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Polymorph);
+            int e = Enemy();
+            Store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Polymorph);
 
-            store.ApplyPolymorph(e, 4, 1.5f);
-            Assert.False(store.EnemyIsPolymorphed[e]);
-            Assert.Equal(0f, store.EnemyPolymorphDurationLeft[e]);
+            Store.ApplyPolymorph(e, 4, 1.5f);
+            Assert.False(Store.EnemyIsPolymorphed[e]);
+            Assert.Equal(0f, Store.EnemyPolymorphDurationLeft[e]);
         }
 
         // ─── Mask_Stagger blocks stagger damage ───────────────────────────
@@ -110,16 +101,15 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void Mask_Stagger_BlocksStaggerDamage()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
+            int e = Enemy();
             // Stagger requires EnemyStaggerMax > 0 (default 0 = immune by design)
-            store.EnemyStaggerMax[e] = 100f;
-            store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Stagger);
+            Store.EnemyStaggerMax[e] = 100f;
+            Store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Stagger);
 
-            bool triggered = store.AddStaggerDamage(e, 200f, 30, 5f);
+            bool triggered = Store.AddStaggerDamage(e, 200f, 30, 5f);
             Assert.False(triggered);
-            Assert.False(store.EnemyIsStaggered[e]);
-            Assert.Equal(0f, store.EnemyStaggerMeter[e]);
+            Assert.False(Store.EnemyIsStaggered[e]);
+            Assert.Equal(0f, Store.EnemyStaggerMeter[e]);
         }
 
         // ─── Mask_AllCC blocks everything ─────────────────────────────────
@@ -127,22 +117,21 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void Mask_AllCC_BlocksEveryCCType()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.SetCCImmuneMask(e, CCImmunityConfig.Mask_AllCC);
+            int e = Enemy();
+            Store.SetCCImmuneMask(e, CCImmunityConfig.Mask_AllCC);
 
-            store.ApplyEnemyStun(e, 2);
-            store.ApplyEnemyFreeze(e, 3);
-            store.ApplyEnemySlow(e, 0.5f, 5);
-            store.ApplyPolymorph(e, 4, 1.5f);
-            store.EnemyStaggerMax[e] = 100f;
-            store.AddStaggerDamage(e, 200f, 30, 5f);
+            Store.ApplyEnemyStun(e, 2);
+            Store.ApplyEnemyFreeze(e, 3);
+            Store.ApplyEnemySlow(e, 0.5f, 5);
+            Store.ApplyPolymorph(e, 4, 1.5f);
+            Store.EnemyStaggerMax[e] = 100f;
+            Store.AddStaggerDamage(e, 200f, 30, 5f);
 
-            Assert.False(store.IsEnemyStunned(e));
-            Assert.False(store.IsEnemyFrozen(e));
-            Assert.Equal(0f, store.EnemySlowFactor[e]);
-            Assert.False(store.EnemyIsPolymorphed[e]);
-            Assert.False(store.EnemyIsStaggered[e]);
+            Assert.False(Store.IsEnemyStunned(e));
+            Assert.False(Store.IsEnemyFrozen(e));
+            Assert.Equal(0f, Store.EnemySlowFactor[e]);
+            Assert.False(Store.EnemyIsPolymorphed[e]);
+            Assert.False(Store.EnemyIsStaggered[e]);
         }
 
         // ─── EnemyIsUnstoppable still works (overrides bitmask) ────────────
@@ -150,33 +139,31 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void Unstoppable_OverridesBitmask_StillBlocksAllCC()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
+            int e = Enemy();
             // Bit set to 0 (so only Unstoppable stops CCs)
-            store.EnemyIsUnstoppable[e] = true;
+            Store.EnemyIsUnstoppable[e] = true;
 
-            store.ApplyEnemyStun(e, 2);
-            store.ApplyEnemyFreeze(e, 3);
-            store.ApplyEnemySlow(e, 0.5f, 5);
-            store.ApplyPolymorph(e, 4, 1.5f);
+            Store.ApplyEnemyStun(e, 2);
+            Store.ApplyEnemyFreeze(e, 3);
+            Store.ApplyEnemySlow(e, 0.5f, 5);
+            Store.ApplyPolymorph(e, 4, 1.5f);
 
-            Assert.False(store.IsEnemyStunned(e));
-            Assert.False(store.IsEnemyFrozen(e));
-            Assert.Equal(0f, store.EnemySlowFactor[e]);
-            Assert.False(store.EnemyIsPolymorphed[e]);
+            Assert.False(Store.IsEnemyStunned(e));
+            Assert.False(Store.IsEnemyFrozen(e));
+            Assert.Equal(0f, Store.EnemySlowFactor[e]);
+            Assert.False(Store.EnemyIsPolymorphed[e]);
         }
 
         [Fact]
         public void Unstoppable_True_AlwaysReturnsTrueFromIsCCImmuneTo()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.EnemyIsUnstoppable[e] = true;
+            int e = Enemy();
+            Store.EnemyIsUnstoppable[e] = true;
 
             // Even with no bits set, IsCCImmuneTo returns true for any mask
-            Assert.True(store.IsCCImmuneTo(e, CCImmunityConfig.Mask_Slow));
-            Assert.True(store.IsCCImmuneTo(e, CCImmunityConfig.Mask_Stun));
-            Assert.True(store.IsCCImmuneTo(e, 0xFFFF));
+            Assert.True(Store.IsCCImmuneTo(e, CCImmunityConfig.Mask_Slow));
+            Assert.True(Store.IsCCImmuneTo(e, CCImmunityConfig.Mask_Stun));
+            Assert.True(Store.IsCCImmuneTo(e, 0xFFFF));
         }
 
         // ─── IsCCImmuneTo() correctly reports per-type immunity ────────────
@@ -184,14 +171,13 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void IsCCImmuneTo_PerTypeCheck_ReturnsCorrect()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.SetCCImmuneMask(e, CCImmunityConfig.Mask_Stun | CCImmunityConfig.Mask_Freeze);
+            int e = Enemy();
+            Store.SetCCImmuneMask(e, CCImmunityConfig.Mask_Stun | CCImmunityConfig.Mask_Freeze);
 
-            Assert.True(store.IsCCImmuneTo(e, CCImmunityConfig.Mask_Stun));
-            Assert.True(store.IsCCImmuneTo(e, CCImmunityConfig.Mask_Freeze));
-            Assert.False(store.IsCCImmuneTo(e, CCImmunityConfig.Mask_Slow));
-            Assert.False(store.IsCCImmuneTo(e, CCImmunityConfig.Mask_Polymorph));
+            Assert.True(Store.IsCCImmuneTo(e, CCImmunityConfig.Mask_Stun));
+            Assert.True(Store.IsCCImmuneTo(e, CCImmunityConfig.Mask_Freeze));
+            Assert.False(Store.IsCCImmuneTo(e, CCImmunityConfig.Mask_Slow));
+            Assert.False(Store.IsCCImmuneTo(e, CCImmunityConfig.Mask_Polymorph));
         }
 
         // ─── SetCCImmuneBit OR-merges, ClearCCImmuneBit removes the bit ────
@@ -199,46 +185,43 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void SetCCImmuneBit_IsORMerge_Idempotent()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
+            int e = Enemy();
 
-            store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Stun);
-            Assert.Equal(CCImmunityConfig.Mask_Stun, store.EnemyCCImmuneMask[e]);
+            Store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Stun);
+            Assert.Equal(CCImmunityConfig.Mask_Stun, Store.EnemyCCImmuneMask[e]);
 
             // Set the same bit again — mask unchanged
-            store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Stun);
-            Assert.Equal(CCImmunityConfig.Mask_Stun, store.EnemyCCImmuneMask[e]);
+            Store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Stun);
+            Assert.Equal(CCImmunityConfig.Mask_Stun, Store.EnemyCCImmuneMask[e]);
 
             // OR a different bit
-            store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Slow);
+            Store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Slow);
             Assert.Equal(
                 CCImmunityConfig.Mask_Stun | CCImmunityConfig.Mask_Slow,
-                store.EnemyCCImmuneMask[e]);
+                Store.EnemyCCImmuneMask[e]);
         }
 
         [Fact]
         public void ClearCCImmuneBit_RemovesBit()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.SetCCImmuneMask(e, CCImmunityConfig.Mask_Stun | CCImmunityConfig.Mask_Slow);
+            int e = Enemy();
+            Store.SetCCImmuneMask(e, CCImmunityConfig.Mask_Stun | CCImmunityConfig.Mask_Slow);
 
-            store.ClearCCImmuneBit(e, CCImmunityConfig.Mask_Stun);
-            Assert.Equal(CCImmunityConfig.Mask_Slow, store.EnemyCCImmuneMask[e]);
+            Store.ClearCCImmuneBit(e, CCImmunityConfig.Mask_Stun);
+            Assert.Equal(CCImmunityConfig.Mask_Slow, Store.EnemyCCImmuneMask[e]);
 
-            store.ClearCCImmuneBit(e, CCImmunityConfig.Mask_Slow);
-            Assert.Equal(0, store.EnemyCCImmuneMask[e]);
+            Store.ClearCCImmuneBit(e, CCImmunityConfig.Mask_Slow);
+            Assert.Equal(0, Store.EnemyCCImmuneMask[e]);
         }
 
         [Fact]
         public void SetCCImmuneMask_Overwrites()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.SetCCImmuneMask(e, CCImmunityConfig.Mask_Stun);
+            int e = Enemy();
+            Store.SetCCImmuneMask(e, CCImmunityConfig.Mask_Stun);
 
-            store.SetCCImmuneMask(e, CCImmunityConfig.Mask_AllCC);
-            Assert.Equal(CCImmunityConfig.Mask_AllCC, store.EnemyCCImmuneMask[e]);
+            Store.SetCCImmuneMask(e, CCImmunityConfig.Mask_AllCC);
+            Assert.Equal(CCImmunityConfig.Mask_AllCC, Store.EnemyCCImmuneMask[e]);
         }
 
         // ─── Slow resistance does not bypass immunity ──────────────────────
@@ -246,14 +229,13 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void SlowImmunity_OverridesSlowResistance()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
+            int e = Enemy();
             // Set both immunity and high slow resistance
-            store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Slow);
-            store.EnemySlowResistance[e] = 1.0f;  // 100% resist (would normally negate the slow anyway)
+            Store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Slow);
+            Store.EnemySlowResistance[e] = 1.0f;  // 100% resist (would normally negate the slow anyway)
 
-            store.ApplyEnemySlow(e, 0.5f, 5);
-            Assert.Equal(0f, store.EnemySlowFactor[e]);
+            Store.ApplyEnemySlow(e, 0.5f, 5);
+            Assert.Equal(0f, Store.EnemySlowFactor[e]);
         }
 
         // ─── Stun resistance does not bypass immunity ──────────────────────
@@ -261,14 +243,13 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void StunImmunity_BlocksStun_BeforeResistanceApplied()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Stun);
-            store.EnemyStunResistance[e] = 0f;  // no resistance, but immunity still blocks
+            int e = Enemy();
+            Store.SetCCImmuneBit(e, CCImmunityConfig.Mask_Stun);
+            Store.EnemyStunResistance[e] = 0f;  // no resistance, but immunity still blocks
 
-            store.ApplyEnemyStun(e, 5);
-            Assert.False(store.IsEnemyStunned(e));
-            Assert.Equal(0f, store.EnemyStunDurationLeft[e]);
+            Store.ApplyEnemyStun(e, 5);
+            Assert.False(Store.IsEnemyStunned(e));
+            Assert.Equal(0f, Store.EnemyStunDurationLeft[e]);
         }
 
         // ─── Mask_BossDefault equals Mask_AllCC ────────────────────────────
@@ -304,17 +285,16 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void MultipleEnemies_HaveIndependentMasks()
         {
-            var store = new ComponentStore();
-            int a = SpawnPlainEnemy(store);
-            int b = SpawnPlainEnemy(store);
+            int a = Enemy();
+            int b = Enemy();
 
-            store.SetCCImmuneMask(a, CCImmunityConfig.Mask_Stun);
-            Assert.Equal(0, store.EnemyCCImmuneMask[b]);
+            Store.SetCCImmuneMask(a, CCImmunityConfig.Mask_Stun);
+            Assert.Equal(0, Store.EnemyCCImmuneMask[b]);
 
-            store.ApplyEnemyStun(a, 3);
-            store.ApplyEnemyStun(b, 3);
-            Assert.False(store.IsEnemyStunned(a));
-            Assert.True(store.IsEnemyStunned(b));
+            Store.ApplyEnemyStun(a, 3);
+            Store.ApplyEnemyStun(b, 3);
+            Assert.False(Store.IsEnemyStunned(a));
+            Assert.True(Store.IsEnemyStunned(b));
         }
 
         // ─── Out-of-range / invalid entity calls are no-ops ───────────────
@@ -322,13 +302,12 @@ namespace BattleSystemECS.Tests
         [Fact]
         public void InvalidEntity_NullsMaskOps()
         {
-            var store = new ComponentStore();
             // Should not throw
-            store.SetCCImmuneBit(-1, CCImmunityConfig.Mask_Stun);
-            store.SetCCImmuneBit(ComponentStore.MAX_ENTITIES, CCImmunityConfig.Mask_Stun);
-            store.ClearCCImmuneBit(-1, CCImmunityConfig.Mask_Stun);
-            Assert.False(store.IsCCImmuneTo(-1, CCImmunityConfig.Mask_Stun));
-            Assert.False(store.IsCCImmuneTo(ComponentStore.MAX_ENTITIES, CCImmunityConfig.Mask_Stun));
+            Store.SetCCImmuneBit(-1, CCImmunityConfig.Mask_Stun);
+            Store.SetCCImmuneBit(ComponentStore.MAX_ENTITIES, CCImmunityConfig.Mask_Stun);
+            Store.ClearCCImmuneBit(-1, CCImmunityConfig.Mask_Stun);
+            Assert.False(Store.IsCCImmuneTo(-1, CCImmunityConfig.Mask_Stun));
+            Assert.False(Store.IsCCImmuneTo(ComponentStore.MAX_ENTITIES, CCImmunityConfig.Mask_Stun));
         }
     }
 }
