@@ -10,7 +10,7 @@
 BattleSystem-ECS/
 ├── BattleSystemECS.Core/     # 战斗逻辑核心库（netstandard2.1，Unity 兼容）
 ├── BattleSystemECS.csproj    # 控制台 EXE（net6.0，引用 Core）
-├── BattleSystemECS.Tests/    # xUnit 单元测试（net9.0，1332 项）
+├── BattleSystemECS.Tests/    # xUnit 单元测试（net9.0，1333 项）
 ├── Systems/                  # 游戏系统（20+ 个，全部编译到 Core）
 ├── Core/                     # ECS 核心（ComponentStore×5、FrameScheduler、GAS、EventBus）
 ├── Data/                     # 静态数据（Monsters×200、Towers×150、Skills×150、Levels×5）

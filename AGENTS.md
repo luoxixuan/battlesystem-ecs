@@ -13,7 +13,7 @@
 - **架构**: SOA ECS（逻辑与渲染完全分离），事件总线（`IBattleEventBus`）驱动渲染
 - **运行时**: 控制台应用（含交互式游戏 + 非交互式压测）+ Unity 2D 渲染端
 - **核心特征**: 全系统并行化 (`Parallel.For`)、零分配热路径、配置驱动、帧末统一结算
-- **代码规模**: Core 库 ~52k 行（Core + Systems）、Tests ~17k 行；1332 项 xUnit 测试
+- **代码规模**: Core 库 ~52k 行（Core + Systems）、Tests ~17k 行；1333 项 xUnit 测试
 - **Unity 工程**: `F:\AI\BattleSystem-ECS-Unity`（2022.3.62f2c1 LTS），通过 `BattleDriver` 消费 DLL
 
 ---
@@ -66,16 +66,16 @@ dotnet test BattleSystemECS.Tests
 
 ```
 BattleSystem-ECS/
-├── BattleSystemECS.Core/              # 核心库（netstandard2.1）
-│   ├── BattleSystemECS.Core.csproj    # 通过 Linked Files 编译 Core/ + Systems/
-│   ├── Core/IsExternalInit.cs        # Polyfill: init; 语法支持
-│   ├── Core/Rng.cs                   # Polyfill: Random.Shared 替代
-│   ├── Core/PolyfillExtensions.cs    # Polyfill: CollectionsMarshal.AsSpan
-│   ├── Core/IBattleEventBus.cs       # 事件总线接口（逻辑→渲染）
-│   └── Core/ConsoleEventBus.cs       # 控制台事件总线实现
+├── BattleSystemECS.Core/              # 核心库项目目录（netstandard2.1，仅含 csproj；源码经 Linked Files 链接编译）
+│   └── BattleSystemECS.Core.csproj    # 通过 Linked Files 编译 ../Core/ + ../Systems/
 ├── BattleSystemECS.csproj             # 控制台 EXE（net6.0，仅含 Program.cs）
 ├── BattleSystemECS.Tests/             # 单元测试（net9.0，引用 Core）
 ├── Core/                              # ECS 核心与基础设施（编译到 Core 库）
+│   ├── IsExternalInit.cs              # Polyfill: init; 语法支持
+│   ├── Rng.cs                         # Polyfill: Random.Shared 替代
+│   ├── PolyfillExtensions.cs          # Polyfill: CollectionsMarshal.AsSpan
+│   ├── IBattleEventBus.cs             # 事件总线接口（逻辑→渲染）
+│   ├── ConsoleEventBus.cs             # 控制台事件总线实现
 │   ├── ComponentStore.cs              # SOA 核心：常量、Position、实体生命周期、死亡队列、查询
 │   ├── ComponentStore_Enemy.cs        # SOA 敌人字段 + 访问方法
 │   ├── ComponentStore_Tower.cs        # SOA 塔字段 + 访问方法
@@ -264,7 +264,7 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 - **Main EXE 和 Tests 都只引用 Core 库**（不直接引用 Core/ 或 Systems/ 源码）。
 - Core 库通过 Linked Files（`<Compile Include="..\Core\*.cs" Link="..." />`）编译源码，不复制。
 - 修改 Core/ 或 Systems/ 下的文件后，两个项目（Core 库 + 引用方）都需重新编译验证。
-- Polyfill 文件（`IsExternalInit.cs`、`Rng.cs`、`PolyfillExtensions.cs`）仅存在于 Core 库项目目录，不放在 Core/。
+- Polyfill 文件（`IsExternalInit.cs`、`Rng.cs`、`PolyfillExtensions.cs`）位于顶层 `Core/` 目录，通过 csproj 的 `<Compile Include="..\Core\*.cs">` Linked Files 编译进 Core 库（不在 `BattleSystemECS.Core/` 项目目录内）。
 
 ---
 
@@ -274,7 +274,7 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 - **xUnit**（`Xunit`），测试项目 `BattleSystemECS.Tests`（TargetFramework=`net9.0`，引用 Core 库）。
 - 测试运行器：`xunit.runner.visualstudio`，覆盖率收集：`coverlet.collector`。
-- 当前测试数量：**1332 项**（全部通过为门禁要求）。
+- 当前测试数量：**1333 项**（全部通过为门禁要求）。
 
 ### 6.2 测试辅助
 
@@ -316,7 +316,7 @@ echo 5 | dotnet run
 
 1. **`dotnet build BattleSystemECS.Core`** — Core 库 0 warnings, 0 errors
 2. **`dotnet build`** — EXE 0 warnings, 0 errors
-3. **`dotnet test BattleSystemECS.Tests`** — 全部通过（当前 1332/1332）
+3. **`dotnet test BattleSystemECS.Tests`** — 全部通过（当前 1333/1333）
 4. **`echo 2 | dotnet run`** — mode 2 压测
 5. **`echo 4 | dotnet run`** — mode 4 压测
 6. **`echo 5 | dotnet run`** — mode 5 压测
@@ -367,7 +367,7 @@ echo 5 | dotnet run
 | 修改技能/效果 | `Core/GAS/*.cs` + `Systems/SkillSystem.cs` + `Data/Configs/skills.json` |
 | 修改科技树 | `Core/TechTreeDef.cs` + `Systems/TechTreeSystem.cs` + `Data/Configs/tech_tree.json` |
 | 修改行为树 | `Data/Configs/behavior_trees.json` + `Systems/BehaviorTreeEvaluator.cs` |
-| 修改 Polyfill | `BattleSystemECS.Core/Core/{IsExternalInit,Rng,PolyfillExtensions}.cs` |
+| 修改 Polyfill | `Core/{IsExternalInit,Rng,PolyfillExtensions}.cs`（经 Linked Files 编译进 Core 库） |
 | 修改测试 | `BattleSystemECS.Tests/XxxTests.cs` |
 | 查看 Bug 历史 | `docs/design-and-bugs.md` |
 | 查看架构决策 | `docs/architecture.md` |
@@ -375,4 +375,4 @@ echo 5 | dotnet run
 
 ---
 
-> **最后更新**：2026-06-09（业务扩展暂停，文档同步当前状态：双项目架构、事件总线、Unity 渲染端、polyfill、1332 tests）
+> **最后更新**：2026-08-15（业务扩展暂停，文档同步当前状态：双项目架构、事件总线、Unity 渲染端、polyfill、1333 tests）
