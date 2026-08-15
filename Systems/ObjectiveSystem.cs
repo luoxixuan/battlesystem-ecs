@@ -441,7 +441,7 @@ namespace BattleSystemECS.Systems
  if (quest.SoulReward >0 && _store.PlayerSoulCount != null && _playerId < _store.PlayerSoulCount.Length)
  _store.PlayerSoulCount[_playerId] += quest.SoulReward;
 
- _eventBus?.Publish(GameEvents.SideQuestCompleted, new SideQuestCompletedEvent
+ _eventBus?.SideQuestCompleted.Publish(new SideQuestCompletedEvent
  {
  PlayerId = _playerId,
  QuestId = quest.Id,

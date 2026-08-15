@@ -27,7 +27,7 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore _store;
         private readonly IRenderer _logger;
         private readonly GameConfig _gameConfig;
-        private readonly IEventBus _eventBus;
+        private readonly EventBus _eventBus;
 
         public const int MAX_TELEGRAPH_ZONES = 1024;
 
@@ -69,7 +69,7 @@ namespace BattleSystemECS.Systems
         public const int SHAPE_LINE = 3;
         public const int SHAPE_CHAIN = 4;
 
-        public TelegraphSystem(ComponentStore store, IRenderer logger, GameConfig gameConfig, IEventBus eventBus = null)
+        public TelegraphSystem(ComponentStore store, IRenderer logger, GameConfig gameConfig, EventBus eventBus = null)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -214,7 +214,7 @@ namespace BattleSystemECS.Systems
             _store.DecreasePlayerHealth(playerId, damage);
             float remaining = _store.GetPlayerCurrentHealth(playerId);
 
-            _eventBus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
+            _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
             {
                 Damage = damage,
                 RemainingHealth = remaining,

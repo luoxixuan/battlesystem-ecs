@@ -22,7 +22,7 @@ namespace BattleSystemECS.Systems
         private GameConfig gameConfig;
         // Round 67: EventBus for On-Hit / On-Crit trigger event publication.
         // Always non-null after construction (ctor falls back to a fresh EventBus instance).
-        private readonly IEventBus _eventBus;
+        private readonly EventBus _eventBus;
         private IBattleEventBus _battleEventBus;
 
         // BUG-1 fix: deterministic hash-based RNG — no shared state, fully reproducible per (frame, enemyId, attackerId)
@@ -95,9 +95,9 @@ namespace BattleSystemECS.Systems
         {
         }
 
-        // Round 67: IEventBus injection for On-Hit / On-Crit trigger event publication.
+        // Round 67: EventBus injection for On-Hit / On-Crit trigger event publication.
         // Optional parameter keeps existing call-sites (tests, partial ctor) compiling.
-        public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem, IEventBus eventBus, IBattleEventBus battleEventBus = null)
+        public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem, EventBus eventBus, IBattleEventBus battleEventBus = null)
         {
             this.store = store;
             this.renderer = renderer;
@@ -574,10 +574,10 @@ public void SetWaveNumber(int waveNumber)
                 Damage = damage,
                 IsCrit = isCrit
             };
-            _eventBus.Publish(GameEvents.EnemyHit, hitPayload);
+            _eventBus.EnemyHit.Publish(hitPayload);
             if (isCrit)
             {
-                _eventBus.Publish(GameEvents.EnemyCrit, hitPayload);
+                _eventBus.EnemyCrit.Publish(hitPayload);
             }
         }
     }

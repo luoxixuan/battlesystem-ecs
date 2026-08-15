@@ -14,7 +14,7 @@ namespace BattleSystemECS.Systems
     /// <c>RallyAtkSpdBonus</c> (+attack speed) for <c>RallyDuration</c> seconds.
     /// Cooldown <c>RallyCooldown</c> prevents stacking on every hit.
     ///
-    /// Wires up via the existing <see cref="GameEvents.PlayerDamaged"/> event —
+    /// Wires up via the existing <see cref="EventBus.PlayerDamaged"/> channel —
     /// published in 3 places (EnemyAISystem, EnemyAbilitySystem, TelegraphSystem),
     /// all of which are the canonical "player lost HP" signal. No new event hooks
     /// needed.
@@ -38,14 +38,14 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore _store;
         private readonly IRenderer _logger;
-        private readonly IEventBus? _eventBus;
+        private readonly EventBus? _eventBus;
 
         // Cached list of active rally towers per player — used by the expiry
         // pass to find which towers to clear when a rally ends. Reused frame-to-frame
         // to avoid allocations. (int playerId, List<int> towerIds)
         private readonly Dictionary<int, List<int>> _activeRallyTowers = new Dictionary<int, List<int>>(4);
 
-        public RallySystem(ComponentStore store, IRenderer logger, IEventBus? eventBus = null)
+        public RallySystem(ComponentStore store, IRenderer logger, EventBus? eventBus = null)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -53,10 +53,7 @@ namespace BattleSystemECS.Systems
 
             if (_eventBus != null)
             {
-                // Wrap method group in a lambda so the signature matches EventBus's
-                // Action<object> exactly (some .NET runtimes reject method-group
-                // conversion from Action<object?> to Action<object>; lambda always works).
-                _eventBus.Subscribe(GameEvents.PlayerDamaged, data => OnPlayerDamagedHandler(data));
+                _eventBus.PlayerDamaged.Subscribe(OnPlayerDamagedHandler);
             }
         }
 
@@ -143,9 +140,8 @@ namespace BattleSystemECS.Systems
         /// Event handler: PlayerDamaged → if cooldown == 0, activate rally for that
         /// player and write the rally zones into the per-player tower list.
         /// </summary>
-        private void OnPlayerDamagedHandler(object? data)
+        private void OnPlayerDamagedHandler(PlayerDamagedEvent ev)
         {
-            if (data is not PlayerDamagedEvent ev) return;
             int pid = ResolvePlayerIdFromEvent(ev);
             if (pid < 0) return;
 

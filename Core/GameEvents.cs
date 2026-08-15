@@ -2,39 +2,11 @@ using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Core
 {
-    /// <summary>
-    /// Canonical event type constants used across the game.
-    /// Only events that have at least one publisher are declared here.
-    /// </summary>
-    public static class GameEvents
-    {
-        // Actively published events (verified against all Subscribe/Publish call sites)
-        public const string PlayerDamaged         = "player_damaged";
-        public const string EnemyCharging         = "enemy_charging";
-        public const string EnemyChargeReleased   = "enemy_charge_released";
-        // On-Hit / On-Crit trigger infrastructure (Round 67)
-        // Published in the serial damage-apply phase of PlayerTowerAttackSystem / TowerAttackSystem.
-        // Payload fields: EnemyId, AttackerId (playerId or towerId; towerId<0 means player attack),
-        // Damage, IsCrit. Subscribers can implement affix logic (heal on crit, slow on crit, etc).
-        public const string EnemyHit              = "enemy_hit";
-        public const string EnemyCrit             = "enemy_crit";
-        // Boss phase transition event (Round 129 Direction 2). Published in the serial end-of-Update
-        // drain phase of EnemyAISystem whenever a boss enemy crosses a phase threshold
-        // (HP-fraction based; one-shot per phase, gated by EnemyPhaseFiredMask). Payload fields:
-        // EnemyId, BossTypeName, OldPhase, NewPhase, HealthFraction, Turn. Subscribers can drive
-        // boss mechanic changes (music swap, AoE warning, dialogue, telemetry, etc) without
-        // tightly coupling to EnemyAISystem internals.
-        public const string BossPhaseChanged = "boss_phase_changed";
- // Side quest completion event — Round201 Direction7. Published by ObjectiveSystem
- // whenever a side quest flips from in-progress to completed (one-shot per quest,
- // gated by PlayerSideQuestCompleted latch). Payload fields: PlayerId, QuestId,
- // Type (0..4, see SideQuestDef), GoldReward, SoulReward. Subscribers can drive
- // reward VFX, sound, achievement telemetry, etc without coupling to the system.
- public const string SideQuestCompleted = "side_quest_completed";
-    }
-
     // ── Event Data Transfer Objects ──
-    // Only DTOs that are actually instantiated in the codebase are kept.
+    // Typed payloads for the EventBus channels (see EventBus.cs).
+    // The previous string-keyed GameEvents constants were removed: each event is now
+    // a strongly-typed field on EventBus, so event names are checked at compile time
+    // instead of by a string literal.
 
     public class PlayerDamagedEvent
     {

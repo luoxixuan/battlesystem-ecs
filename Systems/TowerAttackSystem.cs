@@ -69,7 +69,7 @@ namespace BattleSystemECS.Systems
         // Default size 32 covers all active towers in typical benches; Set grows on demand.
         private readonly HashSet<long> _critFiredThisFrame = new HashSet<long>(32);
         // Round 67: EventBus for On-Hit / On-Crit trigger publication.
-        private readonly IEventBus _eventBus;
+        private readonly EventBus _eventBus;
         private IBattleEventBus _battleEventBus;
 
         // Ping-pong double-buffer for tower debuff events (collected parallel, applied serial)
@@ -157,7 +157,7 @@ namespace BattleSystemECS.Systems
         }
 
         // Round 67: IBattleEventBus optional injection for On-Hit / On-Crit publication.
-        public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem, int mapWidth, IEventBus eventBus, IBattleEventBus battleEventBus = null)
+        public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem, int mapWidth, EventBus eventBus, IBattleEventBus battleEventBus = null)
         {
             this.store = store;
             this.logger = logger;
@@ -2871,10 +2871,10 @@ namespace BattleSystemECS.Systems
                 Damage = damage,
                 IsCrit = isCrit
             };
-            _eventBus.Publish(GameEvents.EnemyHit, hitPayload);
+            _eventBus.EnemyHit.Publish(hitPayload);
             if (isCrit)
             {
-                _eventBus.Publish(GameEvents.EnemyCrit, hitPayload);
+                _eventBus.EnemyCrit.Publish(hitPayload);
             }
         }
     }

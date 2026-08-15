@@ -257,7 +257,7 @@ namespace BattleSystemECS.Core
         public SaveSystem? Save { get; private set; }
 
         // ── EventBus ──
-        public IEventBus? EventBus { get; private set; }
+        public EventBus? EventBus { get; private set; }
 
         // ═══════════════════════════════════════════════════════════════════
         //  Creation — one system per block, in dependency order
@@ -496,7 +496,7 @@ namespace BattleSystemECS.Core
             Projectile = new ProjectileSystem(store, logger, battleEb);
 
             // ── Objective / Branch / Resource ──
-            Objective = new ObjectiveSystem(store, playerId);
+            Objective = new ObjectiveSystem(store, playerId, eventBus);
             WaveBranch = new WaveBranchSystem(store, logger, config, stateMachine);
             ResourceNode = new ResourceNodeSystem(store, logger, playerId);
             WavePreview = new WavePreviewSystem(store, config, playerId);

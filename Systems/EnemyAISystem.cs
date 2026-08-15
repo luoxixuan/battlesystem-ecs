@@ -24,7 +24,7 @@ namespace BattleSystemECS.Systems
         private readonly GameConfig gameConfig;
         private readonly EnemyAbilitySystem enemyAbilitySystem;
         private readonly TechTreeSystem techTreeSystem;
-        private readonly IEventBus _eventBus;
+        private readonly EventBus _eventBus;
         private readonly ReflectTowerSystem _reflectTowerSystem;
         // Round 119 Dir 3 — optional WaveSpawningSystem ref. Set via SetWaveSpawningSystem() after
         // construction. When null (e.g. in unit tests that construct EnemyAISystem without the
@@ -74,9 +74,9 @@ namespace BattleSystemECS.Systems
         // Round 129 Dir 2 — Boss phase change event bag. Pushed in BOTH the sequential (small
         // enemy count) and parallel (large enemy count) branches whenever a phase transition
         // fires (legacy CSV path uses the in-place `currentPhase` gate; structured path uses
-        // EnemyPhaseFiredMask bit). Drained serially at end of Update() into the IEventBus.
+        // EnemyPhaseFiredMask bit). Drained serially at end of Update() into the EventBus.
         // This decouples the Boss-phase system from any specific subscriber (BossTrailAoeSystem,
-        // music, AoE warning, telemetry) — they subscribe via GameEvents.BossPhaseChanged and
+        // music, AoE warning, telemetry) — they subscribe via EventBus.BossPhaseChanged and
         // react to the payload. Drain is always performed (count tracked) even when the event
         // bus is null, matching the pattern of the other two phase-related bags.
         private readonly ConcurrentBag<BossPhaseChangedEvent> _phaseChangeEvents
@@ -91,7 +91,7 @@ namespace BattleSystemECS.Systems
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
         private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
 
-        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem, TechTreeSystem techTreeSystem = null, IEventBus eventBus = null, ReflectTowerSystem reflectTowerSystem = null)
+        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem, TechTreeSystem techTreeSystem = null, EventBus eventBus = null, ReflectTowerSystem reflectTowerSystem = null)
         {
             this.store = store;
             this.logger = logger;
@@ -1058,7 +1058,7 @@ namespace BattleSystemECS.Systems
             store.EnemyStealthMultiplier[enemyId] = 1f;
             store.DecreasePlayerHealth(playerId, damage);
             float remaining = store.GetPlayerCurrentHealth(playerId);
-            _eventBus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
+            _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
             {
                 Damage = damage,
                 RemainingHealth = remaining,
@@ -1097,13 +1097,13 @@ namespace BattleSystemECS.Systems
             store.EnemyStealthMultiplier[enemyId] = 1f;
             store.DecreasePlayerHealth(playerId, damage);
             float remaining = store.GetPlayerCurrentHealth(playerId);
-            _eventBus.Publish(GameEvents.EnemyCharging, new EnemyChargingEvent
+            _eventBus.EnemyCharging.Publish(new EnemyChargingEvent
             {
                 EnemyId = enemyId,
                 Turn = currentTurn,
                 Damage = damage
             });
-            _eventBus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
+            _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
             {
                 Damage = damage,
                 RemainingHealth = remaining,
@@ -1141,7 +1141,7 @@ namespace BattleSystemECS.Systems
             {
                 store.SetEnemyAIChargeCounter(enemyId, counter + 1);
                 store.EnemyChargeParam[enemyId] = param;
-                _eventBus.Publish(GameEvents.EnemyCharging, new EnemyChargingEvent
+                _eventBus.EnemyCharging.Publish(new EnemyChargingEvent
                 {
                     EnemyId = enemyId,
                     Turn = currentTurn,
@@ -1160,13 +1160,13 @@ namespace BattleSystemECS.Systems
                 float chargedDamage = baseDamage * 3f;
                 store.DecreasePlayerHealth(playerId, chargedDamage);
                 float remaining = store.GetPlayerCurrentHealth(playerId);
-                _eventBus.Publish(GameEvents.EnemyChargeReleased, new EnemyChargeReleasedEvent
+                _eventBus.EnemyChargeReleased.Publish(new EnemyChargeReleasedEvent
                 {
                     EnemyId = enemyId,
                     Turn = currentTurn,
                     Damage = chargedDamage
                 });
-                _eventBus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
+                _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
                 {
                     Damage = chargedDamage,
                     RemainingHealth = remaining,
@@ -1208,9 +1208,9 @@ namespace BattleSystemECS.Systems
             // Same pattern as ability drain: serial, end-of-Update, thread-safe. Bag is always
             // drained (count tracked) so diagnostics work even when _waveSpawningSystem is null.
             DrainPhaseMinionEvents();
-            // Round 129 Dir 2 — drain phase-change bag into IEventBus. Fills in BossTypeName
+            // Round 129 Dir 2 — drain phase-change bag into EventBus. Fills in BossTypeName
             // (needs single-threaded access to store.EnemyTypeName[]) and publishes the
-            // GameEvents.BossPhaseChanged event for any subscribers (music, telemetry, AoE
+            // EventBus.BossPhaseChanged channel for any subscribers (music, telemetry, AoE
             // warning). Safe to call even when _eventBus is a no-op (NullEventBus pattern) —
             // the bag is always drained and the count tracked.
             DrainPhaseChangeEvents();
@@ -1322,9 +1322,9 @@ namespace BattleSystemECS.Systems
             PhaseMinionSpawnedCount = spawned;
         }
 
-        // Round 129 Dir 2 — drain the phase-change event bag into IEventBus. Fills in the
+        // Round 129 Dir 2 — drain the phase-change event bag into EventBus. Fills in the
         // BossTypeName from store.EnemyTypeName[] (single-threaded access) and publishes each
-        // event via _eventBus.Publish. Empty BossTypeName is normalized to null so subscribers
+        // event via _eventBus.BossPhaseChanged.Publish. Empty BossTypeName is normalized to null so subscribers
         // see a consistent "no name available" sentinel. Drain count is exposed for tests /
         // diagnostics. Safe to call when _eventBus is null (the constructor default-fallback
         // creates a fresh EventBus, but tests that pass null will get a NullReferenceException
@@ -1342,7 +1342,7 @@ namespace BattleSystemECS.Systems
                 // EnemyTypeName[] array — push sites can run in parallel).
                 string typeName = store.GetEnemyTypeName(ev.EnemyId);
                 ev.BossTypeName = string.IsNullOrEmpty(typeName) ? null : typeName;
-                _eventBus.Publish(GameEvents.BossPhaseChanged, ev);
+                _eventBus.BossPhaseChanged.Publish(ev);
                 published++;
             }
             PhaseChangeDrainCount = count;

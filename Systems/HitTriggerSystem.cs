@@ -9,7 +9,7 @@ namespace BattleSystemECS.Systems
     /// Round 67 — On-Hit / On-Crit Trigger System.
     /// Round 71 — extended with On-Hit Lifesteal handler.
     ///
-    /// Subscribes to GameEvents.EnemyHit and GameEvents.EnemyCrit and acts as the
+    /// Subscribes to EventBus.EnemyHit and EventBus.EnemyCrit and acts as the
     /// central fan-out for affix code that wants to react to "X happened when an
     /// enemy was hit / crit". Future tower affixes / enemy affixes can subscribe
     /// to these events without each attack system needing to know about them.
@@ -37,7 +37,7 @@ namespace BattleSystemECS.Systems
     public class HitTriggerSystem
     {
         private readonly ComponentStore store;
-        private readonly IEventBus eventBus;
+        private readonly EventBus eventBus;
         private bool _subscribed;
 
         // Per-frame counters. Read by benchmark harnesses / debug UI.
@@ -52,7 +52,7 @@ namespace BattleSystemECS.Systems
         private readonly Dictionary<int, int> _hitsPerEnemyThisFrame = new Dictionary<int, int>(128);
         private readonly Dictionary<int, int> _critsPerEnemyThisFrame = new Dictionary<int, int>(128);
 
-        public HitTriggerSystem(ComponentStore store, IEventBus eventBus = null)
+        public HitTriggerSystem(ComponentStore store, EventBus eventBus = null)
         {
             this.store = store;
             this.eventBus = eventBus ?? new EventBus();
@@ -65,8 +65,8 @@ namespace BattleSystemECS.Systems
         {
             if (_subscribed) return;
             _subscribed = true;
-            this.eventBus.Subscribe(GameEvents.EnemyHit, OnEnemyHit);
-            this.eventBus.Subscribe(GameEvents.EnemyCrit, OnEnemyCrit);
+            this.eventBus.EnemyHit.Subscribe(OnEnemyHit);
+            this.eventBus.EnemyCrit.Subscribe(OnEnemyCrit);
         }
 
         /// <summary>
@@ -82,14 +82,12 @@ namespace BattleSystemECS.Systems
         }
 
         // ── Event handlers ────────────────────────────────────────────────
-        // Both handlers run inside the EventBus lock (publish-time) so they
+        // Both handlers run synchronously at publish time (serial phase), so they
         // must be fast. We do only: read fields, increment counters, dictionary
         // upserts. No allocations beyond the per-enemy dict entry on first hit.
 
-        private void OnEnemyHit(object payload)
+        private void OnEnemyHit(EnemyHitEvent e)
         {
-            var e = payload as EnemyHitEvent;
-            if (e == null) return;
             TotalHitsThisFrame++;
             // Per-enemy dict upsert (no-op if entry exists).
             if (_hitsPerEnemyThisFrame.TryGetValue(e.EnemyId, out int n))
@@ -127,10 +125,8 @@ namespace BattleSystemECS.Systems
             }
         }
 
-        private void OnEnemyCrit(object payload)
+        private void OnEnemyCrit(EnemyHitEvent e)
         {
-            var e = payload as EnemyHitEvent;
-            if (e == null) return;
             TotalCritsThisFrame++;
             if (_critsPerEnemyThisFrame.TryGetValue(e.EnemyId, out int n))
                 _critsPerEnemyThisFrame[e.EnemyId] = n + 1;

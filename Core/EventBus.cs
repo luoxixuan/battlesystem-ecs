@@ -1,117 +1,93 @@
+#nullable enable
 using System;
-using System.Collections.Generic;
 
 namespace BattleSystemECS.Core
 {
     /// <summary>
-    /// Event Bus — 解耦系统间通信
-    /// 系统发布事件，其他系统订阅感兴趣的事件类型
+    /// Type-safe, allocation-free event channel.
     ///
-    /// Thread-safety:
-    ///   All public methods use an internal lock. Subscribe/Unsubscribe/Clear are
-    ///   thread-safe. Publish is safe for concurrent calls from main thread or
-    ///   serial-only contexts.
+    /// Replaces the previous string-keyed <c>IEventBus</c> (a
+    /// <c>Dictionary&lt;string, List&lt;Action&lt;object&gt;&gt;&gt;</c> guarded by a lock
+    /// that snapshotted its handler list with <c>ToArray()</c> on every publish). Each
+    /// game event is now a compile-time-typed channel, so:
+    ///   - event names are checked at compile time (no magic-string typos that silently
+    ///     disable every subscriber);
+    ///   - payloads are strongly typed (no <c>object</c> payload, no runtime casts);
+    ///   - <c>Publish</c> is a single multicast-delegate invocation — no lock, no
+    ///     dictionary lookup, no per-publish allocation.
     ///
-    /// Usage:
-    ///   bus.Subscribe("enemy_killed", data => { ... });
-    ///   bus.Publish("enemy_killed", new { enemyId = 5, gold = 10 });
-    ///   bus.Reset(); // call at start of each game turn / level
+    /// Threading contract (matches the codebase's actual two-phase usage):
+    ///   - <c>Subscribe</c>/<c>Unsubscribe</c> run at construction/teardown time
+    ///     (single-threaded);
+    ///   - <c>Publish</c> runs from the serial / main-thread phase only. Do NOT call
+    ///     it from inside a <c>Parallel.For</c> — parallel systems collect events and
+    ///     publish them serially (the two-phase pattern).
     /// </summary>
-    public class EventBus : IEventBus
+    public sealed class EventChannel<T>
     {
-        private readonly Dictionary<string, List<Action<object>>> _handlers =
-            new Dictionary<string, List<Action<object>>>();
+        private Action<T>? _handlers;
 
-        private readonly object _lock = new object();
-
-        /// <summary>
-        /// Subscribe to an event type. Handler receives an object payload.
-        /// Thread-safe.
-        /// </summary>
-        public void Subscribe(string eventType, Action<object> handler)
+        /// <summary>Register a handler. Called at init; not thread-safe.</summary>
+        public void Subscribe(Action<T> handler)
         {
-            lock (_lock)
-            {
-                if (!_handlers.ContainsKey(eventType))
-                    _handlers[eventType] = new List<Action<object>>();
-                _handlers[eventType].Add(handler);
-            }
+            _handlers += handler;
+        }
+
+        /// <summary>Remove a handler. Called at teardown; not thread-safe.</summary>
+        public void Unsubscribe(Action<T> handler)
+        {
+            _handlers -= handler;
         }
 
         /// <summary>
-        /// Publish an event with optional payload data.
-        /// All registered handlers for this event type are called.
-        ///
-        /// Thread-safe: iterates over a snapshot copy to prevent concurrent modification
-        /// during handler execution.
-        ///
-        /// NOTE: Do NOT call Publish from within a Parallel.For — events in parallel
-        /// execution contexts should be queued and dispatched serially on the main thread.
-        /// This EventBus is designed for main-thread / serial event dispatch only.
-        ///
-        /// NOTE: Handlers are invoked inside the lock — keep them fast. For expensive
-        /// operations, queue results and process after lock release.
+        /// Publish a payload. Zero-allocation: one multicast-delegate invoke when
+        /// there are subscribers, otherwise a single null check.
         /// </summary>
-        public void Publish(string eventType, object data = null)
+        public void Publish(T payload)
         {
-            lock (_lock)
-            {
-                if (_handlers.Count == 0) return;
-                if (!_handlers.TryGetValue(eventType, out var list)) return;
-                var snapshot = list.ToArray();
-                foreach (var handler in snapshot)
-                {
-                    try { handler(data); }
-                    catch (Exception ex)
-                    {
-                        Console.Error.WriteLine($"[EventBus] Handler error for '{eventType}': {ex.Message}");
-                    }
-                }
-            }
+            _handlers?.Invoke(payload);
         }
 
-        /// <summary>
-        /// Unsubscribe a handler from an event type. Thread-safe.
-        /// </summary>
-        public void Unsubscribe(string eventType, Action<object> handler)
-        {
-            lock (_lock)
-            {
-                if (_handlers.TryGetValue(eventType, out var list))
-                    list.Remove(handler);
-            }
-        }
+        /// <summary>Number of subscribers (diagnostics / tests only).</summary>
+        public int SubscriberCount => _handlers?.GetInvocationList().Length ?? 0;
 
-        /// <summary>
-        /// Clear all handlers (useful for reset between levels or tests).
-        /// Thread-safe.
-        /// </summary>
+        /// <summary>Drop all subscribers (used by <see cref="EventBus.Reset"/>).</summary>
         public void Clear()
         {
-            lock (_lock) { _handlers.Clear(); }
+            _handlers = null;
         }
+    }
 
-        /// <summary>
-        /// Alias for Clear — resets the EventBus to a clean state.
-        /// Call this at the start of each game turn or level to prevent stale subscriptions.
-        /// </summary>
-        public void Reset() => Clear();
+    /// <summary>
+    /// The single inter-system event bus: one typed channel per game event.
+    /// Systems receive this instance via constructor injection (see SystemRegistry).
+    ///
+    /// Kept distinct from <see cref="IBattleEventBus"/>, which is the logic→render
+    /// boundary consumed by the Unity view layer.
+    /// </summary>
+    public sealed class EventBus
+    {
+        public readonly EventChannel<PlayerDamagedEvent> PlayerDamaged = new EventChannel<PlayerDamagedEvent>();
+        public readonly EventChannel<EnemyHitEvent> EnemyHit = new EventChannel<EnemyHitEvent>();
+        public readonly EventChannel<EnemyHitEvent> EnemyCrit = new EventChannel<EnemyHitEvent>();
+        public readonly EventChannel<EnemyChargingEvent> EnemyCharging = new EventChannel<EnemyChargingEvent>();
+        public readonly EventChannel<EnemyChargeReleasedEvent> EnemyChargeReleased = new EventChannel<EnemyChargeReleasedEvent>();
+        public readonly EventChannel<BossPhaseChangedEvent> BossPhaseChanged = new EventChannel<BossPhaseChangedEvent>();
+        public readonly EventChannel<SideQuestCompletedEvent> SideQuestCompleted = new EventChannel<SideQuestCompletedEvent>();
 
-        /// <summary>
-        /// Get subscriber count for a specific event type.
-        /// </summary>
-        public int SubscriberCount(string eventType)
+        /// <summary>Number of event channels on this bus.</summary>
+        public int EventTypeCount => 7;
+
+        /// <summary>Clear all subscribers (start of a new game / level).</summary>
+        public void Reset()
         {
-            lock (_lock)
-                return _handlers.TryGetValue(eventType, out var list) ? list.Count : 0;
-        }
-
-        /// <summary>
-        /// Total number of event types registered.
-        /// </summary>
-        public int EventTypeCount
-        {
-            get { lock (_lock) return _handlers.Count; }
+            PlayerDamaged.Clear();
+            EnemyHit.Clear();
+            EnemyCrit.Clear();
+            EnemyCharging.Clear();
+            EnemyChargeReleased.Clear();
+            BossPhaseChanged.Clear();
+            SideQuestCompleted.Clear();
         }
     }
 }

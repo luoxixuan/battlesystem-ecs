@@ -42,7 +42,7 @@ namespace BattleSystemECS.Tests
             return tps.PlaceTower(x, y, type, 0f, 0, 0f, 25f);
         }
 
-        private static RallySystem MakeSystem(ComponentStore store, MockRenderer r, IEventBus? bus = null)
+        private static RallySystem MakeSystem(ComponentStore store, MockRenderer r, EventBus? bus = null)
         {
             return new RallySystem(store, r, bus);
         }
@@ -113,7 +113,7 @@ namespace BattleSystemECS.Tests
             var bus = new EventBus();
             var sys = MakeSystem(store, r, bus);
             // Simulate the player taking a 20-damage hit
-            bus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
+            bus.PlayerDamaged.Publish(new PlayerDamagedEvent
             {
                 Damage = 20f,
                 RemainingHealth = 180f
@@ -134,13 +134,13 @@ namespace BattleSystemECS.Tests
             var bus = new EventBus();
             var sys = MakeSystem(store, r, bus);
             // First hit activates rally
-            bus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
+            bus.PlayerDamaged.Publish(new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
             Assert.True(store.PlayerRallyActive[PlayerId]);
             float firstDuration = store.PlayerRallyDurationLeft[PlayerId];
             // Simulate a tiny tick (duration nearly identical, cooldown ramps up)
             sys.Update(0.001f);
             // Second hit during cooldown: must NOT re-activate
-            bus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent { Damage = 10f, RemainingHealth = 170f });
+            bus.PlayerDamaged.Publish(new PlayerDamagedEvent { Damage = 10f, RemainingHealth = 170f });
             // Duration should be exactly the same as after the first hit (only Update decrements it)
             // Cooldown should still be set (still ticking from first hit)
             Assert.True(store.PlayerRallyCooldown[PlayerId] > 0f);
@@ -160,7 +160,7 @@ namespace BattleSystemECS.Tests
             var bus = new EventBus();
             var sys = MakeSystem(store, r, bus);
             // Activate rally
-            bus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
+            bus.PlayerDamaged.Publish(new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
             Assert.Equal(RallyConfig.RallyAtkSpdBonus, store.TowerRallyAtkSpdBonus[tid], 3);
             // Tick beyond the duration in one frame
             sys.Update(RallyConfig.RallyDuration + 0.5f);
@@ -183,7 +183,7 @@ namespace BattleSystemECS.Tests
             var bus = new EventBus();
             var sys = MakeSystem(store, r, bus);
             // Activate
-            bus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
+            bus.PlayerDamaged.Publish(new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
             float initialCooldown = store.PlayerRallyCooldown[PlayerId];
             Assert.Equal(RallyConfig.RallyCooldown, initialCooldown, 3);
             // Tick a bit
@@ -204,7 +204,7 @@ namespace BattleSystemECS.Tests
             // Tower gets dispelled before rally activation
             store.TowerIsDispelled[tid] = true;
             // Activate rally
-            bus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
+            bus.PlayerDamaged.Publish(new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
             // Dispeled tower is NOT in the rally zone
             Assert.Equal(0f, store.TowerRallyAtkSpdBonus[tid]);
         }
@@ -219,7 +219,7 @@ namespace BattleSystemECS.Tests
             int tid = PlaceTower(store, r, 0, 0);
             var bus = new EventBus();
             var sys = MakeSystem(store, r, bus);
-            bus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
+            bus.PlayerDamaged.Publish(new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
             Assert.Equal(RallyConfig.RallyAtkSpdBonus, store.TowerRallyAtkSpdBonus[tid], 3);
             // Expire
             sys.Update(RallyConfig.RallyDuration + 0.1f);
@@ -240,7 +240,7 @@ namespace BattleSystemECS.Tests
             Assert.NotEqual(-1, far); // sanity: placed successfully
             var bus = new EventBus();
             var sys = MakeSystem(store, r, bus);
-            bus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
+            bus.PlayerDamaged.Publish(new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
             // Far tower: 0 (out of radius 5)
             Assert.Equal(0f, store.TowerRallyAtkSpdBonus[far]);
         }
@@ -255,7 +255,7 @@ namespace BattleSystemECS.Tests
             Assert.NotEqual(-1, near); // sanity: placed successfully
             var bus = new EventBus();
             var sys = MakeSystem(store, r, bus);
-            bus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
+            bus.PlayerDamaged.Publish(new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
             Assert.Equal(RallyConfig.RallyAtkSpdBonus, store.TowerRallyAtkSpdBonus[near], 3);
         }
     }

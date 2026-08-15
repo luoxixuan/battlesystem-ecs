@@ -12,11 +12,11 @@ namespace BattleSystemECS.Tests
     /// <summary>
     /// Tests for Round 129 Direction 2: Boss Phase Changed Event.
     /// Verifies that:
-    ///   - GameEvents.BossPhaseChanged constant is defined and is a non-empty string
+    ///   - EventBus.BossPhaseChanged typed channel exists (replaces the string constant)
     ///   - BossPhaseChangedEvent DTO supports all 6 fields (EnemyId / BossTypeName /
     ///     OldPhase / NewPhase / HealthFraction / Turn)
     ///   - EnemyAISystem.PhaseChangeDrainCount / PhaseChangePublishCount default to 0
-    ///   - DrainPhaseChangeEvents publishes each event to the IEventBus
+    ///   - DrainPhaseChangeEvents publishes each event to the EventBus
     ///   - BossTypeName is resolved from store.EnemyTypeName[] during the serial drain
     ///   - Empty/missing BossTypeName is normalized to null in the payload
     ///   - Multiple events are delivered in order via TryTake (drain empties the bag)
@@ -32,13 +32,13 @@ namespace BattleSystemECS.Tests
         // ── GameEvents constant & DTO ─────────────────────────────────────
 
         [Fact]
-        public void GameEvents_BossPhaseChanged_ConstantDefined()
+        public void EventBus_BossPhaseChanged_ChannelExists()
         {
-            // The event type must be a non-empty string (used as the key in the
-            // EventBus handler dictionary). A typo here would silently disable
-            // all subscribers, so we pin the value.
-            Assert.False(string.IsNullOrEmpty(GameEvents.BossPhaseChanged));
-            Assert.Equal("boss_phase_changed", GameEvents.BossPhaseChanged);
+            // The BossPhaseChanged channel is a compile-time-typed field on EventBus
+            // (it replaces the previous string-keyed GameEvents constant). A missing
+            // field is now a compile error rather than a runtime string typo.
+            var bus = new EventBus();
+            Assert.NotNull(bus.BossPhaseChanged);
         }
 
         [Fact]
@@ -107,7 +107,7 @@ namespace BattleSystemECS.Tests
             Assert.Equal(0, ai.PhaseChangePublishCount);
         }
 
-        // ── Drain publishes to the IEventBus ──────────────────────────────
+        // ── Drain publishes to the EventBus ──────────────────────────────
 
         [Fact]
         public void DrainPhaseChangeEvents_PublishesToSubscribedBus()
@@ -122,8 +122,8 @@ namespace BattleSystemECS.Tests
             var bus = new EventBus();
             var ai = new EnemyAISystem(store, renderer, PlayerId, config, enemyAbility, eventBus: bus);
 
-            var received = new List<object>();
-            bus.Subscribe(GameEvents.BossPhaseChanged, data => received.Add(data));
+            var received = new List<BossPhaseChangedEvent>();
+            bus.BossPhaseChanged.Subscribe(received.Add);
 
             // Inject one event into the bag via reflection (production code pushes
             // from the AI loop; tests can't easily simulate a real HP drop).
@@ -142,7 +142,7 @@ namespace BattleSystemECS.Tests
             Assert.Equal(1, ai.PhaseChangeDrainCount);
             Assert.Equal(1, ai.PhaseChangePublishCount);
             Assert.Single(received);
-            var published = Assert.IsType<BossPhaseChangedEvent>(received[0]);
+            var published = received[0];
             Assert.Equal(eid, published.EnemyId);
             Assert.Equal(0, published.OldPhase);
             Assert.Equal(1, published.NewPhase);
@@ -166,8 +166,8 @@ namespace BattleSystemECS.Tests
             var bus = new EventBus();
             var ai = new EnemyAISystem(store, renderer, PlayerId, config, enemyAbility, eventBus: bus);
 
-            BossPhaseChangedEvent captured = null;
-            bus.Subscribe(GameEvents.BossPhaseChanged, data => captured = (BossPhaseChangedEvent)data);
+            BossPhaseChangedEvent? captured = null;
+            bus.BossPhaseChanged.Subscribe(ev => captured = ev);
 
             InjectPhaseChangeEvent(ai, new BossPhaseChangedEvent
             {
@@ -197,8 +197,8 @@ namespace BattleSystemECS.Tests
             var bus = new EventBus();
             var ai = new EnemyAISystem(store, renderer, PlayerId, config, enemyAbility, eventBus: bus);
 
-            BossPhaseChangedEvent captured = null;
-            bus.Subscribe(GameEvents.BossPhaseChanged, data => captured = (BossPhaseChangedEvent)data);
+            BossPhaseChangedEvent? captured = null;
+            bus.BossPhaseChanged.Subscribe(ev => captured = ev);
 
             InjectPhaseChangeEvent(ai, new BossPhaseChangedEvent
             {
@@ -229,7 +229,7 @@ namespace BattleSystemECS.Tests
             var ai = new EnemyAISystem(store, renderer, PlayerId, config, enemyAbility, eventBus: bus);
 
             var ids = new List<int>();
-            bus.Subscribe(GameEvents.BossPhaseChanged, data => ids.Add(((BossPhaseChangedEvent)data).EnemyId));
+            bus.BossPhaseChanged.Subscribe(ev => ids.Add(ev.EnemyId));
 
             InjectPhaseChangeEvent(ai, new BossPhaseChangedEvent { EnemyId = boss1, NewPhase = 1, Turn = 1 });
             InjectPhaseChangeEvent(ai, new BossPhaseChangedEvent { EnemyId = boss2, NewPhase = 1, Turn = 1 });
@@ -259,7 +259,7 @@ namespace BattleSystemECS.Tests
             var ai = new EnemyAISystem(store, renderer, PlayerId, config, enemyAbility, eventBus: bus);
 
             int receivedCount = 0;
-            bus.Subscribe(GameEvents.BossPhaseChanged, data => receivedCount++);
+            bus.BossPhaseChanged.Subscribe(_ => receivedCount++);
 
             InjectPhaseChangeEvent(ai, new BossPhaseChangedEvent { EnemyId = eid, NewPhase = 1 });
             InvokeDrainPhaseChangeEvents(ai);
@@ -276,9 +276,9 @@ namespace BattleSystemECS.Tests
             // Standalone EventBus round-trip: subscribe → publish → handler invoked.
             // Mirrors the wiring pattern any subscriber (music, telemetry) will use.
             var bus = new EventBus();
-            object? captured = null;
+            BossPhaseChangedEvent? captured = null;
             int callCount = 0;
-            bus.Subscribe(GameEvents.BossPhaseChanged, data =>
+            bus.BossPhaseChanged.Subscribe(data =>
             {
                 captured = data;
                 callCount++;
@@ -293,7 +293,7 @@ namespace BattleSystemECS.Tests
                 HealthFraction = 0.25f,
                 Turn = 42,
             };
-            bus.Publish(GameEvents.BossPhaseChanged, ev);
+            bus.BossPhaseChanged.Publish(ev);
 
             Assert.Equal(1, callCount);
             Assert.Same(ev, captured); // same object identity — Publish doesn't copy
@@ -306,8 +306,7 @@ namespace BattleSystemECS.Tests
             // does `if (!_handlers.TryGetValue(...)) return;`). This is the
             // production path before any subscriber registers.
             var bus = new EventBus();
-            var ex = Record.Exception(() => bus.Publish(
-                GameEvents.BossPhaseChanged,
+            var ex = Record.Exception(() => bus.BossPhaseChanged.Publish(
                 new BossPhaseChangedEvent { EnemyId = 1, NewPhase = 1 }));
             Assert.Null(ex);
         }
@@ -324,7 +323,7 @@ namespace BattleSystemECS.Tests
                 "_phaseChangeEvents",
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.NotNull(field); // field must exist
-            var bag = (ConcurrentBag<BossPhaseChangedEvent>)field.GetValue(ai);
+            var bag = (ConcurrentBag<BossPhaseChangedEvent>)field.GetValue(ai)!;
             bag.Add(ev);
         }
 

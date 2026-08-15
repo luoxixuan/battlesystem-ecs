@@ -19,7 +19,7 @@ namespace BattleSystemECS.Systems
         private readonly IRenderer logger;
         private readonly int playerId;
         private readonly GameConfig gameConfig;
-        private readonly IEventBus _eventBus;
+        private readonly EventBus _eventBus;
         private readonly Dictionary<string, EnemyAbilityDef> _abilityLookup;
         private TelegraphSystem _telegraphSystem;
 
@@ -37,7 +37,7 @@ namespace BattleSystemECS.Systems
         // InterruptCast all run on the main game thread (no parallel writes).
         private readonly List<int> _activeChannelers = new List<int>(64);
 
-        public EnemyAbilitySystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, IEventBus eventBus = null)
+        public EnemyAbilitySystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EventBus eventBus = null)
         {
             this.store = store;
             this.logger = logger;
@@ -374,7 +374,7 @@ namespace BattleSystemECS.Systems
                     store.DecreasePlayerHealth(playerId, aoeDamage);
                     float remaining = store.GetPlayerCurrentHealth(playerId);
 
-                    _eventBus.Publish(GameEvents.PlayerDamaged, new PlayerDamagedEvent
+                    _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
                     {
                         Damage = aoeDamage,
                         RemainingHealth = remaining,
