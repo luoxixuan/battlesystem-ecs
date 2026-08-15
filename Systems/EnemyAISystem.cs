@@ -25,7 +25,7 @@ namespace BattleSystemECS.Systems
         private readonly EnemyAbilitySystem enemyAbilitySystem;
         private readonly TechTreeSystem techTreeSystem;
         private readonly IEventBus _eventBus;
-        private readonly ReflectTowerSystem? _reflectTowerSystem;
+        private readonly ReflectTowerSystem _reflectTowerSystem;
         // Round 119 Dir 3 — optional WaveSpawningSystem ref. Set via SetWaveSpawningSystem() after
         // construction. When null (e.g. in unit tests that construct EnemyAISystem without the
         // full GameManager), the minion-summon bag is drained but no spawn happens (drained
@@ -91,7 +91,7 @@ namespace BattleSystemECS.Systems
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
         private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
 
-        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem, TechTreeSystem techTreeSystem = null, IEventBus eventBus = null, ReflectTowerSystem? reflectTowerSystem = null)
+        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem, TechTreeSystem techTreeSystem = null, IEventBus eventBus = null, ReflectTowerSystem reflectTowerSystem = null)
         {
             this.store = store;
             this.logger = logger;

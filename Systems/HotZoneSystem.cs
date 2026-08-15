@@ -50,7 +50,13 @@ namespace BattleSystemECS.Systems
         private void LoadHotZoneDefs()
         {
             var defs = config.HotZoneDefs;
-            _hotZoneCount = defs != null ? defs.Count : 0;
+            if (defs == null)
+            {
+                _hotZoneCount = 0;
+                return;
+            }
+
+            _hotZoneCount = defs.Count;
             
             _hotZoneCenterX = new int[_hotZoneCount];
             _hotZoneCenterY = new int[_hotZoneCount];

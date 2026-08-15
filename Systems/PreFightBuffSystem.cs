@@ -347,7 +347,7 @@ namespace BattleSystemECS.Systems
  /// Returns the option definition for the given Id, or null if
  /// the Id is not in the pool (e.g. pool changed after selection).
  /// </summary>
- public PreFightBuffOptionDef? FindOptionById(string id)
+ public PreFightBuffOptionDef FindOptionById(string id)
  {
  var cfg = gameConfig.PreFight;
  if (cfg == null || cfg.Pool == null || string.IsNullOrEmpty(id)) return null;

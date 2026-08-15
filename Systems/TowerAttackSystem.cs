@@ -131,11 +131,6 @@ namespace BattleSystemECS.Systems
         private readonly object _splashDamageQueueLock = new object();
         private int _splashDamageQueueIdx = 0;
 
-        // Ping-pong double-buffer for tower kill events (granted XP on kill)
-        private List<(int enemyId, int playerId, int towerId)>[] _towerKillQueue = new List<(int, int, int)>[2];
-        private readonly object _towerKillQueueLock = new object();
-        private int _towerKillQueueIdx = 0;
-
         // Ping-pong double-buffer for bounce damage events
         // Tuple: (bounceLevel, enemyId, damage, playerId, towerId)
         //   bounceLevel=0: initial hit (already in _damageQueue)
@@ -182,8 +177,6 @@ namespace BattleSystemECS.Systems
             _chainDamageQueue[1] = new List<(int, int, float, int, int)>(64);
             _splashDamageQueue[0] = new List<(int, float, int, int)>(64);
             _splashDamageQueue[1] = new List<(int, float, int, int)>(64);
-            _towerKillQueue[0] = new List<(int, int, int)>(64);
-            _towerKillQueue[1] = new List<(int, int, int)>(64);
             _bounceDamageQueue[0] = new List<(int, int, float, int, int)>(64);
             _bounceDamageQueue[1] = new List<(int, int, float, int, int)>(64);
             _fragmentQueue[0] = new List<(int, float, int, int, int, float)>(64);

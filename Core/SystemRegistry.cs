@@ -263,7 +263,7 @@ namespace BattleSystemECS.Core
         //  Creation — one system per block, in dependency order
         // ═══════════════════════════════════════════════════════════════════
 
-        public void CreateAll(ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus battleEventBus = null)
+        public void CreateAll(ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus = null)
         {
             var battleEb = battleEventBus ?? NullEventBus.Instance;
 

@@ -1908,7 +1908,7 @@ namespace BattleSystemECS.Config
         public TowerModifierDef[] TowerModifiers { get; set; } = Array.Empty<TowerModifierDef>();
 
         // Look up a tower modifier def by its ModifierId (returns null if not found).
-        public TowerModifierDef? GetTowerModifierDef(string modifierId)
+        public TowerModifierDef GetTowerModifierDef(string modifierId)
         {
             if (string.IsNullOrEmpty(modifierId)) return null;
             return Array.Find(TowerModifiers, m => m.ModifierId == modifierId);
@@ -1922,7 +1922,7 @@ namespace BattleSystemECS.Config
         }
 
         // Look up a tower modifier def by its index in TowerModifiers[] (returns null if not found).
-        public TowerModifierDef? GetTowerModifierDef(int index)
+        public TowerModifierDef GetTowerModifierDef(int index)
         {
             if (index < 0 || index >= TowerModifiers.Length) return null;
             return TowerModifiers[index];
@@ -2162,7 +2162,7 @@ namespace BattleSystemECS.Config
         // Resolved daily challenge for the current run. Filled in by
         // DailyChallengeSystem.ApplyToConfig — null when the system is disabled
         // (no JSON pool, or pool is empty).
-        public DailyChallengeResult? DailyLastResult { get; set; } = null;
+        public DailyChallengeResult DailyLastResult { get; set; } = null;
         // Daily multiplicative damage modifier (default 1.0 = inert).
         public float DailyDamageMult { get; set; } = 1.0f;
         // Daily multiplicative gold modifier (default 1.0 = inert).

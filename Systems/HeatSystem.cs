@@ -26,7 +26,6 @@ namespace BattleSystemECS.Systems
 
         // Cached heat config
         private float _overheatCooldownTime = 3f;  // seconds to cool after overheat clears
-        private float _heatTickDamagePercent = 0.01f; // 1% of max HP per tick when overheated
 
         public HeatSystem(ComponentStore store)
         {

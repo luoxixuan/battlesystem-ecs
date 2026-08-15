@@ -16,7 +16,7 @@ namespace BattleSystemECS.Systems
         private GameConfig gameConfig;
         // Round 145 Direction 3 — Per-Tower Modifier Pool reference. Optional injection;
         // when null, PlaceTower() skips the modifier roll and towers keep ModifierId=-1.
-        private TowerModifierSystem? towerModifierSystem;
+        private TowerModifierSystem towerModifierSystem;
         private IBattleEventBus _eventBus;
 
         // Sell ratio: fraction of upgrade cost refunded (0.5 = 50%)

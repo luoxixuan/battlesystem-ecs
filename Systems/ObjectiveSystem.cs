@@ -24,12 +24,12 @@ namespace BattleSystemECS.Systems
  // Round110 Direction10 — cached LevelConfig so CheckObjective can
  // compute DoomClock final score (needs DoomClockWaveScore / TimeBonusPerSec
  // / HealthBonusPerPercent tunables) without a separate parameter.
- private Config.LevelConfig? _currentLevel;
+ private Config.LevelConfig _currentLevel;
  // Round201 Direction7 — optional EventBus for SideQuestCompleted publish.
  // Null is OK (no subscribers → no publish cost).
- private readonly Core.EventBus? _eventBus;
+ private readonly Core.EventBus _eventBus;
 
- public ObjectiveSystem(ComponentStore store, int playerId =0, Core.EventBus? eventBus = null)
+ public ObjectiveSystem(ComponentStore store, int playerId =0, Core.EventBus eventBus = null)
  {
  _store = store ?? throw new ArgumentNullException(nameof(store));
  _playerId = playerId;

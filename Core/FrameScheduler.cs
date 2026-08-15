@@ -32,14 +32,12 @@ namespace BattleSystemECS.Core
         public SkillBuffGroup      SkillBuff      { get; } = new();
         public PostDeathGroup      PostDeath      { get; } = new();
 
-        public event Action<int, int>? OnEnemyKilled;
-
         // Round 182 Direction 6 — PathfindingSystem reference (optional). Set via property;
         // required by TickBlinkerCycle to validate path waypoint count before advancing
         // the node index. Injected lazily so construction order doesn't matter.
         private Systems.PathfindingSystem? _pathfinding;
 
-        public FrameScheduler(ComponentStore store, GameConfig gameConfig, IBattleEventBus eventBus = null)
+        public FrameScheduler(ComponentStore store, GameConfig gameConfig, IBattleEventBus? eventBus = null)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             _ = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));

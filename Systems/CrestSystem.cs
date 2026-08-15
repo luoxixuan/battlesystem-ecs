@@ -35,7 +35,7 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore store;
         private readonly GameConfig gameConfig;
-        private WaveSpawningSystem? _waveSpawning;
+        private WaveSpawningSystem _waveSpawning;
 
         // Idempotency guard against WireDependencies re-init / test reset
         // paths stacking duplicate OnWaveStart/OnWaveComplete handlers.
