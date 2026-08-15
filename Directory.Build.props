@@ -1,0 +1,12 @@
+<Project>
+
+  <!--
+    离线/气隙构建环境：NuGet 漏洞审计（NuGetAudit）需要访问 api.nuget.org 拉取漏洞数据，
+    本环境无法连通该源，导致每个项目产生 NU1900「无法加载源服务索引」噪音警告。
+    禁用审计以恢复「0 warnings 0 errors」门禁；联网环境如需漏洞审计可临时移除本文件。
+  -->
+  <PropertyGroup>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+
+</Project>
