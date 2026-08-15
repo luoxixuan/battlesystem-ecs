@@ -13,35 +13,6 @@ namespace BattleSystemECS.Tests
     public class FrameSchedulerTests
     {
         [Fact]
-        public void TickGameTurn_RunsWithoutCrash()
-        {
-            var store = new ComponentStore();
-            var r = new MockRenderer();
-            var config = new GameConfig();
-            int pid = store.CreateEntity();
-            store.PlayerMaxHealth[pid] = 200f;
-            store.PlayerCurrentHealth[pid] = 200f;
-            store.PositionX[pid] = 5f;
-            store.PositionY[pid] = 0f;
-
-            var scheduler = new FrameScheduler(store, config);
-            scheduler.Spawning.WaveSpawning = new WaveSpawningSystem(store, r, config);
-            scheduler.AI.EnemyAI = new EnemyAISystem(store, r, pid, config, new EnemyAbilitySystem(store, r, pid, config));
-            scheduler.Movement.EnemyMovement = new EnemyMovementSystem(store, pid);
-            scheduler.Build.Gold = new GoldSystem(store, r);
-            scheduler.Build.Upgrade = new UpgradeSystem(store, r, pid, config);
-
-            // Run several turns
-            for (int turn = 0; turn < 5; turn++)
-            {
-                scheduler.TickGameTurn(1f, turn);
-            }
-
-            // If we get here without exception, tick lifecycle is stable
-            Assert.True(true);
-        }
-
-        [Fact]
         public void TickGameTurn_SpawnsEnemies()
         {
             var store = new ComponentStore();

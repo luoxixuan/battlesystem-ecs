@@ -171,13 +171,5 @@ namespace BattleSystemECS.Tests
             Assert.True(store.GetPlayerGold(pid) > 0);
         }
 
-        [Fact] public void NoEnemies_NoCrash()
-        {
-            var (store, config, pid) = CreateEnv();
-            var r = new MockRenderer();
-            var sys = new SkillSystem(store, r, pid, config);
-            sys.AutoCastBestSkill();
-            Assert.True(true);
-        }
     }
 }

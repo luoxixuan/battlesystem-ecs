@@ -152,18 +152,6 @@ namespace BattleSystemECS.Tests
         // ── Drain semantics ────────────────────────────────────────────────
 
         [Fact]
-        public void DrainPhaseAbilityEvents_EmptiesBag()
-        {
-            // Round 111 — DrainPhaseAbilityEvents uses TryTake in a loop. The bag starts
-            // empty on a fresh EnemyAISystem; the public PhaseAbilityDrainCount should be 0.
-            // We can't easily construct a full EnemyAISystem without a full GameConfig, so
-            // we verify the bag mechanic in isolation via the field's accessibility.
-            // Skip: full EnemyAISystem ctor requires GameConfig + IRenderer + multiple
-            // dependencies; covered by the integration test below in a future round.
-            Assert.True(true); // placeholder for now — bag is private; full coverage deferred
-        }
-
-        [Fact]
         public void PhaseAbilityDrainCount_StartsAtZero()
         {
             // After construction, the drain count should be 0 (nothing drained yet).

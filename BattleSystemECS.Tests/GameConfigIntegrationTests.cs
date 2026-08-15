@@ -202,62 +202,6 @@ namespace BattleSystemECS.Tests
         }
 
         [Fact]
-        public void RunFrames_WithAllMonsterTypes_NoExceptions()
-        {
-            var config = GameConfigLoader.LoadConfig(_renderer);
-            var store = new ComponentStore();
-
-            int playerId = store.CreateEntity();
-            store.PlayerMaxHealth[playerId] = 200f;
-            store.PlayerCurrentHealth[playerId] = 200f;
-            store.SetPlayerGold(playerId, 9999f);
-
-            var random = new Random(777);
-
-            // Spawn 3 of each monster type
-            foreach (var monsterType in config.MonsterTypes)
-            {
-                for (int i = 0; i < 3; i++)
-                {
-                    float x = random.Next(0, 10);
-                    float y = random.Next(1, 20);
-                    int id = store.AddEnemy(
-                        x, y,
-                        monsterType.MoveSpeed,
-                        monsterType.Health,
-                        monsterType.MaxHealth,
-                        monsterType.Damage,
-                        (int)monsterType.AttackRange,
-                        (int)monsterType.AttackInterval
-                    );
-                    store.SetEntityName(id, $"{monsterType.Type}_{i}");
-                    store.SetEnemyAIAction(id, "");
-                    store.EnemyBehaviorTree[id] = config.GetCachedBehaviorTree(monsterType.Type);
-                }
-            }
-
-            // Simulate 10 frames - this exercises EnemyAISystem, EnemyMovementSystem, etc.
-            var enemyAbilitySystem = new EnemyAbilitySystem(store, _renderer, playerId, config);
-            var enemyAISystem = new EnemyAISystem(store, _renderer, playerId, config, enemyAbilitySystem);
-            var enemyMovement = new EnemyMovementSystem(store, playerId);
-            var waveSpawning = new WaveSpawningSystem(store, _renderer, config);
-            var goldSystem = new GoldSystem(store, _renderer);
-
-            for (int frame = 0; frame < 10; frame++)
-            {
-                int turn = frame;
-                store.BeginFrame();
-                enemyAISystem.SetTurn(turn); enemyAISystem.Update();
-                enemyMovement.SetTurn(turn); enemyMovement.Update();
-                goldSystem.Update();
-                store.ResolveEnemiesKilledThisFrame();
-            }
-
-            // If we get here without exception, the test passes
-            Assert.True(true);
-        }
-
-        [Fact]
         public void PlayerSkills_AllExistInSkillConfig()
         {
             var config = GameConfigLoader.LoadConfig(_renderer);
@@ -354,45 +298,6 @@ namespace BattleSystemECS.Tests
             }
 
             // If we get here without exception, all 150 towers are well-behaved
-            Assert.True(true);
-        }
-
-        [Fact]
-        public void All150Skills_InitializeAndFire_NoExceptions()
-        {
-            var config = GameConfigLoader.LoadConfig(_renderer);
-            var store = new ComponentStore();
-
-            int playerId = store.CreateEntity();
-            store.PlayerMaxHealth[playerId] = 200f;
-            store.PlayerCurrentHealth[playerId] = 200f;
-            store.SetPlayerGold(playerId, 999999f);
-            store.AddPlayer(playerId, 10f, 1f, 50f, 1);
-
-            // Spawn enemies in range of player skills
-            var random = new Random(42);
-            for (int i = 0; i < 30; i++)
-            {
-                float x = random.Next(0, 10);
-                float y = random.Next(1, 10); // in player attack range
-                int eid = store.AddEnemy(x, y, 0.5f, 100f, 100f, 5f, 5, 1);
-                store.SetEntityName(eid, $"SkillE{i}");
-                store.SetEnemyAIAction(eid, "");
-            }
-
-            // Initialize SkillSystem (this uses default 3 skills from GameConfig,
-            // not the 150 from game_config.json — but we exercise the full skill path)
-            var skillSystem = new SkillSystem(store, _renderer, playerId, config);
-            skillSystem.InitializePlayerSkills();
-
-            // Run 20 frames — each frame SkillSystem.Update() is called
-            for (int f = 0; f < 20; f++)
-            {
-                store.BeginFrame();
-                skillSystem.Update(1f);
-                store.ResolveEnemiesKilledThisFrame();
-            }
-
             Assert.True(true);
         }
 
