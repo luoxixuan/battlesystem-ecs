@@ -36,7 +36,7 @@ namespace BattleSystemECS.Tests
 
         // ── Test helpers ────────────────────────────────────────────────
 
-        private static (DeathMarkSystem system, ComponentStore store) MakeSystem(DeathMarkConfig config = null)
+        private static (DeathMarkSystem system, ComponentStore store) MakeSystem(DeathMarkConfig? config = null)
         {
             var store = new ComponentStore();
             store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);

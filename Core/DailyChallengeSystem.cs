@@ -35,7 +35,7 @@ namespace BattleSystemECS.Core
         /// generator, NOT for security. The offset basis and prime match the
         /// reference algorithm.
         /// </summary>
-        public static int HashDateSeed(string dateIso)
+        public static int HashDateSeed(string? dateIso)
         {
             if (string.IsNullOrEmpty(dateIso)) return 0;
             // FNV-1a 32-bit constants
@@ -132,7 +132,7 @@ namespace BattleSystemECS.Core
         /// <param name="modifierCount">How many modifiers to pick (default 3).</param>
         /// <returns>DailyChallengeResult with seed and selected modifiers.</returns>
         public static DailyChallengeResult ResolveForDate(
-            List<DailyModifierDef> pool, DateTime date, int modifierCount = 3)
+            List<DailyModifierDef>? pool, DateTime date, int modifierCount = 3)
         {
             if (pool == null || pool.Count == 0 || modifierCount <= 0)
             {
@@ -171,7 +171,7 @@ namespace BattleSystemECS.Core
         /// empty, the GameConfig stays at neutral values and behavior is
         /// indistinguishable from a non-daily run.
         /// </summary>
-        public static void ApplyToConfig(GameConfig config, DailyChallengeResult result)
+        public static void ApplyToConfig(GameConfig? config, DailyChallengeResult? result)
         {
             if (config == null || result == null || result.Selected == null) return;
             float dmg = 1.0f;

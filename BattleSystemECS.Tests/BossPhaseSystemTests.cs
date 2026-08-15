@@ -179,7 +179,7 @@ namespace BattleSystemECS.Tests
                 "PhaseAbilityDrainCount",
                 BindingFlags.Instance | BindingFlags.Public);
             Assert.NotNull(prop); // property exists and is public
-            Assert.Equal(0, (int)prop.GetValue(aiSys));
+            Assert.Equal(0, (int)prop.GetValue(aiSys)!);
         }
 
         // ── Speed/Damage multipliers ───────────────────────────────────────

@@ -47,7 +47,7 @@ namespace BattleSystemECS.Tests
         // custom recipe set and RNG seed so individual tests can exercise
         // specific paths deterministically.
         private static (CraftingSystem system, ComponentStore store, InventorySystem inv, GameConfig cfg)
-            MakeSystem(CraftingRecipeDef[] recipes = null, int seed = 12345, int maxStackOverride = 99)
+            MakeSystem(CraftingRecipeDef[]? recipes = null, int seed = 12345, int maxStackOverride = 99)
         {
             var store = new ComponentStore();
             store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);

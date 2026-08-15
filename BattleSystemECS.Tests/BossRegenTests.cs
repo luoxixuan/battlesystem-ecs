@@ -329,7 +329,7 @@ namespace BattleSystemECS.Tests
             Assert.NotNull(method); // sanity — the helper must exist
 
             string json = @"{ ""PhaseRegenMult"": [ 1.0, 1.5, 2.5 ] }";
-            var result = (float[])method.Invoke(null, new object[] { json, "PhaseRegenMult" });
+            var result = (float[])method.Invoke(null, new object[] { json, "PhaseRegenMult" })!;
             Assert.NotNull(result);
             Assert.Equal(3, result.Length);
             Assert.Equal(1.0f, result[0]);
@@ -346,7 +346,7 @@ namespace BattleSystemECS.Tests
                 "ParseFloatArray",
                 BindingFlags.NonPublic | BindingFlags.Static);
             string json = @"{ ""OtherKey"": 42 }";
-            var result = (float[])method.Invoke(null, new object[] { json, "PhaseRegenMult" });
+            var result = (float[])method!.Invoke(null, new object[] { json, "PhaseRegenMult" })!;
             Assert.NotNull(result);
             Assert.Empty(result);
         }
@@ -360,7 +360,7 @@ namespace BattleSystemECS.Tests
                 "ParseFloatArray",
                 BindingFlags.NonPublic | BindingFlags.Static);
             string json = @"{ ""Decay"": [ -0.5, 0.0, 0.5 ] }";
-            var result = (float[])method.Invoke(null, new object[] { json, "Decay" });
+            var result = (float[])method!.Invoke(null, new object[] { json, "Decay" })!;
             Assert.Equal(3, result.Length);
             Assert.Equal(-0.5f, result[0]);
             Assert.Equal(0.0f, result[1]);

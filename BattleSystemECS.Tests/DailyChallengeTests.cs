@@ -244,7 +244,7 @@ namespace BattleSystemECS.Tests
         public void ApplyToConfig_NullSelected_TreatedAsEmpty()
         {
             var cfg = new GameConfig();
-            var r = new DailyChallengeResult { Selected = null };
+            var r = new DailyChallengeResult { Selected = null! };
             DailyChallengeSystem.ApplyToConfig(cfg, r);
             Assert.Equal(1.0f, cfg.DailyDamageMult);
             Assert.Equal(1.0f, cfg.DailyGoldMult);

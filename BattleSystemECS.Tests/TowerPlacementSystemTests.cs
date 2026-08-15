@@ -94,7 +94,7 @@ namespace BattleSystemECS.Tests
             int id = sys.ConfirmPlacement();
             Assert.True(id >= 0);
             Assert.False(sys.HasActivePreview);
-            Assert.Equal(1, store.ActiveTowerIds.Count);
+            Assert.Single(store.ActiveTowerIds);
             Assert.Equal(3, (int)store.PositionX[id]);
             Assert.Equal(4, (int)store.PositionY[id]);
         }
@@ -212,7 +212,7 @@ namespace BattleSystemECS.Tests
             // The slot was skipped (count = 0 after CompactQueue)
             Assert.Equal(0, sys.GetBuildQueueCount(0));
             // No tower was placed
-            Assert.Equal(0, store.ActiveTowerIds.Count);
+            Assert.Empty(store.ActiveTowerIds);
             // Gold was NOT deducted (we pre-deducted only on success)
             Assert.Equal(30f, store.GetPlayerGold(0));
         }
@@ -277,7 +277,7 @@ namespace BattleSystemECS.Tests
             // Second attempt at the same tile should fail via the cache
             int second = sys.PlaceTower(2, 5, TowerType.Basic, 50f, 3, 1f, 50f);
             Assert.Equal(-1, second);
-            Assert.Equal(1, store.ActiveTowerIds.Count);
+            Assert.Single(store.ActiveTowerIds);
         }
 
         [Fact] public void SellTower_ReleasesTile()

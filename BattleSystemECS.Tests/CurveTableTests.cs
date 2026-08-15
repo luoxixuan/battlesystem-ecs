@@ -30,7 +30,7 @@ namespace BattleSystemECS.Tests
 
         private static CurveDef Make(CurveType type, string id,
             float coef = 0f, float mid = 10f, float steep = 0.5f,
-            float[][] controlPoints = null)
+            float[][]? controlPoints = null)
         {
             var def = new CurveDef { Id = id, ResolvedType = type, Coefficient = coef, Midpoint = mid, Steepness = steep };
             if (controlPoints != null)

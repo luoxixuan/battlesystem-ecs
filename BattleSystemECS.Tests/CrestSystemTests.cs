@@ -45,7 +45,7 @@ namespace BattleSystemECS.Tests
 
         private static GameConfig MakeConfig(
             bool enabled = true,
-            CrestDef[] crests = null)
+            CrestDef[]? crests = null)
         {
             return new GameConfig
             {
@@ -83,7 +83,7 @@ namespace BattleSystemECS.Tests
             d?.Invoke();
         }
 
-        private static Delegate GetEventDelegate(object source, string eventName)
+        private static Delegate? GetEventDelegate(object source, string eventName)
         {
             var field = source.GetType().GetField(eventName,
                 System.Reflection.BindingFlags.Instance |

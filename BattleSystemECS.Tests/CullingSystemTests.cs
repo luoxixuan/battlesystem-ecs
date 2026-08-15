@@ -39,7 +39,7 @@ namespace BattleSystemECS.Tests
 
         // ── Test helpers ────────────────────────────────────────────────
 
-        private static (CullingSystem system, ComponentStore store) MakeSystem(CullingConfig config = null)
+        private static (CullingSystem system, ComponentStore store) MakeSystem(CullingConfig? config = null)
         {
             var store = new ComponentStore();
             store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);

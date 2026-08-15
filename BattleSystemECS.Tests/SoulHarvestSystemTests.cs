@@ -45,7 +45,7 @@ namespace BattleSystemECS.Tests
 
         // ── Test helpers ────────────────────────────────────────────────
 
-        private static (SoulHarvestSystem system, ComponentStore store) MakeSystem(SoulHarvestConfig config = null)
+        private static (SoulHarvestSystem system, ComponentStore store) MakeSystem(SoulHarvestConfig? config = null)
         {
             var store = new ComponentStore();
             store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);

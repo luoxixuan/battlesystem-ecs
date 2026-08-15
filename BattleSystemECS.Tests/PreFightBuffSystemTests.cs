@@ -31,7 +31,7 @@ namespace BattleSystemECS.Tests
  private static GameConfig MakeConfig(
  bool enabled = true,
  int optionsPerWave =3,
- PreFightBuffOptionDef[] pool = null)
+ PreFightBuffOptionDef[]? pool = null)
  {
  if (pool == null)
  {

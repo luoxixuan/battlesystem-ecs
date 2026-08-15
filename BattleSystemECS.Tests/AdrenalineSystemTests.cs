@@ -34,7 +34,7 @@ namespace BattleSystemECS.Tests
 
         // ── Test helpers ────────────────────────────────────────────────
 
-        private static (AdrenalineSystem system, ComponentStore store) MakeSystem(AdrenalineConfig config = null)
+        private static (AdrenalineSystem system, ComponentStore store) MakeSystem(AdrenalineConfig? config = null)
         {
             var store = new ComponentStore();
             store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
