@@ -13,7 +13,7 @@
 - **架构**: SOA ECS（逻辑与渲染完全分离），事件总线（`IBattleEventBus`）驱动渲染
 - **运行时**: 控制台应用（含交互式游戏 + 非交互式压测）+ Unity 2D 渲染端
 - **核心特征**: 全系统并行化 (`Parallel.For`)、零分配热路径、配置驱动、帧末统一结算
-- **代码规模**: Core 库 ~52k 行（Core + Systems）、Tests ~17k 行；1333 项 xUnit 测试
+- **代码规模**: Core 库 ~52k 行（Core + Systems）、Tests ~17k 行；1327 项 xUnit 测试
 - **Unity 工程**: `F:\AI\BattleSystem-ECS-Unity`（2022.3.62f2c1 LTS），通过 `BattleDriver` 消费 DLL
 
 ---
@@ -246,7 +246,7 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 - **xUnit**（`Xunit`），测试项目 `BattleSystemECS.Tests`（TargetFramework=`net9.0`，引用 Core 库）。
 - 测试运行器：`xunit.runner.visualstudio`，覆盖率收集：`coverlet.collector`。
-- 当前测试数量：**1333 项**（全部通过为门禁要求）。
+- 当前测试数量：**1327 项**（全部通过为门禁要求）。
 
 ### 6.2 测试辅助
 
@@ -288,7 +288,7 @@ echo 5 | dotnet run
 
 1. **`dotnet build BattleSystemECS.Core`** — Core 库 0 warnings, 0 errors
 2. **`dotnet build`** — EXE 0 warnings, 0 errors
-3. **`dotnet test BattleSystemECS.Tests`** — 全部通过（当前 1333/1333）
+3. **`dotnet test BattleSystemECS.Tests`** — 全部通过（当前 1327/1327）
 4. **`echo 2 | dotnet run`** — mode 2 压测
 5. **`echo 4 | dotnet run`** — mode 4 压测
 6. **`echo 5 | dotnet run`** — mode 5 压测
@@ -347,4 +347,4 @@ echo 5 | dotnet run
 
 ---
 
-> **最后更新**：2026-08-15（业务扩展暂停，文档同步当前状态：双项目架构、双事件总线、Unity 渲染端、polyfill、144 systems / 11 groups、1333 tests）
+> **最后更新**：2026-08-15（业务扩展暂停，文档同步当前状态：双项目架构、双事件总线、Unity 渲染端、polyfill、144 systems / 11 groups、1327 tests）
