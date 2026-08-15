@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using BattleSystemECS.Config;
 using BattleSystemECS.Components;
 
@@ -404,6 +405,13 @@ namespace BattleSystemECS.Core
                 }
             }
         }
+        // Reused batch buffer for position events — Clear()'d each frame instead of
+        // allocating a new List (AGENTS.md §5.2 禁止每帧分配 List/字典). The backing array
+        // grows to the peak active-enemy count once and is reused thereafter. Consumers must
+        // process OnPositionsChanged synchronously and must not retain the reference beyond
+        // the call (NullEventBus / ConsoleEventBus both comply).
+        private readonly List<(int, float, float)> _positionChanges = new List<(int, float, float)>();
+
         /// <summary>
         /// Emit OnPositionChanged for every active enemy after the movement phase.
         /// Uses batch API to reduce cross-boundary call overhead.
@@ -411,14 +419,14 @@ namespace BattleSystemECS.Core
         private void EmitPositionEvents()
         {
             var activeEnemies = store.ActiveEnemyIds;
-            var changes = new System.Collections.Generic.List<(int, float, float)>(activeEnemies.Count);
+            _positionChanges.Clear();
             for (int i = 0; i < activeEnemies.Count; i++)
             {
                 int eid = activeEnemies[i];
-                changes.Add((eid, store.PositionX[eid], store.PositionY[eid]));
+                _positionChanges.Add((eid, store.PositionX[eid], store.PositionY[eid]));
             }
-            if (changes.Count > 0)
-                _eventBus.OnPositionsChanged(changes);
+            if (_positionChanges.Count > 0)
+                _eventBus.OnPositionsChanged(_positionChanges);
         }
     }
 }
