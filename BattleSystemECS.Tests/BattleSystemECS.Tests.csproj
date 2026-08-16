@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -20,14 +20,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BattleSystemECS.Core\BattleSystemECS.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\game_config.json" Link="game_config.json" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\Data\Configs\tower_placement.json" Link="Data\Configs\tower_placement.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

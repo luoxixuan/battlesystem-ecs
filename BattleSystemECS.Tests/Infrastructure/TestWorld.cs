@@ -78,6 +78,19 @@ namespace BattleSystemECS.Tests.Infrastructure
         /// <summary>给玩家发放金币。</summary>
         public void GrantGold(int playerId, float gold) => Store.SetPlayerGold(playerId, gold);
 
+        /// <summary>
+        /// 清空所有 per-type 塔数量上限（0 = unlimited）。默认上限由
+        /// tower_placement.json 加载，单元测试不应依赖数据里的具体 cap 值；
+        /// 需要测 cap 机制的测试再自行写入显式值。
+        /// </summary>
+        public static void DisablePerTypeTowerCaps(ComponentStore store)
+        {
+            for (int t = 0; t < ComponentStore.MAX_TOWER_TYPES; t++)
+            {
+                store.PlayerTowersOfTypeCap[0 * ComponentStore.MAX_TOWER_TYPES + t] = 0;
+            }
+        }
+
         /// <summary>查找位于 (x,y) 的塔实体 id，找不到返回 -1。</summary>
         public int FindTowerAt(int x, int y)
         {
