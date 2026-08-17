@@ -26,35 +26,47 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
     ///  13. Continuous-per-frame scaling: interval=0 means "dps * deltaTime per frame"
     ///  14. Inactive (no thorns) towers are zero-cost in Update
     /// </summary>
-    public class ThornsAuraSystemTests
+    public class ThornsAuraSystemTests : BattleTestBase
     {
         private const int PlayerId = 0;
 
-        private static (ComponentStore store, MockRenderer renderer) Env()
+        private void InitEnv()
         {
-            var store = new ComponentStore();
-            int pid = store.CreateEntity();
-            store.PlayerMaxHealth[pid] = 200f;
-            store.PlayerCurrentHealth[pid] = 200f;
-            return (store, new MockRenderer());
+            int pid = Store.CreateEntity();
+            Store.PlayerMaxHealth[pid] = 200f;
+            Store.PlayerCurrentHealth[pid] = 200f;
         }
 
-        private static int PlaceTower(ComponentStore store, MockRenderer r, int x, int y,
+        private int PlaceTower(int x, int y,
             TowerType type = TowerType.Basic)
         {
-            var tps = new TowerPlacementSystem(store, r);
-            return tps.PlaceTower(x, y, type, 0f, 0, 0f, 25f);
+            return Tower(x, y, type, t =>
+            {
+                t.Damage = 0f;
+                t.Range = 0;
+                t.Speed = 0f;
+                t.Cost = 25f;
+            });
         }
 
-        private static int PlaceEnemy(ComponentStore store, float x, float y, float maxHp = 100f)
+        private int PlaceEnemy(float x, float y, float maxHp = 100f)
         {
-            int eid = store.AddEnemy(x, y, 1f, maxHp, maxHp, 5f, 10, 1, "TestEnemy");
-            return eid;
+            return Enemy(e =>
+            {
+                e.X = x;
+                e.Y = y;
+                e.MoveSpeed = 1f;
+                e.Health = maxHp;
+                e.Damage = 5f;
+                e.GoldReward = 10;
+                e.WaveNumber = 1;
+                e.Name = "TestEnemy";
+            });
         }
 
-        private static ThornsAuraSystem MakeSystem(ComponentStore store)
+        private ThornsAuraSystem MakeSystem()
         {
-            return new ThornsAuraSystem(store);
+            return new ThornsAuraSystem(Store);
         }
 
         // ─── Config defaults ─────────────────────────────────────────────
@@ -76,13 +88,13 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         public void ComponentStore_ThornsFields_DefaultToZeroAndFalse_OnAddTower()
         {
             // Adding a tower without opting in to thorns aura must leave all 5 fields at false/0.
-            var (store, r) = Env();
-            int id = PlaceTower(store, r, 0, 0);
-            Assert.False(store.TowerIsThornsTower[id]);
-            Assert.Equal(0f, store.TowerThornsRadius[id]);
-            Assert.Equal(0f, store.TowerThornsDps[id]);
-            Assert.Equal(0f, store.TowerThornsInterval[id]);
-            Assert.Equal(0f, store.TowerThornsTimer[id]);
+            InitEnv();
+            int id = PlaceTower(0, 0);
+            Assert.False(Store.TowerIsThornsTower[id]);
+            Assert.Equal(0f, Store.TowerThornsRadius[id]);
+            Assert.Equal(0f, Store.TowerThornsDps[id]);
+            Assert.Equal(0f, Store.TowerThornsInterval[id]);
+            Assert.Equal(0f, Store.TowerThornsTimer[id]);
         }
 
         [Fact]
@@ -92,66 +104,75 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             // fresh one in the recycled slot, the new tower must NOT inherit the
             // previous thorns fields (which would silently turn a non-thorns tower
             // into a thorns emitter).
-            var (store, r) = Env();
-            int id = PlaceTower(store, r, 0, 0);
-            store.TowerIsThornsTower[id] = true;
-            store.TowerThornsRadius[id] = 5f;
-            store.TowerThornsDps[id] = 10f;
-            store.TowerThornsInterval[id] = 1f;
-            store.TowerThornsTimer[id] = 0.5f;
-            store.DestroyEntity(id);
+            InitEnv();
+            int id = PlaceTower(0, 0);
+            Store.TowerIsThornsTower[id] = true;
+            Store.TowerThornsRadius[id] = 5f;
+            Store.TowerThornsDps[id] = 10f;
+            Store.TowerThornsInterval[id] = 1f;
+            Store.TowerThornsTimer[id] = 0.5f;
+            Store.DestroyEntity(id);
             // PlaceTower re-uses the same id (entity recycling).
-            int id2 = PlaceTower(store, r, 1, 1);
+            int id2 = PlaceTower(1, 1);
             Assert.Equal(id, id2); // same slot
-            Assert.False(store.TowerIsThornsTower[id2]);
-            Assert.Equal(0f, store.TowerThornsRadius[id2]);
-            Assert.Equal(0f, store.TowerThornsDps[id2]);
-            Assert.Equal(0f, store.TowerThornsInterval[id2]);
-            Assert.Equal(0f, store.TowerThornsTimer[id2]);
+            Assert.False(Store.TowerIsThornsTower[id2]);
+            Assert.Equal(0f, Store.TowerThornsRadius[id2]);
+            Assert.Equal(0f, Store.TowerThornsDps[id2]);
+            Assert.Equal(0f, Store.TowerThornsInterval[id2]);
+            Assert.Equal(0f, Store.TowerThornsTimer[id2]);
         }
 
         // ─── No-op paths (zero-overhead when no thorns tower) ────────────
 
         [Fact]
-        public void SetTurn_NoThornsTowerOnField_DoesNotThrow()
+        public void SetTurn_NoThornsTowerOnField_DoesNotWriteEnemyFields()
         {
-            var (store, r) = Env();
-            int _ = PlaceTower(store, r, 0, 0);
-            var sys = MakeSystem(store);
-            // No thorns tower on field — SetTurn must be a no-op (no throw).
+            InitEnv();
+            PlaceTower(0, 0); // 普通塔，非荆棘塔
+            int enemy = PlaceEnemy(3, 0);
+            float hpBefore = Store.EnemyHealth[enemy];
+
+            var sys = MakeSystem();
+            // No thorns tower on field — SetTurn 只建缓存，不得改写敌人字段。
             sys.SetTurn();
+
+            Assert.Equal(hpBefore, Store.EnemyHealth[enemy]);
         }
 
         [Fact]
-        public void Update_NoThornsTowerOnField_DoesNotThrow()
+        public void Update_NoThornsTowerOnField_DoesNotDamageEnemy()
         {
-            var (store, r) = Env();
-            int _ = PlaceTower(store, r, 0, 0);
-            int _eid = PlaceEnemy(store, 3, 0);
-            var sys = MakeSystem(store);
+            InitEnv();
+            PlaceTower(0, 0);
+            int enemy = PlaceEnemy(3, 0);
+            var sys = MakeSystem();
             sys.SetTurn();
-            // No emitter cached — Update must early-return without crashing AND
-            // must not damage the enemy.
-            float hpBefore = store.EnemyHealth[_eid];
+            // No emitter cached — Update 早退且不得伤害敌人。
+            float hpBefore = Store.EnemyHealth[enemy];
             sys.Update(0.016f, PlayerId);
-            Assert.Equal(hpBefore, store.EnemyHealth[_eid]);
+            Assert.Equal(hpBefore, Store.EnemyHealth[enemy]);
+            Assert.Single(Store.ActiveTowerIds);
         }
 
         [Fact]
-        public void Update_NoEnemiesOnField_DoesNotThrow()
+        public void Update_NoEnemiesOnField_DoesNotTickEmitterTimer()
         {
             // Thorns tower is placed but no enemies exist — Update must early-return
-            // on empty active-enemy list without crashing.
-            var (store, r) = Env();
-            int thorns = PlaceTower(store, r, 0, 0);
-            store.TowerIsThornsTower[thorns] = true;
-            store.TowerThornsRadius[thorns] = 5f;
-            store.TowerThornsDps[thorns] = 10f;
-            store.TowerThornsInterval[thorns] = 0f;
-            store.TowerThornsTimer[thorns] = 0f;
-            var sys = MakeSystem(store);
+            // on empty active-enemy list, even before ticking the emitter timer.
+            InitEnv();
+            int thorns = PlaceTower(0, 0);
+            Store.TowerIsThornsTower[thorns] = true;
+            Store.TowerThornsRadius[thorns] = 5f;
+            Store.TowerThornsDps[thorns] = 10f;
+            Store.TowerThornsInterval[thorns] = 0f;
+            Store.TowerThornsTimer[thorns] = 0.75f; // 已知计时器
+            Assert.Empty(Store.ActiveEnemyIds);
+
+            var sys = MakeSystem();
             sys.SetTurn();
             sys.Update(0.016f, PlayerId);
+
+            Assert.Equal(0.75f, Store.TowerThornsTimer[thorns]);
         }
 
         // ─── Core thorns behavior ────────────────────────────────────────
@@ -163,110 +184,110 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             // frame = ThornsDps * deltaTime. Place a thorns tower at (0,0) with DPS=10
             // and a damaged enemy at (3,0) with max HP=100. After 0.1s of update, the
             // enemy must have lost exactly 10 * 0.1 = 1.0 HP (per-frame scaling).
-            var (store, r) = Env();
-            int thorns = PlaceTower(store, r, 0, 0);
-            int enemy = PlaceEnemy(store, 3, 0, 100f);
-            store.TowerIsThornsTower[thorns] = true;
-            store.TowerThornsRadius[thorns] = 5f;
-            store.TowerThornsDps[thorns] = 10f;
-            store.TowerThornsInterval[thorns] = 0f;
-            store.TowerThornsTimer[thorns] = 0f;
+            InitEnv();
+            int thorns = PlaceTower(0, 0);
+            int enemy = PlaceEnemy(3, 0, 100f);
+            Store.TowerIsThornsTower[thorns] = true;
+            Store.TowerThornsRadius[thorns] = 5f;
+            Store.TowerThornsDps[thorns] = 10f;
+            Store.TowerThornsInterval[thorns] = 0f;
+            Store.TowerThornsTimer[thorns] = 0f;
 
-            var sys = MakeSystem(store);
+            var sys = MakeSystem();
             sys.SetTurn();
             sys.Update(0.1f, PlayerId);
 
             // Per-frame scaling: 10 DPS * 0.1s = 1 HP lost.
-            Assert.Equal(99f, store.EnemyHealth[enemy]);
+            Assert.Equal(99f, Store.EnemyHealth[enemy]);
         }
 
         [Fact]
         public void ThornsTower_EnemyOutsideRadius_NotDamaged()
         {
             // Enemy at (9, 19) is way outside radius=5 from the thorns tower at (0, 0).
-            var (store, r) = Env();
-            int thorns = PlaceTower(store, r, 0, 0);
-            int enemy = PlaceEnemy(store, 9, 19, 100f);
-            store.TowerIsThornsTower[thorns] = true;
-            store.TowerThornsRadius[thorns] = 5f;
-            store.TowerThornsDps[thorns] = 10f;
-            store.TowerThornsInterval[thorns] = 0f;
-            store.TowerThornsTimer[thorns] = 0f;
+            InitEnv();
+            int thorns = PlaceTower(0, 0);
+            int enemy = PlaceEnemy(9, 19, 100f);
+            Store.TowerIsThornsTower[thorns] = true;
+            Store.TowerThornsRadius[thorns] = 5f;
+            Store.TowerThornsDps[thorns] = 10f;
+            Store.TowerThornsInterval[thorns] = 0f;
+            Store.TowerThornsTimer[thorns] = 0f;
 
-            var sys = MakeSystem(store);
+            var sys = MakeSystem();
             sys.SetTurn();
             sys.Update(1f, PlayerId);
 
             // Far enemy: no damage.
-            Assert.Equal(100f, store.EnemyHealth[enemy]);
+            Assert.Equal(100f, Store.EnemyHealth[enemy]);
         }
 
         [Fact]
         public void ThornsTower_DeadEnemy_NotReDamaged()
         {
             // Enemy already at 0 HP must not be touched (avoid double QueueEnemyDeath).
-            var (store, r) = Env();
-            int thorns = PlaceTower(store, r, 0, 0);
-            int enemy = PlaceEnemy(store, 3, 0, 100f);
-            store.EnemyHealth[enemy] = 0f; // already dead
-            store.TowerIsThornsTower[thorns] = true;
-            store.TowerThornsRadius[thorns] = 5f;
-            store.TowerThornsDps[thorns] = 10f;
-            store.TowerThornsInterval[thorns] = 0f;
-            store.TowerThornsTimer[thorns] = 0f;
+            InitEnv();
+            int thorns = PlaceTower(0, 0);
+            int enemy = PlaceEnemy(3, 0, 100f);
+            Store.EnemyHealth[enemy] = 0f; // already dead
+            Store.TowerIsThornsTower[thorns] = true;
+            Store.TowerThornsRadius[thorns] = 5f;
+            Store.TowerThornsDps[thorns] = 10f;
+            Store.TowerThornsInterval[thorns] = 0f;
+            Store.TowerThornsTimer[thorns] = 0f;
 
-            var sys = MakeSystem(store);
+            var sys = MakeSystem();
             sys.SetTurn();
             // Should not crash; should not write to EnemyHealth of a dead enemy.
             sys.Update(0.016f, PlayerId);
-            Assert.Equal(0f, store.EnemyHealth[enemy]);
+            Assert.Equal(0f, Store.EnemyHealth[enemy]);
         }
 
         [Fact]
         public void ThornsTower_InvulnerableEnemy_NotDamaged()
         {
             // Boss invuln phase must block thorns damage (same as it blocks any other source).
-            var (store, r) = Env();
-            int thorns = PlaceTower(store, r, 0, 0);
-            int enemy = PlaceEnemy(store, 3, 0, 100f);
-            store.EnemyIsInvulnerable[enemy] = true;
-            store.TowerIsThornsTower[thorns] = true;
-            store.TowerThornsRadius[thorns] = 5f;
-            store.TowerThornsDps[thorns] = 10f;
-            store.TowerThornsInterval[thorns] = 0f;
-            store.TowerThornsTimer[thorns] = 0f;
+            InitEnv();
+            int thorns = PlaceTower(0, 0);
+            int enemy = PlaceEnemy(3, 0, 100f);
+            Store.EnemyIsInvulnerable[enemy] = true;
+            Store.TowerIsThornsTower[thorns] = true;
+            Store.TowerThornsRadius[thorns] = 5f;
+            Store.TowerThornsDps[thorns] = 10f;
+            Store.TowerThornsInterval[thorns] = 0f;
+            Store.TowerThornsTimer[thorns] = 0f;
 
-            var sys = MakeSystem(store);
+            var sys = MakeSystem();
             sys.SetTurn();
             sys.Update(1f, PlayerId); // 10 HP would normally be lost
 
             // Invuln: no damage.
-            Assert.Equal(100f, store.EnemyHealth[enemy]);
+            Assert.Equal(100f, Store.EnemyHealth[enemy]);
         }
 
         [Fact]
         public void ThornsTower_KillsEnemy_QueuesDeath()
         {
             // When thorns damage reduces HP to 0, the enemy must be queued for death.
-            var (store, r) = Env();
-            int thorns = PlaceTower(store, r, 0, 0);
-            int enemy = PlaceEnemy(store, 3, 0, 5f); // low HP
+            InitEnv();
+            int thorns = PlaceTower(0, 0);
+            int enemy = PlaceEnemy(3, 0, 5f); // low HP
             // Use a per-tick burst (interval>0 with ThornsDps as the per-tick amount)
             // so we can deliver a big hit in a single frame. interval=0 would mean
             // per-second scaling (dps * deltaTime per frame), which is the wrong
             // convention for this test.
-            store.TowerIsThornsTower[thorns] = true;
-            store.TowerThornsRadius[thorns] = 5f;
-            store.TowerThornsDps[thorns] = 100f; // way more than enemy HP
-            store.TowerThornsInterval[thorns] = 0.5f; // per-tick burst path
-            store.TowerThornsTimer[thorns] = 0.01f;  // timer < deltaTime → expires on first Update
+            Store.TowerIsThornsTower[thorns] = true;
+            Store.TowerThornsRadius[thorns] = 5f;
+            Store.TowerThornsDps[thorns] = 100f; // way more than enemy HP
+            Store.TowerThornsInterval[thorns] = 0.5f; // per-tick burst path
+            Store.TowerThornsTimer[thorns] = 0.01f;  // timer < deltaTime → expires on first Update
 
-            var sys = MakeSystem(store);
+            var sys = MakeSystem();
             sys.SetTurn();
             sys.Update(0.016f, PlayerId);
 
             // HP clamped to 0.
-            Assert.Equal(0f, store.EnemyHealth[enemy]);
+            Assert.Equal(0f, Store.EnemyHealth[enemy]);
         }
 
         [Fact]
@@ -275,25 +296,25 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             // Two thorns towers in range, each contributing 100 DPS to the same enemy
             // → per-frame damage = (100 + 100) * 0.1s = 20 HP. We use interval=0 with
             // per-frame scaling to make the test deterministic.
-            var (store, r) = Env();
-            int t1 = PlaceTower(store, r, 0, 0);
-            int t2 = PlaceTower(store, r, 2, 0);
-            int enemy = PlaceEnemy(store, 1, 0, 100f);
+            InitEnv();
+            int t1 = PlaceTower(0, 0);
+            int t2 = PlaceTower(2, 0);
+            int enemy = PlaceEnemy(1, 0, 100f);
             foreach (var tid in new[] { t1, t2 })
             {
-                store.TowerIsThornsTower[tid] = true;
-                store.TowerThornsRadius[tid] = 5f;
-                store.TowerThornsDps[tid] = 100f;
-                store.TowerThornsInterval[tid] = 0f;
-                store.TowerThornsTimer[tid] = 0f;
+                Store.TowerIsThornsTower[tid] = true;
+                Store.TowerThornsRadius[tid] = 5f;
+                Store.TowerThornsDps[tid] = 100f;
+                Store.TowerThornsInterval[tid] = 0f;
+                Store.TowerThornsTimer[tid] = 0f;
             }
 
-            var sys = MakeSystem(store);
+            var sys = MakeSystem();
             sys.SetTurn();
             sys.Update(0.1f, PlayerId); // (100 + 100) * 0.1 = 20 HP lost
 
             // 100 - 20 = 80.
-            Assert.Equal(80f, store.EnemyHealth[enemy]);
+            Assert.Equal(80f, Store.EnemyHealth[enemy]);
         }
 
         // ─── Timer-gated behavior ────────────────────────────────────────
@@ -304,22 +325,22 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             // interval=1.0s, timer starts at 0.5s. After 0.3s of update (timer=0.2),
             // damage must NOT fire yet. After another 0.5s (timer expires), damage fires.
             // Per-tick damage = ThornsDps (when interval>0).
-            var (store, r) = Env();
-            int thorns = PlaceTower(store, r, 0, 0);
-            int enemy = PlaceEnemy(store, 3, 0, 1000f);
-            store.TowerIsThornsTower[thorns] = true;
-            store.TowerThornsRadius[thorns] = 5f;
-            store.TowerThornsDps[thorns] = 50f; // per-tick damage
-            store.TowerThornsInterval[thorns] = 1.0f;
-            store.TowerThornsTimer[thorns] = 0.5f; // half-way through cooldown
+            InitEnv();
+            int thorns = PlaceTower(0, 0);
+            int enemy = PlaceEnemy(3, 0, 1000f);
+            Store.TowerIsThornsTower[thorns] = true;
+            Store.TowerThornsRadius[thorns] = 5f;
+            Store.TowerThornsDps[thorns] = 50f; // per-tick damage
+            Store.TowerThornsInterval[thorns] = 1.0f;
+            Store.TowerThornsTimer[thorns] = 0.5f; // half-way through cooldown
 
-            var sys = MakeSystem(store);
+            var sys = MakeSystem();
             sys.SetTurn();
             sys.Update(0.3f, PlayerId); // timer: 0.5 - 0.3 = 0.2 → still on cooldown
-            Assert.Equal(1000f, store.EnemyHealth[enemy]);
+            Assert.Equal(1000f, Store.EnemyHealth[enemy]);
 
             sys.Update(0.5f, PlayerId); // timer: 0.2 - 0.5 = -0.3 → fires! reset to 1.0
-            Assert.Equal(950f, store.EnemyHealth[enemy]); // 1000 - 50
+            Assert.Equal(950f, Store.EnemyHealth[enemy]); // 1000 - 50
         }
 
         // ─── Multi-frame continuous scaling ─────────────────────────────
@@ -329,16 +350,16 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         {
             // 10 small frames at DPS=10 → total 10 * 10 * 0.01 = 1 HP lost.
             // (Demonstrates that interval=0 means "continuous DPS", not "burst per tick".)
-            var (store, r) = Env();
-            int thorns = PlaceTower(store, r, 0, 0);
-            int enemy = PlaceEnemy(store, 3, 0, 1000f);
-            store.TowerIsThornsTower[thorns] = true;
-            store.TowerThornsRadius[thorns] = 5f;
-            store.TowerThornsDps[thorns] = 10f;
-            store.TowerThornsInterval[thorns] = 0f;
-            store.TowerThornsTimer[thorns] = 0f;
+            InitEnv();
+            int thorns = PlaceTower(0, 0);
+            int enemy = PlaceEnemy(3, 0, 1000f);
+            Store.TowerIsThornsTower[thorns] = true;
+            Store.TowerThornsRadius[thorns] = 5f;
+            Store.TowerThornsDps[thorns] = 10f;
+            Store.TowerThornsInterval[thorns] = 0f;
+            Store.TowerThornsTimer[thorns] = 0f;
 
-            var sys = MakeSystem(store);
+            var sys = MakeSystem();
             sys.SetTurn();
             for (int i = 0; i < 10; i++)
             {
@@ -347,7 +368,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
 
             // 10 frames * (10 DPS * 0.01s) = 1 HP lost. Use tolerance to absorb
             // float-rounding from 0.1s/0.01s being inexact in IEEE 754.
-            Assert.Equal(999f, store.EnemyHealth[enemy], 3);
+            Assert.Equal(999f, Store.EnemyHealth[enemy], 3);
         }
 
         // ─── Defensive: thorns tower with radius=0 is inert ─────────────
@@ -356,38 +377,38 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         public void ThornsTower_DefensiveRadiusZero_DoesNotDamage()
         {
             // IsThornsTower=true but radius=0 must be inert (defensive guard inside Update).
-            var (store, r) = Env();
-            int thorns = PlaceTower(store, r, 0, 0);
-            int enemy = PlaceEnemy(store, 3, 0, 100f);
-            store.TowerIsThornsTower[thorns] = true;
-            store.TowerThornsRadius[thorns] = 0f; // defensive: should not damage
-            store.TowerThornsDps[thorns] = 10f;
-            store.TowerThornsInterval[thorns] = 0f;
-            store.TowerThornsTimer[thorns] = 0f;
+            InitEnv();
+            int thorns = PlaceTower(0, 0);
+            int enemy = PlaceEnemy(3, 0, 100f);
+            Store.TowerIsThornsTower[thorns] = true;
+            Store.TowerThornsRadius[thorns] = 0f; // defensive: should not damage
+            Store.TowerThornsDps[thorns] = 10f;
+            Store.TowerThornsInterval[thorns] = 0f;
+            Store.TowerThornsTimer[thorns] = 0f;
 
-            var sys = MakeSystem(store);
+            var sys = MakeSystem();
             sys.SetTurn();
             sys.Update(1f, PlayerId);
-            Assert.Equal(100f, store.EnemyHealth[enemy]);
+            Assert.Equal(100f, Store.EnemyHealth[enemy]);
         }
 
         [Fact]
         public void ThornsTower_DefensiveDpsZero_DoesNotDamage()
         {
             // IsThornsTower=true and radius>0 but dps=0 must be inert.
-            var (store, r) = Env();
-            int thorns = PlaceTower(store, r, 0, 0);
-            int enemy = PlaceEnemy(store, 3, 0, 100f);
-            store.TowerIsThornsTower[thorns] = true;
-            store.TowerThornsRadius[thorns] = 5f;
-            store.TowerThornsDps[thorns] = 0f; // defensive: should not damage
-            store.TowerThornsInterval[thorns] = 0f;
-            store.TowerThornsTimer[thorns] = 0f;
+            InitEnv();
+            int thorns = PlaceTower(0, 0);
+            int enemy = PlaceEnemy(3, 0, 100f);
+            Store.TowerIsThornsTower[thorns] = true;
+            Store.TowerThornsRadius[thorns] = 5f;
+            Store.TowerThornsDps[thorns] = 0f; // defensive: should not damage
+            Store.TowerThornsInterval[thorns] = 0f;
+            Store.TowerThornsTimer[thorns] = 0f;
 
-            var sys = MakeSystem(store);
+            var sys = MakeSystem();
             sys.SetTurn();
             sys.Update(1f, PlayerId);
-            Assert.Equal(100f, store.EnemyHealth[enemy]);
+            Assert.Equal(100f, Store.EnemyHealth[enemy]);
         }
     }
 }

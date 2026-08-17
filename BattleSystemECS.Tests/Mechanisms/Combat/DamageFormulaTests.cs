@@ -1,19 +1,21 @@
 using System;
 using Xunit;
 using BattleSystemECS.Core;
+using BattleSystemECS.Components;
 using BattleSystemECS.Tests.Infrastructure;
 
 namespace BattleSystemECS.Tests.Mechanisms.Combat
 {
     /// <summary>
     /// Core damage formula tests — armor, magic resist, true damage, shield absorption.
-    /// Formulas are applied upstream by TowerAttackSystem/PlayerTowerAttack.
-    /// These tests verify the mathematical contracts.
+    /// 公式在 TowerAttackSystem / PlayerTowerAttackSystem 的真实攻击路径中生效；
+    /// 本文件不再在测试内复刻公式，只通过 ApplyEnemyDamage（存储层真实路径）
+    /// 与 PlayerTowerAttackSystem（真实攻击链路）断言可观测结果。
     /// </summary>
     public class DamageFormulaTests : BattleTestBase
     {
         // ══════════════════════════════════════════════════════════════
-        //  Direct damage & shield
+        //  ApplyEnemyDamage：护盾吸收与直接伤害（存储层真实路径）
         // ══════════════════════════════════════════════════════════════
 
         [Fact]
@@ -91,6 +93,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             int eid = Enemy();
             Store.EnemyArmor[eid] = 0.3f;
 
+            // ApplyEnemyDamage 是原始伤害入口，不套护甲；护甲只在攻击系统公式中生效。
             Store.ApplyEnemyDamage(eid, 100f);
             Assert.Equal(0f, Store.EnemyHealth[eid]);
         }
@@ -114,134 +117,74 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         }
 
         // ══════════════════════════════════════════════════════════════
-        //  Armor formula: effectiveArmor = armor * (1 - pen) - shred
-        //  damage = baseDamage * max(0.01, 1 - effectiveArmor)
+        //  真实攻击路径：PlayerTowerAttackSystem 应用护甲/魔抗/真伤
         // ══════════════════════════════════════════════════════════════
 
-        [Fact]
-        public void ArmorFormula_30PercentArmor_70PercentDamage()
+        /// <summary>驱动一次真实玩家攻击，返回敌人实际承受的伤害。</summary>
+        private float DrivePlayerAttackAndGetDamage(float attackDamage, DamageType playerDamageType, float armor, float magicResist)
         {
-            float armor = 0.3f;
-            float baseDamage = 100f;
-            float effectiveArmor = armor; // no pen, no shred
-            float mitigated = baseDamage * Math.Max(0.01f, 1f - effectiveArmor);
-            Assert.Equal(70f, mitigated, 3);
+            int pid = Player(p =>
+            {
+                p.AttackDamage = attackDamage;
+                p.AttackRange = 10f;
+            });
+            Store.PlayerDamageType[pid] = playerDamageType;
+
+            // 敌人放在玩家正下方 0.1 格，满足 PlayerTowerAttackSystem 的 enemyY > playerY 射界。
+            int eid = Enemy(e =>
+            {
+                e.X = 0f;
+                e.Y = 0.1f;
+                e.Health = 1000f;
+            });
+            Store.EnemyArmor[eid] = armor;
+            Store.EnemyMagicResist[eid] = magicResist;
+
+            var attack = new BattleSystemECS.Systems.PlayerTowerAttackSystem(Store, Renderer, pid, Config);
+            attack.SetTurn(0);
+            float preHp = Store.EnemyHealth[eid];
+            attack.Update();
+            return preHp - Store.EnemyHealth[eid];
+        }
+
+        [Theory]
+        [InlineData(DamageType.Physical, 0.3f, 70f)] // 30% 护甲 → 100 × 0.7 = 70
+        [InlineData(DamageType.Physical, 0f, 100f)]  // 无护甲 → 全额
+        [InlineData(DamageType.Magic, 0.5f, 50f)]    // 50% 魔抗 → 100 × 0.5 = 50
+        [InlineData(DamageType.Magic, 0f, 100f)]     // 无魔抗 → 全额
+        public void RealAttack_AppliesMatchingResistance(DamageType damageType, float resist, float expectedDamage)
+        {
+            // 同一攻击链路按伤害类型读取对应抗性，行为同构，合并为理论驱动。
+            float damage = DrivePlayerAttackAndGetDamage(100f, damageType, armor: resist, magicResist: resist);
+            Assert.Equal(expectedDamage, damage, 3);
         }
 
         [Fact]
-        public void ArmorFormula_WithPenetration()
+        public void RealAttack_FullMagicResist_KeepsOnePercentFloor()
         {
-            float armor = 0.5f;
-            float pen = 0.2f;
-            float baseDamage = 200f;
-            float effectiveArmor = armor * (1f - pen); // 0.5 * 0.8 = 0.4
-            float mitigated = baseDamage * Math.Max(0.01f, 1f - effectiveArmor); // 200 * 0.6 = 120
-            Assert.Equal(120f, mitigated, 3);
+            // 魔抗 100% 也保留 1% 最低伤害：100 × max(0.01, 0) = 1。
+            float damage = DrivePlayerAttackAndGetDamage(100f, DamageType.Magic, armor: 0f, magicResist: 1f);
+            Assert.Equal(1f, damage, 3);
         }
 
         [Fact]
-        public void ArmorFormula_WithPenetrationAndShred()
+        public void RealAttack_FullArmor_ClampsAt95PercentBeforeMitigation()
         {
-            float armor = 0.6f;
-            float pen = 0.3f;
-            float shredPerStack = 0.05f;
-            float shredStacks = 4f;
-            float baseDamage = 100f;
-            float effectiveArmor = armor * (1f - pen) - shredStacks * shredPerStack;
-            effectiveArmor = Math.Max(0f, effectiveArmor); // 0.42 - 0.20 = 0.22
-            float mitigated = baseDamage * Math.Max(0.01f, 1f - effectiveArmor); // 100 * 0.78 = 78
-            Assert.Equal(78f, mitigated, 3);
+            // 生产路径先把护甲钳到 0.95：100 × max(0.01, 1 - 0.95) = 5。
+            float damage = DrivePlayerAttackAndGetDamage(100f, DamageType.Physical, armor: 1f, magicResist: 0f);
+            Assert.Equal(5f, damage, 3);
         }
 
         [Fact]
-        public void ArmorFormula_NegativeArmor_ClampsToMinimum()
+        public void RealAttack_TrueDamage_BypassesArmorAndResist()
         {
-            float armor = 0.1f;
-            float shredStacks = 10f;
-            float shredPerStack = 0.05f;
-            float effectiveArmor = Math.Max(0f, armor - shredStacks * shredPerStack); // -0.4 → 0
-            float mitigated = 100f * Math.Max(0.01f, 1f - effectiveArmor); // 100 * 1.0 = 100
-            Assert.Equal(100f, mitigated, 3);
-        }
-
-        [Fact]
-        public void ArmorFormula_FullArmor_DamageClamped()
-        {
-            float armor = 1.0f;
-            float mitigated = 100f * Math.Max(0.01f, 1f - armor); // 100 * 0.01 = 1
-            Assert.Equal(1f, mitigated, 3);
-        }
-
-        // ══════════════════════════════════════════════════════════════
-        //  Magic resist: damage *= max(0.01, 1 - magicResist)
-        // ══════════════════════════════════════════════════════════════
-
-        [Fact]
-        public void MagicResist_50Percent_50PercentDamage()
-        {
-            float magicResist = 0.5f;
-            float baseDamage = 100f;
-            float mitigated = baseDamage * Math.Max(0.01f, 1f - magicResist); // 50
-            Assert.Equal(50f, mitigated, 3);
-        }
-
-        [Fact]
-        public void MagicResist_Zero_NoReduction()
-        {
-            float mitigated = 100f * Math.Max(0.01f, 1f - 0f); // 100
-            Assert.Equal(100f, mitigated, 3);
-        }
-
-        [Fact]
-        public void MagicResist_FullResist_DamageClamped()
-        {
-            float magicResist = 1.0f;
-            float mitigated = 100f * Math.Max(0.01f, 1f - magicResist); // 100 * 0.01 = 1
-            Assert.Equal(1f, mitigated, 3);
+            // 真伤不读护甲/魔抗数组，全额穿透。
+            float damage = DrivePlayerAttackAndGetDamage(100f, DamageType.True, armor: 1f, magicResist: 1f);
+            Assert.Equal(100f, damage, 3);
         }
 
         // ══════════════════════════════════════════════════════════════
-        //  True damage: no reduction from armor or magic resist
-        // ══════════════════════════════════════════════════════════════
-
-        [Fact]
-        public void TrueDamage_IgnoresArmorAndResist()
-        {
-            // True damage passes through with no mitigation — only damageTakenMult applies
-            float baseDamage = 100f;
-            float damageTakenMult = 1.0f;
-            float trueDamage = baseDamage * damageTakenMult;
-            Assert.Equal(100f, trueDamage, 3);
-        }
-
-        [Fact]
-        public void TrueDamage_WithDamageTakenMult()
-        {
-            float baseDamage = 100f;
-            float damageTakenMult = 1.5f; // curse debuff: +50% damage taken
-            float trueDamage = baseDamage * damageTakenMult;
-            Assert.Equal(150f, trueDamage, 3);
-        }
-
-        // ══════════════════════════════════════════════════════════════
-        //  Wave difficulty multiplier
-        // ══════════════════════════════════════════════════════════════
-
-        [Fact]
-        public void WaveDifficultyMult_AppliedAfterMitigation()
-        {
-            float baseDamage = 100f;
-            float armor = 0.3f;
-            float waveMult = 1.2f;
-            // Step 1: armor mitigation
-            float postArmor = baseDamage * Math.Max(0.01f, 1f - armor); // 70
-            // Step 2: wave difficulty
-            float final = postArmor * waveMult; // 84
-            Assert.Equal(84f, final, 3);
-        }
-
-        // ══════════════════════════════════════════════════════════════
-        //  Weather / Day-Night state invariants
+        //  Weather / Day-Night 默认状态（只读默认值，不做纯回读往返）
         // ══════════════════════════════════════════════════════════════
 
         [Fact]
@@ -253,49 +196,11 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         }
 
         [Fact]
-        public void Weather_SetAndGet_RoundTrip()
-        {
-            int pid = Player();
-
-            Store.SetCurrentWeather(pid, 1); // Rain
-            Assert.Equal(1, Store.GetCurrentWeather(pid));
-        }
-
-        [Fact]
         public void DayNight_DefaultPhase()
         {
             int pid = Player();
 
             Assert.Equal(0, Store.GetDayNightPhase(pid)); // 0 = Day
-        }
-
-        [Fact]
-        public void DayNight_SetAndGet_RoundTrip()
-        {
-            int pid = Player();
-
-            Store.SetDayNightPhase(pid, 1); // Night
-            Assert.Equal(1, Store.GetDayNightPhase(pid));
-        }
-
-        // ══════════════════════════════════════════════════════════════
-        //  Get/Set symmetry
-        // ══════════════════════════════════════════════════════════════
-
-        [Fact]
-        public void EnemyHealth_GetSet_RoundTrip()
-        {
-            int eid = Enemy();
-            Store.SetEnemyHealth(eid, 75f);
-            Assert.Equal(75f, Store.GetEnemyHealth(eid));
-        }
-
-        [Fact]
-        public void EnemyArmor_GetSet_RoundTrip()
-        {
-            int eid = Enemy();
-            Store.SetEnemyArmor(eid, 0.5f);
-            Assert.Equal(0.5f, Store.GetEnemyArmor(eid));
         }
     }
 }

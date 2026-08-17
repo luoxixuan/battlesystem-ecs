@@ -4,6 +4,7 @@ using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
+using BattleSystemECS.Tests.Infrastructure;
 
 namespace BattleSystemECS.Tests.Mechanisms.Combat
 {
@@ -13,14 +14,13 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
     /// cooldown end and actual fire. WindupCountdown counts down to 0, then the tower
     /// fires. Tower CC (silence / sabotage) cancels in-flight windup.
     /// </summary>
-    public class WindupSystemTests
+    public class WindupSystemTests : BattleTestBase
     {
-        private (ComponentStore store, int towerId) CreateTower()
+        private int CreateTower()
         {
-            var store = new ComponentStore();
-            int tid = store.CreateEntity();
-            store.AddTower(tid, TowerType.Basic, 10f, 5, 1f, 1, 50f);
-            return (store, tid);
+            int tid = Store.CreateEntity();
+            Store.AddTower(tid, TowerType.Basic, 10f, 5, 1f, 1, 50f);
+            return tid;
         }
 
         // ─── Field defaults ────────────────────────────────────────────────────────
@@ -28,9 +28,9 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void AddTower_DefaultWindup_IsZero()
         {
-            var (store, tid) = CreateTower();
-            Assert.Equal(0, store.TowerWindupFrames[tid]);
-            Assert.Equal(0, store.TowerWindupCountdown[tid]);
+            int tid = CreateTower();
+            Assert.Equal(0, Store.TowerWindupFrames[tid]);
+            Assert.Equal(0, Store.TowerWindupCountdown[tid]);
         }
 
         // ─── WindupConfig constants ────────────────────────────────────────────────
@@ -49,46 +49,31 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void RemoveTower_ResetsWindupFields()
         {
-            var (store, tid) = CreateTower();
-            store.TowerWindupFrames[tid] = 5;
-            store.TowerWindupCountdown[tid] = 3;
-            store.RemoveTower(tid);
-            Assert.Equal(0, store.TowerWindupFrames[tid]);
-            Assert.Equal(0, store.TowerWindupCountdown[tid]);
+            int tid = CreateTower();
+            Store.TowerWindupFrames[tid] = 5;
+            Store.TowerWindupCountdown[tid] = 3;
+            Store.RemoveTower(tid);
+            Assert.Equal(0, Store.TowerWindupFrames[tid]);
+            Assert.Equal(0, Store.TowerWindupCountdown[tid]);
         }
 
         [Fact]
-        public void DestroyEntity_ResetsWindupFields()
+        public void DestroyEntity_ResetsWindupFields_AndRecycledSlotIsClean()
         {
-            var store = new ComponentStore();
-            int tid = store.CreateEntity();
-            store.AddTower(tid, TowerType.Basic, 10f, 5, 1f, 1, 50f);
-            store.TowerWindupFrames[tid] = 8;
-            store.TowerWindupCountdown[tid] = 4;
-            store.DestroyEntity(tid);
-            Assert.Equal(0, store.TowerWindupFrames[tid]);
-            Assert.Equal(0, store.TowerWindupCountdown[tid]);
-        }
+            int tid = Store.CreateEntity();
+            Store.AddTower(tid, TowerType.Basic, 10f, 5, 1f, 1, 50f);
+            Store.TowerWindupFrames[tid] = 8;
+            Store.TowerWindupCountdown[tid] = 4;
+            Store.DestroyEntity(tid);
+            Assert.Equal(0, Store.TowerWindupFrames[tid]);
+            Assert.Equal(0, Store.TowerWindupCountdown[tid]);
 
-        // ─── Reuse-after-recycle: stale countdown must NOT leak ────────────────────
-
-        [Fact]
-        public void WindupCountdown_StaleOnRecycledSlot_DoesNotLeak()
-        {
-            var store = new ComponentStore();
-            // First tower: manually set stale countdown > 0, then destroy.
-            int t1 = store.CreateEntity();
-            store.AddTower(t1, TowerType.Basic, 10f, 5, 1f, 1, 50f);
-            store.TowerWindupCountdown[t1] = 7; // simulate in-flight windup
-            store.DestroyEntity(t1);
-
-            // Reuse the same slot — windup fields must be reset by DestroyEntity.
-            int t2 = store.CreateEntity();
-            // If the slot index matches (entity id reuse), the reset path will hit.
-            // (Note: entity ids always increase, so this is a separate slot, but the
-            //  same reset logic is exercised in DestroyEntity above.)
-            store.AddTower(t2, TowerType.Basic, 10f, 5, 1f, 1, 50f);
-            Assert.Equal(0, store.TowerWindupCountdown[t2]);
+            // 回收语义：销毁后在同一槽位重新 AddTower，windup 字段必须已被重置。
+            int reused = Store.CreateEntity();
+            Assert.Equal(tid, reused); // swap-and-pop 复用同一实体槽位
+            Store.AddTower(reused, TowerType.Basic, 10f, 5, 1f, 1, 50f);
+            Assert.Equal(0, Store.TowerWindupFrames[reused]);
+            Assert.Equal(0, Store.TowerWindupCountdown[reused]);
         }
     }
 }

@@ -20,22 +20,16 @@ namespace BattleSystemECS.Tests.Mechanisms.World
     ///   7. Default parameters produce a non-zero, in-range fire patch
     ///   8. TotalSpawned / TotalFailedFull counters track correctly
     /// </summary>
-    public class FireTrailSystemTests
+    public class FireTrailSystemTests : BattleTestBase
     {
         private const int PlayerId = 0;
 
-        private static (ComponentStore store, MockRenderer renderer) Env()
+        private FireTrailSystem Env()
         {
-            var store = new ComponentStore();
-            int pid = store.CreateEntity();
-            store.PlayerMaxHealth[pid] = 200f;
-            store.PlayerCurrentHealth[pid] = 200f;
-            return (store, new MockRenderer());
-        }
-
-        private static FireTrailSystem MakeSystem(ComponentStore store)
-        {
-            return new FireTrailSystem(store);
+            int pid = Store.CreateEntity();
+            Store.PlayerMaxHealth[pid] = 200f;
+            Store.PlayerCurrentHealth[pid] = 200f;
+            return new FireTrailSystem(Store);
         }
 
         // ─── Constructor / lifecycle ────────────────────────────────────
@@ -49,8 +43,7 @@ namespace BattleSystemECS.Tests.Mechanisms.World
         [Fact]
         public void FreshSystem_ZeroCounters()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
             Assert.Equal(0, sys.TotalSpawned);
             Assert.Equal(0, sys.TotalFailedFull);
         }
@@ -60,43 +53,41 @@ namespace BattleSystemECS.Tests.Mechanisms.World
         [Fact]
         public void SpawnTrail_DefaultParams_AllocatesFireZone()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
             int id = sys.SpawnTrail(10f, 5f);
             Assert.True(id >= 0, $"Expected non-negative slot id, got {id}");
 
             // Verify the slot is populated with a Fire-type corpse effect
-            Assert.True(store.CorpseEffectActive[id]);
-            Assert.Equal(3, store.CorpseEffectType[id]); // 3 = Fire
-            Assert.Equal(10f, store.CorpseEffectX[id]);
-            Assert.Equal(5f, store.CorpseEffectY[id]);
-            Assert.Equal(1.5f, store.CorpseEffectRadius[id]);
-            Assert.Equal(2.0f, store.CorpseEffectDuration[id]);
-            Assert.True(store.CorpseEffectDamagePerTick[id] > 0f);
-            Assert.Equal(0.5f, store.CorpseEffectTickInterval[id]);
+            Assert.True(Store.CorpseEffectActive[id]);
+            Assert.Equal(3, Store.CorpseEffectType[id]); // 3 = Fire
+            Assert.Equal(10f, Store.CorpseEffectX[id]);
+            Assert.Equal(5f, Store.CorpseEffectY[id]);
+            Assert.Equal(1.5f, Store.CorpseEffectRadius[id]);
+            Assert.Equal(2.0f, Store.CorpseEffectDuration[id]);
+            // 生产默认 dps=8、tickInterval=0.5 → damagePerTick = 8 * 0.5 = 4。
+            Assert.Equal(4f, Store.CorpseEffectDamagePerTick[id]);
+            Assert.Equal(0.5f, Store.CorpseEffectTickInterval[id]);
         }
 
         [Fact]
         public void SpawnTrail_CustomParams_AppliesOverride()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
             int id = sys.SpawnTrail(x: 1f, y: 2f, radius: 3f, dps: 10f, duration: 5f, tickInterval: 1f);
             Assert.True(id >= 0);
-            Assert.Equal(3f, store.CorpseEffectRadius[id]);
-            Assert.Equal(5f, store.CorpseEffectDuration[id]);
-            Assert.Equal(1f, store.CorpseEffectTickInterval[id]);
+            Assert.Equal(3f, Store.CorpseEffectRadius[id]);
+            Assert.Equal(5f, Store.CorpseEffectDuration[id]);
+            Assert.Equal(1f, Store.CorpseEffectTickInterval[id]);
             // damagePerTick = dps * tickInterval
-            Assert.Equal(10f, store.CorpseEffectDamagePerTick[id]);
+            Assert.Equal(10f, Store.CorpseEffectDamagePerTick[id]);
         }
 
         [Fact]
         public void SpawnTrail_MultipleCalls_GetDistinctSlots()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
             int id1 = sys.SpawnTrail(0f, 0f);
             int id2 = sys.SpawnTrail(1f, 0f);
@@ -111,8 +102,7 @@ namespace BattleSystemECS.Tests.Mechanisms.World
         [Fact]
         public void SpawnTrail_IncrementsTotalSpawned()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
             Assert.Equal(0, sys.TotalSpawned);
             sys.SpawnTrail(0f, 0f);
@@ -126,8 +116,7 @@ namespace BattleSystemECS.Tests.Mechanisms.World
         [Fact]
         public void SpawnTrail_ZeroRadius_ReturnsMinus1()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
             Assert.Equal(-1, sys.SpawnTrail(0f, 0f, radius: 0f));
             Assert.Equal(-1, sys.SpawnTrail(0f, 0f, radius: -1f));
@@ -137,8 +126,7 @@ namespace BattleSystemECS.Tests.Mechanisms.World
         [Fact]
         public void SpawnTrail_ZeroDuration_ReturnsMinus1()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
             Assert.Equal(-1, sys.SpawnTrail(0f, 0f, duration: 0f));
             Assert.Equal(0, sys.TotalSpawned);
@@ -147,8 +135,7 @@ namespace BattleSystemECS.Tests.Mechanisms.World
         [Fact]
         public void SpawnTrail_NegativeDps_ReturnsMinus1()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
             Assert.Equal(-1, sys.SpawnTrail(0f, 0f, dps: -1f));
             Assert.Equal(0, sys.TotalSpawned);
@@ -157,34 +144,31 @@ namespace BattleSystemECS.Tests.Mechanisms.World
         [Fact]
         public void SpawnTrail_OversizeRadius_ClampsTo50()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
             int id = sys.SpawnTrail(0f, 0f, radius: 99999f);
             Assert.True(id >= 0);
-            Assert.Equal(50f, store.CorpseEffectRadius[id]);
+            Assert.Equal(50f, Store.CorpseEffectRadius[id]);
         }
 
         [Fact]
         public void SpawnTrail_OversizeDuration_ClampsTo30()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
             int id = sys.SpawnTrail(0f, 0f, duration: 99999f);
             Assert.True(id >= 0);
-            Assert.Equal(30f, store.CorpseEffectDuration[id]);
+            Assert.Equal(30f, Store.CorpseEffectDuration[id]);
         }
 
         [Fact]
         public void SpawnTrail_ZeroTickInterval_FallsBackToQuarterSecond()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
             int id = sys.SpawnTrail(0f, 0f, tickInterval: 0f);
             Assert.True(id >= 0);
-            Assert.Equal(0.25f, store.CorpseEffectTickInterval[id]);
+            Assert.Equal(0.25f, Store.CorpseEffectTickInterval[id]);
         }
 
         // ─── SpawnTrail: full storage behavior ──────────────────────────
@@ -192,13 +176,12 @@ namespace BattleSystemECS.Tests.Mechanisms.World
         [Fact]
         public void SpawnTrail_StorageFull_ReturnsMinus1AndIncrementsFailed()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
             // Fill every CorpseEffect slot manually so the next spawn must fail.
             for (int i = 0; i < ComponentStore.MAX_CORPSE_EFFECTS; i++)
             {
-                store.CorpseEffectActive[i] = true;
+                Store.CorpseEffectActive[i] = true;
             }
 
             int id = sys.SpawnTrail(0f, 0f);
@@ -210,12 +193,11 @@ namespace BattleSystemECS.Tests.Mechanisms.World
         [Fact]
         public void SpawnTrail_StorageFull_RepeatedCallsAccumulateFailureCount()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
             for (int i = 0; i < ComponentStore.MAX_CORPSE_EFFECTS; i++)
             {
-                store.CorpseEffectActive[i] = true;
+                Store.CorpseEffectActive[i] = true;
             }
 
             for (int i = 0; i < 5; i++)
@@ -229,15 +211,16 @@ namespace BattleSystemECS.Tests.Mechanisms.World
         // ─── Zero-allocation contract: no per-call allocations ──────────
 
         [Fact]
-        public void SpawnTrail_DoesNotThrowOnFarCoordinates()
+        public void SpawnTrail_FarCoordinates_AreStoredExactly()
         {
-            var (store, _) = Env();
-            var sys = MakeSystem(store);
+            var sys = Env();
 
-            // Far-away positions must not crash; CorpseEffect uses float X/Y
-            // so anything finite is accepted.
+            // 远端坐标必须正常生成，且 X/Y 精确写入（CorpseEffect 用 float 存储）。
             int id = sys.SpawnTrail(1e6f, -1e6f);
             Assert.True(id >= 0);
+            Assert.True(Store.CorpseEffectActive[id]);
+            Assert.Equal(1e6f, Store.CorpseEffectX[id]);
+            Assert.Equal(-1e6f, Store.CorpseEffectY[id]);
         }
     }
 }

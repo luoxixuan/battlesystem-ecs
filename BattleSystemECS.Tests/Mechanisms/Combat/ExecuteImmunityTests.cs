@@ -1,197 +1,151 @@
 using System;
 using BattleSystemECS.Core;
 using BattleSystemECS.Systems;
+using BattleSystemECS.Tests.Infrastructure;
 using Xunit;
 
 namespace BattleSystemECS.Tests.Mechanisms.Combat;
 
 /// <summary>
 /// Round 132 Direction 8 — Execute Immunity / Min-Health Floor tests.
-/// Verifies the floor-clamp helper, the in-place post-= helper, the MarkSystem.ExecuteImmune
-/// guard, the AddEnemy/DestroyEntity reset, and the end-to-end ApplyEnemyDamage path.
+/// 覆盖 ClampDamageToHealthFloor / ApplyMinHealthFloorInPlace 的真实存储层行为、
+/// MarkSystem 的 ExecuteImmune 门、AddEnemy/DestroyEntity 重置，以及端到端 ApplyEnemyDamage。
+/// 同构的“不触发钳制/触发钳制”分支合并为理论驱动。
 /// </summary>
-public class ExecuteImmunityTests
+public class ExecuteImmunityTests : BattleTestBase
 {
     private const int PlayerId = 0;
 
-    private static (ComponentStore store, int enemyId) MakeEnemy(float curHp, float maxHp, float floor = 0f, bool immune = false)
+    private int MakeEnemy(float curHp, float maxHp, float floor = 0f, bool immune = false)
     {
-        var store = new ComponentStore();
-        int enemyId = store.AddEnemy(0, 0, 1f, curHp, maxHp, 5f, 10, 1, "TestEnemy");
-        store.EnemyMinHealthFloor[enemyId] = floor;
-        store.EnemyExecuteImmune[enemyId] = immune;
-        return (store, enemyId);
+        int enemyId = Store.AddEnemy(0, 0, 1f, curHp, maxHp, 5f, 10, 1, "TestEnemy");
+        Store.EnemyMinHealthFloor[enemyId] = floor;
+        Store.EnemyExecuteImmune[enemyId] = immune;
+        return enemyId;
     }
 
-    [Fact]
-    public void ClampDamageToHealthFloor_NoFloor_ReturnsInputUnchanged()
+    // ── ClampDamageToHealthFloor：不触发钳制的同构分支 ──────────────────
+
+    [Theory]
+    [InlineData(500f, 1000f, 0f, 200f, 200f)]   // 无 floor → 输入原样返回
+    [InlineData(500f, 1000f, 0.05f, 0f, 0f)]    // 零伤害 → 0
+    [InlineData(200f, 1000f, 0.05f, 30f, 30f)]  // 未触及 floor → 输入原样返回
+    [InlineData(500f, 1000f, 0.05f, -10f, -10f)] // 负伤害 → 输入原样返回
+    public void ClampDamageToHealthFloor_PassthroughCases_ReturnInput(
+        float curHp, float maxHp, float floor, float inputDamage, float expected)
     {
-        var (store, eid) = MakeEnemy(curHp: 500f, maxHp: 1000f, floor: 0f);
-        float dmg = store.ClampDamageToHealthFloor(eid, 200f);
-        Assert.Equal(200f, dmg);
-        Assert.Equal(500f, store.EnemyHealth[eid]); // unchanged
+        int eid = MakeEnemy(curHp, maxHp, floor);
+        float damage = Store.ClampDamageToHealthFloor(eid, inputDamage);
+        Assert.Equal(expected, damage);
+        Assert.Equal(curHp, Store.EnemyHealth[eid]); // 该 API 只计算不写入
     }
 
-    [Fact]
-    public void ClampDamageToHealthFloor_ZeroDamage_ReturnsZero()
+    // ── ClampDamageToHealthFloor：触发钳制的同构分支 ────────────────────
+
+    [Theory]
+    [InlineData(60f, 1000f, 0.05f, 500f, 10f)]  // 60 - 50 = 10，过量伤害被钳到 floor 上方
+    [InlineData(50f, 1000f, 0.05f, 100f, 0f)]   // 已在 floor → 0
+    [InlineData(49f, 1000f, 0.05f, 100f, 0f)]   // 已在 floor 之下 → 0
+    [InlineData(1000f, 1000f, 1.0f, 500f, 0f)]  // floor=100% → 完全禁止扣血
+    public void ClampDamageToHealthFloor_ClampedCases_ReturnClampedValue(
+        float curHp, float maxHp, float floor, float inputDamage, float expected)
     {
-        var (store, eid) = MakeEnemy(curHp: 500f, maxHp: 1000f, floor: 0.05f);
-        float dmg = store.ClampDamageToHealthFloor(eid, 0f);
-        Assert.Equal(0f, dmg);
+        int eid = MakeEnemy(curHp, maxHp, floor);
+        float damage = Store.ClampDamageToHealthFloor(eid, inputDamage);
+        Assert.Equal(expected, damage);
+        Assert.Equal(curHp, Store.EnemyHealth[eid]); // 该 API 只计算不写入
     }
 
-    [Fact]
-    public void ClampDamageToHealthFloor_Overkill_ClampsToFloor()
-    {
-        // Boss: 1000 HP, 5% floor = 50 HP. Current 60 HP → only 10 damage allowed.
-        var (store, eid) = MakeEnemy(curHp: 60f, maxHp: 1000f, floor: 0.05f);
-        float dmg = store.ClampDamageToHealthFloor(eid, 500f); // would one-shot
-        Assert.Equal(10f, dmg); // 60 - 50 = 10
-    }
+    // ── ApplyMinHealthFloorInPlace：写回路径 ────────────────────────────
 
     [Fact]
-    public void ClampDamageToHealthFloor_AtFloor_ReturnsZero()
+    public void ApplyMinHealthFloorInPlace_NoFloor_LeavesNegativeHpAlone()
     {
-        // Boss at exactly the floor — no more damage allowed.
-        var (store, eid) = MakeEnemy(curHp: 50f, maxHp: 1000f, floor: 0.05f);
-        float dmg = store.ClampDamageToHealthFloor(eid, 100f);
-        Assert.Equal(0f, dmg);
+        int eid = MakeEnemy(curHp: -10f, maxHp: 1000f, floor: 0f);
+        Store.ApplyMinHealthFloorInPlace(eid);
+        Assert.Equal(-10f, Store.EnemyHealth[eid]);
     }
 
-    [Fact]
-    public void ClampDamageToHealthFloor_UnderFloor_ReturnsZero()
+    [Theory]
+    [InlineData(50f, 1000f, 0.05f, 10f, 50f)]   // 被直接 -= 推到 floor 之下 → 抬回 50
+    [InlineData(500f, 1000f, 0.05f, 500f, 500f)] // 在 floor 之上 → 不动
+    public void ApplyMinHealthFloorInPlace_FlooredCases_WriteBackCorrectly(
+        float initialHp, float maxHp, float floor, float mutatedHp, float expectedHp)
     {
-        // Boss slightly under floor — still no damage.
-        var (store, eid) = MakeEnemy(curHp: 49f, maxHp: 1000f, floor: 0.05f);
-        float dmg = store.ClampDamageToHealthFloor(eid, 100f);
-        Assert.Equal(0f, dmg);
-    }
-
-    [Fact]
-    public void ClampDamageToHealthFloor_UnderThreshold_ReturnsInput()
-    {
-        // Damage that doesn't reach the floor is unaffected.
-        var (store, eid) = MakeEnemy(curHp: 200f, maxHp: 1000f, floor: 0.05f);
-        float dmg = store.ClampDamageToHealthFloor(eid, 30f); // leaves 170, well above 50
-        Assert.Equal(30f, dmg);
-    }
-
-    [Fact]
-    public void ClampDamageToHealthFloor_FullFloor_ReturnsZero()
-    {
-        // floor=1.0 (100%) → enemy is functionally immortal to health damage.
-        var (store, eid) = MakeEnemy(curHp: 1000f, maxHp: 1000f, floor: 1.0f);
-        float dmg = store.ClampDamageToHealthFloor(eid, 500f);
-        Assert.Equal(0f, dmg);
-    }
-
-    [Fact]
-    public void ApplyMinHealthFloorInPlace_NoFloor_IsNoOp()
-    {
-        var (store, eid) = MakeEnemy(curHp: -10f, maxHp: 1000f, floor: 0f);
-        store.ApplyMinHealthFloorInPlace(eid);
-        Assert.Equal(-10f, store.EnemyHealth[eid]); // no floor, no clamp
-    }
-
-    [Fact]
-    public void ApplyMinHealthFloorInPlace_BelowFloor_LiftsToFloor()
-    {
-        // Simulate a direct -= that pushed HP below the floor.
-        var (store, eid) = MakeEnemy(curHp: 50f, maxHp: 1000f, floor: 0.05f);
-        store.EnemyHealth[eid] = 10f; // direct mutation below floor
-        store.ApplyMinHealthFloorInPlace(eid);
-        Assert.Equal(50f, store.EnemyHealth[eid]);
-    }
-
-    [Fact]
-    public void ApplyMinHealthFloorInPlace_AboveFloor_DoesNotClamp()
-    {
-        var (store, eid) = MakeEnemy(curHp: 500f, maxHp: 1000f, floor: 0.05f);
-        store.ApplyMinHealthFloorInPlace(eid);
-        Assert.Equal(500f, store.EnemyHealth[eid]);
-    }
-
-    [Fact]
-    public void ApplyEnemyDamage_RespectsFloor()
-    {
-        // End-to-end: massive damage via canonical entry point clamps to floor.
-        var (store, eid) = MakeEnemy(curHp: 60f, maxHp: 1000f, floor: 0.05f);
-        store.ApplyEnemyDamage(eid, 1000f);
-        Assert.Equal(50f, store.EnemyHealth[eid]); // clamped to floor
-    }
-
-    [Fact]
-    public void MarkSystem_AddMark_RespectsExecuteImmune()
-    {
-        var (store, eid) = MakeEnemy(curHp: 1000f, maxHp: 1000f, floor: 0.05f, immune: true);
-        store.EnemyMarkMaxThreshold[eid] = 5;
-        var mark = new MarkSystem(store, playerId: PlayerId);
-        for (int i = 0; i < 10; i++) mark.AddMark(eid, 1);
-        Assert.Equal(0, store.EnemyMarkStacks[eid]); // immune → no stacks
-    }
-
-    [Fact]
-    public void MarkSystem_AddMark_NotImmune_BeatsAsBefore()
-    {
-        // Regression: when EnemyExecuteImmune=false (default), AddMark works as before.
-        var (store, eid) = MakeEnemy(curHp: 1000f, maxHp: 1000f, floor: 0.05f, immune: false);
-        store.EnemyMarkMaxThreshold[eid] = 5;
-        var mark = new MarkSystem(store, playerId: PlayerId);
-        mark.AddMark(eid, 3);
-        Assert.Equal(3, store.EnemyMarkStacks[eid]);
-    }
-
-    [Fact]
-    public void AddEnemy_ResetsExecuteImmunityFieldsToDefaults()
-    {
-        // Opt-out defaults: floor=0, immune=false. Verified via a freshly-added enemy.
-        var store = new ComponentStore();
-        int eid = store.AddEnemy(0, 0, 1f, 500f, 1000f, 5f, 10, 1, "Peon");
-        Assert.Equal(0f, store.EnemyMinHealthFloor[eid]);
-        Assert.False(store.EnemyExecuteImmune[eid]);
-    }
-
-    [Fact]
-    public void DestroyEntity_ResetsExecuteImmunityFields()
-    {
-        // After destroy, the slot must be reset so ID-reuse doesn't leak Boss flags to a peon.
-        var store = new ComponentStore();
-        int eid = store.AddEnemy(0, 0, 1f, 500f, 1000f, 5f, 10, 1, "Boss");
-        store.EnemyMinHealthFloor[eid] = 0.05f;
-        store.EnemyExecuteImmune[eid] = true;
-        store.DestroyEntity(eid);
-        Assert.Equal(0f, store.EnemyMinHealthFloor[eid]);
-        Assert.False(store.EnemyExecuteImmune[eid]);
+        int eid = MakeEnemy(initialHp, maxHp, floor);
+        Store.EnemyHealth[eid] = mutatedHp; // 模拟绕过 ApplyEnemyDamage 的直接 -= 路径
+        Store.ApplyMinHealthFloorInPlace(eid);
+        Assert.Equal(expectedHp, Store.EnemyHealth[eid]);
     }
 
     [Fact]
     public void ApplyMinHealthFloorInPlace_ZeroMaxHealth_IsNoOp()
     {
-        // Defensive: MaxHealth=0 → can't compute floor → no-op (avoids NaN/divide-by-zero).
-        var store = new ComponentStore();
-        int eid = store.AddEnemy(0, 0, 1f, 0f, 0f, 5f, 10, 1, "Ghost");
-        store.EnemyMinHealthFloor[eid] = 0.05f;
-        store.EnemyHealth[eid] = -50f;
-        store.ApplyMinHealthFloorInPlace(eid);
-        Assert.Equal(-50f, store.EnemyHealth[eid]);
+        // MaxHealth=0 无法计算 floor，必须 no-op（避免 NaN / 除零）。
+
+        int eid = Store.AddEnemy(0, 0, 1f, 0f, 0f, 5f, 10, 1, "Ghost");
+        Store.EnemyMinHealthFloor[eid] = 0.05f;
+        Store.EnemyHealth[eid] = -50f;
+        Store.ApplyMinHealthFloorInPlace(eid);
+        Assert.Equal(-50f, Store.EnemyHealth[eid]);
     }
 
+    // ── ApplyEnemyDamage：端到端 floor 语义 ─────────────────────────────
+
     [Fact]
-    public void ClampDamageToHealthFloor_NegativeDamage_ReturnsInput()
+    public void ApplyEnemyDamage_RespectsFloor()
     {
-        // Negative damage is a no-op anyway (ApplyEnemyDamage guards it upstream).
-        var (store, eid) = MakeEnemy(curHp: 500f, maxHp: 1000f, floor: 0.05f);
-        float dmg = store.ClampDamageToHealthFloor(eid, -10f);
-        Assert.Equal(-10f, dmg);
+        // 60 HP、5% floor=50：1000 点过量伤害只能打到 50。
+        int eid = MakeEnemy(curHp: 60f, maxHp: 1000f, floor: 0.05f);
+        Store.ApplyEnemyDamage(eid, 1000f);
+        Assert.Equal(50f, Store.EnemyHealth[eid]);
     }
 
     [Fact]
     public void ApplyEnemyDamage_BelowFloor_FullyAbsorbed()
     {
-        // Sanity: 1 HP damage to a 1000-HP Boss with 0-HP floor (current 0) is fully absorbed
-        // (no damage applied, HP stays at 0). Equivalent to "boss already dead, no resurrection".
-        var (store, eid) = MakeEnemy(curHp: 0f, maxHp: 1000f, floor: 0.05f);
-        store.ApplyEnemyDamage(eid, 1f);
-        Assert.Equal(0f, store.EnemyHealth[eid]);
+        // 已在 floor 之下的敌人不会再被扣血（无“负血复活”）。
+        int eid = MakeEnemy(curHp: 0f, maxHp: 1000f, floor: 0.05f);
+        Store.ApplyEnemyDamage(eid, 1f);
+        Assert.Equal(0f, Store.EnemyHealth[eid]);
+    }
+
+    // ── MarkSystem：ExecuteImmune 门（免疫/非免疫同构合并） ─────────────
+
+    [Theory]
+    [InlineData(true, 0)]  // 免疫 → AddMark 全部被吞
+    [InlineData(false, 3)] // 非免疫 → 正常叠加
+    public void MarkSystem_AddMark_RespectsExecuteImmune(bool immune, int expectedStacks)
+    {
+        int eid = MakeEnemy(curHp: 1000f, maxHp: 1000f, floor: 0.05f, immune: immune);
+        Store.EnemyMarkMaxThreshold[eid] = 5;
+        var mark = new MarkSystem(Store, playerId: PlayerId);
+        mark.AddMark(eid, 3);
+        Assert.Equal(expectedStacks, Store.EnemyMarkStacks[eid]);
+    }
+
+    // ── 槽位生命周期重置 ──────────────────────────────────────────────
+
+    [Fact]
+    public void AddEnemy_ResetsExecuteImmunityFieldsToDefaults()
+    {
+        // 新生成敌人：floor=0、immune=false（opt-out 默认）。
+
+        int eid = Store.AddEnemy(0, 0, 1f, 500f, 1000f, 5f, 10, 1, "Peon");
+        Assert.Equal(0f, Store.EnemyMinHealthFloor[eid]);
+        Assert.False(Store.EnemyExecuteImmune[eid]);
+    }
+
+    [Fact]
+    public void DestroyEntity_ResetsExecuteImmunityFields()
+    {
+        // ID 复用时 Boss 的 floor/immune 不得泄漏给后续小怪。
+
+        int eid = Store.AddEnemy(0, 0, 1f, 500f, 1000f, 5f, 10, 1, "Boss");
+        Store.EnemyMinHealthFloor[eid] = 0.05f;
+        Store.EnemyExecuteImmune[eid] = true;
+        Store.DestroyEntity(eid);
+        Assert.Equal(0f, Store.EnemyMinHealthFloor[eid]);
+        Assert.False(Store.EnemyExecuteImmune[eid]);
     }
 }

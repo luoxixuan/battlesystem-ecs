@@ -30,6 +30,17 @@ namespace BattleSystemECS.Tests.Infrastructure
         protected int Tower(int x, int y, TowerType type = TowerType.Basic, Action<TowerSpec>? configure = null)
             => World.Tower(x, y, type, configure);
 
+        /// <summary>绕过 Placement 的裸塔工厂：精确控制位置/伤害/射程/攻速/等级/造价。</summary>
+        protected int RawTower(int x, int y, TowerType type = TowerType.Basic, float damage = 50f, int range = 3,
+            float speed = 1f, int level = 1, float cost = 50f)
+            => World.RawTower(x, y, type, damage, range, speed, level, cost);
+
+        /// <summary>清空当前 Store 的全部 per-type 塔数量上限（0 = unlimited）。</summary>
+        protected void DisableTowerCaps() => World.DisablePerTypeTowerCapsInstance();
+
+        /// <summary>重建空间网格（驱动塔攻击/空间查询前调用）。</summary>
+        protected void RebuildGrid() => Store.RebuildSpatialGrid();
+
         protected int Player(Action<PlayerSpec>? configure = null) => World.Player(configure);
 
         protected void GrantGold(int playerId, float gold) => World.GrantGold(playerId, gold);

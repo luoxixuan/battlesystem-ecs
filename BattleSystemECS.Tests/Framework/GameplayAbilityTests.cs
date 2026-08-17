@@ -1,10 +1,11 @@
 using System;
 using Xunit;
+using BattleSystemECS.Tests.Infrastructure;
 using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Tests.Framework
 {
-    public class GameplayAbilityTests
+    public class GameplayAbilityTests : BattleTestBase
     {
         private AbilityInstance Make(float cooldown)
         {
@@ -15,30 +16,31 @@ namespace BattleSystemECS.Tests.Framework
             return inst;
         }
 
-        // ─── Bug#37: CanActivate epsilon 边界 ──────────────────────────────────
+        // ─── Bug#37 回归：CanActivate epsilon 边界 ───────────────────────────────
+        // 四个原本几乎相同的 [Fact] 合并为单个 [Theory]。
+        [Theory(DisplayName = "CanActivate 冷却 epsilon 边界")]
+        [InlineData(0f, true)]
+        [InlineData(0.00005f, true)]
+        [InlineData(0.0001f, true)]
+        [InlineData(0.001f, false)]
+        public void CanActivate_RespectsEpsilonBoundary(float cooldown, bool expected)
+        {
+            Assert.Equal(expected, Make(cooldown).CanActivate());
+        }
 
-        [Fact] public void CanActivate_TrueWhenCooldownZero()
-            => Assert.True(Make(0f).CanActivate());
-
-        [Fact] public void CanActivate_TrueWhenCooldownBelowEpsilon()
-            => Assert.True(Make(0.00005f).CanActivate());
-
-        [Fact] public void CanActivate_FalseWhenCooldownAboveEpsilon()
-            => Assert.False(Make(0.001f).CanActivate());
-
-        [Fact] public void CanActivate_TrueWhenCooldownAtOrBelowEpsilon()
-            => Assert.True(Make(0.0001f).CanActivate());
-
-        [Fact] public void Activate_SetsCooldownToDefinitionValue()
+        [Fact]
+        public void Activate_SetsCooldownToDefinitionValue()
         {
             var def = new GameplayAbilityDef("Test", "desc", 5f, 0f, -1, 10f,
                 AbilityActivation.Instant, 0, 0);
             var inst = new AbilityInstance(def);
             inst.Activate();
-            Assert.Equal(5f, inst.CurrentCooldown);
+            // 期望值直接取注入的 def.Cooldown，不重复钉住 5f 字面量。
+            Assert.Equal(def.Cooldown, inst.CurrentCooldown);
         }
 
-        [Fact] public void AbilityInstance_CooldownMutability()
+        [Fact]
+        public void AbilityInstance_CooldownMutability()
         {
             var def = new GameplayAbilityDef("Test", "desc", 5f, 0f, -1, 10f,
                 AbilityActivation.Instant, 0, 0);

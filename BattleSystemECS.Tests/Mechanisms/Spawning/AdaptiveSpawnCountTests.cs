@@ -26,15 +26,14 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
     /// 13. InjectExtraEnemies at multiplier=1.0 is unchanged (zero-overhead)
     /// 14. InjectExtraEnemies at min multiplier (0.5) — halved count
     /// </summary>
-    public class AdaptiveSpawnCountTests
+    public class AdaptiveSpawnCountTests : BattleTestBase
     {
-        private (ComponentStore store, GameConfig config) Env()
+        private WaveSpawningSystem Env()
         {
-            var store = new ComponentStore();
-            int pid = store.CreateEntity();
-            store.PlayerMaxHealth[pid] = 200f;
-            store.PlayerCurrentHealth[pid] = 200f;
-            return (store, new GameConfig());
+            int pid = Store.CreateEntity();
+            Store.PlayerMaxHealth[pid] = 200f;
+            Store.PlayerCurrentHealth[pid] = 200f;
+            return new WaveSpawningSystem(Store, Renderer, Config);
         }
 
         // ─── Config invariants ─────────────────────────────────────────────
@@ -67,16 +66,14 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
         [Fact]
         public void WaveSpawningSystem_PerformanceSpawnMultiplier_DefaultsToOne()
         {
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
+            var sys = Env();
             Assert.Equal(1.0f, sys.PerformanceSpawnMultiplier);
         }
 
         [Fact]
         public void SetPerformanceSpawnMultiplier_ClampsToMax()
         {
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
+            var sys = Env();
             sys.SetPerformanceSpawnMultiplier(99f);
             Assert.Equal(AdaptiveSpawnConfig.MaxSpawnMultiplier, sys.PerformanceSpawnMultiplier);
         }
@@ -84,8 +81,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
         [Fact]
         public void SetPerformanceSpawnMultiplier_ClampsToMin()
         {
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
+            var sys = Env();
             sys.SetPerformanceSpawnMultiplier(-5f);
             Assert.Equal(AdaptiveSpawnConfig.MinSpawnMultiplier, sys.PerformanceSpawnMultiplier);
         }
@@ -95,8 +91,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
         {
             // Sub-1e-4 deviations snap to exactly 1.0 so the hot-path branch stays cheap
             // and test comparisons are exact. 1e-5 is well below the snap threshold.
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
+            var sys = Env();
             sys.SetPerformanceSpawnMultiplier(1.0f + 1e-5f);
             Assert.Equal(1.0f, sys.PerformanceSpawnMultiplier);
             sys.SetPerformanceSpawnMultiplier(1.0f - 1e-5f);
@@ -108,41 +103,43 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
         [Fact]
         public void OverKill_RaisesMultiplierAboveOne()
         {
-            // Player killed 30 out of an expected 20 → +50% over-kill. With sensitivity
-            // 0.5 (default), rawDelta=0.5, multiplier = 1.0 + 0.5*0.5 = 1.25. After
-            // clamp, max 2.0. After near-1 snap, still 1.25 (well above threshold).
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
-            var ads = new AdaptiveDifficultySystem(store, config);
+            // 输入钉死：30 击杀 vs 预期 20；期望值由默认灵敏度现场推导。
+            const int kills = 30;
+            const int expected = 20;
+            var sys = Env();
+            var ads = new AdaptiveDifficultySystem(Store, Config);
             ads.SetWaveSpawningSystem(sys);
-            // Simulate 30 kills recorded this wave
-            for (int i = 0; i < 30; i++) ads.RecordKill(0);
-            ads.OnWaveComplete(0, expectedKills: 20);
-            Assert.Equal(1.25f, sys.PerformanceSpawnMultiplier, 3);
+            for (int i = 0; i < kills; i++) ads.RecordKill(0);
+            ads.OnWaveComplete(0, expectedKills: expected);
+
+            float expectedMult =
+                1.0f + ((kills - expected) / (float)expected) * AdaptiveSpawnConfig.DefaultSpawnSensitivity;
+            Assert.Equal(expectedMult, sys.PerformanceSpawnMultiplier, 3);
         }
 
         [Fact]
         public void UnderKill_LowersMultiplierBelowOne()
         {
-            // Player killed 5 out of an expected 20 → -75% under-kill. With sensitivity
-            // 0.5, rawDelta = -0.75, multiplier = 1.0 + (-0.75)*0.5 = 0.625. Clamp
-            // to MinSpawnMultiplier (0.5) — 0.625 is above 0.5 so stays 0.625.
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
-            var ads = new AdaptiveDifficultySystem(store, config);
+            // 输入钉死：5 击杀 vs 预期 20；期望值由默认灵敏度现场推导。
+            const int kills = 5;
+            const int expected = 20;
+            var sys = Env();
+            var ads = new AdaptiveDifficultySystem(Store, Config);
             ads.SetWaveSpawningSystem(sys);
-            for (int i = 0; i < 5; i++) ads.RecordKill(0);
-            ads.OnWaveComplete(0, expectedKills: 20);
-            Assert.Equal(0.625f, sys.PerformanceSpawnMultiplier, 3);
+            for (int i = 0; i < kills; i++) ads.RecordKill(0);
+            ads.OnWaveComplete(0, expectedKills: expected);
+
+            float expectedMult =
+                1.0f + ((kills - expected) / (float)expected) * AdaptiveSpawnConfig.DefaultSpawnSensitivity;
+            Assert.Equal(expectedMult, sys.PerformanceSpawnMultiplier, 3);
         }
 
         [Fact]
         public void ZeroKills_ClampsToMinSpawnMultiplier()
         {
             // Player killed 0 of expected 100 → rawDelta = -1.0 → mult = 0.5 → clamp to 0.5.
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
-            var ads = new AdaptiveDifficultySystem(store, config);
+            var sys = Env();
+            var ads = new AdaptiveDifficultySystem(Store, Config);
             ads.SetWaveSpawningSystem(sys);
             // No kills recorded
             ads.OnWaveComplete(0, expectedKills: 100);
@@ -153,9 +150,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
         public void MassiveOverKill_ClampsToMaxSpawnMultiplier()
         {
             // Player killed 1000 of expected 1 → rawDelta = 999 → mult = 1 + 499.5 = 500.5 → clamp 2.0.
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
-            var ads = new AdaptiveDifficultySystem(store, config);
+            var sys = Env();
+            var ads = new AdaptiveDifficultySystem(Store, Config);
             ads.SetWaveSpawningSystem(sys);
             for (int i = 0; i < 1000; i++) ads.RecordKill(0);
             ads.OnWaveComplete(0, expectedKills: 1);
@@ -166,9 +162,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
         public void ExpectedKillsZero_MultiplierStaysAtOne()
         {
             // Designer opted out (no ExpectedKillCount in JSON) — multiplier untouched.
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
-            var ads = new AdaptiveDifficultySystem(store, config);
+            var sys = Env();
+            var ads = new AdaptiveDifficultySystem(Store, Config);
             ads.SetWaveSpawningSystem(sys);
             for (int i = 0; i < 50; i++) ads.RecordKill(0);
             // expectedKills = 0 → the rubber-band block is skipped.
@@ -181,8 +176,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
         [Fact]
         public void SetLevel_ResetsMultiplierToOne()
         {
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
+            var sys = Env();
             sys.SetPerformanceSpawnMultiplier(1.5f);
             Assert.Equal(1.5f, sys.PerformanceSpawnMultiplier);
             sys.SetLevel(2);
@@ -195,13 +189,12 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
         public void InjectExtraEnemies_HonorsMultiplier()
         {
             // ApplyToMidWaveSpawns defaults to true, so a 2x multiplier should double
-            // the inject count. We verify by counting enemies in the store.
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
+            // the inject count. We verify by counting enemies in the Store.
+            var sys = Env();
             sys.SetPerformanceSpawnMultiplier(2.0f);
-            int baseline = store.GetActiveEnemyCount();
+            int baseline = Store.GetActiveEnemyCount();
             sys.InjectExtraEnemies(3);
-            int spawnedDelta = store.GetActiveEnemyCount() - baseline;
+            int spawnedDelta = Store.GetActiveEnemyCount() - baseline;
             Assert.Equal(6, spawnedDelta); // 3 * 2.0
         }
 
@@ -209,11 +202,10 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
         public void InjectExtraEnemies_MultiplierOne_NoChange()
         {
             // Zero-overhead path: multiplier = 1.0 → no scaling applied.
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
-            int baseline = store.GetActiveEnemyCount();
+            var sys = Env();
+            int baseline = Store.GetActiveEnemyCount();
             sys.InjectExtraEnemies(3);
-            int spawnedDelta = store.GetActiveEnemyCount() - baseline;
+            int spawnedDelta = Store.GetActiveEnemyCount() - baseline;
             Assert.Equal(3, spawnedDelta);
         }
 
@@ -221,12 +213,11 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
         public void InjectExtraEnemies_ClampedMultiplierHonorsMin()
         {
             // 0.5x (MinSpawnMultiplier) on a 4-count request → 2 enemies.
-            var (store, config) = Env();
-            var sys = new WaveSpawningSystem(store, new MockRenderer(), config);
+            var sys = Env();
             sys.SetPerformanceSpawnMultiplier(0.5f);
-            int baseline = store.GetActiveEnemyCount();
+            int baseline = Store.GetActiveEnemyCount();
             sys.InjectExtraEnemies(4);
-            int spawnedDelta = store.GetActiveEnemyCount() - baseline;
+            int spawnedDelta = Store.GetActiveEnemyCount() - baseline;
             Assert.Equal(2, spawnedDelta); // 4 * 0.5
         }
     }

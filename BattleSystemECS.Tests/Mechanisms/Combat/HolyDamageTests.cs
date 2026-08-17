@@ -20,14 +20,10 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
     ///   - HolyResist clamps to [0, 1] (negative → 0, >1 → 1)
     ///   - Out-of-bounds enemyId safely returns 0
     /// </summary>
-    public class HolyDamageTests
+    public class HolyDamageTests : BattleTestBase
     {
         private const int PlayerId = 0;
-
-        private static ComponentStore NewStore()
-        {
-            return new ComponentStore();
-        }
+        private const float InjectedAttackDamage = 100f;
 
         // ══════════════════════════════════════════════════════════════
         //  EnemyHolyResist SOA field
@@ -36,31 +32,28 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void AddEnemy_SeedsHolyResistFromParam()
         {
-            var store = NewStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test",
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test",
                 armor: 0f, shield: 0f, magicResist: 0f,
                 fireResist: 0.3f, iceResist: 0.5f, lightningResist: 0.7f, holyResist: 0.6f);
-            Assert.Equal(0.6f, store.EnemyHolyResist[eid]);
+            Assert.Equal(0.6f, Store.EnemyHolyResist[eid]);
         }
 
         [Fact]
         public void AddEnemy_DefaultsToZeroHolyResist()
         {
-            var store = NewStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test");
-            Assert.Equal(0f, store.EnemyHolyResist[eid]);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test");
+            Assert.Equal(0f, Store.EnemyHolyResist[eid]);
         }
 
         [Fact]
         public void AddEnemy_ClampsHolyResistToUnitInterval()
         {
-            var store = NewStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test",
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test",
                 holyResist: 1.5f);
-            Assert.Equal(1f, store.EnemyHolyResist[eid]);
-            int eid2 = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test2",
+            Assert.Equal(1f, Store.EnemyHolyResist[eid]);
+            int eid2 = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test2",
                 holyResist: -0.3f);
-            Assert.Equal(0f, store.EnemyHolyResist[eid2]);
+            Assert.Equal(0f, Store.EnemyHolyResist[eid2]);
         }
 
         // ══════════════════════════════════════════════════════════════
@@ -72,33 +65,30 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         {
             // The 3-arg form (pre-existing) must still compile and default holy=0f
             // (backward compat for callers that didn't know about Holy yet).
-            var store = NewStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test");
-            store.SetElementalResist(eid, 0.3f, 0.5f, 0.7f);
-            Assert.Equal(0.3f, store.EnemyFireResist[eid]);
-            Assert.Equal(0.5f, store.EnemyIceResist[eid]);
-            Assert.Equal(0.7f, store.EnemyLightningResist[eid]);
-            Assert.Equal(0f, store.EnemyHolyResist[eid]);  // default
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test");
+            Store.SetElementalResist(eid, 0.3f, 0.5f, 0.7f);
+            Assert.Equal(0.3f, Store.EnemyFireResist[eid]);
+            Assert.Equal(0.5f, Store.EnemyIceResist[eid]);
+            Assert.Equal(0.7f, Store.EnemyLightningResist[eid]);
+            Assert.Equal(0f, Store.EnemyHolyResist[eid]);  // default
         }
 
         [Fact]
         public void SetElementalResist_4Arg_AppliesHoly()
         {
-            var store = NewStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test");
-            store.SetElementalResist(eid, 0.1f, 0.2f, 0.3f, 0.4f);
-            Assert.Equal(0.4f, store.EnemyHolyResist[eid]);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test");
+            Store.SetElementalResist(eid, 0.1f, 0.2f, 0.3f, 0.4f);
+            Assert.Equal(0.4f, Store.EnemyHolyResist[eid]);
         }
 
         [Fact]
         public void SetElementalResist_ClampsHolyInputs()
         {
-            var store = NewStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test");
-            store.SetElementalResist(eid, 0f, 0f, 0f, -0.5f);
-            Assert.Equal(0f, store.EnemyHolyResist[eid]);
-            store.SetElementalResist(eid, 0f, 0f, 0f, 2.0f);
-            Assert.Equal(1f, store.EnemyHolyResist[eid]);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test");
+            Store.SetElementalResist(eid, 0f, 0f, 0f, -0.5f);
+            Assert.Equal(0f, Store.EnemyHolyResist[eid]);
+            Store.SetElementalResist(eid, 0f, 0f, 0f, 2.0f);
+            Assert.Equal(1f, Store.EnemyHolyResist[eid]);
         }
 
         // ══════════════════════════════════════════════════════════════
@@ -108,30 +98,27 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void GetElementResist_Holy_ReturnsField()
         {
-            var store = NewStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test",
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test",
                 holyResist: 0.42f);
-            Assert.Equal(0.42f, store.GetElementResist(eid, DamageType.Holy));
+            Assert.Equal(0.42f, Store.GetElementResist(eid, DamageType.Holy));
         }
 
         [Fact]
         public void GetElementResist_OutOfBounds_ReturnsZero()
         {
-            var store = NewStore();
-            Assert.Equal(0f, store.GetElementResist(99999, DamageType.Holy));
-            Assert.Equal(0f, store.GetElementResist(-1, DamageType.Holy));
+            Assert.Equal(0f, Store.GetElementResist(99999, DamageType.Holy));
+            Assert.Equal(0f, Store.GetElementResist(-1, DamageType.Holy));
         }
 
         [Fact]
         public void GetElementResist_NonElementalTypes_ReturnZero()
         {
             // True / Physical / Magic must all return 0 (bypass elemental resist).
-            var store = NewStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test",
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1, "Test",
                 holyResist: 0.99f);  // even with holy resist set, non-elemental types return 0
-            Assert.Equal(0f, store.GetElementResist(eid, DamageType.Physical));
-            Assert.Equal(0f, store.GetElementResist(eid, DamageType.Magic));
-            Assert.Equal(0f, store.GetElementResist(eid, DamageType.True));
+            Assert.Equal(0f, Store.GetElementResist(eid, DamageType.Physical));
+            Assert.Equal(0f, Store.GetElementResist(eid, DamageType.Magic));
+            Assert.Equal(0f, Store.GetElementResist(eid, DamageType.True));
         }
 
         // ══════════════════════════════════════════════════════════════
@@ -147,119 +134,54 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         }
 
         // ══════════════════════════════════════════════════════════════
-        //  PlayerTowerAttackSystem Holy damage branch
+        //  PlayerTowerAttackSystem 伤害类型契约（同构用例合并）
         // ══════════════════════════════════════════════════════════════
 
-        [Fact]
-        public void PlayerTowerAttack_HolyDamage_FullDamageAtZeroResist()
+        [Theory(DisplayName = "PlayerTowerAttackSystem 各伤害类型对圣光抗性的契约")]
+        [InlineData(DamageType.Holy, 0f, 1f, false)]      // 圣光 0 抗性 → 全额
+        [InlineData(DamageType.Holy, 0.5f, 0.5f, false)]  // 圣光 50% 抗性 → 半伤
+        [InlineData(DamageType.True, 0.99f, 1f, false)]   // 真实伤害无视圣光抗性
+        [InlineData(DamageType.Physical, 0.99f, 1f, false)] // 物理不读圣光抗性
+        [InlineData(DamageType.Fire, 0.99f, 1f, false)]   // 火焰不读圣光抗性
+        [InlineData(DamageType.Holy, 0.3f, 0f, true)]     // 圣光免疫位 → 全挡
+        public void PlayerTowerAttack_DamageTypeContract(
+            DamageType damageType, float holyResist, float expectedFraction, bool holyImmune)
         {
-            // 0% Holy resist → 100% damage taken.
-            var store = NewStore();
-            store.AddPlayer(PlayerId, 10f, 1f, 100f, 1, 10);
-            store.PlayerDamageType[PlayerId] = DamageType.Holy;
-            int eid = store.AddEnemy(0f, 0.1f, 1f, 1000f, 1000f, 0f, 1, 1, "Undead0",
-                holyResist: 0f);
-            var renderer = new MockRenderer();
-            var cfg = new GameConfig();
-            var sys = new PlayerTowerAttackSystem(store, renderer, PlayerId, cfg);
-            sys.SetTurn(0);
-            float pre = store.EnemyHealth[eid];
-            sys.Update();
-            // 100 dmg * 1.0 (0% resist) = 100 dmg
-            Assert.Equal(100f, pre - store.EnemyHealth[eid], 1);
-        }
+            Player(p =>
+            {
+                p.AttackRange = 10f;
+                p.AttackSpeed = 1f;
+                p.AttackDamage = InjectedAttackDamage;
+                p.Level = 1;
+                p.BaseLives = 10;
+            });
+            Store.PlayerDamageType[PlayerId] = damageType;
+            int eid = Enemy(e =>
+            {
+                e.X = 0f;
+                e.Y = 0.1f;
+                e.MoveSpeed = 1f;
+                e.Health = 1000f;
+                e.Damage = 0f;
+                e.GoldReward = 1;
+                e.WaveNumber = 1;
+                e.Name = "Target";
+                e.HolyResist = holyResist;
+                e.FireResist = 0f;
+            });
+            if (holyImmune)
+            {
+                Store.SetDamageImmunityMask(eid, (int)DamageType.Holy);
+            }
 
-        [Fact]
-        public void PlayerTowerAttack_HolyDamage_ReducedByHolyResist()
-        {
-            // 50% Holy resist → 50% damage taken.
-            var store = NewStore();
-            store.AddPlayer(PlayerId, 10f, 1f, 100f, 1, 10);
-            store.PlayerDamageType[PlayerId] = DamageType.Holy;
-            int eid = store.AddEnemy(0f, 0.1f, 1f, 1000f, 1000f, 0f, 1, 1, "Demon0",
-                holyResist: 0.5f);
-            var renderer = new MockRenderer();
-            var cfg = new GameConfig();
-            var sys = new PlayerTowerAttackSystem(store, renderer, PlayerId, cfg);
+            var sys = new PlayerTowerAttackSystem(Store, Renderer, PlayerId, Config);
             sys.SetTurn(0);
-            float pre = store.EnemyHealth[eid];
+            float pre = Store.EnemyHealth[eid];
             sys.Update();
-            // 100 * (1 - 0.5) = 50 dmg
-            Assert.Equal(50f, pre - store.EnemyHealth[eid], 1);
-        }
 
-        [Fact]
-        public void PlayerTowerAttack_TrueDamage_BypassesHolyResist()
-        {
-            // True damage ignores HolyResist (consistent with all other resists).
-            var store = NewStore();
-            store.AddPlayer(PlayerId, 10f, 1f, 100f, 1, 10);
-            store.PlayerDamageType[PlayerId] = DamageType.True;
-            int eid = store.AddEnemy(0f, 0.1f, 1f, 1000f, 1000f, 0f, 1, 1, "HighHolyResist",
-                holyResist: 0.99f);
-            var renderer = new MockRenderer();
-            var cfg = new GameConfig();
-            var sys = new PlayerTowerAttackSystem(store, renderer, PlayerId, cfg);
-            sys.SetTurn(0);
-            float pre = store.EnemyHealth[eid];
-            sys.Update();
-            Assert.Equal(100f, pre - store.EnemyHealth[eid], 1);  // full 100 dmg
-        }
-
-        [Fact]
-        public void PlayerTowerAttack_PhysicalDamage_UnaffectedByHolyResist()
-        {
-            // Physical damage doesn't consult EnemyHolyResist.
-            var store = NewStore();
-            store.AddPlayer(PlayerId, 10f, 1f, 100f, 1, 10);
-            store.PlayerDamageType[PlayerId] = DamageType.Physical;
-            int eid = store.AddEnemy(0f, 0.1f, 1f, 1000f, 1000f, 0f, 1, 1, "Test",
-                holyResist: 0.99f);  // would block 99% of Holy, but Physical ignores it
-            var renderer = new MockRenderer();
-            var cfg = new GameConfig();
-            var sys = new PlayerTowerAttackSystem(store, renderer, PlayerId, cfg);
-            sys.SetTurn(0);
-            float pre = store.EnemyHealth[eid];
-            sys.Update();
-            // Physical uses armor formula; with armor=0, full 100 dmg applied.
-            Assert.Equal(100f, pre - store.EnemyHealth[eid], 1);
-        }
-
-        [Fact]
-        public void PlayerTowerAttack_FireDamage_UnaffectedByHolyResist()
-        {
-            // Fire damage only consults EnemyFireResist, not HolyResist.
-            var store = NewStore();
-            store.AddPlayer(PlayerId, 10f, 1f, 100f, 1, 10);
-            store.PlayerDamageType[PlayerId] = DamageType.Fire;
-            int eid = store.AddEnemy(0f, 0.1f, 1f, 1000f, 1000f, 0f, 1, 1, "Test",
-                holyResist: 0.99f, fireResist: 0f);
-            var renderer = new MockRenderer();
-            var cfg = new GameConfig();
-            var sys = new PlayerTowerAttackSystem(store, renderer, PlayerId, cfg);
-            sys.SetTurn(0);
-            float pre = store.EnemyHealth[eid];
-            sys.Update();
-            Assert.Equal(100f, pre - store.EnemyHealth[eid], 1);
-        }
-
-        [Fact]
-        public void PlayerTowerAttack_HolyImmunity_BlocksAllHolyDamage()
-        {
-            // EnemyDamageImmunityMask with Holy bit → 0 damage (binary immunity wins over fractional).
-            var store = NewStore();
-            store.AddPlayer(PlayerId, 10f, 1f, 100f, 1, 10);
-            store.PlayerDamageType[PlayerId] = DamageType.Holy;
-            int eid = store.AddEnemy(0f, 0.1f, 1f, 1000f, 1000f, 0f, 1, 1, "HolyBoss");
-            store.SetDamageImmunityMask(eid, (int)DamageType.Holy);
-            store.EnemyHolyResist[eid] = 0.3f;  // would reduce by 30%, but immunity wins
-            var renderer = new MockRenderer();
-            var cfg = new GameConfig();
-            var sys = new PlayerTowerAttackSystem(store, renderer, PlayerId, cfg);
-            sys.SetTurn(0);
-            float pre = store.EnemyHealth[eid];
-            sys.Update();
-            Assert.Equal(1000f, store.EnemyHealth[eid]);  // no damage
+            // 期望伤害 = 显式注入的 attackDamage × 契约分数，不硬编码 100。
+            float expectedDamage = InjectedAttackDamage * expectedFraction;
+            Assert.Equal(pre - expectedDamage, Store.EnemyHealth[eid], 1);
         }
 
         // ══════════════════════════════════════════════════════════════

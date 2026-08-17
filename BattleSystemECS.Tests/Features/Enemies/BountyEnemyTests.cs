@@ -14,54 +14,52 @@ namespace BattleSystemECS.Tests.Features.Enemies
     /// 4. DestroyEntity reset prevents leakage across slot reuse
     /// 5. Killing a Bounty enemy actually multiplies gold via ResolveEnemiesKilledThisFrame
     /// </summary>
-    public class BountyEnemyTests
+    public class BountyEnemyTests : BattleTestBase
     {
-        private ComponentStore CreateStore()
-        {
-            return new ComponentStore();
-        }
-
         [Fact]
         public void DefaultEnemy_BountyFields_AreInert()
         {
-            var store = CreateStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
             // Both bounty fields should be in inert defaults — hot path fast-returns
-            Assert.False(store.EnemyIsBounty[eid]);
-            Assert.Equal(1f, store.EnemyBountyGoldMult[eid]);
+            Assert.False(Store.EnemyIsBounty[eid]);
+            Assert.Equal(1f, Store.EnemyBountyGoldMult[eid]);
         }
 
         [Fact]
         public void SetEnemyBounty_ConfiguresFields()
         {
-            var store = CreateStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
-            store.SetEnemyBounty(eid, goldMult: 5.0f);
-            Assert.True(store.EnemyIsBounty[eid]);
-            Assert.Equal(5.0f, store.EnemyBountyGoldMult[eid]);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            Store.SetEnemyBounty(eid, goldMult: 5.0f);
+            Assert.True(Store.EnemyIsBounty[eid]);
+            Assert.Equal(5.0f, Store.EnemyBountyGoldMult[eid]);
         }
 
         [Fact]
         public void SetEnemyBounty_ClampsGoldMult_ToValidRange()
         {
-            var store = CreateStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
             // Clamp upper bound: 50.0f should clamp to 20.0f (no game-breaking economy)
-            store.SetEnemyBounty(eid, 50.0f);
-            Assert.Equal(20.0f, store.EnemyBountyGoldMult[eid]);
+            Store.SetEnemyBounty(eid, 50.0f);
+            Assert.Equal(20.0f, Store.EnemyBountyGoldMult[eid]);
             // Clamp lower bound: -3.0f should clamp to 1.0f (no reduced reward)
-            store.SetEnemyBounty(eid, -3.0f);
-            Assert.Equal(1.0f, store.EnemyBountyGoldMult[eid]);
+            Store.SetEnemyBounty(eid, -3.0f);
+            Assert.Equal(1.0f, Store.EnemyBountyGoldMult[eid]);
         }
 
         [Fact]
         public void SetEnemyBounty_InvalidEntity_NoOp()
         {
-            var store = CreateStore();
-            // Negative entity id is invalid → silent no-op (no throw)
-            store.SetEnemyBounty(-1, 5.0f);
-            // Out-of-range entity id is invalid → silent no-op
-            store.SetEnemyBounty(99999, 5.0f);
+            // 先写入合法实体的已知值作为对照，再用无效 id 调用并断言合法槽位不变。
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            Store.SetEnemyBounty(eid, 5.0f);
+            Assert.True(Store.EnemyIsBounty[eid]);
+            Assert.Equal(5.0f, Store.EnemyBountyGoldMult[eid]);
+
+            Store.SetEnemyBounty(-1, 7.0f);
+            Store.SetEnemyBounty(99999, 7.0f);
+
+            Assert.True(Store.EnemyIsBounty[eid]);
+            Assert.Equal(5.0f, Store.EnemyBountyGoldMult[eid]);
         }
 
         [Fact]
@@ -71,15 +69,14 @@ namespace BattleSystemECS.Tests.Features.Enemies
             // the bounty state must NOT leak from the prior slot occupant. A
             // freshly-spawned enemy must start as a normal enemy, never inherit
             // a 5× gold multiplier from a prior slot occupant.
-            var store = CreateStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
-            store.SetEnemyBounty(eid, 5.0f);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            Store.SetEnemyBounty(eid, 5.0f);
             // Now recycle: destroy then re-add at same id (ComponentStore reuses ids)
-            store.DestroyEntity(eid);
-            int newEid = store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            Store.DestroyEntity(eid);
+            int newEid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
             // Slot must be reset to inert defaults — NOT carry over old bounty state
-            Assert.False(store.EnemyIsBounty[newEid]);
-            Assert.Equal(1f, store.EnemyBountyGoldMult[newEid]);
+            Assert.False(Store.EnemyIsBounty[newEid]);
+            Assert.Equal(1f, Store.EnemyBountyGoldMult[newEid]);
         }
 
         [Fact]
@@ -87,21 +84,20 @@ namespace BattleSystemECS.Tests.Features.Enemies
         {
             // End-to-end: a Bounty enemy with 10 base gold and 5× mult should award
             // 50 gold (10 × 1.0 _goldKillMultiplier × 1.0 _allIncomeMultKill × 5.0 bounty)
-            var store = CreateStore();
-            store.SetPlayerGold(0, 0f);
+            Store.SetPlayerGold(0, 0f);
 
-            int bountyEid = store.AddEnemy(5f, 5f, 1f, 10f, 10f, 0f, 10, 99);
-            store.SetEnemyBounty(bountyEid, 5.0f);
-            store.EnemyActive[bountyEid] = true;
-            store.AddActiveEnemyId(bountyEid);
+            int bountyEid = Store.AddEnemy(5f, 5f, 1f, 10f, 10f, 0f, 10, 99);
+            Store.SetEnemyBounty(bountyEid, 5.0f);
+            Store.EnemyActive[bountyEid] = true;
+            Store.AddActiveEnemyId(bountyEid);
 
             // Kill the bounty enemy (resolve-on-death uses the death queue, not the HP check)
-            store.SetEnemyHealth(bountyEid, 0f);
-            store.QueueEnemyDeath(bountyEid, 0);
-            store.ResolveEnemiesKilledThisFrame();
+            Store.SetEnemyHealth(bountyEid, 0f);
+            Store.QueueEnemyDeath(bountyEid, 0);
+            Store.ResolveEnemiesKilledThisFrame();
 
             // Gold should be 50 (10 base × 5 bounty mult, no other multipliers active)
-            Assert.Equal(50f, store.GetPlayerGold(0), 0.001f);
+            Assert.Equal(50f, Store.GetPlayerGold(0), 0.001f);
         }
 
         [Fact]
@@ -109,19 +105,18 @@ namespace BattleSystemECS.Tests.Features.Enemies
         {
             // Sanity check: a non-bounty enemy with 10 base gold awards exactly 10
             // (no bounty multiplier applied).
-            var store = CreateStore();
-            store.SetPlayerGold(0, 0f);
+            Store.SetPlayerGold(0, 0f);
 
-            int eid = store.AddEnemy(5f, 5f, 1f, 10f, 10f, 0f, 10, 99);
-            store.EnemyActive[eid] = true;
-            store.AddActiveEnemyId(eid);
-            Assert.False(store.EnemyIsBounty[eid]);
+            int eid = Store.AddEnemy(5f, 5f, 1f, 10f, 10f, 0f, 10, 99);
+            Store.EnemyActive[eid] = true;
+            Store.AddActiveEnemyId(eid);
+            Assert.False(Store.EnemyIsBounty[eid]);
 
-            store.SetEnemyHealth(eid, 0f);
-            store.QueueEnemyDeath(eid, 0);
-            store.ResolveEnemiesKilledThisFrame();
+            Store.SetEnemyHealth(eid, 0f);
+            Store.QueueEnemyDeath(eid, 0);
+            Store.ResolveEnemiesKilledThisFrame();
 
-            Assert.Equal(10f, store.GetPlayerGold(0), 0.001f);
+            Assert.Equal(10f, Store.GetPlayerGold(0), 0.001f);
         }
     }
 }

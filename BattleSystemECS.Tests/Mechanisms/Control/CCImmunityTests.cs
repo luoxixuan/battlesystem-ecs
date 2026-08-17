@@ -258,8 +258,16 @@ namespace BattleSystemECS.Tests.Mechanisms.Control
         public void Mask_BossDefault_EqualsMask_AllCC()
         {
             Assert.Equal(CCImmunityConfig.Mask_AllCC, CCImmunityConfig.Mask_BossDefault);
-            // Round 124 — added Mask_Disarm = 1<<6, so 6 bits → 0x3F (63) became 7 bits → 0x7F (127)
-            Assert.Equal(0x7F, CCImmunityConfig.Mask_AllCC);
+            // 期望值由各基础位现场 OR 推导，不钉 0x7F 字面量。
+            int expectedAll =
+                CCImmunityConfig.Mask_Slow |
+                CCImmunityConfig.Mask_Stun |
+                CCImmunityConfig.Mask_Freeze |
+                CCImmunityConfig.Mask_Knockback |
+                CCImmunityConfig.Mask_Polymorph |
+                CCImmunityConfig.Mask_Stagger |
+                CCImmunityConfig.Mask_Disarm;
+            Assert.Equal(CCImmunityConfig.Mask_AllCC, expectedAll);
         }
 
         // ─── Mask bits are unique (no overlap) ─────────────────────────────
@@ -274,6 +282,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Control
                 CCImmunityConfig.Mask_Knockback,
                 CCImmunityConfig.Mask_Polymorph,
                 CCImmunityConfig.Mask_Stagger,
+                CCImmunityConfig.Mask_Disarm,
             };
             for (int i = 0; i < bits.Length; i++)
             for (int j = i + 1; j < bits.Length; j++)

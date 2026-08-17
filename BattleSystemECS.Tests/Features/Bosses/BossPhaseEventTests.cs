@@ -18,17 +18,24 @@ namespace BattleSystemECS.Tests.Features.Bosses
     ///     OldPhase / NewPhase / HealthFraction / Turn)
     ///   - EnemyAISystem.PhaseChangeDrainCount / PhaseChangePublishCount default to 0
     ///   - DrainPhaseChangeEvents publishes each event to the EventBus
-    ///   - BossTypeName is resolved from store.EnemyTypeName[] during the serial drain
+    ///   - BossTypeName is resolved from Store.EnemyTypeName[] during the serial drain
     ///   - Empty/missing BossTypeName is normalized to null in the payload
     ///   - Multiple events are delivered in order via TryTake (drain empties the bag)
     ///   - Subscribers receive the event with the same payload object identity
     ///   - No exception on empty bag (defensive — production code can call drain
     ///     multiple times per frame without ill effects)
     /// </summary>
-    public class BossPhaseEventTests
+    public class BossPhaseEventTests : BattleTestBase
     {
         private const int PlayerId = 0;
         private const float DeltaTime = 1f / 60f;
+
+        /// <summary>文件内共享构造：基于基类 Store/Config 创建 EnemyAISystem（含 EnemyAbilitySystem）。</summary>
+        private EnemyAISystem CreateAi(EventBus? bus = null)
+        {
+            var ability = new EnemyAbilitySystem(Store, Renderer, PlayerId, Config);
+            return new EnemyAISystem(Store, Renderer, PlayerId, Config, ability, eventBus: bus);
+        }
 
         // ── GameEvents constant & DTO ─────────────────────────────────────
 
@@ -84,11 +91,7 @@ namespace BattleSystemECS.Tests.Features.Bosses
         [Fact]
         public void EnemyAISystem_PhaseChangeDrainCount_DefaultsToZero()
         {
-            var store = new ComponentStore();
-            var config = new GameConfig();
-            var renderer = new MockRenderer();
-            var enemyAbility = new EnemyAbilitySystem(store, renderer, PlayerId, config);
-            var ai = new EnemyAISystem(store, renderer, PlayerId, config, enemyAbility);
+            var ai = CreateAi();
             Assert.Equal(0, ai.PhaseChangeDrainCount);
             Assert.Equal(0, ai.PhaseChangePublishCount);
         }
@@ -96,13 +99,7 @@ namespace BattleSystemECS.Tests.Features.Bosses
         [Fact]
         public void EnemyAISystem_PhaseChangeBag_Empty_NoException()
         {
-            // Drain with no events pushed must not throw. The serial-drain helper
-            // uses TryTake in a tight loop; empty bag exits immediately.
-            var store = new ComponentStore();
-            var config = new GameConfig();
-            var renderer = new MockRenderer();
-            var enemyAbility = new EnemyAbilitySystem(store, renderer, PlayerId, config);
-            var ai = new EnemyAISystem(store, renderer, PlayerId, config, enemyAbility);
+            var ai = CreateAi();
             InvokeDrainPhaseChangeEvents(ai);
             Assert.Equal(0, ai.PhaseChangeDrainCount);
             Assert.Equal(0, ai.PhaseChangePublishCount);
@@ -115,13 +112,9 @@ namespace BattleSystemECS.Tests.Features.Bosses
         {
             // Build a bus, subscribe a handler, push 1 event into the bag, invoke
             // drain → handler must receive exactly 1 event with matching payload.
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "Dragon");
-            var config = new GameConfig();
-            var renderer = new MockRenderer();
-            var enemyAbility = new EnemyAbilitySystem(store, renderer, PlayerId, config);
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Damage = 5f; e.Name = "Dragon"; });
             var bus = new EventBus();
-            var ai = new EnemyAISystem(store, renderer, PlayerId, config, enemyAbility, eventBus: bus);
+            var ai = CreateAi(bus);
 
             var received = new List<BossPhaseChangedEvent>();
             bus.BossPhaseChanged.Subscribe(received.Add);
@@ -154,18 +147,14 @@ namespace BattleSystemECS.Tests.Features.Bosses
         [Fact]
         public void DrainPhaseChangeEvents_ResolvesBossTypeName()
         {
-            // The drain must fill BossTypeName from store.EnemyTypeName[] BEFORE
+            // The drain must fill BossTypeName from Store.EnemyTypeName[] BEFORE
             // publishing — subscribers expect a non-null name when the boss has one.
-            var store = new ComponentStore();
             // AddEnemy truncates the type name at the first 'L' (legacy naming
             // convention from the AddEnemy implementation — see ComponentStore_Enemy.cs
             // line ~1143). So we pick a name that survives the truncation intact.
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "Dragon");
-            var config = new GameConfig();
-            var renderer = new MockRenderer();
-            var enemyAbility = new EnemyAbilitySystem(store, renderer, PlayerId, config);
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Damage = 5f; e.Name = "Dragon"; });
             var bus = new EventBus();
-            var ai = new EnemyAISystem(store, renderer, PlayerId, config, enemyAbility, eventBus: bus);
+            var ai = CreateAi(bus);
 
             BossPhaseChangedEvent? captured = null;
             bus.BossPhaseChanged.Subscribe(ev => captured = ev);
@@ -190,13 +179,9 @@ namespace BattleSystemECS.Tests.Features.Bosses
             // If the boss has no type name (test fixture edge case), the payload's
             // BossTypeName must be null, not empty string. Subscribers may do
             // `name ?? "Unknown"` and rely on the null sentinel.
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, ""); // empty name
-            var config = new GameConfig();
-            var renderer = new MockRenderer();
-            var enemyAbility = new EnemyAbilitySystem(store, renderer, PlayerId, config);
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Damage = 5f; e.Name = ""; }); // empty name
             var bus = new EventBus();
-            var ai = new EnemyAISystem(store, renderer, PlayerId, config, enemyAbility, eventBus: bus);
+            var ai = CreateAi(bus);
 
             BossPhaseChangedEvent? captured = null;
             bus.BossPhaseChanged.Subscribe(ev => captured = ev);
@@ -219,15 +204,11 @@ namespace BattleSystemECS.Tests.Features.Bosses
             // Push 3 events → drain should publish all 3 in a single call. TryTake
             // is non-deterministic on order (ConcurrentBag), so we assert SET membership
             // rather than order — the contract is "all events delivered", not FIFO.
-            var store = new ComponentStore();
-            int boss1 = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "Boss1");
-            int boss2 = store.AddEnemy(0, 0, 2f, 200f, 200f, 5f, 10, 1, "Boss2");
-            int boss3 = store.AddEnemy(0, 0, 3f, 300f, 300f, 5f, 10, 1, "Boss3");
-            var config = new GameConfig();
-            var renderer = new MockRenderer();
-            var enemyAbility = new EnemyAbilitySystem(store, renderer, PlayerId, config);
+            int boss1 = Enemy(e => { e.MoveSpeed = 1f; e.Damage = 5f; e.Name = "Boss1"; });
+            int boss2 = Enemy(e => { e.MoveSpeed = 2f; e.MaxHealth = 200f; e.Health = 200f; e.Damage = 5f; e.Name = "Boss2"; });
+            int boss3 = Enemy(e => { e.MoveSpeed = 3f; e.MaxHealth = 300f; e.Health = 300f; e.Damage = 5f; e.Name = "Boss3"; });
             var bus = new EventBus();
-            var ai = new EnemyAISystem(store, renderer, PlayerId, config, enemyAbility, eventBus: bus);
+            var ai = CreateAi(bus);
 
             var ids = new List<int>();
             bus.BossPhaseChanged.Subscribe(ev => ids.Add(ev.EnemyId));
@@ -251,13 +232,9 @@ namespace BattleSystemECS.Tests.Features.Bosses
         {
             // Calling drain twice in a row on the same bag must not re-publish
             // events (the first drain emptied the bag). Verifies no accumulation.
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "Boss");
-            var config = new GameConfig();
-            var renderer = new MockRenderer();
-            var enemyAbility = new EnemyAbilitySystem(store, renderer, PlayerId, config);
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Damage = 5f; e.Name = "Boss"; });
             var bus = new EventBus();
-            var ai = new EnemyAISystem(store, renderer, PlayerId, config, enemyAbility, eventBus: bus);
+            var ai = CreateAi(bus);
 
             int receivedCount = 0;
             bus.BossPhaseChanged.Subscribe(_ => receivedCount++);
@@ -321,7 +298,7 @@ namespace BattleSystemECS.Tests.Features.Bosses
             // happens from EnemyAISystem.Update()'s parallel/sequential paths; for
             // unit tests we bypass the AI loop and test the drain contract directly.
             var field = typeof(EnemyAISystem).GetField(
-                "_phaseChangeEvents",
+                "_phaseChangeEvents", // 私有字段 nameof 类外不可用，保留字符串（反射点）
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.NotNull(field); // field must exist
             var bag = (ConcurrentBag<BossPhaseChangedEvent>)field.GetValue(ai)!;
@@ -334,7 +311,7 @@ namespace BattleSystemECS.Tests.Features.Bosses
             // to test the serial-drain contract without running the full Update()
             // (which would require a full GameConfig + WaveSpawningSystem setup).
             var method = typeof(EnemyAISystem).GetMethod(
-                "DrainPhaseChangeEvents",
+                "DrainPhaseChangeEvents", // 私有方法 nameof 类外不可用，保留字符串（反射点）
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.NotNull(method); // method must exist
             method.Invoke(ai, null);

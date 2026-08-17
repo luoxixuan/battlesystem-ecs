@@ -12,76 +12,75 @@ namespace BattleSystemECS.Tests.Features.Enemies
     /// 3. interval clamps to [0.1, 30.0], phaseDuration clamps to [0.1, 10.0]
     /// 4. DestroyEntity reset prevents leakage across slot reuse
     /// </summary>
-    public class PhaserEnemyTests
+    public class PhaserEnemyTests : BattleTestBase
     {
-        private ComponentStore CreateStore()
-        {
-            return new ComponentStore();
-        }
-
         [Fact]
         public void DefaultEnemy_PhaserFields_AreInert()
         {
-            var store = CreateStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
             // All 6 phaser fields should be in inert defaults — hot path fast-returns
-            Assert.False(store.EnemyIsPhaser[eid]);
-            Assert.Equal(0f, store.EnemyPhaserInterval[eid]);
-            Assert.Equal(0f, store.EnemyPhaserDurationLeft[eid]);
-            Assert.False(store.EnemyPhaserPhaseActive[eid]);
-            Assert.Equal(0f, store.EnemyPhaserCycleTimer[eid]);
-            Assert.Equal(0f, store.EnemyPhaserPhaseDuration[eid]);
+            Assert.False(Store.EnemyIsPhaser[eid]);
+            Assert.Equal(0f, Store.EnemyPhaserInterval[eid]);
+            Assert.Equal(0f, Store.EnemyPhaserDurationLeft[eid]);
+            Assert.False(Store.EnemyPhaserPhaseActive[eid]);
+            Assert.Equal(0f, Store.EnemyPhaserCycleTimer[eid]);
+            Assert.Equal(0f, Store.EnemyPhaserPhaseDuration[eid]);
         }
 
         [Fact]
         public void SetEnemyPhaser_ConfiguresFields()
         {
-            var store = CreateStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
-            store.SetEnemyPhaser(eid, interval: 4.0f, phaseDuration: 1.5f);
-            Assert.True(store.EnemyIsPhaser[eid]);
-            Assert.Equal(4.0f, store.EnemyPhaserInterval[eid]);
-            Assert.Equal(1.5f, store.EnemyPhaserPhaseDuration[eid]);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            Store.SetEnemyPhaser(eid, interval: 4.0f, phaseDuration: 1.5f);
+            Assert.True(Store.EnemyIsPhaser[eid]);
+            Assert.Equal(4.0f, Store.EnemyPhaserInterval[eid]);
+            Assert.Equal(1.5f, Store.EnemyPhaserPhaseDuration[eid]);
             // Starts in the "vulnerable gap": phase inactive, cycle timer at 0
-            Assert.False(store.EnemyPhaserPhaseActive[eid]);
-            Assert.Equal(0f, store.EnemyPhaserDurationLeft[eid]);
-            Assert.Equal(0f, store.EnemyPhaserCycleTimer[eid]);
+            Assert.False(Store.EnemyPhaserPhaseActive[eid]);
+            Assert.Equal(0f, Store.EnemyPhaserDurationLeft[eid]);
+            Assert.Equal(0f, Store.EnemyPhaserCycleTimer[eid]);
         }
 
         [Fact]
         public void SetEnemyPhaser_ClampsInterval_ToValidRange()
         {
-            var store = CreateStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
             // Clamp upper bound: 60.0f should clamp to 30.0f
-            store.SetEnemyPhaser(eid, 60f, 1.5f);
-            Assert.Equal(30.0f, store.EnemyPhaserInterval[eid]);
+            Store.SetEnemyPhaser(eid, 60f, 1.5f);
+            Assert.Equal(30.0f, Store.EnemyPhaserInterval[eid]);
             // Clamp lower bound: 0.01f should clamp to 0.1f
-            store.SetEnemyPhaser(eid, 0.01f, 1.5f);
-            Assert.Equal(0.1f, store.EnemyPhaserInterval[eid]);
+            Store.SetEnemyPhaser(eid, 0.01f, 1.5f);
+            Assert.Equal(0.1f, Store.EnemyPhaserInterval[eid]);
         }
 
         [Fact]
         public void SetEnemyPhaser_ClampsPhaseDuration_ToValidRange()
         {
-            var store = CreateStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
             // Clamp upper bound: 30.0f should clamp to 10.0f
-            store.SetEnemyPhaser(eid, 4f, 30f);
-            Assert.Equal(10.0f, store.EnemyPhaserPhaseDuration[eid]);
+            Store.SetEnemyPhaser(eid, 4f, 30f);
+            Assert.Equal(10.0f, Store.EnemyPhaserPhaseDuration[eid]);
             // Clamp lower bound: 0.01f should clamp to 0.1f
-            store.SetEnemyPhaser(eid, 4f, 0.01f);
-            Assert.Equal(0.1f, store.EnemyPhaserPhaseDuration[eid]);
+            Store.SetEnemyPhaser(eid, 4f, 0.01f);
+            Assert.Equal(0.1f, Store.EnemyPhaserPhaseDuration[eid]);
         }
 
         [Fact]
         public void SetEnemyPhaser_InvalidEntity_NoOp()
         {
-            var store = CreateStore();
-            // Negative entity id is invalid → silent no-op (no throw)
-            store.SetEnemyPhaser(-1, 4f, 1.5f);
-            // Out-of-range entity id is invalid → silent no-op
-            store.SetEnemyPhaser(99999, 4f, 1.5f);
+            // 先写入合法实体的已知值作为对照，再用无效 id 调用并断言合法槽位不变。
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            Store.SetEnemyPhaser(eid, 4f, 1.5f);
+            Assert.True(Store.EnemyIsPhaser[eid]);
+            Assert.Equal(4f, Store.EnemyPhaserInterval[eid]);
+            Assert.Equal(1.5f, Store.EnemyPhaserPhaseDuration[eid]);
+
+            Store.SetEnemyPhaser(-1, 9f, 8f);
+            Store.SetEnemyPhaser(99999, 9f, 8f);
+
+            Assert.True(Store.EnemyIsPhaser[eid]);
+            Assert.Equal(4f, Store.EnemyPhaserInterval[eid]);
+            Assert.Equal(1.5f, Store.EnemyPhaserPhaseDuration[eid]);
         }
 
         [Fact]
@@ -92,23 +91,22 @@ namespace BattleSystemECS.Tests.Features.Enemies
             // freshly-spawned enemy must start in the vulnerable gap, never inherit
             // an active phase window or advanced cycle timer from the prior slot
             // occupant.
-            var store = CreateStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
-            store.SetEnemyPhaser(eid, 4f, 1.5f);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            Store.SetEnemyPhaser(eid, 4f, 1.5f);
             // Simulate "in middle of phase window"
-            store.EnemyPhaserPhaseActive[eid] = true;
-            store.EnemyPhaserDurationLeft[eid] = 1.0f;
-            store.EnemyPhaserCycleTimer[eid] = 2.5f;
+            Store.EnemyPhaserPhaseActive[eid] = true;
+            Store.EnemyPhaserDurationLeft[eid] = 1.0f;
+            Store.EnemyPhaserCycleTimer[eid] = 2.5f;
             // Now recycle: destroy then re-add at same id (ComponentStore reuses ids)
-            store.DestroyEntity(eid);
-            int newEid = store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            Store.DestroyEntity(eid);
+            int newEid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
             // Slot must be reset to inert defaults — NOT carry over old phaser state
-            Assert.False(store.EnemyIsPhaser[newEid]);
-            Assert.Equal(0f, store.EnemyPhaserInterval[newEid]);
-            Assert.Equal(0f, store.EnemyPhaserDurationLeft[newEid]);
-            Assert.False(store.EnemyPhaserPhaseActive[newEid]);
-            Assert.Equal(0f, store.EnemyPhaserCycleTimer[newEid]);
-            Assert.Equal(0f, store.EnemyPhaserPhaseDuration[newEid]);
+            Assert.False(Store.EnemyIsPhaser[newEid]);
+            Assert.Equal(0f, Store.EnemyPhaserInterval[newEid]);
+            Assert.Equal(0f, Store.EnemyPhaserDurationLeft[newEid]);
+            Assert.False(Store.EnemyPhaserPhaseActive[newEid]);
+            Assert.Equal(0f, Store.EnemyPhaserCycleTimer[newEid]);
+            Assert.Equal(0f, Store.EnemyPhaserPhaseDuration[newEid]);
         }
 
         [Fact]
@@ -119,15 +117,14 @@ namespace BattleSystemECS.Tests.Features.Enemies
             // physical damage branches in TowerAttackSystem and PlayerTowerAttackSystem
             // must zero the damage. The flag is set/cleared exclusively by
             // FrameScheduler.TickPhaserCycle (not by callers).
-            var store = CreateStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
-            store.SetEnemyPhaser(eid, 4f, 1.5f);
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
+            Store.SetEnemyPhaser(eid, 4f, 1.5f);
             // Manually flip the phase flag to simulate "currently in phase"
-            store.EnemyPhaserPhaseActive[eid] = true;
-            Assert.True(store.EnemyPhaserPhaseActive[eid]);
+            Store.EnemyPhaserPhaseActive[eid] = true;
+            Assert.True(Store.EnemyPhaserPhaseActive[eid]);
             // Manually clear it
-            store.EnemyPhaserPhaseActive[eid] = false;
-            Assert.False(store.EnemyPhaserPhaseActive[eid]);
+            Store.EnemyPhaserPhaseActive[eid] = false;
+            Assert.False(Store.EnemyPhaserPhaseActive[eid]);
         }
     }
 }

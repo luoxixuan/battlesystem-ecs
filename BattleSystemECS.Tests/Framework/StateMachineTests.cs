@@ -1,4 +1,6 @@
+using System;
 using Xunit;
+using BattleSystemECS.Tests.Infrastructure;
 using BattleSystemECS.Core;
 
 namespace BattleSystemECS.Tests.Framework
@@ -6,95 +8,52 @@ namespace BattleSystemECS.Tests.Framework
     /// <summary>
     /// State machine transition and callback invariants.
     /// </summary>
-    public class StateMachineTests
+    public class StateMachineTests : BattleTestBase
     {
         // ══════════════════════════════════════════════════════════════
         //  Valid transitions
         // ══════════════════════════════════════════════════════════════
 
-        [Fact]
-        public void Init_To_BuildPhase_Valid()
+        // ── 合法 / 非法迁移矩阵：11 个原本几乎相同的 [Fact] 合并为单个 [Theory]，
+        //    每个 InlineData case 保留各自的合法/非法断言。 ──
+        [Theory(DisplayName = "IsValidTransition 合法/非法迁移矩阵")]
+        [InlineData(GameState.Init, GameState.BuildPhase, true)]
+        [InlineData(GameState.BuildPhase, GameState.WavePhase, true)]
+        [InlineData(GameState.WavePhase, GameState.Intermission, true)]
+        [InlineData(GameState.WavePhase, GameState.LevelComplete, true)]
+        [InlineData(GameState.Intermission, GameState.WavePhase, true)]
+        [InlineData(GameState.Intermission, GameState.BranchSelection, true)]
+        [InlineData(GameState.BranchSelection, GameState.WavePhase, true)]
+        [InlineData(GameState.LevelComplete, GameState.BuildPhase, true)]
+        [InlineData(GameState.BuildPhase, GameState.Intermission, false)]
+        [InlineData(GameState.Init, GameState.WavePhase, false)]
+        [InlineData(GameState.WavePhase, GameState.BuildPhase, false)]
+        public void IsValidTransition_Matrix(GameState from, GameState to, bool expected)
         {
-            Assert.True(StateMachine.IsValidTransition(GameState.Init, GameState.BuildPhase));
+            Assert.Equal(expected, StateMachine.IsValidTransition(from, to));
         }
 
-        [Fact]
-        public void BuildPhase_To_WavePhase_Valid()
-        {
-            Assert.True(StateMachine.IsValidTransition(GameState.BuildPhase, GameState.WavePhase));
-        }
-
-        [Fact]
-        public void WavePhase_To_Intermission_Valid()
-        {
-            Assert.True(StateMachine.IsValidTransition(GameState.WavePhase, GameState.Intermission));
-        }
-
-        [Fact]
-        public void WavePhase_To_LevelComplete_Valid()
-        {
-            Assert.True(StateMachine.IsValidTransition(GameState.WavePhase, GameState.LevelComplete));
-        }
-
-        [Fact]
-        public void Intermission_To_WavePhase_Valid()
-        {
-            Assert.True(StateMachine.IsValidTransition(GameState.Intermission, GameState.WavePhase));
-        }
-
-        [Fact]
-        public void Intermission_To_BranchSelection_Valid()
-        {
-            Assert.True(StateMachine.IsValidTransition(GameState.Intermission, GameState.BranchSelection));
-        }
-
-        [Fact]
-        public void BranchSelection_To_WavePhase_Valid()
-        {
-            Assert.True(StateMachine.IsValidTransition(GameState.BranchSelection, GameState.WavePhase));
-        }
-
-        [Fact]
-        public void LevelComplete_To_BuildPhase_Valid()
-        {
-            Assert.True(StateMachine.IsValidTransition(GameState.LevelComplete, GameState.BuildPhase));
-        }
-
-        [Fact]
+        // ── Any-state 迁移改为遍历全部 GameState，不再抽样 2-3 个状态。 ──
+        [Fact(DisplayName = "任意状态均可迁移到 GameOver")]
         public void AnyState_To_GameOver_Valid()
         {
-            Assert.True(StateMachine.IsValidTransition(GameState.BuildPhase, GameState.GameOver));
-            Assert.True(StateMachine.IsValidTransition(GameState.WavePhase, GameState.GameOver));
-            Assert.True(StateMachine.IsValidTransition(GameState.Init, GameState.GameOver));
+            foreach (GameState state in Enum.GetValues<GameState>())
+            {
+                Assert.True(
+                    StateMachine.IsValidTransition(state, GameState.GameOver),
+                    $"{state} -> {GameState.GameOver} 应为合法迁移");
+            }
         }
 
-        [Fact]
+        [Fact(DisplayName = "任意状态均可迁移到 Victory")]
         public void AnyState_To_Victory_Valid()
         {
-            Assert.True(StateMachine.IsValidTransition(GameState.WavePhase, GameState.Victory));
-            Assert.True(StateMachine.IsValidTransition(GameState.BuildPhase, GameState.Victory));
-        }
-
-        // ══════════════════════════════════════════════════════════════
-        //  Invalid transitions
-        // ══════════════════════════════════════════════════════════════
-
-        [Fact]
-        public void BuildPhase_To_Intermission_Invalid()
-        {
-            Assert.False(StateMachine.IsValidTransition(GameState.BuildPhase, GameState.Intermission));
-        }
-
-        [Fact]
-        public void Init_To_WavePhase_Invalid()
-        {
-            Assert.False(StateMachine.IsValidTransition(GameState.Init, GameState.WavePhase));
-        }
-
-        [Fact]
-        public void WavePhase_To_BuildPhase_Invalid()
-        {
-            Assert.False(StateMachine.IsValidTransition(GameState.WavePhase, GameState.BuildPhase));
+            foreach (GameState state in Enum.GetValues<GameState>())
+            {
+                Assert.True(
+                    StateMachine.IsValidTransition(state, GameState.Victory),
+                    $"{state} -> {GameState.Victory} 应为合法迁移");
+            }
         }
 
         // ══════════════════════════════════════════════════════════════

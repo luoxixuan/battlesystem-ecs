@@ -29,14 +29,14 @@ namespace BattleSystemECS.Tests.Features.Buffs
     ///   - ParseDoomClockInitialWaves reads a JSON array of {MonsterType, EnemyCount} entries
     ///   - LevelConfig has all 6 DoomClock fields with sensible defaults
     /// </summary>
-    public class DoomClockTests
+    public class DoomClockTests : BattleTestBase
     {
         private const int PlayerId = 0;
         private const float DeltaTime = 1f / 60f;
 
         // ── Helper: build a minimal store + objective + doom clock system ──
 
-        private static (ComponentStore store, ObjectiveSystem obj, DoomClockSystem dc) MakeSut(
+        private (ObjectiveSystem obj, DoomClockSystem dc) MakeSut(
             int objectiveType = (int)ObjectiveType.DoomClock,
             float doomClockDuration = 180f,
             int doomClockWaveScore = 100,
@@ -45,9 +45,8 @@ namespace BattleSystemECS.Tests.Features.Buffs
             float doomClockWaveScaling = 1.10f,
             int mapHeight = 20)
         {
-            var store = new ComponentStore();
-            var obj = new ObjectiveSystem(store, PlayerId);
-            var dc = new DoomClockSystem(store, PlayerId);
+            var obj = new ObjectiveSystem(Store, PlayerId);
+            var dc = new DoomClockSystem(Store, PlayerId);
             var level = new LevelConfig
             {
                 LevelNumber = 6,
@@ -60,7 +59,7 @@ namespace BattleSystemECS.Tests.Features.Buffs
                 DoomClockWaveScaling = doomClockWaveScaling
             };
             obj.InitializeFromLevel(level, mapHeight);
-            return (store, obj, dc);
+            return (obj, dc);
         }
 
         // ── Default state ──────────────────────────────────────────────
@@ -68,25 +67,25 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void DefaultState_AllDoomClockFieldsInert()
         {
-            var store = new ComponentStore();
-            Assert.False(store.DoomClockActive[0]);
-            Assert.Equal(0f, store.DoomClockTimer[0]);
-            Assert.Equal(0f, store.DoomClockDuration[0]);
-            Assert.Equal(0, store.DoomClockWavesCleared[0]);
-            Assert.Equal(0, store.DoomClockCycleCount[0]);
-            Assert.Equal(0, store.DoomClockFinalScore[0]);
+            Assert.False(Store.DoomClockActive[0]);
+            Assert.Equal(0f, Store.DoomClockTimer[0]);
+            Assert.Equal(0f, Store.DoomClockDuration[0]);
+            Assert.Equal(0, Store.DoomClockWavesCleared[0]);
+            Assert.Equal(0, Store.DoomClockCycleCount[0]);
+            Assert.Equal(0, Store.DoomClockFinalScore[0]);
         }
 
         [Fact]
         public void LevelConfig_ExposesExpectedDefaults()
         {
             var level = new LevelConfig();
-            // Sensible defaults for non-DoomClock levels
-            Assert.Equal(180f, level.DoomClockDuration);
-            Assert.Equal(100, level.DoomClockWaveScore);
-            Assert.Equal(10, level.DoomClockTimeBonusPerSec);
-            Assert.Equal(5, level.DoomClockHealthBonusPerPercent);
-            Assert.Equal(1.10f, level.DoomClockWaveScaling);
+            // 只断言相对不变量：默认时长必须 >0，分数/奖励因子非负，
+            // 波次缩放 ≥1（低于 1 会被 DoomClockSystem 视作 1），初始波次为空列表。
+            Assert.True(level.DoomClockDuration > 0f);
+            Assert.True(level.DoomClockWaveScore >= 0);
+            Assert.True(level.DoomClockTimeBonusPerSec >= 0);
+            Assert.True(level.DoomClockHealthBonusPerPercent >= 0);
+            Assert.True(level.DoomClockWaveScaling >= 1f);
             Assert.NotNull(level.DoomClockInitialWaves);
             Assert.Empty(level.DoomClockInitialWaves);
         }
@@ -96,30 +95,30 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void InitializeFromLevel_DoomClock_SeedsAllFields()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 120f);
-            Assert.True(store.DoomClockActive[0]);
-            Assert.Equal(120f, store.DoomClockTimer[0]);
-            Assert.Equal(120f, store.DoomClockDuration[0]);
-            Assert.Equal(0, store.DoomClockWavesCleared[0]);
-            Assert.Equal(0, store.DoomClockCycleCount[0]);
-            Assert.Equal(0, store.DoomClockFinalScore[0]);
+            var (obj, dc) = MakeSut(doomClockDuration: 120f);
+            Assert.True(Store.DoomClockActive[0]);
+            Assert.Equal(120f, Store.DoomClockTimer[0]);
+            Assert.Equal(120f, Store.DoomClockDuration[0]);
+            Assert.Equal(0, Store.DoomClockWavesCleared[0]);
+            Assert.Equal(0, Store.DoomClockCycleCount[0]);
+            Assert.Equal(0, Store.DoomClockFinalScore[0]);
         }
 
         [Fact]
         public void InitializeFromLevel_NonDoomClock_DisablesActive()
         {
-            var (store, obj, dc) = MakeSut(objectiveType: (int)ObjectiveType.KillAll);
-            Assert.False(store.DoomClockActive[0]);
-            Assert.Equal(0, store.DoomClockFinalScore[0]);
+            var (obj, dc) = MakeSut(objectiveType: (int)ObjectiveType.KillAll);
+            Assert.False(Store.DoomClockActive[0]);
+            Assert.Equal(0, Store.DoomClockFinalScore[0]);
         }
 
         [Fact]
         public void InitializeFromLevel_IdempotentResetsCounters()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 90f);
-            store.DoomClockWavesCleared[0] = 7;
-            store.DoomClockCycleCount[0] = 2;
-            store.DoomClockFinalScore[0] = 999;
+            var (obj, dc) = MakeSut(doomClockDuration: 90f);
+            Store.DoomClockWavesCleared[0] = 7;
+            Store.DoomClockCycleCount[0] = 2;
+            Store.DoomClockFinalScore[0] = 999;
 
             // Re-initialize with a new level
             var level = new LevelConfig
@@ -130,10 +129,10 @@ namespace BattleSystemECS.Tests.Features.Buffs
             };
             obj.InitializeFromLevel(level, 20);
 
-            Assert.Equal(0, store.DoomClockWavesCleared[0]);
-            Assert.Equal(0, store.DoomClockCycleCount[0]);
-            Assert.Equal(0, store.DoomClockFinalScore[0]);
-            Assert.Equal(60f, store.DoomClockTimer[0]);
+            Assert.Equal(0, Store.DoomClockWavesCleared[0]);
+            Assert.Equal(0, Store.DoomClockCycleCount[0]);
+            Assert.Equal(0, Store.DoomClockFinalScore[0]);
+            Assert.Equal(60f, Store.DoomClockTimer[0]);
         }
 
         // ── Update tick ────────────────────────────────────────────────
@@ -141,45 +140,39 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void Update_DecrementsTimerDuringWavePhase()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 10f);
+            var (obj, dc) = MakeSut(doomClockDuration: 10f);
             dc.Update(1.0f, GameState.WavePhase);
-            Assert.Equal(9f, store.DoomClockTimer[0]);
+            Assert.Equal(9f, Store.DoomClockTimer[0]);
         }
 
         [Fact]
         public void Update_StopsAtZero()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 0.5f);
+            var (obj, dc) = MakeSut(doomClockDuration: 0.5f);
             dc.Update(1.0f, GameState.WavePhase);
-            Assert.Equal(0f, store.DoomClockTimer[0]);
+            Assert.Equal(0f, Store.DoomClockTimer[0]);
             // Subsequent updates remain at 0
             dc.Update(1.0f, GameState.WavePhase);
-            Assert.Equal(0f, store.DoomClockTimer[0]);
+            Assert.Equal(0f, Store.DoomClockTimer[0]);
         }
 
         [Fact]
         public void Update_NoOpWhenInactive()
         {
-            var (store, obj, dc) = MakeSut(objectiveType: (int)ObjectiveType.KillAll);
+            var (obj, dc) = MakeSut(objectiveType: (int)ObjectiveType.KillAll);
             // DoomClock was never initialized to active — timer stays 0
             dc.Update(1.0f, GameState.WavePhase);
-            Assert.Equal(0f, store.DoomClockTimer[0]);
+            Assert.Equal(0f, Store.DoomClockTimer[0]);
         }
 
-        [Fact]
-        public void Update_NoOpDuringBuildPhase()
+        [Theory(DisplayName = "DoomClock Update 在非 WavePhase 不推进计时器")]
+        [InlineData(GameState.BuildPhase)]
+        [InlineData(GameState.Intermission)]
+        public void Update_NoOpOutsideWavePhase(GameState state)
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 10f);
-            dc.Update(1.0f, GameState.BuildPhase);
-            Assert.Equal(10f, store.DoomClockTimer[0]);
-        }
-
-        [Fact]
-        public void Update_NoOpDuringIntermission()
-        {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 10f);
-            dc.Update(1.0f, GameState.Intermission);
-            Assert.Equal(10f, store.DoomClockTimer[0]);
+            var (obj, dc) = MakeSut(doomClockDuration: 10f);
+            dc.Update(1.0f, state);
+            Assert.Equal(10f, Store.DoomClockTimer[0]);
         }
 
         // ── Wave slot / cycle ──────────────────────────────────────────
@@ -187,13 +180,13 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void GetCurrentWaveSlot_WrapsAndBumpsCycle()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
             int pool = 3;
             // wave index 0 → (0, 0)
             var (i0, c0) = dc.GetCurrentWaveSlot(0, pool);
             Assert.Equal(0, i0);
             Assert.Equal(0, c0);
-            Assert.Equal(0, store.DoomClockCycleCount[0]);
+            Assert.Equal(0, Store.DoomClockCycleCount[0]);
 
             // wave index 2 → (2, 0)
             var (i1, c1) = dc.GetCurrentWaveSlot(2, pool);
@@ -204,7 +197,7 @@ namespace BattleSystemECS.Tests.Features.Buffs
             var (i2, c2) = dc.GetCurrentWaveSlot(3, pool);
             Assert.Equal(0, i2);
             Assert.Equal(1, c2);
-            Assert.Equal(1, store.DoomClockCycleCount[0]);
+            Assert.Equal(1, Store.DoomClockCycleCount[0]);
 
             // wave index 7 → (1, 2)
             var (i3, c3) = dc.GetCurrentWaveSlot(7, pool);
@@ -215,7 +208,7 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void GetCurrentWaveSlot_EmptyPoolReturnsZero()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
             var (i, c) = dc.GetCurrentWaveSlot(5, 0);
             Assert.Equal(0, i);
             Assert.Equal(0, c);
@@ -224,27 +217,27 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void GetCycleScalingMultiplier_NoScalingAtCycleZero()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
-            store.DoomClockCycleCount[0] = 0;
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
+            Store.DoomClockCycleCount[0] = 0;
             Assert.Equal(1f, dc.GetCycleScalingMultiplier(1.10f));
         }
 
         [Fact]
         public void GetCycleScalingMultiplier_AppliesPow()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
-            store.DoomClockCycleCount[0] = 1;
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
+            Store.DoomClockCycleCount[0] = 1;
             Assert.Equal(1.10f, dc.GetCycleScalingMultiplier(1.10f), 3);
 
-            store.DoomClockCycleCount[0] = 2;
+            Store.DoomClockCycleCount[0] = 2;
             Assert.Equal(1.21f, dc.GetCycleScalingMultiplier(1.10f), 3);
         }
 
         [Fact]
         public void GetCycleScalingMultiplier_ScalingBelowOneIsTreatedAsOne()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
-            store.DoomClockCycleCount[0] = 5;
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
+            Store.DoomClockCycleCount[0] = 5;
             Assert.Equal(1f, dc.GetCycleScalingMultiplier(0.5f));
         }
 
@@ -253,14 +246,14 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void ComputeFinalScore_WavePlusTimePlusHealth()
         {
-            var (store, obj, dc) = MakeSut(
+            var (obj, dc) = MakeSut(
                 doomClockDuration: 100f,
                 doomClockWaveScore: 50,
                 doomClockTimeBonusPerSec: 4,
                 doomClockHealthBonusPerPercent: 2);
 
-            store.DoomClockWavesCleared[0] = 5;
-            store.DoomClockTimer[0] = 30f;     // remaining time
+            Store.DoomClockWavesCleared[0] = 5;
+            Store.DoomClockTimer[0] = 30f;     // remaining time
             // PlayerHealth: 50% → 50 * 2 = 100
             var level = new LevelConfig
             {
@@ -272,17 +265,17 @@ namespace BattleSystemECS.Tests.Features.Buffs
             int score = dc.ComputeFinalScore(level, 0.5f);
             // waveBonus = 5*50 = 250, timeBonus = 30*4 = 120, healthBonus = 50*2 = 100
             Assert.Equal(250 + 120 + 100, score);
-            Assert.Equal(score, store.DoomClockFinalScore[0]);
+            Assert.Equal(score, Store.DoomClockFinalScore[0]);
         }
 
         [Fact]
         public void ComputeFinalScore_ClampsHealthFraction()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 100f);
+            var (obj, dc) = MakeSut(doomClockDuration: 100f);
             var level = new LevelConfig { DoomClockDuration = 100f };
             // Zero the timer / waves so the only variable is the health fraction.
-            store.DoomClockTimer[0] = 0f;
-            store.DoomClockWavesCleared[0] = 0;
+            Store.DoomClockTimer[0] = 0f;
+            Store.DoomClockWavesCleared[0] = 0;
             // Negative fraction → clamped to 0 → 0 health bonus → total 0
             int scoreNeg = dc.ComputeFinalScore(level, -0.5f);
             Assert.Equal(0, scoreNeg);
@@ -294,31 +287,31 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void EndRun_WinComputesScore_LoseClears()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 100f);
-            store.DoomClockWavesCleared[0] = 3;
-            store.DoomClockTimer[0] = 50f;
+            var (obj, dc) = MakeSut(doomClockDuration: 100f);
+            Store.DoomClockWavesCleared[0] = 3;
+            Store.DoomClockTimer[0] = 50f;
             var level = new LevelConfig { DoomClockDuration = 100f };
 
             // First call: win
             dc.EndRun(true, level, 1.0f);
-            Assert.False(store.DoomClockActive[0]);
-            Assert.True(store.DoomClockFinalScore[0] > 0);
+            Assert.False(Store.DoomClockActive[0]);
+            Assert.True(Store.DoomClockFinalScore[0] > 0);
 
             // Second call is a no-op (already ended)
-            int prev = store.DoomClockFinalScore[0];
+            int prev = Store.DoomClockFinalScore[0];
             dc.EndRun(true, level, 0f);
-            Assert.Equal(prev, store.DoomClockFinalScore[0]);
+            Assert.Equal(prev, Store.DoomClockFinalScore[0]);
         }
 
         [Fact]
         public void EndRun_LoseDoesNotSetScore()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 100f);
-            store.DoomClockWavesCleared[0] = 3;
+            var (obj, dc) = MakeSut(doomClockDuration: 100f);
+            Store.DoomClockWavesCleared[0] = 3;
             var level = new LevelConfig { DoomClockDuration = 100f };
             dc.EndRun(false, level, 0.5f);
-            Assert.False(store.DoomClockActive[0]);
-            Assert.Equal(0, store.DoomClockFinalScore[0]);
+            Assert.False(Store.DoomClockActive[0]);
+            Assert.Equal(0, Store.DoomClockFinalScore[0]);
         }
 
         // ── Status string ──────────────────────────────────────────────
@@ -326,10 +319,10 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void GetStatus_RunningFormat()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
-            store.DoomClockTimer[0] = 45.6f;
-            store.DoomClockWavesCleared[0] = 3;
-            store.DoomClockCycleCount[0] = 1;
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
+            Store.DoomClockTimer[0] = 45.6f;
+            Store.DoomClockWavesCleared[0] = 3;
+            Store.DoomClockCycleCount[0] = 1;
             string s = dc.GetStatus();
             Assert.Contains("45.6", s);
             Assert.Contains("Waves: 3", s);
@@ -339,9 +332,9 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void GetStatus_EndedShowsFinalScore()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
-            store.DoomClockActive[0] = false;
-            store.DoomClockFinalScore[0] = 1234;
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
+            Store.DoomClockActive[0] = false;
+            Store.DoomClockFinalScore[0] = 1234;
             string s = dc.GetStatus();
             Assert.Contains("1234", s);
         }
@@ -349,9 +342,9 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void GetStatus_EndedWithoutScore()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
-            store.DoomClockActive[0] = false;
-            store.DoomClockFinalScore[0] = 0;
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
+            Store.DoomClockActive[0] = false;
+            Store.DoomClockFinalScore[0] = 0;
             string s = dc.GetStatus();
             Assert.Contains("ended", s);
         }
@@ -361,7 +354,7 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void CheckObjective_DoomClock_Ongoing_WhenTimerPositive()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
             // No enemies, but timer still ticking
             int r = obj.CheckObjective(activeEnemyCount: 0, currentWave: 1, totalWaves: 1);
             Assert.Equal(0, r);
@@ -370,8 +363,8 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void CheckObjective_DoomClock_Ongoing_WhenEnemiesAlive()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
-            store.DoomClockTimer[0] = 0f;     // expired
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
+            Store.DoomClockTimer[0] = 0f;     // expired
             int r = obj.CheckObjective(activeEnemyCount: 5, currentWave: 1, totalWaves: 1);
             Assert.Equal(0, r);
         }
@@ -379,22 +372,22 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void CheckObjective_DoomClock_Win_WhenTimerZeroAndNoEnemies()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
-            store.DoomClockTimer[0] = 0f;
-            store.DoomClockWavesCleared[0] = 2;
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
+            Store.DoomClockTimer[0] = 0f;
+            Store.DoomClockWavesCleared[0] = 2;
             int r = obj.CheckObjective(activeEnemyCount: 0, currentWave: 1, totalWaves: 1);
             Assert.Equal(1, r);
-            Assert.False(store.DoomClockActive[0]);
+            Assert.False(Store.DoomClockActive[0]);
             // FinalScore should be computed:
             // waveBonus=2*100=200, timeBonus=0*10=0, healthBonus=0*5=0 → 200
-            Assert.Equal(200, store.DoomClockFinalScore[0]);
+            Assert.Equal(200, Store.DoomClockFinalScore[0]);
         }
 
         [Fact]
         public void CheckObjective_DoomClock_AfterEnd_IsOngoing()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
-            store.DoomClockActive[0] = false;  // run already ended
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
+            Store.DoomClockActive[0] = false;  // run already ended
             int r = obj.CheckObjective(activeEnemyCount: 0, currentWave: 1, totalWaves: 1);
             Assert.Equal(0, r);
         }
@@ -403,7 +396,7 @@ namespace BattleSystemECS.Tests.Features.Buffs
         public void CheckObjective_KillAll_UnchangedBehavior()
         {
             // Sanity: non-DoomClock objectives still work as before.
-            var (store, obj, dc) = MakeSut(objectiveType: (int)ObjectiveType.KillAll);
+            var (obj, dc) = MakeSut(objectiveType: (int)ObjectiveType.KillAll);
             int r1 = obj.CheckObjective(activeEnemyCount: 5, currentWave: 1, totalWaves: 1);
             Assert.Equal(0, r1);
             int r2 = obj.CheckObjective(activeEnemyCount: 0, currentWave: 2, totalWaves: 1);
@@ -415,19 +408,19 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void OnWaveCompleted_DoomClock_IncrementsCleared()
         {
-            var (store, obj, dc) = MakeSut(doomClockDuration: 60f);
+            var (obj, dc) = MakeSut(doomClockDuration: 60f);
             obj.OnWaveCompleted(wavesRemaining: 5);
-            Assert.Equal(1, store.DoomClockWavesCleared[0]);
+            Assert.Equal(1, Store.DoomClockWavesCleared[0]);
             obj.OnWaveCompleted(wavesRemaining: 4);
-            Assert.Equal(2, store.DoomClockWavesCleared[0]);
+            Assert.Equal(2, Store.DoomClockWavesCleared[0]);
         }
 
         [Fact]
         public void OnWaveCompleted_NonDoomClock_NoOpOnDoomCounter()
         {
-            var (store, obj, dc) = MakeSut(objectiveType: (int)ObjectiveType.KillAll);
+            var (obj, dc) = MakeSut(objectiveType: (int)ObjectiveType.KillAll);
             obj.OnWaveCompleted(wavesRemaining: 4);
-            Assert.Equal(0, store.DoomClockWavesCleared[0]);
+            Assert.Equal(0, Store.DoomClockWavesCleared[0]);
         }
 
         // ── GameConfigLoader JSON parsing ──────────────────────────────

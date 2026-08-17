@@ -2,6 +2,7 @@ using System;
 using Xunit;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Tests.Infrastructure;
 
 namespace BattleSystemECS.Tests.Mechanisms.Combat
 {
@@ -16,32 +17,32 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
     ///   - DestroyEntity resets all execute fields (no ID-reuse leakage)
     ///   - ExecuteConfig static class exposes sensible defaults
     /// </summary>
-    public class ExecuteSystemTests
+    public class ExecuteSystemTests : BattleTestBase
     {
         private const int PlayerId = 0;
         private const float StartingGold = 100f;
         private const float MaxPlayerMana = 500f;
         private const float StartingMana = 50f;
 
-        private static int SpawnPlainEnemy(ComponentStore store, float maxHp = 100f)
+        private int SpawnPlainEnemy(float maxHp = 100f)
         {
-            return store.AddEnemy(0, 0, 5f, maxHp, maxHp, 5f, 10, 1, "TestEnemy");
+            return Store.AddEnemy(0, 0, 5f, maxHp, maxHp, 5f, 10, 1, "TestEnemy");
         }
 
-        private static int SpawnExecutableEnemy(ComponentStore store, float threshold, float goldBonus, float manaBonus, float maxHp = 100f)
+        private int SpawnExecutableEnemy(float threshold, float goldBonus, float manaBonus, float maxHp = 100f)
         {
-            int e = SpawnPlainEnemy(store, maxHp);
-            store.EnemyExecuteThreshold[e] = threshold;
-            store.EnemyExecuteBonusGold[e] = goldBonus;
-            store.EnemyExecuteBonusMana[e] = manaBonus;
+            int e = SpawnPlainEnemy(maxHp);
+            Store.EnemyExecuteThreshold[e] = threshold;
+            Store.EnemyExecuteBonusGold[e] = goldBonus;
+            Store.EnemyExecuteBonusMana[e] = manaBonus;
             return e;
         }
 
-        private static void InitPlayer(ComponentStore store, float gold = StartingGold, float mana = StartingMana, float maxMana = MaxPlayerMana)
+        private void InitPlayer(float gold = StartingGold, float mana = StartingMana, float maxMana = MaxPlayerMana)
         {
-            store.PlayerGold[PlayerId] = gold;
-            store.PlayerMaxMana[PlayerId] = maxMana;
-            store.PlayerMana[PlayerId] = mana;
+            Store.PlayerGold[PlayerId] = gold;
+            Store.PlayerMaxMana[PlayerId] = maxMana;
+            Store.PlayerMana[PlayerId] = mana;
         }
 
         // ─── Default state — backward compat ─────────────────────────────
@@ -49,12 +50,11 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void DefaultState_AllExecuteFieldsZero()
         {
-            var store = new ComponentStore();
-            int e = SpawnPlainEnemy(store);
-            Assert.Equal(0f, store.EnemyExecuteThreshold[e]);
-            Assert.Equal(0f, store.EnemyExecuteBonusGold[e]);
-            Assert.Equal(0f, store.EnemyExecuteBonusMana[e]);
-            Assert.False(store.EnemyExecuted[e]);
+            int e = SpawnPlainEnemy();
+            Assert.Equal(0f, Store.EnemyExecuteThreshold[e]);
+            Assert.Equal(0f, Store.EnemyExecuteBonusGold[e]);
+            Assert.Equal(0f, Store.EnemyExecuteBonusMana[e]);
+            Assert.False(Store.EnemyExecuted[e]);
         }
 
         [Fact]
@@ -75,21 +75,19 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         public void ResolveEnemiesKilled_DefaultEnemy_NoExecuteBonusAwarded()
         {
             // Backward-compat: a vanilla enemy (no execute config) kills grant no extra gold/mana.
-            var store = new ComponentStore();
-            InitPlayer(store);
-            int e = SpawnPlainEnemy(store);
-            store.EnemyHealth[e] = 0f;
-            float goldBefore = store.PlayerGold[PlayerId];
-            float manaBefore = store.PlayerMana[PlayerId];
+            InitPlayer();
+            int e = SpawnPlainEnemy();
+            Store.EnemyGoldReward[e] = 10; // 显式注入基础奖励，期望从注入值推导
+            Store.EnemyHealth[e] = 0f;
+            float goldBefore = Store.PlayerGold[PlayerId];
+            float manaBefore = Store.PlayerMana[PlayerId];
 
-            store.QueueEnemyDeath(e, PlayerId);
-            store.ResolveEnemiesKilledThisFrame();
+            Store.QueueEnemyDeath(e, PlayerId);
+            Store.ResolveEnemiesKilledThisFrame();
 
-            // Only the normal gold reward should have been paid (EnemyGoldReward defaults).
-            // We don't assert exact gold (depends on base reward), but we assert no execute bonus
-            // was added on top of normal — so gold should equal goldBefore + normal reward.
-            // Mana must be unchanged (no execute bonus applied).
-            Assert.Equal(manaBefore, store.PlayerMana[PlayerId]);
+            // 只发放基础奖励，无 execute 加成。
+            Assert.Equal(goldBefore + 10f, Store.PlayerGold[PlayerId]);
+            Assert.Equal(manaBefore, Store.PlayerMana[PlayerId]);
         }
 
         // ─── Execute bonus award on death ────────────────────────────────
@@ -97,50 +95,48 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void ResolveEnemiesKilled_ExecutableEnemy_GrantsGoldBonus()
         {
-            var store = new ComponentStore();
-            InitPlayer(store);
-            float goldBefore = store.PlayerGold[PlayerId];
-            int e = SpawnExecutableEnemy(store, threshold: 0.2f, goldBonus: 25f, manaBonus: 0f);
-            store.EnemyHealth[e] = 0f;
+            InitPlayer();
+            float goldBefore = Store.PlayerGold[PlayerId];
+            int e = SpawnExecutableEnemy(threshold: 0.2f, goldBonus: 25f, manaBonus: 0f);
+            Store.EnemyGoldReward[e] = 0; // 显式清零基础奖励，期望 = 只含 execute 加成
+            Store.EnemyHealth[e] = 0f;
 
-            store.QueueEnemyDeath(e, PlayerId);
-            store.ResolveEnemiesKilledThisFrame();
+            Store.QueueEnemyDeath(e, PlayerId);
+            Store.ResolveEnemiesKilledThisFrame();
 
-            // Gold must have increased by at least 25 (the execute bonus on top of normal reward).
-            Assert.True(store.PlayerGold[PlayerId] >= goldBefore + 25f,
-                $"Expected gold to increase by >= 25, got {store.PlayerGold[PlayerId] - goldBefore}");
+            // 精确断言：goldBefore + 基础奖励(0) + execute 金币(25)。
+            Assert.Equal(goldBefore + 25f, Store.PlayerGold[PlayerId]);
         }
 
         [Fact]
         public void ResolveEnemiesKilled_ExecutableEnemy_GrantsManaBonus()
         {
-            var store = new ComponentStore();
-            InitPlayer(store);
-            float manaBefore = store.PlayerMana[PlayerId];
-            int e = SpawnExecutableEnemy(store, threshold: 0.2f, goldBonus: 0f, manaBonus: 15f);
-            store.EnemyHealth[e] = 0f;
+            InitPlayer();
+            float manaBefore = Store.PlayerMana[PlayerId];
+            int e = SpawnExecutableEnemy(threshold: 0.2f, goldBonus: 0f, manaBonus: 15f);
+            Store.EnemyHealth[e] = 0f;
 
-            store.QueueEnemyDeath(e, PlayerId);
-            store.ResolveEnemiesKilledThisFrame();
+            Store.QueueEnemyDeath(e, PlayerId);
+            Store.ResolveEnemiesKilledThisFrame();
 
-            Assert.Equal(manaBefore + 15f, store.PlayerMana[PlayerId]);
+            Assert.Equal(manaBefore + 15f, Store.PlayerMana[PlayerId]);
         }
 
         [Fact]
         public void ResolveEnemiesKilled_ExecutableEnemy_GrantsBothBonuses()
         {
-            var store = new ComponentStore();
-            InitPlayer(store);
-            int e = SpawnExecutableEnemy(store, threshold: 0.2f, goldBonus: 25f, manaBonus: 15f);
-            store.EnemyHealth[e] = 0f;
-            float goldBefore = store.PlayerGold[PlayerId];
-            float manaBefore = store.PlayerMana[PlayerId];
+            InitPlayer();
+            int e = SpawnExecutableEnemy(threshold: 0.2f, goldBonus: 25f, manaBonus: 15f);
+            Store.EnemyGoldReward[e] = 0; // 显式清零基础奖励
+            Store.EnemyHealth[e] = 0f;
+            float goldBefore = Store.PlayerGold[PlayerId];
+            float manaBefore = Store.PlayerMana[PlayerId];
 
-            store.QueueEnemyDeath(e, PlayerId);
-            store.ResolveEnemiesKilledThisFrame();
+            Store.QueueEnemyDeath(e, PlayerId);
+            Store.ResolveEnemiesKilledThisFrame();
 
-            Assert.True(store.PlayerGold[PlayerId] >= goldBefore + 25f);
-            Assert.Equal(manaBefore + 15f, store.PlayerMana[PlayerId]);
+            Assert.Equal(goldBefore + 25f, Store.PlayerGold[PlayerId]);
+            Assert.Equal(manaBefore + 15f, Store.PlayerMana[PlayerId]);
         }
 
         // ─── Threshold opt-out (threshold = 0) ───────────────────────────
@@ -149,16 +145,19 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         public void ResolveEnemiesKilled_ZeroThreshold_NoExecuteBonus()
         {
             // Even if gold/mana bonuses are configured, threshold=0 means opt-out.
-            var store = new ComponentStore();
-            InitPlayer(store);
-            float manaBefore = store.PlayerMana[PlayerId];
-            int e = SpawnExecutableEnemy(store, threshold: 0f, goldBonus: 25f, manaBonus: 15f);
-            store.EnemyHealth[e] = 0f;
+            InitPlayer();
+            int e = SpawnExecutableEnemy(threshold: 0f, goldBonus: 25f, manaBonus: 15f);
+            Store.EnemyGoldReward[e] = 10; // 显式注入基础奖励
+            Store.EnemyHealth[e] = 0f;
+            float goldBefore = Store.PlayerGold[PlayerId];
+            float manaBefore = Store.PlayerMana[PlayerId];
 
-            store.QueueEnemyDeath(e, PlayerId);
-            store.ResolveEnemiesKilledThisFrame();
+            Store.QueueEnemyDeath(e, PlayerId);
+            Store.ResolveEnemiesKilledThisFrame();
 
-            Assert.Equal(manaBefore, store.PlayerMana[PlayerId]);
+            // 只发基础奖励；execute 金币/法力都不发。
+            Assert.Equal(goldBefore + 10f, Store.PlayerGold[PlayerId]);
+            Assert.Equal(manaBefore, Store.PlayerMana[PlayerId]);
         }
 
         // ─── Mana clamping ───────────────────────────────────────────────
@@ -166,58 +165,37 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void ResolveEnemiesKilled_ManaBonusClampedAtMax()
         {
-            var store = new ComponentStore();
-            InitPlayer(store, mana: MaxPlayerMana - 5f);  // 5 below cap
-            int e = SpawnExecutableEnemy(store, threshold: 0.2f, goldBonus: 0f, manaBonus: 100f);  // 100 mana would over-cap
-            store.EnemyHealth[e] = 0f;
+            InitPlayer(mana: MaxPlayerMana - 5f);  // 5 below cap
+            int e = SpawnExecutableEnemy(threshold: 0.2f, goldBonus: 0f, manaBonus: 100f);  // 100 mana would over-cap
+            Store.EnemyHealth[e] = 0f;
 
-            store.QueueEnemyDeath(e, PlayerId);
-            store.ResolveEnemiesKilledThisFrame();
+            Store.QueueEnemyDeath(e, PlayerId);
+            Store.ResolveEnemiesKilledThisFrame();
 
             // Mana must be clamped at MaxPlayerMana, not overflowing.
-            Assert.Equal(MaxPlayerMana, store.PlayerMana[PlayerId]);
+            Assert.Equal(MaxPlayerMana, Store.PlayerMana[PlayerId]);
         }
 
-        // ─── One-shot guard (no double-pay) ──────────────────────────────
+        // ─── One-shot guard（真实重复排队只付一次） ──────────────────
 
-        [Fact]
-        public void ResolveEnemiesKilled_OneShotGuard_OnlyPaysBonusOnce()
-        {
-            // Verify the one-shot guard: two distinct executable enemies both pay their bonus.
-            // (Within a single frame, an enemy can only be queued once — it's destroyed after
-            // the first resolve. The flag's purpose is to defend against future re-queue paths
-            // that may exist; this test confirms the bonus is paid at all on a single kill.)
-            var store = new ComponentStore();
-            InitPlayer(store);
-            float manaBefore = store.PlayerMana[PlayerId];
-            int e = SpawnExecutableEnemy(store, threshold: 0.2f, goldBonus: 0f, manaBonus: 15f);
-            store.EnemyHealth[e] = 0f;
-
-            store.QueueEnemyDeath(e, PlayerId);
-            store.ResolveEnemiesKilledThisFrame();
-
-            // Mana must have increased by exactly 15 (one shot).
-            Assert.Equal(manaBefore + 15f, store.PlayerMana[PlayerId]);
-        }
-
+        // 回归：同一敌人同一帧重复 QueueEnemyDeath，EnemyExecuted/EnemyActive 门必须保证只付一次。
         [Fact]
         public void ResolveEnemiesKilled_DoubleQueueStillOnlyPaysOnce()
         {
             // Re-queueing an already-killed enemy in the same frame (defensive): the bonus
             // should still only pay once because the second queue call is filtered by
             // EnemyActive check inside ResolveEnemiesKilledThisFrame.
-            var store = new ComponentStore();
-            InitPlayer(store);
-            float manaBefore = store.PlayerMana[PlayerId];
-            int e = SpawnExecutableEnemy(store, threshold: 0.2f, goldBonus: 0f, manaBonus: 15f);
-            store.EnemyHealth[e] = 0f;
+            InitPlayer();
+            float manaBefore = Store.PlayerMana[PlayerId];
+            int e = SpawnExecutableEnemy(threshold: 0.2f, goldBonus: 0f, manaBonus: 15f);
+            Store.EnemyHealth[e] = 0f;
 
-            store.QueueEnemyDeath(e, PlayerId);
-            store.QueueEnemyDeath(e, PlayerId);  // duplicate queue
-            store.ResolveEnemiesKilledThisFrame();
+            Store.QueueEnemyDeath(e, PlayerId);
+            Store.QueueEnemyDeath(e, PlayerId);  // duplicate queue
+            Store.ResolveEnemiesKilledThisFrame();
 
             // Should pay only once (15 mana), not twice.
-            Assert.Equal(manaBefore + 15f, store.PlayerMana[PlayerId]);
+            Assert.Equal(manaBefore + 15f, Store.PlayerMana[PlayerId]);
         }
 
         // ─── ID-reuse safety: DestroyEntity resets all fields ────────────
@@ -225,21 +203,20 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void DestroyEntity_ResetsExecuteFields()
         {
-            var store = new ComponentStore();
-            int e = SpawnExecutableEnemy(store, threshold: 0.2f, goldBonus: 25f, manaBonus: 15f);
-            store.EnemyExecuted[e] = true;  // simulate post-pay state
-            store.EnemyHealth[e] = 0f;
-            store.QueueEnemyDeath(e, PlayerId);
-            store.ResolveEnemiesKilledThisFrame();
+            int e = SpawnExecutableEnemy(threshold: 0.2f, goldBonus: 25f, manaBonus: 15f);
+            Store.EnemyExecuted[e] = true;  // simulate post-pay state
+            Store.EnemyHealth[e] = 0f;
+            Store.QueueEnemyDeath(e, PlayerId);
+            Store.ResolveEnemiesKilledThisFrame();
 
             // After destroy, the slot is recycled. A new enemy at the same ID should see
             // all defaults. (AddEnemy allocates; we just check the next enemy's fields are
             // independent.)
-            int e2 = SpawnPlainEnemy(store);
-            Assert.False(store.EnemyExecuted[e2]);
-            Assert.Equal(0f, store.EnemyExecuteThreshold[e2]);
-            Assert.Equal(0f, store.EnemyExecuteBonusGold[e2]);
-            Assert.Equal(0f, store.EnemyExecuteBonusMana[e2]);
+            int e2 = SpawnPlainEnemy();
+            Assert.False(Store.EnemyExecuted[e2]);
+            Assert.Equal(0f, Store.EnemyExecuteThreshold[e2]);
+            Assert.Equal(0f, Store.EnemyExecuteBonusGold[e2]);
+            Assert.Equal(0f, Store.EnemyExecuteBonusMana[e2]);
         }
 
         // ─── Stacks with Death Mark bonus ────────────────────────────────
@@ -248,23 +225,22 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         public void ResolveEnemiesKilled_ExecuteStacksWithDeathMark()
         {
             // An enemy that is BOTH marked AND executable should get BOTH bonuses.
-            var store = new ComponentStore();
-            InitPlayer(store);
-            float goldBefore = store.PlayerGold[PlayerId];
-            float manaBefore = store.PlayerMana[PlayerId];
-            int e = SpawnExecutableEnemy(store, threshold: 0.2f, goldBonus: 25f, manaBonus: 15f);
-            store.EnemyMarked[e] = true;
-            store.EnemyMarkedDamageBonus[e] = 0.5f;
-            store.EnemyHealth[e] = 0f;
+            InitPlayer();
+            int e = SpawnExecutableEnemy(threshold: 0.2f, goldBonus: 25f, manaBonus: 15f);
+            Store.EnemyGoldReward[e] = 10; // 显式注入基础奖励
+            Store.EnemyMarked[e] = true;
+            Store.EnemyMarkedDamageBonus[e] = 0.5f;
+            Store.EnemyHealth[e] = 0f;
+            float goldBefore = Store.PlayerGold[PlayerId];
+            float manaBefore = Store.PlayerMana[PlayerId];
 
-            store.QueueEnemyDeath(e, PlayerId);
-            store.ResolveEnemiesKilledThisFrame();
+            Store.QueueEnemyDeath(e, PlayerId);
+            Store.ResolveEnemiesKilledThisFrame();
 
-            // Both bonuses must apply. Gold must be >= base + mark bonus + execute bonus.
-            // We don't know the base gold reward exactly, but we know execute is +25.
-            Assert.True(store.PlayerGold[PlayerId] >= goldBefore + 25f,
-                $"Expected execute gold bonus on top, got delta {store.PlayerGold[PlayerId] - goldBefore}");
-            Assert.Equal(manaBefore + 15f, store.PlayerMana[PlayerId]);
+            // 期望从注入值推导：基础 10 + 死亡标记加成(10 × 0.5) + execute 25。
+            float expectedGold = goldBefore + 10f + 10f * 0.5f + 25f;
+            Assert.Equal(expectedGold, Store.PlayerGold[PlayerId]);
+            Assert.Equal(manaBefore + 15f, Store.PlayerMana[PlayerId]);
         }
     }
 }

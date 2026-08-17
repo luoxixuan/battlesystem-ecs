@@ -20,9 +20,9 @@ namespace BattleSystemECS.Tests.Features.Economy
     ///   - GameConfig.DailyDamageMult / GoldMult / EnemyHpMult default to 1.0
     ///   - GameConfig.DailyStartingGoldBonus defaults to 0
     /// </summary>
-    public class DailyChallengeTests
+    public class DailyChallengeTests : BattleTestBase
     {
-        private static List<DailyModifierDef> MakePool(int n)
+        private List<DailyModifierDef> MakePool(int n)
         {
             var pool = new List<DailyModifierDef>(n);
             for (int i = 0; i < n; i++)
@@ -82,7 +82,7 @@ namespace BattleSystemECS.Tests.Features.Economy
                 Assert.Equal(5, set.Count); // all 5 indices are distinct
                 foreach (int idx in picks)
                 {
-                    Assert.True(idx >= 0 && idx < 30, "out-of-range index");
+                    Assert.InRange(idx, 0, 30 - 1);
                 }
             }
         }
@@ -159,17 +159,21 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void ResolveForDate_EmptyPool_ReturnsEmptyResult()
         {
-            var r = DailyChallengeSystem.ResolveForDate(new List<DailyModifierDef>(), DateTime.Today, 3);
+            // 显式固定日期注入（禁止 DateTime.Today），期望从该日期推导。
+            var date = new DateTime(2026, 8, 16);
+            var r = DailyChallengeSystem.ResolveForDate(new List<DailyModifierDef>(), date, 3);
             Assert.Equal(0, r.Seed);
             Assert.Empty(r.Selected);
-            Assert.Equal(DateTime.Today.ToString("yyyy-MM-dd"), r.Date);
+            Assert.Equal(date.ToString("yyyy-MM-dd"), r.Date);
         }
 
         [Fact]
         public void ResolveForDate_NullPool_ReturnsEmptyResult()
         {
-            var r = DailyChallengeSystem.ResolveForDate(null, DateTime.Today, 3);
+            var date = new DateTime(2026, 8, 16);
+            var r = DailyChallengeSystem.ResolveForDate(null, date, 3);
             Assert.Empty(r.Selected);
+            Assert.Equal(date.ToString("yyyy-MM-dd"), r.Date);
         }
 
         // ─── ApplyToConfig behavior ───────────────────────────────────────
@@ -178,7 +182,7 @@ namespace BattleSystemECS.Tests.Features.Economy
         public void ApplyToConfig_EmptyResult_LeavesNeutralValues()
         {
             // Default config: no daily, multipliers are 1.0 / bonus is 0.
-            var cfg = new GameConfig();
+            var cfg = Config;
             Assert.Equal(1.0f, cfg.DailyDamageMult);
             Assert.Equal(1.0f, cfg.DailyGoldMult);
             Assert.Equal(1.0f, cfg.DailyEnemyHpMult);
@@ -200,7 +204,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             // goldMult 1.5 × 1.0 × 0.9 = 1.35
             // enemyHpMult 1.1 × 1.2 × 1.0 = 1.32
             // startingGoldBonus 50 + 0 + (-20) = 30
-            var cfg = new GameConfig();
+            var cfg = Config;
             var r = new DailyChallengeResult
             {
                 Date = "2026-06-04",
@@ -226,7 +230,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             // Defensive: a modifier with DamageMult=0 is treated as inert
             // (multiplier set to 1) so a malformed JSON entry can't zero out
             // player damage. The product rule only multiplies by >0 values.
-            var cfg = new GameConfig();
+            var cfg = Config;
             var r = new DailyChallengeResult
             {
                 Selected = new List<DailyModifierDef>
@@ -244,7 +248,7 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void ApplyToConfig_NullSelected_TreatedAsEmpty()
         {
-            var cfg = new GameConfig();
+            var cfg = Config;
             var r = new DailyChallengeResult { Selected = null! };
             DailyChallengeSystem.ApplyToConfig(cfg, r);
             Assert.Equal(1.0f, cfg.DailyDamageMult);
@@ -268,7 +272,7 @@ namespace BattleSystemECS.Tests.Features.Economy
         public void GameConfig_Defaults_DailyFieldsNeutral()
         {
             // Fresh GameConfig: pool is empty, modifiers are inert.
-            var cfg = new GameConfig();
+            var cfg = Config;
             Assert.NotNull(cfg.DailyModifierPool);
             Assert.Empty(cfg.DailyModifierPool);
             Assert.Equal(3, cfg.DailyModifierCount);

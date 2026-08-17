@@ -4,31 +4,27 @@ using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
+using BattleSystemECS.Tests.Infrastructure;
 
 namespace BattleSystemECS.Tests.Mechanisms.Perception
 {
     /// <summary>
     /// Invariants for the Threat Score / Dynamic Difficulty Scaling system (Round 99 Direction 5).
-    /// Tests verify:
-    /// 1. Fields exist with correct default (zero) values
-    /// 2. Threat multiplier math at the constants level
-    /// 3. Spawn-time HP scaling uses PlayerRecentDPS
-    /// 4. EMA decay logic reduces PlayerRecentDPS over time
-    /// 5. Cap is enforced (max multiplier, no lower than 1.0)
-    /// 6. Zero DPS path is zero-overhead (no scale applied)
+    /// 威胁公式不再在测试内复刻：EMA 衰减走 FrameScheduler 真实 Tick，
+    /// 生成缩放走 WaveSpawningSystem 真实生成路径，期望倍率由读取到的
+    /// ThreatScoreConfig 常量与显式注入的 DPS 推导。
     /// </summary>
-    public class ThreatScoreTests
+    public class ThreatScoreTests : BattleTestBase
     {
         // ─── Field initialization tests ──────────────────────────────────
 
         [Fact]
         public void PlayerRecentDPS_DefaultsToZero()
         {
-            var store = new ComponentStore();
             for (int p = 0; p < 10; p++)
             {
-                Assert.Equal(0f, store.PlayerRecentDPS[p]);
-                Assert.Equal(0f, store.PlayerDPSAccumulator[p]);
+                Assert.Equal(0f, Store.PlayerRecentDPS[p]);
+                Assert.Equal(0f, Store.PlayerDPSAccumulator[p]);
             }
         }
 
@@ -49,113 +45,73 @@ namespace BattleSystemECS.Tests.Mechanisms.Perception
                 "DPSWindowSec must be positive");
         }
 
-        // ─── Spawn-time scaling math (pure compute, no scheduler) ───────
+        // ─── EMA 衰减：走 FrameScheduler 真实 Tick ───────────────────────
 
         [Fact]
-        public void ThreatMultiplier_ZeroDPSYieldsOne()
+        public void FrameScheduler_ZeroDt_KeepsRecentDPS_AndResetsAccumulator()
         {
-            // At zero DPS, multiplier = 1 + 0 * rate = 1.0 → no scaling.
-            float recentDps = 0f;
-            float mult = 1f + recentDps * ThreatScoreConfig.ThreatScalingRate;
-            Assert.Equal(1.0f, mult);
+            Store.PlayerRecentDPS[0] = 123f;
+            Store.PlayerDPSAccumulator[0] = 45f;
+            var scheduler = new FrameScheduler(Store, Config);
+
+            scheduler.Tick(0f, 0); // dt=0：跳过 blending，保留上一帧值
+
+            Assert.Equal(123f, Store.PlayerRecentDPS[0]);
+            Assert.Equal(0f, Store.PlayerDPSAccumulator[0]);
         }
 
         [Fact]
-        public void ThreatMultiplier_HighDPSIsCapped()
+        public void FrameScheduler_PositiveDt_DecaysRecentDPS_AndResetsAccumulator()
         {
-            // Very high DPS: 1 + 1e6 * 1e-4 = 101 → cap should clamp to MaxThreatMultiplier.
-            float recentDps = 1_000_000f;
-            float mult = 1f + recentDps * ThreatScoreConfig.ThreatScalingRate;
-            if (mult > ThreatScoreConfig.MaxThreatMultiplier) mult = ThreatScoreConfig.MaxThreatMultiplier;
-            if (mult < ThreatScoreConfig.MinThreatMultiplier) mult = ThreatScoreConfig.MinThreatMultiplier;
-            Assert.Equal(ThreatScoreConfig.MaxThreatMultiplier, mult);
+            Store.PlayerRecentDPS[0] = 1000f;
+            Store.PlayerDPSAccumulator[0] = 60f;
+            var scheduler = new FrameScheduler(Store, Config);
+
+            scheduler.Tick(0.5f, 0);
+
+            // 真实 EMA 衰减路径：结果必须严格介于 0 与初值之间，且累加器归零。
+            Assert.True(Store.PlayerRecentDPS[0] > 0f && Store.PlayerRecentDPS[0] < 1000f,
+                $"EMA decay must reduce RecentDPS (now {Store.PlayerRecentDPS[0]})");
+            Assert.Equal(0f, Store.PlayerDPSAccumulator[0]);
         }
 
-        [Fact]
-        public void ThreatMultiplier_ReasonableDPSScalesLinearly()
-        {
-            // At rate 0.0001: 10000 DPS → mult = 1 + 10000*0.0001 = 2.0
-            // 20000 DPS → 3.0
-            float mult1 = 1f + 10000f * ThreatScoreConfig.ThreatScalingRate;
-            float mult2 = 1f + 20000f * ThreatScoreConfig.ThreatScalingRate;
-            Assert.Equal(2.0f, mult1, 3);
-            Assert.Equal(3.0f, mult2, 3);
-        }
+        // ─── 生成路径：PlayerRecentDPS 驱动敌人 HP 缩放 ──────────────────
 
-        // ─── EMA decay math (simulating FrameScheduler.DecayAndAccumulateThreatScore) ──
-
-        [Fact]
-        public void EMADecay_DecaysTowardZeroWithoutAccumulator()
+        private float FirstSpawnedEnemyHealth(float recentDps)
         {
+            // 保留独立 store：同一测试需两个独立世界比较 baseline 与 scaled 血量。
             var store = new ComponentStore();
-            store.PlayerRecentDPS[0] = 1000f;
-            // No accumulator: pure decay
-            float halfLife = ThreatScoreConfig.DPSWindowSec;
-            float dt = 0.5f; // half-life / 10 → expect ~7% remaining
-            float alpha = 1f - MathF.Exp(-0.6931472f * dt / halfLife);
-
-            for (int i = 0; i < 1; i++)
-            {
-                float decayed = store.PlayerRecentDPS[0] * (1f - alpha);
-                store.PlayerRecentDPS[0] = decayed + 0f; // no accumulator
-            }
-            // After dt=0.5s with halfLife=5s, alpha ≈ 0.0677 → result ≈ 932
-            Assert.True(store.PlayerRecentDPS[0] < 1000f,
-                "EMA decay should reduce PlayerRecentDPS over time");
-            Assert.True(store.PlayerRecentDPS[0] > 900f,
-                "Decay over 0.5s should leave most of the value intact");
+            int pid = store.CreateEntity();
+            store.PlayerMaxHealth[pid] = 200f;
+            store.PlayerCurrentHealth[pid] = 200f;
+            store.PlayerRecentDPS[0] = recentDps;
+            var sys = new WaveSpawningSystem(store, Renderer, Config);
+            sys.Update();
+            Assert.NotEmpty(store.ActiveEnemyIds);
+            return store.EnemyHealth[store.ActiveEnemyIds[0]];
         }
 
         [Fact]
-        public void EMAUpdate_AccumulatorResetsAfterDecay()
+        public void WaveSpawning_SpawnedHealth_ScalesWithInjectedDPS()
         {
-            var store = new ComponentStore();
-            store.PlayerRecentDPS[0] = 100f;
-            store.PlayerDPSAccumulator[0] = 50f;
+            const float injectedDps = 10000f;
+            float baselineHealth = FirstSpawnedEnemyHealth(0f);
+            float scaledHealth = FirstSpawnedEnemyHealth(injectedDps);
 
-            // Simulate one tick of DecayAndAccumulateThreatScore
-            float halfLife = ThreatScoreConfig.DPSWindowSec;
-            float dt = 1f / 60f;
-            float alpha = 1f - MathF.Exp(-0.6931472f * dt / halfLife);
-            float decayed = store.PlayerRecentDPS[0] * (1f - alpha);
-            float added = store.PlayerDPSAccumulator[0] * alpha;
-            store.PlayerRecentDPS[0] = decayed + added;
-            store.PlayerDPSAccumulator[0] = 0f;
-
-            Assert.Equal(0f, store.PlayerDPSAccumulator[0]);
-            Assert.True(store.PlayerRecentDPS[0] >= 0f, "Result must be non-negative");
+            // 期望倍率由读取到的 ThreatScalingRate 与注入 DPS 推导。
+            float expectedMult = 1.0f + injectedDps * ThreatScoreConfig.ThreatScalingRate;
+            Assert.Equal(baselineHealth * expectedMult, scaledHealth, 3);
+            Assert.True(scaledHealth > baselineHealth);
         }
 
-        // ─── Integration: end-to-end spawn scaling via FieldSetter ──────
-
         [Fact]
-        public void PlayerRecentDPS_DrivesSpawnScalingInWaveSpawningSystem()
+        public void WaveSpawning_ExtremeDPS_CappedAtMaxThreatMultiplier()
         {
-            // Simulate the spawn-time scaling logic from WaveSpawningSystem:
-            // scaledHealth = base * threatMult
-            var store = new ComponentStore();
-            float baseHp = 100f;
+            float baselineHealth = FirstSpawnedEnemyHealth(0f);
+            float scaledHealth = FirstSpawnedEnemyHealth(100_000_000f);
 
-            // Case 1: zero DPS → mult = 1.0
-            store.PlayerRecentDPS[0] = 0f;
-            float mult = 1f + store.PlayerRecentDPS[0] * ThreatScoreConfig.ThreatScalingRate;
-            float scaledHp1 = baseHp * mult;
-            Assert.Equal(100f, scaledHp1);
-
-            // Case 2: 5000 DPS → mult = 1.5 → 150 HP
-            store.PlayerRecentDPS[0] = 5000f;
-            mult = 1f + store.PlayerRecentDPS[0] * ThreatScoreConfig.ThreatScalingRate;
-            if (mult > ThreatScoreConfig.MaxThreatMultiplier) mult = ThreatScoreConfig.MaxThreatMultiplier;
-            if (mult < ThreatScoreConfig.MinThreatMultiplier) mult = ThreatScoreConfig.MinThreatMultiplier;
-            float scaledHp2 = baseHp * mult;
-            Assert.Equal(150f, scaledHp2, 3);
-
-            // Case 3: extreme DPS clamped to MaxThreatMultiplier (3.0)
-            store.PlayerRecentDPS[0] = 100_000_000f;
-            mult = 1f + store.PlayerRecentDPS[0] * ThreatScoreConfig.ThreatScalingRate;
-            if (mult > ThreatScoreConfig.MaxThreatMultiplier) mult = ThreatScoreConfig.MaxThreatMultiplier;
-            float scaledHp3 = baseHp * mult;
-            Assert.Equal(300f, scaledHp3); // 100 * 3.0
+            // 极端 DPS 的倍率被生产路径钳制到读取到的 MaxThreatMultiplier。
+            Assert.Equal(baselineHealth * ThreatScoreConfig.MaxThreatMultiplier, scaledHealth, 3);
         }
     }
 }

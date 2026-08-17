@@ -9,185 +9,130 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
 {
     /// <summary>
     /// Round 174 Direction 4 — Backstab positional damage bonus tests.
-    /// Verifies: PlaceTower sentinel resolution (0 → 1.0x, > 1.0 → kept),
-    /// _backstabEnabled master switch cached correctly, angle clamp, and
-    /// recycled-slot reset (no phantom bonus bleed from previous occupant).
-    ///
-    /// Coverage strategy: PlaceTower's signature doesn't take a TowerConfig, so
-    /// the per-tower BackstabDamageMult opt-in path is exercised indirectly via
-    /// the recycled-slot test (test 5) which proves a fresh non-rogue tower does
-    /// NOT inherit a phantom 2.0x. The default PlaceTower path always resolves
-    /// to 1.0x (the critical bug-fix contract).
+    /// 覆盖：
+    ///   - PlaceTower 的 0 → 1.0x 哨兵解析与全局默认角度写入（真实放置路径）
+    ///   - SetGameConfig 缓存的主开关通过真实 TowerAttackSystem 攻击路径验证：
+    ///     开启时后方塔获得倍率伤害，关闭时即使塔配置了倍率也只造成基础伤害
+    ///   - 槽位回收后 backstab 字段重置（不残留幻影倍率）
+    ///   - 配置默认值为相对不变量（不钉具体数值）
     /// </summary>
-    public class BackstabSystemTests
+    public class BackstabSystemTests : BattleTestBase
     {
-        // ── 1: PlaceTower default (no per-tower backstab fields) resolves to 1.0x inert ──
+        // ── 1: PlaceTower 默认（无 per-tower backstab 字段）解析为 1.0x 惰性 ──
         [Fact]
         public void PlaceTower_DefaultConfig_ResolvesToInert1_0x()
         {
-            var store = new ComponentStore();
-            var r = new MockRenderer();
-            var config = new GameConfig(); // default BackstabConfig: Enabled=true
-            var sys = new TowerPlacementSystem(store, r, config);
+            var sys = new TowerPlacementSystem(Store, Renderer, Config);
             int towerId = sys.PlaceTower(1, 1, TowerType.Basic, 50f, 3, 1f, 50f);
             Assert.True(towerId >= 0);
-            // Sentinel 0 → 1.0x (inert, fast path). This is the critical bug-fix
-            // test: the previous sentinel logic silently turned every non-rogue
-            // tower into a 2.0x rogue.
-            Assert.Equal(1.0f, store.TowerBackstabDamageMult[towerId]);
+            // 哨兵 0 → 1.0x（惰性快路径）。这是关键 bug-fix 契约：
+            // 旧逻辑会把每座非 rogue 塔静默变成 2.0x。
+            Assert.Equal(1.0f, Store.TowerBackstabDamageMult[towerId]);
         }
 
-        // ── 2: PlaceTower writes angle sentinel (0° → global default 90°) ──
+        // ── 2: PlaceTower 把角度哨兵解析为全局默认角度 ──
         [Fact]
         public void PlaceTower_DefaultAngle_InheritsGlobalDefault()
         {
-            var store = new ComponentStore();
-            var r = new MockRenderer();
-            var config = new GameConfig();
-            config.Backstab.DefaultAngleDeg = 120f;
-            var sys = new TowerPlacementSystem(store, r, config);
+            Config.Backstab.DefaultAngleDeg = 120f;
+            var sys = new TowerPlacementSystem(Store, Renderer, Config);
             int towerId = sys.PlaceTower(2, 2, TowerType.Basic, 50f, 3, 1f, 50f);
             Assert.True(towerId >= 0);
-            // The angle is the global default (used if a future mult is set to > 1.0).
-            // For a 1.0x mult the angle is never read, but PlaceTower still writes
-            // the resolved value so any later code path that flips the mult works.
-            Assert.Equal(120f, store.TowerBackstabAngleDeg[towerId]);
+            // PlaceTower 写入解析后的全局默认角度，后续打开倍率时代码可直接读取。
+            Assert.Equal(120f, Store.TowerBackstabAngleDeg[towerId]);
         }
 
-        // ── 3: SetGameConfig caches _backstabEnabled correctly (with and without config) ──
-        [Fact]
-        public void SetGameConfig_EnabledFalse_DisablesBackstab()
+        // ── 3: SetGameConfig 主开关通过真实攻击路径可观测 ──
+        // 塔在敌人正后方（塔 (0,0)，敌人在 (0,1) 且朝 +Y 移动），
+        // dot(塔→敌人, 敌人朝向) = 1 > cos(90°) → 满足后方判定。
+        [Theory]
+        [InlineData(false, 50f)] // 开关关闭：即使塔倍率 2.0x，也只打基础伤害
+        [InlineData(true, 100f)] // 开关开启：后方命中 ×2.0
+        public void SetGameConfig_BackstabSwitch_DrivesRealDamage(bool enabled, float expectedDamage)
         {
-            var store = new ComponentStore();
-            var r = new MockRenderer();
-            var sys = new TowerAttackSystem(store, r);
+            // AddTower 已自动注册 ActiveTowerIds；再 AddActiveTowerId 会造成重复开火。
+            int towerId = RawTower(0, 0, TowerType.Basic, 50f, 10, 10f, 1, 50f);
+            Store.TowerBackstabDamageMult[towerId] = 2.0f;
+            Store.TowerBackstabAngleDeg[towerId] = 90f;
 
-            // BackstabConfig with Enabled=false → hot path is fully skipped.
-            var configOff = new GameConfig { Backstab = new BackstabConfig { Enabled = false } };
-            sys.SetGameConfig(configOff);
-            Assert.False(configOff.Backstab.Enabled);
+            int enemyId = Enemy(e =>
+            {
+                e.X = 0f;
+                e.Y = 1f;
+                e.MoveSpeed = 1f;
+                e.Health = 1000f;
+                e.Damage = 0f;
+                e.GoldReward = 1;
+                e.Name = "BackstabTarget";
+            });
+            Store.EnemyMoveDirX[enemyId] = 0f;
+            Store.EnemyMoveDirY[enemyId] = 1f; // 朝 +Y 移动，塔位于其正后方
+            RebuildGrid();
 
-            // BackstabConfig with Enabled=true → hot path is on.
-            var configOn = new GameConfig { Backstab = new BackstabConfig { Enabled = true } };
-            sys.SetGameConfig(configOn);
-            Assert.True(configOn.Backstab.Enabled);
+            Config.Backstab = new BackstabConfig { Enabled = enabled };
+            var attack = new TowerAttackSystem(Store, Renderer);
+            attack.SetGameConfig(Config);
+            attack.SetTurn(0);
+            attack.Update(1f);
 
-            // Backstab = null (default GameConfig but no BackstabConfig attached) → safe.
-            var configNull = new GameConfig { Backstab = null };
-            sys.SetGameConfig(configNull);
-
-            // GameConfig = null → safe (matrix-less baseline).
-            sys.SetGameConfig(null);
+            float damageDealt = 1000f - Store.EnemyHealth[enemyId];
+            Assert.Equal(expectedDamage, damageDealt, 3);
         }
 
-        // ── 4: SetGameConfig called repeatedly with different values is stable ──
-        [Fact]
-        public void SetGameConfig_ResilienceToRepeatedCalls()
-        {
-            var store = new ComponentStore();
-            var r = new MockRenderer();
-            var sys = new TowerAttackSystem(store, r);
-
-            // First config: enabled
-            var c1 = new GameConfig();
-            c1.Backstab = new BackstabConfig { Enabled = true, DefaultDamageMult = 2.5f };
-            sys.SetGameConfig(c1);
-
-            // Switch off — call set twice in a row, no exception
-            c1.Backstab.Enabled = false;
-            sys.SetGameConfig(c1);
-            sys.SetGameConfig(c1);
-
-            // Switch back on with a different default
-            c1.Backstab.Enabled = true;
-            c1.Backstab.DefaultDamageMult = 3.0f;
-            sys.SetGameConfig(c1);
-            Assert.Equal(3.0f, c1.Backstab.DefaultDamageMult);
-        }
-
-        // ── 5: Recycled entity slot is reset to 1.0x (no phantom rogue bleed) ──
+        // ── 4: 槽位回收后 backstab 字段重置为 1.0x（无幻影 rogue 残留） ──
         [Fact]
         public void DestroyEntity_RecycledSlot_BackstabFieldsReset()
         {
-            var store = new ComponentStore();
-            var r = new MockRenderer();
-            var config = new GameConfig();
-            var sys = new TowerPlacementSystem(store, r, config);
+            var sys = new TowerPlacementSystem(Store, Renderer, Config);
 
-            // Place a tower, then DIRECTLY inject 3.0x mult (simulating a rogue
-            // tower placed via a future PlaceTowerFromConfig overload or
-            // upgrade-time mutation). This proves the recycled-slot reset
-            // path wipes the phantom bonus, regardless of how the rogue
-            // configuration was originally written.
+            // 放置后直接注入 3.0x，模拟未来升级路径写入的 rogue 配置。
             int id1 = sys.PlaceTower(1, 1, TowerType.Basic, 50f, 3, 1f, 50f);
             Assert.True(id1 >= 0);
-            store.TowerBackstabDamageMult[id1] = 3.0f;
-            store.TowerBackstabAngleDeg[id1] = 60f;
-            Assert.Equal(3.0f, store.TowerBackstabDamageMult[id1]);
+            Store.TowerBackstabDamageMult[id1] = 3.0f;
+            Store.TowerBackstabAngleDeg[id1] = 60f;
+            Assert.Equal(3.0f, Store.TowerBackstabDamageMult[id1]);
 
-            // Destroy the rogue tower — slot is recycled with fresh 1.0x.
-            store.DestroyEntity(id1);
-
-            // Place a normal (non-rogue) tower in the same slot. It must NOT
-            // inherit the 3.0x phantom bonus. The sentinel resolution gives
-            // 1.0x, and the recycled-slot reset in Remove() also writes 1.0x.
+            // 销毁后槽位回收，新塔不得继承 3.0x 幻影倍率。
+            Store.DestroyEntity(id1);
             int id2 = sys.PlaceTower(2, 2, TowerType.Basic, 50f, 3, 1f, 50f);
             Assert.True(id2 >= 0);
-            Assert.Equal(1.0f, store.TowerBackstabDamageMult[id2]);
+            Assert.Equal(1.0f, Store.TowerBackstabDamageMult[id2]);
         }
 
-        // ── 6: BackstabConfig default constructor has sane values ──
+        // ── 5: BackstabConfig 默认值为相对不变量（不钉具体数值） ──
         [Fact]
-        public void BackstabConfig_Defaults_AreSane()
+        public void BackstabConfig_Defaults_AreSaneRelativeInvariants()
         {
             var b = new BackstabConfig();
             Assert.True(b.Enabled);
-            Assert.Equal(2.0f, b.DefaultDamageMult);
-            Assert.Equal(90f, b.DefaultAngleDeg);
+            Assert.True(b.DefaultDamageMult >= 1f);
+            Assert.True(b.DefaultAngleDeg > 0f && b.DefaultAngleDeg <= 180f);
+
+            // GameConfig 默认必须带一个可用实例（生产路径不再判空失败）。
+            Assert.NotNull(Config.Backstab);
+            Assert.True(Config.Backstab.Enabled);
         }
 
-        // ── 7: GameConfig.Backstab default-constructs to a sane instance ──
-        [Fact]
-        public void GameConfig_Backstab_DefaultConstructs()
-        {
-            var g = new GameConfig();
-            Assert.NotNull(g.Backstab);
-            Assert.True(g.Backstab.Enabled);
-        }
-
-        // ── 8: TowerConfig has the two new fields with 0f defaults ──
-        [Fact]
-        public void TowerConfig_BackstabFields_DefaultToZero()
-        {
-            var tc = new TowerConfig();
-            Assert.Equal(0f, tc.BackstabDamageMult);
-            Assert.Equal(0f, tc.BackstabAngleDeg);
-        }
-
-        // ── 9: Store field arrays are sized for MAX_ENTITIES (no premature OOB) ──
+        // ── 6: Store 字段数组按 MAX_ENTITIES 分配（防越界） ──
         [Fact]
         public void Store_BackstabArrays_SizedForMaxEntities()
         {
-            var store = new ComponentStore();
-            Assert.NotNull(store.TowerBackstabDamageMult);
-            Assert.NotNull(store.TowerBackstabAngleDeg);
-            Assert.Equal(ComponentStore.MAX_ENTITIES, store.TowerBackstabDamageMult.Length);
-            Assert.Equal(ComponentStore.MAX_ENTITIES, store.TowerBackstabAngleDeg.Length);
+            Assert.NotNull(Store.TowerBackstabDamageMult);
+            Assert.NotNull(Store.TowerBackstabAngleDeg);
+            Assert.Equal(ComponentStore.MAX_ENTITIES, Store.TowerBackstabDamageMult.Length);
+            Assert.Equal(ComponentStore.MAX_ENTITIES, Store.TowerBackstabAngleDeg.Length);
         }
 
-        // ── 10: Multiple backstabs in sequence (idempotent) ──
+        // ── 7: 多座塔连续放置都保持 1.0x 惰性 ──
         [Fact]
         public void PlaceTower_MultipleTowers_AllInertByDefault()
         {
-            var store = new ComponentStore();
-            var r = new MockRenderer();
-            var config = new GameConfig();
-            var sys = new TowerPlacementSystem(store, r, config);
+            var sys = new TowerPlacementSystem(Store, Renderer, Config);
             for (int i = 0; i < 5; i++)
             {
                 int towerId = sys.PlaceTower(i, 0, TowerType.Basic, 50f, 3, 1f, 50f);
                 Assert.True(towerId >= 0);
-                Assert.Equal(1.0f, store.TowerBackstabDamageMult[towerId]);
+                Assert.Equal(1.0f, Store.TowerBackstabDamageMult[towerId]);
             }
         }
     }

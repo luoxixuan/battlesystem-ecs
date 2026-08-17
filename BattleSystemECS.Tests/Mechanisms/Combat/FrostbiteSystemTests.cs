@@ -213,8 +213,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             // Timer is now 0.7 (1 - 0.3). Reapply — should NOT reset timer
             // (because it's still active), but should refresh duration.
             sys.ApplyFrostbite(eid, 0.05f, 10f);
-            // Timer should be ~0.7
-            Assert.True(Store.EnemyFrostbiteTimer[eid] > 0.5f);
+            // 活跃期间重贴不重置计时器：1 - 0.3 = 0.7 精确保留。
+            Assert.Equal(0.7f, Store.EnemyFrostbiteTimer[eid], 3);
             Assert.Equal(10f, Store.EnemyFrostbiteDurationLeft[eid]);
         }
     }

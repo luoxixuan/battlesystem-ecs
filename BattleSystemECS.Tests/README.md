@@ -35,10 +35,13 @@ BattleSystemECS.Tests/
 
 | 层 | 测什么 | 不测什么 |
 |----|--------|----------|
-| **Framework** | `ComponentStore` 生命周期、`FrameScheduler.Tick` 阶段顺序与死亡结算、`StateMachine` 迁移、`GameConfigLoader` 默认/加载语义、GAS 冷却/激活、`CurveTable` | 具体系统玩法 |
+| **Framework** | `ComponentStore` 生命周期、`FrameScheduler.Tick` 阶段顺序与死亡结算、`StateMachine` 迁移、`GameConfigLoader` 默认/加载语义、GAS 冷却/激活、`CurveTable`、`SystemRegistry` 装配自检 | 具体系统玩法 |
 | **Mechanisms** | 一套公式或状态机在任意实体上的行为；边界值、ID 复用、订阅幂等、缓存失效等历史 bug 回归 | 某个具名塔/Buff 的完整身份 |
 | **Features** | 具名系统对外契约：默认值、配置读取、关键行为、状态重置 | 通过 Feature 测试去推导通用公式 |
 | **Integration** | `game_config.json` 作为输入，断言**结构自洽与相对关系**（引用存在、唯一性、字段有效范围、数量与配置推导值一致） | 任何具体配置值、任何固定数量/固定字符串 |
+
+> `Framework/SystemRegistryTests.cs` 为 144 systems / 11 groups 装配自检；
+> 新增 system 时同步在 `CreateAll` / `WireDependencies` / `AssignToGroups` 接线后补充关键槽位断言。
 
 ## 3. 编写规范
 
@@ -55,9 +58,12 @@ BattleSystemECS.Tests/
 5. 确定性优先：随机数必须固定种子（`new Random(seed)`）；不用 `DateTime.Now`；不依赖测试执行顺序。
 6. 优先使用 `BattleTestBase` 的 `World.Enemy/Tower/Player` 工厂，
    避免散落的 `new ComponentStore()` + 魔法数字。
-7. 手工 `AddTower` 后必须 `store.AddActiveTowerId(id)`（`AddTower` 不会自动注册活跃列表）；
+7. 手工 `AddTower` 已自动注册 `ActiveTowerIds`（M-race fix），不要再重复调用
+   `AddActiveTowerId`；需要绕过注册的存储层直测用原始数组操作并注释原因；
    驱动 `TowerAttackSystem` 前必须 `store.RebuildSpatialGrid()`（`FrameScheduler` 不负责重建网格）。
 8. 修复过的 bug，测试中保留 `// Bug 回归：...` 注释说明回归意图。
+9. CI 静态检查门禁：`pwsh -File tools\check-test-rules.ps1` 必须 0 违规
+   （零断言测试 + 恒真/恒假断言）。
 
 ## 4. 从 git 历史恢复旧测试的规则
 

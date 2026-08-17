@@ -23,17 +23,15 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
     ///   - DestroyEntity and RemoveTower reset the BuffShare fields (ID-reuse safety)
     ///   - No sharing tower present → ResolveBuffShares is a no-op fast path
     /// </summary>
-    public class BuffShareSystemTests
+    public class BuffShareSystemTests : BattleTestBase
     {
-        private static MockRenderer NewRenderer() => new MockRenderer();
-
-        private static int PlaceTower(ComponentStore store, int id, float x, float y,
+        private int PlaceTower(int id, float x, float y,
             float attackSpeed = 1f, int entitySlot = 1)
         {
-            store.AddTower(id, TowerType.Basic, 10f, 5, attackSpeed, 1, 50f,
+            Store.AddTower(id, TowerType.Basic, 10f, 5, attackSpeed, 1, 50f,
                 "standard", 0f, 0f, 0f);
-            store.PositionX[id] = x;
-            store.PositionY[id] = y;
+            Store.PositionX[id] = x;
+            Store.PositionY[id] = y;
             return id;
         }
 
@@ -42,21 +40,19 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void DefaultState_AllBuffShareFieldsZero()
         {
-            var store = new ComponentStore();
             for (int i = 0; i < 10; i++)
             {
-                Assert.Equal(0f, store.TowerBuffShareRadius[i]);
-                Assert.Equal(0, store.TowerBuffShareMask[i]);
+                Assert.Equal(0f, Store.TowerBuffShareRadius[i]);
+                Assert.Equal(0, Store.TowerBuffShareMask[i]);
             }
         }
 
         [Fact]
         public void AddTower_DefaultsBuffShareToZero()
         {
-            var store = new ComponentStore();
-            int t = PlaceTower(store, 0, 0f, 0f);
-            Assert.Equal(0f, store.TowerBuffShareRadius[t]);
-            Assert.Equal(0, store.TowerBuffShareMask[t]);
+            int t = PlaceTower(0, 0f, 0f);
+            Assert.Equal(0f, Store.TowerBuffShareRadius[t]);
+            Assert.Equal(0, Store.TowerBuffShareMask[t]);
         }
 
         [Fact]
@@ -73,21 +69,11 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void GetSetBuffShareRadius_ClampsToZeroOrAbove()
         {
-            var store = new ComponentStore();
-            int t = PlaceTower(store, 0, 0f, 0f);
-            store.SetTowerBuffShareRadius(t, -5f);
-            Assert.Equal(0f, store.GetTowerBuffShareRadius(t));
-            store.SetTowerBuffShareRadius(t, 4.5f);
-            Assert.Equal(4.5f, store.GetTowerBuffShareRadius(t));
-        }
-
-        [Fact]
-        public void GetSetBuffShareMask_StoresAndReturns()
-        {
-            var store = new ComponentStore();
-            int t = PlaceTower(store, 0, 0f, 0f);
-            store.SetTowerBuffShareMask(t, BuffShareConfig.ShareAttackSpeed);
-            Assert.Equal(BuffShareConfig.ShareAttackSpeed, store.GetTowerBuffShareMask(t));
+            int t = PlaceTower(0, 0f, 0f);
+            Store.SetTowerBuffShareRadius(t, -5f);
+            Assert.Equal(0f, Store.GetTowerBuffShareRadius(t));
+            Store.SetTowerBuffShareRadius(t, 4.5f);
+            Assert.Equal(4.5f, Store.GetTowerBuffShareRadius(t));
         }
 
         // ─── Core sharing behavior ─────────────────────────────────────
@@ -95,70 +81,77 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void ResolveBuffShares_NearbyTower_GetsAttackSpeedBonus()
         {
-            var store = new ComponentStore();
-            int sharer = PlaceTower(store, 0, 0f, 0f, attackSpeed: 1f);
-            int target = PlaceTower(store, 1, 3f, 0f, attackSpeed: 2f);
+            int sharer = PlaceTower(0, 0f, 0f, attackSpeed: 1f);
+            int target = PlaceTower(1, 3f, 0f, attackSpeed: 2f);
 
-            store.SetTowerBuffShareRadius(sharer, 8f);
-            store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
+            Store.SetTowerBuffShareRadius(sharer, 8f);
+            Store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
 
-            var sys = new TowerSynergySystem(store, NewRenderer());
+            var sys = new TowerSynergySystem(Store, Renderer);
             sys.ResolveBuffShares();
 
             // Target should now have base_speed * (1 + efficiency)
             float expected = 2f * (1f + BuffShareConfig.DefaultShareEfficiencyPct);
-            Assert.Equal(expected, store.TowerAttackSpeed[target], 4);
+            Assert.Equal(expected, Store.TowerAttackSpeed[target], 4);
         }
 
         [Fact]
         public void ResolveBuffShares_OutOfRangeTower_Unchanged()
         {
-            var store = new ComponentStore();
-            int sharer = PlaceTower(store, 0, 0f, 0f, attackSpeed: 1f);
-            int far = PlaceTower(store, 1, 100f, 100f, attackSpeed: 2f);
+            int sharer = PlaceTower(0, 0f, 0f, attackSpeed: 1f);
+            int far = PlaceTower(1, 100f, 100f, attackSpeed: 2f);
 
-            store.SetTowerBuffShareRadius(sharer, 8f);
-            store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
+            Store.SetTowerBuffShareRadius(sharer, 8f);
+            Store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
 
-            var sys = new TowerSynergySystem(store, NewRenderer());
+            var sys = new TowerSynergySystem(Store, Renderer);
             sys.ResolveBuffShares();
 
             // Far tower beyond radius² = 64 should be unchanged
-            Assert.Equal(2f, store.TowerAttackSpeed[far], 4);
+            Assert.Equal(2f, Store.TowerAttackSpeed[far], 4);
         }
 
-        [Fact]
-        public void ResolveBuffShares_MaskZero_NoShare()
+        // 以下“本应分享却未分享”的路径同构：目标攻速都保持基础值 2f。
+        public enum ShareBlockReason
         {
-            var store = new ComponentStore();
-            int sharer = PlaceTower(store, 0, 0f, 0f);
-            int target = PlaceTower(store, 1, 1f, 0f, attackSpeed: 2f);
-
-            store.SetTowerBuffShareRadius(sharer, 8f);
-            // Mask intentionally left at 0
-            Assert.Equal(0, store.TowerBuffShareMask[sharer]);
-
-            var sys = new TowerSynergySystem(store, NewRenderer());
-            sys.ResolveBuffShares();
-
-            Assert.Equal(2f, store.TowerAttackSpeed[target], 4);
+            MaskZero,           // 分享掩码为 0
+            RadiusZero,         // 分享半径为 0
+            SharerDispelled,    // 分享塔被驱散
+            TargetDispelled,    // 目标塔被驱散
         }
 
-        [Fact]
-        public void ResolveBuffShares_RadiusZero_NoShare()
+        [Theory]
+        [InlineData(ShareBlockReason.MaskZero)]
+        [InlineData(ShareBlockReason.RadiusZero)]
+        [InlineData(ShareBlockReason.SharerDispelled)]
+        [InlineData(ShareBlockReason.TargetDispelled)]
+        public void ResolveBuffShares_BlockedPath_TargetSpeedUnchanged(ShareBlockReason reason)
         {
-            var store = new ComponentStore();
-            int sharer = PlaceTower(store, 0, 0f, 0f);
-            int target = PlaceTower(store, 1, 1f, 0f, attackSpeed: 2f);
+            int sharer = PlaceTower(0, 0f, 0f, attackSpeed: 1f);
+            int target = PlaceTower(1, 1f, 0f, attackSpeed: 2f);
 
-            store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
-            // Radius intentionally left at 0
-            Assert.Equal(0f, store.TowerBuffShareRadius[sharer]);
+            Store.SetTowerBuffShareRadius(sharer, 8f);
+            Store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
+            switch (reason)
+            {
+                case ShareBlockReason.MaskZero:
+                    Store.SetTowerBuffShareMask(sharer, 0);
+                    break;
+                case ShareBlockReason.RadiusZero:
+                    Store.SetTowerBuffShareRadius(sharer, 0f);
+                    break;
+                case ShareBlockReason.SharerDispelled:
+                    Store.TowerIsDispelled[sharer] = true;
+                    break;
+                default:
+                    Store.TowerIsDispelled[target] = true;
+                    break;
+            }
 
-            var sys = new TowerSynergySystem(store, NewRenderer());
+            var sys = new TowerSynergySystem(Store, Renderer);
             sys.ResolveBuffShares();
 
-            Assert.Equal(2f, store.TowerAttackSpeed[target], 4);
+            Assert.Equal(2f, Store.TowerAttackSpeed[target], 4);
         }
 
         [Fact]
@@ -166,32 +159,30 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         {
             // Self-share would be a circular no-op anyway, but verify the method does not
             // accidentally apply the bonus to the sharing tower itself.
-            var store = new ComponentStore();
-            int sharer = PlaceTower(store, 0, 0f, 0f, attackSpeed: 1.5f);
+            int sharer = PlaceTower(0, 0f, 0f, attackSpeed: 1.5f);
 
-            store.SetTowerBuffShareRadius(sharer, 8f);
-            store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
+            Store.SetTowerBuffShareRadius(sharer, 8f);
+            Store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
 
-            var sys = new TowerSynergySystem(store, NewRenderer());
+            var sys = new TowerSynergySystem(Store, Renderer);
             sys.ResolveBuffShares();
 
             // Sharer speed must remain at its base (1.5)
-            Assert.Equal(1.5f, store.TowerAttackSpeed[sharer], 4);
+            Assert.Equal(1.5f, Store.TowerAttackSpeed[sharer], 4);
         }
 
         [Fact]
         public void ResolveBuffShares_NoSharingTowers_FastPathLeavesSpeedsAlone()
         {
             // Both towers have radius=0 and mask=0 — ResolveBuffShares must early-out cleanly.
-            var store = new ComponentStore();
-            int t1 = PlaceTower(store, 0, 0f, 0f, attackSpeed: 1.7f);
-            int t2 = PlaceTower(store, 1, 2f, 0f, attackSpeed: 2.3f);
+            int t1 = PlaceTower(0, 0f, 0f, attackSpeed: 1.7f);
+            int t2 = PlaceTower(1, 2f, 0f, attackSpeed: 2.3f);
 
-            var sys = new TowerSynergySystem(store, NewRenderer());
+            var sys = new TowerSynergySystem(Store, Renderer);
             sys.ResolveBuffShares();
 
-            Assert.Equal(1.7f, store.TowerAttackSpeed[t1], 4);
-            Assert.Equal(2.3f, store.TowerAttackSpeed[t2], 4);
+            Assert.Equal(1.7f, Store.TowerAttackSpeed[t1], 4);
+            Assert.Equal(2.3f, Store.TowerAttackSpeed[t2], 4);
         }
 
         [Fact]
@@ -201,58 +192,23 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             // First frame applies bonus, second frame must restore base + re-apply, not
             // stack on top of an already-boosted value (this is the bug scanner's #1 worry
             // for any multiplicative on-field modifier).
-            var store = new ComponentStore();
-            int sharer = PlaceTower(store, 0, 0f, 0f, attackSpeed: 1f);
-            int target = PlaceTower(store, 1, 1f, 0f, attackSpeed: 2f);
+            int sharer = PlaceTower(0, 0f, 0f, attackSpeed: 1f);
+            int target = PlaceTower(1, 1f, 0f, attackSpeed: 2f);
 
-            store.SetTowerBuffShareRadius(sharer, 8f);
-            store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
+            Store.SetTowerBuffShareRadius(sharer, 8f);
+            Store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
 
-            var sys = new TowerSynergySystem(store, NewRenderer());
+            var sys = new TowerSynergySystem(Store, Renderer);
             sys.ResolveBuffShares();
-            float firstFrame = store.TowerAttackSpeed[target];
+            float firstFrame = Store.TowerAttackSpeed[target];
 
             sys.ResolveBuffShares();
-            float secondFrame = store.TowerAttackSpeed[target];
+            float secondFrame = Store.TowerAttackSpeed[target];
 
             Assert.Equal(firstFrame, secondFrame, 4);
             // Sanity: should equal base × (1 + eff) once, not base × (1 + eff)²
             float expected = 2f * (1f + BuffShareConfig.DefaultShareEfficiencyPct);
             Assert.Equal(expected, secondFrame, 4);
-        }
-
-        [Fact]
-        public void ResolveBuffShares_DispelledSharingTower_NoBonus()
-        {
-            var store = new ComponentStore();
-            int sharer = PlaceTower(store, 0, 0f, 0f, attackSpeed: 1f);
-            int target = PlaceTower(store, 1, 1f, 0f, attackSpeed: 2f);
-
-            store.SetTowerBuffShareRadius(sharer, 8f);
-            store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
-            store.TowerIsDispelled[sharer] = true; // dispel = clears share
-
-            var sys = new TowerSynergySystem(store, NewRenderer());
-            sys.ResolveBuffShares();
-
-            Assert.Equal(2f, store.TowerAttackSpeed[target], 4);
-        }
-
-        [Fact]
-        public void ResolveBuffShares_DispelledTarget_NoBonus()
-        {
-            var store = new ComponentStore();
-            int sharer = PlaceTower(store, 0, 0f, 0f, attackSpeed: 1f);
-            int target = PlaceTower(store, 1, 1f, 0f, attackSpeed: 2f);
-
-            store.SetTowerBuffShareRadius(sharer, 8f);
-            store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
-            store.TowerIsDispelled[target] = true; // dispel = cannot receive share
-
-            var sys = new TowerSynergySystem(store, NewRenderer());
-            sys.ResolveBuffShares();
-
-            Assert.Equal(2f, store.TowerAttackSpeed[target], 4);
         }
 
         [Fact]
@@ -262,52 +218,41 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             // base × (1 + eff)² after ONE frame of ResolveBuffShares. The first frame's
             // base seed equals the un-boosted base; second iteration of the inner loop
             // multiplies the boosted value by (1+eff) once more.
-            var store = new ComponentStore();
-            int s1 = PlaceTower(store, 0, 0f, 0f, attackSpeed: 1f);
-            int s2 = PlaceTower(store, 1, 4f, 0f, attackSpeed: 1f);
-            int target = PlaceTower(store, 2, 2f, 0f, attackSpeed: 2f);
+            int s1 = PlaceTower(0, 0f, 0f, attackSpeed: 1f);
+            int s2 = PlaceTower(1, 4f, 0f, attackSpeed: 1f);
+            int target = PlaceTower(2, 2f, 0f, attackSpeed: 2f);
 
-            store.SetTowerBuffShareRadius(s1, 8f);
-            store.SetTowerBuffShareMask(s1, BuffShareConfig.ShareAttackSpeed);
-            store.SetTowerBuffShareRadius(s2, 8f);
-            store.SetTowerBuffShareMask(s2, BuffShareConfig.ShareAttackSpeed);
+            Store.SetTowerBuffShareRadius(s1, 8f);
+            Store.SetTowerBuffShareMask(s1, BuffShareConfig.ShareAttackSpeed);
+            Store.SetTowerBuffShareRadius(s2, 8f);
+            Store.SetTowerBuffShareMask(s2, BuffShareConfig.ShareAttackSpeed);
 
-            var sys = new TowerSynergySystem(store, NewRenderer());
+            var sys = new TowerSynergySystem(Store, Renderer);
             sys.ResolveBuffShares();
 
             // After sharer 1: target speed = 2 * (1+eff)
             // After sharer 2: target speed = 2 * (1+eff) * (1+eff) = 2 * (1+eff)²
             float eff = BuffShareConfig.DefaultShareEfficiencyPct;
             float expected = 2f * (1f + eff) * (1f + eff);
-            Assert.Equal(expected, store.TowerAttackSpeed[target], 3);
+            Assert.Equal(expected, Store.TowerAttackSpeed[target], 3);
         }
 
         // ─── ID-reuse safety ───────────────────────────────────────────
 
-        [Fact]
-        public void DestroyEntity_ResetsBuffShareFields()
+        [Theory]
+        [InlineData(false)] // DestroyEntity 路径
+        [InlineData(true)]  // RemoveTower 路径
+        public void EntityTeardown_ResetsBuffShareFields(bool useRemoveTower)
         {
-            var store = new ComponentStore();
-            int t = PlaceTower(store, 0, 0f, 0f);
-            store.SetTowerBuffShareRadius(t, 6f);
-            store.SetTowerBuffShareMask(t, BuffShareConfig.ShareAttackSpeed);
+            int t = PlaceTower(0, 0f, 0f);
+            Store.SetTowerBuffShareRadius(t, 6f);
+            Store.SetTowerBuffShareMask(t, BuffShareConfig.ShareAttackSpeed);
 
-            store.DestroyEntity(t);
-            Assert.Equal(0f, store.TowerBuffShareRadius[t]);
-            Assert.Equal(0, store.TowerBuffShareMask[t]);
-        }
+            if (useRemoveTower) Store.RemoveTower(t);
+            else Store.DestroyEntity(t);
 
-        [Fact]
-        public void RemoveTower_ResetsBuffShareFields()
-        {
-            var store = new ComponentStore();
-            int t = PlaceTower(store, 0, 0f, 0f);
-            store.SetTowerBuffShareRadius(t, 6f);
-            store.SetTowerBuffShareMask(t, BuffShareConfig.ShareAttackSpeed);
-
-            store.RemoveTower(t);
-            Assert.Equal(0f, store.TowerBuffShareRadius[t]);
-            Assert.Equal(0, store.TowerBuffShareMask[t]);
+            Assert.Equal(0f, Store.TowerBuffShareRadius[t]);
+            Assert.Equal(0, Store.TowerBuffShareMask[t]);
         }
 
         // ─── Regression: cache must be keyed by towerId, not position in ActiveTowerIds ───
@@ -320,32 +265,31 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             // stat to a different tower. This test seeds two shares, removes the sharing
             // tower, and re-runs ResolveBuffShares — both target towers must still get their
             // own (now-base) attack speed back, not a confused cross-write.
-            var store = new ComponentStore();
-            int sharer = PlaceTower(store, 0, 0f, 0f, attackSpeed: 1f);
-            int t1 = PlaceTower(store, 1, 1f, 0f, attackSpeed: 1.5f);
-            int t2 = PlaceTower(store, 2, 2f, 0f, attackSpeed: 2.5f);
+            int sharer = PlaceTower(0, 0f, 0f, attackSpeed: 1f);
+            int t1 = PlaceTower(1, 1f, 0f, attackSpeed: 1.5f);
+            int t2 = PlaceTower(2, 2f, 0f, attackSpeed: 2.5f);
 
-            store.SetTowerBuffShareRadius(sharer, 8f);
-            store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
+            Store.SetTowerBuffShareRadius(sharer, 8f);
+            Store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
 
-            var sys = new TowerSynergySystem(store, NewRenderer());
+            var sys = new TowerSynergySystem(Store, Renderer);
             sys.ResolveBuffShares();
 
             // Both targets got their base × (1 + eff)
             float eff = BuffShareConfig.DefaultShareEfficiencyPct;
-            Assert.Equal(1.5f * (1f + eff), store.TowerAttackSpeed[t1], 4);
-            Assert.Equal(2.5f * (1f + eff), store.TowerAttackSpeed[t2], 4);
+            Assert.Equal(1.5f * (1f + eff), Store.TowerAttackSpeed[t1], 4);
+            Assert.Equal(2.5f * (1f + eff), Store.TowerAttackSpeed[t2], 4);
 
             // Remove sharer (DestroyEntity → zeros out share fields, drops from ActiveTowerIds).
             // Then verify a second ResolveBuffShares call restores the targets' BASE speed.
             // If cache was position-keyed, this would write 1.5×(1+eff) onto tower 2 etc.
-            store.DestroyEntity(sharer);
+            Store.DestroyEntity(sharer);
 
             sys.ResolveBuffShares();
 
             // Both targets should now be at their base speed (sharing has stopped)
-            Assert.Equal(1.5f, store.TowerAttackSpeed[t1], 4);
-            Assert.Equal(2.5f, store.TowerAttackSpeed[t2], 4);
+            Assert.Equal(1.5f, Store.TowerAttackSpeed[t1], 4);
+            Assert.Equal(2.5f, Store.TowerAttackSpeed[t2], 4);
         }
 
         // ─── Regression: cache must be invalidated when entity ID is reused ───
@@ -360,45 +304,44 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             // the tower, adds a NEW tower at the same entityId with a different attack speed,
             // runs ResolveBuffShares again, and verifies the new tower's attack speed is
             // unchanged (no stale base speed leaked from the previous tower).
-            var store = new ComponentStore();
-            int sharer = PlaceTower(store, 0, 0f, 0f, attackSpeed: 1f);
-            int target = PlaceTower(store, 1, 100f, 100f, attackSpeed: 2.5f); // far from sharer
+            int sharer = PlaceTower(0, 0f, 0f, attackSpeed: 1f);
+            int target = PlaceTower(1, 100f, 100f, attackSpeed: 2.5f); // far from sharer
 
-            store.SetTowerBuffShareRadius(sharer, 8f);
-            store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
+            Store.SetTowerBuffShareRadius(sharer, 8f);
+            Store.SetTowerBuffShareMask(sharer, BuffShareConfig.ShareAttackSpeed);
 
-            var sys = new TowerSynergySystem(store, NewRenderer());
+            var sys = new TowerSynergySystem(Store, Renderer);
             sys.ResolveBuffShares();
 
             // Sharer and target are too far apart (distance > 8) — no sharing happened.
             // Manually force a share by moving the target into range.
-            store.PositionX[target] = 1f;
-            store.PositionY[target] = 0f;
+            Store.PositionX[target] = 1f;
+            Store.PositionY[target] = 0f;
             sys.ResolveBuffShares();
 
             // Target now has its base × (1 + eff) — cache entry for target is seeded
             float eff = BuffShareConfig.DefaultShareEfficiencyPct;
             float sharedSpeed = 2.5f * (1f + eff);
-            Assert.Equal(sharedSpeed, store.TowerAttackSpeed[target], 4);
+            Assert.Equal(sharedSpeed, Store.TowerAttackSpeed[target], 4);
 
             // Destroy the sharer AND the target (so target slot is free), then recycle the
             // target slot for a NEW tower with a DIFFERENT base attack speed. The new tower
             // is placed far away from the new sharer, so no sharing happens this pass — its
             // attack speed must remain at its base 4.0 (proving the cache was invalidated).
-            store.DestroyEntity(sharer);
-            store.DestroyEntity(target);
+            Store.DestroyEntity(sharer);
+            Store.DestroyEntity(target);
 
-            int newTarget = PlaceTower(store, target, 5f, 0f, attackSpeed: 4.0f);
-            int newSharer = PlaceTower(store, 2, 4f, 0f, attackSpeed: 1f);
-            store.SetTowerBuffShareRadius(newSharer, 8f);
-            store.SetTowerBuffShareMask(newSharer, BuffShareConfig.ShareAttackSpeed);
+            int newTarget = PlaceTower(target, 5f, 0f, attackSpeed: 4.0f);
+            int newSharer = PlaceTower(2, 4f, 0f, attackSpeed: 1f);
+            Store.SetTowerBuffShareRadius(newSharer, 8f);
+            Store.SetTowerBuffShareMask(newSharer, BuffShareConfig.ShareAttackSpeed);
 
             sys.ResolveBuffShares();
 
             // The new tower is in range of newSharer, so it gets 4.0 × (1+eff) shared.
             // If the cache entry from the old tower leaked, the new tower would first
             // be reset to 2.5 (old base) and then shared → 2.5 × (1+eff) ≈ 3.25.
-            Assert.Equal(4.0f * (1f + eff), store.TowerAttackSpeed[newTarget], 4);
+            Assert.Equal(4.0f * (1f + eff), Store.TowerAttackSpeed[newTarget], 4);
         }
 
         [Fact]
@@ -407,26 +350,25 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             // Direct test of the public invalidation API. Without invalidation, the cached
             // base would survive a frame even after the sharer is removed, leading to a
             // one-frame stale restore. With invalidation, the entry is gone immediately.
-            var store = new ComponentStore();
-            int t = PlaceTower(store, 0, 0f, 0f, attackSpeed: 1f);
-            store.SetTowerBuffShareRadius(t, 8f);
-            store.SetTowerBuffShareMask(t, BuffShareConfig.ShareAttackSpeed);
+            int t = PlaceTower(0, 0f, 0f, attackSpeed: 1f);
+            Store.SetTowerBuffShareRadius(t, 8f);
+            Store.SetTowerBuffShareMask(t, BuffShareConfig.ShareAttackSpeed);
 
             // Need at least one target to seed the cache.
-            int target = PlaceTower(store, 1, 1f, 0f, attackSpeed: 2f);
-            var sys = new TowerSynergySystem(store, NewRenderer());
+            int target = PlaceTower(1, 1f, 0f, attackSpeed: 2f);
+            var sys = new TowerSynergySystem(Store, Renderer);
             sys.ResolveBuffShares();
 
             float eff = BuffShareConfig.DefaultShareEfficiencyPct;
             // target was shared — speed is now 2 * (1+eff)
-            Assert.Equal(2f * (1f + eff), store.TowerAttackSpeed[target], 4);
+            Assert.Equal(2f * (1f + eff), Store.TowerAttackSpeed[target], 4);
 
             // Remove the sharer (DestroyEntity fires OnTowerEntityInvalidated which auto-
             // invalidates the cache). After this, the target's attack speed must be the
             // base 2.0 (restored on next ResolveBuffShares).
-            store.DestroyEntity(t);
+            Store.DestroyEntity(t);
             sys.ResolveBuffShares();
-            Assert.Equal(2f, store.TowerAttackSpeed[target], 4);
+            Assert.Equal(2f, Store.TowerAttackSpeed[target], 4);
         }
     }
 }

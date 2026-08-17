@@ -1,25 +1,43 @@
 using BattleSystemECS.Tests.Infrastructure;
 using System;
 using Xunit;
+using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
 
 namespace BattleSystemECS.Tests.Features.Economy
 {
-    public class ShopRerollSystemTests
+    public class ShopRerollSystemTests : BattleTestBase
     {
-        private (ComponentStore store, GameConfig config, int playerId) CreateEnv()
+        private (GameConfig config, int playerId) CreateEnv()
         {
-            var store = new ComponentStore();
-            int id = store.CreateEntity();
-            store.PlayerMaxHealth[id] = 200f;
-            store.PlayerCurrentHealth[id] = 200f;
-            store.PlayerGold[id] = 1000f;
-            store.PositionX[id] = 5f;
-            store.PositionY[id] = 0f;
-            var config = new GameConfig();
-            return (store, config, id);
+            int id = Store.CreateEntity();
+            Store.PlayerMaxHealth[id] = 200f;
+            Store.PlayerCurrentHealth[id] = 200f;
+            Store.PlayerGold[id] = 1000f;
+            Store.PositionX[id] = 5f;
+            Store.PositionY[id] = 0f;
+            return (Config, id);
+        }
+
+        /// <summary>GetOffer 结构契约：有效 offer 必须能映射回注入配置池；无效 offer 的 typeId 必须为 0。</summary>
+        private static void AssertOfferConsistentWithConfig(ShopOffer offer, GameConfig config)
+        {
+            if (!offer.IsValid)
+            {
+                Assert.Equal(0, offer.TypeId);
+                return;
+            }
+            Assert.InRange(offer.RarityTier, 0, 2);
+            if (offer.IsTower)
+            {
+                Assert.Contains(config.TowerTypes, t => (int)t.Type == offer.TypeId);
+            }
+            else
+            {
+                Assert.InRange(offer.TypeId, 1, config.Skills.Count);
+            }
         }
 
         [Fact]
@@ -40,80 +58,70 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void OnEnterBuildPhase_ResetsRerollCountAndRollsOffers()
         {
-            var (store, config, pid) = CreateEnv();
-            var r = new MockRenderer();
-            var sys = new ShopRerollSystem(store, r, config, pid, seed: 42);
+            var (config, pid) = CreateEnv();
+            var sys = new ShopRerollSystem(Store, Renderer, config, pid, seed: 42);
 
             sys.OnEnterBuildPhase();
 
-            Assert.Equal(0, store.PlayerShopRerollCount[pid]);
+            Assert.Equal(0, Store.PlayerShopRerollCount[pid]);
 
-            // Pity counters may be > 0 after initial rolls (no Rare/Epic seen yet)
-            // but they must not exceed the configured thresholds.
-            Assert.True(store.PlayerShopPityRare[pid] >= 0);
-            Assert.True(store.PlayerShopPityRare[pid] <= config.ShopReroll.PityRareThreshold);
-            Assert.True(store.PlayerShopPityEpic[pid] >= 0);
-            Assert.True(store.PlayerShopPityEpic[pid] <= config.ShopReroll.PityEpicThreshold);
+            // Pity counters must stay within [0, threshold] after initial rolls.
+            Assert.InRange(Store.PlayerShopPityRare[pid], 0, config.ShopReroll.PityRareThreshold);
+            Assert.InRange(Store.PlayerShopPityEpic[pid], 0, config.ShopReroll.PityEpicThreshold);
 
-            // Slots 0..2 should be populated (with no tower/skill configs in test
-            // config, typeId is 0 — i.e., no offers — but the slots are still cleared).
-            int baseIdx = pid * ComponentStore.MAX_SHOP_OFFER_SLOTS;
+            // 初始 roll 后每个槽位都必须满足 GetOffer 结构契约（有效→可映射，无效→typeId=0）。
             int slots = config.ShopReroll.OfferSlotCount;
-            // Just confirm we can read every slot without crashing.
             for (int i = 0; i < slots; i++)
             {
-                _ = store.PlayerShopOfferTypeId[baseIdx + i];
+                AssertOfferConsistentWithConfig(sys.GetOffer(i), config);
             }
         }
 
         [Fact]
         public void RerollOffers_ChargesGoldAndIncrementsCount()
         {
-            var (store, config, pid) = CreateEnv();
-            var r = new MockRenderer();
-            var sys = new ShopRerollSystem(store, r, config, pid, seed: 42);
+            var (config, pid) = CreateEnv();
+            var sys = new ShopRerollSystem(Store, Renderer, config, pid, seed: 42);
 
             sys.OnEnterBuildPhase();
-            float goldBefore = store.GetPlayerGold(pid);
+            float goldBefore = Store.GetPlayerGold(pid);
 
             bool ok = sys.RerollOffers();
             Assert.True(ok);
-            Assert.Equal(1, store.PlayerShopRerollCount[pid]);
-            // First reroll costs 5g (default CostCurve[0])
-            Assert.Equal(goldBefore - 5f, store.GetPlayerGold(pid), 1);
+            Assert.Equal(1, Store.PlayerShopRerollCount[pid]);
+            // 首次 reroll 费用必须等于 CostCurve[0]（期望从读取的配置推导）。
+            Assert.Equal(goldBefore - config.ShopReroll.CostCurve[0], Store.GetPlayerGold(pid), 1);
         }
 
         [Fact]
         public void RerollOffers_CostEscalatesAlongCurve()
         {
-            var (store, config, pid) = CreateEnv();
-            var r = new MockRenderer();
-            var sys = new ShopRerollSystem(store, r, config, pid, seed: 42);
+            var (config, pid) = CreateEnv();
+            var sys = new ShopRerollSystem(Store, Renderer, config, pid, seed: 42);
 
             // Override cost curve to known values
             config.ShopReroll.CostCurve = new float[] { 10f, 25f, 50f, 100f };
 
             sys.OnEnterBuildPhase();
-            float start = store.GetPlayerGold(pid);
+            float start = Store.GetPlayerGold(pid);
 
             Assert.True(sys.RerollOffers());
-            Assert.Equal(start - 10f, store.GetPlayerGold(pid), 1);
+            Assert.Equal(start - 10f, Store.GetPlayerGold(pid), 1);
 
             Assert.True(sys.RerollOffers());
-            Assert.Equal(start - 10f - 25f, store.GetPlayerGold(pid), 1);
+            Assert.Equal(start - 10f - 25f, Store.GetPlayerGold(pid), 1);
 
             Assert.True(sys.RerollOffers());
-            Assert.Equal(start - 10f - 25f - 50f, store.GetPlayerGold(pid), 1);
+            Assert.Equal(start - 10f - 25f - 50f, Store.GetPlayerGold(pid), 1);
         }
 
         [Fact]
         public void RerollOffers_RespectsMaxRerollsPerPhase()
         {
-            var (store, config, pid) = CreateEnv();
+            var (config, pid) = CreateEnv();
             config.ShopReroll.MaxRerollsPerPhase = 2;
             config.ShopReroll.CostCurve = new float[] { 1f, 1f, 1f };
-            var r = new MockRenderer();
-            var sys = new ShopRerollSystem(store, r, config, pid, seed: 1);
+            var sys = new ShopRerollSystem(Store, Renderer, config, pid, seed: 1);
 
             sys.OnEnterBuildPhase();
 
@@ -121,34 +129,32 @@ namespace BattleSystemECS.Tests.Features.Economy
             Assert.True(sys.RerollOffers());
             // Third reroll should be denied by the cap
             Assert.False(sys.RerollOffers());
-            Assert.Equal(2, store.PlayerShopRerollCount[pid]);
+            Assert.Equal(2, Store.PlayerShopRerollCount[pid]);
         }
 
         [Fact]
         public void RerollOffers_FailsWhenNotEnoughGold()
         {
-            var (store, config, pid) = CreateEnv();
+            var (config, pid) = CreateEnv();
             config.ShopReroll.CostCurve = new float[] { 9999f };
-            var r = new MockRenderer();
-            var sys = new ShopRerollSystem(store, r, config, pid, seed: 1);
+            var sys = new ShopRerollSystem(Store, Renderer, config, pid, seed: 1);
 
             sys.OnEnterBuildPhase();
 
             Assert.False(sys.RerollOffers());
-            Assert.Equal(0, store.PlayerShopRerollCount[pid]);
+            Assert.Equal(0, Store.PlayerShopRerollCount[pid]);
         }
 
         [Fact]
         public void RerollOffers_FailsWhenDisabled()
         {
-            var (store, config, pid) = CreateEnv();
+            var (config, pid) = CreateEnv();
             config.ShopReroll.Enabled = false;
-            var r = new MockRenderer();
-            var sys = new ShopRerollSystem(store, r, config, pid, seed: 1);
+            var sys = new ShopRerollSystem(Store, Renderer, config, pid, seed: 1);
 
             sys.OnEnterBuildPhase();  // should be a no-op
             // RerollCount was never set because OnEnterBuildPhase bailed
-            Assert.Equal(0, store.PlayerShopRerollCount[pid]);
+            Assert.Equal(0, Store.PlayerShopRerollCount[pid]);
 
             Assert.False(sys.RerollOffers());
         }
@@ -156,16 +162,13 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void PityCounters_NeverExceedThreshold()
         {
-            var (store, config, pid) = CreateEnv();
-            var r = new MockRenderer();
-            var sys = new ShopRerollSystem(store, r, config, pid, seed: 7);
+            var (config, pid) = CreateEnv();
+            var sys = new ShopRerollSystem(Store, Renderer, config, pid, seed: 7);
 
             sys.OnEnterBuildPhase();
             // Pity counters after initial rolls — must be within bounds
-            Assert.True(store.PlayerShopPityRare[pid] <= config.ShopReroll.PityRareThreshold,
-                "PityRare should be reset or capped at threshold");
-            Assert.True(store.PlayerShopPityEpic[pid] <= config.ShopReroll.PityEpicThreshold,
-                "PityEpic should be reset or capped at threshold");
+            Assert.InRange(Store.PlayerShopPityRare[pid], 0, config.ShopReroll.PityRareThreshold);
+            Assert.InRange(Store.PlayerShopPityEpic[pid], 0, config.ShopReroll.PityEpicThreshold);
 
             // Reroll several times with a cheap cost curve.
             config.ShopReroll.CostCurve = new float[] { 1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f };
@@ -174,37 +177,39 @@ namespace BattleSystemECS.Tests.Features.Economy
                 if (!sys.RerollOffers()) break;
             }
             // After many rerolls, pity should still be bounded (forced Rare/Epic resets it)
-            Assert.True(store.PlayerShopPityRare[pid] <= config.ShopReroll.PityRareThreshold);
-            Assert.True(store.PlayerShopPityEpic[pid] <= config.ShopReroll.PityEpicThreshold);
+            Assert.InRange(Store.PlayerShopPityRare[pid], 0, config.ShopReroll.PityRareThreshold);
+            Assert.InRange(Store.PlayerShopPityEpic[pid], 0, config.ShopReroll.PityEpicThreshold);
         }
 
         [Fact]
         public void GetOffer_ReturnsValidOfferAfterPhaseEnter()
         {
-            var (store, config, pid) = CreateEnv();
-            var r = new MockRenderer();
-            var sys = new ShopRerollSystem(store, r, config, pid, seed: 99);
+            var (config, pid) = CreateEnv();
+            // 显式注入 tower/skill 池，让 RollOffers 产生真实可映射的 typeId。
+            config.TowerTypes.Add(new TowerConfig { Type = TowerType.AOE, Cost = 50f });
+            config.Skills.Add(new SkillConfig { Name = "Fireball", ManaCost = 10f });
+            var sys = new ShopRerollSystem(Store, Renderer, config, pid, seed: 99);
 
             sys.OnEnterBuildPhase();
 
-            // No tower/skill configs in the test config, so offers may be empty.
-            // We just check that GetOffer doesn't crash for any slot.
             for (int i = 0; i < config.ShopReroll.OfferSlotCount; i++)
             {
                 var offer = sys.GetOffer(i);
-                // With empty tower/skill lists, IsValid is false (no offer rolled)
-                // The contract is just: method returns without throwing.
-                _ = offer;
+                Assert.True(offer.IsValid, $"slot {i} should be valid after a real roll");
+                AssertOfferConsistentWithConfig(offer, config);
             }
+
+            // 越界槽位契约：返回无效 offer。
+            Assert.False(sys.GetOffer(-1).IsValid);
+            Assert.False(sys.GetOffer(config.ShopReroll.OfferSlotCount).IsValid);
         }
 
         [Fact]
         public void GetRerollCost_FollowsCurve()
         {
-            var (store, config, pid) = CreateEnv();
+            var (config, pid) = CreateEnv();
             config.ShopReroll.CostCurve = new float[] { 7f, 14f, 28f };
-            var r = new MockRenderer();
-            var sys = new ShopRerollSystem(store, r, config, pid, seed: 1);
+            var sys = new ShopRerollSystem(Store, Renderer, config, pid, seed: 1);
 
             Assert.Equal(7f, sys.GetRerollCost(0));
             Assert.Equal(14f, sys.GetRerollCost(1));
@@ -216,11 +221,10 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void GetRemainingRerolls_TracksUsage()
         {
-            var (store, config, pid) = CreateEnv();
+            var (config, pid) = CreateEnv();
             config.ShopReroll.MaxRerollsPerPhase = 3;
             config.ShopReroll.CostCurve = new float[] { 1f, 1f, 1f };
-            var r = new MockRenderer();
-            var sys = new ShopRerollSystem(store, r, config, pid, seed: 1);
+            var sys = new ShopRerollSystem(Store, Renderer, config, pid, seed: 1);
 
             sys.OnEnterBuildPhase();
             Assert.Equal(3, sys.GetRemainingRerolls());
@@ -235,14 +239,13 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void Update_NoOp_StaysClean()
         {
-            var (store, config, pid) = CreateEnv();
-            var r = new MockRenderer();
-            var sys = new ShopRerollSystem(store, r, config, pid, seed: 1);
+            var (config, pid) = CreateEnv();
+            var sys = new ShopRerollSystem(Store, Renderer, config, pid, seed: 1);
 
-            // Update() is a BuildPhase no-op. Just call it and ensure no exception.
+            // Update() 是 BuildPhase 空实现：调用后阶段状态必须保持不变（reroll 计数仍为 0）。
             sys.Update();
             sys.Update();
-            Assert.Equal(0, store.PlayerShopRerollCount[pid]);
+            Assert.Equal(0, Store.PlayerShopRerollCount[pid]);
         }
     }
 }

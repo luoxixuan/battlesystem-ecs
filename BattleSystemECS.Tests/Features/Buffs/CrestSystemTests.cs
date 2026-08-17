@@ -38,32 +38,24 @@ namespace BattleSystemECS.Tests.Features.Buffs
     /// 13. Update() is a no-op (event-driven system).
     /// 14. SubscribeToWaveEvents is idempotent.
     /// </summary>
-    public class CrestSystemTests
+    public class CrestSystemTests : BattleTestBase
     {
         private const int PlayerId = 0;
-        private const int EnemyA = 0;
-        private const int EnemyB = 1;
 
-        private static GameConfig MakeConfig(
+        private (CrestSystem sys, WaveSpawningSystem wave) MakeSystem(
             bool enabled = true,
             CrestDef[]? crests = null)
         {
-            return new GameConfig
+            Config.Crest = new CrestConfig
             {
-                Crest = new CrestConfig
-                {
-                    Enabled = enabled,
-                    Crests = crests ?? Array.Empty<CrestDef>()
-                }
+                Enabled = enabled,
+                Crests = crests ?? Array.Empty<CrestDef>()
             };
-        }
-
-        private static CrestSystem MakeSystem(ComponentStore store, GameConfig cfg, WaveSpawningSystem waveSpawning)
-        {
-            var sys = new CrestSystem(store, cfg);
-            sys.SetWaveSpawningSystem(waveSpawning);
+            var wave = new WaveSpawningSystem(Store, Renderer, Config);
+            var sys = new CrestSystem(Store, Config);
+            sys.SetWaveSpawningSystem(wave);
             sys.SubscribeToWaveEvents();
-            return sys;
+            return (sys, wave);
         }
 
         /// <summary>
@@ -98,22 +90,20 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void DefaultState_NewComponentStore_EnemyCrestFieldsAtFastPath()
         {
-            var store = new ComponentStore();
             // 1f damage mult = no buff (fast path)
-            Assert.Equal(1f, store.EnemyCrestDamageMult[0]);
-            Assert.Equal(1f, store.EnemyCrestDamageMult[100]);
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[0]);
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[100]);
             // 0f regen = no regen (fast path)
-            Assert.Equal(0f, store.EnemyCrestRegenPerSec[0]);
-            Assert.Equal(0f, store.EnemyCrestRegenPerSec[100]);
+            Assert.Equal(0f, Store.EnemyCrestRegenPerSec[0]);
+            Assert.Equal(0f, Store.EnemyCrestRegenPerSec[100]);
         }
 
         [Fact]
         public void DefaultState_NewComponentStore_PlayerCrestFieldsAtFastPath()
         {
-            var store = new ComponentStore();
-            Assert.Equal(1f, store.PlayerCrestDamageMult[PlayerId]);
-            Assert.Equal(1f, store.PlayerCrestGoldMult[PlayerId]);
-            Assert.True(string.IsNullOrEmpty(store.PlayerCrestActiveId[PlayerId]));
+            Assert.Equal(1f, Store.PlayerCrestDamageMult[PlayerId]);
+            Assert.Equal(1f, Store.PlayerCrestGoldMult[PlayerId]);
+            Assert.True(string.IsNullOrEmpty(Store.PlayerCrestActiveId[PlayerId]));
         }
 
         [Fact]
@@ -143,26 +133,24 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void AddEnemy_ResetsCrestCacheToDefaults()
         {
-            var store = new ComponentStore();
             // Pre-corrupt
-            store.EnemyCrestDamageMult[0] = 5f;
-            store.EnemyCrestRegenPerSec[0] = 99f;
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            Assert.Equal(1f, store.EnemyCrestDamageMult[eid]);
-            Assert.Equal(0f, store.EnemyCrestRegenPerSec[eid]);
+            Store.EnemyCrestDamageMult[0] = 5f;
+            Store.EnemyCrestRegenPerSec[0] = 99f;
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[eid]);
+            Assert.Equal(0f, Store.EnemyCrestRegenPerSec[eid]);
         }
 
         [Fact]
         public void AddPlayer_ResetsCrestCacheToDefaults()
         {
-            var store = new ComponentStore();
-            store.PlayerCrestDamageMult[PlayerId] = 5f;
-            store.PlayerCrestGoldMult[PlayerId] = 5f;
-            store.PlayerCrestActiveId[PlayerId] = "garbage";
-            store.AddPlayer(PlayerId, 5f, 1f, 100f, 1);
-            Assert.Equal(1f, store.PlayerCrestDamageMult[PlayerId]);
-            Assert.Equal(1f, store.PlayerCrestGoldMult[PlayerId]);
-            Assert.True(string.IsNullOrEmpty(store.PlayerCrestActiveId[PlayerId]));
+            Store.PlayerCrestDamageMult[PlayerId] = 5f;
+            Store.PlayerCrestGoldMult[PlayerId] = 5f;
+            Store.PlayerCrestActiveId[PlayerId] = "garbage";
+            Store.AddPlayer(PlayerId, 5f, 1f, 100f, 1);
+            Assert.Equal(1f, Store.PlayerCrestDamageMult[PlayerId]);
+            Assert.Equal(1f, Store.PlayerCrestGoldMult[PlayerId]);
+            Assert.True(string.IsNullOrEmpty(Store.PlayerCrestActiveId[PlayerId]));
         }
 
         // ─── Disabled config / empty roster — OnWaveStart no-op ─────────
@@ -170,31 +158,25 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void OnWaveStart_DisabledConfig_NoOp()
         {
-            var cfg = MakeConfig(enabled: false, crests: new[]
+            var (sys, wave) = MakeSystem(enabled: false, crests: new[]
             {
                 new CrestDef { Id = "CrestOfFury", TriggerWaves = new[] { 1 }, TargetScope = "enemy", EnemyDamageMult = 1.5f }
             });
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            store.AddPlayer(PlayerId, 5f, 1f, 100f, 1);
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = MakeSystem(store, cfg, wave);
+            int eid = Enemy();
+            Player();
             FireOnWaveStart(wave);
-            Assert.Equal(1f, store.EnemyCrestDamageMult[eid]);
-            Assert.Equal(0f, store.EnemyCrestRegenPerSec[eid]);
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[eid]);
+            Assert.Equal(0f, Store.EnemyCrestRegenPerSec[eid]);
         }
 
         [Fact]
         public void OnWaveStart_EmptyRoster_NoOp()
         {
-            var cfg = MakeConfig(enabled: true, crests: Array.Empty<CrestDef>());
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = MakeSystem(store, cfg, wave);
+            var (sys, wave) = MakeSystem(enabled: true, crests: Array.Empty<CrestDef>());
+            int eid = Enemy();
             FireOnWaveStart(wave);
-            Assert.Equal(1f, store.EnemyCrestDamageMult[eid]);
-            Assert.Equal(0f, store.EnemyCrestRegenPerSec[eid]);
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[eid]);
+            Assert.Equal(0f, Store.EnemyCrestRegenPerSec[eid]);
         }
 
         // ─── Trigger match + scope routing (currentWave defaults to 1) ──
@@ -202,67 +184,58 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void OnWaveStart_EnemyScope_StampsEnemyLeavesPlayer()
         {
-            var cfg = MakeConfig(crests: new[]
+            var (sys, wave) = MakeSystem(crests: new[]
             {
                 new CrestDef { Id = "CrestOfFury", TriggerWaves = new[] { 1 }, TargetScope = "enemy", EnemyDamageMult = 1.20f, EnemyRegenPerSec = 3f }
             });
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            store.AddPlayer(PlayerId, 5f, 1f, 100f, 1);
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = MakeSystem(store, cfg, wave);
+            int eid = Enemy();
+            Player();
             FireOnWaveStart(wave);
             // Enemy fields stamped
-            Assert.Equal(1.20f, store.EnemyCrestDamageMult[eid]);
-            Assert.Equal(3f, store.EnemyCrestRegenPerSec[eid]);
+            Assert.Equal(1.20f, Store.EnemyCrestDamageMult[eid]);
+            Assert.Equal(3f, Store.EnemyCrestRegenPerSec[eid]);
             // Player fields untouched (1f fast path)
-            Assert.Equal(1f, store.PlayerCrestDamageMult[PlayerId]);
-            Assert.Equal(1f, store.PlayerCrestGoldMult[PlayerId]);
+            Assert.Equal(1f, Store.PlayerCrestDamageMult[PlayerId]);
+            Assert.Equal(1f, Store.PlayerCrestGoldMult[PlayerId]);
             // PlayerCrestActiveId reflects the first matching crest id
-            Assert.Equal("CrestOfFury", store.PlayerCrestActiveId[PlayerId]);
+            Assert.Equal("CrestOfFury", Store.PlayerCrestActiveId[PlayerId]);
         }
 
         [Fact]
         public void OnWaveStart_PlayerScope_StampsPlayerLeavesEnemy()
         {
-            var cfg = MakeConfig(crests: new[]
+            var (sys, wave) = MakeSystem(crests: new[]
             {
                 new CrestDef { Id = "CrestOfBounty", TriggerWaves = new[] { 1 }, TargetScope = "player", PlayerDamageMult = 1.15f, PlayerGoldMult = 1.50f }
             });
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            store.AddPlayer(PlayerId, 5f, 1f, 100f, 1);
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = MakeSystem(store, cfg, wave);
+            int eid = Enemy();
+            Player();
             FireOnWaveStart(wave);
             // Enemy fields untouched (1f/0f fast path)
-            Assert.Equal(1f, store.EnemyCrestDamageMult[eid]);
-            Assert.Equal(0f, store.EnemyCrestRegenPerSec[eid]);
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[eid]);
+            Assert.Equal(0f, Store.EnemyCrestRegenPerSec[eid]);
             // Player fields stamped
-            Assert.Equal(1.15f, store.PlayerCrestDamageMult[PlayerId]);
-            Assert.Equal(1.50f, store.PlayerCrestGoldMult[PlayerId]);
-            Assert.Equal("CrestOfBounty", store.PlayerCrestActiveId[PlayerId]);
+            Assert.Equal(1.15f, Store.PlayerCrestDamageMult[PlayerId]);
+            Assert.Equal(1.50f, Store.PlayerCrestGoldMult[PlayerId]);
+            Assert.Equal("CrestOfBounty", Store.PlayerCrestActiveId[PlayerId]);
         }
 
         [Fact]
         public void OnWaveStart_BothScope_StampsBothEnemyAndPlayer()
         {
-            var cfg = MakeConfig(crests: new[]
+            var (sys, wave) = MakeSystem(crests: new[]
             {
                 new CrestDef { Id = "CrestOfFortitude", TriggerWaves = new[] { 1 }, TargetScope = "both", EnemyDamageMult = 1.10f, EnemyRegenPerSec = 2f, PlayerDamageMult = 1.10f, PlayerGoldMult = 1.20f }
             });
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            store.AddPlayer(PlayerId, 5f, 1f, 100f, 1);
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = MakeSystem(store, cfg, wave);
+            int eid = Enemy();
+            Player();
             FireOnWaveStart(wave);
             // Enemy fields stamped
-            Assert.Equal(1.10f, store.EnemyCrestDamageMult[eid]);
-            Assert.Equal(2f, store.EnemyCrestRegenPerSec[eid]);
+            Assert.Equal(1.10f, Store.EnemyCrestDamageMult[eid]);
+            Assert.Equal(2f, Store.EnemyCrestRegenPerSec[eid]);
             // Player fields stamped
-            Assert.Equal(1.10f, store.PlayerCrestDamageMult[PlayerId]);
-            Assert.Equal(1.20f, store.PlayerCrestGoldMult[PlayerId]);
+            Assert.Equal(1.10f, Store.PlayerCrestDamageMult[PlayerId]);
+            Assert.Equal(1.20f, Store.PlayerCrestGoldMult[PlayerId]);
         }
 
         // ─── Non-matching wave index → no-op ───────────────────────────
@@ -272,23 +245,20 @@ namespace BattleSystemECS.Tests.Features.Buffs
         {
             // currentWave defaults to 1, so crests with TriggerWaves that
             // don't include 1 should not fire.
-            var cfg = MakeConfig(crests: new[]
+            var (sys, wave) = MakeSystem(crests: new[]
             {
                 new CrestDef { Id = "Fury", TriggerWaves = new[] { 4, 7, 10 }, TargetScope = "enemy", EnemyDamageMult = 1.5f, EnemyRegenPerSec = 5f },
                 new CrestDef { Id = "Bounty", TriggerWaves = new[] { 5 }, TargetScope = "player", PlayerGoldMult = 1.5f }
             });
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            store.AddPlayer(PlayerId, 5f, 1f, 100f, 1);
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = MakeSystem(store, cfg, wave);
+            int eid = Enemy();
+            Player();
             FireOnWaveStart(wave);
             // No crest matched wave 1 → defaults preserved
-            Assert.Equal(1f, store.EnemyCrestDamageMult[eid]);
-            Assert.Equal(0f, store.EnemyCrestRegenPerSec[eid]);
-            Assert.Equal(1f, store.PlayerCrestDamageMult[PlayerId]);
-            Assert.Equal(1f, store.PlayerCrestGoldMult[PlayerId]);
-            Assert.True(string.IsNullOrEmpty(store.PlayerCrestActiveId[PlayerId]));
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[eid]);
+            Assert.Equal(0f, Store.EnemyCrestRegenPerSec[eid]);
+            Assert.Equal(1f, Store.PlayerCrestDamageMult[PlayerId]);
+            Assert.Equal(1f, Store.PlayerCrestGoldMult[PlayerId]);
+            Assert.True(string.IsNullOrEmpty(Store.PlayerCrestActiveId[PlayerId]));
         }
 
         // ─── Multi-crest composition (multiplicative / additive) ───────
@@ -299,20 +269,17 @@ namespace BattleSystemECS.Tests.Features.Buffs
             // Two enemy-scope crests both fire on wave 1.
             // 1.20 * 1.50 = 1.80 → 1.80f damage mult.
             // 3.0 + 2.0 = 5.0 additive regen.
-            var cfg = MakeConfig(crests: new[]
+            var (sys, wave) = MakeSystem(crests: new[]
             {
                 new CrestDef { Id = "Fury", TriggerWaves = new[] { 1 }, TargetScope = "enemy", EnemyDamageMult = 1.20f, EnemyRegenPerSec = 3f },
                 new CrestDef { Id = "TideOfHealing", TriggerWaves = new[] { 1 }, TargetScope = "enemy", EnemyDamageMult = 1.50f, EnemyRegenPerSec = 2f }
             });
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = MakeSystem(store, cfg, wave);
+            int eid = Enemy();
             FireOnWaveStart(wave);
-            Assert.Equal(1.80f, store.EnemyCrestDamageMult[eid], 4);
-            Assert.Equal(5f, store.EnemyCrestRegenPerSec[eid], 4);
+            Assert.Equal(1.80f, Store.EnemyCrestDamageMult[eid], 4);
+            Assert.Equal(5f, Store.EnemyCrestRegenPerSec[eid], 4);
             // First matching crest id is the one cached
-            Assert.Equal("Fury", store.PlayerCrestActiveId[PlayerId]);
+            Assert.Equal("Fury", Store.PlayerCrestActiveId[PlayerId]);
         }
 
         // ─── Per-frame Update is a no-op ───────────────────────────────
@@ -320,20 +287,17 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void Update_IsNoOp()
         {
-            var cfg = MakeConfig(crests: new[]
+            var (sys, wave) = MakeSystem(crests: new[]
             {
                 new CrestDef { Id = "Fury", TriggerWaves = new[] { 1 }, TargetScope = "enemy", EnemyDamageMult = 1.5f }
             });
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = MakeSystem(store, cfg, wave);
+            int eid = Enemy();
             // Per-frame tick — must be a no-op.
             sys.Update(0.016f);
             sys.Update(1.0f);
             sys.Update(0f);
-            Assert.Equal(1f, store.EnemyCrestDamageMult[eid]);
-            Assert.Equal(0f, store.EnemyCrestRegenPerSec[eid]);
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[eid]);
+            Assert.Equal(0f, Store.EnemyCrestRegenPerSec[eid]);
         }
 
         // ─── OnWaveComplete reset path ────────────────────────────────
@@ -341,34 +305,28 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void OnWaveComplete_ResetsEnemyCachesToDefaults()
         {
-            var cfg = MakeConfig(crests: Array.Empty<CrestDef>());
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
+            var (sys, wave) = MakeSystem(crests: Array.Empty<CrestDef>());
+            int eid = Enemy();
             // Pre-corrupt
-            store.EnemyCrestDamageMult[eid] = 1.75f;
-            store.EnemyCrestRegenPerSec[eid] = 12f;
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = MakeSystem(store, cfg, wave);
+            Store.EnemyCrestDamageMult[eid] = 1.75f;
+            Store.EnemyCrestRegenPerSec[eid] = 12f;
             FireOnWaveComplete(wave);
-            Assert.Equal(1f, store.EnemyCrestDamageMult[eid]);
-            Assert.Equal(0f, store.EnemyCrestRegenPerSec[eid]);
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[eid]);
+            Assert.Equal(0f, Store.EnemyCrestRegenPerSec[eid]);
         }
 
         [Fact]
         public void OnWaveComplete_ResetsPlayerCachesToDefaults()
         {
-            var cfg = MakeConfig(crests: Array.Empty<CrestDef>());
-            var store = new ComponentStore();
-            store.AddPlayer(PlayerId, 5f, 1f, 100f, 1);
-            store.PlayerCrestDamageMult[PlayerId] = 2f;
-            store.PlayerCrestGoldMult[PlayerId] = 3f;
-            store.PlayerCrestActiveId[PlayerId] = "stale";
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = MakeSystem(store, cfg, wave);
+            var (sys, wave) = MakeSystem(crests: Array.Empty<CrestDef>());
+            Player();
+            Store.PlayerCrestDamageMult[PlayerId] = 2f;
+            Store.PlayerCrestGoldMult[PlayerId] = 3f;
+            Store.PlayerCrestActiveId[PlayerId] = "stale";
             FireOnWaveComplete(wave);
-            Assert.Equal(1f, store.PlayerCrestDamageMult[PlayerId]);
-            Assert.Equal(1f, store.PlayerCrestGoldMult[PlayerId]);
-            Assert.True(string.IsNullOrEmpty(store.PlayerCrestActiveId[PlayerId]));
+            Assert.Equal(1f, Store.PlayerCrestDamageMult[PlayerId]);
+            Assert.Equal(1f, Store.PlayerCrestGoldMult[PlayerId]);
+            Assert.True(string.IsNullOrEmpty(Store.PlayerCrestActiveId[PlayerId]));
         }
 
         [Fact]
@@ -376,17 +334,14 @@ namespace BattleSystemECS.Tests.Features.Buffs
         {
             // Cleanup is unconditional: disabled-then-enabled sessions
             // shouldn't see stale data.
-            var cfg = MakeConfig(enabled: false);
-            var store = new ComponentStore();
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            store.AddPlayer(PlayerId, 5f, 1f, 100f, 1);
-            store.EnemyCrestDamageMult[eid] = 9f;
-            store.PlayerCrestDamageMult[PlayerId] = 9f;
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = MakeSystem(store, cfg, wave);
+            var (sys, wave) = MakeSystem(enabled: false);
+            int eid = Enemy();
+            Player();
+            Store.EnemyCrestDamageMult[eid] = 9f;
+            Store.PlayerCrestDamageMult[PlayerId] = 9f;
             FireOnWaveComplete(wave);
-            Assert.Equal(1f, store.EnemyCrestDamageMult[eid]);
-            Assert.Equal(1f, store.PlayerCrestDamageMult[PlayerId]);
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[eid]);
+            Assert.Equal(1f, Store.PlayerCrestDamageMult[PlayerId]);
         }
 
         // ─── SubscribeToWaveEvents idempotency ─────────────────────────
@@ -394,31 +349,40 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void SubscribeToWaveEvents_Idempotent()
         {
-            var cfg = MakeConfig(crests: Array.Empty<CrestDef>());
-            var store = new ComponentStore();
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = new CrestSystem(store, cfg);
-            sys.SetWaveSpawningSystem(wave);
+            var (sys, wave) = MakeSystem(crests: Array.Empty<CrestDef>());
             sys.SubscribeToWaveEvents();
             sys.SubscribeToWaveEvents();
             sys.SubscribeToWaveEvents();
             // No exception, no duplicate-handler side effect.
             // The cleanup path (OnWaveComplete) should still run exactly once.
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            store.EnemyCrestDamageMult[eid] = 5f;
+            int eid = Enemy();
+            Store.EnemyCrestDamageMult[eid] = 5f;
             FireOnWaveComplete(wave);
-            Assert.Equal(1f, store.EnemyCrestDamageMult[eid]);
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[eid]);
         }
 
         [Fact]
         public void SubscribeToWaveEvents_NullSpawner_NoOp()
         {
-            var cfg = MakeConfig(crests: Array.Empty<CrestDef>());
-            var store = new ComponentStore();
-            var sys = new CrestSystem(store, cfg);
-            // Don't call SetWaveSpawningSystem — spawner is null
+            Config.Crest = new CrestConfig
+            {
+                Enabled = true,
+                Crests = Array.Empty<CrestDef>()
+            };
+            var sys = new CrestSystem(Store, Config);
+            // 不注入 spawner 时先订阅：生产实现里 _waveSubscribed 不会被置位，
+            // 所以之后补注入 spawner 再订阅仍必须能正常挂上事件。
             sys.SubscribeToWaveEvents();
-            // No exception. Should be a safe no-op.
+
+            // 可观测证明：null 调用没有消费订阅机会——补注入真实 spawner 后
+            // 再订阅，触发 OnWaveComplete 时缓存必须被清回 1f。
+            int eid = Enemy();
+            Store.EnemyCrestDamageMult[eid] = 5f;
+            var wave = new WaveSpawningSystem(Store, Renderer, Config);
+            sys.SetWaveSpawningSystem(wave);
+            sys.SubscribeToWaveEvents();
+            FireOnWaveComplete(wave);
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[eid]);
         }
 
         // ─── EnemyActive / active-list filtering ──────────────────────
@@ -426,20 +390,17 @@ namespace BattleSystemECS.Tests.Features.Buffs
         [Fact]
         public void OnWaveComplete_OnlyResetsActiveEnemies()
         {
-            var cfg = MakeConfig(crests: Array.Empty<CrestDef>());
-            var store = new ComponentStore();
-            int e0 = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            int e1 = store.AddEnemy(1f, 0f, 1f, 100f, 100f, 10f, 5, 1);
-            store.EnemyActive[e1] = false;
-            store.EnemyCrestDamageMult[e0] = 5f;
-            store.EnemyCrestDamageMult[e1] = 7f;
-            var wave = new WaveSpawningSystem(store, new MockRenderer(), new GameConfig());
-            var sys = MakeSystem(store, cfg, wave);
+            var (sys, wave) = MakeSystem(crests: Array.Empty<CrestDef>());
+            int e0 = Enemy();
+            int e1 = Enemy(e => e.X = 1f);
+            Store.EnemyActive[e1] = false;
+            Store.EnemyCrestDamageMult[e0] = 5f;
+            Store.EnemyCrestDamageMult[e1] = 7f;
             FireOnWaveComplete(wave);
             // Active enemy reset
-            Assert.Equal(1f, store.EnemyCrestDamageMult[e0]);
+            Assert.Equal(1f, Store.EnemyCrestDamageMult[e0]);
             // Inactive enemy NOT reset (the system skips EnemyActive=false)
-            Assert.Equal(7f, store.EnemyCrestDamageMult[e1]);
+            Assert.Equal(7f, Store.EnemyCrestDamageMult[e1]);
         }
 
         // ─── JSON deserialization smoke test ──────────────────────────

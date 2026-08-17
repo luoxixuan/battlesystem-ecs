@@ -30,28 +30,27 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
     ///  17. DeathMarkConfig defaults
     ///  18. LoadConfig override replaces config
     /// </summary>
-    public class DeathMarkSystemTests
+    public class DeathMarkSystemTests : BattleTestBase
     {
         private const int PlayerId = 0;
         private const float DeltaTime = 1f / 60f;
 
         // ── Test helpers ────────────────────────────────────────────────
 
-        private static (DeathMarkSystem system, ComponentStore store) MakeSystem(DeathMarkConfig? config = null)
+        private DeathMarkSystem MakeSystem(DeathMarkConfig? config = null)
         {
-            var store = new ComponentStore();
-            store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
-            var system = new DeathMarkSystem(store, PlayerId);
+            Store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
+            var system = new DeathMarkSystem(Store, PlayerId);
             if (config != null) system.LoadConfig(config);
-            return (system, store);
+            return system;
         }
 
         /// <summary>Spawn a Death-Mark-eligible enemy with the given maxStacks / bonusPerStack.</summary>
-        private static int MakeMarkableEnemy(ComponentStore store, int maxStacks = 10, float bonusPerStack = 0.05f)
+        private int MakeMarkableEnemy(int maxStacks = 10, float bonusPerStack = 0.05f)
         {
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 5f, 10, 1, "TestEnemy");
-            store.EnemyDeathMarkMaxStacks[eid] = maxStacks;
-            store.EnemyDeathMarkBonusPerStack[eid] = bonusPerStack;
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 5f, 10, 1, "TestEnemy");
+            Store.EnemyDeathMarkMaxStacks[eid] = maxStacks;
+            Store.EnemyDeathMarkBonusPerStack[eid] = bonusPerStack;
             return eid;
         }
 
@@ -59,76 +58,75 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void DefaultState_AllFieldsZero()
         {
-            var store = new ComponentStore();
-            Assert.Equal(0, store.EnemyDeathMarkStacks[0]);
-            Assert.Equal(0f, store.EnemyDeathMarkTimer[0]);
-            Assert.Equal(0, store.EnemyDeathMarkMaxStacks[0]);
-            Assert.Equal(0f, store.EnemyDeathMarkBonusPerStack[0]);
+            Assert.Equal(0, Store.EnemyDeathMarkStacks[0]);
+            Assert.Equal(0f, Store.EnemyDeathMarkTimer[0]);
+            Assert.Equal(0, Store.EnemyDeathMarkMaxStacks[0]);
+            Assert.Equal(0f, Store.EnemyDeathMarkBonusPerStack[0]);
         }
 
         // ── 2. AddDeathMark increments stacks ───────────────────────────
         [Fact]
         public void AddDeathMark_IncrementsStacks()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store, maxStacks: 10);
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy(maxStacks: 10);
             int newStacks = sys.AddDeathMark(eid, 1);
             Assert.Equal(1, newStacks);
-            Assert.Equal(1, store.EnemyDeathMarkStacks[eid]);
-            Assert.True(store.EnemyDeathMarkTimer[eid] > 0f);
+            Assert.Equal(1, Store.EnemyDeathMarkStacks[eid]);
+            Assert.True(Store.EnemyDeathMarkTimer[eid] > 0f);
         }
 
         [Fact]
         public void AddDeathMark_StacksAccumulate()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store, maxStacks: 10);
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy(maxStacks: 10);
             sys.AddDeathMark(eid, 3);
             sys.AddDeathMark(eid, 2);
-            Assert.Equal(5, store.EnemyDeathMarkStacks[eid]);
+            Assert.Equal(5, Store.EnemyDeathMarkStacks[eid]);
         }
 
         // ── 3. Opt-out sentinel ─────────────────────────────────────────
         [Fact]
         public void AddDeathMark_OptOutEnemyIsNoOp()
         {
-            var (sys, store) = MakeSystem();
+            var sys = MakeSystem();
             // MakeMarkableEnemy sets MaxStacks; this one stays at default 0
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 5f, 10, 1, "E");
+            int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 5f, 10, 1, "E");
             int result = sys.AddDeathMark(eid, 5);
             Assert.Equal(0, result);
-            Assert.Equal(0, store.EnemyDeathMarkStacks[eid]);
+            Assert.Equal(0, Store.EnemyDeathMarkStacks[eid]);
         }
 
         // ── 4. ExecuteImmune cannot be Death Marked ─────────────────────
         [Fact]
         public void AddDeathMark_ExecuteImmuneIsNoOp()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store, maxStacks: 10);
-            store.EnemyExecuteImmune[eid] = true;
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy(maxStacks: 10);
+            Store.EnemyExecuteImmune[eid] = true;
             int result = sys.AddDeathMark(eid, 5);
             Assert.Equal(0, result);
-            Assert.Equal(0, store.EnemyDeathMarkStacks[eid]);
+            Assert.Equal(0, Store.EnemyDeathMarkStacks[eid]);
         }
 
         // ── 5. Hard cap clamping ────────────────────────────────────────
         [Fact]
         public void AddDeathMark_HardCappedAtConfigMaxStackCap()
         {
-            var (sys, store) = MakeSystem(new DeathMarkConfig { DecayInterval = 1f, MaxStackCap = 5 });
-            int eid = MakeMarkableEnemy(store, maxStacks: 20); // per-enemy cap 20, hard cap 5
+            var sys = MakeSystem(new DeathMarkConfig { DecayInterval = 1f, MaxStackCap = 5 });
+            int eid = MakeMarkableEnemy(maxStacks: 20); // per-enemy cap 20, hard cap 5
             int result = sys.AddDeathMark(eid, 100);
             Assert.Equal(5, result);
-            Assert.Equal(5, store.EnemyDeathMarkStacks[eid]);
+            Assert.Equal(5, Store.EnemyDeathMarkStacks[eid]);
         }
 
         // ── 6. Full stacks → auto-execute + event ───────────────────────
         [Fact]
         public void AddDeathMark_AtCapFiresEventAndQueuesDeath()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store, maxStacks: 3);
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy(maxStacks: 3);
 
             int firedEnemy = -1;
             int firedPlayer = -1;
@@ -136,35 +134,35 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             sys.OnDeathMarkFull += (en, pl, st) => { firedEnemy = en; firedPlayer = pl; firedStacks = st; };
 
             sys.AddDeathMark(eid, 3);
-            Assert.Equal(3, store.EnemyDeathMarkStacks[eid]);
+            Assert.Equal(3, Store.EnemyDeathMarkStacks[eid]);
             Assert.Equal(eid, firedEnemy);
             Assert.Equal(PlayerId, firedPlayer);
             Assert.Equal(3, firedStacks);
 
             // HP zeroed and death queued
-            Assert.Equal(0f, store.EnemyHealth[eid]);
+            Assert.Equal(0f, Store.EnemyHealth[eid]);
 
             // Resolve death so the enemy is no longer active
-            store.ResolveEnemiesKilledThisFrame();
-            Assert.False(store.EnemyActive[eid]);
+            Store.ResolveEnemiesKilledThisFrame();
+            Assert.False(Store.EnemyActive[eid]);
         }
 
         // ── 7. Invalid inputs ───────────────────────────────────────────
         [Fact]
         public void AddDeathMark_InvalidInputsNoOp()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store);
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy();
 
             // negative enemyId
             Assert.Equal(0, sys.AddDeathMark(-1, 1));
             // out-of-range enemyId
             Assert.Equal(0, sys.AddDeathMark(ComponentStore.MAX_ENTITIES + 5, 1));
             // inactive enemy
-            store.EnemyActive[eid] = false;
+            Store.EnemyActive[eid] = false;
             Assert.Equal(0, sys.AddDeathMark(eid, 1));
             // zero stacks
-            store.EnemyActive[eid] = true;
+            Store.EnemyActive[eid] = true;
             Assert.Equal(0, sys.AddDeathMark(eid, 0));
             // negative stacks
             Assert.Equal(0, sys.AddDeathMark(eid, -1));
@@ -174,8 +172,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void GetDamageMultiplier_UnmarkedIsOne()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store);
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy();
             Assert.Equal(1.0f, sys.GetDamageMultiplier(eid));
             // Also covers invalid id
             Assert.Equal(1.0f, sys.GetDamageMultiplier(-1));
@@ -185,8 +183,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void GetDamageMultiplier_ScalesWithStacks()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store, maxStacks: 10, bonusPerStack: 0.05f);
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy(maxStacks: 10, bonusPerStack: 0.05f);
             sys.AddDeathMark(eid, 4);
             // 1.0 + 4 * 0.05 = 1.20
             Assert.Equal(1.20f, sys.GetDamageMultiplier(eid), 3);
@@ -196,56 +194,56 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void Update_TimerExpiryDropsOneStack()
         {
-            var (sys, store) = MakeSystem(new DeathMarkConfig { DecayInterval = 1.0f, MaxStackCap = 50 });
-            int eid = MakeMarkableEnemy(store, maxStacks: 10);
+            var sys = MakeSystem(new DeathMarkConfig { DecayInterval = 1.0f, MaxStackCap = 50 });
+            int eid = MakeMarkableEnemy(maxStacks: 10);
             sys.AddDeathMark(eid, 3);
-            Assert.Equal(3, store.EnemyDeathMarkStacks[eid]);
+            Assert.Equal(3, Store.EnemyDeathMarkStacks[eid]);
 
             // Run update past the decay interval
             sys.Update(1.5f);
-            Assert.Equal(2, store.EnemyDeathMarkStacks[eid]);
-            Assert.True(store.EnemyDeathMarkTimer[eid] > 0f); // re-armed
+            Assert.Equal(2, Store.EnemyDeathMarkStacks[eid]);
+            Assert.True(Store.EnemyDeathMarkTimer[eid] > 0f); // re-armed
         }
 
         // ── 11. Update fast-path ────────────────────────────────────────
         [Fact]
         public void Update_UnmarkedEnemySkipsWork()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store);
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy();
             // Stacks == 0, Timer == 0 — fast path should not touch fields
-            store.EnemyDeathMarkStacks[eid] = 0;
-            store.EnemyDeathMarkTimer[eid] = 0f;
+            Store.EnemyDeathMarkStacks[eid] = 0;
+            Store.EnemyDeathMarkTimer[eid] = 0f;
             sys.Update(5f);
-            Assert.Equal(0, store.EnemyDeathMarkStacks[eid]);
-            Assert.Equal(0f, store.EnemyDeathMarkTimer[eid]);
+            Assert.Equal(0, Store.EnemyDeathMarkStacks[eid]);
+            Assert.Equal(0f, Store.EnemyDeathMarkTimer[eid]);
         }
 
         // ── 12. Update: stacks→0 stops timer ────────────────────────────
         [Fact]
         public void Update_StacksReachZeroStopsTimer()
         {
-            var (sys, store) = MakeSystem(new DeathMarkConfig { DecayInterval = 1.0f, MaxStackCap = 50 });
-            int eid = MakeMarkableEnemy(store, maxStacks: 10);
+            var sys = MakeSystem(new DeathMarkConfig { DecayInterval = 1.0f, MaxStackCap = 50 });
+            int eid = MakeMarkableEnemy(maxStacks: 10);
             sys.AddDeathMark(eid, 1);
             // Run past decay
             sys.Update(1.5f);
-            Assert.Equal(0, store.EnemyDeathMarkStacks[eid]);
-            Assert.Equal(0f, store.EnemyDeathMarkTimer[eid]);
+            Assert.Equal(0, Store.EnemyDeathMarkStacks[eid]);
+            Assert.Equal(0f, Store.EnemyDeathMarkTimer[eid]);
         }
 
         // ── 13. ClearDeathMark ──────────────────────────────────────────
         [Fact]
         public void ClearDeathMark_ResetsEverything()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store, maxStacks: 3);
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy(maxStacks: 3);
             sys.AddDeathMark(eid, 3); // full → latch fired
             Assert.True(sys.IsFullFired(eid));
 
             sys.ClearDeathMark(eid);
-            Assert.Equal(0, store.EnemyDeathMarkStacks[eid]);
-            Assert.Equal(0f, store.EnemyDeathMarkTimer[eid]);
+            Assert.Equal(0, Store.EnemyDeathMarkStacks[eid]);
+            Assert.Equal(0f, Store.EnemyDeathMarkTimer[eid]);
             Assert.False(sys.IsFullFired(eid));
         }
 
@@ -253,8 +251,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void IsMarked_ReflectsStackCount()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store);
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy();
             Assert.False(sys.IsMarked(eid));
             sys.AddDeathMark(eid, 1);
             Assert.True(sys.IsMarked(eid));
@@ -264,8 +262,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void FullFiredLatch_ReArmsAfterDecayBelowCap()
         {
-            var (sys, store) = MakeSystem(new DeathMarkConfig { DecayInterval = 0.5f, MaxStackCap = 50 });
-            int eid = MakeMarkableEnemy(store, maxStacks: 3);
+            var sys = MakeSystem(new DeathMarkConfig { DecayInterval = 0.5f, MaxStackCap = 50 });
+            int eid = MakeMarkableEnemy(maxStacks: 3);
 
             int firedCount = 0;
             sys.OnDeathMarkFull += (_, _, _) => firedCount++;
@@ -275,7 +273,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
 
             // Force a decay to drop below cap
             sys.Update(1.0f);
-            Assert.True(store.EnemyDeathMarkStacks[eid] < 3);
+            Assert.True(Store.EnemyDeathMarkStacks[eid] < 3);
 
             // Bring back to full
             sys.AddDeathMark(eid, 3);
@@ -286,49 +284,38 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void AddDeathMark_InvulnerableDoesNotAutoExecute()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store, maxStacks: 3);
-            store.EnemyIsInvulnerable[eid] = true;
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy(maxStacks: 3);
+            Store.EnemyIsInvulnerable[eid] = true;
             sys.AddDeathMark(eid, 3);
 
             // HP must stay positive (queue death is skipped)
-            Assert.True(store.EnemyHealth[eid] > 0f);
+            Assert.True(Store.EnemyHealth[eid] > 0f);
             // Stacks still at cap, but enemy not queued
-            Assert.Equal(3, store.EnemyDeathMarkStacks[eid]);
-            Assert.True(store.EnemyActive[eid]);
+            Assert.Equal(3, Store.EnemyDeathMarkStacks[eid]);
+            Assert.True(Store.EnemyActive[eid]);
         }
 
-        // ── 17. DeathMarkConfig defaults ────────────────────────────────
+        // ── 17. DeathMarkConfig 默认值为相对不变量 ────────────────────
         [Fact]
-        public void DeathMarkConfig_Defaults()
+        public void DeathMarkConfig_Defaults_AreSaneRelativeInvariants()
         {
             var d = DeathMarkConfig.Default;
-            Assert.Equal(DeathMarkSubsystemConfig.DefaultDecayInterval, d.DecayInterval);
-            Assert.Equal(DeathMarkSubsystemConfig.DefaultMaxStackCap, d.MaxStackCap);
-        }
-
-        // ── 18. LoadConfig override ─────────────────────────────────────
-        [Fact]
-        public void LoadConfig_OverridesConfig()
-        {
-            var (sys, _) = MakeSystem();
-            var custom = new DeathMarkConfig { DecayInterval = 7.5f, MaxStackCap = 25 };
-            sys.LoadConfig(custom);
-            Assert.Equal(7.5f, sys.Config.DecayInterval);
-            Assert.Equal(25, sys.Config.MaxStackCap);
+            Assert.True(d.DecayInterval > 0f);
+            Assert.True(d.MaxStackCap > 0);
         }
 
         // ── 19. Negative deltaTime is no-op ─────────────────────────────
         [Fact]
         public void Update_NegativeDeltaIsNoOp()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store);
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy();
             sys.AddDeathMark(eid, 2);
-            float originalTimer = store.EnemyDeathMarkTimer[eid];
+            float originalTimer = Store.EnemyDeathMarkTimer[eid];
             sys.Update(-1f);
-            Assert.Equal(2, store.EnemyDeathMarkStacks[eid]);
-            Assert.Equal(originalTimer, store.EnemyDeathMarkTimer[eid]);
+            Assert.Equal(2, Store.EnemyDeathMarkStacks[eid]);
+            Assert.Equal(originalTimer, Store.EnemyDeathMarkTimer[eid]);
         }
 
         // ── 21. Regression: hardCap is the event threshold (Claude bug scan fix) ───
@@ -338,22 +325,22 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void AddDeathMark_HardCapIsEventThreshold()
         {
-            var (sys, store) = MakeSystem(new DeathMarkConfig { DecayInterval = 1f, MaxStackCap = 3 });
-            int eid = MakeMarkableEnemy(store, maxStacks: 20); // per-enemy 20, hard cap 3
+            var sys = MakeSystem(new DeathMarkConfig { DecayInterval = 1f, MaxStackCap = 3 });
+            int eid = MakeMarkableEnemy(maxStacks: 20); // per-enemy 20, hard cap 3
 
             int firedCount = 0;
             sys.OnDeathMarkFull += (_, _, _) => firedCount++;
 
             sys.AddDeathMark(eid, 3);
-            Assert.Equal(3, store.EnemyDeathMarkStacks[eid]);
+            Assert.Equal(3, Store.EnemyDeathMarkStacks[eid]);
             Assert.Equal(1, firedCount); // event fires at hardCap, not per-enemy cap
-            Assert.Equal(0f, store.EnemyHealth[eid]); // auto-executed
+            Assert.Equal(0f, Store.EnemyHealth[eid]); // auto-executed
         }
         [Fact]
         public void OnEnemyDestroyed_ClearsLatch()
         {
-            var (sys, store) = MakeSystem();
-            int eid = MakeMarkableEnemy(store, maxStacks: 3);
+            var sys = MakeSystem();
+            int eid = MakeMarkableEnemy(maxStacks: 3);
             sys.AddDeathMark(eid, 3);
             Assert.True(sys.IsFullFired(eid));
 

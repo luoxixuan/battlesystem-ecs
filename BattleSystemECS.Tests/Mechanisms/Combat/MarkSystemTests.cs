@@ -26,7 +26,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
     ///   - Custom MarkConfig (DecayInterval, MaxStackCap) takes effect
     ///   - MaxStackCap overrides threshold when cap &lt; threshold
     /// </summary>
-    public class MarkSystemTests
+    public class MarkSystemTests : BattleTestBase
     {
         private const int PlayerId = 0;
         private const float DeltaTime = 1f / 60f;
@@ -36,10 +36,9 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void DefaultState_AllMarkFieldsInert()
         {
-            var store = new ComponentStore();
-            Assert.Equal(0, store.EnemyMarkStacks[0]);
-            Assert.Equal(0f, store.EnemyMarkDecayTimer[0]);
-            Assert.Equal(0, store.EnemyMarkMaxThreshold[0]);
+            Assert.Equal(0, Store.EnemyMarkStacks[0]);
+            Assert.Equal(0f, Store.EnemyMarkDecayTimer[0]);
+            Assert.Equal(0, Store.EnemyMarkMaxThreshold[0]);
         }
 
         [Fact]
@@ -63,19 +62,19 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void AddMark_NoOptIn_NoOp()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
             // EnemyMarkMaxThreshold defaults to 0 (opt-out)
             int result = system.AddMark(eid, 1);
             Assert.Equal(0, result);
-            Assert.Equal(0, store.EnemyMarkStacks[eid]);
-            Assert.Equal(0f, store.EnemyMarkDecayTimer[eid]);
+            Assert.Equal(0, Store.EnemyMarkStacks[eid]);
+            Assert.Equal(0f, Store.EnemyMarkDecayTimer[eid]);
         }
 
         [Fact]
         public void AddMark_InvalidEnemy_NoOp()
         {
-            var (system, store) = MakeSystem();
+            var system = MakeSystem();
             // Out-of-range
             Assert.Equal(0, system.AddMark(-1, 1));
             Assert.Equal(0, system.AddMark(ComponentStore.MAX_ENTITIES, 1));
@@ -85,11 +84,11 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void AddMark_InactiveEnemy_NoOp()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             // Manually mark inactive
-            store.EnemyActive[eid] = false;
+            Store.EnemyActive[eid] = false;
             int result = system.AddMark(eid, 1);
             Assert.Equal(0, result);
         }
@@ -97,12 +96,12 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void AddMark_NonPositiveStacks_NoOp()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             Assert.Equal(0, system.AddMark(eid, 0));
             Assert.Equal(0, system.AddMark(eid, -1));
-            Assert.Equal(0, store.EnemyMarkStacks[eid]);
+            Assert.Equal(0, Store.EnemyMarkStacks[eid]);
         }
 
         // ── Basic increment + cap behavior ────────────────────────────────
@@ -110,39 +109,39 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void AddMark_IncrementsAndResetsTimer()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             int s1 = system.AddMark(eid);
             Assert.Equal(1, s1);
-            Assert.Equal(1, store.EnemyMarkStacks[eid]);
-            Assert.Equal(1.0f, store.EnemyMarkDecayTimer[eid]);
+            Assert.Equal(1, Store.EnemyMarkStacks[eid]);
+            Assert.Equal(1.0f, Store.EnemyMarkDecayTimer[eid]);
             // Add more
             int s2 = system.AddMark(eid, 2);
             Assert.Equal(3, s2);
-            Assert.Equal(3, store.EnemyMarkStacks[eid]);
+            Assert.Equal(3, Store.EnemyMarkStacks[eid]);
             // Timer reset to 1.0
-            Assert.Equal(1.0f, store.EnemyMarkDecayTimer[eid]);
+            Assert.Equal(1.0f, Store.EnemyMarkDecayTimer[eid]);
         }
 
         [Fact]
         public void AddMark_CapsAtThreshold()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             // Add 10 in one go → cap at 5
             int s = system.AddMark(eid, 10);
             Assert.Equal(5, s);
-            Assert.Equal(5, store.EnemyMarkStacks[eid]);
+            Assert.Equal(5, Store.EnemyMarkStacks[eid]);
         }
 
         [Fact]
         public void AddMark_CapsAtMaxStackCapWhenSmaller()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 50;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 50;
             system.LoadConfig(new MarkConfig { DecayInterval = 1f, MaxStackCap = 3 });
             // Add 10 in one go → cap at 3 (MaxStackCap < threshold)
             int s = system.AddMark(eid, 10);
@@ -153,9 +152,9 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         public void AddMark_MaxStackCapZero_NotApplied()
         {
             // MaxStackCap = 0 means "no cap" (use threshold only)
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 50;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 50;
             system.LoadConfig(new MarkConfig { DecayInterval = 1f, MaxStackCap = 0 });
             int s = system.AddMark(eid, 30);
             Assert.Equal(30, s);
@@ -166,9 +165,9 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void AddMark_ThresholdEvent_FiresOnCrossing()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             int firedCount = 0;
             int firedEnemyId = -1;
             int firedStacks = 0;
@@ -191,9 +190,9 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void AddMark_ThresholdEvent_DoesNotRefireWhileStaysAbove()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             int firedCount = 0;
             system.OnMarkThreshold += (eidArg, pid, stacks) => firedCount++;
             // Cross threshold
@@ -209,9 +208,9 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void AddMark_ThresholdEvent_RefiresAfterDecayBelow()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             int firedCount = 0;
             system.OnMarkThreshold += (eidArg, pid, stacks) => firedCount++;
             // Cross threshold
@@ -219,7 +218,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             Assert.Equal(1, firedCount);
             // Decay stacks below threshold (5 frames of decay)
             for (int i = 0; i < 5; i++) system.Update(1.0f);
-            Assert.Equal(0, store.EnemyMarkStacks[eid]);
+            Assert.Equal(0, Store.EnemyMarkStacks[eid]);
             // Re-add to cross again
             system.AddMark(eid, 5);
             Assert.Equal(2, firedCount);
@@ -230,87 +229,87 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void Update_DecayTimer_DecrementsByDeltaTime()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             system.AddMark(eid, 3);
-            float t0 = store.EnemyMarkDecayTimer[eid];
+            float t0 = Store.EnemyMarkDecayTimer[eid];
             system.Update(0.1f);
-            Assert.Equal(t0 - 0.1f, store.EnemyMarkDecayTimer[eid], 5);
+            Assert.Equal(t0 - 0.1f, Store.EnemyMarkDecayTimer[eid], 5);
             // Stacks unchanged
-            Assert.Equal(3, store.EnemyMarkStacks[eid]);
+            Assert.Equal(3, Store.EnemyMarkStacks[eid]);
         }
 
         [Fact]
         public void Update_DecayTimerExpires_ConsumesOneStack()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             system.AddMark(eid, 3);
             // Run exactly 1 second (decay interval) — timer should hit 0 and consume 1 stack
             system.Update(1.0f);
-            Assert.Equal(2, store.EnemyMarkStacks[eid]);
+            Assert.Equal(2, Store.EnemyMarkStacks[eid]);
             // Timer re-armed for next stack's decay
-            Assert.Equal(1.0f, store.EnemyMarkDecayTimer[eid], 5);
+            Assert.Equal(1.0f, Store.EnemyMarkDecayTimer[eid], 5);
         }
 
         [Fact]
         public void Update_DecayTimerExpires_StopsAtZeroStacks()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             system.AddMark(eid, 1);
             // Run 2 seconds (1 to consume, 1 more to verify timer stops)
             system.Update(1.0f);
-            Assert.Equal(0, store.EnemyMarkStacks[eid]);
+            Assert.Equal(0, Store.EnemyMarkStacks[eid]);
             system.Update(1.0f);
-            Assert.Equal(0, store.EnemyMarkStacks[eid]);
+            Assert.Equal(0, Store.EnemyMarkStacks[eid]);
             // Timer should be 0 (no ticking when no stacks)
-            Assert.Equal(0f, store.EnemyMarkDecayTimer[eid]);
+            Assert.Equal(0f, Store.EnemyMarkDecayTimer[eid]);
         }
 
         [Fact]
         public void Update_FastPath_SkipsUnmarkedEnemies()
         {
-            var (system, store) = MakeSystem();
+            var system = MakeSystem();
             // Spawn 100 unmarked enemies — no work should be done.
             for (int i = 0; i < 100; i++)
-                store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
+                Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
             // Just verify no exception and stacks remain 0
             for (int f = 0; f < 5; f++) system.Update(0.1f);
-            foreach (int eid in store.ActiveEnemyIds)
-                Assert.Equal(0, store.EnemyMarkStacks[eid]);
+            foreach (int eid in Store.ActiveEnemyIds)
+                Assert.Equal(0, Store.EnemyMarkStacks[eid]);
         }
 
         [Fact]
         public void Update_NonPositiveDeltaTime_NoOp()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             system.AddMark(eid, 3);
-            float t = store.EnemyMarkDecayTimer[eid];
+            float t = Store.EnemyMarkDecayTimer[eid];
             system.Update(0f);
-            Assert.Equal(t, store.EnemyMarkDecayTimer[eid]);
+            Assert.Equal(t, Store.EnemyMarkDecayTimer[eid]);
             system.Update(-0.1f);
-            Assert.Equal(t, store.EnemyMarkDecayTimer[eid]);
+            Assert.Equal(t, Store.EnemyMarkDecayTimer[eid]);
         }
 
         [Fact]
         public void Update_CustomDecayInterval_TakesEffect()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             system.LoadConfig(new MarkConfig { DecayInterval = 0.5f, MaxStackCap = 100 });
             system.AddMark(eid, 3);
             // After add: timer = 0.5
-            Assert.Equal(0.5f, store.EnemyMarkDecayTimer[eid], 5);
+            Assert.Equal(0.5f, Store.EnemyMarkDecayTimer[eid], 5);
             // Run 0.5s → stack consumed
             system.Update(0.5f);
-            Assert.Equal(2, store.EnemyMarkStacks[eid]);
+            Assert.Equal(2, Store.EnemyMarkStacks[eid]);
         }
 
         // ── ClearMark / destroy cleanup ──────────────────────────────────
@@ -318,33 +317,33 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void ClearMark_ResetsStacksAndTimer()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             system.AddMark(eid, 3);
             system.ClearMark(eid);
-            Assert.Equal(0, store.EnemyMarkStacks[eid]);
-            Assert.Equal(0f, store.EnemyMarkDecayTimer[eid]);
+            Assert.Equal(0, Store.EnemyMarkStacks[eid]);
+            Assert.Equal(0f, Store.EnemyMarkDecayTimer[eid]);
         }
 
         [Fact]
         public void ClearMark_DoesNotResetMaxThreshold()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             system.AddMark(eid, 3);
             system.ClearMark(eid);
             // MaxThreshold is a static opt-in field, should persist
-            Assert.Equal(5, store.EnemyMarkMaxThreshold[eid]);
+            Assert.Equal(5, Store.EnemyMarkMaxThreshold[eid]);
         }
 
         [Fact]
         public void ClearMark_AllowsRefiringOfThresholdEvent()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             int firedCount = 0;
             system.OnMarkThreshold += (eidArg, pid, stacks) => firedCount++;
             system.AddMark(eid, 5); // fires
@@ -357,23 +356,23 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void DestroyEntity_ResetsAllMarkFields()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             system.AddMark(eid, 3);
-            store.DestroyEntity(eid);
+            Store.DestroyEntity(eid);
             // All mark fields reset to prevent ID-reuse leakage
-            Assert.Equal(0, store.EnemyMarkStacks[eid]);
-            Assert.Equal(0f, store.EnemyMarkDecayTimer[eid]);
-            Assert.Equal(0, store.EnemyMarkMaxThreshold[eid]);
+            Assert.Equal(0, Store.EnemyMarkStacks[eid]);
+            Assert.Equal(0f, Store.EnemyMarkDecayTimer[eid]);
+            Assert.Equal(0, Store.EnemyMarkMaxThreshold[eid]);
         }
 
         [Fact]
         public void OnEnemyDestroyed_ResetsThresholdLatch()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             system.AddMark(eid, 5); // fires latch
             Assert.True(system.IsThresholdFired(eid));
             system.OnEnemyDestroyed(eid);
@@ -381,12 +380,21 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         }
 
         [Fact]
-        public void OnEnemyDestroyed_OutOfRange_NoThrow()
+        public void OnEnemyDestroyed_OutOfRange_DoesNotTouchValidLatch()
         {
-            var (system, _) = MakeSystem();
+            var system = MakeSystem();
+            // 先建立一个合法敌人的 mark 状态与阈值锁存。
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
+            system.AddMark(eid, 5);
+            Assert.True(system.IsThresholdFired(eid));
+
+            // 越界 id 必须 no-op，不能破坏合法槽位的锁存状态。
             system.OnEnemyDestroyed(-1);
             system.OnEnemyDestroyed(ComponentStore.MAX_ENTITIES);
-            // No exception expected
+
+            Assert.True(system.IsThresholdFired(eid));
+            Assert.Equal(5, Store.EnemyMarkStacks[eid]);
         }
 
         // ── Update skips inactive enemies ────────────────────────────────
@@ -394,24 +402,22 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         [Fact]
         public void Update_SkipsInactiveEnemies()
         {
-            var (system, store) = MakeSystem();
-            int eid = store.AddEnemy(0, 0, 1f, 100f, 100f, 5f, 10, 1, "E");
-            store.EnemyMarkMaxThreshold[eid] = 5;
+            var system = MakeSystem();
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Name = "E"; });
+            Store.EnemyMarkMaxThreshold[eid] = 5;
             system.AddMark(eid, 3);
-            store.EnemyActive[eid] = false; // simulate kill
+            Store.EnemyActive[eid] = false; // simulate kill
             // No exception, stack count not relevant since inactive
             system.Update(5.0f);
             // Stack field itself is not modified by Update for inactive enemies
-            Assert.Equal(3, store.EnemyMarkStacks[eid]);
+            Assert.Equal(3, Store.EnemyMarkStacks[eid]);
         }
 
         // ── Helpers ──────────────────────────────────────────────────────
 
-        private static (MarkSystem sys, ComponentStore store) MakeSystem()
+        private MarkSystem MakeSystem()
         {
-            var store = new ComponentStore();
-            var sys = new MarkSystem(store, PlayerId);
-            return (sys, store);
+            return new MarkSystem(Store, PlayerId);
         }
     }
 }

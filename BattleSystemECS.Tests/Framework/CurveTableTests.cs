@@ -1,5 +1,6 @@
 using System;
 using Xunit;
+using BattleSystemECS.Tests.Infrastructure;
 using BattleSystemECS.Core;
 
 namespace BattleSystemECS.Tests.Framework
@@ -18,7 +19,7 @@ namespace BattleSystemECS.Tests.Framework
     ///   9. Register/Get round-trip; duplicate register overwrites
     ///  10. ResetForTests clears the registry (no leakage between tests)
     /// </summary>
-    public class CurveTableTests
+    public class CurveTableTests : BattleTestBase
     {
         public CurveTableTests()
         {
@@ -61,11 +62,14 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(2.0f, def.Evaluate(21f), 5);
         }
 
-        [Fact]
-        public void Linear_ZeroCoefficient_ReturnsOne()
+        // ── 零系数退化：两个几乎相同的 [Fact] 合并为 [Theory]。 ──
+        [Theory(DisplayName = "零系数曲线任何 x 均返回 1")]
+        [InlineData((int)CurveType.Linear, 0f, 50f)]
+        [InlineData((int)CurveType.Exponential, 0f, 100f)]
+        public void ZeroCoefficient_ReturnsOne(int curveType, float coef, float x)
         {
-            var def = Make(CurveType.Linear, "flat", coef: 0f);
-            Assert.Equal(1.0f, def.Evaluate(50f));
+            var def = Make((CurveType)curveType, "flat", coef: coef);
+            Assert.Equal(1.0f, def.Evaluate(x));
         }
 
         // ─── Exponential ───────────────────────────────────────────────────
@@ -84,12 +88,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(1.16985856f, def.Evaluate(5f), 4);
         }
 
-        [Fact]
-        public void Exponential_ZeroCoefficient_ReturnsOne()
-        {
-            var def = Make(CurveType.Exponential, "exp", coef: 0f);
-            Assert.Equal(1.0f, def.Evaluate(100f));
-        }
+
 
         [Fact]
         public void Exponential_ClampsExponentToPreventOverflow()
@@ -201,11 +200,12 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(1.0f, CurveTable.Evaluate("missing", 50f));
         }
 
-        [Fact]
-        public void Evaluate_NullOrEmptyId_ReturnsOne()
+        [Theory(DisplayName = "null/空曲线 id 求值恒为 1")]
+        [InlineData(null)]
+        [InlineData("")]
+        public void Evaluate_NullOrEmptyId_ReturnsOne(string? id)
         {
-            Assert.Equal(1.0f, CurveTable.Evaluate(null, 50f));
-            Assert.Equal(1.0f, CurveTable.Evaluate("", 50f));
+            Assert.Equal(1.0f, CurveTable.Evaluate(id, 50f));
         }
 
         [Fact]

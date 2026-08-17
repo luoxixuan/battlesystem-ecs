@@ -17,16 +17,10 @@ namespace BattleSystemECS.Tests.Features.World
     /// 6. Recoil: Range multiplier drops to 0.8 (Sandstorm spec)
     /// 7. GetEnemyDotPct() returns 0 for non-Sandstorm weather
     /// </summary>
-    public class SandstormWeatherTests
+    public class SandstormWeatherTests : BattleTestBase
     {
-        private ComponentStore CreateStore()
+        private void ConfigureSandstorm(float dotPct, float rangeMult = 0.8f)
         {
-            return new ComponentStore();
-        }
-
-        private GameConfig CreateConfigWithSandstorm(float dotPct, float rangeMult = 0.8f)
-        {
-            var cfg = new GameConfig();
             var wc = new WeatherConfig();
             var s = new WeatherTypeConfig
             {
@@ -40,8 +34,7 @@ namespace BattleSystemECS.Tests.Features.World
                 EnemyDotPct = dotPct,
             };
             wc.Types["Sandstorm"] = s;
-            cfg.Weather = wc;
-            return cfg;
+            Config.Weather = wc;
         }
 
         [Fact]
@@ -65,9 +58,8 @@ namespace BattleSystemECS.Tests.Features.World
             // Sandstorm's tower range must be reduced per spec (0.8x).
             // The multiplier formula is baseMult + (1-baseMult)*intensity, so at intensity=0
             // (full effect) we get the base 0.8. At intensity=1 (no effect) we get 1.0.
-            var cfg = CreateConfigWithSandstorm(dotPct: 0.005f, rangeMult: 0.8f);
-            var store = CreateStore();
-            var sys = new WeatherSystem(store, cfg);
+            ConfigureSandstorm(dotPct: 0.005f, rangeMult: 0.8f);
+            var sys = new WeatherSystem(Store, Config);
 
             // Force sandstorm at zero intensity → full base effect (0.8x range)
             sys.ForceWeather(0, WeatherConfig.Sandstorm, intensity: 0f, duration: 12f);
@@ -84,29 +76,28 @@ namespace BattleSystemECS.Tests.Features.World
             // End-to-end: 2 active enemies, Sandstorm @ 0.5%/s, 1s tick
             // Enemy A: 100 HP → should take 0.5 dmg
             // Enemy B: 200 HP → should take 1.0 dmg
-            var cfg = CreateConfigWithSandstorm(dotPct: 0.005f);
-            var store = CreateStore();
+            ConfigureSandstorm(dotPct: 0.005f);
             // WeatherSystem.Update() skips a player if PlayerCurrentHealth[playerId] <= 0
             // (pre-existing "dead player skips weather transitions" pattern). Set HP first.
-            store.PlayerCurrentHealth[0] = 100f;
-            var sys = new WeatherSystem(store, cfg);
+            Store.PlayerCurrentHealth[0] = 100f;
+            var sys = new WeatherSystem(Store, Config);
             sys.ForceWeather(0, WeatherConfig.Sandstorm, intensity: 1.0f, duration: 12f);
 
-            int eA = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1);
+            int eA = Enemy(e => { e.MoveSpeed = 1f; e.Damage = 0f; e.GoldReward = 1; });
             // Note: AddEnemy already calls AddActiveEnemyId internally. Manual call
             // would create a duplicate entry in _activeEnemyIds, causing Sandstorm DoT
             // to apply twice. Don't double-register.
-            store.EnemyActive[eA] = true;
+            Store.EnemyActive[eA] = true;
 
-            int eB = store.AddEnemy(1f, 0f, 1f, 200f, 200f, 0f, 1, 1);
-            store.EnemyActive[eB] = true;
+            int eB = Enemy(e => { e.X = 1f; e.MoveSpeed = 1f; e.Health = 200f; e.MaxHealth = 200f; e.Damage = 0f; e.GoldReward = 1; });
+            Store.EnemyActive[eB] = true;
 
             // Tick 1 second of game time
             sys.Update(1.0f);
 
             // Assert: 100 * 0.005 * 1.0 = 0.5; 200 * 0.005 * 1.0 = 1.0
-            Assert.Equal(99.5f, store.EnemyHealth[eA], 0.001f);
-            Assert.Equal(199.0f, store.EnemyHealth[eB], 0.001f);
+            Assert.Equal(99.5f, Store.EnemyHealth[eA], 0.001f);
+            Assert.Equal(199.0f, Store.EnemyHealth[eB], 0.001f);
         }
 
         [Fact]
@@ -114,28 +105,24 @@ namespace BattleSystemECS.Tests.Features.World
         {
             // Sentinel fast path: with default (no Sandstorm config), Update() must NOT
             // touch any enemy HP. Cached dotPct = 0 short-circuits the loop.
-            var cfg = new GameConfig();
             // No Sandstorm config — default Weather with empty Types
-            var store = CreateStore();
-            store.PlayerCurrentHealth[0] = 100f;
-            var sys = new WeatherSystem(store, cfg);
+            Store.PlayerCurrentHealth[0] = 100f;
+            var sys = new WeatherSystem(Store, Config);
 
-            int eid = store.AddEnemy(0f, 0f, 1f, 100f, 100f, 0f, 1, 1);
-            store.EnemyActive[eid] = true;
+            int eid = Enemy(e => { e.MoveSpeed = 1f; e.Damage = 0f; e.GoldReward = 1; });
+            Store.EnemyActive[eid] = true;
             // AddEnemy already registers in _activeEnemyIds; don't double-register.
 
-            float before = store.EnemyHealth[eid];
+            float before = Store.EnemyHealth[eid];
             sys.Update(1.0f);
-            Assert.Equal(before, store.EnemyHealth[eid]);
+            Assert.Equal(before, Store.EnemyHealth[eid]);
         }
 
         [Fact]
         public void GetEnemyDotPct_ZeroForNonSandstormWeather()
         {
             // GetEnemyDotPct should be 0 for Clear (sentinel early-return)
-            var cfg = new GameConfig();
-            var store = CreateStore();
-            var sys = new WeatherSystem(store, cfg);
+            var sys = new WeatherSystem(Store, Config);
             // Force Clear weather (no config → no Sandstorm → cached dotPct = 0)
             sys.ForceWeather(0, WeatherConfig.Clear, intensity: 1.0f, duration: -1f);
             Assert.Equal(0f, sys.GetEnemyDotPct(0));
@@ -145,9 +132,8 @@ namespace BattleSystemECS.Tests.Features.World
         public void GetEnemyDotPct_ScalesWithIntensity()
         {
             // dotPct = 0.01 (1%/s), intensity = 0.5 → returns 0.005
-            var cfg = CreateConfigWithSandstorm(dotPct: 0.01f);
-            var store = CreateStore();
-            var sys = new WeatherSystem(store, cfg);
+            ConfigureSandstorm(dotPct: 0.01f);
+            var sys = new WeatherSystem(Store, Config);
             sys.ForceWeather(0, WeatherConfig.Sandstorm, intensity: 0.5f, duration: 12f);
             Assert.Equal(0.005f, sys.GetEnemyDotPct(0), 0.001f);
         }

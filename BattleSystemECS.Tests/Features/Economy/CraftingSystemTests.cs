@@ -31,7 +31,7 @@ namespace BattleSystemECS.Tests.Features.Economy
     ///  17. RefundRate=0 → no refund attempt
     ///  18. RefundRate=1.0 → all inputs returned (effectively no-op on failure)
     /// </summary>
-    public class CraftingSystemTests
+    public class CraftingSystemTests : BattleTestBase
     {
         private const int PlayerId = 0;
         private const int MaxPlayers = 10; // mirrors ComponentStore.MAX_PLAYERS (internal)
@@ -44,39 +44,35 @@ namespace BattleSystemECS.Tests.Features.Economy
 
         // ── Test helpers ────────────────────────────────────────────────
 
-        // Build a (system, store, inventory, config) tuple. Optionally inject a
+        // Build the system over the shared test Store/Config. Optionally inject a
         // custom recipe set and RNG seed so individual tests can exercise
         // specific paths deterministically.
-        private static (CraftingSystem system, ComponentStore store, InventorySystem inv, GameConfig cfg)
+        private (CraftingSystem system, InventorySystem inv)
             MakeSystem(CraftingRecipeDef[]? recipes = null, int seed = 12345, int maxStackOverride = 99)
         {
-            var store = new ComponentStore();
-            store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
+            Store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
             // Items 0..6 from items.json — override MaxStack so tests can pre-fill
             // beyond the production 3/2 limits (crafting with 5 potions is way
             // easier when MaxStack is 99).
-            var cfg = new GameConfig
+            Config.ItemDefs = new ItemDef[]
             {
-                ItemDefs = new ItemDef[]
-                {
-                    new ItemDef { Type = "healing_potion", Name = "Healing Potion", ItemType = InventoryItemType.Heal, MaxStack = maxStackOverride },
-                    new ItemDef { Type = "mana_potion", Name = "Mana Potion", ItemType = InventoryItemType.Mana, MaxStack = maxStackOverride },
-                    new ItemDef { Type = "shield_sigil", Name = "Shield Sigil", ItemType = InventoryItemType.Shield, MaxStack = maxStackOverride },
-                    new ItemDef { Type = "speed_tonic", Name = "Speed Tonic", ItemType = InventoryItemType.SpeedBoost, MaxStack = maxStackOverride },
-                    new ItemDef { Type = "rage_draught", Name = "Rage Draught", ItemType = InventoryItemType.DamageBoost, MaxStack = maxStackOverride },
-                    new ItemDef { Type = "grenade", Name = "Grenade", ItemType = InventoryItemType.AoEBurst, MaxStack = maxStackOverride },
-                    new ItemDef { Type = "cleanse_charm", Name = "Cleanse Charm", ItemType = InventoryItemType.Cleanse, MaxStack = maxStackOverride },
-                },
-                CraftingRecipes = recipes ?? Array.Empty<CraftingRecipeDef>(),
+                new ItemDef { Type = "healing_potion", Name = "Healing Potion", ItemType = InventoryItemType.Heal, MaxStack = maxStackOverride },
+                new ItemDef { Type = "mana_potion", Name = "Mana Potion", ItemType = InventoryItemType.Mana, MaxStack = maxStackOverride },
+                new ItemDef { Type = "shield_sigil", Name = "Shield Sigil", ItemType = InventoryItemType.Shield, MaxStack = maxStackOverride },
+                new ItemDef { Type = "speed_tonic", Name = "Speed Tonic", ItemType = InventoryItemType.SpeedBoost, MaxStack = maxStackOverride },
+                new ItemDef { Type = "rage_draught", Name = "Rage Draught", ItemType = InventoryItemType.DamageBoost, MaxStack = maxStackOverride },
+                new ItemDef { Type = "grenade", Name = "Grenade", ItemType = InventoryItemType.AoEBurst, MaxStack = maxStackOverride },
+                new ItemDef { Type = "cleanse_charm", Name = "Cleanse Charm", ItemType = InventoryItemType.Cleanse, MaxStack = maxStackOverride },
             };
-            var inv = new InventorySystem(store, cfg, null);
-            var system = new CraftingSystem(store, cfg, inv, null, seed: seed);
+            Config.CraftingRecipes = recipes ?? Array.Empty<CraftingRecipeDef>();
+            var inv = new InventorySystem(Store, Config, null);
+            var system = new CraftingSystem(Store, Config, inv, null, seed: seed);
             inv.BindCraftingSystem(system);
-            return (system, store, inv, cfg);
+            return (system, inv);
         }
 
         // Build a "guaranteed success, no bonus" recipe. Inputs/outputs are caller-supplied.
-        private static CraftingRecipeDef MakeSuccessRecipe(
+        private CraftingRecipeDef MakeSuccessRecipe(
             string type,
             CraftingItemStack[] inputs,
             CraftingItemStack[] outputs,
@@ -96,7 +92,7 @@ namespace BattleSystemECS.Tests.Features.Economy
 
         // Give the player N of a particular item by adding it N times (respects
         // MaxStack via AddItem stack-merge / empty-slot).
-        private static void GiveItems(InventorySystem inv, int playerId, int itemId, int count)
+        private void GiveItems(InventorySystem inv, int playerId, int itemId, int count)
         {
             for (int i = 0; i < count; i++)
             {
@@ -105,15 +101,15 @@ namespace BattleSystemECS.Tests.Features.Economy
         }
 
         // Count total of an item id in a player's inventory (sums across slots).
-        private static int CountItem(ComponentStore store, int playerId, int itemId)
+        private int CountItem(int playerId, int itemId)
         {
             int sum = 0;
             for (int s = 0; s < ComponentStore.MAX_INVENTORY_SLOTS; s++)
             {
                 int idx = playerId * ComponentStore.MAX_INVENTORY_SLOTS + s;
-                if (store.PlayerInventoryItemId[idx] == itemId)
+                if (Store.PlayerInventoryItemId[idx] == itemId)
                 {
-                    sum += store.PlayerInventoryCount[idx];
+                    sum += Store.PlayerInventoryCount[idx];
                 }
             }
             return sum;
@@ -123,7 +119,7 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void EmptyRecipes_AllCallsReturnBadRecipe()
         {
-            var (system, _, _, _) = MakeSystem(recipes: Array.Empty<CraftingRecipeDef>());
+            var (system, _) = MakeSystem(recipes: Array.Empty<CraftingRecipeDef>());
             var result = system.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.BadRecipe, result);
             Assert.Equal(0, system.TotalAttempts); // not even counted
@@ -136,7 +132,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             var recipe = MakeSuccessRecipe("combine_heal",
                 new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 2 } },
                 new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } });
-            var (system, _, _, cfg) = MakeSystem(recipes: new[] { recipe });
+            var (system, _) = MakeSystem(recipes: new[] { recipe });
             Assert.Equal(1, system.GetRecipeCount());
             Assert.Equal("combine_heal", system.GetRecipe(0).Type);
         }
@@ -148,14 +144,14 @@ namespace BattleSystemECS.Tests.Features.Economy
             var recipe = MakeSuccessRecipe("combine_heal",
                 new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 2 } },
                 new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } });
-            var (system, store, inv, _) = MakeSystem(recipes: new[] { recipe });
+            var (system, inv) = MakeSystem(recipes: new[] { recipe });
             GiveItems(inv, PlayerId, HealingPotionId, 3);
-            Assert.Equal(3, CountItem(store, PlayerId, HealingPotionId));
+            Assert.Equal(3, CountItem(PlayerId, HealingPotionId));
 
             var result = system.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.Success, result);
             // 3 - 2 inputs + 1 output = 2 left
-            Assert.Equal(2, CountItem(store, PlayerId, HealingPotionId));
+            Assert.Equal(2, CountItem(PlayerId, HealingPotionId));
             Assert.Equal(1, system.TotalSuccesses);
             Assert.Equal(0, system.TotalFailures);
         }
@@ -167,12 +163,12 @@ namespace BattleSystemECS.Tests.Features.Economy
             var recipe = MakeSuccessRecipe("combine_heal",
                 new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 5 } },
                 new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } });
-            var (system, store, inv, _) = MakeSystem(recipes: new[] { recipe });
+            var (system, inv) = MakeSystem(recipes: new[] { recipe });
             GiveItems(inv, PlayerId, HealingPotionId, 3);
 
             var result = system.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.MissingInputs, result);
-            Assert.Equal(3, CountItem(store, PlayerId, HealingPotionId)); // untouched
+            Assert.Equal(3, CountItem(PlayerId, HealingPotionId)); // untouched
             Assert.Equal(1, system.TotalRejectedMissingInputs);
             Assert.Equal(0, system.TotalSuccesses);
         }
@@ -191,14 +187,14 @@ namespace BattleSystemECS.Tests.Features.Economy
                 RefundRate = 1f,  // full refund
                 RareBonusRate = 0f,
             };
-            var (system, store, inv, _) = MakeSystem(recipes: new[] { recipe });
+            var (system, inv) = MakeSystem(recipes: new[] { recipe });
             GiveItems(inv, PlayerId, HealingPotionId, 2);
-            int manaBefore = CountItem(store, PlayerId, ManaPotionId);
+            int manaBefore = CountItem(PlayerId, ManaPotionId);
 
             var result = system.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.Failure, result);
-            Assert.Equal(2, CountItem(store, PlayerId, HealingPotionId)); // refunded
-            Assert.Equal(manaBefore, CountItem(store, PlayerId, ManaPotionId)); // no output
+            Assert.Equal(2, CountItem(PlayerId, HealingPotionId)); // refunded
+            Assert.Equal(manaBefore, CountItem(PlayerId, ManaPotionId)); // no output
             Assert.Equal(1, system.TotalFailures);
         }
 
@@ -216,12 +212,12 @@ namespace BattleSystemECS.Tests.Features.Economy
                 RefundRate = 0f,  // no refund
                 RareBonusRate = 0f,
             };
-            var (system, store, inv, _) = MakeSystem(recipes: new[] { recipe });
+            var (system, inv) = MakeSystem(recipes: new[] { recipe });
             GiveItems(inv, PlayerId, HealingPotionId, 2);
 
             var result = system.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.Failure, result);
-            Assert.Equal(0, CountItem(store, PlayerId, HealingPotionId)); // lost
+            Assert.Equal(0, CountItem(PlayerId, HealingPotionId)); // lost
         }
 
         // ── 7. Rare bonus: bonus outputs delivered on top of base ─────
@@ -239,15 +235,15 @@ namespace BattleSystemECS.Tests.Features.Economy
                 RefundRate = 0.5f,
                 RareBonusRate = 1f, // always bonus
             };
-            var (system, store, inv, _) = MakeSystem(recipes: new[] { recipe });
+            var (system, inv) = MakeSystem(recipes: new[] { recipe });
             GiveItems(inv, PlayerId, HealingPotionId, 2);
 
             var result = system.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.SuccessRareBonus, result);
             // 2 heal - 2 input + 1 output = 1 heal
-            Assert.Equal(1, CountItem(store, PlayerId, HealingPotionId));
+            Assert.Equal(1, CountItem(PlayerId, HealingPotionId));
             // +1 mana bonus
-            Assert.Equal(1, CountItem(store, PlayerId, ManaPotionId));
+            Assert.Equal(1, CountItem(PlayerId, ManaPotionId));
             Assert.Equal(1, system.TotalRareBonuses);
         }
 
@@ -266,20 +262,20 @@ namespace BattleSystemECS.Tests.Features.Economy
                 RefundRate = 0.5f,
                 RareBonusRate = 1f, // always bonus
             };
-            var (system, store, inv, _) = MakeSystem(recipes: new[] { recipe });
+            var (system, inv) = MakeSystem(recipes: new[] { recipe });
             GiveItems(inv, PlayerId, HealingPotionId, 2);
 
             var result = system.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.SuccessRareBonus, result);
             // 2 - 2 + 1 (base) + 1 (bonus duplicate) = 2
-            Assert.Equal(2, CountItem(store, PlayerId, HealingPotionId));
+            Assert.Equal(2, CountItem(PlayerId, HealingPotionId));
         }
 
         // ── 9. Bad recipe id: returns BadRecipe cleanly ───────────────
         [Fact]
         public void BadRecipeId_ReturnsBadRecipe()
         {
-            var (system, _, _, _) = MakeSystem(recipes: new[] {
+            var (system, _) = MakeSystem(recipes: new[] {
                 MakeSuccessRecipe("a", new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } },
                                        new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } }) });
             Assert.Equal(CraftingSystem.CraftingResult.BadRecipe, system.TryCraft(PlayerId, 999));
@@ -292,7 +288,7 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void BadPlayerId_ReturnsBadRecipe()
         {
-            var (system, _, _, _) = MakeSystem(recipes: new[] {
+            var (system, _) = MakeSystem(recipes: new[] {
                 MakeSuccessRecipe("a", new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } },
                                        new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } }) });
             Assert.Equal(CraftingSystem.CraftingResult.BadRecipe, system.TryCraft(-1, 0));
@@ -309,19 +305,15 @@ namespace BattleSystemECS.Tests.Features.Economy
             // Override MaxStack to 1 on the output so the test's MaxStack=99 doesn't
             // pre-fill the inventory with 99s — we need the inventory FULL of the
             // output item id before the craft runs.
-            var store = new ComponentStore();
-            store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
-            var cfg = new GameConfig
+            Store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
+            Config.ItemDefs = new ItemDef[]
             {
-                ItemDefs = new ItemDef[]
-                {
-                    new ItemDef { Type = "heal", Name = "Heal", ItemType = InventoryItemType.Heal, MaxStack = 99 },
-                    new ItemDef { Type = "mana", Name = "Mana", ItemType = InventoryItemType.Mana, MaxStack = 1 }, // <-- stack cap 1 so 8 slots = 8 mana
-                },
-                CraftingRecipes = new[] { recipe },
+                new ItemDef { Type = "heal", Name = "Heal", ItemType = InventoryItemType.Heal, MaxStack = 99 },
+                new ItemDef { Type = "mana", Name = "Mana", ItemType = InventoryItemType.Mana, MaxStack = 1 }, // <-- stack cap 1 so 8 slots = 8 mana
             };
-            var inv = new InventorySystem(store, cfg, null);
-            var system = new CraftingSystem(store, cfg, inv, null, seed: 1);
+            Config.CraftingRecipes = new[] { recipe };
+            var inv = new InventorySystem(Store, Config, null);
+            var system = new CraftingSystem(Store, Config, inv, null, seed: 1);
             inv.BindCraftingSystem(system);
 
             // Add 1 healing potion FIRST so the input slot is reserved before
@@ -336,11 +328,11 @@ namespace BattleSystemECS.Tests.Features.Economy
             var result = system.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.FullInventory, result);
             // Inputs were consumed (1 healing potion gone)
-            Assert.Equal(0, CountItem(store, PlayerId, HealingPotionId));
+            Assert.Equal(0, CountItem(PlayerId, HealingPotionId));
             // Mana: was 7 (full minus the heal slot) + 1 from output (just barely
             // fit into the freed slot) = 8. The remaining 98 mana output entries
             // were dropped due to inventory full.
-            Assert.Equal(8, CountItem(store, PlayerId, ManaPotionId));
+            Assert.Equal(8, CountItem(PlayerId, ManaPotionId));
         }
 
         // ── 12. Multi-input recipe: all inputs must be present ─────────
@@ -353,12 +345,12 @@ namespace BattleSystemECS.Tests.Features.Economy
                     new CraftingItemStack { ItemId = ManaPotionId, Count = 1 },
                 },
                 new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 2 } });
-            var (system, store, inv, _) = MakeSystem(recipes: new[] { recipe });
+            var (system, inv) = MakeSystem(recipes: new[] { recipe });
 
             // Have tonic but no mana → missing inputs
             GiveItems(inv, PlayerId, SpeedTonicId, 1);
             Assert.Equal(CraftingSystem.CraftingResult.MissingInputs, system.TryCraft(PlayerId, 0));
-            Assert.Equal(1, CountItem(store, PlayerId, SpeedTonicId)); // untouched
+            Assert.Equal(1, CountItem(PlayerId, SpeedTonicId)); // untouched
         }
 
         // ── 13. Deterministic with fixed seed ──────────────────────────
@@ -375,28 +367,37 @@ namespace BattleSystemECS.Tests.Features.Economy
                 RefundRate = 0.5f,
                 RareBonusRate = 0f,
             };
-            int seed = 4242;
-            int successesA = 0, successesB = 0;
-            int attemptsA = 0, attemptsB = 0;
-            for (int i = 0; i < 100; i++)
+            const int seed = 4242;
+            const int attempts = 100;
+
+            // 同一 seed 的两次完整 100 次尝试序列必须逐位一致（不是“每次都新建系统”的单点重复）。
+            var seqA = RunCraftSequence(recipe, seed, attempts);
+            var seqB = RunCraftSequence(recipe, seed, attempts);
+            Assert.True(seqA.SequenceEqual(seqB), "same seed must produce identical result sequence");
+
+            // 固定 seed 下序列确定：统计区间 + 两种结果都真实出现，证明概率分支被走到。
+            int successes = 0;
+            foreach (var r in seqA)
             {
-                var (sysA, _, invA, _) = MakeSystem(recipes: new[] { recipe }, seed: seed);
-                invA.AddItem(PlayerId, HealingPotionId);
-                if (sysA.TryCraft(PlayerId, 0) == CraftingSystem.CraftingResult.Success) successesA++;
-                attemptsA++;
+                if (r == CraftingSystem.CraftingResult.Success) successes++;
             }
-            for (int i = 0; i < 100; i++)
+            Assert.InRange(successes, 20, 80);
+            Assert.Contains(CraftingSystem.CraftingResult.Success, seqA);
+            Assert.Contains(CraftingSystem.CraftingResult.Failure, seqA);
+        }
+
+        /// <summary>单个 CraftingSystem 实例连续尝试 N 次（每次补一个输入），返回完整结果序列。</summary>
+        private CraftingSystem.CraftingResult[] RunCraftSequence(
+            CraftingRecipeDef recipe, int seed, int attempts)
+        {
+            var (system, inv) = MakeSystem(recipes: new[] { recipe }, seed: seed);
+            var results = new CraftingSystem.CraftingResult[attempts];
+            for (int i = 0; i < attempts; i++)
             {
-                var (sysB, _, invB, _) = MakeSystem(recipes: new[] { recipe }, seed: seed);
-                invB.AddItem(PlayerId, HealingPotionId);
-                if (sysB.TryCraft(PlayerId, 0) == CraftingSystem.CraftingResult.Success) successesB++;
-                attemptsB++;
+                inv.AddItem(PlayerId, HealingPotionId);
+                results[i] = system.TryCraft(PlayerId, 0);
             }
-            // Determinism: same seed → identical success count
-            Assert.Equal(successesA, successesB);
-            Assert.Equal(attemptsA, attemptsB);
-            // Sanity: 100 attempts is the lower bound (never less than 0 successes)
-            Assert.True(successesA >= 0 && successesA <= 100);
+            return results;
         }
 
         // ── 14. Partial stack consumption ─────────────────────────────
@@ -406,15 +407,15 @@ namespace BattleSystemECS.Tests.Features.Economy
             var recipe = MakeSuccessRecipe("combine_heal",
                 new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 2 } },
                 new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } });
-            var (system, store, inv, _) = MakeSystem(recipes: new[] { recipe });
+            var (system, inv) = MakeSystem(recipes: new[] { recipe });
             // AddItem with MaxStack=99 puts all 5 in slot 0
             GiveItems(inv, PlayerId, HealingPotionId, 5);
 
             system.TryCraft(PlayerId, 0);
             // 5 - 2 input + 1 output = 4
-            Assert.Equal(4, CountItem(store, PlayerId, HealingPotionId));
+            Assert.Equal(4, CountItem(PlayerId, HealingPotionId));
             // Verify it's all in slot 0 (no fragmentation)
-            Assert.Equal(4, store.PlayerInventoryCount[0]);
+            Assert.Equal(4, Store.PlayerInventoryCount[0]);
         }
 
         // ── 15. TryCraft via InventorySystem: forwards correctly ───────
@@ -424,7 +425,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             var recipe = MakeSuccessRecipe("combine",
                 new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } },
                 new[] { new CraftingItemStack { ItemId = ManaPotionId, Count = 1 } });
-            var (system, _, inv, _) = MakeSystem(recipes: new[] { recipe });
+            var (system, inv) = MakeSystem(recipes: new[] { recipe });
             GiveItems(inv, PlayerId, HealingPotionId, 1);
 
             var result = inv.TryCraft(PlayerId, 0);
@@ -435,10 +436,8 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void TryCraft_UnboundInventory_ReturnsBadRecipe()
         {
-            var store = new ComponentStore();
-            store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
-            var cfg = new GameConfig();
-            var inv = new InventorySystem(store, cfg, null);
+            Store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
+            var inv = new InventorySystem(Store, Config, null);
             // No BindCraftingSystem call → craftingSystem is null
             var result = inv.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.BadRecipe, result);
@@ -458,14 +457,14 @@ namespace BattleSystemECS.Tests.Features.Economy
                 RefundRate = 0f,
                 RareBonusRate = 0f,
             };
-            var (system, store, inv, _) = MakeSystem(recipes: new[] { recipe });
+            var (system, inv) = MakeSystem(recipes: new[] { recipe });
             GiveItems(inv, PlayerId, HealingPotionId, 3);
             int addsBefore = inv.TotalAddCalls;
             var result = system.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.Failure, result);
             // No AddItem calls during refund (RefundRate=0 means refundCount=0)
             Assert.Equal(addsBefore, inv.TotalAddCalls);
-            Assert.Equal(0, CountItem(store, PlayerId, HealingPotionId));
+            Assert.Equal(0, CountItem(PlayerId, HealingPotionId));
         }
 
         // ── 18. RefundRate=1.0 → all inputs returned ──────────────────
@@ -482,12 +481,12 @@ namespace BattleSystemECS.Tests.Features.Economy
                 RefundRate = 1f,  // all back
                 RareBonusRate = 0f,
             };
-            var (system, store, inv, _) = MakeSystem(recipes: new[] { recipe });
+            var (system, inv) = MakeSystem(recipes: new[] { recipe });
             GiveItems(inv, PlayerId, HealingPotionId, 3);
             var result = system.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.Failure, result);
             // 3 - 3 (consumed) + 3 (refund) = 3
-            Assert.Equal(3, CountItem(store, PlayerId, HealingPotionId));
+            Assert.Equal(3, CountItem(PlayerId, HealingPotionId));
         }
         // ── 19. Duplicate ItemId in inputs: aggregated check ────────────
         // Claude bug scan regression: a recipe listing the same ItemId in two
@@ -512,22 +511,22 @@ namespace BattleSystemECS.Tests.Features.Economy
                 RefundRate = 0.5f,
                 RareBonusRate = 0f,
             };
-            var (system, store, inv, _) = MakeSystem(recipes: new[] { recipe });
+            var (system, inv) = MakeSystem(recipes: new[] { recipe });
             // Player has only 1 grenade. Recipe asks for 2 (1 + 1). Pre-flight
             // must reject — old code would have passed and silently lost it.
             GiveItems(inv, PlayerId, GrenadeId, 1);
             var result = system.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.MissingInputs, result);
-            Assert.Equal(1, CountItem(store, PlayerId, GrenadeId)); // untouched
+            Assert.Equal(1, CountItem(PlayerId, GrenadeId)); // untouched
             Assert.Equal(1, system.TotalRejectedMissingInputs);
 
             // With 2 grenades in stock, the craft should now succeed.
             GiveItems(inv, PlayerId, GrenadeId, 1);
-            Assert.Equal(2, CountItem(store, PlayerId, GrenadeId));
+            Assert.Equal(2, CountItem(PlayerId, GrenadeId));
             var result2 = system.TryCraft(PlayerId, 0);
             Assert.Equal(CraftingSystem.CraftingResult.Success, result2);
             // 2 - 2 inputs + 1 output = 1
-            Assert.Equal(1, CountItem(store, PlayerId, GrenadeId));
+            Assert.Equal(1, CountItem(PlayerId, GrenadeId));
         }
     }
 }

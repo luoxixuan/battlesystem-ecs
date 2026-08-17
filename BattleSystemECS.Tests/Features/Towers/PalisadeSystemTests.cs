@@ -18,23 +18,16 @@ namespace BattleSystemECS.Tests.Features.Towers
     ///   - ComponentStore SOA fields are zero-initialized (no ID-reuse leakage)
     ///   - DestroyEntity resets Palisade fields
     /// </summary>
-    public class PalisadeSystemTests
+    public class PalisadeSystemTests : BattleTestBase
     {
-        private static int PlacePalisade(ComponentStore store, MockRenderer r, int x, int y)
+        private int PlacePalisade(int x, int y)
         {
-            var sys = new TowerPlacementSystem(store, r);
-            TestWorld.DisablePerTypeTowerCaps(store);
-            return sys.PlaceTower(x, y, TowerType.Palisade, 0f, 0, 0f, 25f);
+            _ = Placement; // 构造 Placement（LoadPerTypeCaps 会写 JSON cap），随后显式清空 cap
+            DisableTowerCaps();
+            return Placement.PlaceTower(x, y, TowerType.Palisade, 0f, 0, 0f, 25f);
         }
 
-        // ─── Enum and config defaults ──────────────────────────────────────
-
-        [Fact]
-        public void Palisade_EnumValue_IsDefined()
-        {
-            // Round 100 — verify the new enum slot exists
-            Assert.Equal(9, (int)TowerType.Palisade);
-        }
+        // ─── Config defaults ───────────────────────────────────────────────
 
         [Fact]
         public void PalisadeConfig_Defaults_AreSensible()
@@ -50,38 +43,32 @@ namespace BattleSystemECS.Tests.Features.Towers
         [Fact]
         public void PlacePalisade_SetsIsPalisadeTrue()
         {
-            var store = new ComponentStore();
-            var r = new MockRenderer();
-            int id = PlacePalisade(store, r, 3, 4);
+            int id = PlacePalisade(3, 4);
             Assert.True(id >= 0);
-            Assert.True(store.TowerIsPalisade[id]);
-            Assert.Equal(TowerType.Palisade, store.TowerType[id]);
+            Assert.True(Store.TowerIsPalisade[id]);
+            Assert.Equal(TowerType.Palisade, Store.TowerType[id]);
         }
 
         [Fact]
         public void PlacePalisade_InitializesStunFramesAndRadius()
         {
-            var store = new ComponentStore();
-            var r = new MockRenderer();
-            int id = PlacePalisade(store, r, 5, 5);
-            Assert.Equal(PalisadeConfig.DefaultPalisadeStunFrames, store.PalisadeStunFrames[id]);
-            Assert.Equal(PalisadeConfig.DefaultPalisadeBlockRadius, store.PalisadeBlockRadius[id]);
-            Assert.Equal(PalisadeConfig.DefaultPalisadeHP, store.PalisadeHP[id]);
-            Assert.Equal(PalisadeConfig.DefaultPalisadeHP, store.PalisadeMaxHP[id]);
+            int id = PlacePalisade(5, 5);
+            Assert.Equal(PalisadeConfig.DefaultPalisadeStunFrames, Store.PalisadeStunFrames[id]);
+            Assert.Equal(PalisadeConfig.DefaultPalisadeBlockRadius, Store.PalisadeBlockRadius[id]);
+            Assert.Equal(PalisadeConfig.DefaultPalisadeHP, Store.PalisadeHP[id], 3);
+            Assert.Equal(PalisadeConfig.DefaultPalisadeHP, Store.PalisadeMaxHP[id], 3);
         }
 
         [Fact]
         public void PlaceNonPalisade_LeavesIsPalisadeFalse()
         {
-            var store = new ComponentStore();
-            var r = new MockRenderer();
-            var sys = new TowerPlacementSystem(store, r);
-            TestWorld.DisablePerTypeTowerCaps(store);
-            int id = sys.PlaceTower(1, 1, TowerType.Basic, 50f, 3, 1f, 25f);
+            _ = Placement; // 构造 Placement（LoadPerTypeCaps 会写 JSON cap），随后显式清空 cap
+            DisableTowerCaps();
+            int id = Placement.PlaceTower(1, 1, TowerType.Basic, 50f, 3, 1f, 25f);
             Assert.True(id >= 0);
-            Assert.False(store.TowerIsPalisade[id]);
-            Assert.Equal(0, store.PalisadeStunFrames[id]);
-            Assert.Equal(0f, store.PalisadeHP[id]);
+            Assert.False(Store.TowerIsPalisade[id]);
+            Assert.Equal(0, Store.PalisadeStunFrames[id]);
+            Assert.Equal(0f, Store.PalisadeHP[id], 3);
         }
 
         // ─── Zero-overhead default: no Palisade field non-zero unless set ─
@@ -92,15 +79,14 @@ namespace BattleSystemECS.Tests.Features.Towers
             // Backward compat: spawning a regular tower (or no tower at all) must not
             // cause any palisade field to be non-zero. Ensures the new SOA arrays are
             // truly zero-overhead for non-palisade gameplay.
-            var store = new ComponentStore();
             // Spot-check a few indices
             for (int i = 0; i < 10; i++)
             {
-                Assert.False(store.TowerIsPalisade[i]);
-                Assert.Equal(0, store.PalisadeStunFrames[i]);
-                Assert.Equal(0, store.PalisadeBlockRadius[i]);
-                Assert.Equal(0f, store.PalisadeHP[i]);
-                Assert.Equal(0f, store.PalisadeMaxHP[i]);
+                Assert.False(Store.TowerIsPalisade[i]);
+                Assert.Equal(0, Store.PalisadeStunFrames[i]);
+                Assert.Equal(0, Store.PalisadeBlockRadius[i]);
+                Assert.Equal(0f, Store.PalisadeHP[i], 3);
+                Assert.Equal(0f, Store.PalisadeMaxHP[i], 3);
             }
         }
 
@@ -109,22 +95,20 @@ namespace BattleSystemECS.Tests.Features.Towers
         [Fact]
         public void DestroyEntity_ResetsPalisadeFields()
         {
-            var store = new ComponentStore();
-            var r = new MockRenderer();
-            int id = PlacePalisade(store, r, 2, 2);
-            Assert.True(store.TowerIsPalisade[id]);
+            int id = PlacePalisade(2, 2);
+            Assert.True(Store.TowerIsPalisade[id]);
 
             // Manually bump HP to non-default to confirm reset
-            store.PalisadeHP[id] = 50f;
-            store.PalisadeMaxHP[id] = 200f;
-            store.PalisadeStunFrames[id] = 30;
+            Store.PalisadeHP[id] = 50f;
+            Store.PalisadeMaxHP[id] = 200f;
+            Store.PalisadeStunFrames[id] = 30;
 
-            store.DestroyEntity(id);
-            Assert.False(store.TowerIsPalisade[id]);
-            Assert.Equal(0, store.PalisadeStunFrames[id]);
-            Assert.Equal(0, store.PalisadeBlockRadius[id]);
-            Assert.Equal(0f, store.PalisadeHP[id]);
-            Assert.Equal(0f, store.PalisadeMaxHP[id]);
+            Store.DestroyEntity(id);
+            Assert.False(Store.TowerIsPalisade[id]);
+            Assert.Equal(0, Store.PalisadeStunFrames[id]);
+            Assert.Equal(0, Store.PalisadeBlockRadius[id]);
+            Assert.Equal(0f, Store.PalisadeHP[id], 3);
+            Assert.Equal(0f, Store.PalisadeMaxHP[id], 3);
         }
 
         // ─── Tile-occupancy interaction: palisade occupies its tile ────────
@@ -132,12 +116,10 @@ namespace BattleSystemECS.Tests.Features.Towers
         [Fact]
         public void PlacePalisade_OccupiesTile()
         {
-            var store = new ComponentStore();
-            var r = new MockRenderer();
-            int id = PlacePalisade(store, r, 4, 7);
+            int id = PlacePalisade(4, 7);
             Assert.True(id >= 0);
             // Round 95 — tile cache should mark (4, 7) as occupied
-            Assert.True(store.IsTileOccupied(4, 7));
+            Assert.True(Store.IsTileOccupied(4, 7));
         }
     }
 }

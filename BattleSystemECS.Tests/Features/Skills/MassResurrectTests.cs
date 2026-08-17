@@ -29,17 +29,14 @@ namespace BattleSystemECS.Tests.Features.Skills
     ///   - SkillSystem.CastSkill dispatch via case 18 with NecromancerSystem injected
     ///   - SkillSystem case 18 with NecromancerSystem NOT injected returns 0 (defensive)
     /// </summary>
-    public class MassResurrectTests
+    public class MassResurrectTests : BattleTestBase
     {
         // ── Helper: build a minimal arena with player + a registered MonsterConfig ──
-        private (ComponentStore store, GameConfig config, int playerId) CreateArena()
+        private int CreateArena()
         {
-            var store = new ComponentStore();
-            int playerId = store.CreateEntity();
-            var config = new GameConfig();
             // Register a minimal monster type so SpawnReanimatedMinion can look up its stats.
             // Health=100 → after hpFraction=0.3 the reanimated minion spawns with 30 HP.
-            config.MonsterTypes.Add(new MonsterConfig
+            Config.MonsterTypes.Add(new MonsterConfig
             {
                 Type = "TestSkeleton",
                 Name = "Test Skeleton",
@@ -52,15 +49,7 @@ namespace BattleSystemECS.Tests.Features.Skills
                 GoldReward = 3
             });
             // Position the player at origin so we can reason about distances in tiles.
-            store.PositionX[playerId] = 0f;
-            store.PositionY[playerId] = 0f;
-            return (store, config, playerId);
-        }
-
-        // Helper: queue a corpse at (x, y) of "TestSkeleton" type, died at simTime=turn
-        private int QueueCorpse(ComponentStore store, float x, float y, float hpPercent, float simTime)
-        {
-            return store.NecromancerQueueCorpse(-1, x, y, "TestSkeleton", hpPercent, simTime);
+            return Player();
         }
 
         // ── Test 1: AreaShapeType.MassResurrect = 18 constant ──────────────────
@@ -70,28 +59,22 @@ namespace BattleSystemECS.Tests.Features.Skills
             Assert.Equal(18, AreaShapeType.MassResurrect);
         }
 
-        // ── Test 2: FromString parses "massresurrect" → 18 ────────────────────
-        [Fact]
-        public void MassResurrect_FromString_ParsesLowercase()
+        // ── Test 2/3: FromString 大小写不敏感解析（同构用例合并） ──────────
+        [Theory(DisplayName = "MassResurrect.FromString(\"{0}\") = 18")]
+        [InlineData("massresurrect")]
+        [InlineData("MassResurrect")]
+        [InlineData("MASSRESURRECT")]
+        public void MassResurrect_FromString_ParsesCaseInsensitive(string input)
         {
-            Assert.Equal(18, AreaShapeType.FromString("massresurrect"));
-        }
-
-        // ── Test 3: FromString is case-insensitive (ToLowerInvariant) ──────────
-        [Fact]
-        public void MassResurrect_FromString_ParsesMixedCase()
-        {
-            Assert.Equal(18, AreaShapeType.FromString("MassResurrect"));
-            Assert.Equal(18, AreaShapeType.FromString("MASSRESURRECT"));
+            Assert.Equal(18, AreaShapeType.FromString(input));
         }
 
         // ── Test 4: Empty corpse queue returns 0 revived ───────────────────────
         [Fact]
         public void MassResurrect_EmptyQueue_ReturnsZero()
         {
-            var (store, config, playerId) = CreateArena();
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            int playerId = CreateArena();
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f);
 
             int revived = sys.MassResurrect(playerId, 0f, 0f, 4f, 0.3f);
@@ -103,10 +86,9 @@ namespace BattleSystemECS.Tests.Features.Skills
         [Fact]
         public void MassResurrect_SingleCorpseInRadius_RevivesOne()
         {
-            var (store, config, playerId) = CreateArena();
-            QueueCorpse(store, 2f, 0f, 1.0f, 0f); // 2 units away, 100% HP, died at t=0
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            int playerId = CreateArena();
+            Store.NecromancerQueueCorpse(-1, 2f, 0f, "TestSkeleton", 1.0f, 0f); // 2 units away, 100% HP, died at t=0
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f);
 
             int revived = sys.MassResurrect(playerId, 0f, 0f, 4f, 0.3f);
@@ -118,13 +100,12 @@ namespace BattleSystemECS.Tests.Features.Skills
         [Fact]
         public void MassResurrect_MultipleCorpsesInRadius_RevivesAll()
         {
-            var (store, config, playerId) = CreateArena();
+            int playerId = CreateArena();
             // 3 corpses within 4 units of origin
-            QueueCorpse(store, 1f, 0f, 1.0f, 0f);
-            QueueCorpse(store, -1f, 0f, 1.0f, 0f);
-            QueueCorpse(store, 0f, 2f, 1.0f, 0f);
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            Store.NecromancerQueueCorpse(-1, 1f, 0f, "TestSkeleton", 1.0f, 0f);
+            Store.NecromancerQueueCorpse(-1, -1f, 0f, "TestSkeleton", 1.0f, 0f);
+            Store.NecromancerQueueCorpse(-1, 0f, 2f, "TestSkeleton", 1.0f, 0f);
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f);
 
             int revived = sys.MassResurrect(playerId, 0f, 0f, 4f, 0.3f);
@@ -136,10 +117,9 @@ namespace BattleSystemECS.Tests.Features.Skills
         [Fact]
         public void MassResurrect_OutOfRadiusCorpse_Ignored()
         {
-            var (store, config, playerId) = CreateArena();
-            QueueCorpse(store, 100f, 0f, 1.0f, 0f); // 100 units away, well outside radius 4
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            int playerId = CreateArena();
+            Store.NecromancerQueueCorpse(-1, 100f, 0f, "TestSkeleton", 1.0f, 0f); // 100 units away, well outside radius 4
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f);
 
             int revived = sys.MassResurrect(playerId, 0f, 0f, 4f, 0.3f);
@@ -151,12 +131,11 @@ namespace BattleSystemECS.Tests.Features.Skills
         [Fact]
         public void MassResurrect_ClaimedCorpse_Ignored()
         {
-            var (store, config, playerId) = CreateArena();
-            int corpseId = QueueCorpse(store, 1f, 0f, 1.0f, 0f);
+            int playerId = CreateArena();
+            int corpseId = Store.NecromancerQueueCorpse(-1, 1f, 0f, "TestSkeleton", 1.0f, 0f);
             // Simulate a necromancer already claiming this corpse
-            store.CorpseOwnerId[corpseId] = 42;
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            Store.CorpseOwnerId[corpseId] = 42;
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f);
 
             int revived = sys.MassResurrect(playerId, 0f, 0f, 4f, 0.3f);
@@ -168,11 +147,10 @@ namespace BattleSystemECS.Tests.Features.Skills
         [Fact]
         public void MassResurrect_AlreadyReanimatedCorpse_Ignored()
         {
-            var (store, config, playerId) = CreateArena();
-            int corpseId = QueueCorpse(store, 1f, 0f, 1.0f, 0f);
-            store.CorpseReanimated[corpseId] = true;
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            int playerId = CreateArena();
+            int corpseId = Store.NecromancerQueueCorpse(-1, 1f, 0f, "TestSkeleton", 1.0f, 0f);
+            Store.CorpseReanimated[corpseId] = true;
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f);
 
             int revived = sys.MassResurrect(playerId, 0f, 0f, 4f, 0.3f);
@@ -184,11 +162,10 @@ namespace BattleSystemECS.Tests.Features.Skills
         [Fact]
         public void MassResurrect_AgedCorpse_Ignored()
         {
-            var (store, config, playerId) = CreateArena();
+            int playerId = CreateArena();
             // Corpse died 100s ago, MAX_CORPSE_AGE_SEC defaults to 30
-            QueueCorpse(store, 1f, 0f, 1.0f, -100f);
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            Store.NecromancerQueueCorpse(-1, 1f, 0f, "TestSkeleton", 1.0f, -100f);
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f); // current simTime = 0, age = 0 - (-100) = 100 > 30
 
             int revived = sys.MassResurrect(playerId, 0f, 0f, 4f, 0.3f);
@@ -200,12 +177,11 @@ namespace BattleSystemECS.Tests.Features.Skills
         [Fact]
         public void MassResurrect_HpFraction_AppliesToMinionMaxHealth()
         {
-            var (store, config, playerId) = CreateArena();
+            int playerId = CreateArena();
             // Queue a corpse with 100% HP (i.e. corpseHpPercent=1.0). After 0.5 hpFraction,
             // the reanimated minion should spawn with Health = 100 * 1.0 * 0.5 = 50.
-            QueueCorpse(store, 1f, 0f, 1.0f, 0f);
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            Store.NecromancerQueueCorpse(-1, 1f, 0f, "TestSkeleton", 1.0f, 0f);
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f);
 
             int revived = sys.MassResurrect(playerId, 0f, 0f, 4f, 0.5f);
@@ -214,12 +190,12 @@ namespace BattleSystemECS.Tests.Features.Skills
             // Find the newly spawned minion (look for any active enemy with IsReanimated=true
             // that was created after the test started). Since we know the player is at slot
             // index 0 and the next available is index 1, we check ActiveEnemyIds.
-            var activeIds = store.GetCachedActiveEnemyIds();
+            var activeIds = Store.GetCachedActiveEnemyIds();
             int minionId = -1;
             for (int i = 0; i < activeIds.Count; i++)
             {
                 int eid = activeIds[i];
-                if (eid != playerId && store.EnemyIsReanimated[eid])
+                if (eid != playerId && Store.EnemyIsReanimated[eid])
                 {
                     minionId = eid;
                     break;
@@ -227,63 +203,60 @@ namespace BattleSystemECS.Tests.Features.Skills
             }
             Assert.True(minionId >= 0, "A reanimated minion should have been spawned");
             // HP = 100 (maxHealth) * 1.0 (corpseHpPercent) * 0.5 (hpFraction) = 50
-            Assert.Equal(50f, store.EnemyHealth[minionId]);
-            Assert.Equal(50f, store.EnemyMaxHealth[minionId]);
+            Assert.Equal(50f, Store.EnemyHealth[minionId]);
+            Assert.Equal(50f, Store.EnemyMaxHealth[minionId]);
         }
 
         // ── Test 12: Spawned minion is tagged with EnemyOwnerId = playerId ─────
         [Fact]
         public void MassResurrect_MinionTaggedWithOwnerId()
         {
-            var (store, config, playerId) = CreateArena();
-            QueueCorpse(store, 1f, 0f, 1.0f, 0f);
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            int playerId = CreateArena();
+            Store.NecromancerQueueCorpse(-1, 1f, 0f, "TestSkeleton", 1.0f, 0f);
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f);
 
             int revived = sys.MassResurrect(playerId, 0f, 0f, 4f, 0.3f);
 
             Assert.Equal(1, revived);
-            var activeIds = store.GetCachedActiveEnemyIds();
+            var activeIds = Store.GetCachedActiveEnemyIds();
             int minionId = -1;
             for (int i = 0; i < activeIds.Count; i++)
             {
                 int eid = activeIds[i];
-                if (eid != playerId && store.EnemyIsReanimated[eid])
+                if (eid != playerId && Store.EnemyIsReanimated[eid])
                 {
                     minionId = eid;
                     break;
                 }
             }
             Assert.True(minionId >= 0, "A reanimated minion should have been spawned");
-            Assert.Equal(playerId, store.EnemyOwnerId[minionId]);
+            Assert.Equal(playerId, Store.EnemyOwnerId[minionId]);
         }
 
         // ── Test 13: CorpseReanimated flag is set to true after revive ────────
         [Fact]
         public void MassResurrect_SetsCorpseReanimatedFlag()
         {
-            var (store, config, playerId) = CreateArena();
-            int corpseId = QueueCorpse(store, 1f, 0f, 1.0f, 0f);
-            Assert.False(store.CorpseReanimated[corpseId], "Pre-condition: flag should be false");
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            int playerId = CreateArena();
+            int corpseId = Store.NecromancerQueueCorpse(-1, 1f, 0f, "TestSkeleton", 1.0f, 0f);
+            Assert.False(Store.CorpseReanimated[corpseId], "Pre-condition: flag should be false");
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f);
 
             sys.MassResurrect(playerId, 0f, 0f, 4f, 0.3f);
 
-            Assert.True(store.CorpseReanimated[corpseId], "After MassResurrect the flag should be true");
-            Assert.Equal(playerId, store.CorpseOwnerId[corpseId]);
+            Assert.True(Store.CorpseReanimated[corpseId], "After MassResurrect the flag should be true");
+            Assert.Equal(playerId, Store.CorpseOwnerId[corpseId]);
         }
 
         // ── Test 14: Zero-radius call returns 0 (defensive) ────────────────────
         [Fact]
         public void MassResurrect_ZeroRadius_ReturnsZero()
         {
-            var (store, config, playerId) = CreateArena();
-            QueueCorpse(store, 1f, 0f, 1.0f, 0f);
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            int playerId = CreateArena();
+            Store.NecromancerQueueCorpse(-1, 1f, 0f, "TestSkeleton", 1.0f, 0f);
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f);
 
             int revived = sys.MassResurrect(playerId, 0f, 0f, 0f, 0.3f);
@@ -295,22 +268,21 @@ namespace BattleSystemECS.Tests.Features.Skills
         [Fact]
         public void MassResurrect_NegativeHpFraction_UsesDefault()
         {
-            var (store, config, playerId) = CreateArena();
-            QueueCorpse(store, 1f, 0f, 1.0f, 0f);
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            int playerId = CreateArena();
+            Store.NecromancerQueueCorpse(-1, 1f, 0f, "TestSkeleton", 1.0f, 0f);
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f);
 
             // hpFraction = -1 should fall back to 0.3 internally
             int revived = sys.MassResurrect(playerId, 0f, 0f, 4f, -1f);
 
             Assert.Equal(1, revived);
-            var activeIds = store.GetCachedActiveEnemyIds();
+            var activeIds = Store.GetCachedActiveEnemyIds();
             int minionId = -1;
             for (int i = 0; i < activeIds.Count; i++)
             {
                 int eid = activeIds[i];
-                if (eid != playerId && store.EnemyIsReanimated[eid])
+                if (eid != playerId && Store.EnemyIsReanimated[eid])
                 {
                     minionId = eid;
                     break;
@@ -319,18 +291,17 @@ namespace BattleSystemECS.Tests.Features.Skills
             Assert.True(minionId >= 0, "A reanimated minion should have been spawned");
             // HP = 100 (max) * 1.0 (corpseHp) * 0.3 (default) = 30
             // (precision tolerance: float multiplication accumulates IEEE 754 rounding)
-            Assert.Equal(30f, store.EnemyHealth[minionId], 3);
+            Assert.Equal(30f, Store.EnemyHealth[minionId], 3);
         }
 
         // ── Test 16: Second MassResurrect call is a no-op (corpses already claimed) ──
         [Fact]
         public void MassResurrect_TwiceInARow_SecondCallIsNoOp()
         {
-            var (store, config, playerId) = CreateArena();
-            QueueCorpse(store, 1f, 0f, 1.0f, 0f);
-            QueueCorpse(store, 2f, 0f, 1.0f, 0f);
-            var r = new MockRenderer();
-            var sys = new NecromancerSystem(store, config, r);
+            int playerId = CreateArena();
+            Store.NecromancerQueueCorpse(-1, 1f, 0f, "TestSkeleton", 1.0f, 0f);
+            Store.NecromancerQueueCorpse(-1, 2f, 0f, "TestSkeleton", 1.0f, 0f);
+            var sys = new NecromancerSystem(Store, Config, Renderer);
             sys.SetTurn(0, 0f);
 
             int firstPass = sys.MassResurrect(playerId, 0f, 0f, 4f, 0.3f);
@@ -344,7 +315,7 @@ namespace BattleSystemECS.Tests.Features.Skills
         [Fact]
         public void SkillSystem_MassResurrect_DispatchesToNecromancerSystem()
         {
-            var (store, config, playerId) = CreateArena();
+            int playerId = CreateArena();
             // Add the MassResurrect ability to the player
             var massResDef = new GameplayAbilityDef(
                 name: "Mass Resurrect",
@@ -363,15 +334,14 @@ namespace BattleSystemECS.Tests.Features.Skills
             // AbilityInstance slot 0 — set the def and bump AbilityCount so CastSkill
             // iterates slot 0 (it gates on `slot < AbilityCount[playerId]`).
             var ability = new AbilityInstance(massResDef);
-            store.SetAbility(playerId, 0, ability);
-            store.AbilityCount[playerId] = 1;
+            Store.SetAbility(playerId, 0, ability);
+            Store.AbilityCount[playerId] = 1;
 
             // Queue a corpse in range
-            QueueCorpse(store, 1f, 0f, 1.0f, 0f);
+            Store.NecromancerQueueCorpse(-1, 1f, 0f, "TestSkeleton", 1.0f, 0f);
 
-            var r = new MockRenderer();
-            var necro = new NecromancerSystem(store, config, r);
-            var skillSys = new SkillSystem(store, r, playerId, config);
+            var necro = new NecromancerSystem(Store, Config, Renderer);
+            var skillSys = new SkillSystem(Store, Renderer, playerId, Config);
             skillSys.InjectNecromancerSystem(necro);
             skillSys.SetTurn(0);
 
@@ -380,12 +350,12 @@ namespace BattleSystemECS.Tests.Features.Skills
 
             // The corpse should be reanimated
             // Find the minion and verify it exists
-            var activeIds = store.GetCachedActiveEnemyIds();
+            var activeIds = Store.GetCachedActiveEnemyIds();
             int minionCount = 0;
             for (int i = 0; i < activeIds.Count; i++)
             {
                 int eid = activeIds[i];
-                if (eid != playerId && store.EnemyIsReanimated[eid])
+                if (eid != playerId && Store.EnemyIsReanimated[eid])
                 {
                     minionCount++;
                 }
@@ -397,7 +367,7 @@ namespace BattleSystemECS.Tests.Features.Skills
         [Fact]
         public void SkillSystem_MassResurrect_NoNecromancerSystem_ReturnsZero()
         {
-            var (store, config, playerId) = CreateArena();
+            int playerId = CreateArena();
             var massResDef = new GameplayAbilityDef(
                 name: "Mass Resurrect",
                 desc: "Test",
@@ -410,26 +380,25 @@ namespace BattleSystemECS.Tests.Features.Skills
                 areaRadius: 4
             );
             var ability = new AbilityInstance(massResDef);
-            store.SetAbility(playerId, 0, ability);
-            store.AbilityCount[playerId] = 1;
+            Store.SetAbility(playerId, 0, ability);
+            Store.AbilityCount[playerId] = 1;
 
-            QueueCorpse(store, 1f, 0f, 1.0f, 0f);
+            Store.NecromancerQueueCorpse(-1, 1f, 0f, "TestSkeleton", 1.0f, 0f);
 
-            var r = new MockRenderer();
             // NOTE: deliberately NOT injecting NecromancerSystem — defensive path
-            var skillSys = new SkillSystem(store, r, playerId, config);
+            var skillSys = new SkillSystem(Store, Renderer, playerId, Config);
             skillSys.SetTurn(0);
 
             skillSys.CastSkill("Mass Resurrect");
 
             // No minion should be spawned since the cast short-circuited
-            var activeIds = store.GetCachedActiveEnemyIds();
+            var activeIds = Store.GetCachedActiveEnemyIds();
             for (int i = 0; i < activeIds.Count; i++)
             {
                 int eid = activeIds[i];
                 if (eid != playerId)
                 {
-                    Assert.False(store.EnemyIsReanimated[eid], "No minion should be spawned when NecromancerSystem is missing");
+                    Assert.False(Store.EnemyIsReanimated[eid], "No minion should be spawned when NecromancerSystem is missing");
                 }
             }
         }

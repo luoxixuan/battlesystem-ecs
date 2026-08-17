@@ -13,7 +13,7 @@
 - **架构**: SOA ECS（逻辑与渲染完全分离），事件总线（`IBattleEventBus`）驱动渲染
 - **运行时**: 控制台应用（含交互式游戏 + 非交互式压测）+ Unity 2D 渲染端
 - **核心特征**: 全系统并行化 (`Parallel.For`)、零分配热路径、配置驱动、帧末统一结算
-- **代码规模**: Core 库 ~52k 行（Core + Systems）、Tests ~22k 行；1310 项 xUnit 测试（框架层 / 机制层 / 业务层 / 集成层四分层）
+- **代码规模**: Core 库 ~52k 行（Core + Systems）、Tests ~22k 行；1281 项 xUnit 测试（框架层 / 机制层 / 业务层 / 集成层四分层）
 - **Unity 工程**: `F:\AI\BattleSystem-ECS-Unity`（2022.3.62f2c1 LTS），通过 `BattleDriver` 消费 DLL
 
 ---
@@ -252,14 +252,14 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 - **xUnit**（`Xunit`），测试项目 `BattleSystemECS.Tests`（TargetFramework=`net9.0`，引用 Core 库）。
 - 测试运行器：`xunit.runner.visualstudio`，覆盖率收集：`coverlet.collector`。
-- 当前测试数量：**1310 项**（全部通过为门禁要求）。
+- 当前测试数量：**1281 项**（全部通过为门禁要求）。
 - **测试范围分层**（目录即分层，详见 `BattleSystemECS.Tests/README.md`）：
   - **Infrastructure**：`TestWorld` / `Specs` / `MockRenderer` / `BattleTestBase` 共享基建，不含测试。
   - **Framework 框架层**：ECS 存储生命周期、帧调度与死亡结算、状态机、配置加载、GAS 冷却、曲线表、技能核心、时光快照。
   - **Mechanisms 机制层**：伤害公式 / 抗性 / 处决 / 标记 / 光环 / 多目标 / 控制免疫 / 仇恨威胁 / 移动寻路 / 生成难度 / 地形区域 / 塔位公共机制。
   - **Features 业务层**：具名塔 / 敌怪 / Boss / 技能 / 经济 / 具名 Buff / 天气，只保留有真实断言的测试。
   - **Integration 集成层**：读取 `game_config.json` 作为输入，只断言结构自洽与相对关系（引用存在、唯一性、字段有效范围、数量与配置推导值一致），不钉住任何具体配置值。
-- **测试质量规则**：禁止 `Assert.True(true)` 恒真断言与调试残留；每个 `[Fact]` 至少一条有意义断言；随机数固定种子；**允许读取配置数据，但禁止把配置中的某个具体值当固定常量断言**（期望值从读取结果推导或由测试代码注入，如 `TestWorld.DisablePerTypeTowerCaps`）；手工 `AddTower` 后需 `AddActiveTowerId`，驱动塔攻击前需 `RebuildSpatialGrid()`（见 README）。
+- **测试质量规则**：禁止 `Assert.True(true)` 恒真断言与调试残留；每个 `[Fact]` 至少一条有意义断言；随机数固定种子；**允许读取配置数据，但禁止把配置中的某个具体值当固定常量断言**（期望值从读取结果推导或由测试代码注入，如 `TestWorld.DisablePerTypeTowerCaps`）；`AddTower` 已自动注册活跃塔列表，不要再重复 `AddActiveTowerId`（需要绕过注册的存储层直测用原始数组操作并注释原因），驱动塔攻击前需 `RebuildSpatialGrid()`（见 README）。
 
 ### 6.2 测试辅助
 
@@ -288,9 +288,9 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 ### 7.3 运行方式
 
 ```bash
-echo 2 | dotnet run
-echo 4 | dotnet run
-echo 5 | dotnet run
+echo 2 | dotnet run   # mode 2：stdin 菜单路径（Program.cs 读取 "2"）
+echo 4 | dotnet run   # mode 4：stdin 菜单路径（Program.cs 读取 "4"）
+dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "5" 不会进入压测分支
 ```
 
 ---
@@ -301,13 +301,14 @@ echo 5 | dotnet run
 
 1. **`dotnet build BattleSystemECS.Core`** — Core 库 0 warnings, 0 errors
 2. **`dotnet build`** — EXE 0 warnings, 0 errors
-3. **`dotnet test BattleSystemECS.Tests`** — 全部通过（当前 1310/1310）
-4. **`echo 2 | dotnet run`** — mode 2 压测
-5. **`echo 4 | dotnet run`** — mode 4 压测
-6. **`echo 5 | dotnet run`** — mode 5 压测
-7. **同步文档** — 更新 `AGENTS.md` / `README.md` / `docs/` / `CHANGELOG.md`
-8. **`git add -A && git commit -m "描述"`** — 原子性最小改动
-9. **`git push github master`** — commit 完成后立即推送
+3. **`dotnet test BattleSystemECS.Tests`** — 全部通过（当前 1281/1281）
+4. **`pwsh -File tools\check-test-rules.ps1`** — 测试静态规则 0 违规（零断言测试 + 恒真/恒假断言）
+5. **`echo 2 | dotnet run`** — mode 2 压测
+6. **`echo 4 | dotnet run`** — mode 4 压测
+7. **`dotnet run -- 5`** — mode 5 压测（注意：参数模式，不能用 `echo 5 | dotnet run`）
+8. **同步文档** — 更新 `AGENTS.md` / `README.md` / `docs/` / `CHANGELOG.md`
+9. **`git add -A && git commit -m "描述"`** — 原子性最小改动
+10. **`git push github master`** — commit 完成后立即推送
 
 ### Git 提交风格
 
@@ -354,10 +355,11 @@ echo 5 | dotnet run
 | 修改行为树 | `Data/Configs/behavior_trees.json` + `Systems/BehaviorTreeEvaluator.cs` |
 | 修改 Polyfill | `Core/{IsExternalInit,Rng,PolyfillExtensions}.cs`（经 Linked Files 编译进 Core 库） |
 | 修改测试 | `BattleSystemECS.Tests/<层级>/XxxTests.cs`（分层规则见 `BattleSystemECS.Tests/README.md`） |
+| CI 测试静态规则 | `tools/check-test-rules.ps1`（0 违规门禁：零断言测试 + 恒真/恒假断言） |
 | 查看 Bug 历史 | `docs/design-and-bugs.md` |
 | 查看架构决策 | `docs/architecture.md` |
 | 查看 CodeReview 改进 | `Research/CodeReview_Improvements.md` |
 
 ---
 
-> **最后更新**：2026-08-16（测试架构重构：四分层；配置数据边界 = 允许读取、禁止钉住具体值，移除 17 项钉数据的测试并重写 cap 测试；1310 tests；双项目架构、双事件总线、Unity 渲染端、polyfill、144 systems / 11 groups）
+> **最后更新**：2026-08-17（测试可维护性整改：清 smoke/镜像测试、Theory 化、BattleTestBase 全量迁移、SystemRegistry 装配自检、CI 静态规则）

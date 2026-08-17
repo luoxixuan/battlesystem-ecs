@@ -1,5 +1,15 @@
 # 更新记录 (Changelog)
 
+### 2026-08-17
+- 单元测试可维护性/价值整改（P0-P3，仅测试项目 + 文档，零生产代码改动）：
+  1. P0 清除假绿：修复/删除 23 个零断言 smoke（`tools/check-test-rules.ps1` 全量扫描确认 0 违规）；删除在测试内复刻生产公式自证的镜像测试（ThreatScore/Adrenaline/ManaDrain/Enchant/MultiStrike/BossPhase/SummonCircle 等）与纯字段写读回环，改为真实攻击链路断言（Backstab/Enchant/ManaDrain/MultiStrike/TowerEffectiveness/InvulnerabilityFrames 等）；弱断言精确化（Mine/Execute/Inventory/Culling/FrameScheduler 等从 `>0`/区间改为注入值推导的 `Assert.Equal`）。
+  2. P1 参数化：1 个 [Theory] → 44 个 [Theory]，收敛 StateMachine/ElementalResistance/HolyDamage/CorpseEffect(844→670 行)/Mine chain/Beacon/Shrine/ThemedSummon/CCImmunity 等高复制区。
+  3. P2 基建推广：扩展 `TestWorld.RawTower`/`DisablePerTypeTowerCapsInstance` 与 `BattleTestBase.RebuildGrid` 等；82 个测试类全量继承 `BattleTestBase`，测试目录 `new ComponentStore()` 356→6、`new MockRenderer()` 216→2（均为基建或带注释的合规例外）。
+  4. P3 装配守护：新增 `Framework/SystemRegistryTests.cs`（CreateAll/WireDependencies/AssignToGroups 关键系统与 11 group 槽位非空 + BuildPhase tick 一致性）；新增 CI 静态规则 `tools/check-test-rules.ps1`（零断言/恒真恒假 0 违规门禁），并写入 AGENTS.md 检查清单。
+  5. 文档同步：AGENTS.md/README.md/测试 README 更新（测试数 1310→1281；修正 `AddTower` 已自动注册活跃塔列表的过时规则；修正 mode 5 压测必须用 `dotnet run -- 5` 而非 `echo 5 | dotnet run`）。
+- 验证：`dotnet build BattleSystemECS.Core` 与 `dotnet build` 均 0 warnings/0 errors；`pwsh -File tools\check-test-rules.ps1` 0 违规；`dotnet test` 1281/1281 PASS（2m02s）；压测 mode2 7746 FPS / mode4 4608 FPS / mode5 4290 FPS，全部通过硬门禁且无相对回退。
+- 遗留建议（生产测缝，未改生产代码）：EnemyAISystem 的 phase drain 注释与实际调用点错位；HeroSkillSystem/BossPhaseEvent/BossRegen 部分测试仍用反射访问私有成员；建议后续提供 internal+InternalsVisibleTo 或公开只读测缝。
+
 ### 2026-08-16
 - 单元测试配置数据边界清理：确立「允许读取配置数据、禁止把配置中的具体值当固定常量断言」的规则。移除 17 项钉住 shipped JSON 具体值的测试（GameConfigIntegration 2 个纯 smoke stress + TowerPlacement PerTypeCap_LoadFromConfig/4 个 sell-ratio JSON 测试 + CorpseEffect 4 个 LoadsFromJsonConfig + TowerShrine/TowerBeacon/HeroSkill/Mine/TowerEffectiveness 各 1 个文件存在/内容/条目测试），并将 TowerPlacement cap 测试重写为代码注入 cap（新增 `TestWorld.DisablePerTypeTowerCaps`，全部 TowerPlacement 测试构造后清除数据 cap）。恢复 Integration 层为「读取 game_config.json、只断言结构自洽与相对关系」的 11 项测试（引用存在/唯一性/字段范围/数量与配置推导一致）。验证：`dotnet test` 1310/1310 PASS（2m08s）。
 - 单元测试架构重构（四分层）：`BattleSystemECS.Tests` 重组为 `Infrastructure/`（TestWorld/Specs/MockRenderer/BattleTestBase）+ `Framework/` + `Mechanisms/`（Combat/Control/Perception/Movement/Spawning/World/TowerCore）+ `Features/`（Towers/Enemies/Bosses/Skills/Economy/Buffs/World）+ `Integration/`，新增 `BattleSystemECS.Tests/README.md` 固化分层与质量规范（禁止恒真断言/纯 smoke、固定种子、AddActiveTowerId/RebuildSpatialGrid、配置数据边界）。

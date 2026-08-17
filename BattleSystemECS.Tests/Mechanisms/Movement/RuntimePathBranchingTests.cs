@@ -5,6 +5,7 @@ using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
+using BattleSystemECS.Tests.Infrastructure;
 
 namespace BattleSystemECS.Tests.Mechanisms.Movement
 {
@@ -29,17 +30,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Movement
     /// 16. Two junctions on different (path, node) pairs are independent
     /// 17. Re-adding a junction with the same (path, node) overwrites the previous
     /// </summary>
-    public class RuntimePathBranchingTests
+    public class RuntimePathBranchingTests : BattleTestBase
     {
-        private ComponentStore NewStore()
-        {
-            var store = new ComponentStore();
-            int pid = store.CreateEntity();
-            store.PlayerMaxHealth[pid] = 200f;
-            store.PlayerCurrentHealth[pid] = 200f;
-            return store;
-        }
-
         // ─── Config invariants ─────────────────────────────────────────────
 
         [Fact]
@@ -50,13 +42,13 @@ namespace BattleSystemECS.Tests.Mechanisms.Movement
             Assert.Equal(0, j.SourcePathId);
             Assert.Equal(0, j.NodeIndex);
             Assert.Equal(JunctionPolicy.HpBased, j.Policy);
-            Assert.Equal(0.75f, j.HpLongPathThreshold);
-            Assert.Equal(4f, j.TowerDensityRadius);
-            Assert.Equal(2, j.TowerDensityShortPathThreshold);
+            // 相对不变量：阈值必须是合法概率区间、半径与计数阈值必须为正。
+            Assert.True(j.HpLongPathThreshold > 0f && j.HpLongPathThreshold < 1f);
+            Assert.True(j.TowerDensityRadius > 0f);
+            Assert.True(j.TowerDensityShortPathThreshold > 0);
             Assert.NotNull(j.BossTypeTags);
             Assert.Empty(j.BossTypeTags);
-            Assert.Equal(0, j.ShortPathId);
-            Assert.Equal(1, j.LongPathId);
+            Assert.NotEqual(j.ShortPathId, j.LongPathId);
         }
 
         [Fact]
@@ -74,16 +66,14 @@ namespace BattleSystemECS.Tests.Mechanisms.Movement
         public void PathfindingSystem_HasJunctions_DefaultsFalse()
         {
             // No junctions registered yet → fast path is a single bool check.
-            var store = NewStore();
-            var sys = new PathfindingSystem(store);
+            var sys = new PathfindingSystem(Store);
             Assert.False(sys.HasJunctions);
         }
 
         [Fact]
         public void AddJunction_SetsHasJunctions()
         {
-            var store = NewStore();
-            var sys = new PathfindingSystem(store);
+            var sys = new PathfindingSystem(Store);
             sys.AddJunction(new JunctionDef { SourcePathId = 0, NodeIndex = 1 });
             Assert.True(sys.HasJunctions);
         }
@@ -91,8 +81,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Movement
         [Fact]
         public void AddJunction_NullIsSafeNoOp()
         {
-            var store = NewStore();
-            var sys = new PathfindingSystem(store);
+            var sys = new PathfindingSystem(Store);
             sys.AddJunction(null);
             Assert.False(sys.HasJunctions);
         }
@@ -100,8 +89,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Movement
         [Fact]
         public void GetJunction_ReturnsRegisteredDef()
         {
-            var store = NewStore();
-            var sys = new PathfindingSystem(store);
+            var sys = new PathfindingSystem(Store);
             var j = new JunctionDef { Id = "test", SourcePathId = 0, NodeIndex = 2, Policy = JunctionPolicy.HpBased };
             sys.AddJunction(j);
             var fetched = sys.GetJunction(0, 2);
@@ -113,8 +101,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Movement
         [Fact]
         public void GetJunction_ReturnsNullForUnregistered()
         {
-            var store = NewStore();
-            var sys = new PathfindingSystem(store);
+            var sys = new PathfindingSystem(Store);
             Assert.Null(sys.GetJunction(99, 99));
         }
 
@@ -122,16 +109,14 @@ namespace BattleSystemECS.Tests.Mechanisms.Movement
         public void GetJunction_ReturnsNullWhenNoneRegistered()
         {
             // Even with a non-zero path/node, an empty junction map returns null.
-            var store = NewStore();
-            var sys = new PathfindingSystem(store);
+            var sys = new PathfindingSystem(Store);
             Assert.Null(sys.GetJunction(0, 1));
         }
 
         [Fact]
         public void ClearJunctions_ResetsToEmpty()
         {
-            var store = NewStore();
-            var sys = new PathfindingSystem(store);
+            var sys = new PathfindingSystem(Store);
             sys.AddJunction(new JunctionDef { SourcePathId = 0, NodeIndex = 1 });
             sys.AddJunction(new JunctionDef { SourcePathId = 1, NodeIndex = 0 });
             Assert.True(sys.HasJunctions);
@@ -145,8 +130,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Movement
         public void ReAddSameJunction_OverwritesPrevious()
         {
             // Same (path, node) → new def replaces the old one.
-            var store = NewStore();
-            var sys = new PathfindingSystem(store);
+            var sys = new PathfindingSystem(Store);
             sys.AddJunction(new JunctionDef { Id = "v1", SourcePathId = 0, NodeIndex = 1 });
             sys.AddJunction(new JunctionDef { Id = "v2", SourcePathId = 0, NodeIndex = 1, Policy = JunctionPolicy.TypeBased });
             var j = sys.GetJunction(0, 1);
@@ -159,8 +143,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Movement
         public void TwoJunctions_AtDifferentPositions_AreIndependent()
         {
             // Two junctions at different (path, node) keys must be independently retrievable.
-            var store = NewStore();
-            var sys = new PathfindingSystem(store);
+            var sys = new PathfindingSystem(Store);
             var j1 = new JunctionDef { Id = "j1", SourcePathId = 0, NodeIndex = 1 };
             var j2 = new JunctionDef { Id = "j2", SourcePathId = 1, NodeIndex = 0 };
             sys.AddJunction(j1);
@@ -302,21 +285,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Movement
         public void EnemyPathSegmentStartIndex_DefaultsToZero_OnNewEntity()
         {
             // A newly-created enemy has EnemyPathSegmentStartIndex = 0 (fresh path).
-            // Enemy fields are default-initialized in SOA arrays (0/false).
-            var store = NewStore();
-            int eid = store.CreateEntity();
-            // The default for int[] in C# is 0 — verify the field exists and is zero.
-            Assert.Equal(0, store.EnemyPathSegmentStartIndex[eid]);
-        }
-
-        [Fact]
-        public void EnemyPathSegmentStartIndex_PersistsAfterWrite()
-        {
-            // Round-trip: write a non-default segment index and read it back.
-            var store = NewStore();
-            int eid = store.CreateEntity();
-            store.EnemyPathSegmentStartIndex[eid] = 7;
-            Assert.Equal(7, store.EnemyPathSegmentStartIndex[eid]);
+            int eid = Store.CreateEntity();
+            Assert.Equal(0, Store.EnemyPathSegmentStartIndex[eid]);
         }
     }
 }

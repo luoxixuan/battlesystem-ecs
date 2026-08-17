@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 using BattleSystemECS.Tests.Infrastructure;
-using BattleSystemECS.Components;
-using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Tests.Integration
@@ -12,15 +10,15 @@ namespace BattleSystemECS.Tests.Integration
     /// <summary>
     /// 集成层：读取真实 game_config.json 作为输入，但只断言结构自洽与相对关系
     /// （引用存在、唯一性、字段范围），不钉住任何具体配置值。
+    /// 渲染器与实体存储复用 <see cref="BattleTestBase"/> 的 Renderer / Store。
     /// </summary>
-    public class GameConfigIntegrationTests
+    public class GameConfigIntegrationTests : BattleTestBase
     {
-        private readonly MockRenderer _renderer = new();
 
         [Fact]
         public void LoadConfig_FromRealFile_Succeeds()
         {
-            var config = GameConfigLoader.LoadConfig(_renderer);
+            var config = GameConfigLoader.LoadConfig(Renderer);
 
             Assert.NotNull(config);
             Assert.NotEmpty(config.MonsterTypes);
@@ -30,7 +28,7 @@ namespace BattleSystemECS.Tests.Integration
         [Fact]
         public void MonsterTypes_AllHaveRequiredFields()
         {
-            var config = GameConfigLoader.LoadConfig(_renderer);
+            var config = GameConfigLoader.LoadConfig(Renderer);
 
             foreach (var monster in config.MonsterTypes)
             {
@@ -50,7 +48,7 @@ namespace BattleSystemECS.Tests.Integration
         [Fact]
         public void TowerTypes_AllHaveRequiredFields()
         {
-            var config = GameConfigLoader.LoadConfig(_renderer);
+            var config = GameConfigLoader.LoadConfig(Renderer);
 
             foreach (var tower in config.TowerTypes)
             {
@@ -66,7 +64,7 @@ namespace BattleSystemECS.Tests.Integration
         [Fact]
         public void Skills_AllHaveRequiredFields()
         {
-            var config = GameConfigLoader.LoadConfig(_renderer);
+            var config = GameConfigLoader.LoadConfig(Renderer);
 
             foreach (var skill in config.Skills)
             {
@@ -82,7 +80,7 @@ namespace BattleSystemECS.Tests.Integration
         [Fact]
         public void LevelWave_MonsterType_ExistsInMonsterTypes()
         {
-            var config = GameConfigLoader.LoadConfig(_renderer);
+            var config = GameConfigLoader.LoadConfig(Renderer);
 
             foreach (var level in config.Levels)
             {
@@ -104,7 +102,7 @@ namespace BattleSystemECS.Tests.Integration
         [Fact]
         public void AllMonsterNames_AreUnique()
         {
-            var config = GameConfigLoader.LoadConfig(_renderer);
+            var config = GameConfigLoader.LoadConfig(Renderer);
             var duplicates = config.MonsterTypes
                 .Select(m => m.Name)
                 .GroupBy(x => x)
@@ -118,7 +116,7 @@ namespace BattleSystemECS.Tests.Integration
         [Fact]
         public void AllSkillNames_AreUnique()
         {
-            var config = GameConfigLoader.LoadConfig(_renderer);
+            var config = GameConfigLoader.LoadConfig(Renderer);
             var duplicates = config.Skills
                 .Select(s => s.Name)
                 .GroupBy(x => x)
@@ -132,7 +130,7 @@ namespace BattleSystemECS.Tests.Integration
         [Fact]
         public void AllTowerNames_AreUnique()
         {
-            var config = GameConfigLoader.LoadConfig(_renderer);
+            var config = GameConfigLoader.LoadConfig(Renderer);
             var duplicates = config.TowerTypes
                 .Select(t => t.Name)
                 .GroupBy(x => x)
@@ -146,13 +144,12 @@ namespace BattleSystemECS.Tests.Integration
         [Fact]
         public void SpawnEnemies_AllMonsterTypes_MatchesConfigCount()
         {
-            var config = GameConfigLoader.LoadConfig(_renderer);
-            var store = new ComponentStore();
+            var config = GameConfigLoader.LoadConfig(Renderer);
 
-            int playerId = store.CreateEntity();
-            store.PlayerMaxHealth[playerId] = 200f;
-            store.PlayerCurrentHealth[playerId] = 200f;
-            store.SetPlayerGold(playerId, 9999f);
+            int playerId = Store.CreateEntity();
+            Store.PlayerMaxHealth[playerId] = 200f;
+            Store.PlayerCurrentHealth[playerId] = 200f;
+            Store.SetPlayerGold(playerId, 9999f);
 
             var random = new Random(777);
 
@@ -162,7 +159,7 @@ namespace BattleSystemECS.Tests.Integration
                 {
                     float x = random.Next(0, 10);
                     float y = random.Next(1, 20);
-                    int id = store.AddEnemy(
+                    int id = Store.AddEnemy(
                         x, y,
                         monsterType.MoveSpeed,
                         monsterType.Health,
@@ -171,20 +168,23 @@ namespace BattleSystemECS.Tests.Integration
                         (int)monsterType.AttackRange,
                         (int)monsterType.AttackInterval
                     );
-                    store.SetEntityName(id, $"{monsterType.Type}_{i}");
-                    store.SetEnemyAIAction(id, "");
+                    Store.SetEntityName(id, $"{monsterType.Type}_{i}");
+                    Store.SetEnemyAIAction(id, "");
                 }
             }
 
             // 期望值完全由读取到的配置推导，不钉住 200 之类的固定数量
-            Assert.Equal(config.MonsterTypes.Count * 5, store.GetActiveEnemyCount());
+            Assert.Equal(config.MonsterTypes.Count * 5, Store.GetActiveEnemyCount());
         }
 
         [Fact]
         public void PlayerSkills_AllExistInSkillConfig()
         {
-            var config = GameConfigLoader.LoadConfig(_renderer);
-            if (config.Player?.StartingSkills == null) return;
+            var config = GameConfigLoader.LoadConfig(Renderer);
+
+            // 禁止 null 静默通过：玩家与其起始技能列表必须真实存在。
+            Assert.NotNull(config.Player);
+            Assert.NotEmpty(config.Player.StartingSkills);
 
             var skillNames = config.Skills.Select(s => s.Name).ToList();
             foreach (var skillName in config.Player.StartingSkills)
@@ -199,7 +199,7 @@ namespace BattleSystemECS.Tests.Integration
         [Fact]
         public void Levels_HaveValidWaveCounts()
         {
-            var config = GameConfigLoader.LoadConfig(_renderer);
+            var config = GameConfigLoader.LoadConfig(Renderer);
 
             foreach (var level in config.Levels)
             {

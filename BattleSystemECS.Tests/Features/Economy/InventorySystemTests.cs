@@ -36,36 +36,33 @@ namespace BattleSystemECS.Tests.Features.Economy
     ///  23. Out-of-range playerId/slot in accessors returns safe defaults (-1 / 0)
     ///  24. AddPlayer calls ResetInventory (init path)
     /// </summary>
-    public class InventorySystemTests
+    public class InventorySystemTests : BattleTestBase
     {
         private const int PlayerId = 0;
 
-        private (ComponentStore store, GameConfig config, InventorySystem inv) CreateEnv()
+        private InventorySystem CreateEnv()
         {
-            var store = new ComponentStore();
-            store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
+            Store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
             // Default player to fully-rested state so Heal/Mana tests don't no-op.
-            store.PlayerMaxHealth[0] = 1000f;
-            store.PlayerCurrentHealth[0] = 500f;  // half HP — heals can fire
-            store.PlayerMaxMana[0] = 1000f;
-            store.PlayerMana[0] = 500f;  // half mana — mana pots can fire
-            var config = new GameConfig();
+            Store.PlayerMaxHealth[0] = 1000f;
+            Store.PlayerCurrentHealth[0] = 500f;  // half HP — heals can fire
+            Store.PlayerMaxMana[0] = 1000f;
+            Store.PlayerMana[0] = 500f;  // half mana — mana pots can fire
             // Inject 3 test items.
-            config.ItemDefs = new ItemDef[]
+            Config.ItemDefs = new ItemDef[]
             {
                 new ItemDef { Type = "potion_heal", Name = "Heal Potion", ItemType = InventoryItemType.Heal, Value = 50f, MaxStack = 2 },
                 new ItemDef { Type = "potion_mana", Name = "Mana Potion", ItemType = InventoryItemType.Mana, Value = 30f, MaxStack = 3 },
                 new ItemDef { Type = "grenade",     Name = "Grenade",     ItemType = InventoryItemType.AoEBurst, Value = 80f, Radius = 3.5f, MaxStack = 1 },
             };
-            var inv = new InventorySystem(store, config, null);
-            return (store, config, inv);
+            return new InventorySystem(Store, Config, null);
         }
 
         // ── 1. ItemDefs default empty ──────────────────────────────────────
         [Fact]
         public void ItemDefs_DefaultEmpty()
         {
-            var cfg = new GameConfig();
+            var cfg = Config;
             Assert.NotNull(cfg.ItemDefs);
             Assert.Empty(cfg.ItemDefs);
         }
@@ -74,74 +71,85 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void ResetInventory_ClearsAllSlots()
         {
-            var (store, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             inv.AddItem(0, 0);
             inv.AddItem(0, 1);
-            Assert.Equal(2, store.GetInventoryUsed(0));
+            Assert.Equal(2, Store.GetInventoryUsed(0));
 
-            store.ResetInventory(0);
-            Assert.Equal(0, store.GetInventoryUsed(0));
+            Store.ResetInventory(0);
+            Assert.Equal(0, Store.GetInventoryUsed(0));
             for (int s = 0; s < ComponentStore.MAX_INVENTORY_SLOTS; s++)
             {
-                Assert.Equal(-1, store.GetInventoryItemId(0, s));
-                Assert.Equal(0, store.GetInventoryCount(0, s));
+                Assert.Equal(-1, Store.GetInventoryItemId(0, s));
+                Assert.Equal(0, Store.GetInventoryCount(0, s));
             }
         }
 
         [Fact]
-        public void ResetInventory_OutOfRange_NoThrow()
+        public void ResetInventory_OutOfRange_LeavesValidSlotsUntouched()
         {
-            var (store, _, _) = CreateEnv();
-            store.ResetInventory(-1);  // no throw
-            store.ResetInventory(99);  // no throw
+            var inv = CreateEnv();
+            // 先写入合法槽位作为对照。
+            Assert.True(inv.AddItem(0, 0));
+            Assert.Equal(0, Store.GetInventoryItemId(0, 0));
+            Assert.Equal(1, Store.GetInventoryCount(0, 0));
+            Assert.Equal(1, Store.GetInventoryUsed(0));
+
+            Store.ResetInventory(-1);
+            Store.ResetInventory(99);
+
+            // 越界调用必须保持合法玩家 0 的槽位不变。
+            Assert.Equal(0, Store.GetInventoryItemId(0, 0));
+            Assert.Equal(1, Store.GetInventoryCount(0, 0));
+            Assert.Equal(1, Store.GetInventoryUsed(0));
         }
 
         // ── 3. AddItem places in first empty slot ──────────────────────────
         [Fact]
         public void AddItem_FirstEmptySlot()
         {
-            var (store, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             Assert.True(inv.AddItem(0, 0));
-            Assert.Equal(0, store.GetInventoryItemId(0, 0));
-            Assert.Equal(1, store.GetInventoryCount(0, 0));
-            Assert.Equal(1, store.GetInventoryUsed(0));
+            Assert.Equal(0, Store.GetInventoryItemId(0, 0));
+            Assert.Equal(1, Store.GetInventoryCount(0, 0));
+            Assert.Equal(1, Store.GetInventoryUsed(0));
         }
 
         [Fact]
         public void AddItem_SecondEmptySlot_AfterFirstFilled()
         {
-            var (store, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             inv.AddItem(0, 0);
             inv.AddItem(0, 1);
-            Assert.Equal(0, store.GetInventoryItemId(0, 0));
-            Assert.Equal(1, store.GetInventoryItemId(0, 1));
-            Assert.Equal(2, store.GetInventoryUsed(0));
+            Assert.Equal(0, Store.GetInventoryItemId(0, 0));
+            Assert.Equal(1, Store.GetInventoryItemId(0, 1));
+            Assert.Equal(2, Store.GetInventoryUsed(0));
         }
 
         // ── 4. AddItem stacks when same item + room ────────────────────────
         [Fact]
         public void AddItem_StacksSameItem_WhenRoomAvailable()
         {
-            var (store, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             inv.AddItem(0, 0);
             inv.AddItem(0, 0);
             // MaxStack=2, so second add should stack to 2 in slot 0.
-            Assert.Equal(0, store.GetInventoryItemId(0, 0));
-            Assert.Equal(2, store.GetInventoryCount(0, 0));
-            Assert.Equal(1, store.GetInventoryUsed(0));
+            Assert.Equal(0, Store.GetInventoryItemId(0, 0));
+            Assert.Equal(2, Store.GetInventoryCount(0, 0));
+            Assert.Equal(1, Store.GetInventoryUsed(0));
         }
 
         [Fact]
         public void AddItem_StacksUpToMaxStackThenNewSlot()
         {
-            var (store, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             inv.AddItem(0, 0);  // slot 0, count 1
             inv.AddItem(0, 0);  // slot 0, count 2 (max)
             inv.AddItem(0, 0);  // slot 1, count 1
-            Assert.Equal(2, store.GetInventoryCount(0, 0));
-            Assert.Equal(0, store.GetInventoryItemId(0, 1));
-            Assert.Equal(1, store.GetInventoryCount(0, 1));
-            Assert.Equal(2, store.GetInventoryUsed(0));
+            Assert.Equal(2, Store.GetInventoryCount(0, 0));
+            Assert.Equal(0, Store.GetInventoryItemId(0, 1));
+            Assert.Equal(1, Store.GetInventoryCount(0, 1));
+            Assert.Equal(2, Store.GetInventoryUsed(0));
         }
 
         // ── 5. AddItem returns false when full ─────────────────────────────
@@ -149,20 +157,19 @@ namespace BattleSystemECS.Tests.Features.Economy
         public void AddItem_ReturnsFalse_WhenFull()
         {
             // Use a single-use item to ensure each add consumes a new slot.
-            var cfg = new GameConfig();
+            var cfg = Config;
             cfg.ItemDefs = new ItemDef[]
             {
                 new ItemDef { Type = "grenade", Name = "Grenade", ItemType = InventoryItemType.AoEBurst, Value = 80f, Radius = 3.5f, MaxStack = 1 },
             };
-            var store = new ComponentStore();
-            store.AddPlayer(0, 1f, 1f, 1f, 1);
-            var inv = new InventorySystem(store, cfg, null);
+            Store.AddPlayer(0, 1f, 1f, 1f, 1);
+            var inv = new InventorySystem(Store, cfg, null);
             // Fill all 8 slots with single-use grenades.
             for (int i = 0; i < ComponentStore.MAX_INVENTORY_SLOTS; i++)
             {
                 Assert.True(inv.AddItem(0, 0));
             }
-            Assert.Equal(ComponentStore.MAX_INVENTORY_SLOTS, store.GetInventoryUsed(0));
+            Assert.Equal(ComponentStore.MAX_INVENTORY_SLOTS, Store.GetInventoryUsed(0));
             // 9th add must fail (full).
             Assert.False(inv.AddItem(0, 0));
             Assert.Equal(1, inv.TotalDroppedFullInv);
@@ -172,7 +179,7 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void AddItem_OutOfRange_ReturnsFalse()
         {
-            var (_, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             Assert.False(inv.AddItem(-1, 0));
             Assert.False(inv.AddItem(99, 0));
             Assert.False(inv.AddItem(0, -1));
@@ -183,7 +190,7 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void UseItem_EmptySlot_ReturnsFalse()
         {
-            var (_, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             Assert.False(inv.UseItem(0, 0));
             Assert.False(inv.UseItem(0, 5));
         }
@@ -191,7 +198,7 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void UseItem_OutOfRange_ReturnsFalse()
         {
-            var (_, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             Assert.False(inv.UseItem(-1, 0));
             Assert.False(inv.UseItem(99, 0));
             Assert.False(inv.UseItem(0, -1));
@@ -202,199 +209,202 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void UseItem_DecrementsCount_ClearsWhenZero()
         {
-            var (store, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             inv.AddItem(0, 0);  // MaxStack=2
             inv.AddItem(0, 0);  // stacked to 2
             Assert.True(inv.UseItem(0, 0));
-            Assert.Equal(1, store.GetInventoryCount(0, 0));
-            Assert.Equal(0, store.GetInventoryItemId(0, 0));
+            Assert.Equal(1, Store.GetInventoryCount(0, 0));
+            Assert.Equal(0, Store.GetInventoryItemId(0, 0));
             Assert.True(inv.UseItem(0, 0));  // second use clears
-            Assert.Equal(-1, store.GetInventoryItemId(0, 0));
-            Assert.Equal(0, store.GetInventoryCount(0, 0));
-            Assert.Equal(0, store.GetInventoryUsed(0));
+            Assert.Equal(-1, Store.GetInventoryItemId(0, 0));
+            Assert.Equal(0, Store.GetInventoryCount(0, 0));
+            Assert.Equal(0, Store.GetInventoryUsed(0));
         }
 
         // ── 9. UseItem updates PlayerInventoryUsedTotal ───────────────────
         [Fact]
         public void UseItem_IncrementsUsedTotal()
         {
-            var (store, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             inv.AddItem(0, 0);
             inv.AddItem(0, 0);
             inv.UseItem(0, 0);
             inv.UseItem(0, 0);
-            Assert.Equal(2, store.PlayerInventoryUsedTotal[0]);
+            Assert.Equal(2, Store.PlayerInventoryUsedTotal[0]);
         }
 
         // ── 10. Heal clamps to MaxHealth ──────────────────────────────────
         [Fact]
         public void UseItem_Heal_ClampsToMaxHealth()
         {
-            var (store, _, inv) = CreateEnv();
-            store.PlayerMaxHealth[0] = 100f;
-            store.PlayerCurrentHealth[0] = 80f;
+            var inv = CreateEnv();
+            Store.PlayerMaxHealth[0] = 100f;
+            Store.PlayerCurrentHealth[0] = 80f;
             inv.AddItem(0, 0);  // heal potion, value=50
             inv.UseItem(0, 0);
-            Assert.Equal(100f, store.PlayerCurrentHealth[0]);  // 80+50=130, clamped to 100
+            Assert.Equal(100f, Store.PlayerCurrentHealth[0]);  // 80+50=130, clamped to 100
         }
 
         [Fact]
         public void UseItem_Heal_FullHP_NoOp()
         {
-            var (store, _, inv) = CreateEnv();
-            store.PlayerMaxHealth[0] = 100f;
-            store.PlayerCurrentHealth[0] = 100f;
+            var inv = CreateEnv();
+            Store.PlayerMaxHealth[0] = 100f;
+            Store.PlayerCurrentHealth[0] = 100f;
             inv.AddItem(0, 0);
             Assert.False(inv.UseItem(0, 0));  // already full → no-op
-            Assert.Equal(1, store.GetInventoryCount(0, 0));  // not consumed
+            Assert.Equal(1, Store.GetInventoryCount(0, 0));  // not consumed
         }
 
         // ── 11. Mana clamps to MaxMana ────────────────────────────────────
         [Fact]
         public void UseItem_Mana_ClampsToMaxMana()
         {
-            var (store, _, inv) = CreateEnv();
-            store.PlayerMana[0] = 80f;
-            store.PlayerMaxMana[0] = 100f;
+            var inv = CreateEnv();
+            Store.PlayerMana[0] = 80f;
+            Store.PlayerMaxMana[0] = 100f;
             inv.AddItem(0, 1);  // mana potion, value=30
             inv.UseItem(0, 0);
-            Assert.Equal(100f, store.PlayerMana[0]);
+            Assert.Equal(100f, Store.PlayerMana[0]);
         }
 
         // ── 12. Shield sets value + duration ──────────────────────────────
         [Fact]
         public void UseItem_Shield_SetsValueAndDuration()
         {
-            var cfg = new GameConfig();
+            var cfg = Config;
             cfg.ItemDefs = new ItemDef[]
             {
                 new ItemDef { Type = "shield_sigil", Name = "Shield", ItemType = InventoryItemType.Shield, Value = 25f, BuffDuration = 12f, MaxStack = 1 },
             };
-            var store = new ComponentStore();
-            store.AddPlayer(0, 1f, 1f, 1f, 1);
-            var inv = new InventorySystem(store, cfg, null);
+            Store.AddPlayer(0, 1f, 1f, 1f, 1);
+            var inv = new InventorySystem(Store, cfg, null);
             inv.AddItem(0, 0);
-            store.PlayerShield[0] = 0f;
-            store.PlayerShieldDuration[0] = 0;
+            Store.PlayerShield[0] = 0f;
+            Store.PlayerShieldDuration[0] = 0;
             Assert.True(inv.UseItem(0, 0));
-            Assert.Equal(25f, store.PlayerShield[0]);
-            Assert.Equal(12, store.PlayerShieldDuration[0]);
+            Assert.Equal(25f, Store.PlayerShield[0]);
+            Assert.Equal(12, Store.PlayerShieldDuration[0]);
         }
 
         // ── 13. SpeedBoost sets SlowFactor=1.5 + SlowDuration ─────────────
         [Fact]
         public void UseItem_SpeedBoost_SetsSlowFactorAndDuration()
         {
-            var cfg = new GameConfig();
+            var cfg = Config;
             cfg.ItemDefs = new ItemDef[]
             {
                 new ItemDef { Type = "tonic", Name = "Tonic", ItemType = InventoryItemType.SpeedBoost, BuffDuration = 8f, MaxStack = 1 },
             };
-            var store = new ComponentStore();
-            store.AddPlayer(0, 1f, 1f, 1f, 1);
-            var inv = new InventorySystem(store, cfg, null);
+            Store.AddPlayer(0, 1f, 1f, 1f, 1);
+            var inv = new InventorySystem(Store, cfg, null);
             inv.AddItem(0, 0);
-            store.PlayerSlowFactor[0] = 1f;
-            store.PlayerSlowDuration[0] = 0;
+            Store.PlayerSlowFactor[0] = 1f;
+            Store.PlayerSlowDuration[0] = 0;
             Assert.True(inv.UseItem(0, 0));
-            Assert.Equal(1.5f, store.PlayerSlowFactor[0]);
-            Assert.Equal(8, store.PlayerSlowDuration[0]);
+            Assert.Equal(1.5f, Store.PlayerSlowFactor[0]);
+            Assert.Equal(8, Store.PlayerSlowDuration[0]);
         }
 
         // ── 14. DamageBoost sets AttackBoost bit + duration ──────────────
         [Fact]
         public void UseItem_DamageBoost_SetsAttackBoostFlag()
         {
-            var cfg = new GameConfig();
+            var cfg = Config;
             cfg.ItemDefs = new ItemDef[]
             {
                 new ItemDef { Type = "rage", Name = "Rage", ItemType = InventoryItemType.DamageBoost, Value = 0.2f, BuffDuration = 10f, MaxStack = 1 },
             };
-            var store = new ComponentStore();
-            store.AddPlayer(0, 1f, 1f, 1f, 1);
-            var inv = new InventorySystem(store, cfg, null);
+            Store.AddPlayer(0, 1f, 1f, 1f, 1);
+            var inv = new InventorySystem(Store, cfg, null);
             inv.AddItem(0, 0);
-            store.PlayerBuffFlags[0] = BuffType.None;
-            store.PlayerDamageBoostDuration[0] = 0;
+            Store.PlayerBuffFlags[0] = BuffType.None;
+            Store.PlayerDamageBoostDuration[0] = 0;
             Assert.True(inv.UseItem(0, 0));
-            Assert.True((store.PlayerBuffFlags[0] & BuffType.AttackBoost) != 0);
-            Assert.Equal(10, store.PlayerDamageBoostDuration[0]);
+            Assert.True((Store.PlayerBuffFlags[0] & BuffType.AttackBoost) != 0);
+            Assert.Equal(10, Store.PlayerDamageBoostDuration[0]);
             // Verify Claude bug scan fix: DamageBoost no longer touches PlayerSlowDuration.
-            Assert.Equal(0, store.PlayerSlowDuration[0]);
+            Assert.Equal(0, Store.PlayerSlowDuration[0]);
             // BUG scan fix: per-item Value magnitude (0.2 = +20%) is now persisted to
             // PlayerDamageBoostMultiplier so the damage system can apply the correct multiplier.
-            Assert.Equal(0.2f, store.PlayerDamageBoostMultiplier[0]);
+            Assert.Equal(0.2f, Store.PlayerDamageBoostMultiplier[0]);
         }
 
         // ── 14b. DamageBoost does NOT clobber SpeedBoost timer ──────────────
         [Fact]
         public void UseItem_DamageBoost_DoesNotClobberSpeedBoostTimer()
         {
-            var cfg = new GameConfig();
+            var cfg = Config;
             cfg.ItemDefs = new ItemDef[]
             {
                 new ItemDef { Type = "tonic", Name = "Tonic", ItemType = InventoryItemType.SpeedBoost, BuffDuration = 8f, MaxStack = 1 },
                 new ItemDef { Type = "rage",  Name = "Rage",  ItemType = InventoryItemType.DamageBoost, Value = 0.2f, BuffDuration = 10f, MaxStack = 1 },
             };
-            var store = new ComponentStore();
-            store.AddPlayer(0, 1f, 1f, 1f, 1);
-            var inv = new InventorySystem(store, cfg, null);
+            Store.AddPlayer(0, 1f, 1f, 1f, 1);
+            var inv = new InventorySystem(Store, cfg, null);
             inv.AddItem(0, 0); inv.UseItem(0, 0);  // SpeedBoost sets SlowDuration=8
-            Assert.Equal(8, store.PlayerSlowDuration[0]);
+            Assert.Equal(8, Store.PlayerSlowDuration[0]);
             inv.AddItem(0, 1); inv.UseItem(0, 0);  // DamageBoost (lands in slot 0 since slot 0 was cleared)
-            Assert.Equal(8, store.PlayerSlowDuration[0]);
-            Assert.Equal(10, store.PlayerDamageBoostDuration[0]);
+            Assert.Equal(8, Store.PlayerSlowDuration[0]);
+            Assert.Equal(10, Store.PlayerDamageBoostDuration[0]);
         }
 
         // ── 15. AoEBurst damages enemies in radius, queues death on HP<=0 ─
         [Fact]
         public void UseItem_AoEBurst_DamagesEnemiesInRadius()
         {
-            var (store, _, inv) = CreateEnv();
-            store.PositionX[0] = 0f; store.PositionY[0] = 0f;
-            int e1 = store.AddEnemy(1f, 1f, 1f, 100f, 100f, 1f, 1, 1, "goblin");
-            int e2 = store.AddEnemy(50f, 50f, 1f, 100f, 100f, 1f, 1, 1, "ogre");
+            var inv = CreateEnv();
+            Store.PositionX[0] = 0f; Store.PositionY[0] = 0f;
+            int e1 = Store.AddEnemy(1f, 1f, 1f, 100f, 100f, 1f, 1, 1, "goblin");
+            int e2 = Store.AddEnemy(50f, 50f, 1f, 100f, 100f, 1f, 1, 1, "ogre");
             inv.AddItem(0, 2);  // grenade: 80 dmg, radius 3.5
             Assert.True(inv.UseItem(0, 0));
             // e1 in radius (sqrt(2) ≈ 1.4), e2 outside.
-            Assert.True(store.EnemyHealth[e1] < 100f);
-            Assert.Equal(100f, store.EnemyHealth[e2]);
+            Assert.Equal(100f - 80f, Store.EnemyHealth[e1], 0.001f);
+            Assert.Equal(100f, Store.EnemyHealth[e2]);
         }
 
         [Fact]
         public void UseItem_AoEBurst_HitsAndQueuesDeathOnKill()
         {
-            var (store, _, inv) = CreateEnv();
-            store.PositionX[0] = 0f; store.PositionY[0] = 0f;
-            int e1 = store.AddEnemy(1f, 1f, 1f, 50f, 50f, 1f, 1, 1, "goblin");
-            inv.AddItem(0, 2);
+            var inv = CreateEnv();
+            Store.PositionX[0] = 0f; Store.PositionY[0] = 0f;
+            int e1 = Store.AddEnemy(1f, 1f, 1f, 50f, 50f, 1f, 1, 1, "goblin");
+            Assert.Contains(e1, Store.GetCachedActiveEnemyIds());
+
+            inv.AddItem(0, 2);  // grenade: 80 dmg
             Assert.True(inv.UseItem(0, 0));
-            Assert.True(store.EnemyHealth[e1] <= 0f);
+
+            // 精确血量：50 - 80 = -30，并已进入死亡队列（UseItem 直接 QueueEnemyDeath）。
+            Assert.Equal(50f - 80f, Store.EnemyHealth[e1], 0.001f);
+            Store.ResolveEnemiesKilledThisFrame();
+            // 帧末结算后死亡实体必须从活跃列表移除。
+            Assert.DoesNotContain(e1, Store.GetCachedActiveEnemyIds());
+            Assert.False(Store.EnemyActive[e1]);
         }
 
         [Fact]
         public void UseItem_AoEBurst_SkipsInvulnerableEnemies()
         {
-            var (store, _, inv) = CreateEnv();
-            store.PositionX[0] = 0f; store.PositionY[0] = 0f;
-            int e1 = store.AddEnemy(1f, 1f, 1f, 100f, 100f, 1f, 1, 1, "goblin");
-            store.EnemyIsInvulnerable[e1] = true;
+            var inv = CreateEnv();
+            Store.PositionX[0] = 0f; Store.PositionY[0] = 0f;
+            int e1 = Store.AddEnemy(1f, 1f, 1f, 100f, 100f, 1f, 1, 1, "goblin");
+            Store.EnemyIsInvulnerable[e1] = true;
             inv.AddItem(0, 2);
             Assert.True(inv.UseItem(0, 0));
-            Assert.Equal(100f, store.EnemyHealth[e1]);
+            Assert.Equal(100f, Store.EnemyHealth[e1]);
         }
 
         [Fact]
         public void UseItem_AoEBurst_ZeroRadius_NoOp()
         {
-            var cfg = new GameConfig();
+            var cfg = Config;
             cfg.ItemDefs = new ItemDef[]
             {
                 new ItemDef { Type = "broken", Name = "Broken", ItemType = InventoryItemType.AoEBurst, Value = 100f, Radius = 0f, MaxStack = 1 },
             };
-            var store = new ComponentStore();
-            store.AddPlayer(0, 1f, 1f, 1f, 1);
-            var inv = new InventorySystem(store, cfg, null);
+            Store.AddPlayer(0, 1f, 1f, 1f, 1);
+            var inv = new InventorySystem(Store, cfg, null);
             inv.AddItem(0, 0);
             Assert.False(inv.UseItem(0, 0));
         }
@@ -403,72 +413,69 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void UseItem_Cleanse_ClearsStunDuration()
         {
-            var cfg = new GameConfig();
+            var cfg = Config;
             cfg.ItemDefs = new ItemDef[]
             {
                 new ItemDef { Type = "charm", Name = "Charm", ItemType = InventoryItemType.Cleanse, MaxStack = 1 },
             };
-            var store = new ComponentStore();
-            store.AddPlayer(0, 1f, 1f, 1f, 1);
-            var inv = new InventorySystem(store, cfg, null);
+            Store.AddPlayer(0, 1f, 1f, 1f, 1);
+            var inv = new InventorySystem(Store, cfg, null);
             inv.AddItem(0, 0);
-            store.PlayerStunDuration[0] = 5;
+            Store.PlayerStunDuration[0] = 5;
             Assert.True(inv.UseItem(0, 0));
-            Assert.Equal(0, store.PlayerStunDuration[0]);
+            Assert.Equal(0, Store.PlayerStunDuration[0]);
         }
 
         // ── 18. Summon returns false, slot not consumed ───────────────────
         [Fact]
         public void UseItem_Summon_ReturnsFalse_NotConsumed()
         {
-            var cfg = new GameConfig();
+            var cfg = Config;
             cfg.ItemDefs = new ItemDef[]
             {
                 new ItemDef { Type = "scroll", Name = "Scroll", ItemType = InventoryItemType.Summon, Value = 3, MaxStack = 1 },
             };
-            var store = new ComponentStore();
-            store.AddPlayer(0, 1f, 1f, 1f, 1);
-            var inv = new InventorySystem(store, cfg, null);
+            Store.AddPlayer(0, 1f, 1f, 1f, 1);
+            var inv = new InventorySystem(Store, cfg, null);
             inv.AddItem(0, 0);
             Assert.False(inv.UseItem(0, 0));
             // Slot not consumed (TODO future round).
-            Assert.Equal(0, store.GetInventoryItemId(0, 0));
-            Assert.Equal(1, store.GetInventoryCount(0, 0));
+            Assert.Equal(0, Store.GetInventoryItemId(0, 0));
+            Assert.Equal(1, Store.GetInventoryCount(0, 0));
         }
 
         // ── 19. Unknown item returns false at UseItem (after AddItem rejection) ──
         [Fact]
         public void UseItem_UnknownItemType_ReturnsFalse_AndAddItemRejectsUnknown()
         {
-            var cfg = new GameConfig();
+            var cfg = Config;
             cfg.ItemDefs = new ItemDef[]
             {
                 new ItemDef { Type = "broken_def", Name = "Broken", ItemType = InventoryItemType.Unknown, MaxStack = 1 },
             };
-            var store = new ComponentStore();
-            store.AddPlayer(0, 1f, 1f, 1f, 1);
-            var inv = new InventorySystem(store, cfg, null);
+            Store.AddPlayer(0, 1f, 1f, 1f, 1);
+            var inv = new InventorySystem(Store, cfg, null);
             // Claude bug scan fix: AddItem now rejects Unknown items outright (no permanent slot).
             Assert.False(inv.AddItem(0, 0));
-            Assert.Equal(0, store.GetInventoryUsed(0));
+            Assert.Equal(0, Store.GetInventoryUsed(0));
         }
 
         // ── 20. RemoveItem clears slot without effect ─────────────────────
         [Fact]
         public void RemoveItem_ClearsSlot_NoEffectApplied()
         {
-            var (store, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             inv.AddItem(0, 0);
-            Assert.Equal(0, store.GetInventoryItemId(0, 0));
+            Assert.Equal(0, Store.GetInventoryItemId(0, 0));
             Assert.True(inv.RemoveItem(0, 0));
-            Assert.Equal(-1, store.GetInventoryItemId(0, 0));
-            Assert.Equal(0, store.GetInventoryUsed(0));
+            Assert.Equal(-1, Store.GetInventoryItemId(0, 0));
+            Assert.Equal(0, Store.GetInventoryUsed(0));
         }
 
         [Fact]
         public void RemoveItem_EmptySlot_ReturnsFalse()
         {
-            var (_, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             Assert.False(inv.RemoveItem(0, 0));
         }
 
@@ -476,29 +483,29 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void GetInventoryUsed_TracksFillLevel()
         {
-            var (store, _, inv) = CreateEnv();
-            Assert.Equal(0, store.GetInventoryUsed(0));
+            var inv = CreateEnv();
+            Assert.Equal(0, Store.GetInventoryUsed(0));
             inv.AddItem(0, 0);
-            Assert.Equal(1, store.GetInventoryUsed(0));
+            Assert.Equal(1, Store.GetInventoryUsed(0));
             inv.AddItem(0, 1);
-            Assert.Equal(2, store.GetInventoryUsed(0));
+            Assert.Equal(2, Store.GetInventoryUsed(0));
             inv.UseItem(0, 0);
-            Assert.Equal(1, store.GetInventoryUsed(0));
+            Assert.Equal(1, Store.GetInventoryUsed(0));
         }
 
         // ── 23. Out-of-range accessor safety ──────────────────────────────
         [Fact]
         public void GetInventory_OutOfRange_ReturnsDefaults()
         {
-            var (store, _, _) = CreateEnv();
-            Assert.Equal(-1, store.GetInventoryItemId(-1, 0));
-            Assert.Equal(-1, store.GetInventoryItemId(0, -1));
-            Assert.Equal(-1, store.GetInventoryItemId(99, 0));
-            Assert.Equal(-1, store.GetInventoryItemId(0, 99));
-            Assert.Equal(0, store.GetInventoryCount(-1, 0));
-            Assert.Equal(0, store.GetInventoryCount(0, 99));
-            Assert.Equal(0, store.GetInventoryUsed(-1));
-            Assert.Equal(0, store.GetInventoryUsed(99));
+            CreateEnv();
+            Assert.Equal(-1, Store.GetInventoryItemId(-1, 0));
+            Assert.Equal(-1, Store.GetInventoryItemId(0, -1));
+            Assert.Equal(-1, Store.GetInventoryItemId(99, 0));
+            Assert.Equal(-1, Store.GetInventoryItemId(0, 99));
+            Assert.Equal(0, Store.GetInventoryCount(-1, 0));
+            Assert.Equal(0, Store.GetInventoryCount(0, 99));
+            Assert.Equal(0, Store.GetInventoryUsed(-1));
+            Assert.Equal(0, Store.GetInventoryUsed(99));
         }
 
         [Fact]
@@ -523,13 +530,12 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void AddPlayer_ResetsInventory()
         {
-            var store = new ComponentStore();
-            store.AddPlayer(0, 1f, 1f, 1f, 1);
-            Assert.Equal(0, store.GetInventoryUsed(0));
+            Store.AddPlayer(0, 1f, 1f, 1f, 1);
+            Assert.Equal(0, Store.GetInventoryUsed(0));
             for (int s = 0; s < ComponentStore.MAX_INVENTORY_SLOTS; s++)
             {
-                Assert.Equal(-1, store.GetInventoryItemId(0, s));
-                Assert.Equal(0, store.GetInventoryCount(0, s));
+                Assert.Equal(-1, Store.GetInventoryItemId(0, s));
+                Assert.Equal(0, Store.GetInventoryCount(0, s));
             }
         }
 
@@ -537,7 +543,7 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void GetItemName_ReturnsNameOrEmpty()
         {
-            var (_, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             Assert.Equal("Heal Potion", inv.GetItemName(0));
             Assert.Equal("Mana Potion", inv.GetItemName(1));
             Assert.Equal("Grenade", inv.GetItemName(2));
@@ -549,22 +555,22 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact]
         public void AddItem_StackingRespectsMaxStackCap()
         {
-            var (store, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             // Item 0 MaxStack=2. After 2 stacks, third add should go to slot 1.
             inv.AddItem(0, 0);
             inv.AddItem(0, 0);
             inv.AddItem(0, 0);
-            Assert.Equal(2, store.GetInventoryCount(0, 0));  // capped
-            Assert.Equal(0, store.GetInventoryItemId(0, 1));  // moved to next slot
-            Assert.Equal(1, store.GetInventoryCount(0, 1));
-            Assert.Equal(2, store.GetInventoryUsed(0));
+            Assert.Equal(2, Store.GetInventoryCount(0, 0));  // capped
+            Assert.Equal(0, Store.GetInventoryItemId(0, 1));  // moved to next slot
+            Assert.Equal(1, Store.GetInventoryCount(0, 1));
+            Assert.Equal(2, Store.GetInventoryUsed(0));
         }
 
         // ── 27. Telemetry counters increment ──────────────────────────────
         [Fact]
         public void TelemetryCounters_Increment()
         {
-            var (_, _, inv) = CreateEnv();
+            var inv = CreateEnv();
             inv.AddItem(0, 0);
             inv.AddItem(0, 0);
             inv.AddItem(0, 0);
