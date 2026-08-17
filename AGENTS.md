@@ -303,12 +303,13 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 2. **`dotnet build`** — EXE 0 warnings, 0 errors
 3. **`dotnet test BattleSystemECS.Tests`** — 全部通过（当前 1281/1281）
 4. **`pwsh -File tools\check-test-rules.ps1`** — 测试静态规则 0 违规（零断言测试 + 恒真/恒假断言）
-5. **`echo 2 | dotnet run`** — mode 2 压测
-6. **`echo 4 | dotnet run`** — mode 4 压测
-7. **`dotnet run -- 5`** — mode 5 压测（注意：参数模式，不能用 `echo 5 | dotnet run`）
-8. **同步文档** — 更新 `AGENTS.md` / `README.md` / `docs/` / `CHANGELOG.md`
-9. **`git add -A && git commit -m "描述"`** — 原子性最小改动
-10. **`git push github master`** — commit 完成后立即推送
+5. **`git diff --check`** — 无空白/行尾错误（CRLF、trailing whitespace）
+6. **`echo 2 | dotnet run`** — mode 2 压测
+7. **`echo 4 | dotnet run`** — mode 4 压测
+8. **`dotnet run -- 5`** — mode 5 压测（注意：参数模式，不能用 `echo 5 | dotnet run`）
+9. **同步文档** — 更新 `AGENTS.md` / `README.md` / `docs/` / `CHANGELOG.md`
+10. **`git add -A && git commit -m "描述"`** — 原子性最小改动
+11. **`git push github master`** — commit 完成后立即推送
 
 ### Git 提交风格
 

@@ -10,6 +10,15 @@
 - 验证：`dotnet build BattleSystemECS.Core` 与 `dotnet build` 均 0 warnings/0 errors；`pwsh -File tools\check-test-rules.ps1` 0 违规；`dotnet test` 1281/1281 PASS（2m02s）；压测 mode2 7746 FPS / mode4 4608 FPS / mode5 4290 FPS，全部通过硬门禁且无相对回退。
 - 遗留建议（生产测缝，未改生产代码）：EnemyAISystem 的 phase drain 注释与实际调用点错位；HeroSkillSystem/BossPhaseEvent/BossRegen 部分测试仍用反射访问私有成员；建议后续提供 internal+InternalsVisibleTo 或公开只读测缝。
 
+### 2026-08-17 (review-fix)
+- 修复最近提交审查发现的问题：
+  1. 行尾规范：5 个测试文件 CRLF → LF（HeroSkillSystemTests / MassResurrectTests / SummonCircleTests / ThemedSummonTests / SandstormWeatherTests），新增 `.gitattributes` 统一 `*.cs/*.ps1/*.md/*.json/*.csproj` 为 LF，`git diff --check` 通过。
+  2. `tools/check-test-rules.ps1` 恒真/恒假断言增强：覆盖带 message / 第三参数形式（如 `Assert.True(true, "msg")`）。
+  3. 消除 `GameSimulationTests` 硬编码 `spawnBatchSize = 5`：在 `BattleTestBase` 抽取共享 helper `ReadConfiguredWaveSpawnBatchSize()`，`WaveSpawningSystemTests` 同步复用。
+  4. `TestWorld.DisablePerTypeTowerCaps` / `BattleTestBase.DisableTowerCaps` 支持指定玩家 id，默认仍为 0。
+  5. 新增 GitHub Actions CI：构建 Core/EXE + 单元测试 + 测试静态规则 + `git diff --check` 行尾/空白检查。
+- 验证：`dotnet build BattleSystemECS.Core` 与 `dotnet build` 均 0 warnings/0 errors；`dotnet test` 1281/1281 PASS；`pwsh -File tools\check-test-rules.ps1` 0 违规；`git diff --check` 0。
+
 ### 2026-08-16
 - 单元测试配置数据边界清理：确立「允许读取配置数据、禁止把配置中的具体值当固定常量断言」的规则。移除 17 项钉住 shipped JSON 具体值的测试（GameConfigIntegration 2 个纯 smoke stress + TowerPlacement PerTypeCap_LoadFromConfig/4 个 sell-ratio JSON 测试 + CorpseEffect 4 个 LoadsFromJsonConfig + TowerShrine/TowerBeacon/HeroSkill/Mine/TowerEffectiveness 各 1 个文件存在/内容/条目测试），并将 TowerPlacement cap 测试重写为代码注入 cap（新增 `TestWorld.DisablePerTypeTowerCaps`，全部 TowerPlacement 测试构造后清除数据 cap）。恢复 Integration 层为「读取 game_config.json、只断言结构自洽与相对关系」的 11 项测试（引用存在/唯一性/字段范围/数量与配置推导一致）。验证：`dotnet test` 1310/1310 PASS（2m08s）。
 - 单元测试架构重构（四分层）：`BattleSystemECS.Tests` 重组为 `Infrastructure/`（TestWorld/Specs/MockRenderer/BattleTestBase）+ `Framework/` + `Mechanisms/`（Combat/Control/Perception/Movement/Spawning/World/TowerCore）+ `Features/`（Towers/Enemies/Bosses/Skills/Economy/Buffs/World）+ `Integration/`，新增 `BattleSystemECS.Tests/README.md` 固化分层与质量规范（禁止恒真断言/纯 smoke、固定种子、AddActiveTowerId/RebuildSpatialGrid、配置数据边界）。

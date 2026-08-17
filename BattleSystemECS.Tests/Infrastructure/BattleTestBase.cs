@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using BattleSystemECS.Components;
 using BattleSystemECS.Config;
 using BattleSystemECS.Core;
@@ -35,11 +36,24 @@ namespace BattleSystemECS.Tests.Infrastructure
             float speed = 1f, int level = 1, float cost = 50f)
             => World.RawTower(x, y, type, damage, range, speed, level, cost);
 
-        /// <summary>清空当前 Store 的全部 per-type 塔数量上限（0 = unlimited）。</summary>
-        protected void DisableTowerCaps() => World.DisablePerTypeTowerCapsInstance();
+        /// <summary>清空当前 Store 指定玩家的全部 per-type 塔数量上限（0 = unlimited）。</summary>
+        protected void DisableTowerCaps(int playerId = 0) => World.DisablePerTypeTowerCapsInstance(playerId);
 
         /// <summary>重建空间网格（驱动塔攻击/空间查询前调用）。</summary>
         protected void RebuildGrid() => Store.RebuildSpatialGrid();
+
+        /// <summary>
+        /// 读取 <see cref="WaveSpawningSystem"/> 实际注入的每帧生成批量大小。
+        /// 生产未提供公开只读属性，先用反射读取私有字段；后续补公开测缝后可移除。
+        /// </summary>
+        protected static int ReadConfiguredWaveSpawnBatchSize(WaveSpawningSystem sys)
+        {
+            FieldInfo field = typeof(WaveSpawningSystem)
+                .GetField("spawnConfig", BindingFlags.NonPublic | BindingFlags.Instance)
+                ?? throw new InvalidOperationException("WaveSpawningSystem.spawnConfig 字段不存在");
+            var config = (WaveSpawnConfig)field.GetValue(sys)!;
+            return config.SpawnBatchSize;
+        }
 
         protected int Player(Action<PlayerSpec>? configure = null) => World.Player(configure);
 

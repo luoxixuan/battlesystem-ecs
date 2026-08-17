@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.0.x
+            9.0.x
+
+      - name: Verify diff hygiene
+        run: |
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            git diff --check HEAD^
+          else
+            git diff --check HEAD
+          fi
+
+      - name: Build Core
+        run: dotnet build BattleSystemECS.Core --nologo -v q
+
+      - name: Build EXE
+        run: dotnet build --nologo -v q
+
+      - name: Static test rules
+        run: pwsh -File tools/check-test-rules.ps1
+
+      - name: Run tests
+        run: dotnet test BattleSystemECS.Tests --nologo -v q

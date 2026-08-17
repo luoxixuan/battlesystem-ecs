@@ -1,6 +1,4 @@
 using BattleSystemECS.Tests.Infrastructure;
-using System;
-using System.Reflection;
 using Xunit;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -18,16 +16,6 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
             return new WaveSpawningSystem(Store, Renderer, Config);
         }
 
-        // WaveSpawningSystem 没有公开 SpawnBatchSize，测试从系统实例的私有
-        // spawnConfig 读取真实注入值来推导期望（不钉 JSON 里的具体 5）。
-        private static int ReadConfiguredBatchSize(WaveSpawningSystem sys)
-        {
-            FieldInfo field = typeof(WaveSpawningSystem)
-                .GetField("spawnConfig", BindingFlags.NonPublic | BindingFlags.Instance)!;
-            var config = (WaveSpawnConfig)field.GetValue(sys)!;
-            return config.SpawnBatchSize;
-        }
-
         [Fact] public void NewSystem_StartsAtWaveOne()
         {
             var sys = Env();
@@ -39,7 +27,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Spawning
         [Fact] public void FirstUpdate_SpawnsExactlyOneConfiguredBatch()
         {
             var sys = Env();
-            int expectedBatch = ReadConfiguredBatchSize(sys);
+            int expectedBatch = ReadConfiguredWaveSpawnBatchSize(sys);
 
             sys.Update();
 

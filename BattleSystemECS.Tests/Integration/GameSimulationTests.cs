@@ -23,12 +23,14 @@ namespace BattleSystemECS.Tests.Integration
             });
 
             const int updateCount = 10;
-            const int spawnBatchSize = 5; // WaveSpawningSystem.Update 每帧固定批量生成 5 个（生产实现）
-            var waveConfig = Config.Levels[0].Waves[0];
-            waveConfig.EnemyCount = updateCount * spawnBatchSize; // 测试显式注入波次总数 = 50
-            int expectedSpawned = waveConfig.GetTotalEnemyCount();
 
             var wave = new WaveSpawningSystem(Store, Renderer, Config);
+            int spawnBatchSize = ReadConfiguredWaveSpawnBatchSize(wave);
+
+            var waveConfig = Config.Levels[0].Waves[0];
+            waveConfig.EnemyCount = updateCount * spawnBatchSize; // 用真实批量大小注入波次总数
+            int expectedSpawned = waveConfig.GetTotalEnemyCount();
+
             var atk = new PlayerTowerAttackSystem(Store, Renderer, pid, Config);
             var skill = new SkillSystem(Store, Renderer, pid, Config);
             skill.InitializePlayerSkills();
@@ -47,7 +49,7 @@ namespace BattleSystemECS.Tests.Integration
                 skill.Update(1f);
             }
 
-            // 精确期望：注入总数 50 = 10 帧 × 每帧 5 个，且尚未触发波次完成。
+            // 精确期望：注入总数 = 10 帧 × 真实配置的每帧批量大小，且尚未触发波次完成。
             Assert.Equal(expectedSpawned, wave.GetTotalEnemiesSpawned());
             Assert.Equal(expectedSpawned, Store.GetActiveEnemyCount());
             Assert.Equal(1, wave.GetCurrentWave());

@@ -5,7 +5,7 @@
   1. 扫描 BattleSystemECS.Tests 下全部 *.cs（自动排除 bin/obj）。
   2. 按行解析每个 [Fact] / [Theory] 方法体（行级大括号平衡），
      方法体内必须至少出现一次 Assert.；否则输出 文件:行:测试名。
-  3. grep 恒真/恒假断言：
+  3. grep 恒真/恒假断言（含带 message 参数形式）：
        Assert.True(true) / Assert.False(false) /
        Assert.True(false) / Assert.False(true)
      发现即输出 文件:行:模式。
@@ -33,11 +33,12 @@ $constantViolations = @()
 $totalMethods = 0
 
 # ── 恒真 / 恒假四模式 ──
+# 同时覆盖带 message / 第三参数的形式，如 Assert.True(true, "msg")。
 $constantPatterns = @(
-    @{ Name = 'Assert.True(true)';  Regex = 'Assert\.True\s*\(\s*true\s*\)' },
-    @{ Name = 'Assert.False(false)'; Regex = 'Assert\.False\s*\(\s*false\s*\)' },
-    @{ Name = 'Assert.True(false)'; Regex = 'Assert\.True\s*\(\s*false\s*\)' },
-    @{ Name = 'Assert.False(true)'; Regex = 'Assert\.False\s*\(\s*true\s*\)' }
+    @{ Name = 'Assert.True(true)';  Regex = 'Assert\.True\s*\(\s*true\s*(?:\)|,)' },
+    @{ Name = 'Assert.False(false)'; Regex = 'Assert\.False\s*\(\s*false\s*(?:\)|,)' },
+    @{ Name = 'Assert.True(false)'; Regex = 'Assert\.True\s*\(\s*false\s*(?:\)|,)' },
+    @{ Name = 'Assert.False(true)'; Regex = 'Assert\.False\s*\(\s*true\s*(?:\)|,)' }
 )
 
 function Get-RelPath {

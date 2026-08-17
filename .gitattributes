@@ -1,0 +1,7 @@
+# 本仓库文本文件统一使用 LF 行尾。
+# 新增/修改以下类型文件时，Git 会在写入索引时把 CRLF 规范化为 LF。
+*.cs text eol=lf
+*.ps1 text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.csproj text eol=lf
