@@ -98,7 +98,7 @@ namespace BattleSystemECS.Systems
             // Bonuses are pre-cached in tower fields at placement time — no recalculation here.
             // This Update() call exists for the case where towers are placed mid-wave
             // (rare, but possible via relocate). For the normal case bonuses are set at placement.
-            Parallel.For(0, count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+            Parallel.For(0, count, ParallelOptionsCache.HotPath, i =>
             {
                 int towerId = activeTowerIds[i];
                 if (!store.TowerActive[towerId]) return;

@@ -69,7 +69,7 @@ namespace BattleSystemECS.Systems
             var activeEnemies = _activeEnemyList;
 
             // Phase 1 (parallel): each LifeLinker scans for nearby link candidates and queues link events
-            Parallel.For(0, activeEnemies.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+            Parallel.For(0, activeEnemies.Count, ParallelOptionsCache.HotPath, i =>
             {
                 int enemyId = activeEnemies[i];
                 if (!store.EnemyActive[enemyId])
@@ -333,7 +333,7 @@ namespace BattleSystemECS.Systems
             var enemies = _activeEnemyList;
             if (enemies == null) return;
 
-            Parallel.For(0, enemies.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+            Parallel.For(0, enemies.Count, ParallelOptionsCache.HotPath, i =>
             {
                 int enemyId = enemies[i];
                 if (!store.EnemyActive[enemyId] || !store.EnemyIsLifeLinker[enemyId])

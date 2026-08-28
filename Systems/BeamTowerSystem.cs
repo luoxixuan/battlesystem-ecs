@@ -101,7 +101,7 @@ namespace BattleSystemECS.Systems
             // DPS scale factor: damage per frame = DPS * deltaTime
             float dpsScale = deltaTime * DPS_TO_FRAME_SCALE;
 
-            Parallel.For(0, towerIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, ti =>
+            Parallel.For(0, towerIds.Count, ParallelOptionsCache.HotPath, ti =>
             {
                 int towerId = towerIds[ti];
 

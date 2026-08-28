@@ -61,7 +61,7 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = _activeEnemyList;
             int count = activeEnemyIds.Count;
 
-            Parallel.For(0, count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+            Parallel.For(0, count, ParallelOptionsCache.HotPath, i =>
             {
                 int protectorId = activeEnemyIds[i];
                 if (!store.EnemyActive[protectorId])

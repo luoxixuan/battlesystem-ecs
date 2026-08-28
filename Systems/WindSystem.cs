@@ -115,7 +115,7 @@ namespace BattleSystemECS.Systems
                 return;
 
             // Parallel wind application — read-heavy, minimal branching
-            Parallel.For(0, count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+            Parallel.For(0, count, ParallelOptionsCache.HotPath, i =>
             {
                 int enemyId = activeEnemies[i];
                 if (!store.EnemyActive[enemyId])

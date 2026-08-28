@@ -108,7 +108,7 @@ namespace BattleSystemECS.Systems
             // boundary), so we use the IReadOnlyList<int> ActiveEnemyIds directly and
             // reference it by index from the parallel body.
             var activeEnemies = activeEnemiesList;
-            Parallel.For(0, enemyCount, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+            Parallel.For(0, enemyCount, ParallelOptionsCache.HotPath, i =>
             {
                 int eid = activeEnemies[i];
                 if (!store.EnemyActive[eid]) return;

@@ -87,7 +87,7 @@ namespace BattleSystemECS.Systems
             _frostQueueCount = 0;
             var queue = _frostQueueIdx == 0 ? _frostQueue0 : _frostQueue1;
 
-            Parallel.For(0, activeEnemyIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+            Parallel.For(0, activeEnemyIds.Count, ParallelOptionsCache.HotPath, i =>
             {
                 int enemyId = activeEnemyIds[i];
                 if (!store.EnemyActive[enemyId]) return;

@@ -57,7 +57,7 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = store.GetCachedActiveEnemyIds();
             var count = activeEnemyIds.Count;
 
-            Parallel.For(0, count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+            Parallel.For(0, count, ParallelOptionsCache.HotPath, i =>
             {
                 int enemyId = activeEnemyIds[i];
                 if (!store.EnemyActive[enemyId])
@@ -181,7 +181,7 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = store.GetCachedActiveEnemyIds();
             var count = activeEnemyIds.Count;
 
-            Parallel.For(0, count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+            Parallel.For(0, count, ParallelOptionsCache.HotPath, i =>
             {
                 int enemyId = activeEnemyIds[i];
                 if (!store.EnemyActive[enemyId])

@@ -128,7 +128,7 @@ namespace BattleSystemECS.Systems
             object lockObj = _damageQueueLock;
             
             // Iterate all potential hero slots
-            Parallel.For(0, ComponentStore.MAX_HEROES, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+            Parallel.For(0, ComponentStore.MAX_HEROES, ParallelOptionsCache.HotPath, i =>
             {
                 if (!store.HeroIsDeployed[i]) return;
                 

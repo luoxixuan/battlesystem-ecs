@@ -94,7 +94,7 @@ namespace BattleSystemECS.Systems
             _bleedQueueCount = 0;
             var queue = _bleedQueueIdx == 0 ? _bleedQueue0 : _bleedQueue1;
 
-            Parallel.For(0, activeEnemyIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+            Parallel.For(0, activeEnemyIds.Count, ParallelOptionsCache.HotPath, i =>
             {
                 int enemyId = activeEnemyIds[i];
                 if (!store.EnemyActive[enemyId]) return;

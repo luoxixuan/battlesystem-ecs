@@ -432,7 +432,7 @@ namespace BattleSystemECS.Systems
             else
             {
                 int numBatches = (count + batchSize - 1) / batchSize;
-                Parallel.For(0, numBatches, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                Parallel.For(0, numBatches, ParallelOptionsCache.HotPath,
                     batchIdx =>
                 {
                     int start = batchIdx * batchSize;
