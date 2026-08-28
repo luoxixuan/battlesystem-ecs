@@ -43,23 +43,18 @@ namespace BattleSystemECS.Systems
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         // Tuple: (enemyId, rawDamage) — raw damage only; armor reduction handled by PlayerTowerAttackSystem and TowerAttackSystem
         private List<(int enemyId, float damage)>[] _skillDamageQueue = new List<(int, float)>[2];
-        private readonly object _skillDamageQueueLock = new object();
         private int _skillDamageQueueIdx = 0;
-        // GC elimination: field-level lists pre-allocated, cleared before each use
-        private List<(int enemyId, float distSq)> _singleTargetCandidates = new List<(int, float)>(64);
-        private List<int> _crossAreaHits = new List<int>(64);
-        private List<int> _boxAreaHits = new List<int>(64);
-        private List<int> _lineAreaHits = new List<int>(64);
-        private List<int> _coneAreaHits = new List<int>(64);
-        private List<int> _groundTargetHits = new List<int>(64);
-        private List<int> _slowAreaHits = new List<int>(64);
-        private readonly object _singleTargetCandidatesLock = new object();
-        private readonly object _crossAreaHitsLock = new object();
-        private readonly object _boxAreaHitsLock = new object();
-        private readonly object _lineAreaHitsLock = new object();
-        private readonly object _coneAreaHitsLock = new object();
-        private readonly object _groundTargetHitsLock = new object();
-        private readonly object _slowAreaHitsLock = new object();
+
+        // 统一的 AoE 命中收集（替代原先每个 Cast 方法各自 Parallel.ForEach + lock 的模式）：
+        //   - 敌人数 < ParallelMinEnemies：纯串行直写 _mergedHits（跳过 TPL 启停开销）；
+        //   - 否则按 ParallelBatchSize/批分区并行，每批独占一个批缓冲、无锁收集，
+        //     Parallel.For 全屏障后按批序合并进 _mergedHits（= 敌人索引序，确定性顺序）。
+        // 各 Cast 方法只提供 filter 谓词（只读 store + 写自己的缓冲），
+        // 命中后的伤害入队/效果应用统一在串行段完成（_skillDamageQueue 仅串行访问，无需锁）。
+        private const int ParallelBatchSize = 256;
+        private const int ParallelMinEnemies = 500;
+        private List<int>[] _hitBatchBuffers = new List<int>[8];
+        private readonly List<int> _mergedHits = new List<int>(64);
 
         // Poison Nova DoT constants
         private const float POISON_NOVA_DURATION = 5f;
@@ -456,30 +451,27 @@ namespace BattleSystemECS.Systems
 
             int rangeSq = range * range;
 
-            _singleTargetCandidates.Clear();
-            Parallel.ForEach(activeEnemyIds, enemyId =>
+            // Phase 1: collect candidates in range (lock-free, threshold-gated)
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
                 if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
                 if (enemyHealth <= 0f) return;
 
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-
-                float dx = enemyX - playerX;
-                float dy = enemyY - playerY;
+                float dx = store.PositionX[enemyId] - playerX;
+                float dy = store.PositionY[enemyId] - playerY;
                 float distSq = dx * dx + dy * dy;
-                if (distSq <= rangeSq)
-                {
-                    lock (_singleTargetCandidatesLock) { _singleTargetCandidates.Add((enemyId, distSq)); }
-                }
-            });
+                if (distSq <= rangeSq) hits.Add(enemyId);
+            }, _mergedHits);
 
-            // Serial phase: find global closest
+            // Serial phase: find global closest (recompute distSq on the filtered set)
             int closestEnemyId = -1;
             float closestDistSq = float.MaxValue;
-            foreach (var (enemyId, distSq) in _singleTargetCandidates)
+            foreach (int enemyId in _mergedHits)
             {
+                float dx = store.PositionX[enemyId] - playerX;
+                float dy = store.PositionY[enemyId] - playerY;
+                float distSq = dx * dx + dy * dy;
                 if (distSq < closestDistSq)
                 {
                     closestDistSq = distSq;
@@ -492,12 +484,63 @@ namespace BattleSystemECS.Systems
                 float enemyX = store.PositionX[closestEnemyId];
                 float enemyY = store.PositionY[closestEnemyId];
 
-                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((closestEnemyId, finalDamage)); }
+                _skillDamageQueue[_skillDamageQueueIdx].Add((closestEnemyId, finalDamage));
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {closestEnemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
                 return 1;
             }
             return 0;
+        }
+
+        /// <summary>
+        /// 统一的命中收集驱动：低于阈值纯串行；否则按批分区并行（每批独占缓冲、无锁），
+        /// Parallel.For 全屏障后按批序合并进 results（敌人索引序，确定性）。
+        /// filter 只允许读 store 并把命中 id 写入自己的 hits 缓冲，不得做任何其他共享写。
+        /// </summary>
+        private void CollectHits(List<int> activeEnemyIds, Action<int, List<int>> filter, List<int> results)
+        {
+            results.Clear();
+            int count = activeEnemyIds.Count;
+            if (count < ParallelMinEnemies)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    filter(activeEnemyIds[i], results);
+                }
+                return;
+            }
+            int numBatches = (count + ParallelBatchSize - 1) / ParallelBatchSize;
+            if (_hitBatchBuffers.Length < numBatches)
+            {
+                var grown = new List<int>[numBatches];
+                Array.Copy(_hitBatchBuffers, grown, _hitBatchBuffers.Length);
+                _hitBatchBuffers = grown;
+            }
+            // 确保本帧用到的每个槽位都已实例化（初始数组与扩容后的旧槽位可能是 null）
+            for (int b = 0; b < numBatches; b++)
+            {
+                if (_hitBatchBuffers[b] == null)
+                    _hitBatchBuffers[b] = new List<int>(ParallelBatchSize);
+            }
+            Parallel.For(0, numBatches, ParallelOptionsCache.HotPath, batchIdx =>
+            {
+                var batchBuffer = _hitBatchBuffers[batchIdx];
+                batchBuffer.Clear();
+                int start = batchIdx * ParallelBatchSize;
+                int end = Math.Min(start + ParallelBatchSize, count);
+                for (int i = start; i < end; i++)
+                {
+                    filter(activeEnemyIds[i], batchBuffer);
+                }
+            });
+            for (int b = 0; b < numBatches; b++)
+            {
+                var batchBuffer = _hitBatchBuffers[b];
+                for (int k = 0; k < batchBuffer.Count; k++)
+                {
+                    results.Add(batchBuffer[k]);
+                }
+            }
         }
 
         private int CastCrossArea(float finalDamage, float playerX, float playerY, int radius, string name)
@@ -506,10 +549,8 @@ namespace BattleSystemECS.Systems
             if (_activeEnemyList == null) return 0;
             var activeEnemyIds = _activeEnemyList;
 
-            // Parallel phase: collect all enemies in cross area
-            _crossAreaHits.Clear();
-
-            Parallel.ForEach(activeEnemyIds, enemyId =>
+            // Phase 1: collect all enemies in cross area (lock-free, threshold-gated)
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
                 if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
@@ -525,18 +566,18 @@ namespace BattleSystemECS.Systems
 
                 if (inHorizontalArm || inVerticalArm)
                 {
-                    lock (_crossAreaHitsLock) { _crossAreaHits.Add(enemyId); }
+                    hits.Add(enemyId);
                 }
-            });
+            }, _mergedHits);
 
             // Serial phase: apply damage
             int hitCount = 0;
-            foreach (int enemyId in _crossAreaHits)
+            foreach (int enemyId in _mergedHits)
             {
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
                 hitCount++;
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
@@ -555,10 +596,8 @@ namespace BattleSystemECS.Systems
             float yMin = playerY - (float)range;
             float yMax = playerY + (float)range;
 
-            // Parallel phase: collect all enemies in box area
-            _boxAreaHits.Clear();
-
-            Parallel.ForEach(activeEnemyIds, enemyId =>
+            // Phase 1: collect all enemies in box area (lock-free, threshold-gated)
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
                 if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
@@ -570,18 +609,18 @@ namespace BattleSystemECS.Systems
                 if (enemyX >= xMin && enemyX <= xMax &&
                     enemyY >= yMin && enemyY <= yMax)
                 {
-                    lock (_boxAreaHitsLock) { _boxAreaHits.Add(enemyId); }
+                    hits.Add(enemyId);
                 }
-            });
+            }, _mergedHits);
 
             // Serial phase: apply damage
             int hitCount = 0;
-            foreach (int enemyId in _boxAreaHits)
+            foreach (int enemyId in _mergedHits)
             {
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
                 hitCount++;
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
@@ -598,9 +637,7 @@ namespace BattleSystemECS.Systems
 
             int radiusSq = radius * radius;
 
-            _boxAreaHits.Clear();
-
-            Parallel.ForEach(activeEnemyIds, enemyId =>
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
                 if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
@@ -615,13 +652,13 @@ namespace BattleSystemECS.Systems
 
                 if (distSq <= radiusSq)
                 {
-                    lock (_boxAreaHitsLock) { _boxAreaHits.Add(enemyId); }
+                    hits.Add(enemyId);
                 }
-            });
+            }, _mergedHits);
 
             // Serial phase: apply DoT effect to each enemy
             int hitCount = 0;
-            foreach (int enemyId in _boxAreaHits)
+            foreach (int enemyId in _mergedHits)
             {
                 if (dotSystem != null && def.HasDot)
                 {
@@ -645,7 +682,7 @@ namespace BattleSystemECS.Systems
                 else
                 {
                     // Fallback: immediate damage if no dotSystem wired
-                    lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+                    _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
                 }
                 hitCount++;
             }
@@ -840,10 +877,8 @@ namespace BattleSystemECS.Systems
             if (_activeEnemyList == null) return 0;
             var activeEnemyIds = _activeEnemyList;
 
-            // Parallel phase: collect all enemies on same Y row within range
-            _lineAreaHits.Clear();
-
-            Parallel.ForEach(activeEnemyIds, enemyId =>
+            // Phase 1: collect all enemies on same Y row within range (lock-free, threshold-gated)
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
                 if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
@@ -858,18 +893,18 @@ namespace BattleSystemECS.Systems
 
                 if (onSameRow && withinRange)
                 {
-                    lock (_lineAreaHitsLock) { _lineAreaHits.Add(enemyId); }
+                    hits.Add(enemyId);
                 }
-            });
+            }, _mergedHits);
 
             // Serial phase: apply damage
             int hitCount = 0;
-            foreach (int enemyId in _lineAreaHits)
+            foreach (int enemyId in _mergedHits)
             {
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
                 hitCount++;
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
@@ -917,7 +952,7 @@ namespace BattleSystemECS.Systems
 
                 if (distSq <= radiusSq)
                 {
-                    lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+                    _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
 
                     if (def.FreezeDuration > 0f && def.FreezeChance > 0f)
                     {
@@ -947,9 +982,8 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = _activeEnemyList;
 
             int radiusSq = radius * radius;
-            _slowAreaHits.Clear();
 
-            Parallel.ForEach(activeEnemyIds, enemyId =>
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
                 if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
@@ -964,15 +998,15 @@ namespace BattleSystemECS.Systems
 
                 if (distSq <= radiusSq)
                 {
-                    lock (_slowAreaHitsLock) { _slowAreaHits.Add(enemyId); }
+                    hits.Add(enemyId);
                 }
-            });
+            }, _mergedHits);
 
             // Serial phase: apply damage and slow effect
             int hitCount = 0;
-            foreach (int enemyId in _slowAreaHits)
+            foreach (int enemyId in _mergedHits)
             {
-                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
 
                 if (def.SlowAmount > 0f && def.SlowDuration > 0f)
                 {
@@ -1000,9 +1034,8 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = _activeEnemyList;
 
             int radiusSq = radius * radius;
-            _slowAreaHits.Clear();  // reuse the same hit-list — same shape, same lifetime
 
-            Parallel.ForEach(activeEnemyIds, enemyId =>
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
                 if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
@@ -1017,15 +1050,15 @@ namespace BattleSystemECS.Systems
 
                 if (distSq <= radiusSq)
                 {
-                    lock (_slowAreaHitsLock) { _slowAreaHits.Add(enemyId); }
+                    hits.Add(enemyId);
                 }
-            });
+            }, _mergedHits);
 
             // Serial phase: apply damage and polymorph effect
             int hitCount = 0;
-            foreach (int enemyId in _slowAreaHits)
+            foreach (int enemyId in _mergedHits)
             {
-                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
 
                 if (def.PolymorphDuration > 0f)
                 {
@@ -1158,9 +1191,7 @@ namespace BattleSystemECS.Systems
             float targetX = store.PositionX[playerId];
             float targetY = store.PositionY[playerId];
 
-            _groundTargetHits.Clear();
-
-            Parallel.ForEach(activeEnemyIds, enemyId =>
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
                 if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
@@ -1175,15 +1206,15 @@ namespace BattleSystemECS.Systems
 
                 if (distSq <= radiusSq)
                 {
-                    lock (_groundTargetHitsLock) { _groundTargetHits.Add(enemyId); }
+                    hits.Add(enemyId);
                 }
-            });
+            }, _mergedHits);
 
             // Serial phase: apply damage and count
             int hitCount = 0;
-            foreach (int enemyId in _groundTargetHits)
+            foreach (int enemyId in _mergedHits)
             {
-                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
                 hitCount++;
             }
             return hitCount;
@@ -1209,9 +1240,7 @@ namespace BattleSystemECS.Systems
             const double dirX = 0.0;
             const double dirY = -1.0;
 
-            _coneAreaHits.Clear();
-
-            Parallel.ForEach(activeEnemyIds, enemyId =>
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
                 if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
@@ -1238,18 +1267,18 @@ namespace BattleSystemECS.Systems
 
                 if (dot >= cosThreshold)
                 {
-                    lock (_coneAreaHitsLock) { _coneAreaHits.Add(enemyId); }
+                    hits.Add(enemyId);
                 }
-            });
+            }, _mergedHits);
 
             // Serial phase: apply damage
             int hitCount = 0;
-            foreach (int enemyId in _coneAreaHits)
+            foreach (int enemyId in _mergedHits)
             {
                 float enemyX = store.PositionX[enemyId];
                 float enemyY = store.PositionY[enemyId];
 
-                lock (_skillDamageQueueLock) { _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage)); }
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
                 hitCount++;
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
