@@ -1,5 +1,14 @@
 # 更新记录 (Changelog)
 
+### 2026-08-27
+- 并行热路径性能优化（4 项生产代码改动；1281 测试全过、三模式压测全部提升、战斗语义零变化）：
+  1. `PlayerTowerAttackSystem`：并行阶段每次命中抢全局锁（`_damageQueueLock`）把并行收集打回串行 —— 重构为按批分区无锁收集（256 敌/批、每批独占缓冲、帧末按批序合并、确定性顺序），并新增敌数 <500 的纯串行快速路径。mode4 PlayerAttack 27.0→12.1ms（−55%）。修复批缓冲初始槽位为 null 导致 10K 压测 NRE 的问题（槽位按需实例化）。
+  2. `SkillSystem`：8 处 `Parallel.ForEach` + 每命中加锁的 AoE 命中收集 → 统一 `CollectHits`（<500 敌串行 / 否则无锁批分区并行）；删除 7 个每站点命中列表与 8 把锁对象；`_skillDamageQueue` 确认仅串行访问后移除全部锁包裹。
+  3. `TowerAttackSystem`：塔数 <8 时塔循环由 `Parallel.For` 改为串行调用同一 lambda 体（少量塔时 TPL 启停 + 跨核同步开销大于并行收益）。mode4 TowerAttack 19.4→15.6ms（−20%）。
+  4. 全仓 24 处每帧 `new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }` → 新增 `Core/ParallelOptionsCache.HotPath` 静态缓存（消除每帧分配；ManaBurnSystem 专用 MaxDegreeOfParallelism=4 保持不变）。
+- 新增 DOTS 迁移可行性评估：`docs/dots-migration-evaluation.md`（结论：不做全量迁移 —— Entities/Burst 无法脱离 Unity 工具链编译运行，CLI 基准/测试门禁工作流无法保留；模拟侧仅占 60FPS 帧预算 ~1.2%，性能不构成迁移理由；推荐"维持 SOA + 定点优化"，可选 Unity 侧局部 Burst 实验路线）。
+- 验证：`dotnet build BattleSystemECS.Core` 与 `dotnet build` 均 0 warnings/0 errors；`dotnet test` 1281/1281 PASS；`pwsh -File tools\check-test-rules.ps1` 0 违规；`git diff --check` 干净；压测 mode2 8333 FPS（上一轮 7746，+7.6%）/ mode4 5212 FPS（4608，+13.1%）/ mode5 4874 FPS（4290，+13.6%），全部通过硬门禁且无相对回退。
+
 ### 2026-08-17
 - 单元测试可维护性/价值整改（P0-P3，仅测试项目 + 文档，零生产代码改动）：
   1. P0 清除假绿：修复/删除 23 个零断言 smoke（`tools/check-test-rules.ps1` 全量扫描确认 0 违规）；删除在测试内复刻生产公式自证的镜像测试（ThreatScore/Adrenaline/ManaDrain/Enchant/MultiStrike/BossPhase/SummonCircle 等）与纯字段写读回环，改为真实攻击链路断言（Backstab/Enchant/ManaDrain/MultiStrike/TowerEffectiveness/InvulnerabilityFrames 等）；弱断言精确化（Mine/Execute/Inventory/Culling/FrameScheduler 等从 `>0`/区间改为注入值推导的 `Assert.Equal`）。
