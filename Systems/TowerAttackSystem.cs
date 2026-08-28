@@ -438,6 +438,9 @@ namespace BattleSystemECS.Systems
             _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(waveNumber) : 1f;
         }
 
+        // 少于该塔数时 Update 走纯串行驱动（TPL 启停/跨核同步开销大于并行收益）
+        private const int ParallelMinTowers = 8;
+
         public void Update(float deltaTime)
         {
             var activeTowerIds = store.ActiveTowerIds;
@@ -474,7 +477,7 @@ namespace BattleSystemECS.Systems
             var bounceLock = _bounceDamageQueueLock;
             var fragmentLock = _fragmentQueueLock;
 
-            Parallel.For(0, activeTowerIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, ti =>
+            Action<int> towerBody = ti =>
             {
                 int towerId = activeTowerIds[ti];
 
@@ -1601,7 +1604,14 @@ namespace BattleSystemECS.Systems
                         }
                     }
                 }
-            });
+            };
+
+            // 低于并行阈值时纯串行驱动 —— 少量塔时 TPL 启停 + 跨核同步开销超过并行收益
+            //（基准场景 2 座塔；实战上限 ~150 座）。并行路径与原先行为一致（同一 lambda 体）。
+            if (activeTowerIds.Count >= ParallelMinTowers)
+                Parallel.For(0, activeTowerIds.Count, ParallelOptionsCache.HotPath, towerBody);
+            else
+                for (int tiSeq = 0; tiSeq < activeTowerIds.Count; tiSeq++) towerBody(tiSeq);
 
             // Phase 2 (serial): apply damage
             int readIdx = _damageQueueIdx;
