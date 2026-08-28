@@ -67,17 +67,22 @@ namespace BattleSystemECS.Systems
 
         private int _currentTurn;
 
-        // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
-        // Ping-pong double-buffer for damage (enemyId, raw damage, wasCrit, damageType).
-        // wasCrit is set in the parallel phase (where the crit roll happens) and
-        // drained in the serial phase to publish EnemyHit / EnemyCrit events.
-        // damageType is the resolved type for this hit portion — when conversion is active
-        // the parallel phase enqueues TWO entries for the same enemy (one per type) so the
-        // serial phase applies them with the correct resistance/armor/immunity path.
-        // Default-initialized to false; both bools and the 4-tuple are stack-friendly.
-        private List<(int enemyId, float damage, bool wasCrit, DamageType damageType)>[] _damageQueue = new List<(int, float, bool, DamageType)>[2];
-        private readonly object _damageQueueLock = new object();
-        private int _damageQueueIdx = 0;
+        // 两阶段并行模式的伤害收集缓冲（enemyId, damage, wasCrit, damageType）。
+        // wasCrit 在并行段（暴击判定处）产生，串行段结算时用于发布 EnemyHit / EnemyCrit 事件。
+        // damageType 是本次命中部分的最终类型 —— 伤害转换激活时同一敌人会入队两条
+        //（每类型一条），串行段按对应的抗性/护甲/免疫路径分别结算。
+        //
+        // 收集策略（帧稳态零分配 + 并行段无锁）：
+        //   - 敌人数 < ParallelMinEnemies：纯串行直写 _mergedDamage（跳过 TPL 启停开销）；
+        //   - 否则按 ParallelBatchSize/批分区并行，每批独占一个批缓冲（_batchDamageBuffers），
+        //     任意两个线程不写同一个 List —— 消除旧实现"并行段每命中抢全局锁"的串行化。
+        //     Parallel.For 本身是全屏障，帧末串行段按批序合并进 _mergedDamage 后统一结算。
+        private const int ParallelBatchSize = 256;
+        private const int ParallelMinEnemies = 500;
+        private List<(int enemyId, float damage, bool wasCrit, DamageType damageType)>[] _batchDamageBuffers
+            = new List<(int, float, bool, DamageType)>[8];
+        private readonly List<(int enemyId, float damage, bool wasCrit, DamageType damageType)> _mergedDamage
+            = new List<(int, float, bool, DamageType)>(256);
 
         // Ping-pong double-buffer for thorns damage reflect (enemy -> player, from player attacking enemy)
         private List<float>[] _thornsQueue = new List<float>[2];
@@ -106,8 +111,6 @@ namespace BattleSystemECS.Systems
             this.gameConfig = gameConfig;
             this._eventBus = eventBus ?? new EventBus();
             _battleEventBus = battleEventBus ?? NullEventBus.Instance;
-            _damageQueue[0] = new List<(int, float, bool, DamageType)>(256);
-            _damageQueue[1] = new List<(int, float, bool, DamageType)>(256);
             _thornsQueue[0] = new List<float>(64);
             _thornsQueue[1] = new List<float>(64);
         }
@@ -206,95 +209,57 @@ public void SetWaveNumber(int waveNumber)
 
             var activeEnemyIds = _activeEnemyList;
 
-            // Phase 1 (parallel): collect damage events only — no structural mutations
-            Parallel.For(0, activeEnemyIds.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i =>
+            // Phase 1: collect damage events only — no structural mutations.
+            // 低于阈值纯串行（跳过 TPL 启停开销）；高于阈值按批分区并行，每批独占缓冲、无锁收集。
+            var merged = _mergedDamage;
+            merged.Clear();
+            int enemyCount = activeEnemyIds != null ? activeEnemyIds.Count : 0;
+            if (enemyCount < ParallelMinEnemies)
             {
-                int enemyId = activeEnemyIds[i];
-                if (enemyId == playerId) return;
-
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-                if (enemyY <= _playerY) return;
-
-                float dx = enemyX - _playerX;
-                if (dx * dx > _rangeSq) return;
-
-                float enemyHealth = store.EnemyHealth[enemyId];
-                if (enemyHealth <= 0f) return;
-
-                // Death Mark / Execute: auto-mark enemy when HP drops below threshold
-                // Marked enemies take +EnemyMarkedDamageBonus extra damage (e.g. 0.5 = +50%).
-                // Self-balancing: bosses with massive HP get the bonus only in their final
-                // 15% — turns long fights into satisfying executions.
-                float maxHp = store.EnemyMaxHealth[enemyId];
-                if (!store.EnemyMarked[enemyId] && maxHp > 0f)
+                for (int i = 0; i < enemyCount; i++)
                 {
-                    float hpFrac = enemyHealth / maxHp;
-                    if (hpFrac <= store.EnemyMarkedThreshold[enemyId])
+                    CollectEnemyDamage(activeEnemyIds, i, baseDamage, merged);
+                }
+            }
+            else
+            {
+                int numBatches = (enemyCount + ParallelBatchSize - 1) / ParallelBatchSize;
+                if (_batchDamageBuffers.Length < numBatches)
+                {
+                    var grown = new List<(int, float, bool, DamageType)>[numBatches];
+                    Array.Copy(_batchDamageBuffers, grown, _batchDamageBuffers.Length);
+                    _batchDamageBuffers = grown;
+                }
+                // 确保本帧用到的每个槽位都已实例化（初始数组与扩容后的旧槽位可能是 null）
+                for (int b = 0; b < numBatches; b++)
+                {
+                    if (_batchDamageBuffers[b] == null)
+                        _batchDamageBuffers[b] = new List<(int, float, bool, DamageType)>(ParallelBatchSize);
+                }
+                Parallel.For(0, numBatches, ParallelOptionsCache.HotPath, batchIdx =>
+                {
+                    var batchBuffer = _batchDamageBuffers[batchIdx];
+                    batchBuffer.Clear();
+                    int start = batchIdx * ParallelBatchSize;
+                    int end = Math.Min(start + ParallelBatchSize, enemyCount);
+                    for (int i = start; i < end; i++)
                     {
-                        store.EnemyMarked[enemyId] = true;
+                        CollectEnemyDamage(activeEnemyIds, i, baseDamage, batchBuffer);
+                    }
+                });
+                // Parallel.For 是全屏障 —— 此处串行按批序合并（= 敌人索引序，确定性顺序）
+                for (int b = 0; b < numBatches; b++)
+                {
+                    var batchBuffer = _batchDamageBuffers[b];
+                    for (int k = 0; k < batchBuffer.Count; k++)
+                    {
+                        merged.Add(batchBuffer[k]);
                     }
                 }
+            }
 
-// H-3 fix: crit rolled per-enemy inside parallel loop, not once per frame globally.
-                // Optimized: merged crit rate threshold (precomputed _critRateThreshold) eliminates branch
-                // Round 67: capture wasCrit bool so the serial phase can publish EnemyHit / EnemyCrit events.
-                // Crit Resistance: enemy can suppress a fraction of incoming crit chance (Boss/Elite = 0.5).
-                // Effective threshold = _critRateThreshold * (1 - EnemyCritResistance), applied inline.
-                float finalDamage = baseDamage;
-                bool wasCrit = false;
-                float effectiveCritThreshold = _critRateThreshold * (1f - store.EnemyCritResistance[enemyId]);
-                if (GetDeterministicRandom(_currentTurn, enemyId, playerId) < (int)(effectiveCritThreshold * 0x7FFFFFFF))
-                {
-                    finalDamage *= (1f + _critDamageBonus);
-                    wasCrit = true;
-                }
-
-                // Resolve the player's primary damage type once per parallel iteration.
-                // The resistance/immunity application + enqueue is delegated to
-                // ApplyResistancesAndEnqueue (Round 102 Direction 7 — Damage Conversion).
-                DamageType dmgType = store.PlayerDamageType[playerId];
-
-                // ── Damage Conversion (Round 102 Direction 7) ──────────────────────────
-                // If the player has a non-trivial conversion ratio configured (via
-                // gameConfig.PlayerDamageConversionRatio), split the damage into the original
-                // type portion + a converted type portion. Both portions are queued as separate
-                // hit events so the serial phase applies each with the correct resistance/immunity
-                // path. This mirrors TowerAttackSystem's damage conversion (lines 791-848) for
-                // consistency across the attack pipeline.
-                //
-                // IMPORTANT: crit was rolled on the COMBINED finalDamage, so we treat both
-                // portions as a single crit event from the enemy's perspective (wasCrit is true
-                // on both, matching how TowerAttackSystem handles post-crit conversion).
-                float convRatio = gameConfig != null ? gameConfig.PlayerDamageConversionRatio : 0f;
-                if (convRatio < DamageConversionConfig.MinMeaningfulRatio)
-                {
-                    // Fast path: no meaningful conversion — single-event apply
-                    ApplyResistancesAndEnqueue(enemyId, finalDamage, wasCrit, dmgType);
-                }
-                else
-                {
-                    // Clamp at the global cap so designers can't accidentally break the formula
-                    if (convRatio > DamageConversionConfig.ConversionDefaultCap)
-                        convRatio = DamageConversionConfig.ConversionDefaultCap;
-
-                    DamageType convertToType = gameConfig.PlayerConvertedDamageType;
-                    float origPortion = finalDamage * (1f - convRatio);
-                    float convPortion = finalDamage * convRatio;
-
-                    // Original-type portion
-                    ApplyResistancesAndEnqueue(enemyId, origPortion, wasCrit, dmgType);
-                    // Converted-type portion
-                    ApplyResistancesAndEnqueue(enemyId, convPortion, wasCrit, convertToType);
-                }
-            });
-
-            // Phase 2 (serial): ping-pong swap — read from current bag, clear alternate for next frame
-            int readIdx = _damageQueueIdx;
-            int writeIdx = 1 - _damageQueueIdx;
-            _damageQueueIdx = writeIdx;
-            _damageQueue[writeIdx].Clear(); // clear the bag threads will write to next frame
-            foreach (var (enemyId, damage, wasCrit, damageType) in _damageQueue[readIdx])
+            // Phase 2 (serial): drain the merged damage list (deterministic index order)
+            foreach (var (enemyId, damage, wasCrit, damageType) in merged)
             {
                 if (!store.EnemyActive[enemyId]) continue;
                 // Invulnerability check: skip damage if enemy is invulnerable
@@ -408,6 +373,94 @@ public void SetWaveNumber(int waveNumber)
         }
 
         /// <summary>
+        /// 单个敌人的伤害收集（原并行 lambda 体，串行/并行两路共用）。
+        /// 只读 SOA 字段 + 写入调用方独占的 sink 缓冲 —— 无共享写、无锁、无结构变更。
+        /// sink 在串行路径是 _mergedDamage，在并行路径是本批独占缓冲。
+        /// </summary>
+        private void CollectEnemyDamage(List<int> activeEnemyIds, int index, float baseDamage,
+            List<(int enemyId, float damage, bool wasCrit, DamageType damageType)> sink)
+        {
+            int enemyId = activeEnemyIds[index];
+            if (enemyId == playerId) return;
+
+            float enemyX = store.PositionX[enemyId];
+            float enemyY = store.PositionY[enemyId];
+            if (enemyY <= _playerY) return;
+
+            float dx = enemyX - _playerX;
+            if (dx * dx > _rangeSq) return;
+
+            float enemyHealth = store.EnemyHealth[enemyId];
+            if (enemyHealth <= 0f) return;
+
+            // Death Mark / Execute: auto-mark enemy when HP drops below threshold
+            // Marked enemies take +EnemyMarkedDamageBonus extra damage (e.g. 0.5 = +50%).
+            // Self-balancing: bosses with massive HP get the bonus only in their final
+            // 15% — turns long fights into satisfying executions.
+            float maxHp = store.EnemyMaxHealth[enemyId];
+            if (!store.EnemyMarked[enemyId] && maxHp > 0f)
+            {
+                float hpFrac = enemyHealth / maxHp;
+                if (hpFrac <= store.EnemyMarkedThreshold[enemyId])
+                {
+                    store.EnemyMarked[enemyId] = true;
+                }
+            }
+
+// H-3 fix: crit rolled per-enemy inside the collect loop, not once per frame globally.
+            // Optimized: merged crit rate threshold (precomputed _critRateThreshold) eliminates branch
+            // Round 67: capture wasCrit bool so the serial phase can publish EnemyHit / EnemyCrit events.
+            // Crit Resistance: enemy can suppress a fraction of incoming crit chance (Boss/Elite = 0.5).
+            // Effective threshold = _critRateThreshold * (1 - EnemyCritResistance), applied inline.
+            float finalDamage = baseDamage;
+            bool wasCrit = false;
+            float effectiveCritThreshold = _critRateThreshold * (1f - store.EnemyCritResistance[enemyId]);
+            if (GetDeterministicRandom(_currentTurn, enemyId, playerId) < (int)(effectiveCritThreshold * 0x7FFFFFFF))
+            {
+                finalDamage *= (1f + _critDamageBonus);
+                wasCrit = true;
+            }
+
+            // Resolve the player's primary damage type once per iteration.
+            // The resistance/immunity application + enqueue is delegated to
+            // ApplyResistancesAndCollect (Round 102 Direction 7 — Damage Conversion).
+            DamageType dmgType = store.PlayerDamageType[playerId];
+
+            // ── Damage Conversion (Round 102 Direction 7) ──────────────────────────
+            // If the player has a non-trivial conversion ratio configured (via
+            // gameConfig.PlayerDamageConversionRatio), split the damage into the original
+            // type portion + a converted type portion. Both portions are queued as separate
+            // hit events so the serial phase applies each with the correct resistance/immunity
+            // path. This mirrors TowerAttackSystem's damage conversion for
+            // consistency across the attack pipeline.
+            //
+            // IMPORTANT: crit was rolled on the COMBINED finalDamage, so we treat both
+            // portions as a single crit event from the enemy's perspective (wasCrit is true
+            // on both, matching how TowerAttackSystem handles post-crit conversion).
+            float convRatio = gameConfig != null ? gameConfig.PlayerDamageConversionRatio : 0f;
+            if (convRatio < DamageConversionConfig.MinMeaningfulRatio)
+            {
+                // Fast path: no meaningful conversion — single-event apply
+                ApplyResistancesAndCollect(enemyId, finalDamage, wasCrit, dmgType, sink);
+            }
+            else
+            {
+                // Clamp at the global cap so designers can't accidentally break the formula
+                if (convRatio > DamageConversionConfig.ConversionDefaultCap)
+                    convRatio = DamageConversionConfig.ConversionDefaultCap;
+
+                DamageType convertToType = gameConfig.PlayerConvertedDamageType;
+                float origPortion = finalDamage * (1f - convRatio);
+                float convPortion = finalDamage * convRatio;
+
+                // Original-type portion
+                ApplyResistancesAndCollect(enemyId, origPortion, wasCrit, dmgType, sink);
+                // Converted-type portion
+                ApplyResistancesAndCollect(enemyId, convPortion, wasCrit, convertToType, sink);
+            }
+        }
+
+        /// <summary>
         /// Apply life link shared damage to a linked enemy.
         /// The linked enemy takes full damage (no further splitting — links are not recursive).
         /// </summary>
@@ -440,14 +493,15 @@ public void SetWaveNumber(int waveNumber)
         }
 
         /// <summary>
-        /// Apply damage-type-specific resistance/immunity to the given portion and enqueue
-        /// the hit for serial application. Extracted from the parallel phase so damage
-        /// conversion (Round 102 Direction 7) can call it twice — once per type — without
-        /// duplicating the resistance pipeline. Crit, exposure, death-mark and damage-taken
-        /// multipliers are all assumed to have been baked into <paramref name="rawDamage"/>
-        /// by the caller.
+        /// Apply damage-type-specific resistance/immunity to the given portion and append
+        /// the hit to the caller-exclusive sink buffer for serial application. Extracted so
+        /// damage conversion (Round 102 Direction 7) can call it twice — once per type —
+        /// without duplicating the resistance pipeline. Crit, exposure, death-mark and
+        /// damage-taken multipliers are all assumed to have been baked into
+        /// <paramref name="rawDamage"/> by the caller.
         /// </summary>
-        private void ApplyResistancesAndEnqueue(int enemyId, float rawDamage, bool wasCrit, DamageType damageType)
+        private void ApplyResistancesAndCollect(int enemyId, float rawDamage, bool wasCrit, DamageType damageType,
+            List<(int enemyId, float damage, bool wasCrit, DamageType damageType)> sink)
         {
             float finalDamage = rawDamage;
 
@@ -542,13 +596,10 @@ public void SetWaveNumber(int waveNumber)
                 finalDamage *= 1.30f; // 1 + EXPOSURE_BONUS_PCT (hardcoded in ElementalReactionSystem)
             }
 
-            // Enqueue with damage type tag. Note: ThreatScore accumulator is bumped in the
-            // serial phase (post-saturation) so we don't add baseDamage here — that path
-            // already tracks combined finalDamage.
-            lock (_damageQueueLock)
-            {
-                _damageQueue[_damageQueueIdx].Add((enemyId, finalDamage, wasCrit, damageType));
-            }
+            // 入队到调用方独占的 sink（串行路径 = merged；并行路径 = 本批缓冲）——无锁。
+            // Note: ThreatScore accumulator is bumped in the serial phase (post-saturation)
+            // so we don't add baseDamage here — that path already tracks combined finalDamage.
+            sink.Add((enemyId, finalDamage, wasCrit, damageType));
         }
 
         /// <summary>
