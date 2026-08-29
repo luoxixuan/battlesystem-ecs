@@ -24,6 +24,16 @@
 
 无代码进入条件。M0 是所有深改前的测量和决策闸门。
 
+### 2.1.1 M0 前置清单
+
+- [ ] 运行全套仓库门禁并保存完整日志（不只记录 FPS）；
+- [ ] 记录 `git status`、当前 commit、未提交文件和配置版本；
+- [ ] 确认 Core、EXE、Tests 的 .NET 版本以及 Unity `BattleDriver` 使用的 DLL 版本；
+- [ ] 确认 mode 2/4/5 的 system composition 是否与生产一致；
+- [ ] 备份 golden 场景输入、输出、事件序列和性能结果；
+- [ ] 运行 `tools/inventory-ecs-gas-migration.ps1` 生成第一版台账；
+- [ ] 给台账确认“定义存在但未启用”的系统（当前至少包括 `HitTrigger`；`Mark`/`DeathMark` 的状态需以本次 Registry 扫描为准）标上 `disabled` 状态，不把 getter 测试当作生产接线证据。
+
 ### 2.2 必做工作
 
 #### 记录环境和基线
@@ -50,12 +60,15 @@
 1. `FrameScheduler` 驱动的普通塔攻击、护甲/抗性和死亡奖励；
 2. `BuffSystem` 的 Firewall/Poison 类周期伤害；
 3. Projectile 命中和命中后附加效果；
-4. Weather/Meteor 直接伤害和死亡入队；
+4. Weather/Meteor 直接伤害、已修复的死亡入队契约和后续 Resolver 迁移；
 5. 护盾、元素转换、免疫、I-frame 和下限；
 6. Effect/实体 ID 回收；
 7. 同一帧 14 次命中后的计数和触发顺序。
 
 另外单独覆盖 BuildPhase：当前 BuildGroup 可能更新 GlobalSkill 和 Skill，若它们产生战斗性请求而 scheduler 早退，死亡或技能队列可能跨帧滞留。必须先决定 BuildPhase 是否允许产生战斗 Ability/Effect；若允许，必须有通用的 resource/death commit，若不允许，Ability gate 必须明确拒绝战斗效果并定义请求丢弃规则。
+
+这里的“前置”是 M0 的第一批工作，不是进入 M0 之前必须完成的代码重构。M0 可以先以只读方式建立基线、复现当前行为并完成决策；在 BuildPhase 语义和测试证据缺失时，真正被阻塞的是 M1 结构改动和任何 cutover，不能把“不要立即进入 M0”理解成先改生产路径。
+当前 `game_config.json` 没有 `GlobalSkills` 配置，Meteor 的 BuildPhase 测试需要显式注入测试定义；这说明默认生产路径暂未启用 Meteor，不代表 BuildGroup 的早退语义可以忽略。
 
 golden 结果不只记录最终 HP，还要记录请求、资源变化、死亡队列、奖励、Gameplay Event 类型和 sequence 顺序。确定性 replay 应能在相同输入下重现这些结果。
 
@@ -70,6 +83,22 @@ golden 结果不只记录最终 HP，还要记录请求、资源变化、死亡�
 - parser、配置数据源、Group nullable 槽位、Registry setter/injector；
 - 旧效果/DoT timer 的 owner；
 - benchmark 是否使用与生产相同的 system composition。
+
+当前快照的候选扫描结果必须带口径，不能把一个数字直接称为“伤害路径”：
+
+| 扫描口径（Core/Systems，排除测试） | 当前结果 | 解释 |
+|---|---:|---|
+| 严格的 `EnemyHealth[...] -= ...` | 29 行 / 19 个文件 | 包含 `ComponentStore` 的 authority 和 `MovementGroup`，不含等价的 `old - damage`/`newHp` 赋值 |
+| 所有 `EnemyHealth[...]` 赋值或复合赋值候选 | 59 行 / 37 个文件 | 混有初始化、生命周期、治疗、恢复、基准 harness 和真正伤害，不能直接当路径数 |
+| `ApplyEnemyDamage` 生产调用点 | 5 个 | `EnemyAI` 两处、`PlayerTowerAttack`、`Skill`、`TerrainZone`；定义、重载转发、注释和测试不计入 |
+
+审查报告中的“21 个文件”和“23 次调用”只有在另加一组未说明的语义筛选或混入定义/测试时才可能出现，不能作为当前无条件事实。把等价减法、置零、禁用系统和已注册系统分别列出后，“约 30 条路径”仍可作为迁移规模的粗略量级，但 M0 台账必须保存 raw occurrence、生产方法、状态（active/disabled）和唯一 writer，避免把文件数、写点数和路径数混在一起。
+同理，不能用 5 个 `ApplyEnemyDamage` 调用点与 29 个 `-=` 写点直接计算“84% 绕过”；两者的统计单位不同，比例必须基于同一组已定义的语义伤害请求。
+
+推荐使用只读脚本 `tools/inventory-ecs-gas-migration.ps1` 快速生成候选清单。脚本只做静态候选统计，不替代人工审查：它应输出生产方法名、文件和行号，并将写入点分成 `Init`、`Resource`、`DamageCandidate`、`Unknown` 四类；分类不确定的项必须保留在 Unknown，不能为了让数字好看而自动排除。
+脚本对行注释有基本过滤，但不是 C# 语法解析器；块注释、预处理分支和跨行表达式仍可能出现在候选清单中。`disabledDefinitions` 只探测少数已知系统，完整的 active/disabled 状态必须由 M0 人工确认并记录。
+
+最小用法是 `pwsh -File tools/inventory-ecs-gas-migration.ps1 -OutputPath artifacts/gas-migration-ledger.json`。输出至少包含 `generatedAt`、`commit`、`filesScanned`、`directWrites`、`applyEnemyDamage`、`damageLoops`、`abilityEntrypoints`、`effectTimerOwners`、`nullableGroupSlots`、`registryInjectors` 和 `disabledDefinitions`。`OutputPath` 是可选的；不传时只打印摘要，不修改源码或配置。
 
 直接写资源的生产点先分为三类，不能机械地全部替换：
 
@@ -97,6 +126,33 @@ golden 结果不只记录最终 HP，还要记录请求、资源变化、死亡�
 | 资源 | MaxHealth 改变时是否裁剪 CurrentHealth？MaxHealth 上升是否自动治疗？ |
 | 失败和容量 | stale handle、池耗尽、递归超限如何报告？ |
 
+### 2.3.1 建议的 BuildPhase 决策模板
+
+在产品语义尚未确认前，采用以下默认候选，M0 由设计最终签字：
+
+| Ability/Effect 类别 | BuildPhase 默认行为 | 必须验证的结果 |
+|---|---|---|
+| 资源操作、商店、建设和 UI 冷却 | 允许，在 Build commit 提交 | Mana/Gold/冷却不跨帧丢失 |
+| Passive 属性聚合 | 允许，在声明的 AttributeAggregate 提交 | 下一次可见边界正确 |
+| 伤害、投射物、攻击性 DoT、战斗性召唤 | 默认拒绝，产生 `AbilityRejected(PhaseNotAllowed)` | 不产生 HP 写入、DamageRequest 或死亡队列 |
+| 明确允许在 Build 执行的战斗 Ability | 只有图中存在 Build Resource/Death commit 才允许 | 当帧完成唯一 death queue commit，下一帧不抛保护异常 |
+
+无论选择哪一列，都要补充 `BuildPhase_CombatAbility_IsRejectedOrCommitted`、`BuildPhase_NoStaleDamageRequest` 和 `WavePhase_CombatAbility_Commits` 三类真实帧测试。请求被拒绝时必须记录原因并按定义丢弃；不能静默滞留到下一 Wave。
+
+### 2.3.2 时钟映射表
+
+M0 要为每个周期 Effect 选定一个时钟，而不是由调用方临时传入 delta：
+
+| ClockId | 当前来源/映射 | bullet-time 规则 |
+|---|---|---|
+| `Build` | BuildGroup 的阶段 delta，仅用于允许的资源/冷却规则 | 不受敌人侧减速影响 |
+| `Enemy` | `enemyDt`，覆盖 PreGame/Spawning/AI/Movement/Terrain 等敌人阶段 | 按当前 enemy time scale 减速 |
+| `Combat` | `combatDt`，覆盖 Combat/SkillBuff/PostDeath 的战斗阶段 | 保持玩家/塔侧全速，除非定义另行声明 |
+| `RealTime` | 外部 fixed timestep/输入时钟 | 不受模拟 bullet-time 影响 |
+| `Global` | 全局时间缩放节点 | 只按明确的全局规则变更 |
+
+至少补充“时停期间 Poison 是否 tick”“塔攻击是否继续”“Weather 与 Wound 是否同一 clock”的行为测试。
+
 ### 2.4 M0 退出门槛
 
 - 基线命令都有可复现输出；
@@ -104,6 +160,8 @@ golden 结果不只记录最终 HP，还要记录请求、资源变化、死亡�
 - 语义表每项都有明确选择和测试样例；
 - 台账完成首次记录；
 - benchmark 覆盖差异已列出并有修复计划。
+
+在进入任何结构性 M1 改动前，以下三项 P0 必须已完成并留有证据：BuildPhase 战斗请求的真实失败/提交测试、`GameplayEffectDef` 使用点和兼容 facade 的影响范围清单、台账脚本可重复生成报告。M0 可以先做这些只读/测试工作，但不能以“正在收集基线”为由提前切流。
 
 ### 2.5 M0 回滚
 
@@ -130,6 +188,8 @@ M0 的基线、golden 场景和语义选择已冻结。
 
 定义只保存静态配置。剩余时间、tick 累加器、层数、捕获值、来源/目标实例和 generation 必须留在运行态池。
 `DamageType` 在现有代码中包含位标志语义，不能按连续 ordinal 重新编号；M1 的 schema/validator 要保留 Physical/Magic/Fire/Ice/Lightning/Holy/True 以及现有 immunity mask 的兼容规则，并为 Holy/True 的特殊分支写测试。
+迁移测试应对现有枚举底层值做快照，并验证组合 mask 的 `HasFlag`/按位与结果；只有新增值才允许追加，不得重排或把 `True` 当作普通可抗性类型。
+当前 `DamageImmunityFlags` 只声明 Physical/Magic/Fire/Ice/Lightning，`True`（32）按约定绕过 mask，Holy（64）则使用独立抗性/分支；这属于必须先冻结的兼容语义，不能在 Catalog 迁移中顺手补位或重编号。
 
 #### 请求、事实和命令
 
@@ -162,6 +222,47 @@ Request 可以被拒绝，Event 只表示已验证事实。内部 Gameplay Event
 4. 用 adapter 把旧 tuple queue、旧 `GameplayEffectDef` 和旧 skill id 转为新 contract；
 5. 在 feature-off 下跑 golden 场景，确认无行为漂移。
 
+### 3.3.0 M1 的真实范围：结构拆分而非单纯加 adapter
+
+当前 `GameplayEffectDef` 同时保存静态字段和 `RemainingTime`、`TicksRemaining`、`RefreshDuration` 等运行态字段，`AppliedEffect` 又嵌入 Definition；`BuffSystem` 会直接修改这些嵌套字段。这个事实意味着 M1 的 GAS 部分是一次需要完整影响范围清单的结构拆分，不能按“新增几个类型、旧代码原样继续用”估算为低风险小改动。
+其中 `RefreshDuration` 在当前生产代码里主要由构造/工厂写入，实际刷新分支按 `StackingBehavior` 直接修改 `RemainingTime`；拆分时必须把这两个语义合并到唯一的 Effect runtime，不能只把字段机械搬家。
+当前生产代码对这些类型的引用需要按方法去重后重新统计；粗扫约为十余处，测试、注释和兼容构造另计。“20-30 处”可以作为待核查的工作量上界，不能当作已经验证的事实。
+
+建议把 M1 的 GAS 工作拆成三个子工作包：
+
+1. **M1a 冻结与扫描**：列出所有 `GameplayEffectDef`/`AppliedEffect` 构造、读取和写入点，尤其是 `BuffSystem` 的 timer/stack 逻辑；冻结旧 public facade，不再新增对运行态字段的依赖；
+2. **M1b 定义/实例分离**：引入 immutable `GameplayEffectDefinition`、`ActiveGameplayEffect` 和转换 adapter；旧 `GameplayEffectDef` 暂作为明确的 `Legacy` wrapper，保证 Core DLL/测试可编译；
+3. **M1c caller 切换**：按 DoT、控制、技能初始化和尸体效果逐类改 caller；当生产代码不再读写旧运行态字段后，才删除 wrapper 中的运行态成员。
+
+因此 M1 的风险级别应标为“高（L）”，而不是仅有 ID/Catalog 的增量工作。兼容 facade 使编译和行为可以渐进切换，但不改变“最终必须完成类型拆分”这一事实。
+
+### 3.3.1 Generation 访问规则
+
+`EntityHandle` 是跨帧 contract，方法内短暂使用的 index 不是。M1 要同时落地三层保护：
+
+当前代码仍以裸 `int` entity id 为主；下面的 generation 规则是 M1 的目标合同和未来风险控制，不是声称当前已经存在 generation 校验。阶段 0 的清理修复只能阻止已知槽位继承，不能替代句柄代数。
+
+- 所有跨帧字段、Command、Event 和 ActiveEffect 引用只能保存 handle，禁止保存裸 `int`；
+- 所有 `TryGet`/写入入口验证 index、generation、active 状态，失败返回明确的 stale/invalid 原因；
+- 架构测试扫描新增代码中的持久化 `int entityId` 字段和未经过 `TryResolve` 的外部访问，允许在同一帧局部循环中使用的 index 必须有注释或 contract 标记。
+
+补充压力测试：快速创建/销毁/回收同一批实体，同时投递旧代数的 Effect、Damage 和 Event，确认新实体不继承旧状态，旧请求只被拒绝一次并可观测。
+
+### 3.3.2 Pool 和队列容量策略
+
+当前 `ComponentStore.AddAbility`/`AddEffect` 在槽位满时会直接返回，缺少 `PoolExhausted` 诊断；这是已核实的静默失败风险，但不是“已经覆盖所有战斗场景”的事实。M1 必须先记录容量和调用方，再把返回值/诊断接入统一命令合同。
+
+容量不能在 M1 里凭感觉写死。先用 M0 的完整一局和压力场景记录峰值，再按“观测峰值 × 2 + 固定保底”设置初始容量，并把容量写入配置摘要和启动日志。关键死亡/资源提交保留少量 reserved slots，避免非关键效果耗尽池后阻塞生命周期。
+
+推荐的耗尽语义：
+
+- 非关键 Effect/Tag/Trigger：拒绝申请，产生 `EffectRejected(PoolExhausted)` 或对应诊断，游戏继续；
+- Damage/Resource/Death command：使用 reserved slots；reserved 也耗尽时，开发/测试模式 fail-fast，生产模式停止当前提交轮并产生明确 `GameplayLoopAborted`；
+- 不在热路径隐式扩容，不覆盖旧槽，不静默丢请求；
+- 槽位释放后下一帧可正常恢复，压力测试需验证“耗尽 → 释放 → 再申请”。
+
+具体数值、reserved 比例和生产模式策略必须在 M1 退出前冻结并测试。
+
 ### 3.4 当前代码触点
 
 - `Core/GAS/Attributes.cs`、`GameplayEffect.cs`、`GameplayAbility.cs`：从示例/混合 struct 演进为静态定义 contract；
@@ -173,10 +274,12 @@ Request 可以被拒绝，Event 只表示已验证事实。内部 Gameplay Event
 ### 3.5 M1 退出门槛
 
 - canonical 配置可编译且坏配置测试能 fail-fast；旧 `game_config.Skills` 只能通过显式 legacy importer，并对缺失字段给出诊断，不得静默伪装成完整新定义；
+- 新 `GameplayEffectDefinition` 不含倒计时/当前层数；生产代码不再写旧 `GameplayEffectDef` 的运行态字段；
 - 实体和效果 ID 回收不会继承旧 generation；
 - command/event 在单线程和并行收集下 sequence 一致；
 - feature-off golden 结果与 M0 一致；
 - sparse pool、命令队列、事件队列的峰值和溢出有诊断；
+- generation 访问、DamageType 位标志、Holy/True 特殊分支和 pool 耗尽/恢复测试通过；
 - 仓库全套门禁通过，mode 2/4/5 相对基线无超过 ±5% 的回退。
 
 ### 3.6 M1 回滚

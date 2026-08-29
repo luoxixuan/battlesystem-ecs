@@ -40,7 +40,9 @@
 
 ### 1.4 Resolver 合同
 
-`DamageRequest` 至少携带：source/target handle、raw amount、DamageType、ElementType、flags、ability/effect id、owner player、sequence、父请求/链路信息和 execution context。
+`DamageRequest` 至少携带：source/target handle、raw amount、DamageType、ElementType、flags、ability/effect id、owner player、sequence、父请求/链路信息和 execution context。M3 必须另外冻结 `rawAmount` 的金额语义：推荐它表示“来源快照后的基础量、尚未应用目标侧护甲/抗性/护盾且尚未应用暴击”的值，由 Resolver 统一处理暴击；若某个过渡来源仍提交已含暴击的金额，必须显式标记 `AmountStage=PostCrit`，Resolver 不得再次乘算。切流完成后应只保留一种 stage，不能靠调用方约定。
+
+来源归属不能从默认 `playerId` 猜测。Request 要显式传递 source handle、owner player、tower/ability/effect id 和 parent sequence；尤其 `BuffSystem` 的 DoT 不能把所有来源固定成 player，也不能因为 Firewall 没有传 tower id 就丢失 sourceDeathPolicy、Kill attribution 或 Trigger scope。
 
 Resolver 的顺序固定为：
 
@@ -72,6 +74,15 @@ Resolver 的顺序固定为：
 
 当前 `ComponentStore.BeginFrame` 对未完成的死亡队列有保护性检查。引入多个伤害消费边界时，仍必须保持每帧唯一的 death queue commit；如果未来需要多队列，必须先定义新的双缓冲协议并补充回归测试，不能绕过这个保护。
 
+推荐的过渡协议是“多个 producer/Resolver 消费边界，共享一个当帧死亡队列，单次 `DeathResolve`”：
+
+1. `EarlyResolve`、`GameplayResolve` 等边界各自消费本阶段请求，并把首次归零的目标标记为 `PendingDeath`；
+2. 同一目标只追加一次 `DeathQueued`，后续阶段看到 `PendingDeath` 后拒绝新的伤害/效果请求，避免 AI 或目标选择再次使用它；
+3. 所有边界完成后，由唯一的 `DeathResolve` 提交当前帧死亡队列；`KillConfirmed` 只能在奖励归属和生命周期处理完成后产生；
+4. 下一帧 `BeginFrame` 仍必须看到已清空的死亡双缓冲。若确实需要跨帧队列，先设计新的队列协议，不得绕过现有保护。
+
+至少补充 `WeatherKillsEnemy_BeforeNextAISelection`、`EarlyDamage_DoesNotDoubleQueueDeath` 和 `KillConfirmed_IsAfterRewardAndDestroy` 三类时序测试。
+
 BuildPhase 是同一规则的特殊边界：当前 BuildGroup 仍可能 tick Skill/GlobalSkill，但 `FrameScheduler.Tick` 可能在 BuildGroup 后早退。M3 不得让战斗请求或死亡队列无意跨 Build 帧；要么在 Ability gate 中拒绝战斗型请求，要么为 BuildPhase 增加明确的 commit/清理节点，并为两种状态写 golden 测试。
 
 ### 1.5 Shadow 和切流
@@ -79,7 +90,7 @@ BuildPhase 是同一规则的特殊边界：当前 BuildGroup 仍可能 tick Ski
 每个来源单独切流，推荐顺序：
 
 1. `BuffSystem` DoT（已有队列，最适合验证 Periodic → DamageRequest）；
-2. `WeatherSystem` 和 `GlobalSkillSystem` Meteor（验证直接 HP 写和死亡入队）；
+2. `WeatherSystem` 和 `GlobalSkillSystem` Meteor（验证已修复的死亡入队契约，并把直接 HP 写迁入 Resolver）；
 3. Projectile、Bleed、Frostbite、Thorns（验证 flags、护盾和特殊规则）；
 4. `PlayerTowerAttackSystem`；
 5. `TowerAttackSystem` 主路径及 chain/splash/bounce/link/transfer 等复杂队列；
@@ -96,7 +107,13 @@ BuildPhase 是同一规则的特殊边界：当前 BuildGroup 仍可能 tick Ski
 
 生产路径不能同时让 legacy 和 new 写 HP 或发布同一事实。未切流来源可以继续经过 `LegacyDamageAdapter`，但不得直接绕过 Resolver 写入资源。
 
-`TowerAttackSystem.Update` 不能作为一次性“大改”处理：它在同一串行调用中按顺序消费主伤害、Tesla chain、splash、bounce、lifesteal、thorns、debuff、knockback 和 fragment 队列，部分分支还依赖本帧目标的死亡状态/位置。迁移时先给 queue item 增加 `parentSequence`/`phase` 等上下文，用 `TowerAttackLegacyAdapter` 保留原有消费顺序并逐项提交统一 Resolver；等每类 queue 都有 golden 测试后，才拆成 FrameGraph 节点。
+M3 就要建立事件迁移表，逐项标记旧 `EventBus` 的 `LegacyOnly`/`Bridge`/`GameplayOnly` 状态；M4 才允许 Trigger 消费 `GameplayOnly`。Bridge 期间由新事实单向转发旧事件，按 sequence 去重，不能让旧 publisher 和新 publisher 各发一份。
+
+`TowerAttackSystem.Update` 不能作为一次性“大改”处理：这是一个约 2.9K 行的系统，暴露约 17 个依赖 setter（含 `SetTurn`/配置入口约 19 个 `Set*` 方法），在同一串行调用中按顺序消费主伤害、Tesla chain、splash、bounce、lifesteal、thorns、debuff、knockback 和 fragment 队列，部分分支还依赖本帧目标的死亡状态/位置。迁移时先给 queue item 增加 `parentSequence`/`phase` 等上下文，用 `TowerAttackLegacyAdapter` 保留原有消费顺序并逐项提交统一 Resolver；等每类 queue 都有 golden 测试后，才拆成 FrameGraph 节点。这里的行数、setter 数和队列数都是当前快照的定位指标，不是迁移完成度指标。
+
+当前 `TowerAttackSystem` 明确有 8 类双缓冲队列：damage、debuff、heal、thorns、chain、splash、bounce 和 fragment；不要把“队列数量”写成固定七类。台账脚本还应按逻辑队列去重，并记录每类的 producer、drain、容量和是否会直接写资源。
+
+Tower 路径至少要冻结两组顺序样例：`Chain_DoesNotRetargetAlreadyDeadTarget`（链式伤害遇到已标记死亡目标）和 `Splash_PreservesStablePropagationOrder`（溅射/反弹的 parent sequence 顺序）。测试要断言目标状态、请求序列、实际伤害和死亡队列，而不是只断言最终存活数量。
 
 ### 1.6 当前代码触点
 
@@ -176,7 +193,7 @@ M3 不立即删除全部旧 drain loop。某个来源只有在 100% 切流、真
 
 每类效果都要验证 apply → tick/aggregate → expire/remove → 资源/伤害 → 死亡清理完整链路。
 
-`DeathMark` 当前的生产接线和层数写入并不完整，不能把现有 getter 测试当成机制已启用。迁移时应以新的 `HitConfirmed`/`DamageApplied` Trigger + Effect 做真实垂直切片，并补 Registry 到 `FrameScheduler` 的集成测试；旧 DeathMark 路径在此之前明确标为 disabled。
+`Mark`/`DeathMark` 的类和部分 Registry 接线已经存在，但层数写入、增伤消费和 Trigger 事实链仍不完整；`HitTriggerSystem` 当前没有完整生产注册。不能把现有 getter 测试当成机制已启用。迁移时应以新的 `HitConfirmed`/`DamageApplied` Trigger + Effect 做真实垂直切片，并补 Registry 到 `FrameScheduler` 的集成测试；只有台账确认未注册的旧路径才标为 disabled。
 
 ### 2.5 旧 Buff/Effect 适配
 
@@ -197,7 +214,22 @@ Trigger 只消费已经提交的 Gameplay Event，不直接订阅多个旧系统
 
 由 Trigger 产生的新 EffectRequest 进入下一事件队列，默认不在同一调用栈递归。超过单帧轮次、事件数或池容量时，停止该链并产生诊断。
 
+M0 先用压力场景测量，再冻结初始上限；建议起始值为每帧最多 8 个提交轮次、每帧最多 8192 个 Gameplay Event，且可按配置覆盖但必须启动校验。`GameplayLoopAborted` 的默认语义是“已提交的前序结果保留，当前轮尚未提交的链式请求全部丢弃，实体和资源不做隐式回滚”，并记录触发链、sequence、剩余队列和原因。若产品需要原子回滚，必须另行设计事务缓冲，不能在现有 commit 逻辑中假装支持。
+
+补充一个自触发 OnKill → Effect → Damage → Kill 的无限递归失败测试，以及“达到上限后下一帧可恢复”的测试。
+
 注意 `HitTriggerSystem` 当前只是定义存在、没有完整生产接线；不能把现有 `EventBus` 的少量频道当成 GAS Trigger runtime。新 Trigger 必须以 Resolver 产生的内部 Gameplay Event 为唯一输入。
+
+### 2.6.1 旧 EventBus 并存协议
+
+每种事件在台账中标注 `LegacyOnly`、`Bridge` 或 `GameplayOnly`，并明确唯一 publisher：
+
+- `GameplayEventCommit` 是新事实的唯一 publisher；
+- 兼容期只允许单向 `GameplayEvent → Legacy EventBus adapter`，禁止旧 EventBus 反向触发新 Trigger；
+- adapter 以 `(eventType, source/target, sequence)` 做去重，已由新 Trigger 消费的事件不能再执行一次旧规则；
+- `IBattleEventBus` 仍只接收 Presentation adapter 的已提交展示事件，不直接替代内部 Gameplay Event。
+
+补充 `OnHit_IsPublishedOnce_WithLegacyBridge`、`OnDamage_IsNotDoubleConsumed` 和 `PresentationBus_DoesNotActivateGameplayRule` 测试，并在每个事件完成切流后把状态从 `Bridge` 改为 `GameplayOnly`。
 
 ### 2.7 M4 退出门槛
 

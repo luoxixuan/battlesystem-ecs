@@ -5,6 +5,8 @@
 > 方法:6 个维度并行深挖 + 逐条 file:line 证据核验(grep/读码复核),每条头部结论均已独立验证
 > 结论定性:CONFIRMED = 已读码/grep 核实;下文所有 A–H 主结论均为 CONFIRMED
 
+> **当前快照说明（2026-08-30 复核，HEAD `c17a984`）**：本文保留审查当时的证据和判断，不等同于当前待修清单。`f3596db` 已修复 Weather 沙暴 DoT 与 GlobalSkill Meteor 的死亡入队，并补上实体回收清理；`e0c3e7c` 已接线 `ElementalReactionSystem`。当前它们仍属于“绕过统一 Resolver 的迁移来源”，不应重复列为同一个已知死亡入队 bug。数量也必须注明口径：严格匹配生产 `EnemyHealth[...] -=` 为 29 行/19 个文件；所有赋值候选为 59 行/37 个文件；`ApplyEnemyDamage` 生产调用点为 5 个。`SystemRegistry` 是 21 次 `= null` group-slot 赋值、18 个独立槽位名（跨 group 有重复），TowerAttack 是 8 类双缓冲队列。可重复生成候选台账：`tools/inventory-ecs-gas-migration.ps1`。迁移执行以 [ecs-gas-migration-plan.md](ecs-gas-migration-plan.md) 及其阶段文档为准。
+
 ---
 
 ## 一、总体评价
@@ -26,7 +28,7 @@
 
 ### 🔴 A. 伤害结算没有单一管线 —— 框架级根因
 
-**问题**:没有 `Damage` 结构体、没有 `IDamageSource`,伤害就是到处传的裸元组。全库 **30 处裸 `EnemyHealth[x] -=` 写点,分布在 19 个文件**;号称"规范入口"的 `store.ApplyEnemyDamage` 只有 5 处调用,**约 84% 的伤害绕过它**。而两个"规范"入口本身互不重叠:
+**问题**:没有 `Damage` 结构体、没有 `IDamageSource`,伤害就是到处传的裸元组。当前源码严格匹配的生产 **29 处裸 `EnemyHealth[x] -=` 写点,分布在 19 个文件**；另有 `old - damage`、`newHp` 和置零等价写法。号称"规范入口"的 `store.ApplyEnemyDamage` 只有 5 个生产调用点,**大部分伤害仍绕过它**。而两个"规范"入口本身互不重叠:
 
 - `ApplyEnemyDamage`(`Core/ComponentStore_Enemy.cs:2098`):处理路径地形倍率 + 血量下限 + 护盾(含元素护盾规则),**但不含护甲 / 元素抗性 / 暴击 / 死亡入队**;
 - `TowerAttackSystem` 内联串行段(`Systems/TowerAttackSystem.cs:1928`):处理护甲 / 抗性 / 暴击 / 减伤 / 饱和 / 附魔 / 下限 / 死亡入队,**但完全不碰 `EnemyShield`**。
@@ -37,9 +39,9 @@
 
 | 缺陷 | 证据 | 后果 |
 |---|---|---|
-| **沙暴 DoT 击杀不入队**(同类,且**当前唯一可达**) | `WeatherSystem.cs:111` 裸写 `EnemyHealth[eid] -= dmg` 后无 `QueueEnemyDeath`(全文件 0 次)。系统确实在跑:`SystemRegistry.cs:424` 构造、`:791` 接入 PreGame;`ApplyWeatherDot` 由 `Update` 无条件调用(`:82`);`weather.json` 的 `Sandstorm` 带 `enemyDotPct: 0.005`,`TransitionWeather` 以 70% 概率在 5 种天气中随机选中 | 被沙暴 tick 打到 HP≤0 的敌人不给金币、不计击杀,且**继续行走**(`EnemyMovementSystem` 只按 `EnemyActive` 门控)、期间无法被再次击杀(各系统 `HP<=0 continue` 跳过它),走到底由 `GameManager.cs:461` **白扣一条基地命**后才入队。**Meteor 的 `GlobalSkills` 生产端 0 处写入(loader 无解析、数据无键),所以这条才是该 bug 类当前唯一真正发货的实例** |
-| **`ElementalReactionSystem` 从未构造 → 元素状态永不衰减 + `_pendingShieldBreaks` 无界增长**(新发现,可达;**已接线**) | `new ElementalReactionSystem(` 全库 **0 次**(连测试都没有);`SystemRegistry` 无字段、11 个 `*Group.cs` 无属性。但它是**唯一**的元素计时器衰减者(`:244-265`)与**唯一**的 `PendingShieldBreaks` 消费者(`:231`),而生产端确实在写入两者:`ApplyEnemyDamage:2184-2189`(破盾)——`monster_shield.json`/`monster_enforcer.json` 带非零 `Shield`,且 `ApplyEnemyDamage` 有 5 处生产调用 | ① 敌人一旦被破盾附上元素状态,`EnemyElementStatus`/`EnemyElementTimer` **永不清除**(无其他衰减者);② `_pendingShieldBreaks` 每次破盾 `Add` 一个 int 而永不 `Clear`,随会话时长**无界增长**;③ `EnemyExposureMask`/`Timer` 只由该系统写入 → `TowerAttackSystem:1838` 与 `PlayerTowerAttackSystem:596` 读的 **+30% 元素易伤永不触发**(整个 Exposure 特性是死的);④ 冻结/眩晕 effect 施加路径(`:198,213`)同样是死的。**已修**:补 registry 字段 + 构造(紧随 `Buff`)+ `SkillBuffGroup` 槽位与调用。相位由两个硬约束定死 —— `Update()` 须晚于本帧全部 `ApplyEnemyDamage`(才看得到 Phase 8 追加的破盾),`ResolveReactionDamage()` 须早于 Phase 10 死亡结算,Phase 9 是唯一同时满足的窗口(已核验 Phase 10–12 无系统再追加破盾)。**注意这不是 no-op:接线激活了 ③ 的 +30% 易伤,会改战斗数值** |
-| **Meteor 击杀不入队**(同类,结构性代表,当前**不可达**) | `GlobalSkillSystem.cs:184-192` 把 HP 夹到 0、`killed++`、打日志,但**全文件 `QueueEnemyDeath` 0 次**;而 `ResolveEnemiesKilledThisFrame` 只处理入队项,**无全局 `HP<=0` 兜底 sweeper**(唯一兜底 `MovementGroup.cs:182` 只覆盖它自己那条 DoT) | 陨石"击杀"的敌人 HP=0 但仍 `EnemyActive`:不给金币、不计分、不释放实体槽,且被后续所有 `EnemyHealth<=0 continue` 的系统当死人跳过 → 僵尸**并非永久占位** —— `EnemyMovementSystem` 只按 `EnemyActive` 门控,HP=0 的敌人继续走到基地,由 `GameManager.cs:461` 扣命后入队。故真实后果是**不给金币 / 不计击杀 / 白扣一条命 / 期间免疫再次击杀**。此项为该 bug 类的结构性代表,但**当前配置下不可达**(见上一行) |
+| **沙暴 DoT 击杀不入队**（审查时发现，现已修复） | 审查快照中 `WeatherSystem.cs:111` 裸写 `EnemyHealth[eid] -= dmg` 后无 `QueueEnemyDeath`；当前 `f3596db` 已在归零后入队，并由 `Sandstorm_LethalDot_QueuesDeathAndResolves` 真实帧测试覆盖 | 作为结构性迁移案例保留，但不要再次实施死亡入队补丁；后续仍需把 Weather 直接写入迁入统一 Resolver |
+| **`ElementalReactionSystem` 从未构造 → 元素状态永不衰减 + `_pendingShieldBreaks` 无界增长**（审查时发现，当前已接线） | 审查快照中 `new ElementalReactionSystem(` 为 0；当前 `e0c3e7c` 已补 registry 字段、构造、`SkillBuffGroup` 槽位和调用。生产端仍会写入破盾队列，因此其 phase 顺序和数值变化必须继续由 golden 测试锁定 | 审查时的后果和修复理由仍有效，但不能把“从未构造”当作当前状态；接线激活了 +30% 元素易伤，属于已落地的行为变化 |
+| **Meteor 击杀不入队**（审查时发现，现已修复） | 审查快照中 `GlobalSkillSystem.cs:184-192` 未入队；当前 `f3596db` 已补入队，并由 `GlobalSkillMeteorTests` 覆盖。生产 `game_config.json` 仍没有 `GlobalSkills`，所以默认路径未启用 | 保留为未来接线的回归案例；后续把 Meteor 直接 HP/armor 计算迁入统一 Resolver |
 | 塔伤害元素类型丢失 | 塔 damage queue 是 `(enemyId,damage,playerId,towerId)` 无 `DamageType`,上报硬编码字面量 `"Physical"`(`TowerAttackSystem.cs:1933`),尽管 `:1019` 处已知类型;对比 `PlayerTowerAttackSystem` 同位置传 `damageType.ToString()` | on-hit / 分析 / UI 消费方对**所有塔伤害**拿到错误元素归因 |
 | DeathMark 层数增伤是死代码 | `GetDamageMultiplier` 生产端 **0 调用**(只在自身定义 + 测试文件) | 一整个"标记叠层增伤"机制静默失效,测试却因直接调 getter 而绿 |
 
@@ -114,7 +116,7 @@
    **回归测试**:`SystemRegistryTests` 走完整 `CreateAll → WireDependencies` 后反射断言两个私有字段非 null(生产未暴露只读访问器)。撤销前移 → 2 个测试变红。
 
 2. **DoT 跨实体泄漏(回收 ID 继承旧 DoT)—— 已修** ✅
-   `ActiveEffectCount[]` / `AbilityCount[]` 在 `DestroyEntity` 中**从不清零**(grep 核实:`ComponentStore.cs` 内 0 次),`AddEnemy` / `CreateEntity` 也不重置。而实体 ID 走 free-list 回收(`ComponentStore.cs:551-573`),`BuffSystem.cs:95` 按 `GetEffectCount(enemyId)` tick 敌人 DoT。**注意证据路径已更正**:原稿引 `ElementalReactionSystem.cs:198,213` 作为"敌人会被加 effect"的依据,但该系统**从未被构造**(见 A-1),那条路是死的。真正可达的是 `BuffSystem.ApplyDot` → `AddEffect`(`:216,261`),生产入口为 `TowerAttackSystem:2094` 的 Firewall 分支(`Data/Towers/tower_061/086/111.json` 确有 `"Type":"Firewall"`)。→ 回收 ID 的新敌人继承前一个占用者的冻结 / 眩晕 / DoT(连 `SourceEntityId` 都指向旧攻击者)。
+  `ActiveEffectCount[]` / `AbilityCount[]` 在 `DestroyEntity` 中**从不清零**(审查快照，现已修复),`AddEnemy` / `CreateEntity` 也不重置。而实体 ID 走 free-list 回收(`ComponentStore.cs:551-573`),`BuffSystem.cs:95` 按 `GetEffectCount(enemyId)` tick 敌人 DoT。**注意证据路径已更正**:原稿引 `ElementalReactionSystem.cs:198,213` 作为"敌人会被加 effect"的依据,但该系统在审查快照中**从未被构造**(现已接线),那条路当时是死的。真正可达的是 `BuffSystem.ApplyDot` → `AddEffect`(`:216,261`),生产入口为 `TowerAttackSystem:2094` 的 Firewall 分支(`Data/Towers/tower_061/086/111.json` 确有 `"Type":"Firewall"`)。→ 回收 ID 的新敌人曾继承前一个占用者的冻结 / 眩晕 / DoT(连 `SourceEntityId` 都指向旧攻击者)。
    **修复仅需 2 行**:`DestroyEntity` 共享段加 `AbilityCount[id]=0; ActiveEffectCount[id]=0;`(count 归零即可,槽内容从不越过 count 读取)。其中真正会触发的是 `ActiveEffectCount` 那半;`AbilityCount` 那半是防御性的 —— `AddAbility` 生产端唯一调用者传 `playerId`(`SkillSystem.cs:202`),而玩家 id 从不进 `freeEntityIds`(`nextEntityId` 从 2 起,`AddPlayer` 不走 `CreateEntity`)。**已验证安全**:全部 `DestroyEntity` 调用点只传敌人 / 陷阱 / 回声克隆 / 塔,不会误清玩家技能栏。
    **回归测试**:`GasSlotRecycleTests` 3 个用例 —— 销毁归零、回收 id 不继承 effect、以及驱动真实 `BuffSystem.Update` + `ResolveDotDamage` 断言回收敌人 HP 未被上一任的 DoT 扣减(第三个用例是关键:前两个是 getter 形状,只有它证明机制真的活着)。撤销 2 行 → 3 个全红。
 
@@ -176,13 +178,13 @@
 - **G-2 "runs last" 措辞不精确(非事实错误)**:`CombatGroup` 有 **7 处**注释各自声称"runs last"(`:65,75,89,167,182,187,194`),而尾部实为 **8 个**串行 `?.Update`。核验后澄清:这 7 个系统**确实**按注释意图排在尾部区域,所以并非"自相矛盾",而是 **7 个系统共享同一段尾部区域**、各自用了独占式措辞。问题仍在:当注释是唯一的顺序规范(G-1)时,"runs last" 这种措辞无法表达"谁在谁之后",维护者据此无法判断在尾部插入新系统是否安全。
   > 修正:原稿称"自相矛盾 / 从未与现实对账",定性过重。
 - **G-3 `SystemRegistry` 是 god-object**:996 行,三个巨型线性方法(`CreateAll` ≈350 行、`WireDependencies` ≈140 行、`AssignToGroups` ≈230 行),三种耦合机制并存无一致性 —— 构造函数位置参数(如 `EnemyAISystem` 8 参,含 D-1 的 null 隐患)、`Set*/Inject*` setter(40 处)、事件订阅(24 处)。加一个功能要改 4 处(属性 + 三个方法),无编译保证同步。文档自承"从 GameManager 抽出以消灭 ~300 行 spaghetti init"—— spaghetti 是被搬走而非消除,现已长到 996 行。
-- **G-4 21 个 group 槽被接线成 `= null`(为未落地功能预留的槽位)**:`AssignToGroups` 显式把 21 个槽赋 null(如 `Combat.Heat/TowerOvercharge/Demolish/Dispel/TowerSilence/EnemyProjectile`),但 `CombatGroup.Execute` 仍每帧 `Heat?.Update()`。核验:这些系统在 `SystemRegistry` 中 **`new` 次数全为 0** —— 从未被构造,而非"接线漏了"。
+- **G-4 21 次 group-slot 赋值成 `= null`(18 个独立槽位，为未落地或未注册功能预留)**:`AssignToGroups` 显式把 21 次赋值写成 null（`TowerIncome`/`TowerLink`/`TowerOvercharge` 在不同 group 重复）,但 `CombatGroup.Execute` 仍每帧 `Heat?.Update()`。核验:这些目标系统在 `SystemRegistry` 中审查时 `new` 次数为 0 —— 从未被构造，而非普通的运行时开关。
   > 两处修正:(1) 原稿称"读代码者以为 dispel 生效,实际静默关闭了一个能用的系统"——定性不准,更准确的说法是**为尚未落地的功能预留了槽位**;(2) 我核验时也发现,这 11 个系统的**实现文件全部存在**(`TowerDispelSystem.cs`、`FogOfWarSystem.cs`、`EnemyWoundSystem.cs` 等),所以"连实现文件都不存在"同样不成立 —— 它们是"有实现、从未构造"。
-  坏味道依然成立:该删属性 / 加 `FeatureFlags`,并让"有实现但未启用"在启动日志里可见,否则 21 个死槽 + 每帧 21 次无效 null-check 会持续误导读者。
+  坏味道依然成立:该删属性 / 加 `FeatureFlags`,并让"有实现但未启用"在启动日志里可见，否则 18 个独立死槽（21 次赋值）+ 每帧无效 null-check 会持续误导读者。
 - **G-5 阶段门控是二元硬编码**:`FrameScheduler.Tick`(`:98-104`)靠单个 `Phase==BuildPhase` 分支切换整条管线;`PostDeath.Phase` 每帧手工再同步(第二个真相源);`WaveBranch.IsBranchActive` 在 `Execute` 中途 early-return —— 阶段逻辑散落在 scheduler + group 字段 + group 内早退三处。新增阶段无法不改 scheduler 与每个 group。
 - **G-6 `FrameScheduler` 泄漏它声称只"编排"的战斗机制**:`ISystemGroup` 说"scheduler 只编排 group",但它内联实现了 `DecrementInvulnFramesLeft`、`TickPhaserCycle`、`TickBlinkerCycle`(≈83 行,含一次性 `SetPathfindingSystem` 注入)、`EmitPositionEvents` 四个 per-enemy 机制,绕过 group / registry 模型。
 
-**改进**:引入**声明式系统模型** —— 每个系统声明 `Reads/Writes` 组件标签或 `RunsAfter(typeof(X))`,由 builder 在启动时拓扑排序并校验(遇环 / 违规 fail-fast)。更廉价的第一步:加一个"顺序快照"断言测试,强制重排必须过一次有意识 diff。删除 "runs last" 措辞与 21 个死槽(或用 `FeatureFlags` 显式门控 + 启动日志)。把 G-6 四个机制抽成真正的系统。
+**改进**:引入**声明式系统模型** —— 每个系统声明 `Reads/Writes` 组件标签或 `RunsAfter(typeof(X))`,由 builder 在启动时拓扑排序并校验(遇环 / 违规 fail-fast)。更廉价的第一步:加一个"顺序快照"断言测试,强制重排必须过一次有意识 diff。删除 "runs last" 措辞与 18 个独立死槽（当前 21 次 group-slot 赋值）,或用 `FeatureFlags` 显式门控 + 启动日志。把 G-6 四个机制抽成真正的系统。
 
 **预期收益**:把约 90 个静默腐化风险变成编译期 / 启动期失败;`AssignToGroups` 的 4 处 shotgun edit 收敛;消除 D-1 那一类"构造顺序"bug;支持 N 阶段而非 2 条硬编码路径。
 
@@ -249,7 +251,7 @@
 - F-1 `AbilityInstances` 改 `MAX_PLAYERS * MAX_ABILITIES_PER_ENTITY`(约 4 行,回收百 MB 量级);boss-phase 表改 `MAX_BOSSES≈64`。先用 `sizeof` 实测确认收益数字。
 - 用构造期反射对 `T[]` 字段生成统一清理循环(含非零默认值表),取代手写 `DestroyEntity`/`Dispose`/`AddEnemy` —— 这才是消除 F-4 整类漏清的结构解法(阶段 0 的补清只是止血)。
 - H-2 第一步:引入 `ISystem`,group 改 `List<ISystem>`(消除逐系统 `?.Update` 行,为阶段 3 铺路)。
-- G-4 清理:删掉 21 个死槽属性,或加 `FeatureFlags` + 启动日志暴露"有实现但未启用"。
+- G-4 清理:删掉 18 个独立死槽属性（`SystemRegistry` 当前有 21 次跨 group 赋值）,或加 `FeatureFlags` + 启动日志暴露"有实现但未启用"。
 
 ### 阶段 2 —— 伤害管线统一(中风险,最高杠杆)
 
@@ -260,7 +262,7 @@
 
 ### 阶段 3 —— 声明式系统模型 + 编排(中高风险,深改)
 
-- G:每系统声明 `RunsAfter` / `Reads/Writes`,builder 启动时拓扑排序 + 校验;删 "runs last" 注释与 21 个死槽;阶段归属改为 group 声明 `ActivePhases`(消除 G-5 双真相源);G-6 四机制抽成真系统。
+- G:每系统声明 `RunsAfter` / `Reads/Writes`,builder 启动时拓扑排序 + 校验;删 "runs last" 注释与 18 个独立死槽（21 次 group-slot 赋值）,阶段归属改为 group 声明 `ActivePhases`(消除 G-5 双真相源);G-6 四机制抽成真系统。
 - G-3:把每系统的构造 + 接线收进自注册 `ISystemInstaller`,registry 只迭代 installer(4 处 shotgun edit → 1 处)。
 
 ### 阶段 4 —— 技能 / 效果正交化 + 配置收口(深改,须在阶段 2/3 后)
@@ -273,7 +275,7 @@
 
 ## 四、一句话结论
 
-**这套技能 / 战斗框架的引擎底座(并行安全的两阶段模型、可隔离的测试)是可靠的,真正的问题是内容层缺一个声明式抽象:GAS 空转、技能靠三处并行维护的巨型 switch、伤害无单一管线、系统顺序靠手工排列且约 90 条不变量只写在注释里——因此每加一点内容都要跨 6–9 个 god-file 手术,而框架不做任何一致性校验,漏改即静默失效。** 但要区分两件事:**碎片化是确定的结构债,它导致的后果却不全是正在发货的缺陷** —— 本次核验后确认的真 bug 是:**沙暴 DoT 击杀不入队**(该类唯一可达,已修)、**`ElementalReactionSystem` 从未构造**(元素状态永不衰减 + `_pendingShieldBreaks` 无界增长 + 整个 +30% 元素易伤是死的)、DoT 跨实体泄漏(已修)、Meteor 击杀不入队(同类但当前配置不可达,已一并修)、塔伤害元素上报错误、DeathMark 增伤未接入、ReflectTower 永久 null(实际影响面为零 —— 它唯一的消费者 `SuicideBombSystem` 整条链被零写入的 `EnemyIsSuicide` 门死),以及敌人 **2** / 塔 10 个字段漏清(均已修)。**阶段 0 的 7 项修复 + `ElementalReactionSystem` 接线已全部落地并通过回退验证**(撤销任一项都能让对应测试变红),测试 1298 → **1325**;仍未动的是塔伤害元素上报与 DeathMark 增伤接入 —— 这两项都该随阶段 2 的统一伤害管线一起做,孤立修会再造散落取舍。另发现**压测覆盖盲区**:`BenchmarkSystem` 对 `SystemRegistry` 引用数为 0(三模式全手工接线),故任何"只在 registry 里接线"的改动都不受压测保护。而"技能跳护甲""荆棘不吃护盾"是**已写在代码里的取舍**,"血量下限被绕过"在当前数据下**不可达**。所以路线是:阶段 0 先修那几个真 bug 止血,再以"统一伤害管线"为最高杠杆——**它的价值在于把散落各处的取舍变成显式的 `DamageFlags` 声明、把"改了 HP 却忘了入队"这类漏改从人工纪律转为框架保证**,而不是一次修掉五个 bug。
+**这套技能 / 战斗框架的引擎底座(并行安全的两阶段模型、可隔离的测试)是可靠的,真正的问题是内容层缺一个声明式抽象:GAS 空转、技能靠三处并行维护的巨型 switch、伤害无单一管线、系统顺序靠手工排列且约 90 条不变量只写在注释里——因此每加一点内容都要跨 6–9 个 god-file 手术,而框架不做任何一致性校验,漏改即静默失效。** 但要区分两件事:**碎片化是确定的结构债,它导致的后果却不全是正在发货的缺陷** —— 本次核验后确认的真 bug 是:**沙暴 DoT 击杀不入队**(审查时发现，已修)、**`ElementalReactionSystem` 未接线**(审查时导致元素状态不衰减、`_pendingShieldBreaks` 增长和 +30% 元素易伤不触发，现已接线)、DoT 跨实体泄漏(已修)、Meteor 击杀不入队(同类但当前配置不可达,已一并修)、塔伤害元素上报错误、DeathMark 增伤未接入、ReflectTower 永久 null(实际影响面为零 —— 它唯一的消费者 `SuicideBombSystem` 整条链被零写入的 `EnemyIsSuicide` 门死),以及敌人 **2** / 塔 10 个字段漏清(均已修)。**阶段 0 的 7 项修复 + `ElementalReactionSystem` 接线已全部落地并通过回退验证**(撤销任一项都能让对应测试变红),测试 1298 → **1325**;仍未动的是塔伤害元素上报与 DeathMark 增伤接入 —— 这两项都该随阶段 2 的统一伤害管线一起做,孤立修会再造散落取舍。另发现**压测覆盖盲区**:`BenchmarkSystem` 对 `SystemRegistry` 引用数为 0(三模式全手工接线),故任何"只在 registry 里接线"的改动都不受压测保护。而"技能跳护甲""荆棘不吃护盾"是**已写在代码里的取舍**,"血量下限被绕过"在当前数据下**不可达**。所以路线是:阶段 0 先修那几个真 bug 止血,再以"统一伤害管线"为最高杠杆——**它的价值在于把散落各处的取舍变成显式的 `DamageFlags` 声明、把"改了 HP 却忘了入队"这类漏改从人工纪律转为框架保证**,而不是一次修掉五个 bug。
 
 ---
 
@@ -297,9 +299,26 @@
 | "F-4 敌人 44 个字段纯脏继承,是真实 ID 复用风险" | **收窄到 2 个**。实测 337 个 `Enemy*` 数组中 41 个在两个生命周期方法里都没写,但逐个核验后只有 `EnemyElementStatus`/`EnemyElementTimer` 真会泄漏(其唯一衰减者从未构造)。其余 39 个被排除:20 个无任何生产写入者、写入系统未构造、spawn 期无条件初始化、只写 false、每帧自纠、或被零写入的开关门控 |
 | 数字微调 | 数组字段 1018→**1008**;`new T[MAX_ENTITIES]` 714→**711**;`Dispose` null 487→**486**;`GameConfig` 类型 101+15→**85+8**;`Extract*` "45 个助手"→**5 个定义 / ~200 处调用**;`Cast*` 23→**20** |
 
-**遗漏补报**:原稿把 Meteor 问题归到"减伤发散"里带过,漏掉了其中最严重的部分 —— `GlobalSkillSystem.cs` 全文件 `QueueEnemyDeath` **0 次**,且无全局 `HP<=0` 兜底 sweeper(唯一兜底 `MovementGroup.cs:182` 只覆盖自身 DoT),导致陨石"击杀"的敌人无法正常死亡。此项已提入 A-1。**二次核查又发现同类的 `WeatherSystem.cs:111`(沙暴 DoT)同样不入队,且它是该 bug 类当前唯一真正可达的实例**(Meteor 的 `GlobalSkills` 生产端 0 写入),已列为 A-1 首位 / 阶段 0 第 1 项。同时修正:原稿把 `WeatherSystem` 列入"绕过血量下限"的来源,实为误列——它调了 `ClampDamageToHealthFloor`。
+**遗漏补报（审查时快照）**:原稿把 Meteor 问题归到"减伤发散"里带过,漏掉了其中最严重的部分 —— 当时 `GlobalSkillSystem.cs` 全文件 `QueueEnemyDeath` **0 次**,且无全局 `HP<=0` 兜底 sweeper(唯一兜底 `MovementGroup.cs:182` 只覆盖自身 DoT),导致陨石"击杀"的敌人无法正常死亡。此项已在 `f3596db` 补入队并由测试覆盖。**二次核查也确认了当时同类的 `WeatherSystem.cs:111`(沙暴 DoT)缺口，现已修复**；它仍是统一 Resolver 的迁移来源。`WeatherSystem` 调了 `ClampDamageToHealthFloor`，不应再列为绕过血量下限的来源。
 
-**三次核查再补报(最重要的一条)**:`ElementalReactionSystem` **从未被构造**(全库 `new ElementalReactionSystem(` 0 次,`SystemRegistry` 无字段、11 个 group 无属性、连测试都没有),而它独占三项职责:元素计时器衰减、`PendingShieldBreaks` 消费、`EnemyExposureMask/Timer` 写入。后果:破盾附加的元素状态永不清除、`_pendingShieldBreaks` 无界增长、两处攻击系统读的 +30% 元素易伤永不触发。**原稿从头到尾把这个系统当活的引用**(A 表元素破盾反应、B 节 `ModifierOp`、D-2 的"敌人会被加 effect"证据),这是本次审查最大的单点事实错误 —— 一个 395 行、被 CHANGELOG 记录为两轮功能交付的系统,实际从未接线。
+**三次核查再补报（审查时快照）**:`ElementalReactionSystem` 当时**从未被构造**(全库 `new ElementalReactionSystem(` 0 次、`SystemRegistry` 无字段、11 个 group 无属性、连测试都没有),而它独占三项职责。该缺口已在 `e0c3e7c` 接线；保留本段是为了说明为什么需要回退验证和行为基线，不能把它当作当前未接线事实。
+
+## 当前复核裁决
+
+下表是对附件“经复核版本”的独立裁决。`Confirmed` 表示问题或结构债务仍存在；`Partial` 表示方向成立但数字/性质需要限定；`Stale` 表示报告引用的是修复前快照。
+
+| 报告结论 | 裁决 | 应采用的修正 |
+|---|---|---|
+| 约 30 条伤害路径、21 个文件、23 次 `ApplyEnemyDamage` | **Partial** | 约 30 是可接受的规模量级；当前严格 `-=` 是 29 行/19 文件，所有 `EnemyHealth` 写入候选是 59 行/37 文件，生产 `ApplyEnemyDamage` 调用是 5 个。两组数字统计单位不同，不能据此推出“84% 绕过”。必须在台账中分开 raw、语义路径、active/disabled 和 authority。 |
+| 21 个 null 槽位 | **Partial** | `SystemRegistry` 有 21 次 group-slot `= null` 赋值，但只有 18 个独立槽位名（3 个跨 group 重复）；对应实现文件可能存在，实际状态应写成 disabled/unregistered，不能据此断言“未实现”。 |
+| GAS 定义混入运行态字段、M1 被低估 | **Confirmed** | `GameplayEffectDef` 的运行态字段和 `BuffSystem` 写入点确实要求 M1 做定义/实例拆分；按 M1a/M1b/M1c 重新估算，风险为高（L）。 |
+| BuildPhase 语义未决策 | **Confirmed, not a pre-M0 blocker** | 这是 M0 的第一批只读/测试工作；缺证据时阻塞 M1 和 cutover，不要求先改生产代码再“进入 M0”。 |
+| SkillSystem 半迁移、FrameScheduler 内联复杂 | **Confirmed** | 保留为 M5/M6 风险；FrameScheduler 的 i-frame/Phaser/Blinker 主要遍历活跃实体列表，不能写成固定 `O(MAX_ENTITIES)`。 |
+| TowerAttack 为 7 个队列 | **Stale/Partial** | 当前是 8 类双缓冲队列，包含 `fragment` projectile-event；迁移顺序和 parent sequence 仍需保留。 |
+| Weather/Meteor 当前击杀不入队 | **Stale** | `f3596db` 已补入队并有真实帧测试；它们仍需迁入统一 Resolver，不能重复实施死亡入队修复。 |
+| 总工期 10–14 个月、先完成 P0 才能进入 M0 | **Unsupported** | 仓库不能推出日历工期；使用 S/M/L/XL，M0 后结合团队并行度重新估算。P0 是 M0 内的门禁，不是进入 M0 前的代码阶段。 |
+
+因此迁移优先级仍然是：先用台账和 golden 场景冻结语义，再做 GAS 定义/实例拆分，随后收口统一 DamageResolver；不要因为报告中的历史数字再次修复已经落地的 Weather/Meteor 入队代码。
 
 ---
 

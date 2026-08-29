@@ -8,6 +8,7 @@ obj/
 *.suo
 *.userosscache
 *.sln.docstates
+*.sln
 
 # NuGet Packages
 packages/
@@ -57,3 +58,6 @@ Thumbs.db
 
 # 运行时生成（存档/自动保存）
 Data/Saves/checkpoint.json
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+graft/

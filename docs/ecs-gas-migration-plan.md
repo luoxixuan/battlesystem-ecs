@@ -2,7 +2,7 @@
 
 > 状态：执行计划（不代表迁移已经开始）
 >
-> 更新日期：2026-08-29
+> 更新日期：2026-08-30
 >
 > 终态约束：[ecs-gas-final-architecture.md](ecs-gas-final-architecture.md)
 >
@@ -62,7 +62,7 @@
 
 | 债务 | 终态方向 | 详述 |
 |---|---|---|
-| 伤害散落在约 30 个路径 | 单一 `DamageResolver` | combat 文档 M3 |
+| 伤害散落在约 30 个语义路径（当前严格 `-=` 为 29 行/19 文件；口径见 foundation） | 单一 `DamageResolver` | combat 文档 M3 |
 | GAS 定义外形存在但没有真实属性运行时 | Attribute + Effect runtime | foundation M2、combat M4 |
 | 技能入口和 shape switch 分散 | `GasRuntime.TryActivate` + registry | orchestration M6 |
 | Group/Registry 依赖靠手工顺序 | FrameGraph + Installer | orchestration M5/M7 |
@@ -78,6 +78,30 @@
 `M0 基线与语义冻结 → M1 Catalog/ID/Handle/Request/Event → M2 属性基座 → M3 统一伤害与资源 → M4 Effect/Trigger runtime → M5 FrameGraph → M6 Ability/Config → M7 注册与清理 → M8 稳定观察与性能决策`。
 
 M5 的 `ISystem` 容器和节点元数据可以在 M1 后并行搭脚手架，但真正切换提交顺序必须等 M3/M4 的请求、事实和时钟语义稳定。M6 的静态 Catalog 编译可以和 M2/M4 的部分工作并行，能力激活不能早于 Effect Registry 和权威 Gameplay Event。
+
+审查文档的 Stage 0-4 与本文的对应关系是：Stage 0 的剩余止血项归入 M0/M1，Stage 1 的数据和 `ISystem` 脚手架归入 M1/M5，Stage 2 的统一伤害管线归入 M3，Stage 3 的声明式编排和 Installer 归入 M5/M7，Stage 4 的技能/效果正交化归入 M4/M6。
+
+### 4.1 阶段执行卡
+
+规模使用相对级别而不是未经基线验证的人天承诺；M0 完成后再按实际代码量拆成迭代任务。
+
+| 阶段 | 相对规模 | 主要风险 | 主要工具/证据 |
+|---|---|---|---|
+| M0 | S | 基线不可复现、语义未冻结 | 门禁命令、台账脚本、golden/replay |
+| M1 | L | 混合 Effect 定义拆分、ID/旧配置兼容、容量策略 | 影响范围清单、Catalog Validator、handle 压力测试 |
+| M2 | M | 新旧属性重复贡献 | Aggregator 单测、computed projection 差分 |
+| M3 | XL | 双重减伤、死亡/时序漂移 | shadow resolver、source cutover、真实帧集成测试 |
+| M4 | L | timer/事件重复、递归链 | Effect/Trigger 测试、事件队列诊断 |
+| M5 | XL | 顺序和阶段门控变化 | FrameGraph 校验器、legacy/graph replay、同构 benchmark |
+| M6 | XL | 数据源不一致、技能行为缺失 | typed Catalog、Ability 级开关、Unity smoke |
+| M7 | L | 删除过早、外部 API 破坏 | installer 审计、依赖架构测试、兼容 facade |
+| M8 | M | 优化收益不足、观测盲区 | profile、soak、mode 2/4/5 A/B |
+
+每张阶段执行卡都必须补充：负责人、具体工作包、输入/输出、进入条件、退出门槛、回滚 SOP 和删除旧路径条件。相对规模仅用于排期讨论，不是完成承诺。
+
+阶段数量不是迭代数量，也不能从仓库静态信息推出“10-14 个月”的确定工期。M0 之后应按实际团队人数、并行度、Unity 联调窗口和每个切片的吞吐重新估算；附件报告给出的月份只能作为风险情景，不能写成项目承诺。
+
+可并行的工作只限于不共享同一 legacy writer 的工作包：M2 的属性 schema 与 M5 的 adapter 脚手架可以在 M1 后并行；M4 的静态 Definition/Catalog 编译可以和 M3 的 resolver skeleton 并行；同一伤害队列、同一 Effect timer 或同一配置 parser 不允许多人并行改写，合并前必须先完成 source 级 golden 测试。
 
 ## 5. 跨阶段不变量
 
@@ -129,6 +153,8 @@ M5 的 `ISystem` 容器和节点元数据可以在 M1 后并行搭脚手架，�
 此外必须满足：golden 场景和 deterministic replay 没有未批准差异；14-hit 批量触发、属性/效果叠层、实体 ID 回收和 stale handle 测试通过；mode 2/4/5 相对 M0 的任一回退不超过仓库规定的 ±5%；Core DLL 变化后 Unity `BattleDriver` smoke 通过；benchmark 使用与生产相同的 composition/FrameGraph，或明确记录覆盖差异。
 
 任一硬门禁失败，阶段状态保持“进行中”，不得进入下一阶段。
+
+特别闸门：M0 在 BuildPhase 战斗语义、`DamageType` 位标志兼容、死亡队列边界和各类时钟没有决策及真实测试前不得退出；M1 在 `GameplayEffectDef` 的定义/运行态拆分影响范围没有清单前不得按“低风险 adapter”推进。这里的 P0 属于 M0 内的只读/测试工作，不应被误读为“先改生产代码才能进入 M0”。
 
 ## 8. 迁移台账
 

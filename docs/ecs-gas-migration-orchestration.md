@@ -30,6 +30,15 @@
 5. 以 legacy/graph 双组合做 shadow 顺序和状态对比，但只有一套路径可以提交写入；
 6. 图稳定后再把 GAS 节点和死亡/展示提交节点切到声明式图。
 
+### 1.2.1 M5 技术合同补充
+
+- 引入不可变的 `TimeContext`（原始 delta、`enemyDt`、`combatDt`、Build/RealTime/Global clock），节点只读 context；禁止继续用 `ref deltaTime` 隐式修改后续节点输入；
+- 节点声明 `optionalDependencies` 及缺失时的明确策略（disabled、no-op 或启动失败）。例如 Blinker 依赖 Pathfinding 时，不能只在运行时 null-check 而让图谱看不见这条依赖；
+- i-frame、Phaser、Blinker、全局时间缩放和位置事件包装为显式 `GlobalStateNode`/serial node，声明它们的读写和执行策略；
+- `UpdateTimeScale` 产生的 TimeContext 必须在同一帧固定，后续节点不能各自重新计算缩放。
+
+这里的迁移理由是所有权、可选依赖和时序可见性，不是把当前成本描述成固定的 `O(MAX_ENTITIES)`：i-frame/Phaser/Blinker 目前主要遍历活跃实体列表，实际复杂度和 profile 结果应在 M0 记录。
+
 ### 1.3 目标节点映射
 
 最终至少要有以下可观察节点：
@@ -55,7 +64,7 @@
 - `FrameScheduler` 内联的 i-frame、Phaser、Blinker 和位置事件机制；
 - `MovementGroup` 内部的 lazy system construction（例如 `DeployableTrapSystem`）：迁移前必须显式注册，不能让节点在首次 Execute 时偷偷出现；
 - `CombatGroup`、`SkillBuffGroup` 中仅靠注释表达的“runs last/before/after”；
-- 21 个 `= null` 预留槽位：删除，或改成有日志的 Feature flag 注册；
+- `SystemRegistry` 中 21 次 `= null` group-slot 赋值（18 个独立槽位名，`TowerIncome`/`TowerLink`/`TowerOvercharge` 跨 group 重复）：删除，或改成有日志的 Feature flag 注册；这些槽位对应的实现文件可能已经存在，必须以“是否实例化/注册”判断 disabled，而不是以文件是否存在判断；
 - `SystemRegistry.CreateAll/WireDependencies/AssignToGroups` 的构造顺序和 setter 注入；
 - benchmark 手工 composition 与生产 Registry 不一致的问题。
 
@@ -66,6 +75,7 @@
 - 并行节点没有未声明共享写入，Commit 顺序稳定；
 - 阶段门控只有一个事实源；
 - scheduler 内联机制已包装为可注册节点；
+- 所有节点使用同一 `TimeContext`，optional dependency 的缺失策略可由启动校验发现；
 - benchmark 使用与生产相同的 composition/FrameGraph，或差异有明确测试；
 - deterministic replay、全套门禁和 mode 2/4/5 通过。
 
@@ -85,6 +95,8 @@ M5 不删除现有 Group、legacy scheduler 或 `SetTurn`/`ResolveX` facade。�
 - `GameplayEvent` 已由 Resolver/生命周期模块权威产生；
 - M5 至少提供稳定的 `AbilityCommit`、`EffectCommit` 和 `AttributeAggregate` 边界；
 - 玩家技能栏数据源的选择已经冻结。
+
+M6 还必须先完成 `SkillSystem` 的迁移状态审计：当前文件已经引用 GAS 并使用 `AbilityInstances`，但仍保留 `_skillDamageQueue`、`AreaShapeType` 大 switch、Chain Lightning 常量和多处直接效果逻辑。因此 M6 是“完成半迁移”，不是把一个纯 legacy 系统从零替换；审计表要分别标出已接 GAS、仍是硬编码、需要进入 Targeting 的形状和需要进入 DamageResolver 的队列。
 
 ### 2.2 统一能力入口
 
@@ -107,6 +119,8 @@ M5 不删除现有 Group、legacy scheduler 或 `SetTurn`/`ResolveX` facade。�
 4. 先迁简单 Single/Circle/DoT/Heal/Shield，再迁 Chain、CC、TimeWarp、Summon、rewind 和 resurrect；
 5. 逐个迁移 Global、Hero、Tower active 和 Enemy ability；
 6. 每个 Ability ID 的真实激活、冷却、资源、目标、效果和死亡测试通过后，才关闭旧 case。
+
+`_skillDamageQueue` 必须在 M3 已定义的 `DamageRequest` contract 上收口；Chain Lightning 的“最多目标数、跳转衰减和去重”属于可复用 Targeting/Execution 定义，不应继续作为 `SkillSystem` 私有常量和 switch case 的隐式语义。
 
 `AutoSkillSystem` 可以继续保留为调用 facade，但不能再产生另一套冷却或效果规则。Hero/Tower active 当前只翻冷却和打印日志，必须在切流时接入同一能力管线。
 
@@ -165,7 +179,7 @@ M5 不删除现有 Group、legacy scheduler 或 `SetTurn`/`ResolveX` facade。�
 - `SystemRegistry` 先作为 adapter，逐步从 `CreateAll/WireDependencies/AssignToGroups` 三个巨型方法退化为 installer 迭代；
 - `HitConfirmed`、`DamageApplied`、`KillConfirmed`、`TowerPlaced` 等成为一等 Gameplay Event；
 - 订阅者通过 event contract 注册，不再由内容系统互相持有具体类引用；
-- 21 个未启用槽位要么移除，要么在启动日志中明确列为 disabled。
+- 21 次 group-slot 赋值对应的 18 个独立槽位要么移除，要么在启动日志中明确列为 disabled；实现文件存在但没有 `CreateAll` 实例化的项仍视为未注册，不能把文件存在当成已启用。
 
 ### 3.3 Engine/Content 分层
 
@@ -233,6 +247,19 @@ Engine contract 只暴露实体/存储 view、空间查询、Catalog、CommandSi
 - dense SOA + sparse side table/capped pool 不能以更小风险解决问题；
 - chunk 搬迁的复杂度、调试成本和 Unity/测试影响有量化收益；
 - 可以保持现有 GAS 语义和所有 public contract。
+
+### 4.3.1 初始量化门槛
+
+M0 完成后允许基于实际硬件调整一次阈值，但必须在做 prototype 之前冻结。建议使用相同配置、相同种子、至少 3 次运行取中位数：
+
+- 候选组件迭代至少占模拟 CPU 时间的 30%，或占 mode 4/5 总帧时间的 20%；
+- 有硬件计数器时，候选路径的 cache miss/内存停顿相对基线至少高 30%；没有硬件计数器时，使用 profiler 的内存带宽、遍历耗时和采样栈作为可复核代理，不得凭感觉判断；
+- 最小 Archetype prototype 必须让候选路径 CPU 时间下降至少 20%，并让 mode 4/5 中位 FPS 提升至少 15%；
+- 实体结构迁移、维护和序列化的额外开销必须低于总模拟帧时间的 5%；
+- mode 2/4/5 任一项不得比基线下降超过 5%，常驻内存不能增加超过 10%；
+- prototype 的迁移代码、调试和 Unity/测试适配成本要单独记录，不得用局部微基准收益掩盖整体成本。
+
+未同时达到这些门槛，就记录“本项目不引入 Archetype”，继续使用 dense SOA + sparse/capped pool；阈值本身不能被事后改写来证明方案成功。
 
 如果 profile 不支持引入，保留“dense SOA 核心 + sparse GAS pool + active entity lists”就是完成状态。动态 Buff、层数、周期计时不能通过增删结构组件让实体搬迁。
 
