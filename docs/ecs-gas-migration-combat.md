@@ -1,0 +1,228 @@
+# ECS + GAS 迁移：战斗与效果阶段（M3-M4）
+
+> 上级总览：[ecs-gas-migration-plan.md](ecs-gas-migration-plan.md)
+>
+> 前置阶段：[ecs-gas-migration-foundation.md](ecs-gas-migration-foundation.md)
+>
+> 终态约束：[ecs-gas-final-architecture.md](ecs-gas-final-architecture.md)
+
+本文覆盖统一伤害/资源/死亡管线，以及 Gameplay Effect 和 Trigger runtime。它是行为风险最高的阶段，必须建立在 M1 的请求/句柄合同和 M2 的属性语义之上。
+
+## 1. M3：统一伤害、资源和死亡管线
+
+### 1.1 进入条件
+
+- M0 的 Damage 顺序、DamageFlags、护盾策略、死亡事件时点已经冻结；
+- M1 的 `DamageRequest`、`ResourceRequest`、EntityHandle、sequence 和命令缓冲可用；
+- M2 的 computed 属性可以由攻击路径读取，但不要求所有属性已经迁移；
+- golden 场景能区分初始化、资源恢复和真伤害三类写入；
+- 当前 `FrameScheduler` 的并行收集 → 串行提交顺序仍保持不变。
+
+### 1.2 目标
+
+所有真伤害来源只产生 `DamageRequest`。一个 `DamageResolver` 负责解释命中、免疫、暴击、护甲、抗性、元素、护盾、下限和死亡入队；`ResourceResolver` 负责实际写入 HP、Shield、Mana、Gold 等资源；生命周期模块负责死亡解析、奖励和击杀事实。
+
+`ApplyEnemyDamage` 如果需要保留为公共入口，只能变成明确的 adapter，不能继续成为另一套规则解释器。
+
+迁移 `ApplyEnemyDamage` 的调用方时要先删除其已有的抗性、下限或护盾重复分支。当前部分路径（例如 PlayerTower/Skill）已经在入队前计算过抗性，再把它们原样转发到包含同一规则的 Resolver 会造成双重减伤；每个 source 必须在台账中标出“已计算字段”和“由 Resolver 计算字段”。
+
+### 1.3 先分类，后替换
+
+审查中发现的直接写入必须先分类，避免把初始化或资源恢复误当成伤害：
+
+| 类别 | 示例 | 迁移目标 |
+|---|---|---|
+| Spawn/初始化/实体迁移 | `AddEnemy`、召唤、Morph、Burrow、Mine、Ascension | 仍由生成/生命周期模块写入；不进入 DamageResolver |
+| 治疗、护盾、法力和资源恢复 | EnemyHealer、EnemyAbility heal、EmergencyHeal、`BuffSystem.HealPlayer` | `HealRequest`/`ShieldRequest`/`ResourceRequest` → ResourceResolver |
+| 真伤、DoT、处决、反射和伤害转移 | Tower/Skill/Projectile/Bleed/Frostbite/Thorns/Weather/Meteor/LifeLink 等 | `DamageRequest` → DamageResolver |
+
+只有第三类必须经过 DamageResolver。第一类不能为了通过静态扫描而机械改成伤害请求。
+
+### 1.4 Resolver 合同
+
+`DamageRequest` 至少携带：source/target handle、raw amount、DamageType、ElementType、flags、ability/effect id、owner player、sequence、父请求/链路信息和 execution context。
+
+Resolver 的顺序固定为：
+
+1. 验证 source/target handle 和目标活跃状态；
+2. 应用无敌、免疫、命中和闪避规则；
+3. 应用暴击、护甲、抗性、元素和暴露规则；
+4. 生成护盾消耗或其他 Resource operation；
+5. 按 policy 应用血量下限；
+6. 由 ResourceResolver 写入资源并产生 `DamageApplied`；
+7. HP 达到死亡条件时只产生一次 `DeathQueued`；
+8. `DeathResolve` 完成奖励和归属后，才产生 `KillConfirmed`。
+
+技能跳过护甲、荆棘是否过护盾、塔是否过护盾、特殊处决是否忽略无敌等取舍，必须通过显式 `DamageFlags` 或 resolver policy 表达。不能以“某系统没有调用某函数”作为语义。
+
+元素转换必须保留完整类型信息：一击拆成两种实际伤害时，使用两条带类型的请求，或使用能表达转换组成的明确字段；不能将两种类型合并成一个无类型 tuple 后再猜测。
+
+### 1.4.1 Resolver 与 commit boundary
+
+统一的是伤害规则和唯一 writer，不是所有请求都必须被拖到同一个晚期节点。每个 producer 必须声明 `commitBoundary`/`applyPhase`，Resolver 在该边界消费请求：
+
+| Producer | 现有语义位置 | 迁移约束 |
+|---|---|---|
+| Weather DoT | `PreGame` | 在原有天气更新结束处提交，不能让敌人多走一阶段后才受伤 |
+| Movement/Wound | `Movement` | 在移动/伤口规则要求的边界提交，保持目标和路径判断时序 |
+| Enemy ability/Burrow/LifeLink | `AI`/`Movement` | 按原阶段提交，死亡和后续 AI 是否可见必须由 golden 场景确认 |
+| Tower/Projectile/Skill | `Combat`/`SkillBuff` | 可映射到 `CombatEmit` 后的 `GameplayResolve`，但要保持现有同帧可见性 |
+
+兼容期可以在原 Group 末尾调用同一个 Resolver，也可以定义 `EarlyResolve` 和 `GameplayResolve` 两个声明式节点。Resolver 的规则实现只能有一份；节点只是消费边界，不能各自再解释护甲、抗性或死亡。Weather/Wound/EnemyAbility 至少各有一条“旧时序 vs 新时序”的 golden 测试，验证后续 AI、目标选择、死亡入队和事件顺序没有未批准变化。
+
+当前 `ComponentStore.BeginFrame` 对未完成的死亡队列有保护性检查。引入多个伤害消费边界时，仍必须保持每帧唯一的 death queue commit；如果未来需要多队列，必须先定义新的双缓冲协议并补充回归测试，不能绕过这个保护。
+
+BuildPhase 是同一规则的特殊边界：当前 BuildGroup 仍可能 tick Skill/GlobalSkill，但 `FrameScheduler.Tick` 可能在 BuildGroup 后早退。M3 不得让战斗请求或死亡队列无意跨 Build 帧；要么在 Ability gate 中拒绝战斗型请求，要么为 BuildPhase 增加明确的 commit/清理节点，并为两种状态写 golden 测试。
+
+### 1.5 Shadow 和切流
+
+每个来源单独切流，推荐顺序：
+
+1. `BuffSystem` DoT（已有队列，最适合验证 Periodic → DamageRequest）；
+2. `WeatherSystem` 和 `GlobalSkillSystem` Meteor（验证直接 HP 写和死亡入队）；
+3. Projectile、Bleed、Frostbite、Thorns（验证 flags、护盾和特殊规则）；
+4. `PlayerTowerAttackSystem`；
+5. `TowerAttackSystem` 主路径及 chain/splash/bounce/link/transfer 等复杂队列；
+6. Elemental reaction、Reflect、Boss/塔特殊路径和其他低频来源。
+
+顺序可以由 M0 基线调整，但每个来源必须完成以下闭环：
+
+- legacy adapter 将旧输入转为 `DamageRequest`；
+- shadow resolver 只计算并记录差异，不写任何共享状态；
+- 差分覆盖最终伤害、护盾消耗、DamageType/ElementType、死亡队列和事件顺序；
+- 在帧边界打开该来源的 cutover flag；
+- 关闭该来源的旧 drain loop/直接写入；
+- 加一条从真实 `FrameScheduler` 入口驱动的集成测试。
+
+生产路径不能同时让 legacy 和 new 写 HP 或发布同一事实。未切流来源可以继续经过 `LegacyDamageAdapter`，但不得直接绕过 Resolver 写入资源。
+
+`TowerAttackSystem.Update` 不能作为一次性“大改”处理：它在同一串行调用中按顺序消费主伤害、Tesla chain、splash、bounce、lifesteal、thorns、debuff、knockback 和 fragment 队列，部分分支还依赖本帧目标的死亡状态/位置。迁移时先给 queue item 增加 `parentSequence`/`phase` 等上下文，用 `TowerAttackLegacyAdapter` 保留原有消费顺序并逐项提交统一 Resolver；等每类 queue 都有 golden 测试后，才拆成 FrameGraph 节点。
+
+### 1.6 当前代码触点
+
+- `Core/FrameScheduler.cs`：保留唯一帧入口和现有两阶段边界；
+- `Core/ComponentStore.cs`、`ComponentStore_Enemy.cs`：保留死亡队列兼容入口，逐步让 Resolver 成为唯一调用者；
+- `Systems/SkillSystem.cs`：先改 `ResolveSkillDamage` 的 tuple/直接写路径；
+- `Systems/BuffSystem.cs`、`BleedSystem.cs`、`FrostbiteSystem.cs`、`ElementalReactionSystem.cs`：改为生成请求；
+- `Systems/ProjectileSystem.cs`、`WeatherSystem.cs`、`GlobalSkillSystem.cs`：关闭直接 HP 写；
+- `Systems/PlayerTowerAttackSystem.cs`、`TowerAttackSystem.cs`：先扩充队列字段，再逐个迁移主、链、溅射、反弹和生命链接分支；
+- `Systems/ObstacleSystem.cs`、`HeroSystem.cs`、`InventorySystem.cs`、`ReflectTowerSystem.cs`、`SuicideBombSystem.cs`、`ThornsAuraSystem.cs` 等：按上述三类台账迁移；
+- `Core/MovementGroup.cs` 中可能 lazy construction 的 `DeployableTrapSystem`：先登记为明确 producer，再把其 Movement 阶段伤害纳入同一请求管线；
+- `BenchmarkSystem` 的 mode 2/4/5 harness：同步使用和生产相同的 resolver composition，避免只改生产 Registry。
+
+### 1.7 生命周期兼容注意事项
+
+当前 `ResolveEnemiesKilledThisFrame` 会在奖励和 `OnEnemyKilled` 订阅后执行 `DestroyEntity`。M3 先保留它作为唯一的兼容生命周期提交点，给新 Resolver 增加 `DeathQueued`；不要在同一阶段同时改变回调和销毁顺序。
+
+Combo、Necromancer、Culling、SoulHarvest 等旧订阅者先通过 adapter 消费兼容事件。`KillConfirmed` 的终态时点和 post-death adapter 留到 M5 的 `PostDeathEventCommit` 再统一调整。
+
+### 1.8 M3 退出门槛
+
+- 生产代码中除 Spawn/初始化例外外，真伤写入点都变成 `DamageRequest`；
+- Resource 写入集中到 ResourceResolver，治疗/护盾/法力不再由内容系统直接改数组；
+- 每个伤害来源只有一个 writer，旧 drain loop 在 cutover 后不再运行；
+- 护甲、抗性、护盾、免疫、下限、暴击、元素归因和死亡奖励测试通过；
+- `DamageType` 的位标志、Holy/True 特殊分支和 immunity mask 兼容测试通过；
+- 同一目标先死亡后续请求被拒绝；批量命中、14 hits、ID 回收和 deterministic replay 通过；
+- `DamageApplied`、`DeathQueued`、`KillConfirmed` 时点符合冻结语义；
+- 静态扫描和架构测试能发现新增的直接资源写点；
+- 全套 build/test/rules/diff-check/mode 2/4/5 通过，性能无超过 ±5% 的回退。
+
+### 1.9 M3 回滚
+
+按 source 关闭 cutover flag，在下一帧边界恢复该来源的 legacy adapter。确认旧路径重新成为唯一 writer 后才继续运行。已由新 Resolver 提交的当前帧结果不能再由旧路径补写；必要时丢弃尚未提交的请求并记录诊断。
+
+### 1.10 M3 删除条件
+
+M3 不立即删除全部旧 drain loop。某个来源只有在 100% 切流、真实帧测试和观察期都通过后，才可删除该来源的直接写入和旧队列；全局旧入口留到 M7 收口。
+
+## 2. M4：Gameplay Effect 和 Trigger runtime
+
+### 2.1 进入条件
+
+- M1 的 Effect/Ability/Tag ID、generation、命令和事件合同已可用；
+- M2 的 AttributeAggregator 已能接收 Modifier 并标记 dirty；
+- M3 的 Resolver 能产生权威 `HitConfirmed`、`DamageApplied`、`DeathQueued` 等事实；
+- 每种已迁移 DoT 都已关闭旧 timer 或旧伤害 owner。
+
+### 2.2 运行时产物
+
+- immutable `GameplayEffectDefinition` 与稀疏 `ActiveGameplayEffect` 池分离；
+- `AbilityState`、`TriggerState`、Tag contribution、Modifier handle 的生命周期管理；
+- `EffectCommit`、`EffectTick`、`EffectExpire`、`GameplayEventCommit` 节点；
+- 固定的 `clockId`、首次 tick、catch-up、snapshot、叠层/刷新和 source death policy；
+- Instant effect 不占 active slot；Periodic effect 只产生 Damage/Resource/Gameplay Event request；
+- 单帧提交轮次、事件数量、池容量和递归深度上限。
+
+`GameplayEffectDefinition` 不保存 remaining time、当前 stack、tick accumulator 或当前 source/target 实例；这些字段只存在于 `ActiveGameplayEffect`。
+
+### 2.3 第一条垂直切片：命中 10 次后伤害增加 30%
+
+用一个 Trigger 和一个 Effect 验证事件、叠层和属性边界：
+
+- Trigger：`HitConfirmed`、scope=`PerSource`、threshold=10、mode=`EveryN`、保留余数；
+- Effect：`Infinite`、`AddStack`、明确 `maxStacks` 和 stack key；
+- Modifier：`DamageOutputMultiplier`、`Add 0.30`。
+
+同一帧 14 次命中时，必须按批次得到 1 次 crossing，余数为 4。默认所有命中读取帧开始属性快照，Effect 在下一次 AttributeAggregate 边界可见。若设计要求第 11 次命中立即影响第 12 次，必须把多段攻击声明为有序子批次。
+
+### 2.4 效果迁移顺序
+
+1. Poison Nova/Firewall 等单一 Periodic DoT；
+2. 一个带 Infinite Modifier 的攻击 Buff；
+3. Freeze/Slow/Root 等 Tag/控制效果；
+4. Heal、Shield 和资源类效果；
+5. 需要 Execution 的链式、回溯、召唤和特殊 Boss 效果。
+
+每类效果都要验证 apply → tick/aggregate → expire/remove → 资源/伤害 → 死亡清理完整链路。
+
+`DeathMark` 当前的生产接线和层数写入并不完整，不能把现有 getter 测试当成机制已启用。迁移时应以新的 `HitConfirmed`/`DamageApplied` Trigger + Effect 做真实垂直切片，并补 Registry 到 `FrameScheduler` 的集成测试；旧 DeathMark 路径在此之前明确标为 disabled。
+
+### 2.5 旧 Buff/Effect 适配
+
+- `BuffSystem.ApplyDot` 先转换成 `EffectRequest`；
+- 旧 `GameplayEffectDef` 构造函数可以保留兼容 facade，但新代码不能把运行态字段写回 Definition；
+- 旧 `Enemy*DurationLeft` 只能作为 projection/调试数据，不能继续倒计时；
+- `BuffSystem.ResolveDotDamage` 只负责提交请求，不能直接 `EnemyHealth -=`；
+- Elemental reaction 的 Freeze/Stun 通过 Effect Registry 创建，不能从系统内部偷偷构造另一种效果实例。
+
+### 2.6 Trigger 和事件权威
+
+Trigger 只消费已经提交的 Gameplay Event，不直接订阅多个旧系统回调。事件顺序由 M3 Resolver 和生命周期 adapter 统一产生：
+
+- `HitConfirmed`：命中验证通过后；
+- `DamageApplied`：ResourceResolver 实际产生有效伤害后；
+- `DeathQueued`：目标进入死亡队列后；
+- `KillConfirmed`：死亡解析和奖励归属完成后。
+
+由 Trigger 产生的新 EffectRequest 进入下一事件队列，默认不在同一调用栈递归。超过单帧轮次、事件数或池容量时，停止该链并产生诊断。
+
+注意 `HitTriggerSystem` 当前只是定义存在、没有完整生产接线；不能把现有 `EventBus` 的少量频道当成 GAS Trigger runtime。新 Trigger 必须以 Resolver 产生的内部 Gameplay Event 为唯一输入。
+
+### 2.7 M4 退出门槛
+
+- Effect apply/remove/expire、叠层、刷新、满层、来源死亡和目标死亡都有测试；
+- clock、首 tick、catch-up、snapshot 和同帧可见性都有测试；
+- 14-hit、实体 ID 回收、stale handle、池耗尽和递归上限测试通过；
+- 真实施放 → tick → 伤害/资源 → 死亡 → 清理链路通过；
+- 每个已切流效果只有一个 timer/damage owner；
+- 旧 EventBus 不会和新 Gameplay Event 重复触发同一规则；
+- 全套门禁和性能对照通过。
+
+### 2.8 M4 回滚
+
+按 Effect/Ability ID 关闭新 runtime 消费，恢复对应旧 Buff/Skill adapter。保留池和 Definition 不代表启用；关闭状态下不得 tick、改属性、发伤害或发布重复事件。
+
+### 2.9 M4 删除条件
+
+M4 不删除旧 `GameplayEffectDef`、旧 timer 或旧 Trigger 代码。对应 Effect/Trigger 完成切流、stale/generation/递归测试和观察期后，才可删除其旧 owner；公共兼容 facade 留到 M7/M8 再决定。
+
+## 3. 战斗阶段禁止事项
+
+- 不在 shadow 阶段双写 HP、护盾、层数或事件；
+- 不在 generation 句柄稳定前把 ActiveEffect 索引暴露给跨帧调用方；
+- 不让旧 timer 和新 Effect runtime 同时推进同一个效果；
+- 不在 M3 同时重排完整 FrameGraph 和改变死亡事件顺序；
+- 不把初始化写点、治疗写点和真伤写点用一个“统一伤害”类型粗暴覆盖；
+- 不为了让测试变绿而把 `KillConfirmed` 提前到 `DeathQueued`；
+- 不在同一帧依赖并行回调顺序来决定 14 hits 的效果可见性。
