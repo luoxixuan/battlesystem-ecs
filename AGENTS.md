@@ -13,7 +13,7 @@
 - **架构**: SOA ECS（逻辑与渲染完全分离），事件总线（`IBattleEventBus`）驱动渲染
 - **运行时**: 控制台应用（含交互式游戏 + 非交互式压测）+ Unity 2D 渲染端
 - **核心特征**: 全系统并行化 (`Parallel.For`)、零分配热路径、配置驱动、帧末统一结算
-- **代码规模**: Core 库 ~52k 行（Core + Systems）、Tests ~22k 行；1298 项 xUnit 测试（框架层 / 机制层 / 业务层 / 集成层四分层）
+- **代码规模**: Core 库 ~52k 行（Core + Systems）、Tests ~22k 行；1317 项 xUnit 测试（框架层 / 机制层 / 业务层 / 集成层四分层）
 - **Unity 工程**: `F:\AI\BattleSystem-ECS-Unity`（2022.3.62f2c1 LTS），通过 `BattleDriver` 消费 DLL
 
 ---
@@ -252,7 +252,7 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 - **xUnit**（`Xunit`），测试项目 `BattleSystemECS.Tests`（TargetFramework=`net9.0`，引用 Core 库）。
 - 测试运行器：`xunit.runner.visualstudio`，覆盖率收集：`coverlet.collector`。
-- 当前测试数量：**1298 项**（全部通过为门禁要求）。
+- 当前测试数量：**1317 项**（全部通过为门禁要求）。
 - **测试范围分层**（目录即分层，详见 `BattleSystemECS.Tests/README.md`）：
   - **Infrastructure**：`TestWorld` / `Specs` / `MockRenderer` / `BattleTestBase` 共享基建，不含测试。
   - **Framework 框架层**：ECS 存储生命周期、帧调度与死亡结算、状态机、配置加载、GAS 冷却、曲线表、技能核心、时光快照。
@@ -301,7 +301,7 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 
 1. **`dotnet build BattleSystemECS.Core`** — Core 库 0 warnings, 0 errors
 2. **`dotnet build`** — EXE 0 warnings, 0 errors
-3. **`dotnet test BattleSystemECS.Tests`** — 全部通过（当前 1298/1298）
+3. **`dotnet test BattleSystemECS.Tests`** — 全部通过（当前 1317/1317）
 4. **`pwsh -File tools\check-test-rules.ps1`** — 测试静态规则 0 违规（零断言测试 + 恒真/恒假断言）
 5. **`git diff --check`** — 无空白/行尾错误（CRLF、trailing whitespace）
 6. **`echo 2 | dotnet run`** — mode 2 压测

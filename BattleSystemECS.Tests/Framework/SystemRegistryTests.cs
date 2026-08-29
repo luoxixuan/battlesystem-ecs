@@ -86,5 +86,56 @@ namespace BattleSystemECS.Tests.Framework
             Assert.True(Store.IsPlayerAlive(playerId), "BuildPhase 3 帧后玩家必须仍然存活");
             Assert.True(Store.GetPlayerCurrentHealth(playerId) > 0f, "BuildPhase 不应扣除玩家生命");
         }
+
+        // ─── Bug 回归：构造顺序不得让消费者捕获 null ─────────────────────────
+        // CreateAll 是一条线性方法，依赖靠"先构造、后当参数传入"表达，而框架
+        // 不做任何校验。ReflectTower / TowerStealth 曾被排在 SuicideBomb 之后
+        // 构造，于是 SuicideBomb 把 null 存进 readonly 字段且没有补注 setter，
+        // 反伤与潜行判定对自爆兵路径永久失效（编译通过、旧测试全绿）。
+        // 这里用反射读私有字段，因为生产没有暴露这两个依赖的只读访问器。
+
+        [Fact]
+        public void Assembly_SuicideBomb_ReceivesNonNullReflectAndStealth()
+        {
+            GameConfig config = GameConfigLoader.LoadConfig(Renderer);
+            var stateMachine = new StateMachine();
+            int playerId = Player();
+
+            var registry = new SystemRegistry();
+            registry.CreateAll(Store, config, Renderer, playerId, stateMachine);
+            registry.WireDependencies(Store, playerId);
+
+            Assert.NotNull(registry.ReflectTower);
+            Assert.NotNull(registry.TowerStealth);
+            Assert.NotNull(registry.SuicideBomb);
+
+            Assert.NotNull(ReadPrivateField(registry.SuicideBomb!, "_reflectTowerSystem"));
+            Assert.NotNull(ReadPrivateField(registry.SuicideBomb!, "_towerStealthSystem"));
+        }
+
+        [Fact]
+        public void Assembly_EnemyAI_ReceivesNonNullReflectTower()
+        {
+            GameConfig config = GameConfigLoader.LoadConfig(Renderer);
+            var stateMachine = new StateMachine();
+            int playerId = Player();
+
+            var registry = new SystemRegistry();
+            registry.CreateAll(Store, config, Renderer, playerId, stateMachine);
+            registry.WireDependencies(Store, playerId);
+
+            Assert.NotNull(registry.EnemyAI);
+            Assert.NotNull(ReadPrivateField(registry.EnemyAI!, "_reflectTowerSystem"));
+        }
+
+        /// <summary>读取私有实例字段（生产未提供只读访问器；补测缝后可移除）。</summary>
+        private static object? ReadPrivateField(object target, string fieldName)
+        {
+            var field = target.GetType().GetField(fieldName,
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                ?? throw new System.InvalidOperationException(
+                    $"{target.GetType().Name}.{fieldName} 字段不存在");
+            return field.GetValue(target);
+        }
     }
 }

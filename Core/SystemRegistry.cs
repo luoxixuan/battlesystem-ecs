@@ -366,6 +366,16 @@ namespace BattleSystemECS.Core
             // ── Mana ↔ Skill wiring ──
             Skill.InjectManaSystem(Mana);
 
+            // ── Reflect Tower / Tower Stealth ──
+            // Constructed HERE, before their first consumers (EnemyAI below and SuicideBomb
+            // further down), not after them. Both take only (store, playerId), so they have
+            // no ordering constraints of their own. Previously they were created after the
+            // systems that receive them as constructor arguments, so those systems captured
+            // null into readonly fields with no later setter — silently disabling reflect
+            // damage and stealth targeting for the suicide-bomber path.
+            ReflectTower = new ReflectTowerSystem(store, playerId);
+            TowerStealth = new TowerStealthSystem(store, playerId);
+
             // ── Enemy AI & Abilities ──
             EnemyAbility = new EnemyAbilitySystem(store, logger, playerId, config, eventBus);
             EnemyAI = new EnemyAISystem(store, logger, playerId, config, EnemyAbility, TechTree, eventBus, ReflectTower);
@@ -393,13 +403,9 @@ namespace BattleSystemECS.Core
             EnemyStrafe = new EnemyStrafeSystem(store, logger);
 
             // ── Suicide Bomb ──
+            // ReflectTower / TowerStealth are constructed earlier (see the Enemy AI section)
+            // so both arrive non-null here.
             SuicideBomb = new SuicideBombSystem(store, playerId, ReflectTower, TowerStealth);
-
-            // ── Reflect Tower ──
-            ReflectTower = new ReflectTowerSystem(store, playerId);
-
-            // ── Tower Stealth ──
-            TowerStealth = new TowerStealthSystem(store, playerId);
 
             // ── Desperation / Last Stand ──
             Desperation = new DesperationSystem(store);

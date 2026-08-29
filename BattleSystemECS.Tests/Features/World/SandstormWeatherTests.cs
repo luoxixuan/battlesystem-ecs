@@ -137,5 +137,83 @@ namespace BattleSystemECS.Tests.Features.World
             sys.ForceWeather(0, WeatherConfig.Sandstorm, intensity: 0.5f, duration: 12f);
             Assert.Equal(0.005f, sys.GetEnemyDotPct(0), 0.001f);
         }
+
+        // ── Bug 回归：沙暴 DoT 击杀必须入队 ─────────────────────────────
+        // ApplyWeatherDot 直接写 EnemyHealth 而不走 ApplyEnemyDamage，此前 HP
+        // 归零后从不调用 QueueEnemyDeath（该文件 QueueEnemyDeath 计数为 0）。
+        // 全局没有 "扫描 HP<=0" 的兜底 sweeper，所以入队是唯一的死亡路径：
+        // 漏掉它 → 敌人 HP<=0 但仍 EnemyActive，不给金币 / 不计击杀 / 不释放
+        // 实体槽，且 EnemyMovementSystem 只按 EnemyActive 门控，它会继续走到
+        // 基地白扣一条命，期间被所有 `HP<=0 continue` 守卫当死人跳过。
+
+        /// <summary>沙暴把敌人打到 HP&lt;=0 → 入队，Resolve 后真正死亡并结算。</summary>
+        [Fact]
+        public void Sandstorm_LethalDot_QueuesDeathAndResolves()
+        {
+            // dotPct=0.5 (50% maxHp/s)，maxHp=100 → 1s tick 造成 50 伤害
+            ConfigureSandstorm(dotPct: 0.5f);
+            Player(p => { p.Health = 100f; p.Gold = 0f; });
+            var sys = new WeatherSystem(Store, Config);
+            sys.ForceWeather(0, WeatherConfig.Sandstorm, intensity: 1.0f, duration: 12f);
+
+            // 残血敌人：10 HP，承受 50 点沙暴伤害
+            int eid = Enemy(e => { e.Health = 10f; e.MaxHealth = 100f; e.Damage = 0f; e.GoldReward = 20; });
+
+            sys.Update(1.0f);
+
+            // tick 后：血已归零，但实体仍活着（死亡在帧末串行结算）
+            Assert.True(Store.EnemyHealth[eid] <= 0f);
+            Assert.True(Store.EnemyActive[eid]);
+
+            Store.ResolveEnemiesKilledThisFrame();
+
+            // 死亡结算真正跑过：失活 + 计入击杀 + 金币入账 + 实体槽释放
+            Assert.False(Store.EnemyActive[eid]);
+            Assert.Equal(1, Store.TotalKills);
+            Assert.True(Store.PlayerGold[0] >= 20f);
+            Assert.Equal(eid, Store.CreateEntity()); // 前提：槽已回收（free-list 只有这一个 id）
+        }
+
+        /// <summary>非致死 tick 只掉血，不得入队（负向对照）。</summary>
+        [Fact]
+        public void Sandstorm_NonLethalDot_DoesNotQueueDeath()
+        {
+            ConfigureSandstorm(dotPct: 0.005f);
+            Player(p => { p.Health = 100f; p.Gold = 0f; });
+            var sys = new WeatherSystem(Store, Config);
+            sys.ForceWeather(0, WeatherConfig.Sandstorm, intensity: 1.0f, duration: 12f);
+
+            int eid = Enemy(e => { e.Health = 100f; e.MaxHealth = 100f; e.Damage = 0f; e.GoldReward = 20; });
+
+            sys.Update(1.0f);
+            Store.ResolveEnemiesKilledThisFrame();
+
+            Assert.True(Store.EnemyActive[eid]);
+            Assert.Equal(99.5f, Store.EnemyHealth[eid], 0.001f);
+            Assert.Equal(0, Store.TotalKills);
+            Assert.Equal(0f, Store.PlayerGold[0]);
+        }
+
+        /// <summary>血量下限生效时沙暴不得击杀（floor 与入队的交互）。</summary>
+        [Fact]
+        public void Sandstorm_WithMinHealthFloor_DoesNotKill()
+        {
+            // ApplyWeatherDot 在写血前调 ClampDamageToHealthFloor，所以带 floor
+            // 的敌人不会被沙暴打死 —— 补入队后这一点必须仍然成立。
+            ConfigureSandstorm(dotPct: 0.5f);
+            Player(p => { p.Health = 100f; p.Gold = 0f; });
+            var sys = new WeatherSystem(Store, Config);
+            sys.ForceWeather(0, WeatherConfig.Sandstorm, intensity: 1.0f, duration: 12f);
+
+            int eid = Enemy(e => { e.Health = 10f; e.MaxHealth = 100f; e.Damage = 0f; e.GoldReward = 20; });
+            Store.EnemyMinHealthFloor[eid] = 0.05f; // 下限 = 100 * 5% = 5 HP
+
+            sys.Update(1.0f);
+            Store.ResolveEnemiesKilledThisFrame();
+
+            Assert.True(Store.EnemyActive[eid]);
+            Assert.Equal(5f, Store.EnemyHealth[eid], 0.001f);
+            Assert.Equal(0, Store.TotalKills);
+        }
     }
 }

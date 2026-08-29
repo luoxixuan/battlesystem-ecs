@@ -109,6 +109,17 @@ namespace BattleSystemECS.Systems
                 float dmg = _store.ClampDamageToHealthFloor(eid, rawDmg);
                 if (dmg <= 0f) continue;
                 _store.EnemyHealth[eid] -= dmg;
+                // Enqueue the death so ResolveEnemiesKilledThisFrame runs the death handlers
+                // (gold / score / slot release). There is no global "scan for HP<=0" sweeper,
+                // so without this the enemy sits at HP<=0 while still EnemyActive: it keeps
+                // walking (EnemyMovementSystem gates on EnemyActive only), cannot be killed
+                // again (every downstream `HP<=0 continue` guard skips it), and finally costs
+                // a base life at GameManager's leak check. Damage was already floor-clamped
+                // above, so no re-clamp here.
+                if (_store.EnemyHealth[eid] <= 0f)
+                {
+                    _store.QueueEnemyDeath(eid, playerId);
+                }
             }
         }
 

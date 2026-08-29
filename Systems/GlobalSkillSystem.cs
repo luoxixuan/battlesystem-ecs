@@ -187,6 +187,11 @@ namespace BattleSystemECS.Systems
                 if (store.EnemyHealth[eid] <= 0f)
                 {
                     store.EnemyHealth[eid] = 0f;
+                    // Enqueue the death so ResolveEnemiesKilledThisFrame runs the death
+                    // handlers (gold / score / life-link) and destroys the entity. Without
+                    // this the enemy sits at HP=0 but still EnemyActive: no reward, no slot
+                    // release, and every `EnemyHealth <= 0f` guard downstream skips it.
+                    store.QueueEnemyDeath(eid, playerId);
                     killed++;
                 }
             }

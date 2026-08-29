@@ -274,6 +274,15 @@ namespace BattleSystemECS.Core
             _deathQueueIdx = 1 - _deathQueueIdx;
             _deathQueue[_deathQueueIdx].Clear();
             _deathQueueResolved = false;
+            // Shield-break queue is per-frame by contract: ApplyEnemyDamage appends on every
+            // elemental-shield break, and the drain lives in ElementalReactionSystem — which is
+            // never constructed (no `new ElementalReactionSystem(` anywhere), so nothing ever
+            // called its Clear(). Shipped data reaches this path (monster_shield.json and
+            // monster_enforcer.json carry Shield + ShieldElement, wired at
+            // WaveSpawningSystem:993-1001), so the list grew without bound for the whole
+            // session. Clearing at frame start keeps the documented per-frame semantics: a
+            // consumer wired later still sees everything appended during its own frame.
+            _pendingShieldBreaks.Clear();
             // Round 171 Direction 4 — reset curse debuff accumulators so that curse auras
             // (CurseAuraSystem +=) and BlightedGround (CorpseEffectSystem +=) both build
             // up fresh each frame. Without this reset, repeated += calls would compound
@@ -587,6 +596,18 @@ namespace BattleSystemECS.Core
 
             // ── Phase 2: shared state cleanup ─────────────────────────────────────
             PositionActive[entityId] = false;
+            // GAS slot counts must be zeroed here (not only in ResetPlayerAbilities): entity
+            // IDs are recycled through freeEntityIds, so a non-zero count would let the next
+            // occupant of this ID inherit the previous one's active effects (SourceEntityId
+            // included). The live path is BuffSystem: it ticks enemy DoT driven by
+            // GetEffectCount, and ApplyDot is reached in production from TowerAttackSystem's
+            // Firewall branch. Zeroing the count is sufficient — slot contents are never read
+            // past the count.
+            // Note: the ActiveEffectCount half is what actually fires; the AbilityCount half is
+            // defense-in-depth, since AddAbility's only production caller targets playerId and
+            // player ids (0..MAX_PLAYERS) never enter freeEntityIds.
+            AbilityCount[entityId] = 0;
+            ActiveEffectCount[entityId] = 0;
             // H-1 fix: lock around dictionary removal (thread-safe)
             lock (entityNamesLock)
             {
@@ -642,6 +663,19 @@ namespace BattleSystemECS.Core
                 EnemyCanLand[entityId] = false;
                 EnemyStealthMultiplier[entityId] = 1f;
                 EnemyShield[entityId] = 0f;
+                // Elemental status reset (recycled slot must not leak element bits/timers).
+                // These two are written in production by ApplyEnemyDamage's shield-break path
+                // and by TowerAttackSystem's enchant path, but their only decay/clear logic
+                // lives in ElementalReactionSystem — which is never constructed. Without a
+                // reset here, a recycled id keeps the previous occupant's element bits forever,
+                // and TowerAttackSystem's Elemental Affinity bonus (a live reader) then grants
+                // an undeserved damage multiplier against the new enemy. 4 timer slots/enemy.
+                EnemyElementStatus[entityId] = ElementType.None;
+                int elemBase = entityId * 4;
+                EnemyElementTimer[elemBase] = 0f;
+                EnemyElementTimer[elemBase + 1] = 0f;
+                EnemyElementTimer[elemBase + 2] = 0f;
+                EnemyElementTimer[elemBase + 3] = 0f;
                 EnemyThornsRatio[entityId] = 0f;
                 // Round 176 Direction 7 — Siege reset (recycled slot must not leak siege
                 // armor/slow state — a freshly-spawned enemy must start as a normal enemy,
@@ -960,6 +994,30 @@ namespace BattleSystemECS.Core
                 TowerAuraDamageBonus[entityId] = 0f;
                 // Player-disabled flag (Round 96): default false on recycle
                 TowerPlayerDisabled[entityId] = false;
+                // Chrono / patrol / selection fields. These are the only 10 of the 150 fields
+                // that RemoveTower clears and this branch did not, which AddTower also does not
+                // re-initialize — i.e. the entire genuine ID-reuse surface on the tower side
+                // (the other 140 are re-initialized by AddTower, so clearing them here would be
+                // 140 wasted writes per tower destruction; do NOT delegate to RemoveTower).
+                // Defense-in-depth today: their writers in TowerPlacementSystem are gated on
+                // tc.IsChronoTower / tc.IsMobile, and no shipped Data/Towers/*.json sets either
+                // key, so they are never written non-default in production yet. Clearing them
+                // now means wiring a chrono or patrol tower later cannot resurrect stale state
+                // on a recycled slot. TowerSelected's SelectTower/DeselectTower likewise have
+                // no production callers.
+                TowerIsChronoTower[entityId] = false;
+                TowerTimeFieldRadius[entityId] = 0f;
+                TowerTimeScale[entityId] = 0f;
+                TowerIsMobile[entityId] = false;
+                TowerMoveSpeed[entityId] = 0f;
+                TowerPatrolPathId[entityId] = -1;
+                TowerPatrolWaypointIndex[entityId] = 0;
+                TowerPatrolDirection[entityId] = 1;
+                // 1f, not 0f: this is a multiplier on attack speed (TowerPlacementSystem:583
+                // defaults it to 0.75 = 75% speed for patrol towers). Zeroing it would leave a
+                // recycled slot unable to attack. Matches RemoveTower's value.
+                TowerPatrolAttackSpeedPenalty[entityId] = 1f;
+                TowerSelected[entityId] = false;
                 // Round 98 — Windup fields reset (recycled slot must start with no windup)
                 TowerWindupFrames[entityId] = 0;
                 TowerWindupCountdown[entityId] = 0;
