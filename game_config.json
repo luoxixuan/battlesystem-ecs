@@ -6274,8 +6274,7 @@
                        "Name":  "Corporate Warfare",
                        "LevelNumber":  5
                    }
-               ]
-           },
+               ],
            "Combo": {
                "comboWindowSeconds": 3.0,
                "comboDamageBonusPerKill": 0.05,
@@ -6298,4 +6297,3 @@
                "BackstabDamageMultiplier": 1.50
            }
        }
-   }

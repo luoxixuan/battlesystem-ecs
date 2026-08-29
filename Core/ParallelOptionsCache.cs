@@ -16,5 +16,11 @@ namespace BattleSystemECS.Core
         {
             MaxDegreeOfParallelism = Environment.ProcessorCount
         };
+
+        /// <summary>并行度 = 4（轻量并行段专用，如 ManaBurnSystem 的批收集）。</summary>
+        public static readonly ParallelOptions Capped4 = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = 4
+        };
     }
 }

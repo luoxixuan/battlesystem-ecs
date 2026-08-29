@@ -162,7 +162,7 @@ namespace BattleSystemECS.Systems
                 const int batchSize = 512;
                 int numBatches = (count + batchSize - 1) / batchSize;
 
-                Parallel.For(0, numBatches, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, batchIdx =>
+                Parallel.For(0, numBatches, ParallelOptionsCache.HotPath, batchIdx =>
                 {
                     int start = batchIdx * batchSize;
                     int end = Math.Min(start + batchSize, count);

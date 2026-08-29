@@ -76,7 +76,7 @@ namespace BattleSystemECS.Systems
             {
                 // Parallel path — batch processing
                 int numBatches = (count + batchSize - 1) / batchSize;
-                Parallel.For(0, numBatches, new ParallelOptions { MaxDegreeOfParallelism = 4 }, batchIdx =>
+                Parallel.For(0, numBatches, ParallelOptionsCache.Capped4, batchIdx =>
                 {
                     int start = batchIdx * batchSize;
                     int end = Math.Min(start + batchSize, count);

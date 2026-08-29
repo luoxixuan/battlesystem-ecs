@@ -1410,6 +1410,25 @@ namespace BattleSystemECS.Config
         public float AoeStunDuration { get; set; }     // turns (used by AreaShape=aoestun)
         public float AoeRootDuration { get; set; }     // turns (used by AreaShape=aoeroot)
         public float AoeKnockbackForce { get; set; }   // radial push impulse (used by AreaShape=aoeknockback)
+        // 修饰效果列表（Data/Configs/skills.json 的 Modifiers 数组）—— "形状 × 效果列表" 正交化的
+        // 数据基础。当前仅加载与暴露，运行时消费待效果列表化重构接入。
+        public List<SkillModifierDef> Modifiers { get; set; } = new List<SkillModifierDef>();
+    }
+
+    /// <summary>
+    /// 技能修饰效果定义（skills.json 每技能的 Modifiers 数组元素）。
+    /// 字段名与 JSON 键一一对应；Type/StackingType/EffectTag 为设计器字符串约定
+    /// （"Damage"/"Debuff"/"Buff"、"None"/"Duration"、"Normal"/"Poison"/"Lightning"…）。
+    /// </summary>
+    public class SkillModifierDef
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "";
+        public float Duration { get; set; }
+        public string StackingType { get; set; } = "None";
+        public int StackLimitCount { get; set; }
+        public float Value { get; set; }
+        public string EffectTag { get; set; } = "Normal";
     }
 
     public class BehaviorTreeDef
@@ -1732,7 +1751,13 @@ namespace BattleSystemECS.Config
     public class GameConfig
     {
         public PlayerConfig Player { get; set; } = new PlayerConfig();
+        // 玩家技能栏（game_config.json "Skills" 数组）—— SkillSystem.InitializePlayerSkills 的数据源。
         public List<SkillConfig> Skills { get; set; } = new List<SkillConfig>();
+        // 共享技能定义表（此前仅存在于 HeroSkillSystem / TowerConfig.ActiveSkillId 注释中的 "SkillDefs[]"）：
+        // Data/Configs/skills.json（精选技能，含完整 shape/DoT/CC 字段与 Modifiers）+
+        // Data/Skills/*.json（静态定义，按名去重，精选优先）。按名引用的消费方（HeroSkillSystem、
+        // TowerActiveSkillSystem）优先在此表解析，回退到 Skills。
+        public List<SkillConfig> SkillDefs { get; set; } = new List<SkillConfig>();
         public List<MonsterConfig> MonsterTypes { get; set; } = new List<MonsterConfig>();
         public List<TowerConfig> TowerTypes { get; set; } = new List<TowerConfig>();
         public List<SummonDef> Summons { get; set; } = new List<SummonDef>();
@@ -1802,6 +1827,9 @@ namespace BattleSystemECS.Config
 
         // Tower Overcharge configuration
         public TowerOverchargeConfig TowerOvercharge { get; set; } = new TowerOverchargeConfig();
+        // 全局朝向伤害层（game_config.json "PositionalDamage" 段，此前无解析代码）。
+        // Enabled 总开关：JSON 未提供该键时保持 false —— 接线后默认零行为变化。
+        public PositionalDamageConfig PositionalDamage { get; set; } = new PositionalDamageConfig();
 
         // Tower Mastery / XP system configuration
         public TowerMasteryConfig TowerMastery { get; set; } = new TowerMasteryConfig();
@@ -3351,6 +3379,26 @@ namespace BattleSystemECS.Config
         public float ManaCost { get; set; } = 20f;
         /// <summary>Player must have at least this much mana to activate overcharge</summary>
         public float MinManaRequired { get; set; } = 10f;
+    }
+
+    /// <summary>
+    /// Positional damage（game_config.json "PositionalDamage" 段）—— 全局朝向伤害分层：
+    /// 塔从敌人背刺锥（以正后方为轴、总张角 BackstabAngleDegrees）内命中时伤害
+    /// ×BackstabDamageMultiplier；其外侧袭带（总张角 BackstabAngleDegrees+FlankAngleDegrees
+    /// 的锥内）×FlankDamageMultiplier；正面无加成。与 Round 174 的每塔 opt-in
+    /// BackstabConfig 相互独立（后者由 per-tower 字段驱动）。
+    /// Enabled 总开关默认 false：JSON 未提供该键时保持关闭，零行为变化（消费点
+    /// TowerAttackSystem 走与 BackstabConfig 相同的零开销短路门）。
+    /// </summary>
+    public class PositionalDamageConfig
+    {
+        public bool Enabled { get; set; } = false;
+        /// <summary>背刺锥总张角（度，(0,180]），以敌人正后方为轴</summary>
+        public float BackstabAngleDegrees { get; set; } = 120f;
+        /// <summary>侧袭带在背刺锥基础上向外扩展的总张角（度，>0；两角之和 ≤ 360）</summary>
+        public float FlankAngleDegrees { get; set; } = 60f;
+        public float BackstabDamageMultiplier { get; set; } = 1.5f;
+        public float FlankDamageMultiplier { get; set; } = 1.25f;
     }
 
     /// <summary>

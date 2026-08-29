@@ -56,11 +56,6 @@ namespace BattleSystemECS.Systems
         private List<int>[] _hitBatchBuffers = new List<int>[8];
         private readonly List<int> _mergedHits = new List<int>(64);
 
-        // Poison Nova DoT constants
-        private const float POISON_NOVA_DURATION = 5f;
-        private const float POISON_NOVA_TICK_INTERVAL = 1f;
-        private const float POISON_NOVA_DAMAGE_PER_TICK = 8f;
-
         // Chain Lightning constants
         private const int CHAIN_LIGHTNING_MAX_TARGETS = 4;  // primary + 3 chain targets
         private const float CHAIN_LIGHTNING_DAMAGE_DECAY = 0.70f;  // each hop deals 70% of previous
@@ -935,37 +930,40 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = _activeEnemyList;
 
             int radiusSq = radius * radius;
-            int hitCount = 0;
 
-            foreach (int enemyId in activeEnemyIds)
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
-                if (enemyId == playerId) continue;
+                if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) continue;
+                if (enemyHealth <= 0f) return;
 
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-
-                float dx = enemyX - playerX;
-                float dy = enemyY - playerY;
+                float dx = store.PositionX[enemyId] - playerX;
+                float dy = store.PositionY[enemyId] - playerY;
                 float distSq = dx * dx + dy * dy;
 
                 if (distSq <= radiusSq)
                 {
-                    _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
-
-                    if (def.FreezeDuration > 0f && def.FreezeChance > 0f)
-                    {
-                        float roll = (float)Rng.Shared.NextDouble();
-                        if (roll < def.FreezeChance)
-                        {
-                            int freezeTurns = Math.Max(1, (int)Math.Ceiling(def.FreezeDuration * (1f - _enemyFreezeResistance)));
-                            store.ApplyEnemyFreeze(enemyId, freezeTurns);
-                            renderer.Log($"[SKILL] {name} froze enemy {enemyId} for {freezeTurns} turns");
-                        }
-                    }
-                    hitCount++;
+                    hits.Add(enemyId);
                 }
+            }, _mergedHits);
+
+            // Serial phase: apply damage + freeze roll（命中序 = 敌人索引序，RNG 逐敌顺序与串行实现一致）
+            int hitCount = 0;
+            foreach (int enemyId in _mergedHits)
+            {
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+
+                if (def.FreezeDuration > 0f && def.FreezeChance > 0f)
+                {
+                    float roll = (float)Rng.Shared.NextDouble();
+                    if (roll < def.FreezeChance)
+                    {
+                        int freezeTurns = Math.Max(1, (int)Math.Ceiling(def.FreezeDuration * (1f - _enemyFreezeResistance)));
+                        store.ApplyEnemyFreeze(enemyId, freezeTurns);
+                        renderer.Log($"[SKILL] {name} froze enemy {enemyId} for {freezeTurns} turns");
+                    }
+                }
+                hitCount++;
             }
             return hitCount;
         }
@@ -1383,23 +1381,30 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = _activeEnemyList;
 
             int radiusSq = radius * radius;
-            int hitCount = 0;
-            foreach (int enemyId in activeEnemyIds)
+            int stunTurns = Math.Max(1, (int)Math.Ceiling(duration));
+
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
-                if (enemyId == playerId) continue;
+                if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) continue;
+                if (enemyHealth <= 0f) return;
 
                 float dx = store.PositionX[enemyId] - centerX;
                 float dy = store.PositionY[enemyId] - centerY;
-                if (dx * dx + dy * dy > radiusSq) continue;
+                if (dx * dx + dy * dy > radiusSq) return;
 
-                int stunTurns = Math.Max(1, (int)Math.Ceiling(duration));
+                hits.Add(enemyId);
+            }, _mergedHits);
+
+            // Serial phase: apply stun（stunTurns 为循环不变量，已提出）
+            int hitCount = 0;
+            foreach (int enemyId in _mergedHits)
+            {
                 store.ApplyEnemyStun(enemyId, stunTurns);
                 hitCount++;
             }
             if (hitCount > 0)
-                renderer.Log($"[SKILL] {name} AOE-stunned {hitCount} enemies in radius {radius} for {(int)Math.Ceiling(duration)} turns");
+                renderer.Log($"[SKILL] {name} AOE-stunned {hitCount} enemies in radius {radius} for {stunTurns} turns");
             return hitCount;
         }
 
@@ -1416,23 +1421,30 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = _activeEnemyList;
 
             int radiusSq = radius * radius;
-            int hitCount = 0;
-            foreach (int enemyId in activeEnemyIds)
+            int rootTurns = Math.Max(1, (int)Math.Ceiling(duration));
+
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
-                if (enemyId == playerId) continue;
+                if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) continue;
+                if (enemyHealth <= 0f) return;
 
                 float dx = store.PositionX[enemyId] - centerX;
                 float dy = store.PositionY[enemyId] - centerY;
-                if (dx * dx + dy * dy > radiusSq) continue;
+                if (dx * dx + dy * dy > radiusSq) return;
 
-                int rootTurns = Math.Max(1, (int)Math.Ceiling(duration));
+                hits.Add(enemyId);
+            }, _mergedHits);
+
+            // Serial phase: apply root（rootTurns 为循环不变量，已提出）
+            int hitCount = 0;
+            foreach (int enemyId in _mergedHits)
+            {
                 store.ApplyEnemyRoot(enemyId, rootTurns);
                 hitCount++;
             }
             if (hitCount > 0)
-                renderer.Log($"[SKILL] {name} AOE-rooted {hitCount} enemies in radius {radius} for {(int)Math.Ceiling(duration)} turns");
+                renderer.Log($"[SKILL] {name} AOE-rooted {hitCount} enemies in radius {radius} for {rootTurns} turns");
             return hitCount;
         }
 
@@ -1449,24 +1461,26 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = _activeEnemyList;
 
             int radiusSq = radius * radius;
-            int hitCount = 0;
-            foreach (int enemyId in activeEnemyIds)
+
+            CollectHits(activeEnemyIds, (enemyId, hits) =>
             {
-                if (enemyId == playerId) continue;
+                if (enemyId == playerId) return;
                 float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) continue;
+                if (enemyHealth <= 0f) return;
 
                 float dx = store.PositionX[enemyId] - centerX;
                 float dy = store.PositionY[enemyId] - centerY;
                 float distSq = dx * dx + dy * dy;
-                if (distSq > radiusSq) continue;
+                if (distSq > radiusSq) return;
 
-                // Store radial vector as knockback force; consumer (ResolveKnockback) reads magnitude
-                // from EnemyKnockbackForceLeft and direction from dx/dy at the time of application.
-                // We keep the simple scalar API of ApplyEnemyKnockback — magnitude only.
-                // Direction is applied by the consumer using (PositionX[enemyId]-centerX, ...)
-                // at the frame the force is resolved, so the same force field carries implicit
-                // direction-from-player at consumption time.
+                hits.Add(enemyId);
+            }, _mergedHits);
+
+            // Serial phase: apply knockback impulse（radial 方向由消费方 ResolveKnockback 按
+            // 施加时刻的 (Position - center) 解析，这里只写力大小 —— 与原串行实现一致）
+            int hitCount = 0;
+            foreach (int enemyId in _mergedHits)
+            {
                 store.ApplyEnemyKnockback(enemyId, force);
                 hitCount++;
             }

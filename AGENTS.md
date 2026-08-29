@@ -13,7 +13,7 @@
 - **架构**: SOA ECS（逻辑与渲染完全分离），事件总线（`IBattleEventBus`）驱动渲染
 - **运行时**: 控制台应用（含交互式游戏 + 非交互式压测）+ Unity 2D 渲染端
 - **核心特征**: 全系统并行化 (`Parallel.For`)、零分配热路径、配置驱动、帧末统一结算
-- **代码规模**: Core 库 ~52k 行（Core + Systems）、Tests ~22k 行；1281 项 xUnit 测试（框架层 / 机制层 / 业务层 / 集成层四分层）
+- **代码规模**: Core 库 ~52k 行（Core + Systems）、Tests ~22k 行；1298 项 xUnit 测试（框架层 / 机制层 / 业务层 / 集成层四分层）
 - **Unity 工程**: `F:\AI\BattleSystem-ECS-Unity`（2022.3.62f2c1 LTS），通过 `BattleDriver` 消费 DLL
 
 ---
@@ -27,10 +27,10 @@
 | `BattleSystemECS.Core/BattleSystemECS.Core.csproj` | **核心库** — netstandard2.1，LangVersion=9.0，编译 Core/ + Systems/ 全部代码。含 polyfill（IsExternalInit、Rng、PolyfillExtensions）、事件总线（IBattleEventBus/ConsoleEventBus + EventBus/GameEvents） |
 | `BattleSystemECS.csproj` | 主 EXE — net6.0，引用 Core 库，仅含 Program.cs |
 | `BattleSystemECS.Tests/BattleSystemECS.Tests.csproj` | 测试项目 — net9.0，引用 Core 库（不含 EXE） |
-| `game_config.json` | 运行时游戏主配置（怪物类型、关卡、波次、玩家属性、连击参数），`CopyToOutputDirectory=PreserveNewest` |
-| `Data/Configs/*.json` | 子配置：行为树、技能、科技树、塔位规则、波次生成、阶段行为、自动技能 |
+| `game_config.json` | 运行时游戏主配置（怪物类型、关卡、波次、玩家属性、连击/TowerOvercharge/PositionalDamage 参数），`CopyToOutputDirectory=PreserveNewest` |
+| `Data/Configs/*.json` | 子配置：行为树、技能（skills.json = 精选技能表，加载进 `GameConfig.SkillDefs`）、科技树、塔位规则、波次生成、阶段行为、自动技能 |
 | `Data/Monsters/*.json` | 200 种怪物静态定义 |
-| `Data/Skills/*.json` | 150 种技能静态定义 |
+| `Data/Skills/*.json` | 150 种技能静态定义（按名去重合并进 `GameConfig.SkillDefs`，精选条目优先） |
 | `Data/Towers/*.json` | 150 种塔静态定义 |
 | `Data/Levels/*.json` | 5 个关卡配置 |
 
@@ -252,7 +252,7 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 - **xUnit**（`Xunit`），测试项目 `BattleSystemECS.Tests`（TargetFramework=`net9.0`，引用 Core 库）。
 - 测试运行器：`xunit.runner.visualstudio`，覆盖率收集：`coverlet.collector`。
-- 当前测试数量：**1281 项**（全部通过为门禁要求）。
+- 当前测试数量：**1298 项**（全部通过为门禁要求）。
 - **测试范围分层**（目录即分层，详见 `BattleSystemECS.Tests/README.md`）：
   - **Infrastructure**：`TestWorld` / `Specs` / `MockRenderer` / `BattleTestBase` 共享基建，不含测试。
   - **Framework 框架层**：ECS 存储生命周期、帧调度与死亡结算、状态机、配置加载、GAS 冷却、曲线表、技能核心、时光快照。
@@ -301,7 +301,7 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 
 1. **`dotnet build BattleSystemECS.Core`** — Core 库 0 warnings, 0 errors
 2. **`dotnet build`** — EXE 0 warnings, 0 errors
-3. **`dotnet test BattleSystemECS.Tests`** — 全部通过（当前 1281/1281）
+3. **`dotnet test BattleSystemECS.Tests`** — 全部通过（当前 1298/1298）
 4. **`pwsh -File tools\check-test-rules.ps1`** — 测试静态规则 0 违规（零断言测试 + 恒真/恒假断言）
 5. **`git diff --check`** — 无空白/行尾错误（CRLF、trailing whitespace）
 6. **`echo 2 | dotnet run`** — mode 2 压测
@@ -351,7 +351,7 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 | 添加事件发射 | 逻辑→渲染走 `Core/IBattleEventBus.cs`；系统间走 `Core/EventBus.cs` + `Core/GameEvents.cs`（DTO） |
 | 修改并行策略 | 对应系统的 `Update()`，注意两阶段模式审查 |
 | 修改配置格式 | `Core/GameConfig.cs` + `Core/GameConfigLoader.cs` + `Data/Configs/*.json` |
-| 修改技能/效果 | `Core/GAS/*.cs` + `Systems/SkillSystem.cs` + `Data/Configs/skills.json` |
+| 修改技能/效果 | `Core/GAS/*.cs` + `Systems/SkillSystem.cs` + `game_config.json` Skills 数组（玩家技能栏）；共享技能表（SkillDefs）= `Data/Configs/skills.json`（精选）+ `Data/Skills/*.json`（静态），消费方 HeroSkillSystem / TowerActiveSkillSystem 按名解析 |
 | 修改科技树 | `Core/TechTreeDef.cs` + `Systems/TechTreeSystem.cs` + `Data/Configs/tech_tree.json` |
 | 修改行为树 | `Data/Configs/behavior_trees.json` + `Systems/BehaviorTreeEvaluator.cs` |
 | 修改 Polyfill | `Core/{IsExternalInit,Rng,PolyfillExtensions}.cs`（经 Linked Files 编译进 Core 库） |
@@ -363,4 +363,4 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 
 ---
 
-> **最后更新**：2026-08-27（并行热路径优化：并行段锁消除/批分区/串行阈值/静态 ParallelOptions，mode2/4/5 = 8333/5212/4874 FPS；新增 DOTS 迁移可行性评估 docs/dots-migration-evaluation.md）
+> **最后更新**：2026-08-29（死配置接线：`GameConfig.SkillDefs` 共享技能表（skills.json 20 精选 + Data/Skills 150 静态，按名去重）+ TowerOvercharge/PositionalDamage 段解析（后者 Enabled 门控默认关，消费点 TowerAttackSystem）；hero_skills.json 技能名此前解析恒失败已修复；game_config.json 修复为合法 JSON；测试 1281→1298）

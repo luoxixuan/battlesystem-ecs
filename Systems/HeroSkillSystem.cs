@@ -219,31 +219,55 @@ namespace BattleSystemECS.Systems
         public bool HasAnyConfiguredSkill() => _anySkillConfigured;
 
         // ── Private helpers ───────────────────────────────────────────────
+        // 技能 id 归一化索引空间：[0, SkillDefs.Count) 索引共享定义表（Data/Configs/
+        // skills.json + Data/Skills/*.json）；[SkillDefs.Count, +Skills.Count) 索引
+        // 玩家技能栏回退。此前只在 _config.Skills（占位技能）里找名字，hero_skills.json
+        // 引用的精选技能名永远解析失败 → 槽位恒 -1 → 系统休眠。
 
         private int ResolveSkillIdByName(string name)
         {
-            if (_config?.Skills == null) return -1;
-            for (int i = 0; i < _config.Skills.Count; i++)
+            if (string.IsNullOrEmpty(name)) return -1;
+            var defs = _config?.SkillDefs;
+            if (defs != null)
             {
-                var s = _config.Skills[i];
-                if (s == null) continue;
-                if (string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)) return i;
+                for (int i = 0; i < defs.Count; i++)
+                {
+                    var s = defs[i];
+                    if (s == null) continue;
+                    if (string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)) return i;
+                }
+            }
+            var skills = _config?.Skills;
+            if (skills != null)
+            {
+                int offset = defs != null ? defs.Count : 0;
+                for (int i = 0; i < skills.Count; i++)
+                {
+                    var s = skills[i];
+                    if (s == null) continue;
+                    if (string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)) return offset + i;
+                }
             }
             return -1;
         }
 
-        private string ResolveSkillNameById(int skillId)
+        private SkillConfig? ResolveSkillConfigById(int skillId)
         {
-            if (_config?.Skills == null || skillId < 0 || skillId >= _config.Skills.Count) return "?";
-            return _config.Skills[skillId]?.Name ?? "?";
+            var defs = _config?.SkillDefs;
+            if (defs != null && skillId >= 0 && skillId < defs.Count) return defs[skillId];
+            var skills = _config?.Skills;
+            int offset = defs != null ? defs.Count : 0;
+            if (skills != null && skillId >= offset && skillId < offset + skills.Count) return skills[skillId - offset];
+            return null;
         }
+
+        private string ResolveSkillNameById(int skillId) => ResolveSkillConfigById(skillId)?.Name ?? "?";
 
         private float ResolveCooldownForSkill(int skillId)
         {
-            if (_config?.Skills == null || skillId < 0 || skillId >= _config.Skills.Count) return 0f;
             // Cooldown is in seconds per the SkillConfig contract. Default to 5s if not set
             // so the gate is observable even if a designer forgot to set it.
-            float cd = _config.Skills[skillId]?.Cooldown ?? 0f;
+            float cd = ResolveSkillConfigById(skillId)?.Cooldown ?? 0f;
             return cd > 0f ? cd : 5f;
         }
 

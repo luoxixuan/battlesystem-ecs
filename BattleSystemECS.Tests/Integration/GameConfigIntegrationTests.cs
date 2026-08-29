@@ -4,6 +4,7 @@ using System.Linq;
 using Xunit;
 using BattleSystemECS.Tests.Infrastructure;
 using BattleSystemECS.Config;
+using BattleSystemECS.Systems;
 
 namespace BattleSystemECS.Tests.Integration
 {
@@ -214,6 +215,56 @@ namespace BattleSystemECS.Tests.Integration
                     Assert.True(wave.EnemyCount > 0, $"Level {level.LevelNumber} Wave {wave.WaveNumber} has no enemies");
                 }
             }
+        }
+
+        // ── 死配置接线：SkillDefs 共享技能表 + TowerOvercharge / PositionalDamage 段 ──
+
+        [Fact]
+        public void SkillDefs_LoadedFromStaticFiles_WithUniqueNames()
+        {
+            var config = GameConfigLoader.LoadConfig(Renderer);
+            // 精选（Data/Configs/skills.json）+ 静态（Data/Skills/*.json）按名去重合并
+            Assert.NotEmpty(config.SkillDefs);
+            var names = config.SkillDefs.Select(d => d.Name).ToList();
+            Assert.True(names.All(n => !string.IsNullOrWhiteSpace(n)), "SkillDefs 含空名条目");
+            Assert.Equal(names.Count, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        }
+
+        [Fact]
+        public void SkillDefs_HeroSkillSlots_ResolveWithRealConfig()
+        {
+            // 端到端接线断言：接线前 hero_skills.json 引用的精选技能名（"Cross Slash" 等）
+            // 只在占位玩家技能栏里找 → 解析恒失败 → HasAnySkillConfigured 恒 false。
+            var config = GameConfigLoader.LoadConfig(Renderer);
+            Assert.NotEmpty(config.SkillDefs);
+
+            var sys = new HeroSkillSystem(Store, 0, heroSkillsPath: "Data/Configs/hero_skills.json", config: config);
+            sys.Initialize();
+            Assert.True(sys.HasAnyConfiguredSkill(), "hero_skills.json 引用的技能名未能在 SkillDefs/Skills 解析");
+        }
+
+        [Fact]
+        public void TowerOvercharge_LoadedFromJson_StructurallyConsistent()
+        {
+            var config = GameConfigLoader.LoadConfig(Renderer);
+            var t = config.TowerOvercharge;
+            Assert.True(t.Cooldown >= t.Duration, "Overcharge 冷却应覆盖增益持续时间");
+            Assert.True(t.DamageMultiplier >= 1f);
+            Assert.True(t.AttackSpeedMultiplier >= 1f);
+            Assert.True(t.ManaCost >= t.MinManaRequired, "激活门槛（MinManaRequired）不应高于实际消耗（ManaCost）");
+        }
+
+        [Fact]
+        public void PositionalDamage_LoadedFromJson_DisabledByDefaultWithValidAngles()
+        {
+            var config = GameConfigLoader.LoadConfig(Renderer);
+            var p = config.PositionalDamage;
+            // JSON 未提供 Enabled 键 → 默认关闭：接线零行为变化契约
+            Assert.False(p.Enabled);
+            Assert.True(p.BackstabAngleDegrees > 0f && p.BackstabAngleDegrees <= 180f, "背刺锥张角须在 (0,180]");
+            Assert.True(p.FlankAngleDegrees > 0f, "侧袭带张角须为正");
+            Assert.True(p.BackstabAngleDegrees + p.FlankAngleDegrees <= 360f, "两带张角之和须 ≤ 360");
+            Assert.True(p.FlankDamageMultiplier < p.BackstabDamageMultiplier, "侧袭倍率应弱于背刺倍率");
         }
     }
 }

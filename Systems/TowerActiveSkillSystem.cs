@@ -85,8 +85,24 @@ namespace BattleSystemECS.Systems
             // Gate passed — flip the cooldown to its max and emit the log.
             store.SetTowerActiveOnCooldown(towerId);
             string towerName = store.TowerType[towerId].ToString();
-            Console.WriteLine($"[TOWER_ACTIVE] tower={towerId} ({towerName}) cast skillId={skillId} (cd={store.TowerActiveCooldownMax[towerId]:F1}s)");
+            string skillName = ResolveSkillName(skillId);
+            Console.WriteLine($"[TOWER_ACTIVE] tower={towerId} ({towerName}) cast skillId={skillId} ({skillName}) cd={store.TowerActiveCooldownMax[towerId]:F1}s");
             return true;
+        }
+
+        /// <summary>
+        /// 技能 id → 显示名。TowerConfig.ActiveSkillId 语义（见其注释）是索引共享
+        /// SkillDefs 表；越界时回退玩家技能栏（Skills）。两表皆未命中返回 "?"。
+        /// </summary>
+        private string ResolveSkillName(int skillId)
+        {
+            var cfg = _config;
+            if (cfg == null) return "?";
+            var defs = cfg.SkillDefs;
+            if (defs != null && skillId >= 0 && skillId < defs.Count) return defs[skillId]?.Name ?? "?";
+            var skills = cfg.Skills;
+            if (skills != null && skillId >= 0 && skillId < skills.Count) return skills[skillId]?.Name ?? "?";
+            return "?";
         }
 
         /// <summary>

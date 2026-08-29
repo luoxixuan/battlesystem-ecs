@@ -43,6 +43,14 @@ namespace BattleSystemECS.Systems
         // backstab block is fully skipped (zero overhead) even if a tower has a non-1.0
         // TowerBackstabDamageMult — designers get a single global kill-switch.
         private bool _backstabEnabled;
+        // 全局朝向伤害层（game_config.json "PositionalDamage" 段，默认关）。与 Round 174
+        // 的每塔 opt-in backstab 相互独立：本层对全部塔生效。缓存开关与两个 cos 阈值
+        // （背刺锥 / 侧袭带外边界），热路径避免 MathF.Cos 与 config 对象读。
+        private bool _positionalEnabled;
+        private float _posBackstabCos;   // cos(BackstabAngleDegrees/2)：dot 大于它 → 背刺锥内
+        private float _posFlankCos;      // cos((Backstab+Flank)/2)：dot 大于它且未达背刺阈值 → 侧袭带
+        private float _posBackstabMult;
+        private float _posFlankMult;
         // Cached desperation bonuses (updated each SetTurn from DesperationSystem)
         private float _desperationDmgBonus = 0f;
         private float _desperationSpeedBonus = 0f;
@@ -244,6 +252,20 @@ namespace BattleSystemECS.Systems
             _backstabEnabled = config != null
                 && config.Backstab != null
                 && config.Backstab.Enabled;
+            // 全局朝向伤害层：角度非法（B∉(0,180]、F≤0、B+F>360）时同样视为关闭，
+            // 设计器改坏配置不会让热路径吃到 NaN cos 阈值。
+            var pos = config != null ? config.PositionalDamage : null;
+            _positionalEnabled = pos != null && pos.Enabled
+                && pos.BackstabAngleDegrees > 0f && pos.BackstabAngleDegrees <= 180f
+                && pos.FlankAngleDegrees > 0f
+                && pos.BackstabAngleDegrees + pos.FlankAngleDegrees <= 360f;
+            if (_positionalEnabled)
+            {
+                _posBackstabCos = MathF.Cos(pos.BackstabAngleDegrees * MathF.PI / 180f / 2f);
+                _posFlankCos = MathF.Cos((pos.BackstabAngleDegrees + pos.FlankAngleDegrees) * MathF.PI / 180f / 2f);
+                _posBackstabMult = pos.BackstabDamageMultiplier;
+                _posFlankMult = pos.FlankDamageMultiplier;
+            }
         }
 
         /// <summary>
@@ -1265,6 +1287,36 @@ namespace BattleSystemECS.Systems
                                         baseDmg *= backstabMult;
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    // ── 全局朝向伤害层（game_config.json "PositionalDamage"，默认关）────
+                    // 与上方每塔 opt-in 的 backstab 块相互独立：本层对全部塔生效。dot 为
+                    // (塔→敌 单位向量)·(敌面朝 单位向量)：dot > cos(B/2) → 背刺锥 ×BackstabMult；
+                    // 其外侧袭带（dot > cos((B+F)/2) 且未达背刺阈值）×FlankMult；正面无加成。
+                    // Enabled=false（JSON 未提供该键的默认态）时一次 bool 读短路 —— 与
+                    // BackstabConfig 相同的零开销门模式。
+                    if (_positionalEnabled)
+                    {
+                        float posDirX = store.EnemyMoveDirX[bestTarget];
+                        float posDirY = store.EnemyMoveDirY[bestTarget];
+                        float posDirLenSq = posDirX * posDirX + posDirY * posDirY;
+                        if (posDirLenSq > 0.0001f)
+                        {
+                            float posInvLen = 1.0f / MathF.Sqrt(posDirLenSq);
+                            float posEx = store.PositionX[bestTarget];
+                            float posEy = store.PositionY[bestTarget];
+                            float posDx = posEx - tx;
+                            float posDy = posEy - ty;
+                            float posDistSq = posDx * posDx + posDy * posDy;
+                            if (posDistSq > 0.0001f)
+                            {
+                                float posInvDist = 1.0f / MathF.Sqrt(posDistSq);
+                                float posDot = posDx * posInvDist * posDirX * posInvLen
+                                             + posDy * posInvDist * posDirY * posInvLen;
+                                if (posDot > _posBackstabCos) baseDmg *= _posBackstabMult;
+                                else if (posDot > _posFlankCos) baseDmg *= _posFlankMult;
                             }
                         }
                     }

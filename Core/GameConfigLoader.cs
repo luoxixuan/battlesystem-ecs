@@ -58,6 +58,13 @@ namespace BattleSystemECS.Config
                 LoadItemDefs(gameConfig, renderer);
                 LoadCraftingRecipes(gameConfig, renderer);
 
+                // Load shared skill definition table (SkillDefs): curated skills from
+                // Data/Configs/skills.json + per-file static defs from Data/Skills/*.json,
+                // deduplicated by name (curated wins). Consumed by name-lookup paths
+                // (HeroSkillSystem, TowerActiveSkillSystem); player skill bar (Skills)
+                // still comes from game_config.json above.
+                LoadSkillDefs(gameConfig, renderer);
+
                 // Load enemy fission definitions
                 LoadFissionDefs(gameConfig, renderer);
 
@@ -640,6 +647,12 @@ LoadAdrenalineConfig(gameConfig, renderer);
             // Parse Combo config from JSON (fills GameConfig.Combo)
             ParseComboConfig(gameConfig, jsonContent);
 
+            // Parse TowerOvercharge / PositionalDamage sections (previously present in
+            // game_config.json but silently ignored — TowerOvercharge ran on coded defaults,
+            // PositionalDamage had no model at all)
+            ParseTowerOverchargeConfig(gameConfig, jsonContent);
+            ParsePositionalDamageConfig(gameConfig, jsonContent);
+
             return gameConfig;
         }
 
@@ -661,6 +674,62 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 ComboDamageBonusPerKill = ExtractFloat(comboJson, "comboDamageBonusPerKill"),
                 ComboGoldBonusPerKill = ExtractFloat(comboJson, "comboGoldBonusPerKill"),
                 ComboMaxMultiplier = ExtractFloat(comboJson, "comboMaxMultiplier")
+            };
+        }
+
+        /// <summary>
+        /// 解析 game_config.json 的 "TowerOvercharge" 段。此前该段存在于 JSON 但无解析代码，
+        /// TowerOverchargeSystem 一直跑 TowerOverchargeConfig 代码默认值（两处值恰好一致）。
+        /// public static：供 loader 单测注入 JSON 片段驱动（HeroSkillsConfigLoader.Parse 先例）。
+        /// </summary>
+        public static void ParseTowerOverchargeConfig(GameConfig gameConfig, string jsonContent)
+        {
+            int sectionStart = jsonContent.IndexOf("\"TowerOvercharge\"");
+            if (sectionStart == -1) return;
+
+            int braceStart = jsonContent.IndexOf('{', sectionStart);
+            if (braceStart == -1) return;
+            int braceEnd = FindMatchingBrace(jsonContent, braceStart);
+            if (braceEnd == -1) return;
+
+            string sectionJson = jsonContent.Substring(braceStart + 1, braceEnd - braceStart - 1);
+
+            gameConfig.TowerOvercharge = new TowerOverchargeConfig
+            {
+                DamageMultiplier = ExtractFloat(sectionJson, "DamageMultiplier"),
+                AttackSpeedMultiplier = ExtractFloat(sectionJson, "AttackSpeedMultiplier"),
+                RangeMultiplier = ExtractFloat(sectionJson, "RangeMultiplier"),
+                Duration = ExtractFloat(sectionJson, "Duration"),
+                Cooldown = ExtractFloat(sectionJson, "Cooldown"),
+                ManaCost = ExtractFloat(sectionJson, "ManaCost"),
+                MinManaRequired = ExtractFloat(sectionJson, "MinManaRequired")
+            };
+        }
+
+        /// <summary>
+        /// 解析 game_config.json 的 "PositionalDamage" 段（全局朝向伤害层）。
+        /// 此前该段无模型无解析。Enabled 键缺失时保持默认 false —— 零行为变化。
+        /// public static：供 loader 单测注入 JSON 片段驱动。
+        /// </summary>
+        public static void ParsePositionalDamageConfig(GameConfig gameConfig, string jsonContent)
+        {
+            int sectionStart = jsonContent.IndexOf("\"PositionalDamage\"");
+            if (sectionStart == -1) return;
+
+            int braceStart = jsonContent.IndexOf('{', sectionStart);
+            if (braceStart == -1) return;
+            int braceEnd = FindMatchingBrace(jsonContent, braceStart);
+            if (braceEnd == -1) return;
+
+            string sectionJson = jsonContent.Substring(braceStart + 1, braceEnd - braceStart - 1);
+
+            gameConfig.PositionalDamage = new PositionalDamageConfig
+            {
+                Enabled = ExtractBool(sectionJson, "Enabled"),
+                BackstabAngleDegrees = ExtractFloat(sectionJson, "BackstabAngleDegrees"),
+                FlankAngleDegrees = ExtractFloat(sectionJson, "FlankAngleDegrees"),
+                BackstabDamageMultiplier = ExtractFloat(sectionJson, "BackstabDamageMultiplier"),
+                FlankDamageMultiplier = ExtractFloat(sectionJson, "FlankDamageMultiplier")
             };
         }
 
@@ -1637,6 +1706,187 @@ LoadAdrenalineConfig(gameConfig, renderer);
             {
                 renderer.Log("[PICKUP] Failed to load pickup defs: " + ex.Message);
             }
+        }
+
+        // ── Shared skill definition table (SkillDefs) ────────────────────────
+        // 接线此前无任何代码加载的两处死数据：Data/Configs/skills.json（精选技能表，
+        // 顶层为数组，含完整 shape/DoT/CC 字段与 Modifiers）与 Data/Skills/*.json
+        // （150 个静态定义，字段为 SkillConfig 子集）。按名去重合并，精选优先。
+        // 消费方：HeroSkillSystem / TowerActiveSkillSystem 的按名解析（优先 SkillDefs，
+        // 回退 Skills）。玩家技能栏（Skills）仍来自 game_config.json 主文件。
+
+        private static void LoadSkillDefs(GameConfig gameConfig, IRenderer renderer)
+        {
+            const string curatedFile = "Data/Configs/skills.json";
+            const string staticDir = "Data/Skills";
+            try
+            {
+                int curatedCount = 0;
+                if (File.Exists(curatedFile))
+                {
+                    string json = File.ReadAllText(curatedFile);
+                    if (!string.IsNullOrWhiteSpace(json))
+                    {
+                        curatedCount = ParseSkillDefsArrayJson(gameConfig, json);
+                    }
+                }
+                else
+                {
+                    renderer.Log("[SKILLDEF] Curated skill defs file not found: " + curatedFile);
+                }
+
+                int staticCount = 0, skipped = 0;
+                if (Directory.Exists(staticDir))
+                {
+                    foreach (string path in Directory.GetFiles(staticDir, "skill_*.json"))
+                    {
+                        try
+                        {
+                            string json = File.ReadAllText(path);
+                            if (string.IsNullOrWhiteSpace(json)) continue;
+                            using (var doc = System.Text.Json.JsonDocument.Parse(json))
+                            {
+                                if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                                var def = ParseSkillDefElement(doc.RootElement);
+                                if (string.IsNullOrEmpty(def.Name) || NameExists(gameConfig, def.Name)) { skipped++; continue; }
+                                gameConfig.SkillDefs.Add(def);
+                                staticCount++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            renderer.Log("[SKILLDEF] Failed to parse " + path + ": " + ex.Message);
+                        }
+                    }
+                }
+                else
+                {
+                    renderer.Log("[SKILLDEF] Static skill defs directory not found: " + staticDir);
+                }
+
+                renderer.Log("[SKILLDEF] Loaded " + curatedCount + " curated + " + staticCount
+                    + " static skill defs (" + skipped + " skipped as duplicates/empty)");
+            }
+            catch (Exception ex)
+            {
+                renderer.Log("[SKILLDEF] Failed to load skill defs: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 解析顶层为 JSON 数组的技能定义表，按名去重追加到 SkillDefs（同名跳过）。
+        /// 返回新增条数。public static：供单测注入 JSON 片段驱动（HeroSkillsConfigLoader.Parse 先例）。
+        /// </summary>
+        public static int ParseSkillDefsArrayJson(GameConfig gameConfig, string jsonArrayJson)
+        {
+            if (string.IsNullOrWhiteSpace(jsonArrayJson)) return 0;
+            using (var doc = System.Text.Json.JsonDocument.Parse(jsonArrayJson))
+            {
+                if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array) return 0;
+                int added = 0;
+                foreach (var elem in doc.RootElement.EnumerateArray())
+                {
+                    var def = ParseSkillDefElement(elem);
+                    if (string.IsNullOrEmpty(def.Name) || NameExists(gameConfig, def.Name)) continue;
+                    gameConfig.SkillDefs.Add(def);
+                    added++;
+                }
+                return added;
+            }
+        }
+
+        private static bool NameExists(GameConfig gameConfig, string name)
+        {
+            for (int i = 0; i < gameConfig.SkillDefs.Count; i++)
+            {
+                if (string.Equals(gameConfig.SkillDefs[i]?.Name, name, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>System.Text.Json 元素 → SkillConfig（只覆盖 JSON 中存在的键，其余保持 SkillConfig 默认值）。</summary>
+        private static SkillConfig ParseSkillDefElement(System.Text.Json.JsonElement elem)
+        {
+            var s = new SkillConfig();
+            if (elem.ValueKind != System.Text.Json.JsonValueKind.Object) return s;
+
+            s.Name = DefGetString(elem, "Name");
+            s.Description = DefGetString(elem, "Description");
+            s.Hotkey = DefGetString(elem, "Hotkey");
+            s.AreaShape = DefGetString(elem, "AreaShape");
+            s.SummonDefId = DefGetString(elem, "SummonDefId");
+            s.DamageMultiplier = DefGetFloat(elem, "DamageMultiplier");
+            s.Cooldown = DefGetFloat(elem, "Cooldown");
+            s.DotDuration = DefGetFloat(elem, "DotDuration");
+            s.DotTickInterval = DefGetFloat(elem, "DotTickInterval");
+            s.DotDamagePerTick = DefGetFloat(elem, "DotDamagePerTick");
+            s.HealPercent = DefGetFloat(elem, "HealPercent");
+            s.ShieldAmount = DefGetFloat(elem, "ShieldAmount");
+            s.ShieldDuration = DefGetFloat(elem, "ShieldDuration");
+            s.FreezeDuration = DefGetFloat(elem, "FreezeDuration");
+            s.FreezeChance = DefGetFloat(elem, "FreezeChance");
+            s.SlowAmount = DefGetFloat(elem, "SlowAmount");
+            s.SlowDuration = DefGetFloat(elem, "SlowDuration");
+            s.PolymorphDuration = DefGetFloat(elem, "PolymorphDuration");
+            s.ManaCost = DefGetFloat(elem, "ManaCost");
+            s.AoeStunDuration = DefGetFloat(elem, "AoeStunDuration");
+            s.AoeRootDuration = DefGetFloat(elem, "AoeRootDuration");
+            s.AoeKnockbackForce = DefGetFloat(elem, "AoeKnockbackForce");
+            s.AreaWidth = (int)DefGetFloat(elem, "AreaWidth");
+            s.AreaHeight = (int)DefGetFloat(elem, "AreaHeight");
+            s.AttackRange = (int)DefGetFloat(elem, "AttackRange");
+            s.AreaRadius = (int)DefGetFloat(elem, "AreaRadius");
+
+            if (elem.TryGetProperty("AutoCast", out var ac))
+            {
+                if (ac.ValueKind == System.Text.Json.JsonValueKind.True) s.AutoCast = true;
+                else if (ac.ValueKind == System.Text.Json.JsonValueKind.False) s.AutoCast = false;
+                else if (ac.ValueKind == System.Text.Json.JsonValueKind.String && bool.TryParse(ac.GetString(), out bool parsed)) s.AutoCast = parsed;
+            }
+            if (elem.TryGetProperty("PolymorphDamageTakenMultiplier", out var pdm)
+                && pdm.ValueKind == System.Text.Json.JsonValueKind.Number)
+            {
+                s.PolymorphDamageTakenMultiplier = (float)pdm.GetDouble();
+            }
+            // ConeAngleDegrees 默认 60：键缺失时保持默认（避免非 cone 技能把默认值清零）
+            if (elem.TryGetProperty("ConeAngleDegrees", out var cad)
+                && cad.ValueKind == System.Text.Json.JsonValueKind.Number)
+            {
+                s.ConeAngleDegrees = (float)cad.GetDouble();
+            }
+
+            if (elem.TryGetProperty("Modifiers", out var mods) && mods.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                foreach (var m in mods.EnumerateArray())
+                {
+                    if (m.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                    s.Modifiers.Add(new SkillModifierDef
+                    {
+                        Name = DefGetString(m, "Name"),
+                        Type = DefGetString(m, "Type"),
+                        Duration = DefGetFloat(m, "Duration"),
+                        StackingType = DefGetString(m, "StackingType"),
+                        StackLimitCount = (int)DefGetFloat(m, "StackLimitCount"),
+                        Value = DefGetFloat(m, "Value"),
+                        EffectTag = DefGetString(m, "EffectTag")
+                    });
+                }
+            }
+            return s;
+        }
+
+        private static string DefGetString(System.Text.Json.JsonElement e, string key)
+        {
+            return e.TryGetProperty(key, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String
+                ? v.GetString() ?? ""
+                : "";
+        }
+
+        private static float DefGetFloat(System.Text.Json.JsonElement e, string key)
+        {
+            return e.TryGetProperty(key, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.Number
+                ? (float)v.GetDouble()
+                : 0f;
         }
 
         // ── Round 130 Inventory items ─────────────────────────────────────

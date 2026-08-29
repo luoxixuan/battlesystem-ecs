@@ -233,5 +233,66 @@ namespace BattleSystemECS.Tests.Features.Skills
             Assert.True(ok);
             Assert.Equal(5f, sys.GetHeroSkillCooldown(0, 0), 3);
         }
+
+        // ─── SkillDefs 优先解析（接线：Data/Configs/skills.json 共享技能表）─────────
+
+        /// <summary>
+        /// 同名技能同时存在于 SkillDefs（共享定义表）与 Skills（玩家技能栏）时，
+        /// Initialize 的名称解析必须命中 SkillDefs 条目（冷却取自精选定义）。
+        /// 接线前 SkillDefs 不存在，hero_skills.json 引用的精选技能名永远解析失败。
+        /// </summary>
+        [Fact]
+        public void Initialize_SkillDefsTakePriority_SameNameInBothTables()
+        {
+            Config.SkillDefs.Add(new SkillConfig { Name = "Cross Slash", Cooldown = 7f });
+            Config.SkillDefs.Add(new SkillConfig { Name = "Guardian Heal", Cooldown = 9f });
+            Config.Skills.Add(new SkillConfig { Name = "Cross Slash", Cooldown = 3f }); // 玩家栏同名条目，不得被优先命中
+
+            string tmp = Path.Combine(Path.GetTempPath(), "hero_skills_test_" + Guid.NewGuid().ToString("N") + ".json");
+            try
+            {
+                File.WriteAllText(tmp,
+                    "{\"Skills\":[{\"SlotIndex\":0,\"SkillName\":\"Cross Slash\"},{\"SlotIndex\":1,\"SkillName\":\"Guardian Heal\"}]}");
+                var sys = new HeroSkillSystem(Store, 0, heroSkillsPath: tmp, config: Config);
+                sys.Initialize();
+
+                Assert.True(sys.HasAnyConfiguredSkill());
+                Store.HeroIsDeployed[0] = true;
+                Assert.True(sys.IsHeroSkillReady(0, 0));
+                Assert.True(sys.IsHeroSkillReady(0, 1));
+                // 冷却上限来自 SkillDefs 条目（7s），不是玩家栏同名条目（3s）
+                Assert.Equal(7f, sys.GetHeroSkillCooldownMax(0, 0), 3);
+                Assert.Equal(9f, sys.GetHeroSkillCooldownMax(0, 1), 3);
+                // 触发成功并把冷却翻转到 SkillDefs 的 max
+                Assert.True(sys.TriggerHeroSkill(0, 0));
+                Assert.Equal(7f, sys.GetHeroSkillCooldown(0, 0), 3);
+            }
+            finally
+            {
+                File.Delete(tmp);
+            }
+        }
+
+        [Fact]
+        public void Initialize_FallsBackToPlayerSkillBar_WhenNameNotInSkillDefs()
+        {
+            Config.Skills.Add(new SkillConfig { Name = "Railgun Shot #3", Cooldown = 4f });
+
+            string tmp = Path.Combine(Path.GetTempPath(), "hero_skills_test_" + Guid.NewGuid().ToString("N") + ".json");
+            try
+            {
+                File.WriteAllText(tmp, "{\"Skills\":[{\"SlotIndex\":2,\"SkillName\":\"Railgun Shot #3\"}]}");
+                var sys = new HeroSkillSystem(Store, 0, heroSkillsPath: tmp, config: Config);
+                sys.Initialize();
+
+                Store.HeroIsDeployed[0] = true;
+                Assert.True(sys.IsHeroSkillReady(0, 2));
+                Assert.Equal(4f, sys.GetHeroSkillCooldownMax(0, 2), 3);
+            }
+            finally
+            {
+                File.Delete(tmp);
+            }
+        }
     }
 }

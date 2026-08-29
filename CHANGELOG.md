@@ -1,5 +1,24 @@
 # 更新记录 (Changelog)
 
+### 2026-08-29（第二批：死配置接线）
+- 三处死数据全部接线（`GameConfig.SkillDefs` 共享技能表 + TowerOvercharge/PositionalDamage 段解析；测试 1281→1298，战斗行为默认零变化）：
+  1. **SkillDefs 共享技能表**（此前仅存在于 HeroSkillSystem/TowerConfig 注释中的 "SkillDefs[]"，实现缺失）：新增 `GameConfig.SkillDefs`，`LoadSkillDefs` 用 System.Text.Json 加载 `Data/Configs/skills.json`（20 个精选技能，含完整 shape/DoT/CC 字段与此前无处安放的 `Modifiers` 数组 → 新增 `SkillModifierDef` 模型）+ `Data/Skills/*.json`（150 个静态定义），按名去重合并（精选优先）。Core csproj 补 `Data/Skills` 的 CopyToOutputDirectory（该目录此前从未随产物分发——死数据的又一症状）。
+  2. **HeroSkillSystem 槽位修复**：名称解析此前只在 150 个占位玩家技能里找 → `hero_skills.json` 引用的 "Cross Slash"/"Guardian Heal"/"Cold Nova" 等精选技能名解析恒失败 → 槽位恒 -1、系统休眠。现按 SkillDefs 优先 → Skills 回退的归一化索引空间解析，4 槽位真实配置生效（集成测试断言 `HasAnyConfiguredSkill()==true`，接线前该断言必失败）。
+  3. **TowerOvercharge 段解析**：此前 JSON 有段无解析代码，`TowerOverchargeSystem` 一直跑代码默认值（两处数值恰好一致，纯配置正确性修复）。新增 `ParseTowerOverchargeConfig`（ExtractFloat 风格，与 ParseComboConfig 一致）。
+  4. **PositionalDamage 段接线（门控消费）**：此前无模型无解析。新增 `PositionalDamageConfig`（Backstab/Flank 角度+倍率+Enabled 总开关），`TowerAttackSystem` 消费点与 Round 174 每塔 opt-in backstab 层相互独立（新增隔离测试验证不叠加）：背刺锥 dot>cos(B/2) ×BackstabMult、侧袭带 ×FlankMult、正面无加成，cos 阈值 SetGameConfig 时缓存；角度非法（B∉(0,180] 等）视为关闭防 NaN。**JSON 未提供 Enabled 键 → 默认关，热路径一次 bool 读短路，零行为变化**；要启用需在 JSON 显式加 `"Enabled": true`。
+  5. TowerActiveSkillSystem 的 TriggerTowerActive log 行现从 SkillDefs/Skills 解析技能名（原只打 skillId 数字）。
+- 测试：+17（loader 注入式解析单测 5 / HeroSkillSystem SkillDefs 优先与回退 2 / 集成 4（含 hero 槽位端到端）/ PositionalDamage 真实攻击路径 6：背刺/侧袭/正面/关闭/非法配置 Theory + 层隔离）。修正一处测试设计：正面场景须用"朝向塔的敌人"而非"塔下方的敌人"（塔索敌有 Y 方向性）。
+- 验证：build ×2 均 0 warnings/0 errors；`dotnet test` 1298/1298 PASS；check-test-rules 0 违规；`git diff --check` 干净。压测：mode2 8116 / mode4 5075 通过；mode5 4405–4792（4 跑），stash A/B 基线 4329/4330 —— 接线后分布不低于基线，无回归（单次 4405 为当日噪声低端；当日 mode5 波动带本身 ±5%）。
+
+### 2026-08-29（第一批：审查核实 + 低风险修复）
+- 架构审查结论核实 + 第一批低风险修复（审查 7 大项全部证实；本批 5 项改动零战斗语义变化，1281 测试全过）：
+  1. `game_config.json` 结构修复：原文件根对象在 6278 行提前闭合，`Combo`/`TowerOvercharge`/`PositionalDamage` 三段被拼接在根对象之外（严格解析器报 `Extra data`，整个文件不是合法 JSON，只有手写字符串扫描 parser 能读）。外科手术式修复：三段移入根对象成为正常成员，文件现可用标准 JSON 解析器加载，为后续迁移 `System.Text.Json` 解除阻塞。`ParseComboConfig` 的 `IndexOf` 扫描行为不变（键首次出现位置语义一致）。另核实：三段中仅 `Combo` 有解析代码，`TowerOvercharge`/`PositionalDamage` 为死配置（`GameConfig.TowerOvercharge` 一直用代码默认值）。
+  2. `SkillSystem` 四处遗漏的串行循环 → `CollectHits` 两阶段收敛：`CastFreezeArea`/`CastAoeStun`/`CastAoeRoot`/`CastAoeKnockback` 原为纯串行 foreach（与类注释宣称的 "parallel collect → serial apply" 不符，是 8 处统一改造的遗漏项）。收敛后命中序 = 敌人索引序，RNG 逐敌顺序与原实现一致（AoeCcTests/Freeze 测试全过）；Stun/Root 的 turns 计算为循环不变量，提出循环外。
+  3. 每帧 `new ParallelOptions` 漏网清理（上轮 24 处清扫的补遗）：`BenchmarkSystem` mode2 合并循环（→`ParallelOptionsCache.HotPath`）、`ManaBurnSystem` 并行段（新增 `ParallelOptionsCache.Capped4`，保持 DOP=4 语义不变）。
+  4. `SkillSystem` 死代码清理：`POISON_NOVA_*` 三常量定义后从未被引用，删除。
+  5. 核实记录（无代码改动）：mode2/4 压测中 `skill.SetTurn` 从未被调用且 `BenchmarkSystem` 丢弃 `LoadConfig` 返回值（用空 `GameConfig`），技能施放在 mode2/4 实际为 no-op，仅 mode5 真实驱动技能链路；`Data/Configs/skills.json`（13KB）与 `Data/Skills/*.json`（150 文件）无任何代码加载（AGENTS.md 所述"静态定义"与实际不符，待决策删除或接线）。
+- 验证：build ×2 均 0 warnings/0 errors；`dotnet test` 1281/1281 PASS；check-test-rules 0 违规；`git diff --check` 干净。压测：mode4 5164 / mode5 4721 通过；mode2 当日本机噪声带 6791–8309（stash A/B 对照：基线两跑 6791/8026，改动后三跑 7496/7995/8309，分布无法区分，无回归；8333 记录基线为 08-27 较快机器状态下取得）。
+
 ### 2026-08-27
 - 并行热路径性能优化（4 项生产代码改动；1281 测试全过、三模式压测全部提升、战斗语义零变化）：
   1. `PlayerTowerAttackSystem`：并行阶段每次命中抢全局锁（`_damageQueueLock`）把并行收集打回串行 —— 重构为按批分区无锁收集（256 敌/批、每批独占缓冲、帧末按批序合并、确定性顺序），并新增敌数 <500 的纯串行快速路径。mode4 PlayerAttack 27.0→12.1ms（−55%）。修复批缓冲初始槽位为 null 导致 10K 压测 NRE 的问题（槽位按需实例化）。
