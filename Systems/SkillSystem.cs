@@ -232,32 +232,29 @@ namespace BattleSystemECS.Systems
         public void Update(float deltaTime)
         {
             this.deltaTime = deltaTime;
+
+            // Cooldown decay multipliers are per-player invariants — computed once per
+            // frame, not per slot. Applied as deltaTime × cdrFactor × adrFactor:
+            //   • CDR (PlayerCooldownReduction): 0 = none, 0.3 = 30% faster; capped at
+            //     0.6 to avoid near-zero cooldowns.
+            //   • Adrenaline cooldown multiplier (Round 207 Direction 2) layered on top:
+            //     tier 1 low-HP → LowTierCooldownMult (0.80 = -20% cd), tier 2 critical →
+            //     CriticalTierCooldownMult (0.50 = -50% cd). A mult < 1 reduces deltaTime
+            //     (slower decay) — the opposite of what we want — so we INVERT: 1/mult.
+            //     Sentinels: disabled config keeps mult at 1; degenerate mult (<= 0, or the
+            //     1/0 = Infinity case) falls back / clamps so decay never goes negative.
+            float cdrFactor = 1f + Math.Min(store.PlayerCooldownReduction[playerId], 0.6f);
+            float adrMult = store.PlayerAdrenalineCooldownMult[playerId];
+            if (adrMult <= 0f) adrMult = 1f;
+            float adrFactor = 1f + Math.Min((1f / adrMult) - 1f, 4f);
+
             int count = store.AbilityCount[playerId];
             for (int slot = 0; slot < count; slot++)
             {
                 var inst = store.GetAbility(playerId, slot);
                 if (inst.CurrentCooldown > 0f)
                 {
-                    // Apply cooldown reduction (CDR): 0 = no reduction, 0.3 = 30% faster
-                    // effectiveRate = 1 + cdr, so deltaTime is scaled up by (1 + cdr)
-                    float cdr = store.PlayerCooldownReduction[playerId];
-                    float cdrClamped = Math.Min(cdr, 0.6f); // cap at 60% to avoid near-zero cooldowns
-                    // Round 207 Direction 2 — Adrenaline cooldown multiplier layered on top
-                    // of the existing CDR. When the player is in tier 1 (low HP) the mult
-                    // drops to LowTierCooldownMult (default 0.80 = -20% cooldown) and in
-                    // tier 2 to CriticalTierCooldownMult (default 0.50 = -50% cooldown).
-                    // A mult < 1 reduces deltaTime (slower cooldown decay), which is the
-                    // opposite of what we want — so we INVERT here: 1/mult. Sentinel: when
-                    // AdrenalineConfig is disabled the mult stays at 1f, and a degenerate
-                    // mult (<= 0) falls back to 1f so we never get a divide-by-zero or
-                    // negative cooldown decay.
-                    float adrMult = store.PlayerAdrenalineCooldownMult[playerId];
-                    if (adrMult <= 0f) adrMult = 1f;
-                    float adrEffectiveRate = (1f / adrMult) - 1f;
-                    // Clamp to avoid a degenerate config making cooldowns go negative
-                    // (e.g. CriticalTierCooldownMult=0.0 would give 1/0 = Infinity).
-                    adrEffectiveRate = Math.Min(adrEffectiveRate, 4f);
-                    inst.CurrentCooldown = Math.Max(0f, inst.CurrentCooldown - deltaTime * (1f + cdrClamped) * (1f + adrEffectiveRate));
+                    inst.CurrentCooldown = Math.Max(0f, inst.CurrentCooldown - deltaTime * cdrFactor * adrFactor);
                     store.SetAbility(playerId, slot, inst);
                 }
 
@@ -326,103 +323,75 @@ namespace BattleSystemECS.Systems
 
             switch (def.AreaShape)
             {
-                case 0: // Single target
+                case AreaShapeType.Single:
                     enemiesHit = CastSingleTarget(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
                     break;
-                case 1: // Cross (+) shape
+                case AreaShapeType.Cross: // (+) shape
                     enemiesHit = CastCrossArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
                     break;
-                case 2: // Box (N×N)
+                case AreaShapeType.Box: // (N×N)
                     enemiesHit = CastBoxArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
                     break;
-                case 3: // Circle (radius-based AOE, for DoT abilities)
+                case AreaShapeType.Circle: // radius-based AOE, for DoT abilities
                     enemiesHit = CastCircleArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def);
                     break;
-                case 4: // Chain Lightning — O(N) nearest-neighbor chaining
+                case AreaShapeType.Chain: // Chain Lightning — O(N) nearest-neighbor chaining
                     enemiesHit = CastChainLightning(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
                     break;
-                case 5: // Heal — restore player HP
+                case AreaShapeType.Heal: // restore player HP
                     CastHeal(def);
                     enemiesHit = 0;
                     break;
-                case 6: // Shield — apply shield to player
+                case AreaShapeType.Shield: // apply shield to player
                     CastShield(def);
                     enemiesHit = 0;
                     break;
-                case 7: // Line/Ray — horizontal laser beam along player's Y axis
+                case AreaShapeType.Line: // horizontal laser beam along player's Y axis
                     enemiesHit = CastLineArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name);
                     break;
-                case 8: // Freeze — circle AoE + chance to freeze enemies
+                case AreaShapeType.Freeze: // circle AoE + chance to freeze enemies
                     enemiesHit = CastFreezeArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def);
                     break;
-                case 9: // Cone — directional fan-shaped AoE
+                case AreaShapeType.Cone: // directional fan-shaped AoE
                     enemiesHit = CastConeArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def.ConeAngleDegrees);
                     break;
-                case 10: // GroundTarget — player selects a point, AoE around that point
+                case AreaShapeType.GroundTarget: // player selects a point, AoE around that point
                     enemiesHit = CastGroundTarget(finalDamage, def.AreaRadius, def.Name);
                     break;
-                case 11: // Slow — circle AoE that slows enemies in radius (move speed reduction, non-freeze)
+                case AreaShapeType.Slow: // circle AoE that slows enemies in radius (move speed reduction, non-freeze)
                     enemiesHit = CastSlowArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def);
                     break;
-                case 12: // TimeWarp — slow/fast game time
+                case AreaShapeType.TimeWarp: // slow/fast game time
                     CastTimeWarp(def);
                     enemiesHit = 0;
                     break;
-                case 13: // Summon — spawn a player-summoned combat unit
+                case AreaShapeType.Summon: // spawn a player-summoned combat unit
                     CastSummon(def);
                     enemiesHit = 0;
                     break;
-                case 14: // HealingZone — place a ground healing zone that heals allies in radius
+                case AreaShapeType.HealingZone: // place a ground healing zone that heals allies in radius
                     enemiesHit = CastHealingZone(def);
                     break;
-                case 15: // Polymorph — circle AoE that turns enemies into a harmless form (sheep/chicken)
+                case AreaShapeType.Polymorph: // circle AoE that turns enemies into a harmless form (sheep/chicken)
                     enemiesHit = CastPolymorphArea(finalDamage, playerX, playerY, def.AreaRadius, def.Name, def);
                     break;
-                case 16: // TimeRewind — restore player HP / Mana / Shield from a recent snapshot
+                case AreaShapeType.TimeRewind: // restore player HP / Mana / Shield from a recent snapshot
                     CastTimeRewind(def);
                     enemiesHit = 0;
                     break;
-                case 17: // Chain Heal — O(N) nearest-neighbor heal chaining on injured allies
-                    // base heal = HealPercent * player max HP (consistent with single-target CastHeal using HealPercent)
-                    // ShieldAmount = shield bonus applied per healed target; ShieldDuration = duration of that shield
-                    {
-                        float casterMaxHp = store.PlayerMaxHealth[playerId] > 0f ? store.PlayerMaxHealth[playerId] : 200f;
-                        float chainBaseHeal = def.HealPercent > 0f ? casterMaxHp * def.HealPercent : 0f;
-                        int chainRange = def.AreaRadius > 0 ? def.AreaRadius : (int)CHAIN_HEAL_DEFAULT_RANGE;
-                        enemiesHit = CastChainHeal(chainBaseHeal, playerX, playerY, chainRange, def.Name, def.ShieldAmount, def.ShieldDuration);
-                    }
+                case AreaShapeType.ChainHeal: // O(N) nearest-neighbor heal chaining on injured allies
+                    enemiesHit = CastChainHealAbility(def, playerX, playerY);
                     break;
-                case 18: // Mass Resurrect — AOE revival of all un-reanimated corpses within AreaRadius tiles (Round 133)
-                    // Delegates to NecromancerSystem.MassResurrect(playerId, playerX, playerY, radius, hpFraction)
-                    // where hpFraction = HealPercent (0.0-1.0 of corpse's max HP). AreaRadius = AOE radius in
-                    // tiles (matches Necromancer range convention; corpses are positioned in world units but
-                    // MassResurrect is a tactical AOE so a small radius like 3-5 tiles is appropriate).
-                    {
-                        if (necromancerSystem == null)
-                        {
-                            renderer.Log($"[SKILL] '{def.Name}' failed: NecromancerSystem not injected into SkillSystem");
-                            enemiesHit = 0;
-                            break;
-                        }
-                        float massRadius = def.AreaRadius > 0 ? def.AreaRadius : 3f; // default 3 tiles
-                        float hpFraction = def.HealPercent > 0f ? def.HealPercent : 0.3f; // 30% HP fallback
-                        // Ensure the necromancer system has an up-to-date sim time for corpse age gating.
-                        // NecromancerSystem.SetTurn signature is (int turn, float simTime); the AIGroup
-                        // wires it before SkillSystem runs (Necromancer sits in AI group, Skill in SkillBuff
-                        // group — so the simTime is already current). We re-set it here as a defensive
-                        // measure in case the order ever changes, using the same turn-based time proxy
-                        // convention the AIGroup uses (pass `turn` for both args — turn as time).
-                        necromancerSystem.SetTurn(_currentTurn, _currentTurn);
-                        enemiesHit = necromancerSystem.MassResurrect(playerId, playerX, playerY, massRadius, hpFraction);
-                    }
+                case AreaShapeType.MassResurrect: // AOE revival of un-reanimated corpses within AreaRadius tiles (Round 133)
+                    enemiesHit = CastMassResurrect(def, playerX, playerY);
                     break;
-                case 19: // AoeStun — circle AoE that stuns all enemies in radius (Round 136 Direction 2)
+                case AreaShapeType.AoeStun: // circle AoE that stuns all enemies in radius (Round 136 Direction 2)
                     enemiesHit = CastAoeStun(playerX, playerY, def.AreaRadius, def.AoeStunDuration, def.Name);
                     break;
-                case 20: // AoeRoot — circle AoE that roots all enemies in radius (Round 136 Direction 2)
+                case AreaShapeType.AoeRoot: // circle AoE that roots all enemies in radius (Round 136 Direction 2)
                     enemiesHit = CastAoeRoot(playerX, playerY, def.AreaRadius, def.AoeRootDuration, def.Name);
                     break;
-                case 21: // AoeKnockback — circle AoE that pushes all enemies radially from player (Round 136 Direction 2)
+                case AreaShapeType.AoeKnockback: // circle AoE that pushes all enemies radially from player (Round 136 Direction 2)
                     enemiesHit = CastAoeKnockback(playerX, playerY, def.AreaRadius, def.AoeKnockbackForce, def.Name);
                     break;
                 default:
@@ -438,26 +407,51 @@ namespace BattleSystemECS.Systems
             renderer.Log($"[SKILL] {def.Name} cast! Hit {enemiesHit} enemies, cooldown: {def.Cooldown}s");
         }
 
+        /// <summary>
+        /// ChainHeal (AreaShape=17) 的参数推导：base heal = HealPercent × 玩家最大 HP
+        /// （与单目标 CastHeal 用 HealPercent 的口径一致）；ShieldAmount / ShieldDuration
+        /// 作为每次命中附带的护盾加成。
+        /// </summary>
+        private int CastChainHealAbility(GameplayAbilityDef def, float playerX, float playerY)
+        {
+            float casterMaxHp = store.PlayerMaxHealth[playerId] > 0f ? store.PlayerMaxHealth[playerId] : 200f;
+            float chainBaseHeal = def.HealPercent > 0f ? casterMaxHp * def.HealPercent : 0f;
+            int chainRange = def.AreaRadius > 0 ? def.AreaRadius : (int)CHAIN_HEAL_DEFAULT_RANGE;
+            return CastChainHeal(chainBaseHeal, playerX, playerY, chainRange, def.Name, def.ShieldAmount, def.ShieldDuration);
+        }
+
+        /// <summary>
+        /// MassResurrect (AreaShape=18)：委托 NecromancerSystem.MassResurrect，其中
+        /// hpFraction = HealPercent（0.0-1.0，按尸体最大 HP 复活比例，30% 回退）。
+        /// AreaRadius 为 AOE 半径（tiles，3 回退——尸体按世界坐标存放，但 MassResurrect
+        /// 是战术 AOE，小半径 3-5 tiles 是合理量级）。
+        /// </summary>
+        private int CastMassResurrect(GameplayAbilityDef def, float playerX, float playerY)
+        {
+            if (necromancerSystem == null)
+            {
+                renderer.Log($"[SKILL] '{def.Name}' failed: NecromancerSystem not injected into SkillSystem");
+                return 0;
+            }
+            float massRadius = def.AreaRadius > 0 ? def.AreaRadius : 3f; // default 3 tiles
+            float hpFraction = def.HealPercent > 0f ? def.HealPercent : 0.3f; // 30% HP fallback
+            // Ensure the necromancer system has an up-to-date sim time for corpse age gating.
+            // NecromancerSystem.SetTurn signature is (int turn, float simTime); the AIGroup
+            // wires it before SkillSystem runs (Necromancer sits in AI group, Skill in SkillBuff
+            // group — so the simTime is already current). We re-set it here as a defensive
+            // measure in case the order ever changes, using the same turn-based time proxy
+            // convention the AIGroup uses (pass `turn` for both args — turn as time).
+            necromancerSystem.SetTurn(_currentTurn, _currentTurn);
+            return necromancerSystem.MassResurrect(playerId, playerX, playerY, massRadius, hpFraction);
+        }
+
         private int CastSingleTarget(float finalDamage, float playerX, float playerY, int range, string name)
         {
             // _activeEnemyList is guaranteed non-null after SetTurn(); no fallback needed
             if (_activeEnemyList == null) return 0;
-            var activeEnemyIds = _activeEnemyList;
-
-            int rangeSq = range * range;
 
             // Phase 1: collect candidates in range (lock-free, threshold-gated)
-            CollectHits(activeEnemyIds, (enemyId, hits) =>
-            {
-                if (enemyId == playerId) return;
-                float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) return;
-
-                float dx = store.PositionX[enemyId] - playerX;
-                float dy = store.PositionY[enemyId] - playerY;
-                float distSq = dx * dx + dy * dy;
-                if (distSq <= rangeSq) hits.Add(enemyId);
-            }, _mergedHits);
+            CollectCircleHits(playerX, playerY, range * range);
 
             // Serial phase: find global closest (recompute distSq on the filtered set)
             int closestEnemyId = -1;
@@ -538,6 +532,45 @@ namespace BattleSystemECS.Systems
             }
         }
 
+        /// <summary>
+        /// 圆形 AoE 命中收集 —— 所有圆形类 Cast 方法（Single/Circle/Freeze/Slow/Polymorph/
+        /// GroundTarget/AoeStun/AoeRoot/AoeKnockback）共用的过滤谓词：存活、非玩家、
+        /// 位于 (cx,cy) 半径平方 radiusSq 之内。命中写入 _mergedHits（敌人索引序）。
+        /// 调用前需已确认 _activeEnemyList 非空。
+        /// </summary>
+        private void CollectCircleHits(float cx, float cy, int radiusSq)
+        {
+            CollectHits(_activeEnemyList, (enemyId, hits) =>
+            {
+                if (enemyId == playerId) return;
+                if (store.GetEnemyHealth(enemyId) <= 0f) return;
+                float dx = store.PositionX[enemyId] - cx;
+                float dy = store.PositionY[enemyId] - cy;
+                if (dx * dx + dy * dy <= radiusSq) hits.Add(enemyId);
+            }, _mergedHits);
+        }
+
+        /// <summary>
+        /// 串行段：对 _mergedHits 中每个敌人入队等额伤害（verbose 时逐敌打命中日志）。
+        /// 返回命中数。
+        /// </summary>
+        private int QueueDamageForMergedHits(float finalDamage, string name, bool verbose)
+        {
+            int hitCount = 0;
+            foreach (int enemyId in _mergedHits)
+            {
+                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                if (verbose)
+                {
+                    float enemyX = store.PositionX[enemyId];
+                    float enemyY = store.PositionY[enemyId];
+                    renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
+                }
+                hitCount++;
+            }
+            return hitCount;
+        }
+
         private int CastCrossArea(float finalDamage, float playerX, float playerY, int radius, string name)
         {
             // _activeEnemyList is guaranteed non-null after SetTurn(); no fallback needed
@@ -566,18 +599,7 @@ namespace BattleSystemECS.Systems
             }, _mergedHits);
 
             // Serial phase: apply damage
-            int hitCount = 0;
-            foreach (int enemyId in _mergedHits)
-            {
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
-                hitCount++;
-
-                renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
-            }
-            return hitCount;
+            return QueueDamageForMergedHits(finalDamage, name, verbose: true);
         }
 
         private int CastBoxArea(float finalDamage, float playerX, float playerY, int range, string name)
@@ -609,18 +631,7 @@ namespace BattleSystemECS.Systems
             }, _mergedHits);
 
             // Serial phase: apply damage
-            int hitCount = 0;
-            foreach (int enemyId in _mergedHits)
-            {
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
-                hitCount++;
-
-                renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
-            }
-            return hitCount;
+            return QueueDamageForMergedHits(finalDamage, name, verbose: true);
         }
 
 
@@ -628,28 +639,8 @@ namespace BattleSystemECS.Systems
         {
             // _activeEnemyList is guaranteed non-null after SetTurn(); no fallback needed
             if (_activeEnemyList == null) return 0;
-            var activeEnemyIds = _activeEnemyList;
 
-            int radiusSq = radius * radius;
-
-            CollectHits(activeEnemyIds, (enemyId, hits) =>
-            {
-                if (enemyId == playerId) return;
-                float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) return;
-
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-
-                float dx = enemyX - playerX;
-                float dy = enemyY - playerY;
-                float distSq = dx * dx + dy * dy;
-
-                if (distSq <= radiusSq)
-                {
-                    hits.Add(enemyId);
-                }
-            }, _mergedHits);
+            CollectCircleHits(playerX, playerY, radius * radius);
 
             // Serial phase: apply DoT effect to each enemy
             int hitCount = 0;
@@ -893,59 +884,29 @@ namespace BattleSystemECS.Systems
             }, _mergedHits);
 
             // Serial phase: apply damage
-            int hitCount = 0;
-            foreach (int enemyId in _mergedHits)
-            {
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
-                hitCount++;
-
-                renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
-            }
-            return hitCount;
+            return QueueDamageForMergedHits(finalDamage, name, verbose: true);
         }
 
         /// <summary>
-        /// Freeze AreaShape: circle AoE that damages and can freeze enemies.
-        /// Reuses CastCircleArea range query logic, then applies freeze via ApplyEnemyStun
-        /// with probability-based roll (FreezeChance). Follows two-phase pattern.
+        /// 死亡入队 —— QueueEnemyDeath 交给帧末 ResolveEnemiesKilledThisFrame() 统一结算。
         /// </summary>
         private void HandleKill(int enemyId)
         {
-            // Queue death for serial resolution — ResolveEnemiesKilledThisFrame() called at frame end
             store.QueueEnemyDeath(enemyId, playerId);
             renderer.Log($"[SKILL] Killed enemy {enemyId}");
         }
 
         /// <summary>
         /// Freeze AreaShape: circle AoE that damages and can freeze enemies.
-        /// Reuses CastCircleArea range query logic, then applies freeze via ApplyEnemyStun
+        /// Reuses the shared circle range query, then applies freeze via ApplyEnemyFreeze
         /// with probability-based roll (FreezeChance). Follows two-phase pattern.
+        /// </summary>
         private int CastFreezeArea(float finalDamage, float playerX, float playerY,
             int radius, string name, GameplayAbilityDef def)
         {
             if (_activeEnemyList == null) return 0;
-            var activeEnemyIds = _activeEnemyList;
 
-            int radiusSq = radius * radius;
-
-            CollectHits(activeEnemyIds, (enemyId, hits) =>
-            {
-                if (enemyId == playerId) return;
-                float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) return;
-
-                float dx = store.PositionX[enemyId] - playerX;
-                float dy = store.PositionY[enemyId] - playerY;
-                float distSq = dx * dx + dy * dy;
-
-                if (distSq <= radiusSq)
-                {
-                    hits.Add(enemyId);
-                }
-            }, _mergedHits);
+            CollectCircleHits(playerX, playerY, radius * radius);
 
             // Serial phase: apply damage + freeze roll（命中序 = 敌人索引序，RNG 逐敌顺序与串行实现一致）
             int hitCount = 0;
@@ -977,28 +938,8 @@ namespace BattleSystemECS.Systems
             int radius, string name, GameplayAbilityDef def)
         {
             if (_activeEnemyList == null) return 0;
-            var activeEnemyIds = _activeEnemyList;
 
-            int radiusSq = radius * radius;
-
-            CollectHits(activeEnemyIds, (enemyId, hits) =>
-            {
-                if (enemyId == playerId) return;
-                float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) return;
-
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-
-                float dx = enemyX - playerX;
-                float dy = enemyY - playerY;
-                float distSq = dx * dx + dy * dy;
-
-                if (distSq <= radiusSq)
-                {
-                    hits.Add(enemyId);
-                }
-            }, _mergedHits);
+            CollectCircleHits(playerX, playerY, radius * radius);
 
             // Serial phase: apply damage and slow effect
             int hitCount = 0;
@@ -1029,28 +970,8 @@ namespace BattleSystemECS.Systems
             int radius, string name, GameplayAbilityDef def)
         {
             if (_activeEnemyList == null) return 0;
-            var activeEnemyIds = _activeEnemyList;
 
-            int radiusSq = radius * radius;
-
-            CollectHits(activeEnemyIds, (enemyId, hits) =>
-            {
-                if (enemyId == playerId) return;
-                float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) return;
-
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-
-                float dx = enemyX - playerX;
-                float dy = enemyY - playerY;
-                float distSq = dx * dx + dy * dy;
-
-                if (distSq <= radiusSq)
-                {
-                    hits.Add(enemyId);
-                }
-            }, _mergedHits);
+            CollectCircleHits(playerX, playerY, radius * radius);
 
             // Serial phase: apply damage and polymorph effect
             int hitCount = 0;
@@ -1180,42 +1101,16 @@ namespace BattleSystemECS.Systems
         private int CastGroundTarget(float finalDamage, int radius, string name)
         {
             if (_activeEnemyList == null) return 0;
-            var activeEnemyIds = _activeEnemyList;
-
-            int radiusSq = radius * radius;
 
             // For benchmark compatibility, use player's current position as target.
             // In real gameplay, this would read a stored mouse-click target coordinate.
             float targetX = store.PositionX[playerId];
             float targetY = store.PositionY[playerId];
 
-            CollectHits(activeEnemyIds, (enemyId, hits) =>
-            {
-                if (enemyId == playerId) return;
-                float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) return;
-
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-
-                float dx = enemyX - targetX;
-                float dy = enemyY - targetY;
-                float distSq = dx * dx + dy * dy;
-
-                if (distSq <= radiusSq)
-                {
-                    hits.Add(enemyId);
-                }
-            }, _mergedHits);
+            CollectCircleHits(targetX, targetY, radius * radius);
 
             // Serial phase: apply damage and count
-            int hitCount = 0;
-            foreach (int enemyId in _mergedHits)
-            {
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
-                hitCount++;
-            }
-            return hitCount;
+            return QueueDamageForMergedHits(finalDamage, name, verbose: false);
         }
 
         /// <summary>
@@ -1270,18 +1165,7 @@ namespace BattleSystemECS.Systems
             }, _mergedHits);
 
             // Serial phase: apply damage
-            int hitCount = 0;
-            foreach (int enemyId in _mergedHits)
-            {
-                float enemyX = store.PositionX[enemyId];
-                float enemyY = store.PositionY[enemyId];
-
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
-                hitCount++;
-
-                renderer.Log($"[SKILL] {name} queued damage for enemy {enemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
-            }
-            return hitCount;
+            return QueueDamageForMergedHits(finalDamage, name, verbose: true);
         }
 
         /// <summary>
@@ -1378,23 +1262,10 @@ namespace BattleSystemECS.Systems
         {
             if (_activeEnemyList == null) return 0;
             if (radius <= 0 || duration <= 0f) return 0;
-            var activeEnemyIds = _activeEnemyList;
 
-            int radiusSq = radius * radius;
             int stunTurns = Math.Max(1, (int)Math.Ceiling(duration));
 
-            CollectHits(activeEnemyIds, (enemyId, hits) =>
-            {
-                if (enemyId == playerId) return;
-                float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) return;
-
-                float dx = store.PositionX[enemyId] - centerX;
-                float dy = store.PositionY[enemyId] - centerY;
-                if (dx * dx + dy * dy > radiusSq) return;
-
-                hits.Add(enemyId);
-            }, _mergedHits);
+            CollectCircleHits(centerX, centerY, radius * radius);
 
             // Serial phase: apply stun（stunTurns 为循环不变量，已提出）
             int hitCount = 0;
@@ -1418,23 +1289,10 @@ namespace BattleSystemECS.Systems
         {
             if (_activeEnemyList == null) return 0;
             if (radius <= 0 || duration <= 0f) return 0;
-            var activeEnemyIds = _activeEnemyList;
 
-            int radiusSq = radius * radius;
             int rootTurns = Math.Max(1, (int)Math.Ceiling(duration));
 
-            CollectHits(activeEnemyIds, (enemyId, hits) =>
-            {
-                if (enemyId == playerId) return;
-                float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) return;
-
-                float dx = store.PositionX[enemyId] - centerX;
-                float dy = store.PositionY[enemyId] - centerY;
-                if (dx * dx + dy * dy > radiusSq) return;
-
-                hits.Add(enemyId);
-            }, _mergedHits);
+            CollectCircleHits(centerX, centerY, radius * radius);
 
             // Serial phase: apply root（rootTurns 为循环不变量，已提出）
             int hitCount = 0;
@@ -1458,23 +1316,8 @@ namespace BattleSystemECS.Systems
         {
             if (_activeEnemyList == null) return 0;
             if (radius <= 0 || force <= 0f) return 0;
-            var activeEnemyIds = _activeEnemyList;
 
-            int radiusSq = radius * radius;
-
-            CollectHits(activeEnemyIds, (enemyId, hits) =>
-            {
-                if (enemyId == playerId) return;
-                float enemyHealth = store.GetEnemyHealth(enemyId);
-                if (enemyHealth <= 0f) return;
-
-                float dx = store.PositionX[enemyId] - centerX;
-                float dy = store.PositionY[enemyId] - centerY;
-                float distSq = dx * dx + dy * dy;
-                if (distSq > radiusSq) return;
-
-                hits.Add(enemyId);
-            }, _mergedHits);
+            CollectCircleHits(centerX, centerY, radius * radius);
 
             // Serial phase: apply knockback impulse（radial 方向由消费方 ResolveKnockback 按
             // 施加时刻的 (Position - center) 解析，这里只写力大小 —— 与原串行实现一致）

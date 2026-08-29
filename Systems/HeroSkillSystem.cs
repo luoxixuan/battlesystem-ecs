@@ -219,47 +219,15 @@ namespace BattleSystemECS.Systems
         public bool HasAnyConfiguredSkill() => _anySkillConfigured;
 
         // ── Private helpers ───────────────────────────────────────────────
-        // 技能 id 归一化索引空间：[0, SkillDefs.Count) 索引共享定义表（Data/Configs/
-        // skills.json + Data/Skills/*.json）；[SkillDefs.Count, +Skills.Count) 索引
-        // 玩家技能栏回退。此前只在 _config.Skills（占位技能）里找名字，hero_skills.json
-        // 引用的精选技能名永远解析失败 → 槽位恒 -1 → 系统休眠。
+        // 技能 id 归一化索引空间的唯一约定在 GameConfig（GetSkillIdByName /
+        // TryGetSkillById）：[0, SkillDefs.Count) 索引共享定义表（Data/Configs/
+        // skills.json + Data/Skills/*.json），其后索引玩家技能栏回退。此处只做委托，
+        // 勿在此重新实现遍历 —— 此前只在 _config.Skills（占位技能）里找名字，
+        // hero_skills.json 引用的精选技能名永远解析失败 → 槽位恒 -1 → 系统休眠。
 
-        private int ResolveSkillIdByName(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return -1;
-            var defs = _config?.SkillDefs;
-            if (defs != null)
-            {
-                for (int i = 0; i < defs.Count; i++)
-                {
-                    var s = defs[i];
-                    if (s == null) continue;
-                    if (string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)) return i;
-                }
-            }
-            var skills = _config?.Skills;
-            if (skills != null)
-            {
-                int offset = defs != null ? defs.Count : 0;
-                for (int i = 0; i < skills.Count; i++)
-                {
-                    var s = skills[i];
-                    if (s == null) continue;
-                    if (string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)) return offset + i;
-                }
-            }
-            return -1;
-        }
+        private int ResolveSkillIdByName(string name) => _config?.GetSkillIdByName(name) ?? -1;
 
-        private SkillConfig? ResolveSkillConfigById(int skillId)
-        {
-            var defs = _config?.SkillDefs;
-            if (defs != null && skillId >= 0 && skillId < defs.Count) return defs[skillId];
-            var skills = _config?.Skills;
-            int offset = defs != null ? defs.Count : 0;
-            if (skills != null && skillId >= offset && skillId < offset + skills.Count) return skills[skillId - offset];
-            return null;
-        }
+        private SkillConfig? ResolveSkillConfigById(int skillId) => _config?.TryGetSkillById(skillId);
 
         private string ResolveSkillNameById(int skillId) => ResolveSkillConfigById(skillId)?.Name ?? "?";
 

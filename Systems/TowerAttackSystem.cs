@@ -269,6 +269,34 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// 朝向 dot 的共用数学：dot = (攻击方→敌 单位向量)·(敌面朝单位向量)。
+        /// dot=+1 → 攻击方在敌人正后方；dot=-1 → 正前方；两侧 → 0 附近。
+        /// 敌面朝为零向量或两者坐标重合时返回 false（调用方视为不可判定，跳过加成）。
+        /// Round 174 每塔 backstab 与全局 PositionalDamage 两层共用，避免同一段
+        /// 归一化数学复制两份后各自漂移。静态纯函数、零分配，热路径可 JIT 内联。
+        /// </summary>
+        private static bool TryComputeRearDot(ComponentStore store, float fromX, float fromY, int enemyId, out float dot)
+        {
+            dot = 0f;
+            float dirX = store.EnemyMoveDirX[enemyId];
+            float dirY = store.EnemyMoveDirY[enemyId];
+            float dirLenSq = dirX * dirX + dirY * dirY;
+            if (dirLenSq <= 0.0001f) return false;
+
+            float dx = store.PositionX[enemyId] - fromX;
+            float dy = store.PositionY[enemyId] - fromY;
+            float distSq = dx * dx + dy * dy;
+            if (distSq <= 0.0001f) return false;
+
+            // Normalize both vectors so the dot is bounded by [-1, 1] regardless of
+            // motion-vector length and attack distance.
+            float invDirLen = 1.0f / MathF.Sqrt(dirLenSq);
+            float invDist = 1.0f / MathF.Sqrt(distSq);
+            dot = (dx * invDist) * (dirX * invDirLen) + (dy * invDist) * (dirY * invDirLen);
+            return true;
+        }
+
+        /// <summary>
         /// Round 143 Direction 1 — Compute the effectiveness multiplier for a tower attacking
         /// a given enemy. Returns 1.0 (no change) when the matrix is empty / entry is missing.
         /// Hot path: O(1) dictionary lookup, single string allocation per call (kept on the
@@ -1183,7 +1211,6 @@ namespace BattleSystemECS.Systems
                     }
 
                     // ── Tower type-specific mechanics ─────────────────────────────────────
-                    // ── Tower type-specific mechanics ─────────────────────────────────────
                     TowerType towerType = store.TowerType[towerId];
 
                     // ── I-frames guard (Round 118) ─────────────────────────────────────
@@ -1248,45 +1275,13 @@ namespace BattleSystemECS.Systems
                         // Fast path: skip the math entirely for non-rogue towers (1.0x).
                         if (backstabMult > 1.0001f)
                         {
-                            float enemyDirX = store.EnemyMoveDirX[bestTarget];
-                            float enemyDirY = store.EnemyMoveDirY[bestTarget];
-                            float dirLenSq = enemyDirX * enemyDirX + enemyDirY * enemyDirY;
-                            if (dirLenSq > 0.0001f)
+                            // Per-tower rear cone: half-angle from TowerBackstabAngleDeg.
+                            // 0° (strict, cos=1) never triggers; 180° (full rear hemisphere,
+                            // cos=-1) triggers for any non-antiparallel position.
+                            if (TryComputeRearDot(store, tx, ty, bestTarget, out float backstabDot)
+                                && backstabDot > MathF.Cos(store.TowerBackstabAngleDeg[towerId] * MathF.PI / 180f))
                             {
-                                float angleDeg = store.TowerBackstabAngleDeg[towerId];
-                                // cos(angleDeg) of the half-cone. The tower is in the
-                                // rear cone when dot((tower→enemy unit), (enemy facing unit))
-                                // > cos(angleDeg). For 0° (strict): cos=1, so dot>1 is
-                                // impossible (test never triggers). For 180° (full rear
-                                // hemisphere): cos=-1, so dot>-1 is always true for any
-                                // non-antiparallel position. Both endpoints handled.
-                                // MathF.Cos avoids the (float) cast Math.Cos requires.
-                                float cosAngle = MathF.Cos(angleDeg * MathF.PI / 180f);
-                                // Normalize the enemy direction vector to a unit (so dot
-                                // is bounded by [-1, 1] regardless of motion-vector length).
-                                float invDirLen = 1.0f / MathF.Sqrt(dirLenSq);
-                                float unitDirX = enemyDirX * invDirLen;
-                                float unitDirY = enemyDirY * invDirLen;
-                                // tower→enemy direction (tx,ty) → (ex,ey)
-                                float ex = store.PositionX[bestTarget];
-                                float ey = store.PositionY[bestTarget];
-                                float dx = ex - tx;
-                                float dy = ey - ty;
-                                float distSq = dx * dx + dy * dy;
-                                if (distSq > 0.0001f)
-                                {
-                                    float invDist = 1.0f / MathF.Sqrt(distSq);
-                                    float unitDx = dx * invDist;
-                                    float unitDy = dy * invDist;
-                                    // Dot of (tower→enemy unit) · (enemy facing unit).
-                                    // dot=1 → tower is directly behind. dot=-1 → tower is
-                                    // directly in front. Rear-cone test: dot > cos(angleDeg).
-                                    float dot = unitDx * unitDirX + unitDy * unitDirY;
-                                    if (dot > cosAngle)
-                                    {
-                                        baseDmg *= backstabMult;
-                                    }
-                                }
+                                baseDmg *= backstabMult;
                             }
                         }
                     }
@@ -1296,28 +1291,13 @@ namespace BattleSystemECS.Systems
                     // (塔→敌 单位向量)·(敌面朝 单位向量)：dot > cos(B/2) → 背刺锥 ×BackstabMult；
                     // 其外侧袭带（dot > cos((B+F)/2) 且未达背刺阈值）×FlankMult；正面无加成。
                     // Enabled=false（JSON 未提供该键的默认态）时一次 bool 读短路 —— 与
-                    // BackstabConfig 相同的零开销门模式。
+                    // BackstabConfig 相同的零开销门模式。cos 阈值已在 SetGameConfig 缓存。
                     if (_positionalEnabled)
                     {
-                        float posDirX = store.EnemyMoveDirX[bestTarget];
-                        float posDirY = store.EnemyMoveDirY[bestTarget];
-                        float posDirLenSq = posDirX * posDirX + posDirY * posDirY;
-                        if (posDirLenSq > 0.0001f)
+                        if (TryComputeRearDot(store, tx, ty, bestTarget, out float posDot))
                         {
-                            float posInvLen = 1.0f / MathF.Sqrt(posDirLenSq);
-                            float posEx = store.PositionX[bestTarget];
-                            float posEy = store.PositionY[bestTarget];
-                            float posDx = posEx - tx;
-                            float posDy = posEy - ty;
-                            float posDistSq = posDx * posDx + posDy * posDy;
-                            if (posDistSq > 0.0001f)
-                            {
-                                float posInvDist = 1.0f / MathF.Sqrt(posDistSq);
-                                float posDot = posDx * posInvDist * posDirX * posInvLen
-                                             + posDy * posInvDist * posDirY * posInvLen;
-                                if (posDot > _posBackstabCos) baseDmg *= _posBackstabMult;
-                                else if (posDot > _posFlankCos) baseDmg *= _posFlankMult;
-                            }
+                            if (posDot > _posBackstabCos) baseDmg *= _posBackstabMult;
+                            else if (posDot > _posFlankCos) baseDmg *= _posFlankMult;
                         }
                     }
 

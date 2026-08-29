@@ -351,7 +351,7 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 | 添加事件发射 | 逻辑→渲染走 `Core/IBattleEventBus.cs`；系统间走 `Core/EventBus.cs` + `Core/GameEvents.cs`（DTO） |
 | 修改并行策略 | 对应系统的 `Update()`，注意两阶段模式审查 |
 | 修改配置格式 | `Core/GameConfig.cs` + `Core/GameConfigLoader.cs` + `Data/Configs/*.json` |
-| 修改技能/效果 | `Core/GAS/*.cs` + `Systems/SkillSystem.cs` + `game_config.json` Skills 数组（玩家技能栏）；共享技能表（SkillDefs）= `Data/Configs/skills.json`（精选）+ `Data/Skills/*.json`（静态），消费方 HeroSkillSystem / TowerActiveSkillSystem 按名解析 |
+| 修改技能/效果 | `Core/GAS/*.cs` + `Systems/SkillSystem.cs` + `game_config.json` Skills 数组（玩家技能栏）；共享技能表（SkillDefs）= `Data/Configs/skills.json`（精选）+ `Data/Skills/*.json`（静态）。技能 id/name 互解析统一走 `GameConfig.GetSkillIdByName / TryGetSkillById / GetSkillDisplayName`（归一化索引空间：[0, SkillDefs.Count) 索引共享表，其后偏移索引 Skills），消费方禁止各自手写遍历 |
 | 修改科技树 | `Core/TechTreeDef.cs` + `Systems/TechTreeSystem.cs` + `Data/Configs/tech_tree.json` |
 | 修改行为树 | `Data/Configs/behavior_trees.json` + `Systems/BehaviorTreeEvaluator.cs` |
 | 修改 Polyfill | `Core/{IsExternalInit,Rng,PolyfillExtensions}.cs`（经 Linked Files 编译进 Core 库） |
@@ -363,4 +363,4 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 
 ---
 
-> **最后更新**：2026-08-29（死配置接线：`GameConfig.SkillDefs` 共享技能表（skills.json 20 精选 + Data/Skills 150 静态，按名去重）+ TowerOvercharge/PositionalDamage 段解析（后者 Enabled 门控默认关，消费点 TowerAttackSystem）；hero_skills.json 技能名此前解析恒失败已修复；game_config.json 修复为合法 JSON；测试 1281→1298）
+> **最后更新**：2026-08-29（第三批：技能/战斗系统可维护性重构 —— 技能 id 归一化约定集中 `GameConfig.GetSkillIdByName/TryGetSkillById`、SkillSystem 9 处圆形 AoE 谓词收敛 `CollectCircleHits`、ExecuteAbility switch 命名常量化、TowerAttackSystem 朝向 dot 提取 `TryComputeRearDot` 共用；净 -177 行，1298 测试全过。同日第二批：死配置接线 SkillDefs/TowerOvercharge/PositionalDamage + hero 技能槽修复 + game_config.json 修复为合法 JSON，测试 1281→1298）

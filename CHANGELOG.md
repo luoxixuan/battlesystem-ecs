@@ -1,5 +1,15 @@
 # 更新记录 (Changelog)
 
+### 2026-08-29（第三批：技能/战斗系统可维护性重构）
+- 架构分析 + 6 项针对性修复（零战斗语义变化；1298 测试全过；生产代码净 -177 行）：
+  1. **技能 id 归一化约定集中到 GameConfig**："[0, SkillDefs.Count) 索引共享表、其后偏移索引 Skills 回退"的约定此前只存在于 HeroSkillSystem 的私有实现与注释里，而 TowerActiveSkillSystem.ResolveSkillName 用裸索引分别查两张表 —— 同一 skillId 在两个系统解析结果不同（回退区 id 会被误读或落入歧义）。新增 `GameConfig.GetSkillIdByName / TryGetSkillById / GetSkillDisplayName` 作为唯一约定载体，两个系统全部委托，后续消费方（TowerConfig.ActiveSkillId 等）不会再各自实现走样。
+  2. **SkillSystem 圆形 AoE 谓词收敛**：9 处逐字重复的「存活 + 非玩家 + 半径内」过滤谓词（Single/Circle/Freeze/Slow/Polymorph/GroundTarget/AoeStun/AoeRoot/AoeKnockback）收敛为一个 `CollectCircleHits`；4 处相同的串行段「入队伤害 + 逐敌日志」循环收敛为 `QueueDamageForMergedHits`。新增命中规则（如新的门控检查）从改 9 处变为改 1 处。
+  3. **ExecuteAbility switch 去魔法数字**：case 0..21 裸数字改为 `AreaShapeType.*` 命名常量（常量表早已存在）；ChainHeal / MassResurrect 两个内联参数推导块提取为 `CastChainHealAbility` / `CastMassResurrect` 私有方法，与其他 case 对称。
+  4. **SkillSystem.Update 冷却不变量外提**：CDR clamp + Adrenaline 倒数是每玩家不变量，从每槽位重算改为每帧一次（乘法结合顺序保持原样，位级一致）。
+  5. **TowerAttackSystem 朝向 dot 数学共用**：Round 174 每塔 backstab 与全局 PositionalDamage 两段各自手写的「归一化敌朝向 + 攻击方→敌向量 + dot」提取为静态 `TryComputeRearDot`（零分配纯函数），第三层朝向效果出现时不再复制。
+  6. **文档修复**：HandleKill 顶着从 CastFreezeArea 复制来的错误 doc、CastFreezeArea 的 `<summary>` 缺闭合标签（XML doc 损坏）、TowerAttackSystem 攻击主循环内重复两行的分隔注释。
+- 验证：build ×2 均 0 warnings/0 errors；`dotnet test` 1298/1298 PASS；check-test-rules 0 违规；`git diff --check` 干净。压测：mode2 7709 / mode4 5313（3 跑中位）/ mode5 ~4590（3 跑），硬门禁全过；mode5 当日噪声带宽 4269–4791（stash A/B：HEAD 两跑 4269/4791，重构后 4567–4600 落在带内），无重构回归；mode2/4 与重构前同会话分布持平。
+
 ### 2026-08-29（第二批：死配置接线）
 - 三处死数据全部接线（`GameConfig.SkillDefs` 共享技能表 + TowerOvercharge/PositionalDamage 段解析；测试 1281→1298，战斗行为默认零变化）：
   1. **SkillDefs 共享技能表**（此前仅存在于 HeroSkillSystem/TowerConfig 注释中的 "SkillDefs[]"，实现缺失）：新增 `GameConfig.SkillDefs`，`LoadSkillDefs` 用 System.Text.Json 加载 `Data/Configs/skills.json`（20 个精选技能，含完整 shape/DoT/CC 字段与此前无处安放的 `Modifiers` 数组 → 新增 `SkillModifierDef` 模型）+ `Data/Skills/*.json`（150 个静态定义），按名去重合并（精选优先）。Core csproj 补 `Data/Skills` 的 CopyToOutputDirectory（该目录此前从未随产物分发——死数据的又一症状）。

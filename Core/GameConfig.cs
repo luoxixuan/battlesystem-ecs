@@ -1758,6 +1758,46 @@ namespace BattleSystemECS.Config
         // Data/Skills/*.json（静态定义，按名去重，精选优先）。按名引用的消费方（HeroSkillSystem、
         // TowerActiveSkillSystem）优先在此表解析，回退到 Skills。
         public List<SkillConfig> SkillDefs { get; set; } = new List<SkillConfig>();
+
+        // ── 技能 id 归一化索引空间（唯一约定，消费方禁止各自手写解析）────────────
+        // id ∈ [0, SkillDefs.Count) 索引上面的共享定义表；id ∈ [SkillDefs.Count,
+        // SkillDefs.Count + Skills.Count) 索引玩家技能栏回退。消费方（HeroSkillSystem
+        // 的 hero_skills.json 槽位、TowerConfig.ActiveSkillId / TowerActiveSkillSystem）
+        // 一律经 GetSkillIdByName / TryGetSkillById 解析，保证同一 id 处处同义。
+
+        /// <summary>按名解析技能 → 归一化 id（SkillDefs 优先、Skills 回退，忽略大小写）；未命中返回 -1。</summary>
+        public int GetSkillIdByName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return -1;
+            var defs = SkillDefs;
+            for (int i = 0; i < defs.Count; i++)
+            {
+                var s = defs[i];
+                if (s != null && string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)) return i;
+            }
+            var skills = Skills;
+            int offset = defs.Count;
+            for (int i = 0; i < skills.Count; i++)
+            {
+                var s = skills[i];
+                if (s != null && string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)) return offset + i;
+            }
+            return -1;
+        }
+
+        /// <summary>归一化 id → SkillConfig（GetSkillIdByName 的逆映射）；越界/空槽返回 null。</summary>
+        public SkillConfig TryGetSkillById(int skillId)
+        {
+            var defs = SkillDefs;
+            if (skillId >= 0 && skillId < defs.Count) return defs[skillId];
+            var skills = Skills;
+            int offset = defs.Count;
+            if (skillId >= offset && skillId < offset + skills.Count) return skills[skillId - offset];
+            return null;
+        }
+
+        /// <summary>归一化 id → 显示名（日志/HUD 用）；未命中返回 "?"。</summary>
+        public string GetSkillDisplayName(int skillId) => TryGetSkillById(skillId)?.Name ?? "?";
         public List<MonsterConfig> MonsterTypes { get; set; } = new List<MonsterConfig>();
         public List<TowerConfig> TowerTypes { get; set; } = new List<TowerConfig>();
         public List<SummonDef> Summons { get; set; } = new List<SummonDef>();
