@@ -35,6 +35,9 @@ namespace BattleSystemECS.Core
         public SkillSystem? Skill { get; private set; }
         // ── Buffs & Debuffs ──
         public BuffSystem? Buff { get; private set; }
+        // Elemental reactions (element timer decay + shield-break reactions + exposure window).
+        // Was never constructed before this wiring — see the CreateAll comment for what that cost.
+        public ElementalReactionSystem? ElementalReaction { get; private set; }
         public ComboSystem? Combo { get; private set; }
         public AutoSkillSystem? AutoSkill { get; private set; }
         public ManaSystem? Mana { get; private set; }
@@ -352,6 +355,18 @@ namespace BattleSystemECS.Core
             Skill = new SkillSystem(store, logger, playerId, config, TechTree);
             Skill.InitializePlayerSkills();
             Buff = new BuffSystem(store, playerId);
+            // Elemental reactions. This system existed for two feature rounds but was NEVER
+            // constructed (no `new ElementalReactionSystem(` anywhere, no registry field, no
+            // group slot), so three things it exclusively owns were dead:
+            //   1. element timer decay — EnemyElementStatus/EnemyElementTimer, written by
+            //      ApplyEnemyDamage's shield-break path and TowerAttackSystem's enchant path,
+            //      were never cleared, so element bits were effectively permanent;
+            //   2. PendingShieldBreaks consumption — the queue grew for the whole session;
+            //   3. EnemyExposureMask / EnemyExposureTimer writes — so the +30% off-element
+            //      vulnerability read by TowerAttackSystem and PlayerTowerAttackSystem could
+            //      never fire.
+            // Wiring it activates (3), which is a real combat-damage change, not a no-op.
+            ElementalReaction = new ElementalReactionSystem(store, playerId, logger);
             Combo = new ComboSystem(store, config.Combo);
             Mana = new ManaSystem(store, logger, config, playerId, TechTree);
             Mana.Initialize();
@@ -954,6 +969,12 @@ namespace BattleSystemECS.Core
             // ── Skill / Buff / Bleed ──
             scheduler.SkillBuff.Buff = Buff;
             scheduler.SkillBuff.Skill = Skill;
+            // Elemental reactions run in SkillBuff (Phase 9) because that phase is the only
+            // window satisfying both ordering constraints: Update() must observe the shield
+            // breaks that Combat (Phase 8) appended to PendingShieldBreaks this frame, and
+            // ResolveReactionDamage() must precede the Phase 10 death resolve so reaction
+            // kills are settled at the frame boundary like every other damage source.
+            scheduler.SkillBuff.ElementalReaction = ElementalReaction;
             scheduler.SkillBuff.Bleed = Bleed;
             scheduler.SkillBuff.Frostbite = Frostbite;
             scheduler.SkillBuff.HealingZone = HealingZone;

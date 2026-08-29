@@ -6,6 +6,11 @@ namespace BattleSystemECS.Core
     {
         public Systems.BuffSystem? Buff { get; set; }
         public Systems.SkillSystem? Skill { get; set; }
+        // Elemental reactions: element timer decay + shield-break reaction drain + exposure
+        // window maintenance. Must run in this phase — Update() needs to see the shield breaks
+        // that Combat (Phase 8) appended to PendingShieldBreaks this frame, and its reaction
+        // damage must be resolved before the Phase 10 death pass.
+        public Systems.ElementalReactionSystem? ElementalReaction { get; set; }
         public Systems.BleedSystem? Bleed { get; set; }
         // Round 170 Direction 6 — Frostbite (non-stacking %-of-maxHP DoT).
         // Runs after Bleed (combat debuff resolution) so %-based damage is layered
@@ -46,6 +51,13 @@ namespace BattleSystemECS.Core
             Buff?.Update(deltaTime);
             Skill?.ResolveSkillDamage();
             Buff?.ResolveDotDamage();
+            // Elemental reactions: drain this frame's shield breaks, decay element timers,
+            // maintain the exposure window, then settle any reaction damage. Ordered before
+            // the other DoT sources below only so its own queued damage lands in the same
+            // frame it was generated; the hard constraint is that ResolveReactionDamage runs
+            // before the Phase 10 death resolve, which this position satisfies.
+            ElementalReaction?.Update(deltaTime);
+            ElementalReaction?.ResolveReactionDamage();
             Bleed?.Update(deltaTime);
             Bleed?.ResolveBleedDamage();
             // Round 170 Direction 6 — Frostbite (non-stacking %-of-maxHP DoT)
