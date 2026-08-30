@@ -952,7 +952,7 @@ namespace BattleSystemECS.Systems
                         _energySystem.ConsumeEnergy(towerId);
                     }
 
-                    float baseDmg = store.TowerAttackDamage[towerId];
+                    float baseDmg = store.GetTowerAttackDamage(towerId);
 
                     // ── Random Damage Variance (Gambling / RNG Damage Range) ──────────────
                     float dmgVariance = store.TowerDamageVariance[towerId];
@@ -1622,7 +1622,7 @@ namespace BattleSystemECS.Systems
                             // Reset attack cooldown so this counts as a fired shot
                             store.TowerLastAttackTime[towerId] = 0f;
                             // Compute base damage to apply (use same TowerAttackDamage)
-                            float dstrDmg = store.TowerAttackDamage[towerId];
+                            float dstrDmg = store.GetTowerAttackDamage(towerId);
                             if (dstrDmg < 0f) dstrDmg = 0f;
                             // Queue for serial resolution (same damage-lock pattern as enemy damage)
                             lock (damageLock)

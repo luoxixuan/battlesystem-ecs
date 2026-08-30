@@ -67,6 +67,8 @@ namespace BattleSystemECS.Core
         public void Tick(float deltaTime, int turn)
         {
             store.BeginFrame();
+            // Attribute modifiers become visible at the scheduler's aggregate boundary.
+            store.AttributeAggregator.AggregateDirty();
             store.SetTurnCCFlags();
 
             // ── I-frames countdown (Round 118) ───────────────────────────────────

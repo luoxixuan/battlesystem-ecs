@@ -509,6 +509,7 @@ namespace BattleSystemECS.Core
 
         public ComponentStore()
         {
+            ResourceResolver = new GAS.ResourceResolver(this);
             // Initialize ping-pong death queue buffers
             _deathQueue[0] = new ConcurrentBag<(int, int)>();
             _deathQueue[1] = new ConcurrentBag<(int, int)>();
