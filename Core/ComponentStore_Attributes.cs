@@ -12,11 +12,20 @@ namespace BattleSystemECS.Core
         public AttributeModifierHandle AddAttributeModifier(int entityId, ModifierDefinition definition, float capturedMagnitude = float.NaN)
         { return AttributeAggregator.AddModifier(entityId, definition, capturedMagnitude); }
         public bool RemoveAttributeModifier(int entityId, AttributeModifierHandle handle) => AttributeAggregator.RemoveModifier(entityId, handle);
+        internal void SyncComputedAttributeBases()
+        {
+            if (!UseComputedAttributes) return;
+            for (int i = 0; i < ActiveTowerIds.Count; i++)
+            {
+                int towerId = ActiveTowerIds[i];
+                AttributeAggregator.SetBase(towerId, new AttributeKey(8), TowerAttackDamage[towerId]);
+            }
+        }
+        internal void ClearComputedAttributes(int entityId) => AttributeAggregator.ClearEntity(entityId);
         public float GetTowerAttackDamage(int towerId)
         {
             var baseValue = TowerAttackDamage[towerId];
             if (!UseComputedAttributes) return baseValue;
-            AttributeAggregator.SetBase(towerId, new AttributeKey(8), baseValue);
             return AttributeAggregator.GetComputed(towerId, new AttributeKey(8), baseValue);
         }
     }

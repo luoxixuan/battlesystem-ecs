@@ -610,6 +610,7 @@ namespace BattleSystemECS.Core
 
         public void DestroyEntity(int entityId)
         {
+            ClearComputedAttributes(entityId);
             // ── Phase 1: determine archetype ────────────────────────────────────────
             bool wasEnemy = EnemyActive[entityId];
             bool wasTower = TowerActive[entityId];

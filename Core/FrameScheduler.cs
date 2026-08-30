@@ -68,6 +68,7 @@ namespace BattleSystemECS.Core
         {
             store.BeginFrame();
             // Attribute modifiers become visible at the scheduler's aggregate boundary.
+            store.SyncComputedAttributeBases();
             store.AttributeAggregator.AggregateDirty();
             store.SetTurnCCFlags();
 

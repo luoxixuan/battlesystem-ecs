@@ -49,7 +49,8 @@ namespace BattleSystemECS.Core.GAS
             new AttributeDefinition(new AttributeKey(5), "CritRate", AttributeDomain.Combat, 0f, AttributeUnit.Percent, 0f, 1f),
             new AttributeDefinition(new AttributeKey(6), "BuffStrength", AttributeDomain.Combat, 0f, AttributeUnit.Percent, 0f),
             new AttributeDefinition(new AttributeKey(7), "Mana", AttributeDomain.Resource, 0f, AttributeUnit.Points, 0f, float.PositiveInfinity, false),
-            new AttributeDefinition(new AttributeKey(8), "DamageOutputMultiplier", AttributeDomain.Combat, 1f, AttributeUnit.Scalar, 0f)
+            new AttributeDefinition(new AttributeKey(8), "DamageOutputMultiplier", AttributeDomain.Combat, 1f, AttributeUnit.Scalar, 0f),
+            new AttributeDefinition(new AttributeKey(9), "Shield", AttributeDomain.Resource, 0f, AttributeUnit.Points, 0f, float.PositiveInfinity, false)
         });
     }
 
@@ -64,12 +65,13 @@ namespace BattleSystemECS.Core.GAS
     /// <summary>唯一属性解释器：每次 dirty 聚合都从 base 重算，避免浮点逆运算误差。</summary>
     public sealed class AttributeAggregator
     {
-        private sealed class Modifier { public AttributeModifierHandle Handle; public AttributeKey Key; public AttributeModifierOp Op; public float Magnitude; public int Priority; public float Captured; public long Sequence; }
+        private sealed class Modifier { public AttributeModifierHandle Handle; public AttributeKey Key; public AttributeModifierOp Op; public float Magnitude; public int Priority; public float Captured; public SnapshotPolicy Snapshot; public long Sequence; }
         private readonly AttributeSchema _schema;
         private readonly Dictionary<(int, AttributeKey), float> _base = new Dictionary<(int, AttributeKey), float>();
         private readonly Dictionary<(int, AttributeKey), float> _computed = new Dictionary<(int, AttributeKey), float>();
         private readonly Dictionary<(int, AttributeKey), List<Modifier>> _modifiers = new Dictionary<(int, AttributeKey), List<Modifier>>();
         private readonly HashSet<(int, AttributeKey)> _dirty = new HashSet<(int, AttributeKey)>();
+        private readonly List<(int, AttributeKey)> _pending = new List<(int, AttributeKey)>();
         private long _nextId, _sequence;
         public AttributeAggregator(AttributeSchema schema = null) { _schema = schema ?? AttributeSchema.Default; }
         public int DirtyCount => _dirty.Count;
@@ -78,16 +80,17 @@ namespace BattleSystemECS.Core.GAS
         {
             var d = _schema.Get(definition.Attribute); if (!d.AllowsModifiers) throw new InvalidOperationException("Attribute does not allow modifiers");
             var id = new AttributeModifierHandle(++_nextId); var value = definition.Snapshot == SnapshotPolicy.CaptureOnApply && !float.IsNaN(capturedMagnitude) ? capturedMagnitude : definition.Magnitude;
-            var m = new Modifier { Handle = id, Key = definition.Attribute, Op = definition.Operation, Magnitude = definition.Magnitude, Captured = value, Priority = definition.Priority, Sequence = ++_sequence };
+            var m = new Modifier { Handle = id, Key = definition.Attribute, Op = definition.Operation, Magnitude = definition.Magnitude, Captured = value, Snapshot = definition.Snapshot, Priority = definition.Priority, Sequence = ++_sequence };
             var slot = (entityId, definition.Attribute); if (!_modifiers.TryGetValue(slot, out var list)) _modifiers[slot] = list = new List<Modifier>(); list.Add(m); _dirty.Add(slot); return id;
         }
         public bool RemoveModifier(int entityId, AttributeModifierHandle handle) { foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) { var index = pair.Value.FindIndex(m => m.Handle.Equals(handle)); if (index >= 0) { _dirty.Add(pair.Key); pair.Value.RemoveAt(index); return true; } } return false; }
         public bool RefreshModifier(int entityId, AttributeModifierHandle handle, float magnitude)
-        { foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) { var modifier = pair.Value.Find(m => m.Handle.Equals(handle)); if (modifier != null) { modifier.Magnitude = magnitude; modifier.Captured = magnitude; _dirty.Add(pair.Key); return true; } } return false; }
+        { foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) { var modifier = pair.Value.Find(m => m.Handle.Equals(handle)); if (modifier != null) { modifier.Magnitude = magnitude; if (modifier.Snapshot == SnapshotPolicy.ReevaluateOnRead) modifier.Captured = magnitude; _dirty.Add(pair.Key); return true; } } return false; }
         public void MarkDirty(int entityId, AttributeKey key) => _dirty.Add((entityId, key));
-        public void AggregateDirty() { var pending = new List<(int, AttributeKey)>(_dirty); _dirty.Clear(); foreach (var slot in pending) Aggregate(slot.Item1, slot.Item2); }
+        public void AggregateDirty() { _pending.Clear(); foreach (var slot in _dirty) _pending.Add(slot); _dirty.Clear(); for (int i = 0; i < _pending.Count; i++) Aggregate(_pending[i].Item1, _pending[i].Item2); }
+        public void ClearEntity(int entityId) { foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) _dirty.Remove(pair.Key); var keys = new List<(int, AttributeKey)>(); foreach (var pair in _base) if (pair.Key.Item1 == entityId) keys.Add(pair.Key); for (int i = 0; i < keys.Count; i++) { _base.Remove(keys[i]); _computed.Remove(keys[i]); } foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) pair.Value.Clear(); }
         public float GetComputed(int entityId, AttributeKey key, float fallback = 0f) { if (_dirty.Contains((entityId, key))) AggregateDirty(); return _computed.TryGetValue((entityId, key), out var value) ? value : fallback; }
-        private void Aggregate(int entityId, AttributeKey key) { var slot = (entityId, key); var value = _base.TryGetValue(slot, out var b) ? b : _schema.Get(key).DefaultValue; if (_modifiers.TryGetValue(slot, out var list)) { list.Sort((x, y) => x.Priority != y.Priority ? x.Priority.CompareTo(y.Priority) : x.Sequence.CompareTo(y.Sequence)); foreach (var m in list) { var magnitude = m.Captured; if (m.Op == AttributeModifierOp.Override) value = magnitude; else if (m.Op == AttributeModifierOp.Add) value += magnitude; else value *= magnitude; } } _computed[slot] = _schema.Get(key).Clamp(value); }
+        private void Aggregate(int entityId, AttributeKey key) { var slot = (entityId, key); var value = _base.TryGetValue(slot, out var b) ? b : _schema.Get(key).DefaultValue; if (_modifiers.TryGetValue(slot, out var list)) { list.Sort((x, y) => x.Priority != y.Priority ? x.Priority.CompareTo(y.Priority) : x.Sequence.CompareTo(y.Sequence)); foreach (var m in list) { var magnitude = m.Snapshot == SnapshotPolicy.CaptureOnApply ? m.Captured : m.Magnitude; if (m.Op == AttributeModifierOp.Override) value = magnitude; else if (m.Op == AttributeModifierOp.Add) value += magnitude; else value *= magnitude; } } _computed[slot] = _schema.Get(key).Clamp(value); }
     }
 
     /// <summary>
