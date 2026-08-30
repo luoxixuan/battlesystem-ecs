@@ -120,7 +120,7 @@ namespace BattleSystemECS.Systems
             _currentTurn = turn;
             _playerX = store.PositionX[playerId];
             _playerY = store.PositionY[playerId];
-            _attackDamage = store.GetPlayerAttackDamage(playerId);
+            _attackDamage = store.GetPlayerAttackDamageProjection(playerId);
             _attackRange = store.GetPlayerAttackRange(playerId);
             _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
             _turnCached = true;
@@ -144,7 +144,7 @@ namespace BattleSystemECS.Systems
             // Precompute buff-related values — eliminates 2 method calls + 2 boundary checks per frame
             _attackBuffMult = store.GetAttackBuffMultiplier(playerId);
             bool hasCritRateBuff = store.HasCritRateBuff(playerId);
-            _critRateThreshold = (hasCritRateBuff ? 0.05f : 0f) + _critRateBonus;
+            _critRateThreshold = store.GetPlayerCritRateProjection(playerId, (hasCritRateBuff ? 0.05f : 0f) + _critRateBonus);
         }
 
         /// <summary>

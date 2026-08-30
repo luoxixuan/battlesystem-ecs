@@ -88,5 +88,51 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(0f, Store.EnemyHealth[enemyIds[2]]);
             Assert.Equal(injectedEnemyHealth, Store.EnemyHealth[enemyIds[0]], 3);
         }
+
+        [Fact]
+        // 真实帧入口验证攻击、暴击与护甲投影，方法名保持静态规则可解析。
+        public void Tick_CombatProjectionEntry()
+        {
+            Player();
+            Store.PositionX[0] = 5f; Store.PositionY[0] = 0f;
+            Store.PlayerAttackDamage[0] = 10f; Store.PlayerAttackRange[0] = 10f; Store.PlayerAttackSpeed[0] = 1f;
+            Store.PlayerMaxHealth[0] = 100f; Store.PlayerCurrentHealth[0] = 100f;
+            int enemyId = Enemy();
+            Store.PositionX[enemyId] = 5f; Store.PositionY[enemyId] = 1f; Store.EnemyMoveSpeed[enemyId] = 0f;
+            Store.EnemyPathId[enemyId] = -1;
+            Store.EnemyHealth[enemyId] = 100f; Store.EnemyMaxHealth[enemyId] = 100f; Store.EnemyArmor[enemyId] = 0f;
+            Store.PlayerPreFightCritBonus[0] = 0f;
+            Store.PlayerIsWaveActive[0] = true;
+            Store.PlayerArmor[0] = 0.2f;
+            Store.UseComputedAttributes = true;
+            Store.AddAttributeModifier(0, new BattleSystemECS.Core.GAS.ModifierDefinition(new BattleSystemECS.Core.GAS.AttributeKey(0), BattleSystemECS.Core.GAS.AttributeModifierOp.Multiply, 2f));
+            Store.AddAttributeModifier(0, new BattleSystemECS.Core.GAS.ModifierDefinition(new BattleSystemECS.Core.GAS.AttributeKey(5), BattleSystemECS.Core.GAS.AttributeModifierOp.Add, 1f));
+            Store.AddAttributeModifier(0, new BattleSystemECS.Core.GAS.ModifierDefinition(new BattleSystemECS.Core.GAS.AttributeKey(10), BattleSystemECS.Core.GAS.AttributeModifierOp.Add, 0.1f));
+            var events = new EventBus();
+            int criticalHits = 0;
+            events.EnemyCrit.Subscribe(_ => criticalHits++);
+            var attack = new PlayerTowerAttackSystem(Store, Renderer, 0, Config, null, events);
+            var scheduler = new FrameScheduler(Store, Config);
+            scheduler.CombatSetup.PlayerTowerAttack = attack;
+            scheduler.Combat.PlayerTowerAttack = attack;
+            RebuildGrid();
+
+            scheduler.Tick(1f, 0);
+
+            Assert.Equal(1, attack.GetCachedEnemyCount());
+            Assert.True(Store.EnemyActive[enemyId]);
+            scheduler.Tick(1f, 1);
+            Assert.True(Store.EnemyHealth[enemyId] < 100f);
+            Assert.True(criticalHits > 0);
+            Assert.Equal(0.3f, Store.GetPlayerArmorProjection(0), 3);
+            float computedDamage = 100f - Store.EnemyHealth[enemyId];
+            Store.EnemyHealth[enemyId] = 100f;
+            Store.UseComputedAttributes = false;
+            scheduler.Tick(1f, 2);
+            Assert.Equal(10f, 100f - Store.EnemyHealth[enemyId], 3);
+            Assert.True(computedDamage > 10f);
+            Store.DecreasePlayerHealth(0, 10f);
+            Assert.Equal(92f, Store.PlayerCurrentHealth[0], 3);
+        }
     }
 }

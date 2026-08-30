@@ -66,6 +66,7 @@ namespace BattleSystemECS.Core
         /// </summary>
         public void Tick(float deltaTime, int turn)
         {
+            store.ApplyComputedAttributeModeAtFrameBoundary();
             store.BeginFrame();
             // Attribute modifiers become visible at the scheduler's aggregate boundary.
             store.SyncComputedAttributeBases();

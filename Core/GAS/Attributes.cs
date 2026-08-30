@@ -19,6 +19,9 @@ namespace BattleSystemECS.Core.GAS
             float maximum = float.PositiveInfinity, bool allowsModifiers = true)
         {
             if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Attribute name is required", nameof(name));
+            if (float.IsNaN(minimum) || float.IsNaN(maximum) || minimum > maximum)
+                throw new ArgumentOutOfRangeException(nameof(minimum), "Attribute range is invalid");
+            if (float.IsInfinity(defaultValue)) throw new ArgumentOutOfRangeException(nameof(defaultValue));
             if (float.IsNaN(defaultValue) || defaultValue < minimum || defaultValue > maximum) throw new ArgumentOutOfRangeException(nameof(defaultValue));
             Key = key; Name = name; Domain = domain; DefaultValue = defaultValue; Unit = unit;
             Minimum = minimum; Maximum = maximum; AllowsModifiers = allowsModifiers;
@@ -43,7 +46,7 @@ namespace BattleSystemECS.Core.GAS
         public static AttributeSchema Default { get; } = new AttributeSchema(new[] {
             new AttributeDefinition(new AttributeKey(0), "AttackDamage", AttributeDomain.Combat, 0f, AttributeUnit.Points, 0f),
             new AttributeDefinition(new AttributeKey(1), "AttackRange", AttributeDomain.Movement, 0f, AttributeUnit.Tiles, 0f),
-            new AttributeDefinition(new AttributeKey(2), "MaxHealth", AttributeDomain.Resource, 0f, AttributeUnit.Points, 0f),
+            new AttributeDefinition(new AttributeKey(2), "MaxHealth", AttributeDomain.Resource, 0f, AttributeUnit.Points, 0f, float.PositiveInfinity, false),
             new AttributeDefinition(new AttributeKey(3), "CurrentHealth", AttributeDomain.Resource, 0f, AttributeUnit.Points, 0f, float.PositiveInfinity, false),
             new AttributeDefinition(new AttributeKey(4), "Gold", AttributeDomain.Economy, 0f, AttributeUnit.Currency, 0f, float.PositiveInfinity, false),
             new AttributeDefinition(new AttributeKey(5), "CritRate", AttributeDomain.Combat, 0f, AttributeUnit.Percent, 0f, 1f),
@@ -51,6 +54,7 @@ namespace BattleSystemECS.Core.GAS
             new AttributeDefinition(new AttributeKey(7), "Mana", AttributeDomain.Resource, 0f, AttributeUnit.Points, 0f, float.PositiveInfinity, false),
             new AttributeDefinition(new AttributeKey(8), "DamageOutputMultiplier", AttributeDomain.Combat, 1f, AttributeUnit.Scalar, 0f),
             new AttributeDefinition(new AttributeKey(9), "Shield", AttributeDomain.Resource, 0f, AttributeUnit.Points, 0f, float.PositiveInfinity, false)
+            ,new AttributeDefinition(new AttributeKey(10), "Armor", AttributeDomain.Defense, 0f, AttributeUnit.Percent, 0f, 1f)
         });
     }
 
@@ -75,7 +79,7 @@ namespace BattleSystemECS.Core.GAS
         private long _nextId, _sequence;
         public AttributeAggregator(AttributeSchema schema = null) { _schema = schema ?? AttributeSchema.Default; }
         public int DirtyCount => _dirty.Count;
-        public void SetBase(int entityId, AttributeKey key, float value) { var d = _schema.Get(key); _base[(entityId, key)] = d.Clamp(value); _dirty.Add((entityId, key)); }
+        public void SetBase(int entityId, AttributeKey key, float value) { var d = _schema.Get(key); var slot = (entityId, key); var next = d.Clamp(value); if (_base.TryGetValue(slot, out var previous) && previous.Equals(next)) return; _base[slot] = next; _dirty.Add(slot); }
         public AttributeModifierHandle AddModifier(int entityId, ModifierDefinition definition, float capturedMagnitude = float.NaN)
         {
             var d = _schema.Get(definition.Attribute); if (!d.AllowsModifiers) throw new InvalidOperationException("Attribute does not allow modifiers");
@@ -88,9 +92,11 @@ namespace BattleSystemECS.Core.GAS
         { foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) { var modifier = pair.Value.Find(m => m.Handle.Equals(handle)); if (modifier != null) { modifier.Magnitude = magnitude; if (modifier.Snapshot == SnapshotPolicy.ReevaluateOnRead) modifier.Captured = magnitude; _dirty.Add(pair.Key); return true; } } return false; }
         public void MarkDirty(int entityId, AttributeKey key) => _dirty.Add((entityId, key));
         public void AggregateDirty() { _pending.Clear(); foreach (var slot in _dirty) _pending.Add(slot); _dirty.Clear(); for (int i = 0; i < _pending.Count; i++) Aggregate(_pending[i].Item1, _pending[i].Item2); }
-        public void ClearEntity(int entityId) { foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) _dirty.Remove(pair.Key); var keys = new List<(int, AttributeKey)>(); foreach (var pair in _base) if (pair.Key.Item1 == entityId) keys.Add(pair.Key); for (int i = 0; i < keys.Count; i++) { _base.Remove(keys[i]); _computed.Remove(keys[i]); } foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) pair.Value.Clear(); }
+        public void ClearEntity(int entityId) { var keys = new List<(int, AttributeKey)>(); foreach (var pair in _base) if (pair.Key.Item1 == entityId) keys.Add(pair.Key); foreach (var pair in _computed) if (pair.Key.Item1 == entityId && !keys.Contains(pair.Key)) keys.Add(pair.Key); foreach (var pair in _dirty) if (pair.Item1 == entityId && !keys.Contains(pair)) keys.Add(pair); foreach (var key in keys) { _base.Remove(key); _computed.Remove(key); _dirty.Remove(key); } foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) pair.Value.Clear(); }
+        public void ClearAllComputed() { _computed.Clear(); }
+        public void MarkAllDirty() { foreach (var pair in _base) _dirty.Add(pair.Key); foreach (var pair in _modifiers) _dirty.Add(pair.Key); }
         public float GetComputed(int entityId, AttributeKey key, float fallback = 0f) { if (_dirty.Contains((entityId, key))) AggregateDirty(); return _computed.TryGetValue((entityId, key), out var value) ? value : fallback; }
-        private void Aggregate(int entityId, AttributeKey key) { var slot = (entityId, key); var value = _base.TryGetValue(slot, out var b) ? b : _schema.Get(key).DefaultValue; if (_modifiers.TryGetValue(slot, out var list)) { list.Sort((x, y) => x.Priority != y.Priority ? x.Priority.CompareTo(y.Priority) : x.Sequence.CompareTo(y.Sequence)); foreach (var m in list) { var magnitude = m.Snapshot == SnapshotPolicy.CaptureOnApply ? m.Captured : m.Magnitude; if (m.Op == AttributeModifierOp.Override) value = magnitude; else if (m.Op == AttributeModifierOp.Add) value += magnitude; else value *= magnitude; } } _computed[slot] = _schema.Get(key).Clamp(value); }
+        private void Aggregate(int entityId, AttributeKey key) { var slot = (entityId, key); var definition = _schema.Get(key); var value = _base.TryGetValue(slot, out var b) ? b : definition.DefaultValue; if (_modifiers.TryGetValue(slot, out var list)) { int overridePriority = int.MinValue; long overrideSequence = long.MinValue; float overrideValue = value; float add = 0f; float multiply = 1f; for (int i = 0; i < list.Count; i++) { var m = list[i]; var magnitude = m.Snapshot == SnapshotPolicy.CaptureOnApply ? m.Captured : m.Magnitude; if (m.Op == AttributeModifierOp.Override) { if (m.Priority > overridePriority || (m.Priority == overridePriority && m.Sequence > overrideSequence)) { overridePriority = m.Priority; overrideSequence = m.Sequence; overrideValue = magnitude; } } else if (m.Op == AttributeModifierOp.Add) add += magnitude; else multiply *= magnitude; } value = (overridePriority == int.MinValue ? value : overrideValue) + add; value *= multiply; } _computed[slot] = definition.Clamp(value); }
     }
 
     /// <summary>

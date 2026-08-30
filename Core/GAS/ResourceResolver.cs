@@ -29,16 +29,36 @@ namespace BattleSystemECS.Core.GAS
         public ResourceResolver(ComponentStore store) { _store = store ?? throw new ArgumentNullException(nameof(store)); }
         public ResourceApplyResult TryApply(ResourceRequest request)
         {
-            if (!Valid(request.Target.Index)) return new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidTarget);
-            if (float.IsNaN(request.Delta) || float.IsInfinity(request.Delta)) return new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidValue);
+            ResourceKind kind;
             switch (request.Resource.Value)
             {
-                case 3: return new ResourceApplyResult(true, Heal(request.Target.Index, request.Delta), ResourceRejectionReason.None);
-                case 4: return new ResourceApplyResult(true, ApplyGold(request.Target.Index, request.Delta), ResourceRejectionReason.None);
-                case 7: return new ResourceApplyResult(true, ApplyMana(request.Target.Index, request.Delta), ResourceRejectionReason.None);
-                case 9: return new ResourceApplyResult(true, ApplyShield(request.Target.Index, request.Delta), ResourceRejectionReason.None);
+                case 2: kind = ResourceKind.MaxHealth; break;
+                case 3: kind = ResourceKind.CurrentHealth; break;
+                case 4: kind = ResourceKind.Gold; break;
+                case 7: kind = ResourceKind.Mana; break;
+                case 9: kind = ResourceKind.Shield; break;
                 default: return new ResourceApplyResult(false, 0f, ResourceRejectionReason.UnknownResource);
             }
+            int targetId;
+            HandleResolveFailure failure;
+            if (!_store.TryResolve(request.Target, out targetId, out failure))
+                return new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidTarget);
+            if (!Valid(targetId) || targetId != _store.PlayerEntityId)
+                return new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidTarget);
+            if (float.IsNaN(request.Delta) || float.IsInfinity(request.Delta)) return new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidValue);
+            ResourcePolicy policy = Policy(kind);
+            if (!policy.AllowsNegative && request.Delta < 0f && kind == ResourceKind.CurrentHealth)
+                return new ResourceApplyResult(false, 0f, ResourceRejectionReason.UnsupportedOperation);
+            float applied;
+            switch (kind)
+            {
+                case ResourceKind.CurrentHealth: applied = Heal(targetId, request.Delta); break;
+                case ResourceKind.MaxHealth: applied = SetMaxHealth(targetId, request.Delta); break;
+                case ResourceKind.Gold: applied = ApplyGold(targetId, request.Delta); break;
+                case ResourceKind.Mana: applied = ApplyMana(targetId, request.Delta); break;
+                default: applied = ApplyShield(targetId, request.Delta); break;
+            }
+            return new ResourceApplyResult(true, applied, ResourceRejectionReason.None);
         }
         public float Apply(ResourceRequest request)
         {
@@ -52,5 +72,8 @@ namespace BattleSystemECS.Core.GAS
         private static float Clamp(float value, float max) => Math.Min(Math.Max(0f, value), Math.Max(0f, max));
         private static bool Valid(int playerId) => (uint)playerId < ComponentStore.MAX_PLAYERS;
         private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
+        private static ResourcePolicy Policy(ResourceKind kind) => kind == ResourceKind.CurrentHealth
+            ? new ResourcePolicy(kind, allowsNegative: false, clampToMaximum: true)
+            : new ResourcePolicy(kind, allowsNegative: true, clampToMaximum: kind == ResourceKind.Mana);
     }
 }

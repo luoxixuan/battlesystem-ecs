@@ -504,6 +504,12 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         {
             if (entityId < 0 || entityId >= MAX_PLAYERS) return;
 
+            // Players use the same handle contract as other entities. Reinitializing a
+            // player slot starts a fresh identity and makes it resolvable by resource APIs.
+            _entityGenerations[entityId] = _entityGenerations[entityId] == 0 ? 1 : NextGeneration(_entityGenerations[entityId]);
+            AttributeAggregator.ClearEntity(entityId);
+            PositionActive[entityId] = true;
+
             PlayerAttackRange[entityId] = attackRange;
             PlayerAttackSpeed[entityId] = attackSpeed;
             PlayerAttackDamage[entityId] = attackDamage;
@@ -984,7 +990,7 @@ PlayerCrestActiveId[entityId] = "";
                 damage -= absorbed;
                 if (damage <= 0f) return;
             }
-            float armor = PlayerArmor[playerId];
+            float armor = GetPlayerArmorProjection(playerId);
             float mitigatedDamage = damage * (1f - armor);
             // One-shot protection: clamp current health so it never drops below PlayerMinHealthFloor.
             // Excess damage is absorbed (HP stays at floor). Floor=0 disables protection (backward compatible).
