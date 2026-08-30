@@ -17,31 +17,52 @@ namespace BattleSystemECS.Core.GAS
 
     public sealed class GameplayCatalog
     {
-        public IReadOnlyList<AbilityCatalogEntry> Abilities { get; internal set; }
-        public IReadOnlyList<AbilityDefinition> AbilityDefinitions { get; internal set; }
-        public IReadOnlyList<TargetingDefinition> Targetings { get; internal set; }
-        public IReadOnlyList<ModifierDefinition> Modifiers { get; internal set; }
-        public IReadOnlyList<TriggerDefinition> Triggers { get; internal set; }
-        public IReadOnlyList<GameplayEffectDefinition> Effects { get; internal set; }
-        public IReadOnlyList<ExecutionDefinition> Executions { get; internal set; }
-        public IReadOnlyDictionary<string, AbilityId> Aliases { get; internal set; }
-        internal GameplayCatalog() { Abilities = Array.Empty<AbilityCatalogEntry>(); AbilityDefinitions = Array.Empty<AbilityDefinition>(); Targetings = Array.Empty<TargetingDefinition>(); Effects = Array.Empty<GameplayEffectDefinition>(); Executions = Array.Empty<ExecutionDefinition>(); Triggers = Array.Empty<TriggerDefinition>(); Modifiers = Array.Empty<ModifierDefinition>(); Aliases = new Dictionary<string, AbilityId>(); }
+        private readonly AbilityCatalogEntry[] _abilities;
+        private readonly AbilityDefinition[] _abilityDefinitions;
+        private readonly TargetingDefinition[] _targetings;
+        private readonly ModifierDefinition[] _modifiers;
+        private readonly TriggerDefinition[] _triggers;
+        private readonly GameplayEffectDefinition[] _effects;
+        private readonly ExecutionDefinition[] _executions;
+        private readonly IReadOnlyDictionary<string, AbilityId> _aliases;
+        private readonly IReadOnlyList<AbilityCatalogEntry> _abilitiesView;
+        private readonly IReadOnlyList<AbilityDefinition> _abilityDefinitionsView;
+        private readonly IReadOnlyList<TargetingDefinition> _targetingsView;
+        private readonly IReadOnlyList<ModifierDefinition> _modifiersView;
+        private readonly IReadOnlyList<TriggerDefinition> _triggersView;
+        private readonly IReadOnlyList<GameplayEffectDefinition> _effectsView;
+        private readonly IReadOnlyList<ExecutionDefinition> _executionsView;
+        public IReadOnlyList<AbilityCatalogEntry> Abilities => _abilitiesView;
+        public IReadOnlyList<AbilityDefinition> AbilityDefinitions => _abilityDefinitionsView;
+        public IReadOnlyList<TargetingDefinition> Targetings => _targetingsView;
+        public IReadOnlyList<ModifierDefinition> Modifiers => _modifiersView;
+        public IReadOnlyList<TriggerDefinition> Triggers => _triggersView;
+        public IReadOnlyList<GameplayEffectDefinition> Effects => _effectsView;
+        public IReadOnlyList<ExecutionDefinition> Executions => _executionsView;
+        public IReadOnlyDictionary<string, AbilityId> Aliases => _aliases;
         internal GameplayCatalog(IReadOnlyList<AbilityDefinition> abilities, IReadOnlyList<TargetingDefinition> targetings, IReadOnlyList<GameplayEffectDefinition> effects, IReadOnlyList<ExecutionDefinition> executions, IReadOnlyList<TriggerDefinition> triggers, IReadOnlyList<ModifierDefinition> modifiers, IReadOnlyDictionary<string, AbilityId> aliases)
-        { AbilityDefinitions = Copy(abilities); Targetings = Copy(targetings); Effects = Copy(effects); Executions = Copy(executions); Triggers = Copy(triggers); Modifiers = Copy(modifiers); Aliases = new ReadOnlyDictionary<string, AbilityId>(new Dictionary<string, AbilityId>(aliases)); var entries = new AbilityCatalogEntry[abilities.Count]; for (int i = 0; i < entries.Length; i++) entries[i] = new AbilityCatalogEntry(abilities[i].Id, abilities[i].Name, (int)abilities[i].Targeting.Shape, 0f); Abilities = Array.AsReadOnly(entries); }
-        private static IReadOnlyList<T> Copy<T>(IReadOnlyList<T> values) { var copy = new T[values == null ? 0 : values.Count]; if (values != null) for (int i = 0; i < copy.Length; i++) copy[i] = values[i]; return Array.AsReadOnly(copy); }
-        public bool TryGetAbility(AbilityId id, out AbilityDefinition definition) { if ((uint)id.Value < (uint)AbilityDefinitions.Count && AbilityDefinitions[id.Value].Id.Value == id.Value) { definition = AbilityDefinitions[id.Value]; return true; } definition = default(AbilityDefinition); return false; }
-        public bool TryGetEffect(EffectId id, out GameplayEffectDefinition definition) { if ((uint)id.Value < (uint)Effects.Count && Effects[id.Value].Id.Value == id.Value) { definition = Effects[id.Value]; return true; } definition = default(GameplayEffectDefinition); return false; }
+        {
+            _abilityDefinitions = Copy(abilities); _targetings = Copy(targetings); _effects = Copy(effects); _executions = Copy(executions); _triggers = Copy(triggers); _modifiers = Copy(modifiers); _aliases = new ReadOnlyDictionary<string, AbilityId>(new Dictionary<string, AbilityId>(aliases));
+            _abilities = new AbilityCatalogEntry[_abilityDefinitions.Length];
+            for (int i = 0; i < _abilities.Length; i++) _abilities[i] = new AbilityCatalogEntry(_abilityDefinitions[i].Id, _abilityDefinitions[i].Name, LegacyAreaShape(_abilityDefinitions[i].Targeting.Shape), DurationFor(_abilityDefinitions[i], _effects, _executions));
+            _abilitiesView = Array.AsReadOnly(_abilities); _abilityDefinitionsView = Array.AsReadOnly(_abilityDefinitions); _targetingsView = Array.AsReadOnly(_targetings); _modifiersView = Array.AsReadOnly(_modifiers); _triggersView = Array.AsReadOnly(_triggers); _effectsView = Array.AsReadOnly(_effects); _executionsView = Array.AsReadOnly(_executions);
+        }
+        private static T[] Copy<T>(IReadOnlyList<T> values) { var copy = new T[values == null ? 0 : values.Count]; if (values != null) for (int i = 0; i < copy.Length; i++) copy[i] = values[i]; return copy; }
+        private static float DurationFor(AbilityDefinition ability, GameplayEffectDefinition[] effects, ExecutionDefinition[] executions) { float duration = 0f; foreach (var effect in ability.Effects) if ((uint)effect.Value < (uint)effects.Length && effects[effect.Value].Duration > duration) duration = effects[effect.Value].Duration; foreach (var execution in ability.Executions) if ((uint)execution.Value < (uint)executions.Length && executions[execution.Value].Duration > duration) duration = executions[execution.Value].Duration; return duration; }
+        private static int LegacyAreaShape(TargetingShape shape) { switch (shape) { case TargetingShape.TimeRewind: return AreaShapeType.TimeRewind; case TargetingShape.ChainHeal: return AreaShapeType.ChainHeal; case TargetingShape.MassResurrect: return AreaShapeType.MassResurrect; case TargetingShape.AoeStun: return AreaShapeType.AoeStun; case TargetingShape.AoeRoot: return AreaShapeType.AoeRoot; case TargetingShape.AoeKnockback: return AreaShapeType.AoeKnockback; default: return AreaShapeType.FromString(shape.ToString()); } }
+        public bool TryGetAbility(AbilityId id, out AbilityDefinition definition) { if ((uint)id.Value < (uint)_abilityDefinitions.Length && _abilityDefinitions[id.Value].Id.Value == id.Value) { definition = _abilityDefinitions[id.Value]; return true; } definition = default(AbilityDefinition); return false; }
+        public bool TryGetEffect(EffectId id, out GameplayEffectDefinition definition) { if ((uint)id.Value < (uint)_effects.Length && _effects[id.Value].Id.Value == id.Value) { definition = _effects[id.Value]; return true; } definition = default(GameplayEffectDefinition); return false; }
         public bool TryGetExecution(ExecutionId id, out ExecutionDefinition definition)
         {
-            if ((uint)id.Value < (uint)Executions.Count && Executions[id.Value].Id.Value == id.Value) { definition = Executions[id.Value]; return true; }
+            if ((uint)id.Value < (uint)_executions.Length && _executions[id.Value].Id.Value == id.Value) { definition = _executions[id.Value]; return true; }
             definition = default(ExecutionDefinition); return false;
         }
         public bool TryGetTrigger(TriggerId id, out TriggerDefinition definition)
         {
-            if ((uint)id.Value < (uint)Triggers.Count && Triggers[id.Value].Id.Value == id.Value) { definition = Triggers[id.Value]; return true; }
+            if ((uint)id.Value < (uint)_triggers.Length && _triggers[id.Value].Id.Value == id.Value) { definition = _triggers[id.Value]; return true; }
             definition = default(TriggerDefinition); return false;
         }
-        public bool TryResolveAlias(string alias, out AbilityId id) => Aliases.TryGetValue(alias, out id);
+        public bool TryResolveAlias(string alias, out AbilityId id) => _aliases.TryGetValue(alias, out id);
     }
 
     /// <summary>Strict bootstrap for canonical skills.json. Legacy game_config skills remain an explicit caller choice.</summary>
@@ -59,6 +80,7 @@ namespace BattleSystemECS.Core.GAS
             var effects = new List<GameplayEffectDefinition>();
             var executions = new List<ExecutionDefinition>();
             var aliases = new Dictionary<string, AbilityId>(StringComparer.OrdinalIgnoreCase);
+            var staticNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             using (var doc = JsonDocument.Parse(File.ReadAllText(canonicalSkillsPath)))
             {
                 if (doc.RootElement.ValueKind != JsonValueKind.Array)
@@ -170,7 +192,9 @@ namespace BattleSystemECS.Core.GAS
                             throw new CatalogValidationException($"{skillPath}: expected object");
                         var staticRecord = StaticSkillSchemaAdapter.Read(node, skillPath, abilities.Count);
                         string name = staticRecord.Name;
+                        if (staticNames.Contains(name)) throw new CatalogValidationException($"{skillPath}: static skill alias conflict '{name}'");
                         if (aliases.ContainsKey(name)) continue; // curated entries have precedence
+                        staticNames.Add(name);
                         var entry = new AbilityCatalogEntry(new AbilityId(abilities.Count), name, AreaShapeType.Single, 0f);
                         var staticExecution = new ExecutionId(executions.Count);
                         executions.Add(new ExecutionDefinition(staticExecution, EffectPayloadKind.Damage, staticRecord.DamageMultiplier, CatalogRegistries.SkillTag, MagnitudeSource.Multiplier, DamageAmountStage.LegacyMultiplier));
@@ -181,7 +205,7 @@ namespace BattleSystemECS.Core.GAS
                     }
                 }
             }
-            var catalog = new GameplayCatalog { Abilities = abilities.ToArray(), AbilityDefinitions = typedAbilities.ToArray(), Targetings = targetings.ToArray(), Modifiers = modifiers.ToArray(), Triggers = triggers.ToArray(), Effects = effects.ToArray(), Executions = executions.ToArray(), Aliases = new ReadOnlyDictionary<string, AbilityId>(aliases) };
+            var catalog = new GameplayCatalog(typedAbilities, targetings, effects, executions, triggers, modifiers, aliases);
             CatalogValidator.Validate(catalog, canonicalSkillsPath);
             return catalog;
         }

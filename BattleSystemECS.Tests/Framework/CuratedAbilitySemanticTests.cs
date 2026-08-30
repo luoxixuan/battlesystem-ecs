@@ -33,6 +33,10 @@ namespace BattleSystemECS.Tests.Framework
                 Assert.Equal(radii[i], catalog.AbilityDefinitions[i].Targeting.Radius);
                 Assert.True(catalog.AbilityDefinitions[i].Executions.Count > 0 || catalog.AbilityDefinitions[i].Effects.Count > 0, names[i]);
             }
+            Assert.Equal(16, catalog.Abilities[19].AreaShape);
+            Assert.Equal(3f, catalog.Abilities[6].Duration);
+            Assert.Equal(5f, catalog.Abilities[11].Duration);
+            Assert.Equal(2f, catalog.Abilities[13].Duration);
 
             AssertMultiplier(catalog, "Cross Slash", 4f);
             AssertMultiplier(catalog, "Mega Explosion", 3f);

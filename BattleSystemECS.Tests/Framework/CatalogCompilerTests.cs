@@ -81,5 +81,21 @@ namespace BattleSystemECS.Tests.Framework
             Assert.NotEmpty(config.CompiledCatalog!.AbilityDefinitions);
             Assert.NotEmpty(config.CompiledCatalog.Effects);
         }
+
+        [Fact]
+        public void StaticStaticAliasConflictFailsFastWhileCanonicalWins()
+        {
+            string canonical = Path.Combine(AppContext.BaseDirectory, "Data", "Configs", "skills.json");
+            if (!File.Exists(canonical)) canonical = Path.Combine(Directory.GetCurrentDirectory(), "Data", "Configs", "skills.json");
+            string root = Path.Combine(Path.GetTempPath(), "catalog-static-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string json = "{\"Name\":\"Static Conflict\",\"AttackRange\":1,\"AreaWidth\":1,\"AreaHeight\":1,\"Cooldown\":1,\"DamageMultiplier\":1,\"ManaCost\":1}";
+            string first = Path.Combine(root, "a.json");
+            string second = Path.Combine(root, "b.json");
+            File.WriteAllText(first, json);
+            File.WriteAllText(second, json);
+            try { Assert.Throws<CatalogValidationException>(() => CatalogCompiler.Compile(canonical, new[] { first, second })); }
+            finally { Directory.Delete(root, true); }
+        }
     }
 }
