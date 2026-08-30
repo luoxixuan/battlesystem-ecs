@@ -1,0 +1,85 @@
+using System;
+using System.IO;
+using BattleSystemECS.Core.GAS;
+using BattleSystemECS.Tests.Infrastructure;
+using Xunit;
+
+namespace BattleSystemECS.Tests.Framework
+{
+    public sealed class CatalogCompilerTests
+    {
+        [Fact]
+        public void CanonicalSkillsCompileWithStableIds()
+        {
+            string path = Path.Combine(AppContext.BaseDirectory, "Data", "Configs", "skills.json");
+            if (!File.Exists(path)) path = Path.Combine(Directory.GetCurrentDirectory(), "Data", "Configs", "skills.json");
+            var catalog = CatalogCompiler.Compile(path);
+            Assert.NotEmpty(catalog.Abilities);
+            Assert.Equal(0, catalog.Abilities[0].Id.Value);
+            string configDir = Path.GetDirectoryName(path) ?? throw new InvalidOperationException("config path has no directory");
+            string dataDir = Path.GetDirectoryName(configDir) ?? throw new InvalidOperationException("config directory has no parent");
+            string staticRoot = Path.Combine(dataDir, "Skills");
+            string[] staticFiles = Directory.GetFiles(staticRoot, "*.json");
+            var merged = CatalogCompiler.Compile(path, staticFiles);
+            Assert.True(merged.Abilities.Count >= catalog.Abilities.Count);
+            Assert.Equal(merged.Abilities.Count, merged.AbilityDefinitions.Count);
+            Assert.NotEmpty(merged.Effects);
+            Assert.NotEmpty(merged.AbilityDefinitions[0].Executions);
+            Assert.True(merged.TryResolveAlias("Poison Nova", out var poisonId));
+            Assert.True(merged.TryGetAbility(poisonId, out var poison));
+            Assert.Single(poison.Effects);
+            Assert.True(merged.TryGetEffect(poison.Effects[0], out var poisonEffect));
+            Assert.Equal(5f, poisonEffect.Duration);
+            Assert.Equal(1f, poisonEffect.Period);
+            Assert.Equal(new TagId(7), poisonEffect.Tag);
+            Assert.Equal(8f, merged.Executions[poisonEffect.Executions[0].Value].Magnitude);
+            Assert.True(merged.TryResolveAlias("Cold Nova", out var coldId));
+            Assert.True(merged.TryGetAbility(coldId, out var cold));
+            Assert.True(merged.TryGetEffect(cold.Effects[0], out var coldEffect));
+            Assert.Equal(2f, coldEffect.Duration);
+            Assert.Equal(EffectPayloadKind.CrowdControl, coldEffect.Payload);
+            Assert.Equal(new TagId(3), coldEffect.Tag);
+            Assert.True(merged.TryResolveAlias("Meteor Strike", out var meteorId));
+            Assert.True(merged.TryGetAbility(meteorId, out var meteor));
+            Assert.Single(meteor.Effects);
+            Assert.Equal(2, meteor.Executions.Count);
+            Assert.Contains(meteor.Executions, executionId => merged.Executions[executionId.Value].MagnitudeSource == MagnitudeSource.Multiplier && merged.Executions[executionId.Value].Magnitude == 8f);
+            Assert.Contains(meteor.Executions, executionId => merged.Executions[executionId.Value].Magnitude == 70f && merged.Executions[executionId.Value].MagnitudeSource == MagnitudeSource.Constant);
+            Assert.True(merged.TryGetEffect(meteor.Effects[0], out var meteorDot));
+            Assert.Equal(4f, merged.Executions[meteorDot.Executions[0].Value].Magnitude);
+            Assert.Equal(2, meteorDot.MaxStacks);
+            Assert.True(merged.TryResolveAlias("Cross Slash", out var crossId));
+            Assert.True(merged.TryGetAbility(crossId, out var cross));
+            Assert.Contains(cross.Executions, executionId => merged.Executions[executionId.Value].Magnitude == 40f && merged.Executions[executionId.Value].MagnitudeSource == MagnitudeSource.Constant);
+            Assert.Equal(3, cross.Targeting.Width);
+            Assert.True(merged.TryResolveAlias("Chain Heal", out var chainHealId));
+            Assert.True(merged.TryGetAbility(chainHealId, out var chainHeal));
+            Assert.Equal(2, chainHeal.Executions.Count);
+            Assert.True(merged.TryGetExecution(chainHeal.Executions[1], out var chainShield));
+            Assert.Equal(EffectPayloadKind.Shield, chainShield.Payload);
+            Assert.Equal(15f, chainShield.Magnitude);
+            Assert.Equal(3f, chainShield.Duration);
+            Assert.True(merged.TryResolveAlias("Energy Shield", out var shieldId));
+            Assert.True(merged.TryGetAbility(shieldId, out var shieldAbility));
+            Assert.True(merged.TryGetExecution(shieldAbility.Executions[0], out var shieldExecution));
+            Assert.Equal(50f, shieldExecution.Magnitude);
+            Assert.Equal(5f, shieldExecution.Duration);
+            Assert.False(merged.TryGetAbility(new AbilityId(-1), out _));
+            Assert.False(merged.TryGetEffect(new EffectId(-1), out _));
+            Assert.False(merged.TryGetExecution(new ExecutionId(-1), out _));
+            foreach (var definition in catalog.AbilityDefinitions)
+                Assert.True(definition.Executions.Count > 0 || definition.Effects.Count > 0, definition.Name);
+            Assert.NotEmpty(LegacySkillImporter.ImportAliases(new[] { "legacy_skill" }, "legacy.json"));
+        }
+
+        [Fact]
+        public void StrictBootstrapValidatesCanonicalAndStaticSkillsBeforeLegacyLoad()
+        {
+            var config = BattleSystemECS.Config.GameConfigLoader.LoadStrictCatalog(new MockRenderer());
+            Assert.NotEmpty(config.SkillDefs);
+            Assert.NotNull(config.CompiledCatalog);
+            Assert.NotEmpty(config.CompiledCatalog!.AbilityDefinitions);
+            Assert.NotEmpty(config.CompiledCatalog.Effects);
+        }
+    }
+}
