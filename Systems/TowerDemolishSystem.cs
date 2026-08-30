@@ -129,7 +129,7 @@ namespace BattleSystemECS.Systems
                 case EFFECT_TYPE_FIRE:
                 case EFFECT_TYPE_POISON:
                     // DoT handled via BuffSystem's poison/burn mechanism
-                    // Create a Periodic AppliedEffect for burning/poison
+                    // 通过 BuffSystem 创建类型化的燃烧/中毒周期效果。
                     if (buffSystem != null)
                     {
                         ApplyDotEffect(enemyId, effectType, towerId);
@@ -176,40 +176,11 @@ namespace BattleSystemECS.Systems
                 dotInterval = storedDotInterval > 0f ? storedDotInterval : 1f;
             }
 
-            // Use buffSystem to apply the DoT if available
-            // Note: BuffSystem.AddEffectToEnemy applies to Player (playerId slot),
-            // not enemies. For enemy DoT, we go through BuffSystem's enemy process.
-            // Instead, directly queue the dot damage here.
-            QueueDotDamage(enemyId, dotDamage, dotDuration, dotInterval, effectName);
-        }
-
-        /// <summary>
-        /// Queue DoT damage for an enemy — adds to the shared damage queue
-        /// that SkillSystem/BuffSystem process each frame.
-        /// </summary>
-        private void QueueDotDamage(int enemyId, float damagePerTick, float duration, float tickInterval, string effectName)
-        {
-            if (damagePerTick <= 0f || duration <= 0f) return;
-
-            int ticks = (int)Math.Floor(duration / tickInterval);
-            if (ticks <= 0) ticks = 1;
-
-            // Queue each tick as a separate damage event
-            // For simplicity, queue damage directly to enemy health
-            // (this is safe because we process serial in this system)
-            for (int t = 0; t < ticks; t++)
+            if (buffSystem != null)
             {
-                float currentHealth = store.EnemyHealth[enemyId];
-                if (currentHealth <= 0f) break; // enemy already dead
-
-                float newHealth = currentHealth - damagePerTick;
-                store.EnemyHealth[enemyId] = newHealth;
-
-                if (newHealth <= 0f && store.EnemyActive[enemyId])
-                {
-                    store.QueueEnemyDeath(enemyId, 1);
-                    break;
-                }
+                var dotDef = GameplayEffectDef.Periodic(effectName, AttributeSetDefinitions.ENEMY_HEALTH,
+                    dotDamage, dotDuration, dotInterval);
+                buffSystem.ApplyDot(enemyId, dotDef);
             }
         }
     }

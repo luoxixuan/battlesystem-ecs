@@ -109,7 +109,13 @@ namespace BattleSystemECS.Core.GAS
         public EffectId DefinitionId;
         public EntityHandle Source, Target;
         public float RemainingTime, TickAccumulator;
-        public int StackCount;
-        public ActiveGameplayEffect(EffectHandle handle, EffectId definitionId, EntityHandle source, EntityHandle target, float remainingTime) { Handle = handle; DefinitionId = definitionId; Source = source; Target = target; RemainingTime = remainingTime; TickAccumulator = 0f; StackCount = 1; }
+        public float CapturedMagnitude;
+        public int TicksRemaining, StackCount;
+        public ClockId Clock;
+        public FirstTickPolicy FirstTick;
+        public CatchUpPolicy CatchUp;
+        public SourceDeathPolicy SourceDeath;
+        public bool FirstTickPending;
+        public ActiveGameplayEffect(EffectHandle handle, EffectId definitionId, EntityHandle source, EntityHandle target, float remainingTime, int ticksRemaining = 0, float capturedMagnitude = 0f, ClockId clock = ClockId.Combat, FirstTickPolicy firstTick = FirstTickPolicy.NextInterval, CatchUpPolicy catchUp = CatchUpPolicy.CatchUpAll, SourceDeathPolicy sourceDeath = SourceDeathPolicy.Persist) { Handle = handle; DefinitionId = definitionId; Source = source; Target = target; RemainingTime = remainingTime; TickAccumulator = 0f; CapturedMagnitude = capturedMagnitude; TicksRemaining = ticksRemaining; StackCount = 1; Clock = clock; FirstTick = firstTick; CatchUp = catchUp; SourceDeath = sourceDeath; FirstTickPending = true; }
     }
 }

@@ -1,0 +1,65 @@
+using System;
+using System.Collections.Generic;
+
+namespace BattleSystemECS.Core.GAS
+{
+    public enum CommandRejection { None, Capacity, ReservedExhausted, CriticalCapacity }
+
+    public sealed class CommandBuffer<T> where T : struct
+    {
+        private readonly T[] _items;
+        private int _count;
+        public int Capacity => _items.Length;
+        public int Count => _count;
+        public int OverflowCount { get; private set; }
+        public CommandRejection LastRejection { get; private set; }
+        public int Reserved { get; }
+        public CommandBuffer(int capacity, int reserved = 0) { if (capacity < 1 || reserved < 0 || reserved > capacity) throw new ArgumentOutOfRangeException(); _items = new T[capacity]; Reserved = reserved; }
+        public bool TryAdd(T value, bool critical = false) {
+            int limit = critical ? Capacity : Capacity - Reserved;
+            if (_count >= limit) {
+                OverflowCount++;
+                LastRejection = critical ? CommandRejection.CriticalCapacity : (limit == Capacity ? CommandRejection.Capacity : CommandRejection.ReservedExhausted);
+                return false;
+            }
+            _items[_count++] = value; LastRejection = CommandRejection.None; return true;
+        }
+        public T Get(int index) => index >= 0 && index < _count ? _items[index] : throw new ArgumentOutOfRangeException(nameof(index));
+        public void Sort(Comparison<T> comparison) { if (comparison == null) throw new ArgumentNullException(nameof(comparison)); Array.Sort(_items, 0, _count, Comparer<T>.Create(comparison)); }
+        public bool TryMerge(CommandBuffer<T> source, Comparison<T> comparison, bool critical = false) {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            int limit = critical ? Capacity : Capacity - Reserved;
+            if (_count > limit - source._count) {
+                OverflowCount++;
+                LastRejection = critical ? CommandRejection.CriticalCapacity : (limit == Capacity ? CommandRejection.Capacity : CommandRejection.ReservedExhausted);
+                return false;
+            }
+            for (int i = 0; i < source._count; i++) if (!TryAdd(source._items[i], critical)) return false;
+            Sort(comparison); return true;
+        }
+        public void Clear() { Array.Clear(_items, 0, _count); _count = 0; LastRejection = CommandRejection.None; }
+        public void ResetOverflowCount() { OverflowCount = 0; }
+    }
+
+    public sealed class CommandSink<T> where T : struct
+    {
+        private readonly CommandBuffer<T> _buffer;
+        public bool Aborted { get; private set; }
+        public int Count => _buffer.Count;
+        public int OverflowCount => _buffer.OverflowCount;
+        public CommandRejection LastRejection => _buffer.LastRejection;
+        public T Get(int index) => _buffer.Get(index);
+        public CommandSink(int capacity, int reserved = 0) { _buffer = new CommandBuffer<T>(capacity, reserved); }
+        public bool Submit(T command, bool critical = false) { if (Aborted) return false; if (_buffer.TryAdd(command, critical)) return true; if (critical) Aborted = true; return false; }
+        public void Sort(Comparison<T> comparison) => _buffer.Sort(comparison);
+        public bool TryMerge(CommandSink<T> source, Comparison<T> comparison, bool critical = false) {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            if (Aborted) return false;
+            bool ok = _buffer.TryMerge(source._buffer, comparison, critical);
+            if (!ok && critical) Aborted = true;
+            return ok;
+        }
+        public void Clear() { _buffer.Clear(); Aborted = false; }
+        public void ResetDiagnostics() { _buffer.ResetOverflowCount(); Aborted = false; }
+    }
+}

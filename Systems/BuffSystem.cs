@@ -40,52 +40,25 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void Update(float deltaTime)
         {
-            ProcessPlayerEffects(deltaTime);
-            ProcessEnemyEffects(deltaTime);
+            Update(deltaTime, ClockId.Combat);
         }
 
-        private void ProcessPlayerEffects(float deltaTime)
+        public void Update(float deltaTime, ClockId clock)
+        {
+            ProcessPlayerEffects(deltaTime, clock);
+            ProcessEnemyEffects(deltaTime, clock);
+        }
+
+        private void ProcessPlayerEffects(float deltaTime, ClockId clock)
         {
             int count = store.GetEffectCount(playerId);
             for (int slot = 0; slot < count; slot++)
             {
-                var eff = store.GetEffect(playerId, slot);
-                if (eff.Definition.Type == EffectType.Instant || eff.Definition.Type == EffectType.Heal)
-                {
-                    // Instant and Heal effects are handled separately (Heal via SkillSystem casting, Instant already applied)
-                    continue;
-                }
-
-                if (eff.Definition.Type == EffectType.Periodic)
-                {
-                    eff.TimeSinceLastTick += deltaTime;
-                    while (eff.TimeSinceLastTick >= eff.Definition.TickInterval && eff.Definition.TicksRemaining > 0)
-                    {
-                        eff.TimeSinceLastTick -= eff.Definition.TickInterval;
-                        eff.Definition.TicksRemaining--;
-                        // Periodic DoT on enemies — find affected enemies in range
-                        // For now, Poison Nova already applied initial hit; periodic tick goes through damage queue
-                    }
-                    eff.Definition.RemainingTime = Math.Max(0f, eff.Definition.RemainingTime - deltaTime);
-                }
-                else if (eff.Definition.Type == EffectType.Duration)
-                {
-                    eff.Definition.RemainingTime = Math.Max(0f, eff.Definition.RemainingTime - deltaTime);
-                }
-
-                store.SetEffect(playerId, slot, eff);
-
-                // Expire expired effects
-                if (eff.Definition.RemainingTime <= 0f)
-                {
-                    RemoveEffectAtSlot(playerId, slot);
-                    count--;
-                    slot--;
-                }
+                if (!ProcessEffectAt(playerId, slot, deltaTime, clock, false)) { count--; slot--; }
             }
         }
 
-        private void ProcessEnemyEffects(float deltaTime)
+        private void ProcessEnemyEffects(float deltaTime, ClockId clock)
         {
             // Iterate all active enemies and tick their Periodic/Duration effects
             // Only tick enemies that have active effects — check ActiveEffectCount first
@@ -97,37 +70,69 @@ namespace BattleSystemECS.Systems
 
                 for (int slot = 0; slot < count; slot++)
                 {
-                    var eff = store.GetEffect(enemyId, slot);
-                    if (eff.Definition.Type == EffectType.Instant) continue;
-
-                    if (eff.Definition.Type == EffectType.Periodic)
-                    {
-                        eff.TimeSinceLastTick += deltaTime;
-                        while (eff.TimeSinceLastTick >= eff.Definition.TickInterval && eff.Definition.TicksRemaining > 0)
-                        {
-                            eff.TimeSinceLastTick -= eff.Definition.TickInterval;
-                            eff.Definition.TicksRemaining--;
-                            // Queue DoT damage (multiplied by current stack count)
-                            float stackedDamage = eff.Definition.Magnitude * eff.StackCount;
-                            _dotDamageQueue[_dotQueueIdx].Add((enemyId, stackedDamage));
-                        }
-                        eff.Definition.RemainingTime = Math.Max(0f, eff.Definition.RemainingTime - deltaTime);
-                    }
-                    else if (eff.Definition.Type == EffectType.Duration)
-                    {
-                        eff.Definition.RemainingTime = Math.Max(0f, eff.Definition.RemainingTime - deltaTime);
-                    }
-
-                    store.SetEffect(enemyId, slot, eff);
-
-                    if (eff.Definition.RemainingTime <= 0f)
-                    {
-                        RemoveEffectAtSlot(enemyId, slot);
-                        count--;
-                        slot--;
-                    }
+                    if (!ProcessEffectAt(enemyId, slot, deltaTime, clock, true)) { count--; slot--; }
                 }
             }
+        }
+
+        private bool ProcessEffectAt(int entityId, int slot, float deltaTime, ClockId clock, bool queueDamage)
+        {
+            if (!store.TryGetActiveEffectAt(entityId, slot, out var active, out var definition, out _)) return true;
+            if (active.SourceDeath == SourceDeathPolicy.Remove && !store.TryResolve(active.Source, out _, out _))
+            {
+                RemoveEffectAtSlot(entityId, slot);
+                return false;
+            }
+            if (definition.Type == EffectType.Instant || definition.Type == EffectType.Heal || active.Clock != clock) return true;
+
+            if (definition.Type == EffectType.Periodic)
+            {
+                int ticks = AdvancePeriodic(ref active, definition, deltaTime);
+                if (queueDamage && ticks > 0)
+                {
+                    float damage = active.CapturedMagnitude * active.StackCount;
+                    for (int i = 0; i < ticks; i++) _dotDamageQueue[_dotQueueIdx].Add((entityId, damage));
+                }
+            }
+            active.RemainingTime = Math.Max(0f, active.RemainingTime - deltaTime);
+
+            if (active.RemainingTime <= 0f)
+            {
+                RemoveEffectAtSlot(entityId, slot);
+                return false;
+            }
+            store.TryUpdateActiveEffect(store.GetEntityHandle(entityId), active);
+            return true;
+        }
+
+        private static int AdvancePeriodic(ref ActiveGameplayEffect active, GameplayEffectDefinition definition, float deltaTime)
+        {
+            int available = active.TicksRemaining;
+            if (available <= 0 || definition.Period <= 0f) return 0;
+            active.TickAccumulator += deltaTime;
+            int due = 0;
+            if (active.FirstTickPending)
+            {
+                active.FirstTickPending = false;
+                if (active.FirstTick == FirstTickPolicy.Immediate) due = 1;
+            }
+            if (active.CatchUp == CatchUpPolicy.CatchUpAll)
+            {
+                while (due < available && active.TickAccumulator >= definition.Period)
+                {
+                    active.TickAccumulator -= definition.Period;
+                    due++;
+                }
+            }
+            else if (due == 0 && active.TickAccumulator >= definition.Period)
+            {
+                due = 1;
+                if (active.CatchUp == CatchUpPolicy.SkipMissed) active.TickAccumulator %= definition.Period;
+                else active.TickAccumulator -= definition.Period;
+            }
+            if (due > available) due = available;
+            active.TicksRemaining -= due;
+            return due;
         }
 
         /// <summary>
@@ -156,25 +161,7 @@ namespace BattleSystemECS.Systems
 
         private void RemoveEffectAtSlot(int entityId, int slot)
         {
-            // Shift remaining effects down to fill the gap
-            int count = store.GetEffectCount(entityId);
-            for (int i = slot; i < count - 1; i++)
-            {
-                var next = store.GetEffect(entityId, i + 1);
-                store.SetEffect(entityId, i, next);
-            }
-            // Clear last slot and decrement count
-            store.SetEffect(entityId, count - 1, default);
-            // Decrement count via reflection-free approach: need a helper
-            DecrementEffectCount(entityId);
-        }
-
-        private void DecrementEffectCount(int entityId)
-        {
-            // ActiveEffectCount lives in the store; expose a setter
-            int newCount = store.GetEffectCount(entityId) - 1;
-            if (newCount >= 0)
-                store.SetEffectCount(entityId, newCount);
+            store.TryRemoveActiveEffectAt(entityId, slot, out _, out _, out _);
         }
 
         /// <summary>
@@ -210,28 +197,31 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void ApplyDot(int targetId, GameplayEffectDef dotDef)
         {
+            var target = store.GetEntityHandle(targetId);
+            var application = LegacyEffectAdapter.CreateApplication(dotDef, store.GetEntityHandle(playerId), target);
             // Fast path: StackingBehavior.None skips the search — same as old O(1) behavior
             if (dotDef.StackingBehavior == StackingBehavior.None)
             {
-                store.AddEffect(targetId, new AppliedEffect(dotDef, playerId));
+                store.TryAddGameplayEffect(targetId, application, out _);
                 return;
             }
 
             int count = store.GetEffectCount(targetId);
             for (int slot = 0; slot < count; slot++)
             {
-                var existing = store.GetEffect(targetId, slot);
-                if (existing.Definition.Name != dotDef.Name) continue;
-                if (existing.Definition.Type != EffectType.Periodic) continue;
+                if (!store.TryGetActiveEffectAt(targetId, slot, out var existing, out var definition, out var snapshot)) continue;
+                if (!string.Equals(snapshot.Name, dotDef.Name, StringComparison.Ordinal)) continue;
+                if (definition.Type != EffectType.Periodic) continue;
 
                 switch (dotDef.StackingBehavior)
                 {
                     case StackingBehavior.DurationRefresh:
                         // Refresh duration only, keep existing stacks
-                        existing.Definition.RemainingTime = dotDef.Duration;
-                        existing.Definition.TicksRemaining = dotDef.TotalTicks;
-                        existing.TimeSinceLastTick = 0f;
-                        store.SetEffect(targetId, slot, existing);
+                        existing.RemainingTime = application.Runtime.RemainingTime;
+                        existing.TicksRemaining = application.Runtime.TicksRemaining;
+                        existing.TickAccumulator = 0f;
+                        existing.FirstTickPending = true;
+                        store.TryUpdateActiveEffect(target, existing);
                         return;
 
                     case StackingBehavior.MaxStacks:
@@ -239,7 +229,7 @@ namespace BattleSystemECS.Systems
                         if (existing.StackCount < dotDef.MaxStacks)
                         {
                             existing.StackCount++;
-                            store.SetEffect(targetId, slot, existing);
+                            store.TryUpdateActiveEffect(target, existing);
                         }
                         return;
 
@@ -249,16 +239,17 @@ namespace BattleSystemECS.Systems
                         {
                             existing.StackCount++;
                         }
-                        existing.Definition.RemainingTime = dotDef.Duration;
-                        existing.Definition.TicksRemaining = dotDef.TotalTicks;
-                        existing.TimeSinceLastTick = 0f;
-                        store.SetEffect(targetId, slot, existing);
+                        existing.RemainingTime = application.Runtime.RemainingTime;
+                        existing.TicksRemaining = application.Runtime.TicksRemaining;
+                        existing.TickAccumulator = 0f;
+                        existing.FirstTickPending = true;
+                        store.TryUpdateActiveEffect(target, existing);
                         return;
                 }
                 return;
             }
             // No existing effect found — add new one
-            store.AddEffect(targetId, new AppliedEffect(dotDef, playerId));
+            store.TryAddGameplayEffect(targetId, application, out _);
         }
 
         /// <summary>

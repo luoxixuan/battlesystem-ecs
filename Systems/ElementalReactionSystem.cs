@@ -195,7 +195,9 @@ namespace BattleSystemECS.Systems
             );
             frozenDef.StackingBehavior = Core.GAS.StackingBehavior.None;
             frozenDef.MaxStacks = 1;
-            store.AddEffect(enemyId, new Core.GAS.AppliedEffect(frozenDef, playerId));
+            var application = Core.GAS.LegacyEffectAdapter.CreateApplication(frozenDef,
+                store.GetEntityHandle(playerId), store.GetEntityHandle(enemyId));
+            store.TryAddGameplayEffect(enemyId, application, out _);
         }
 
         private void ApplyStun(int enemyId, float duration)
@@ -210,7 +212,9 @@ namespace BattleSystemECS.Systems
             );
             stunDef.StackingBehavior = Core.GAS.StackingBehavior.None;
             stunDef.MaxStacks = 1;
-            store.AddEffect(enemyId, new Core.GAS.AppliedEffect(stunDef, playerId));
+            var application = Core.GAS.LegacyEffectAdapter.CreateApplication(stunDef,
+                store.GetEntityHandle(playerId), store.GetEntityHandle(enemyId));
+            store.TryAddGameplayEffect(enemyId, application, out _);
         }
 
         /// <summary>

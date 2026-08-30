@@ -28,17 +28,20 @@ namespace BattleSystemECS.Core.GAS
         public AttributeModifierOp ModifierOp;
         public float Magnitude; // the modifier value (e.g., +10, ×1.5)
         public float Duration;  // for Duration effects (seconds)
-        public float RemainingTime; // runtime: countdown for duration effects
+        // Legacy compatibility facade; production runtime state belongs to ActiveGameplayEffectStore.
+        public float RemainingTime;
 
         // Periodic (DoT) fields
         public float TickInterval;  // seconds between ticks (e.g., 1.0 = once per second)
         public int TotalTicks;      // total number of ticks (e.g., 5 for 5s DoT at 1s interval)
-        public int TicksRemaining;  // runtime: ticks left
+        // Legacy compatibility facade; production runtime state belongs to ActiveGameplayEffectStore.
+        public int TicksRemaining;
 
         // Stacking fields
         public StackingBehavior StackingBehavior;
         public int MaxStacks;       // max stack count (1 = single, >1 = stacking)
-        public bool RefreshDuration; // runtime: whether to reset RemainingTime on stack refresh
+        // Legacy compatibility facade; derive refresh behavior from StackingBehavior.
+        public bool RefreshDuration;
 
         public GameplayEffectDef(string name, EffectType type, int attrIdx, AttributeModifierOp op, float magnitude, float duration = 0f)
         {
@@ -96,6 +99,18 @@ namespace BattleSystemECS.Core.GAS
 
         // Stacking: current stack count for this applied effect
         public int StackCount;
+        // Legacy runtime projection. ActiveGameplayEffectStore remains authoritative.
+        public float RemainingTime;
+        public int TicksRemaining;
+        public EffectHandle Handle;
+        public EffectId DefinitionId;
+        public EntityHandle Source;
+        public EntityHandle Target;
+        public ClockId Clock;
+        public FirstTickPolicy FirstTick;
+        public CatchUpPolicy CatchUp;
+        public SourceDeathPolicy SourceDeath;
+        public bool FirstTickPending;
 
         public AppliedEffect(GameplayEffectDef def, int sourceId)
         {
@@ -103,6 +118,24 @@ namespace BattleSystemECS.Core.GAS
             SourceEntityId = sourceId;
             TimeSinceLastTick = 0f;
             StackCount = 1;
+            RemainingTime = def.Duration;
+            TicksRemaining = def.TotalTicks;
+            Handle = default(EffectHandle);
+            DefinitionId = default(EffectId);
+            Source = default(EntityHandle);
+            Target = default(EntityHandle);
+            Clock = ClockId.Combat;
+            FirstTick = FirstTickPolicy.NextInterval;
+            CatchUp = CatchUpPolicy.CatchUpAll;
+            SourceDeath = SourceDeathPolicy.Persist;
+            FirstTickPending = true;
+        }
+
+        public AppliedEffect(GameplayEffectDef def, EntityHandle source, EntityHandle target)
+            : this(def, source.Index)
+        {
+            Source = source;
+            Target = target;
         }
     }
 }

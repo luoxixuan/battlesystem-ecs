@@ -133,6 +133,25 @@ namespace BattleSystemECS.Core
         private int nextEntityId = 2; // 从 2 开始，1 是玩家
         public int CurrentFrame { get; private set; } = 0;
 
+        // Cross-frame identity. A recycled slot always receives a new generation.
+        private readonly int[] _entityGenerations = new int[MAX_ENTITIES];
+        public BattleSystemECS.Core.GAS.EntityHandle GetEntityHandle(int entityId)
+        {
+            if (!IsValidEntity(entityId) || _entityGenerations[entityId] == 0)
+                return default(BattleSystemECS.Core.GAS.EntityHandle);
+            return new BattleSystemECS.Core.GAS.EntityHandle(entityId, _entityGenerations[entityId]);
+        }
+        public bool TryResolve(BattleSystemECS.Core.GAS.EntityHandle handle, out int entityId, out BattleSystemECS.Core.GAS.HandleResolveFailure failure)
+        {
+            entityId = handle.Index;
+            if (!handle.IsValid) { failure = BattleSystemECS.Core.GAS.HandleResolveFailure.InvalidIndex; return false; }
+            if (!IsValidEntity(handle.Index)) { failure = BattleSystemECS.Core.GAS.HandleResolveFailure.InvalidIndex; return false; }
+            if (_entityGenerations[handle.Index] != handle.Generation) { failure = BattleSystemECS.Core.GAS.HandleResolveFailure.StaleGeneration; return false; }
+            if (!PositionActive[handle.Index] && !EnemyActive[handle.Index] && !TowerActive[handle.Index]) { failure = BattleSystemECS.Core.GAS.HandleResolveFailure.Inactive; return false; }
+            failure = BattleSystemECS.Core.GAS.HandleResolveFailure.None;
+            return true;
+        }
+
         // Expose as read-only references — zero allocation on read. All writes go through internal API (Add/Remove).
         // Caller responsibility: read-only access only. Consistent with ref-return patterns in ECS frameworks.
         public IReadOnlyList<int> ActiveEnemyIds => _activeEnemyIds;
@@ -564,6 +583,7 @@ namespace BattleSystemECS.Core
             {
                 if (entityId >= 0 && entityId < MAX_ENTITIES)
                 {
+                    _entityGenerations[entityId] = NextGeneration(_entityGenerations[entityId]);
                     EnemyActionEnum[entityId] = EnemyActionType.None;
                     // Ensure recycled entity has clean stealth multiplier (DestroyEntity already reset it,
                     // but we set it explicitly here to guard against any future code that might
@@ -574,11 +594,17 @@ namespace BattleSystemECS.Core
             }
             int entityId2 = Interlocked.Increment(ref nextEntityId) - 1;
             if (entityId2 >= MAX_ENTITIES) return -1;
+            _entityGenerations[entityId2] = 1;
             EnemyActionEnum[entityId2] = EnemyActionType.None;
             // Newly allocated IDs start with default float[] = 0f; set to 1f so that
             // EnemyAISystem attack methods multiply correctly (stealth_mult=1f means no bonus).
             EnemyStealthMultiplier[entityId2] = 1f;
             return entityId2;
+        }
+
+        private static int NextGeneration(int current)
+        {
+            return current == int.MaxValue || current <= 0 ? 1 : current + 1;
         }
 
         public void DestroyEntity(int entityId)
@@ -606,8 +632,8 @@ namespace BattleSystemECS.Core
             // Note: the ActiveEffectCount half is what actually fires; the AbilityCount half is
             // defense-in-depth, since AddAbility's only production caller targets playerId and
             // player ids (0..MAX_PLAYERS) never enter freeEntityIds.
+            RemoveAllGameplayEffects(entityId);
             AbilityCount[entityId] = 0;
-            ActiveEffectCount[entityId] = 0;
             // H-1 fix: lock around dictionary removal (thread-safe)
             lock (entityNamesLock)
             {

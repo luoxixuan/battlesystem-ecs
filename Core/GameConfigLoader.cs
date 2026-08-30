@@ -4,12 +4,24 @@ using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Systems;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Config
 {
     public class GameConfigLoader
     {
         private const string CONFIG_FILE = "game_config.json";
+
+        public static GameConfig LoadStrictCatalog(IRenderer renderer, string canonicalPath = null, string staticDirectory = null)
+        {
+            string canonical = canonicalPath ?? Path.Combine("Data", "Configs", "skills.json");
+            string directory = staticDirectory ?? Path.Combine("Data", "Skills");
+            var files = Directory.Exists(directory) ? Directory.GetFiles(directory, "*.json") : throw new CatalogValidationException($"{directory}: static skill directory not found");
+            var catalog = CatalogCompiler.Compile(canonical, files);
+            var config = LoadConfig(renderer);
+            config.CompiledCatalog = catalog;
+            return config;
+        }
 
         public static GameConfig LoadConfig(IRenderer renderer)
         {

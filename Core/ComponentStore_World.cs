@@ -359,11 +359,17 @@ namespace BattleSystemECS.Core
 
         // Per-entity ability instances (SOA: first dimension = entity, second = slot)
         public AbilityInstance[] AbilityInstances = new AbilityInstance[MAX_ENTITIES * MAX_ABILITIES_PER_ENTITY];
+        public int AbilityPoolRejections;
+        public int EffectPoolRejections;
+        public event Action<int, bool> OnGasPoolRejected;
         public int[] AbilityCount = new int[MAX_ENTITIES]; // how many abilities this entity has
 
-        // Per-entity active effects
+        // Legacy same-frame projection. ActiveGameplayEffectStore owns all runtime state.
         public AppliedEffect[] ActiveEffects = new AppliedEffect[MAX_ENTITIES * MAX_ACTIVE_EFFECTS_PER_ENTITY];
         public int[] ActiveEffectCount = new int[MAX_ENTITIES];
+        private EffectHandle[] _activeEffectHandles = new EffectHandle[MAX_ENTITIES * MAX_ACTIVE_EFFECTS_PER_ENTITY];
+        public readonly ActiveGameplayEffectStore GameplayEffects = new ActiveGameplayEffectStore(MAX_ENTITIES * MAX_ACTIVE_EFFECTS_PER_ENTITY);
+        public EffectPool GameplayEffectPool => GameplayEffects.Handles;
         #endregion
 
         // ==================== 路障管理 ====================
@@ -822,29 +828,42 @@ namespace BattleSystemECS.Core
             AbilityInstances[entityId * MAX_ABILITIES_PER_ENTITY + slot] = inst;
         }
 
-        public void AddAbility(int entityId, GameplayAbilityDef def) {
-            if (!IsValidEntity(entityId)) return;
+        public void AddAbility(int entityId, GameplayAbilityDef def) { TryAddAbility(entityId, def); }
+        public bool TryAddAbility(int entityId, GameplayAbilityDef def) {
+            if (!IsValidEntity(entityId)) return false;
             int slot = AbilityCount[entityId];
-            if (slot < MAX_ABILITIES_PER_ENTITY) { SetAbility(entityId, slot, new AbilityInstance(def)); AbilityCount[entityId]++; }
+            if (slot >= MAX_ABILITIES_PER_ENTITY) { AbilityPoolRejections++; OnGasPoolRejected?.Invoke(entityId, true); return false; }
+            SetAbility(entityId, slot, new AbilityInstance(def)); AbilityCount[entityId]++; return true;
         }
 
         // Bug#9: Reset abilities for entity — clears all slots (used before re-initializing)
         public void ResetPlayerAbilities(int entityId) {
             if (!IsValidEntity(entityId)) return;
+            RemoveAllGameplayEffects(entityId);
             AbilityCount[entityId] = 0;
-            ActiveEffectCount[entityId] = 0;
         }
 
+        // Legacy same-frame slot projection. Cross-frame callers must use handle-aware APIs.
         public AppliedEffect GetEffect(int entityId, int slot) {
-            if (!IsValidEntity(entityId)) return default;
-            if (slot < 0 || slot >= MAX_ACTIVE_EFFECTS_PER_ENTITY) return default;
-            return ActiveEffects[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot];
+            if (!TryGetActiveEffectAt(entityId, slot, out var runtime, out var definition, out var snapshot)) return default;
+            var projection = LegacyEffectAdapter.ToProjection(runtime, definition, snapshot);
+            ActiveEffects[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot] = projection;
+            return projection;
         }
 
+        // Legacy same-frame slot projection. Cross-frame callers must use handle-aware APIs.
         public void SetEffect(int entityId, int slot, AppliedEffect eff) {
-            if (!IsValidEntity(entityId)) return;
-            if (slot < 0 || slot >= MAX_ACTIVE_EFFECTS_PER_ENTITY) return;
-            ActiveEffects[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot] = eff;
+            if (!TryGetActiveEffectAt(entityId, slot, out var runtime, out _, out _)) return;
+            runtime.RemainingTime = eff.RemainingTime;
+            runtime.TickAccumulator = eff.TimeSinceLastTick;
+            runtime.TicksRemaining = eff.TicksRemaining;
+            runtime.StackCount = eff.StackCount;
+            runtime.Clock = eff.Clock;
+            runtime.FirstTick = eff.FirstTick;
+            runtime.CatchUp = eff.CatchUp;
+            runtime.SourceDeath = eff.SourceDeath;
+            runtime.FirstTickPending = eff.FirstTickPending;
+            TryUpdateActiveEffect(GetEntityHandle(entityId), runtime);
         }
 
         public int GetEffectCount(int entityId) {
@@ -852,17 +871,138 @@ namespace BattleSystemECS.Core
             return ActiveEffectCount[entityId];
         }
 
-        public void AddEffect(int entityId, AppliedEffect eff) {
-            if (!IsValidEntity(entityId)) return;
+        // Legacy same-frame compatibility entry; it still allocates a generation-owned handle.
+        public void AddEffect(int entityId, AppliedEffect eff) { TryAddEffect(entityId, eff); }
+        public bool TryAddEffect(int entityId, AppliedEffect eff) {
+            var source = eff.Source.IsValid ? eff.Source : GetEntityHandle(eff.SourceEntityId);
+            var target = eff.Target.IsValid ? eff.Target : GetEntityHandle(entityId);
+            return TryAddGameplayEffect(entityId, LegacyEffectAdapter.FromProjection(eff, source, target), out _);
+        }
+
+        public bool TryAddGameplayEffect(int entityId, GameplayEffectApplication application, out EffectHandle handle)
+        {
+            handle = default(EffectHandle);
+            if (!IsValidEntity(entityId)) return false;
             int slot = ActiveEffectCount[entityId];
-            if (slot < MAX_ACTIVE_EFFECTS_PER_ENTITY) { SetEffect(entityId, slot, eff); ActiveEffectCount[entityId]++; }
+            if (slot >= MAX_ACTIVE_EFFECTS_PER_ENTITY) { EffectPoolRejections++; OnGasPoolRejected?.Invoke(entityId, false); return false; }
+            var target = GetEntityHandle(entityId);
+            var runtime = application.Runtime;
+            runtime.Target = target;
+            application = new GameplayEffectApplication(application.Definition, application.LegacySnapshot, runtime);
+            if (!GameplayEffects.TryAdd(application, out handle)) { EffectPoolRejections++; OnGasPoolRejected?.Invoke(entityId, false); return false; }
+            int index = entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot;
+            _activeEffectHandles[index] = handle;
+            ActiveEffectCount[entityId] = slot + 1;
+            if (GameplayEffects.TryGet(handle, out runtime, out var definition, out var snapshot))
+                ActiveEffects[index] = LegacyEffectAdapter.ToProjection(runtime, definition, snapshot);
+            return true;
+        }
+
+        public bool TryGetEffect(EntityHandle target, EffectHandle handle, out AppliedEffect effect)
+        {
+            effect = default(AppliedEffect);
+            if (!TryGetActiveEffect(target, handle, out var runtime, out var definition, out var snapshot)) return false;
+            effect = LegacyEffectAdapter.ToProjection(runtime, definition, snapshot);
+            return true;
+        }
+
+        public bool TrySetEffect(EntityHandle target, EffectHandle handle, AppliedEffect effect)
+        {
+            if (!TryGetActiveEffect(target, handle, out var runtime, out _, out _)) return false;
+            runtime.RemainingTime = effect.RemainingTime;
+            runtime.TickAccumulator = effect.TimeSinceLastTick;
+            runtime.TicksRemaining = effect.TicksRemaining;
+            runtime.StackCount = effect.StackCount;
+            runtime.Clock = effect.Clock;
+            runtime.FirstTick = effect.FirstTick;
+            runtime.CatchUp = effect.CatchUp;
+            runtime.SourceDeath = effect.SourceDeath;
+            runtime.FirstTickPending = effect.FirstTickPending;
+            return TryUpdateActiveEffect(target, runtime);
+        }
+
+        public bool TryRemoveEffect(EntityHandle target, EffectHandle handle, out AppliedEffect removed)
+        {
+            removed = default(AppliedEffect);
+            if (!TryResolve(target, out int entityId, out _)) return false;
+            int count = ActiveEffectCount[entityId];
+            for (int slot = 0; slot < count; slot++)
+            {
+                if (!_activeEffectHandles[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot].Equals(handle)) continue;
+                if (!TryRemoveActiveEffectAt(entityId, slot, out var runtime, out var definition, out var snapshot)) return false;
+                removed = LegacyEffectAdapter.ToProjection(runtime, definition, snapshot);
+                return true;
+            }
+            return false;
+        }
+
+        public bool TryGetActiveEffectAt(int entityId, int slot, out ActiveGameplayEffect runtime, out GameplayEffectDefinition definition, out LegacyEffectSnapshot snapshot)
+        {
+            runtime = default(ActiveGameplayEffect); definition = default(GameplayEffectDefinition); snapshot = default(LegacyEffectSnapshot);
+            if (!IsValidEntity(entityId) || slot < 0 || slot >= ActiveEffectCount[entityId]) return false;
+            return GameplayEffects.TryGet(_activeEffectHandles[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot], out runtime, out definition, out snapshot)
+                && runtime.Target.Equals(GetEntityHandle(entityId));
+        }
+
+        public bool TryGetActiveEffect(EntityHandle target, EffectHandle handle, out ActiveGameplayEffect runtime, out GameplayEffectDefinition definition, out LegacyEffectSnapshot snapshot)
+        {
+            runtime = default(ActiveGameplayEffect); definition = default(GameplayEffectDefinition); snapshot = default(LegacyEffectSnapshot);
+            if (!TryResolve(target, out int entityId, out _)) return false;
+            int count = ActiveEffectCount[entityId];
+            for (int slot = 0; slot < count; slot++)
+                if (_activeEffectHandles[entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot].Equals(handle))
+                    return GameplayEffects.TryGet(handle, out runtime, out definition, out snapshot) && runtime.Target.Equals(target);
+            return false;
+        }
+
+        public bool TryUpdateActiveEffect(EntityHandle target, ActiveGameplayEffect runtime)
+        {
+            if (!TryResolve(target, out int entityId, out _) || !runtime.Target.Equals(target)) return false;
+            int count = ActiveEffectCount[entityId];
+            for (int slot = 0; slot < count; slot++)
+            {
+                int index = entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY + slot;
+                if (!_activeEffectHandles[index].Equals(runtime.Handle)) continue;
+                if (!GameplayEffects.TryUpdate(runtime.Handle, runtime)) return false;
+                if (GameplayEffects.TryGet(runtime.Handle, out runtime, out var definition, out var snapshot))
+                    ActiveEffects[index] = LegacyEffectAdapter.ToProjection(runtime, definition, snapshot);
+                return true;
+            }
+            return false;
+        }
+
+        public bool TryRemoveActiveEffectAt(int entityId, int slot, out ActiveGameplayEffect removed, out GameplayEffectDefinition definition, out LegacyEffectSnapshot snapshot)
+        {
+            removed = default(ActiveGameplayEffect); definition = default(GameplayEffectDefinition); snapshot = default(LegacyEffectSnapshot);
+            if (!IsValidEntity(entityId) || slot < 0 || slot >= ActiveEffectCount[entityId]) return false;
+            int baseIndex = entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY;
+            var handle = _activeEffectHandles[baseIndex + slot];
+            if (!GameplayEffects.TryGet(handle, out removed, out definition, out snapshot)) return false;
+            int lastSlot = ActiveEffectCount[entityId] - 1;
+            if (slot != lastSlot)
+            {
+                _activeEffectHandles[baseIndex + slot] = _activeEffectHandles[baseIndex + lastSlot];
+                ActiveEffects[baseIndex + slot] = ActiveEffects[baseIndex + lastSlot];
+            }
+            _activeEffectHandles[baseIndex + lastSlot] = default(EffectHandle);
+            ActiveEffects[baseIndex + lastSlot] = default(AppliedEffect);
+            ActiveEffectCount[entityId] = lastSlot;
+            return GameplayEffects.Release(handle);
+        }
+
+        public void RemoveAllGameplayEffects(int entityId)
+        {
+            if (!IsValidEntity(entityId)) return;
+            while (ActiveEffectCount[entityId] > 0)
+                if (!TryRemoveActiveEffectAt(entityId, ActiveEffectCount[entityId] - 1, out _, out _, out _)) break;
         }
 
         public void SetEffectCount(int entityId, int count) {
             if (!IsValidEntity(entityId)) return;
             if (count < 0) count = 0;
             if (count > MAX_ACTIVE_EFFECTS_PER_ENTITY) count = MAX_ACTIVE_EFFECTS_PER_ENTITY;
-            ActiveEffectCount[entityId] = count;
+            while (ActiveEffectCount[entityId] > count)
+                if (!TryRemoveActiveEffectAt(entityId, ActiveEffectCount[entityId] - 1, out _, out _, out _)) break;
         }
 
         // ==================== Wind Source 管理方法 ====================

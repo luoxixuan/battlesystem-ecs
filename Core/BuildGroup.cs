@@ -32,8 +32,8 @@ namespace BattleSystemECS.Core
             Gold?.Update();
             TowerIncome?.Update(deltaTime);
             Upgrade?.Update();
-            Skill?.Update(deltaTime);
-            AutoSkill?.Update();
+            Skill?.Update(deltaTime, allowCombat: false);
+            AutoSkill?.Update(allowCombat: false);
             TowerRelocate?.Update();
             Interest?.Update();
             Mana?.Update(deltaTime, isBuildPhase: true);

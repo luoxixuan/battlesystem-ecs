@@ -94,7 +94,18 @@ namespace BattleSystemECS.Systems
             }
 
             if (skillIdx < 0) return;
+            var selected = GetSkillDef(skillIdx);
+            if (isBuildPhase && selected != null && IsCombatSkill(selected.SkillType))
+            {
+                renderer.Log($"[ABILITY_REJECTED] PhaseNotAllowed globalSkill={selected.Name}");
+                return;
+            }
             TryActivateGlobalSkill(skillIdx);
+        }
+
+        private static bool IsCombatSkill(int skillType)
+        {
+            return skillType == (int)GlobalSkillType.MeteorStrike || skillType == (int)GlobalSkillType.TimeStop;
         }
 
         /// <summary>

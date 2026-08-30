@@ -26,6 +26,7 @@ namespace BattleSystemECS.Systems
         private readonly int playerId;
         private readonly SkillSystem skillSystem;
         private readonly AutoSkillConfig config;
+        private bool _buildPhaseRejectReported;
 
         // 选优策略枚举
         private static readonly Random _rng = new Random();
@@ -48,8 +49,9 @@ namespace BattleSystemECS.Systems
         /// BuildPhase 每帧调用：检查就绪技能，选优施放。
         /// 施放上限由 AutoSkillConfig.MaxSkillsPerPhase 控制，防止一帧内刷空所有技能。
         /// </summary>
-        public void Update()
+        public void Update(bool allowCombat = true)
         {
+            if (allowCombat) _buildPhaseRejectReported = false;
             if (!config.Enabled)
                 return;
 
@@ -66,6 +68,15 @@ namespace BattleSystemECS.Systems
 
             // 施放优先级最高的技能（可配置上限）
             int toCast = Math.Min(candidates.Count, maxCasts);
+            if (!allowCombat)
+            {
+                if (!_buildPhaseRejectReported)
+                {
+                    renderer.Log("[ABILITY_REJECTED] PhaseNotAllowed source=AutoSkill");
+                    _buildPhaseRejectReported = true;
+                }
+                return;
+            }
             for (int i = 0; i < toCast; i++)
             {
                 var skill = candidates[i];

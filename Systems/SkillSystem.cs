@@ -36,6 +36,7 @@ namespace BattleSystemECS.Systems
         // Cached armor stats (updated on SetTurn — used in damage calculation)
         private float _armorPenetration = 0f;
         private float _damageTakenMult = 1f;
+        private bool _buildPhaseRejectReported;
 
         // Cached enemy CC resistance stats (updated each SetTurn — from TechTreeSystem getters)
         private float _enemyFreezeResistance = 0f;  // from techTreeSystem.GetFreezeResistance()
@@ -206,14 +207,16 @@ namespace BattleSystemECS.Systems
             // Apply "Attack+10%" and "Crit Rate+5%" buffs via GameplayEffect
             var attackBoost = new GameplayEffectDef("Attack+10%", EffectType.Instant,
                 AttributeSetDefinitions.ATTACK_DAMAGE, AttributeModifierOp.Multiply, 1.1f);
-            store.AddEffect(playerId, new AppliedEffect(attackBoost, playerId));
+            store.TryAddGameplayEffect(playerId, LegacyEffectAdapter.CreateApplication(attackBoost,
+                store.GetEntityHandle(playerId), store.GetEntityHandle(playerId)), out _);
             // Sync to bit flags for O(1) hot-path queries
             store.AddBuff(playerId, BuffType.AttackBoost);
             renderer.Log("[SKILL] Applied Effect: Attack+10% (instant, ×1.1)");
 
             var critBoost = new GameplayEffectDef("Crit Rate+5%", EffectType.Instant,
                 AttributeSetDefinitions.CRIT_RATE, AttributeModifierOp.Add, 0.05f);
-            store.AddEffect(playerId, new AppliedEffect(critBoost, playerId));
+            store.TryAddGameplayEffect(playerId, LegacyEffectAdapter.CreateApplication(critBoost,
+                store.GetEntityHandle(playerId), store.GetEntityHandle(playerId)), out _);
             // Sync to bit flags for O(1) hot-path queries
             store.AddBuff(playerId, BuffType.CritRateBoost);
             renderer.Log("[SKILL] Applied Effect: Crit Rate+5% (instant, +0.05)");
@@ -229,9 +232,10 @@ namespace BattleSystemECS.Systems
         /// Update cooldown timers for all abilities.
         /// Auto-cast any Passive ability that is off cooldown.
         /// </summary>
-        public void Update(float deltaTime)
+        public void Update(float deltaTime, bool allowCombat = true)
         {
             this.deltaTime = deltaTime;
+            if (allowCombat) _buildPhaseRejectReported = false;
 
             // Cooldown decay multipliers are per-player invariants — computed once per
             // frame, not per slot. Applied as deltaTime × cdrFactor × adrFactor:
@@ -261,6 +265,15 @@ namespace BattleSystemECS.Systems
                 // Auto-cast Passive abilities that are ready
                 if (inst.Definition.Activation == AbilityActivation.Passive && inst.CanActivate())
                 {
+                    if (!allowCombat)
+                    {
+                        if (!_buildPhaseRejectReported)
+                        {
+                            renderer.Log($"[ABILITY_REJECTED] PhaseNotAllowed skill={inst.Definition.Name}");
+                            _buildPhaseRejectReported = true;
+                        }
+                        continue;
+                    }
                     ExecuteAbility(inst.Definition, slot);
                 }
             }

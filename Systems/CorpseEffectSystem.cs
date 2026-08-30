@@ -192,9 +192,7 @@ namespace BattleSystemECS.Systems
                     if (_buffSystem != null)
                     {
                         _ = effectType; // keep switch-like intent explicit
-                        // Build a properly-initialized Periodic DoT (legacy ApplyDot(int,float,int)
-                        // overload leaves TicksRemaining=0 so it never ticks). Use the full
-                        // GameplayEffectDef.Periodic factory which initializes TicksRemaining.
+                        // 通过 legacy snapshot 生成完整的周期规则，运行态计时由 BuffSystem 的 typed store 推进。
                         var dotDef = GameplayEffectDef.Periodic(
                             name: $"corpse_zone_tick_{effectType}",
                             attrIdx: AttributeSetDefinitions.ENEMY_HEALTH,
