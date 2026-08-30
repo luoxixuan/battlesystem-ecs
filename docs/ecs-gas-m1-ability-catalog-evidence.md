@@ -37,6 +37,7 @@
 - Definitions defensively copy arrays into read-only views. Catalog lookup is contiguous-index O(1); validator rejects duplicate/non-contiguous references and unregistered IDs.
 - Determinism tests cover repeated compilation, reversed static input order, culture changes, and execution metadata fingerprinting.
 - `CuratedAbilitySemanticTests` verifies all 20 names/IDs, targeting closure, payload magnitudes, source/stage, duration/period and composite payloads.
+- Static skill adapter compatibility is intentionally limited to legacy `Name`, `AttackRange`, `AreaWidth`, `AreaHeight`, `Cooldown`, `DamageMultiplier`, and `ManaCost`; such entries receive a typed Single targeting plus multiplier execution. Canonical entries always win same-name merges, while duplicate non-canonical static names fail fast.
 
 ## Verification
 
