@@ -15,9 +15,14 @@ namespace BattleSystemECS.Core
     public class FrameScheduler
     {
         private readonly ComponentStore store;
+        public ComponentStore Store => store;
         private readonly IBattleEventBus _eventBus;
+        private IReadOnlyList<Core.GAS.TriggerDefinition> _gameplayTriggers = Array.Empty<Core.GAS.TriggerDefinition>();
+        private float _externalDeltaTime;
 
         public GameState Phase { get; set; } = GameState.WavePhase;
+        /// <summary>GameplayClock 作为兼容路径的主时钟；其余定义时钟仍各推进一次。</summary>
+        public Core.GAS.ClockId GameplayClock { get; set; } = Core.GAS.ClockId.Combat;
 
         // ── System groups — one per logical phase ──
         public BuildGroup          Build          { get; } = new();
@@ -60,14 +65,22 @@ namespace BattleSystemECS.Core
             _pathfinding = pathfinding;
         }
 
+        public void ConfigureGameplayRuntime(IReadOnlyList<Core.GAS.TriggerDefinition> triggers)
+        {
+            _gameplayTriggers = triggers ?? Array.Empty<Core.GAS.TriggerDefinition>();
+        }
+
         /// <summary>
         /// Execute one full frame of systems, gated by current Phase.
         /// BuildPhase: economy/UI-only systems. WavePhase/Intermission: full combat pipeline.
         /// </summary>
         public void Tick(float deltaTime, int turn)
         {
+            _externalDeltaTime = deltaTime;
             store.ApplyComputedAttributeModeAtFrameBoundary();
             store.BeginFrame();
+            store.GameplayEffectsRuntime.ResetFrame();
+            store.GameplayTriggersRuntime.ResetFrame();
             store.DamageResolver.EnableDeferred(true);
             store.ResourceResolver.EnableDeferred(true);
             // Attribute modifiers become visible at the scheduler's aggregate boundary.
@@ -108,7 +121,20 @@ namespace BattleSystemECS.Core
                 // emitted by compatibility systems instead of carrying them into Wave.
                 store.DamageResolver.RejectPending(Core.GAS.DamageCommitBoundary.GameplayResolve);
                 store.ResourceResolver.RejectPendingEnemyDamage();
+                // Build 阶段继续推进 RealTime/Global/Build effect；Combat/Enemy 伤害在本帧明确拒绝。
+                store.GameplayEffectsRuntime.Tick(_externalDeltaTime, Core.GAS.ClockId.RealTime);
+                store.GameplayEffectsRuntime.Tick(deltaTime, Core.GAS.ClockId.Global);
+                store.GameplayEffectsRuntime.Tick(deltaTime, Core.GAS.ClockId.Build);
+                store.DamageResolver.RejectPendingEnemyDamage();
+                store.DamageResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
                 store.ResourceResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
+                if (_gameplayTriggers.Count > 0)
+                {
+                    store.GameplayTriggersRuntime.ConsumeOnly(store.DamageResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.HitConfirmed, Core.GAS.GameplayEventType.DamageApplied, Core.GAS.GameplayEventType.EffectApplied);
+                    store.GameplayTriggersRuntime.ConsumeOnly(store.ResourceResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.HealApplied, Core.GAS.GameplayEventType.ShieldChanged, Core.GAS.GameplayEventType.ResourceChanged);
+                    store.GameplayTriggersRuntime.Consume(store.GameplayEffectsRuntime.Events, _gameplayTriggers, true);
+                    store.GameplayTriggersRuntime.ConsumeNextRounds(_gameplayTriggers);
+                }
                 store.DamageResolver.EnableDeferred(false);
                 store.ResourceResolver.EnableDeferred(false);
                 return;
@@ -190,11 +216,24 @@ namespace BattleSystemECS.Core
             Combat.Execute(store, combatDt, turn);
 
             // Phase 9: Skill resolution + Buff DoT + Bleed — COMBAT side (full speed)
+            SkillBuff.GameplayClock = GameplayClock;
+            SkillBuff.GameplayEnemyDeltaTime = enemyDt;
+            SkillBuff.GameplayRealTimeDeltaTime = _externalDeltaTime;
+            SkillBuff.GameplayGlobalDeltaTime = deltaTime;
             SkillBuff.Execute(store, combatDt, turn);
 
             // 战斗与技能阶段产生的资源/伤害请求在此提交边界统一可见。
             store.DamageResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
             store.ResourceResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
+            if (_gameplayTriggers.Count > 0)
+                store.GameplayTriggersRuntime.ConsumeOnly(store.ResourceResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.HealApplied, Core.GAS.GameplayEventType.ShieldChanged, Core.GAS.GameplayEventType.ResourceChanged);
+            if (_gameplayTriggers.Count > 0)
+                store.GameplayTriggersRuntime.ConsumeOnly(store.DamageResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.HitConfirmed, Core.GAS.GameplayEventType.DamageApplied, Core.GAS.GameplayEventType.EffectApplied);
+            if (_gameplayTriggers.Count > 0)
+                store.GameplayTriggersRuntime.Consume(store.GameplayEffectsRuntime.Events, _gameplayTriggers, true);
+            if (_gameplayTriggers.Count > 0)
+                store.GameplayTriggersRuntime.ConsumeNextRounds(_gameplayTriggers);
+            store.AttributeAggregator.AggregateDirty();
 
             // Phase 10: Death resolve (uses queued damage, dt-free)
             store.ResolveEnemiesKilledThisFrame();
@@ -204,6 +243,20 @@ namespace BattleSystemECS.Core
             // 死亡后奖励、治疗与尸体效果沿用同一 Gameplay 提交边界。
             store.DamageResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
             store.ResourceResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
+            // PostDeath 可能产生致死 deferred damage；在同一帧闭合第二次死亡解析。
+            store.ResolveEnemiesKilledThisFrame();
+            if (_gameplayTriggers.Count > 0)
+                store.GameplayTriggersRuntime.ConsumeOnly(store.ResourceResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.HealApplied, Core.GAS.GameplayEventType.ShieldChanged, Core.GAS.GameplayEventType.ResourceChanged);
+            if (_gameplayTriggers.Count > 0)
+                store.GameplayTriggersRuntime.Consume(store.GameplayEffectsRuntime.Events, _gameplayTriggers, true);
+            // PostDeath 产生的生命链接/惩罚伤害也在本边界交给 Trigger，避免下一帧清空事实。
+            if (_gameplayTriggers.Count > 0)
+                store.GameplayTriggersRuntime.ConsumeOnly(store.DamageResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.HitConfirmed, Core.GAS.GameplayEventType.DamageApplied, Core.GAS.GameplayEventType.EffectApplied);
+            // 死亡/击杀事实只在生命周期和 PostDeath 提交完成后消费。
+            if (_gameplayTriggers.Count > 0)
+                store.GameplayTriggersRuntime.ConsumeOnly(store.DamageResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.KillConfirmed, Core.GAS.GameplayEventType.ResourceChanged, Core.GAS.GameplayEventType.DeathQueued);
+            if (_gameplayTriggers.Count > 0)
+                store.GameplayTriggersRuntime.ConsumeNextRounds(_gameplayTriggers);
             store.DamageResolver.EnableDeferred(false);
             store.ResourceResolver.EnableDeferred(false);
 

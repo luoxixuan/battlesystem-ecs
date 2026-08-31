@@ -13,6 +13,7 @@ namespace BattleSystemECS.Core.GAS
     public enum ExecutionOperation { Default, ApplyDamage, ApplyHeal, ApplyShield, Resurrect, RestoreSnapshot, ApplyCrowdControl, ApplySlow }
     public enum RefreshPolicy { None, Duration, StacksAndDuration }
     public enum SourceDeathPolicy { Persist, Remove }
+    public enum DurationPolicy { Instant, Duration, Infinite }
     public enum ActivationPolicy { Instant, InputPressed, Passive }
     public enum MagnitudeSource { Constant, Attribute, Multiplier }
     public enum DamageAmountStage { Raw, PostCrit, LegacyMultiplier, PostMitigation }
@@ -20,6 +21,10 @@ namespace BattleSystemECS.Core.GAS
     public enum DamageFlags { None = 0, IgnoreArmor = 1, IgnoreResistance = 2, IgnoreShield = 4, IgnoreInvulnerability = 8, Execute = 16, Reflect = 32, Transfer = 64 }
     public enum DamageCommitBoundary { EarlyResolve, GameplayResolve }
     public enum SnapshotPolicy { CaptureOnApply, ReevaluateOnRead }
+    public enum TriggerScope { PerSource, PerTarget, PerSourceTarget, PerPlayer }
+    public enum TriggerMode { Once, EveryN }
+    public enum TriggerResetPolicy { None, Explicit }
+    public enum EffectTargetPolicy { Source, Target }
     public enum FirstTickPolicy { NextInterval, Immediate }
     public enum CatchUpPolicy { CatchUpAll, OnePerFrame, SkipMissed }
     public enum RelationFilter { Any, Enemies, Allies, Self }
@@ -31,7 +36,10 @@ namespace BattleSystemECS.Core.GAS
     public readonly struct ExecutionId : IEquatable<ExecutionId> { public readonly int Value; public ExecutionId(int value) { Value = value; } public bool Equals(ExecutionId other) => Value == other.Value; public override bool Equals(object obj) => obj is ExecutionId other && Equals(other); public override int GetHashCode() => Value; }
     public readonly struct TargetingId : IEquatable<TargetingId> { public readonly int Value; public TargetingId(int value) { Value = value; } public bool Equals(TargetingId other) => Value == other.Value; public override bool Equals(object obj) => obj is TargetingId other && Equals(other); public override int GetHashCode() => Value; }
     public readonly struct TriggerId : IEquatable<TriggerId> { public readonly int Value; public TriggerId(int value) { Value = value; } public bool Equals(TriggerId other) => Value == other.Value; public override bool Equals(object obj) => obj is TriggerId other && Equals(other); public override int GetHashCode() => Value; }
-    public readonly struct PeriodicSpec { public readonly float Period; public readonly FirstTickPolicy FirstTick; public readonly CatchUpPolicy CatchUp; public readonly ExecutionId PayloadExecution; public readonly DamageType? Damage; public readonly ElementType? Element; public PeriodicSpec(float period, FirstTickPolicy firstTick, CatchUpPolicy catchUp, ExecutionId payloadExecution, DamageType? damage = null, ElementType? element = null) { Period = period; FirstTick = firstTick; CatchUp = catchUp; PayloadExecution = payloadExecution; Damage = damage; Element = element; } }
+    public readonly struct PeriodicSpec { public readonly float Period; public readonly FirstTickPolicy FirstTick; public readonly CatchUpPolicy CatchUp; public readonly ExecutionId PayloadExecution; public readonly DamageType? Damage; public readonly ElementType? Element; public readonly EffectPayloadKind Payload; public readonly MagnitudeSource MagnitudeSource; public readonly float Magnitude; public readonly AttributeKey Resource; public readonly GameplayEventType EventType;
+        public PeriodicSpec(float period, ExecutionId payloadExecution, EffectPayloadKind payload, MagnitudeSource magnitudeSource, FirstTickPolicy firstTick, CatchUpPolicy catchUp, DamageType? damage = null, ElementType? element = null, float magnitude = 0f, AttributeKey resource = default(AttributeKey), GameplayEventType eventType = GameplayEventType.EffectApplied) { Period = period; FirstTick = firstTick; CatchUp = catchUp; PayloadExecution = payloadExecution; Payload = payload; MagnitudeSource = magnitudeSource; Damage = damage; Element = element; Magnitude = magnitude; Resource = resource; EventType = eventType; }
+        public PeriodicSpec(float period, FirstTickPolicy firstTick, CatchUpPolicy catchUp, ExecutionId payloadExecution, DamageType? damage = null, ElementType? element = null, float magnitude = 0f, AttributeKey resource = default(AttributeKey), GameplayEventType eventType = GameplayEventType.EffectApplied) : this(period, payloadExecution, EffectPayloadKind.Damage, MagnitudeSource.Constant, firstTick, catchUp, damage, element, magnitude, resource, eventType) { }
+        public PeriodicSpec(float period, FirstTickPolicy firstTick, CatchUpPolicy catchUp, ExecutionId payloadExecution, DamageType? damage, ElementType? element) : this(period, firstTick, catchUp, payloadExecution, damage, element, 0f, default(AttributeKey), GameplayEventType.EffectApplied) { } }
     public readonly struct CostDefinition { public readonly AttributeKey Resource; public readonly float Amount; public CostDefinition(AttributeKey resource, float amount) { Resource = resource; Amount = amount; } }
     public readonly struct ExecutionDefinition { public readonly ExecutionId Id; public readonly EffectPayloadKind Payload; public readonly float Magnitude; public readonly float Duration; public readonly MagnitudeSource MagnitudeSource; public readonly DamageAmountStage Stage; public readonly TagId Tag; public readonly ExecutionOperation Operation; public ExecutionDefinition(ExecutionId id, EffectPayloadKind payload, float magnitude, TagId tag, MagnitudeSource source = MagnitudeSource.Constant, DamageAmountStage stage = DamageAmountStage.Raw, float duration = 0f, ExecutionOperation operation = ExecutionOperation.Default) { Id = id; Payload = payload; Magnitude = magnitude; Duration = duration; Tag = tag; MagnitudeSource = source; Stage = stage; Operation = operation; } }
     public readonly struct ModifierDefinition
@@ -63,7 +71,15 @@ namespace BattleSystemECS.Core.GAS
         public readonly ConsumerId Consumer;
         public readonly GameplayEventType EventType;
         public readonly EffectId Effect;
-        public TriggerDefinition(TriggerId id, GameplayEventType eventType, EffectId effect, ConsumerId consumer, TagId[] filterTags = null, TagId effectTag = default(TagId)) { Id = id; EventType = eventType; Effect = effect; Consumer = consumer; FilterTags = ImmutableViews.List(filterTags); EffectTag = effectTag; }
+        public readonly TriggerScope Scope;
+        public readonly TriggerMode Mode;
+        public readonly int Threshold;
+        public readonly bool PreserveRemainder;
+        public readonly int EffectStackDelta;
+        public readonly EffectTargetPolicy EffectTarget;
+        public readonly TriggerResetPolicy ResetPolicy;
+        public TriggerDefinition(TriggerId id, GameplayEventType eventType, EffectId effect, ConsumerId consumer, TagId[] filterTags = null, TagId effectTag = default(TagId), TriggerScope scope = TriggerScope.PerSource, int threshold = 1, TriggerMode mode = TriggerMode.Once, bool preserveRemainder = false, int effectStackDelta = 1, EffectTargetPolicy effectTarget = EffectTargetPolicy.Source, TriggerResetPolicy resetPolicy = TriggerResetPolicy.None) { Id = id; EventType = eventType; Effect = effect; Consumer = consumer; FilterTags = ImmutableViews.List(filterTags); EffectTag = effectTag; Scope = scope; Threshold = threshold; Mode = mode; PreserveRemainder = preserveRemainder; EffectStackDelta = effectStackDelta; EffectTarget = effectTarget; ResetPolicy = resetPolicy; }
+        public TriggerDefinition(TriggerId id, GameplayEventType eventType, EffectId effect, ConsumerId consumer, TagId[] filterTags, TagId effectTag) : this(id, eventType, effect, consumer, filterTags, effectTag, TriggerScope.PerSource, 1, TriggerMode.Once, false, 1, EffectTargetPolicy.Source, TriggerResetPolicy.None) { }
     }
     public readonly struct AbilityDefinition
     {
@@ -91,6 +107,7 @@ namespace BattleSystemECS.Core.GAS
         public readonly EffectType Type;
         public readonly IReadOnlyList<ModifierDefinition> Modifiers;
         public readonly float Duration;
+        public readonly DurationPolicy DurationPolicy;
         public readonly ClockId Clock;
         public readonly StackingBehavior Stacking;
         public readonly int MaxStacks;
@@ -102,9 +119,13 @@ namespace BattleSystemECS.Core.GAS
         public readonly IReadOnlyList<ExecutionId> Executions;
         public readonly SourceDeathPolicy SourceDeath;
         public readonly IReadOnlyList<TagId> GrantedTags, BlockedTags;
+        public readonly TagId StackKey;
         public float Period { get { return Periodic.HasValue ? Periodic.Value.Period : 0f; } }
         public bool RefreshDuration { get { return Refresh != RefreshPolicy.None; } }
-        public GameplayEffectDefinition(EffectId id, EffectType type, ModifierDefinition[] modifiers, float duration, float period, ClockId clock, StackingBehavior stacking, int maxStacks, RefreshPolicy refresh, SourceDeathPolicy sourceDeath, EffectPayloadKind payload, TagId tag, ExecutionId[] executions, TagId[] grantedTags = null, TagId[] blockedTags = null) { Id = id; Type = type; Duration = duration; Clock = clock; Stacking = stacking; MaxStacks = maxStacks; Refresh = refresh; Payload = payload; Tag = tag; Periodic = period > 0f ? new PeriodicSpec(period, FirstTickPolicy.NextInterval, CatchUpPolicy.CatchUpAll, executions == null || executions.Length == 0 ? default(ExecutionId) : executions[0]) : (PeriodicSpec?)null; Executions = ImmutableViews.List(executions); SourceDeath = sourceDeath; GrantedTags = ImmutableViews.List(grantedTags); BlockedTags = ImmutableViews.List(blockedTags); Modifiers = ImmutableViews.List(modifiers); }
+        public GameplayEffectDefinition(EffectId id, EffectType type, ModifierDefinition[] modifiers, float duration, ClockId clock, StackingBehavior stacking, int maxStacks, RefreshPolicy refresh, SourceDeathPolicy sourceDeath, EffectPayloadKind payload, TagId tag, PeriodicSpec periodic, ExecutionId[] executions, TagId[] grantedTags = null, TagId[] blockedTags = null, TagId stackKey = default(TagId)) { Id = id; Type = type; Duration = duration; DurationPolicy = type == EffectType.Periodic ? DurationPolicy.Duration : type == EffectType.Instant ? DurationPolicy.Instant : duration == 0f ? DurationPolicy.Infinite : DurationPolicy.Duration; Clock = clock; Stacking = stacking; MaxStacks = maxStacks; Refresh = refresh; Payload = payload; Tag = tag; StackKey = stackKey; Periodic = periodic; Executions = ImmutableViews.List(executions); SourceDeath = sourceDeath; GrantedTags = ImmutableViews.List(grantedTags); BlockedTags = ImmutableViews.List(blockedTags); Modifiers = ImmutableViews.List(modifiers); }
+        public GameplayEffectDefinition(EffectId id, EffectType type, ModifierDefinition[] modifiers, float duration, DurationPolicy durationPolicy, ClockId clock, StackingBehavior stacking, int maxStacks, RefreshPolicy refresh, SourceDeathPolicy sourceDeath, EffectPayloadKind payload, TagId tag, PeriodicSpec periodic, ExecutionId[] executions, TagId[] grantedTags = null, TagId[] blockedTags = null, TagId stackKey = default(TagId)) : this(id, type, modifiers, duration, clock, stacking, maxStacks, refresh, sourceDeath, payload, tag, periodic, executions, grantedTags, blockedTags, stackKey) { DurationPolicy = durationPolicy; }
+        public GameplayEffectDefinition(EffectId id, EffectType type, ModifierDefinition[] modifiers, float duration, float period, ClockId clock, StackingBehavior stacking, int maxStacks, RefreshPolicy refresh, SourceDeathPolicy sourceDeath, EffectPayloadKind payload, TagId tag, ExecutionId[] executions, TagId[] grantedTags = null, TagId[] blockedTags = null, TagId stackKey = default(TagId), float periodicMagnitude = 0f) { Id = id; Type = type; Duration = duration; DurationPolicy = type == EffectType.Periodic ? DurationPolicy.Duration : type == EffectType.Instant ? DurationPolicy.Instant : duration == 0f ? DurationPolicy.Infinite : DurationPolicy.Duration; Clock = clock; Stacking = stacking; MaxStacks = maxStacks; Refresh = refresh; Payload = payload; Tag = tag; StackKey = stackKey; Periodic = period > 0f ? new PeriodicSpec(period, FirstTickPolicy.NextInterval, CatchUpPolicy.CatchUpAll, executions == null || executions.Length == 0 ? default(ExecutionId) : executions[0], magnitude: periodicMagnitude) : (PeriodicSpec?)null; Executions = ImmutableViews.List(executions); SourceDeath = sourceDeath; GrantedTags = ImmutableViews.List(grantedTags); BlockedTags = ImmutableViews.List(blockedTags); Modifiers = ImmutableViews.List(modifiers); }
+        public GameplayEffectDefinition(EffectId id, EffectType type, ModifierDefinition[] modifiers, float duration, float period, ClockId clock, StackingBehavior stacking, int maxStacks, RefreshPolicy refresh, SourceDeathPolicy sourceDeath, EffectPayloadKind payload, TagId tag, ExecutionId[] executions) : this(id, type, modifiers, duration, period, clock, stacking, maxStacks, refresh, sourceDeath, payload, tag, executions, null, null, default(TagId), 0f) { }
     }
     public struct ActiveGameplayEffect
     {
@@ -118,7 +139,14 @@ namespace BattleSystemECS.Core.GAS
         public FirstTickPolicy FirstTick;
         public CatchUpPolicy CatchUp;
         public SourceDeathPolicy SourceDeath;
+        public bool RuntimeOwned;
+        public int TicksProcessed;
+        public TagId Tag;
+        public int OwnerPlayerId;
+        public long ApplicationSequence, ProvenanceId;
         public bool FirstTickPending;
-        public ActiveGameplayEffect(EffectHandle handle, EffectId definitionId, EntityHandle source, EntityHandle target, float remainingTime, int ticksRemaining = 0, float capturedMagnitude = 0f, ClockId clock = ClockId.Combat, FirstTickPolicy firstTick = FirstTickPolicy.NextInterval, CatchUpPolicy catchUp = CatchUpPolicy.CatchUpAll, SourceDeathPolicy sourceDeath = SourceDeathPolicy.Persist) { Handle = handle; DefinitionId = definitionId; Source = source; Target = target; RemainingTime = remainingTime; TickAccumulator = 0f; CapturedMagnitude = capturedMagnitude; TicksRemaining = ticksRemaining; StackCount = 1; Clock = clock; FirstTick = firstTick; CatchUp = catchUp; SourceDeath = sourceDeath; FirstTickPending = true; }
+        public ActiveGameplayEffect(EffectHandle handle, EffectId definitionId, EntityHandle source, EntityHandle target, float remainingTime, int ticksRemaining = 0, float capturedMagnitude = 0f, ClockId clock = ClockId.Combat, FirstTickPolicy firstTick = FirstTickPolicy.NextInterval, CatchUpPolicy catchUp = CatchUpPolicy.CatchUpAll, SourceDeathPolicy sourceDeath = SourceDeathPolicy.Persist, int ownerPlayerId = -1, long applicationSequence = 0L, long provenanceId = 0L, TagId tag = default(TagId)) { Handle = handle; DefinitionId = definitionId; Source = source; Target = target; RemainingTime = remainingTime; TickAccumulator = 0f; CapturedMagnitude = capturedMagnitude; TicksRemaining = ticksRemaining; StackCount = 1; Clock = clock; FirstTick = firstTick; CatchUp = catchUp; SourceDeath = sourceDeath; OwnerPlayerId = ownerPlayerId; ApplicationSequence = applicationSequence; ProvenanceId = provenanceId; RuntimeOwned = false; TicksProcessed = 0; Tag = tag; FirstTickPending = true; }
+        public ActiveGameplayEffect(EffectHandle handle, EffectId definitionId, EntityHandle source, EntityHandle target, float remainingTime) : this(handle, definitionId, source, target, remainingTime, 0, 0f, ClockId.Combat, FirstTickPolicy.NextInterval, CatchUpPolicy.CatchUpAll, SourceDeathPolicy.Persist, -1, 0L, 0L, default(TagId)) { }
+        public ActiveGameplayEffect(EffectHandle handle, EffectId definitionId, EntityHandle source, EntityHandle target, float remainingTime, int ticksRemaining, float capturedMagnitude, ClockId clock, FirstTickPolicy firstTick, CatchUpPolicy catchUp, SourceDeathPolicy sourceDeath) : this(handle, definitionId, source, target, remainingTime, ticksRemaining, capturedMagnitude, clock, firstTick, catchUp, sourceDeath, -1, 0L, 0L, default(TagId)) { }
     }
 }

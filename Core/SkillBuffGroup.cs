@@ -45,9 +45,26 @@ namespace BattleSystemECS.Core
         // the live PlayerRallyActive set. Subscribes to PlayerDamaged in its constructor
         // (via SystemRegistry) to activate the rally on player damage.
         public Systems.RallySystem? Rally { get; set; }
+        public Core.GAS.ClockId GameplayClock { get; set; } = Core.GAS.ClockId.Combat;
+        /// <summary>敌方时钟使用的本帧 delta，由 FrameScheduler 注入。</summary>
+        private float _gameplayEnemyDeltaTime, _gameplayRealTimeDeltaTime, _gameplayGlobalDeltaTime;
+        public bool HasGameplayEnemyDeltaTime { get; private set; }
+        public bool HasGameplayRealTimeDeltaTime { get; private set; }
+        public bool HasGameplayGlobalDeltaTime { get; private set; }
+        public float GameplayEnemyDeltaTime { get { return _gameplayEnemyDeltaTime; } set { _gameplayEnemyDeltaTime = value; HasGameplayEnemyDeltaTime = true; } }
+        public float GameplayRealTimeDeltaTime { get { return _gameplayRealTimeDeltaTime; } set { _gameplayRealTimeDeltaTime = value; HasGameplayRealTimeDeltaTime = true; } }
+        public float GameplayGlobalDeltaTime { get { return _gameplayGlobalDeltaTime; } set { _gameplayGlobalDeltaTime = value; HasGameplayGlobalDeltaTime = true; } }
 
-        public void Execute(ComponentStore store, float deltaTime, int turn)
+        public void Execute(ComponentStore store, float deltaTime, int turn, Core.GAS.ClockId? clock = null)
         {
+            if (clock.HasValue) store.GameplayEffectsRuntime.Tick(deltaTime, clock.Value);
+            else
+            {
+                store.GameplayEffectsRuntime.Tick(deltaTime, Core.GAS.ClockId.Combat);
+                store.GameplayEffectsRuntime.Tick(HasGameplayEnemyDeltaTime ? GameplayEnemyDeltaTime : deltaTime, Core.GAS.ClockId.Enemy);
+                store.GameplayEffectsRuntime.Tick(HasGameplayRealTimeDeltaTime ? GameplayRealTimeDeltaTime : deltaTime, Core.GAS.ClockId.RealTime);
+                store.GameplayEffectsRuntime.Tick(HasGameplayGlobalDeltaTime ? GameplayGlobalDeltaTime : deltaTime, Core.GAS.ClockId.Global);
+            }
             Buff?.Update(deltaTime);
             Skill?.ResolveSkillDamage();
             Buff?.ResolveDotDamage();
@@ -90,5 +107,8 @@ namespace BattleSystemECS.Core
             // on the next frame's hot-path read. (Same gate order as Bleed/Frostbite.)
             Rally?.Update(deltaTime);
         }
+        public void Execute(ComponentStore store, float deltaTime, int turn) => Execute(store, deltaTime, turn, null);
+
+        void ISystemGroup.Execute(ComponentStore store, float deltaTime, int turn) => Execute(store, deltaTime, turn, GameplayClock);
     }
 }

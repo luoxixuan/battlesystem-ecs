@@ -369,6 +369,8 @@ namespace BattleSystemECS.Core
         public int[] ActiveEffectCount = new int[MAX_ENTITIES];
         private EffectHandle[] _activeEffectHandles = new EffectHandle[MAX_ENTITIES * MAX_ACTIVE_EFFECTS_PER_ENTITY];
         public readonly ActiveGameplayEffectStore GameplayEffects = new ActiveGameplayEffectStore(MAX_ENTITIES * MAX_ACTIVE_EFFECTS_PER_ENTITY);
+        public GAS.GameplayEffectRuntime GameplayEffectsRuntime { get; }
+        public GAS.GameplayTriggerRuntime GameplayTriggersRuntime { get; }
         public EffectPool GameplayEffectPool => GameplayEffects.Handles;
         #endregion
 
@@ -993,6 +995,8 @@ namespace BattleSystemECS.Core
         public void RemoveAllGameplayEffects(int entityId)
         {
             if (!IsValidEntity(entityId)) return;
+            // 让 typed runtime 同步释放 modifier bookkeeping，再清理兼容槽位。
+            GameplayEffectsRuntime.CleanupEntity(entityId);
             while (ActiveEffectCount[entityId] > 0)
                 if (!TryRemoveActiveEffectAt(entityId, ActiveEffectCount[entityId] - 1, out _, out _, out _)) break;
         }

@@ -70,6 +70,22 @@ namespace BattleSystemECS.Core.GAS
                 if (write < _pending.Count) _pending.RemoveRange(write, _pending.Count - write);
             }
         }
+        /// <summary>BuildPhase 拒绝敌方目标伤害，避免死亡队列跨帧遗留。</summary>
+        internal void RejectPendingEnemyDamage()
+        {
+            lock (_pendingLock)
+            {
+                int write = 0;
+                for (int i = 0; i < _pending.Count; i++)
+                {
+                    var request = _pending[i];
+                    bool enemy = _store.TryResolve(request.Target, out int target, out _) && _store.EnemyActive[target];
+                    if (enemy) { Interlocked.Increment(ref _unconsumedRequestCount); Interlocked.Increment(ref _rejectedCount); SetRejection(DamageRejectionReason.UnsupportedCommitBoundary); }
+                    else _pending[write++] = request;
+                }
+                if (write < _pending.Count) _pending.RemoveRange(write, _pending.Count - write);
+            }
+        }
         // 帧调度器在阶段末显式提交边界，供诊断与后续排队消费者观察。
         internal void CommitBoundary(DamageCommitBoundary boundary)
         {
@@ -107,11 +123,12 @@ namespace BattleSystemECS.Core.GAS
         {
             if (DiagnosticsEnabled) { if (validated) Interlocked.Increment(ref _requestsFastPath); else Interlocked.Increment(ref _requestsValidated); }
             int target;
-            if (!validated && !_store.TryResolve(request.Source, out _, out _)) { Interlocked.Increment(ref _rejectedCount); SetRejection(DamageRejectionReason.InvalidSource); return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.InvalidSource); }
+            if (!request.AllowMissingSource && !validated && !_store.TryResolve(request.Source, out _, out _)) { Interlocked.Increment(ref _rejectedCount); SetRejection(DamageRejectionReason.InvalidSource); return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.InvalidSource); }
             int source;
             // validated 适配器同样解析完整句柄；调用方不能只提供索引绕过代数和 active 校验。
-            if (!_store.TryResolve(request.Source, out source, out _)) { Interlocked.Increment(ref _rejectedCount); SetRejection(DamageRejectionReason.InvalidSource); return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.InvalidSource); }
+            if (!_store.TryResolve(request.Source, out source, out _) && !request.AllowMissingSource) { Interlocked.Increment(ref _rejectedCount); SetRejection(DamageRejectionReason.InvalidSource); return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.InvalidSource); }
             if (!_store.TryResolve(request.Target, out target, out _)) { Interlocked.Increment(ref _rejectedCount); SetRejection(DamageRejectionReason.InvalidTarget); return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.InvalidTarget); }
+            if (request.AllowMissingSource) source = target;
             if (float.IsNaN(request.RawAmount) || float.IsInfinity(request.RawAmount)) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.NonFiniteAmount);
             if (request.RawAmount <= 0f) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.NonPositiveAmount);
             if (!IsSupportedDamageType(request.DamageType)) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.UnsupportedDamageType);
@@ -138,7 +155,7 @@ namespace BattleSystemECS.Core.GAS
                 }
                 return new DamageApplyResult(true, 0f, 0f, false, DamageRejectionReason.None, deferred: true);
             }
-            var hitFact = new GameplayEvent(GameplayEventType.HitConfirmed, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth);
+            var hitFact = new GameplayEvent(GameplayEventType.HitConfirmed, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId);
             bool hitPublished = Events.TryPublish(hitFact, true);
             EventObserver?.Invoke(hitFact);
             if (!hitPublished) Volatile.Write(ref _eventPublicationFailed, 1);
@@ -167,9 +184,9 @@ namespace BattleSystemECS.Core.GAS
             bool death = _store.EnemyHealth[target] <= 0f;
             if (death) _store.ResourceResolver.ClampEnemyHealthAtZero(target);
             if (death) _store.QueueEnemyDeath(target, request.OwnerPlayerId, request.Sequence, request.Source);
-            if (!Events.TryPublish(new GameplayEvent(GameplayEventType.DamageApplied, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth), true)) Volatile.Write(ref _eventPublicationFailed, 1);
+            if (!Events.TryPublish(new GameplayEvent(GameplayEventType.DamageApplied, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId), true)) Volatile.Write(ref _eventPublicationFailed, 1);
             if (DiagnosticsEnabled && !LastEventPublicationFailed) Interlocked.Increment(ref _factsPublished);
-            if (death && !Events.TryPublish(new GameplayEvent(GameplayEventType.DeathQueued, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth), true)) Volatile.Write(ref _eventPublicationFailed, 1);
+            if (death && !Events.TryPublish(new GameplayEvent(GameplayEventType.DeathQueued, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId), true)) Volatile.Write(ref _eventPublicationFailed, 1);
             if (DiagnosticsEnabled && death && !LastEventPublicationFailed) Interlocked.Increment(ref _factsPublished);
             Interlocked.Increment(ref _acceptedCount);
             return new DamageApplyResult(true, applied, absorbed, death, DamageRejectionReason.None);

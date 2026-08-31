@@ -19,6 +19,8 @@ namespace BattleSystemECS.Core
     /// </summary>
     public class SystemRegistry
     {
+        private readonly List<Core.GAS.TriggerDefinition> _runtimeTriggers = new List<Core.GAS.TriggerDefinition>();
+        private Core.GAS.GameplayEffectDefinition _runtimeComboEffect;
         // ── Map ──
         public MapSystem? Map { get; private set; }
 
@@ -268,6 +270,15 @@ namespace BattleSystemECS.Core
 
         public void CreateAll(ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus = null)
         {
+            _runtimeComboEffect = new Core.GAS.GameplayEffectDefinition(new Core.GAS.EffectId(9001), Core.GAS.EffectType.Duration,
+                // 旧 Duration=0 兼容映射为 Infinite，连击效果不会因零时长被拒绝。
+                new[] { new Core.GAS.ModifierDefinition(new Core.GAS.AttributeKey(8), Core.GAS.AttributeModifierOp.Add, 0.30f) }, 0f, 0f,
+                Core.GAS.ClockId.Combat, Core.GAS.StackingBehavior.MaxStacksRefresh, 5, Core.GAS.RefreshPolicy.StacksAndDuration,
+                Core.GAS.SourceDeathPolicy.Persist, Core.GAS.EffectPayloadKind.GameplayEvent, default(Core.GAS.TagId), Array.Empty<Core.GAS.ExecutionId>(), stackKey: new Core.GAS.TagId(9001));
+            _runtimeTriggers.Clear();
+            _runtimeTriggers.Add(new Core.GAS.TriggerDefinition(new Core.GAS.TriggerId(9001), Core.GAS.GameplayEventType.HitConfirmed,
+                new Core.GAS.EffectId(9001), Core.GAS.CatalogRegistries.SkillConsumer, scope: Core.GAS.TriggerScope.PerSource,
+                threshold: 10, mode: Core.GAS.TriggerMode.EveryN, preserveRemainder: true));
             var battleEb = battleEventBus ?? NullEventBus.Instance;
 
             // ── EventBus (needed early by several systems) ──
@@ -785,6 +796,8 @@ namespace BattleSystemECS.Core
 
         public void AssignToGroups(FrameScheduler scheduler)
         {
+            scheduler.ConfigureGameplayRuntime(_runtimeTriggers);
+            scheduler.Store.GameplayTriggersRuntime.RegisterEffect(_runtimeComboEffect);
             // ── BuildPhase ──
             scheduler.Build.Gold = Gold;
             scheduler.Build.TowerIncome = null;

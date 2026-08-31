@@ -79,6 +79,8 @@ namespace BattleSystemECS.Systems
         private bool ProcessEffectAt(int entityId, int slot, float deltaTime, ClockId clock, bool queueDamage)
         {
             if (!store.TryGetActiveEffectAt(entityId, slot, out var active, out var definition, out _)) return true;
+            // typed GameplayEffectRuntime 是 RuntimeOwned effect 的唯一 owner；legacy facade 只读 projection。
+            if (active.RuntimeOwned) return true;
             if (active.SourceDeath == SourceDeathPolicy.Remove && !store.TryResolve(active.Source, out _, out _))
             {
                 RemoveEffectAtSlot(entityId, slot);

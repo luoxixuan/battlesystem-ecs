@@ -47,6 +47,15 @@ namespace BattleSystemECS.Core.GAS
         public int RequestOverflowCount => Volatile.Read(ref _requestOverflowCount);
         public int UnconsumedRequestCount => Volatile.Read(ref _unconsumedRequestCount);
         public ResourceResolver(ComponentStore store) { _store = store ?? throw new ArgumentNullException(nameof(store)); }
+        /// <summary>提交独立的治疗请求；治疗不是通用资源写入。</summary>
+        public ResourceApplyResult TryApply(HealRequest request)
+        {
+            if (request.RawAmount <= 0f || float.IsNaN(request.RawAmount) || float.IsInfinity(request.RawAmount))
+            { SetRejection(ResourceRejectionReason.InvalidValue); Interlocked.Increment(ref _rejectedCount); return new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidValue); }
+            return TryApply(request.AllowMissingSource
+                ? ResourceRequest.ForPersistentEffect(request.Source, request.Target, new AttributeKey(3), request.RawAmount, request.Sequence, request.OwnerPlayerId)
+                : new ResourceRequest(request.Source, request.Target, new AttributeKey(3), request.RawAmount, request.Sequence, request.OwnerPlayerId));
+        }
         private void SetRejection(ResourceRejectionReason reason) { lock (_diagnosticsLock) _lastRejectionReason = reason; }
         internal void BeginFrame() { SetRejection(ResourceRejectionReason.None); Volatile.Write(ref _eventPublicationFailed, 0); lock (_pendingLock) { if (_pending.Count != 0) { Interlocked.Add(ref _unconsumedRequestCount, _pending.Count); Interlocked.Add(ref _rejectedCount, _pending.Count); SetRejection(ResourceRejectionReason.UnconsumedRequests); _pending.Clear(); } } }
         internal void EnableDeferred(bool value) { _deferred = value; }
@@ -106,7 +115,7 @@ namespace BattleSystemECS.Core.GAS
             HandleResolveFailure failure;
             if (!_store.TryResolve(request.Target, out targetId, out failure))
                 return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidTarget));
-            if (!_store.TryResolve(request.Source, out _, out failure))
+            if (!_store.TryResolve(request.Source, out _, out failure) && !request.AllowMissingSource)
                 return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidSource));
             if (request.OwnerPlayerId < 0 || request.OwnerPlayerId >= ComponentStore.MAX_PLAYERS)
                 return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidOwner));
@@ -114,6 +123,8 @@ namespace BattleSystemECS.Core.GAS
             bool isEnemy = ComponentStore.IsValidEntity(targetId) && _store.EnemyActive[targetId];
             if (!isPlayer && !isEnemy)
                 return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidTarget));
+            if (isEnemy && (_store.EnemyHealth[targetId] <= 0f || _store.IsEnemyPendingDeath(targetId)))
+                return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.TargetAlreadyDead));
             if (float.IsNaN(request.Delta) || float.IsInfinity(request.Delta)) return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidValue));
             ResourcePolicy policy = Policy(kind);
             if (request.Operation == ResourceOperation.Set && kind == ResourceKind.CurrentHealth && request.Delta < 0f)
@@ -146,11 +157,11 @@ namespace BattleSystemECS.Core.GAS
                 }
             }
             var type = kind == ResourceKind.CurrentHealth && request.Delta < 0f ? GameplayEventType.DamageApplied : kind == ResourceKind.CurrentHealth ? GameplayEventType.HealApplied : kind == ResourceKind.Shield ? GameplayEventType.ShieldChanged : GameplayEventType.ResourceChanged;
-            if (!Events.TryPublish(new GameplayEvent(type, request.Source, request.Target, request.Sequence), true)) Volatile.Write(ref _eventPublicationFailed, 1);
+            if (!Events.TryPublish(new GameplayEvent(type, request.Source, request.Target, default(EffectHandle), default(EffectId), request.Sequence, provenanceId: request.ProvenanceId, ownerPlayerId: request.OwnerPlayerId), true)) Volatile.Write(ref _eventPublicationFailed, 1);
             if (isEnemy && kind == ResourceKind.CurrentHealth && _store.EnemyHealth[targetId] <= 0f)
             {
                 _store.QueueEnemyDeath(targetId, request.OwnerPlayerId, request.Sequence, request.Source);
-                if (!Events.TryPublish(new GameplayEvent(GameplayEventType.DeathQueued, request.Source, request.Target, request.Sequence), true)) Volatile.Write(ref _eventPublicationFailed, 1);
+                if (!Events.TryPublish(new GameplayEvent(GameplayEventType.DeathQueued, request.Source, request.Target, request.Sequence, ownerPlayerId: request.OwnerPlayerId), true)) Volatile.Write(ref _eventPublicationFailed, 1);
             }
             return new ResourceApplyResult(true, applied, ResourceRejectionReason.None);
         }
@@ -164,14 +175,14 @@ namespace BattleSystemECS.Core.GAS
         {
             if (!Valid(playerId) || ownerPlayerId < 0 || ownerPlayerId >= ComponentStore.MAX_PLAYERS || !Finite(delta)) return 0f;
             float applied = ApplyGold(playerId, delta);
-            PublishResourceFact(new GameplayEvent(GameplayEventType.ResourceChanged, source, _store.GetEntityHandle(playerId), sequence));
+            PublishResourceFact(new GameplayEvent(GameplayEventType.ResourceChanged, source, _store.GetEntityHandle(playerId), sequence, ownerPlayerId: ownerPlayerId));
             return applied;
         }
         internal float ApplyLifecycleMana(int playerId, float delta, EntityHandle source, long sequence, int ownerPlayerId)
         {
             if (!Valid(playerId) || ownerPlayerId < 0 || ownerPlayerId >= ComponentStore.MAX_PLAYERS || !Finite(delta)) return 0f;
             float applied = ApplyMana(playerId, delta);
-            PublishResourceFact(new GameplayEvent(GameplayEventType.ResourceChanged, source, _store.GetEntityHandle(playerId), sequence));
+            PublishResourceFact(new GameplayEvent(GameplayEventType.ResourceChanged, source, _store.GetEntityHandle(playerId), sequence, ownerPlayerId: ownerPlayerId));
             return applied;
         }
         private void PublishResourceFact(GameplayEvent fact)

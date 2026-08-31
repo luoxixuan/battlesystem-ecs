@@ -504,6 +504,11 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         {
             if (entityId < 0 || entityId >= MAX_PLAYERS) return;
 
+            // Bug 回归：同一玩家槽位重初始化时，先回收旧 typed/trigger 状态，避免代数复用泄漏。
+            GameplayEffectsRuntime.CleanupEntity(entityId);
+            GameplayTriggersRuntime.CleanupEntity(entityId);
+            RemoveAllGameplayEffects(entityId);
+
             // Players use the same handle contract as other entities. Reinitializing a
             // player slot starts a fresh identity and makes it resolvable by resource APIs.
             _entityGenerations[entityId] = _entityGenerations[entityId] == 0 ? 1 : NextGeneration(_entityGenerations[entityId]);

@@ -61,6 +61,7 @@ namespace BattleSystemECS.Core.GAS
     public readonly struct AttributeModifierHandle : IEquatable<AttributeModifierHandle>
     {
         internal readonly long Id; internal AttributeModifierHandle(long id) { Id = id; }
+        public bool IsValid => Id > 0;
         public bool Equals(AttributeModifierHandle other) => Id == other.Id;
         public override bool Equals(object obj) => obj is AttributeModifierHandle other && Equals(other);
         public override int GetHashCode() => Id.GetHashCode();

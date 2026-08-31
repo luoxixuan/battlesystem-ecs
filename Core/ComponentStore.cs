@@ -538,7 +538,7 @@ namespace BattleSystemECS.Core
                 // KillConfirmed 仅在奖励、生命周期回调、塔击杀经验和销毁完成后发布；保留致死命中的旧代句柄。
                 bool killPublished = DamageResolver.Events.TryPublish(new GameplayEvent(
                     GameplayEventType.KillConfirmed, oldSource, oldTarget,
-                    killSequence), true);
+                    killSequence, ownerPlayerId: playerId), true);
                 DamageResolver.MarkEventPublicationFailure(!killPublished);
             }
             _deathQueue[writeIdx].Clear();
@@ -549,6 +549,8 @@ namespace BattleSystemECS.Core
         {
             ResourceResolver = new GAS.ResourceResolver(this);
             DamageResolver = new GAS.DamageResolver(this);
+            GameplayEffectsRuntime = new GAS.GameplayEffectRuntime(this);
+            GameplayTriggersRuntime = new GAS.GameplayTriggerRuntime(this, GameplayEffectsRuntime);
             // Initialize ping-pong death queue buffers
             _deathQueue[0] = new ConcurrentBag<DeathEntry>();
             _deathQueue[1] = new ConcurrentBag<DeathEntry>();
@@ -665,7 +667,6 @@ namespace BattleSystemECS.Core
             int rtType = wasTower ? (int)TowerType[entityId] : -1;
 
             // ── Phase 2: shared state cleanup ─────────────────────────────────────
-            PositionActive[entityId] = false;
             // GAS slot counts must be zeroed here (not only in ResetPlayerAbilities): entity
             // IDs are recycled through freeEntityIds, so a non-zero count would let the next
             // occupant of this ID inherit the previous one's active effects (SourceEntityId
@@ -676,7 +677,10 @@ namespace BattleSystemECS.Core
             // Note: the ActiveEffectCount half is what actually fires; the AbilityCount half is
             // defense-in-depth, since AddAbility's only production caller targets playerId and
             // player ids (0..MAX_PLAYERS) never enter freeEntityIds.
+            GameplayEffectsRuntime.CleanupEntity(entityId);
+            GameplayTriggersRuntime.CleanupEntity(entityId);
             RemoveAllGameplayEffects(entityId);
+            PositionActive[entityId] = false;
             AbilityCount[entityId] = 0;
             // H-1 fix: lock around dictionary removal (thread-safe)
             lock (entityNamesLock)

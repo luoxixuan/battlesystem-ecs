@@ -37,8 +37,11 @@ namespace BattleSystemECS.Core.GAS
                 foreach (var effect in catalog.Effects)
                 {
                     if (!effectIds.Add(effect.Id.Value)) throw new CatalogValidationException($"{path}: duplicate effect id {effect.Id.Value}");
-                    if (effect.Duration < 0 || effect.Period < 0 || effect.MaxStacks < 1) throw new CatalogValidationException($"{path}: invalid duration/period/stack for effect {effect.Id.Value}");
-                    if (effect.Type == EffectType.Periodic && effect.Period <= 0) throw new CatalogValidationException($"{path}: periodic effect {effect.Id.Value} requires period > 0");
+                    if (float.IsNaN(effect.Duration) || float.IsInfinity(effect.Duration) || float.IsNaN(effect.Period) || float.IsInfinity(effect.Period) || effect.Duration < 0 || effect.Period < 0 || effect.MaxStacks < 1) throw new CatalogValidationException($"{path}: invalid duration/period/stack for effect {effect.Id.Value}");
+                    if (effect.Type == EffectType.Periodic && (effect.Period <= 0 || effect.Duration <= 0)) throw new CatalogValidationException($"{path}: periodic effect {effect.Id.Value} requires finite duration and period > 0");
+                    if (effect.Type == EffectType.Instant && effect.DurationPolicy != DurationPolicy.Instant) throw new CatalogValidationException($"{path}: instant effect {effect.Id.Value} has incompatible duration policy");
+                    if (effect.Type == EffectType.Duration && (effect.DurationPolicy != DurationPolicy.Duration && effect.DurationPolicy != DurationPolicy.Infinite || effect.Periodic.HasValue)) throw new CatalogValidationException($"{path}: duration effect {effect.Id.Value} has incompatible duration policy/spec");
+                    if (effect.Type == EffectType.Periodic && (effect.DurationPolicy != DurationPolicy.Duration || !effect.Periodic.HasValue)) throw new CatalogValidationException($"{path}: periodic effect {effect.Id.Value} has incompatible duration policy/spec");
                     if (!Enum.IsDefined(typeof(ClockId), effect.Clock) || effect.Clock == ClockId.Invalid) throw new CatalogValidationException($"{path}: invalid clock for effect {effect.Id.Value}");
                     if (!CatalogRegistries.TryTag(effect.Tag)) throw new CatalogValidationException($"{path}: effect {effect.Id.Value} has unregistered tag");
                     foreach (var execution in effect.Executions) if ((uint)execution.Value >= (uint)catalog.Executions.Count) throw new CatalogValidationException($"{path}: effect {effect.Id.Value} references missing execution {execution.Value}");
@@ -52,6 +55,7 @@ namespace BattleSystemECS.Core.GAS
                 if ((uint)trigger.Id.Value >= (uint)catalog.Triggers.Count || catalog.Triggers[trigger.Id.Value].Id.Value != trigger.Id.Value) throw new CatalogValidationException($"{path}: trigger {trigger.Id.Value} is not contiguous");
                 if ((uint)trigger.Effect.Value >= (uint)catalog.Effects.Count) throw new CatalogValidationException($"{path}: trigger {trigger.Id.Value} references missing effect {trigger.Effect.Value}");
                 if (!CatalogRegistries.TryConsumer(trigger.Consumer)) throw new CatalogValidationException($"{path}: trigger {trigger.Id.Value} has unregistered consumer");
+                if (trigger.Threshold <= 0 || trigger.EffectStackDelta <= 0) throw new CatalogValidationException($"{path}: trigger {trigger.Id.Value} requires positive threshold and effect stack delta");
                 foreach (var tag in trigger.FilterTags) if (!CatalogRegistries.TryTag(tag)) throw new CatalogValidationException($"{path}: trigger {trigger.Id.Value} has unregistered filter tag");
             }
             if (catalog.Executions != null) for (int i = 0; i < catalog.Executions.Count; i++)

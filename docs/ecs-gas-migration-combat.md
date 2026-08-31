@@ -168,7 +168,7 @@ M3 不立即删除全部旧 drain loop。某个来源只有在 100% 切流、真
 - `AbilityState`、`TriggerState`、Tag contribution、Modifier handle 的生命周期管理；
 - `EffectCommit`、`EffectTick`、`EffectExpire`、`GameplayEventCommit` 节点；
 - 固定的 `clockId`、首次 tick、catch-up、snapshot、叠层/刷新和 source death policy；
-- Instant effect 不占 active slot；Periodic effect 只产生 Damage/Resource/Gameplay Event request；
+- Instant effect 不占 active slot；Periodic runtime contract 已支持 Damage/Heal/Resource/GameplayEvent 四类 dispatch；
 - 单帧提交轮次、事件数量、池容量和递归深度上限。
 
 `GameplayEffectDefinition` 不保存 remaining time、当前 stack、tick accumulator 或当前 source/target 实例；这些字段只存在于 `ActiveGameplayEffect`。
@@ -193,7 +193,7 @@ M3 不立即删除全部旧 drain loop。某个来源只有在 100% 切流、真
 
 每类效果都要验证 apply → tick/aggregate → expire/remove → 资源/伤害 → 死亡清理完整链路。
 
-`Mark`/`DeathMark` 的类和部分 Registry 接线已经存在，但层数写入、增伤消费和 Trigger 事实链仍不完整；`HitTriggerSystem` 当前没有完整生产注册。不能把现有 getter 测试当成机制已启用。迁移时应以新的 `HitConfirmed`/`DamageApplied` Trigger + Effect 做真实垂直切片，并补 Registry 到 `FrameScheduler` 的集成测试；只有台账确认未注册的旧路径才标为 disabled。
+`Mark`/`DeathMark` 的类和部分 Registry 接线已经存在，但层数写入、增伤消费和 Trigger 事实链仍不完整；`SystemRegistry` 现在已注册默认 `HitConfirmed`/`PerSource`/`EveryN(10)` 垂直切片，并由 `FrameScheduler` 驱动。`HitTriggerSystem` 仍是 legacy EventBus 路径，不能把其 getter 测试当成新机制；未接入 typed Catalog 的其他 Trigger 仍标为 disabled。
 
 ### 2.5 旧 Buff/Effect 适配
 
@@ -230,6 +230,23 @@ M0 先用压力场景测量，再冻结初始上限；建议起始值为每帧�
 - `IBattleEventBus` 仍只接收 Presentation adapter 的已提交展示事件，不直接替代内部 Gameplay Event。
 
 补充 `OnHit_IsPublishedOnce_WithLegacyBridge`、`OnDamage_IsNotDoubleConsumed` 和 `PresentationBus_DoesNotActivateGameplayRule` 测试，并在每个事件完成切流后把状态从 `Bridge` 改为 `GameplayOnly`。
+
+当前实现台账：`GameplayEffectRuntime` 已成为 typed effect 的 apply/remove/expire owner，`ActiveGameplayEffectStore` 持有 generation-safe runtime；`GameplayTriggerRuntime` 只读取 Resolver 队列并以 `(type, sequence, source, target)` 去重。Trigger 链式结果保留在 `NextEvents`，事件上限为 8192，超限发布 `GameplayLoopAborted`。`FrameScheduler.ConfigureGameplayRuntime` 提供真实入口；默认 scheduler 不注入完整 Catalog，但 `SystemRegistry` 会显式注册 9001 连击 runtime effect，现有 `HitTriggerSystem` 与旧 `EventBus` 其余内容仍为 `LegacyOnly`，没有宣称完成切流；旧 `BuffSystem` 仅继续推进未切流的 legacy projection，`RuntimeOwned` effect 不再由其计时。
+M6 延后边界：完整 typed Catalog 接管、源/目标 tag state、Transfer source-death policy 和内容配置编译仍未切流；本阶段只实现 event-tag seam，并对未支持的 tag filter 明确拒绝。
+
+本轮 M4 契约复核补充：`GameplayEffectRuntime` 是 `RuntimeOwned` effect 的唯一 timer/damage owner；legacy `BuffSystem` 仅推进未标记的兼容 projection。Periodic runtime 已按四类 payload dispatch，Trigger 的 effect-tag 即使没有 filter-tags 也必须匹配。`SourceDeathPolicy.Persist` 的 RuntimeOwned tick 可通过 `AllowMissingSource` 使用 target 代理索引结算，事件仍保留 stale source；其他请求默认拒绝。完整生产内容/Catalog 接管、Transfer/反射 source-death 语义和 legacy Trigger/DoT 删除继续延后至 M6/M7，未宣称完成切流。
+效果注册入口会 fail-fast 拒绝负 ID、非 Constant MagnitudeSource 及非法 Periodic 数值，并发布可观察拒绝诊断；zero-based 的 ID=0 合法。兼容构造器仅负责旧数据映射，不再静默修正坏定义。
+容器边界：Runtime 的 active entity 列表按申请/移除维护且固定容量受实体上限约束；Trigger 的 counters/seen/definitions/reset 目前使用预分配稀疏字典/集合，满载会拒绝并发布诊断，但 Consume 仍可能触发哈希查询。迁移为固定容量值类型开放寻址表属于后续性能债务，需单独基准验证。
+
+Runtime 事件队列在 `FrameScheduler` 每帧边界显式 `ResetFrame`，不会跨长局累积；modifier capacity 和 effect-definition capacity 在写入前拒绝，并通过 `EffectRejected`/诊断计数保持可观察。
+
+Periodic payload runtime 已按 Damage、Heal、Resource、GameplayEvent 分派：Heal 走独立 `HealRequest` 语义，Resource 必须使用已注册资源键且不能伪装 CurrentHealth，四个运行时 clock（Combat/Enemy/RealTime/Global）由实例定义驱动。轮次、seen、counter 和 definition 容量超限统一发布 `GameplayLoopAborted` 并保留 durable abort 诊断；完整生产内容/Catalog 接管、Transfer/反射和 legacy owner 清理仍延后至 M6/M7。
+
+当前 Periodic `MagnitudeSource` 仅支持 `Constant`；Attribute/Multiplier/Execution 求值留待后续 Catalog/Execution 迁移，注册时 fail-fast 并发布拒绝诊断，不以零 magnitude 静默降级。Runtime.Events 默认容量为 8192，也可通过构造参数覆盖；容量耗尽会进入独立 abort 诊断队列并保留拒绝计数。
+
+Runtime/Trigger 的字典按固定容量预分配；ActiveGameplayEffect sparse pool 只在 apply/remove/expire 等非遍历热路径使用，容量耗尽和状态更新失败均保留计数与拒绝事实。ActiveGameplayEffect 使用 `TickAccumulator` 表达 next-tick 时间，不另存未维护的 `NextTickTime` 字段。
+
+Trigger 消费采用固定输入快照，链式事件保留至下一轮；`SkipMissed` 每个周期最多补发一次并清除欠账。`KillConfirmed` 的 stale target 仅在 Source 目标策略下允许继续，ResourceResolver 的 Heal/Shield/Resource 事实在 GameplayResolve 与 PostDeath 边界消费；完整 Catalog、Transfer/反射及旧 owner 清理仍延后至 M6/M7。
 
 ### 2.7 M4 退出门槛
 
@@ -286,3 +303,15 @@ mode 5 不得伪造为通过，也不因该债务删除或改写历史日志；�
 - Reflect/Transfer 作为未迁移语义仍被 Resolver 明确拒绝并返回 `UnsupportedFlags`；Reflect 系统产生的可迁移真伤继续构造普通 `DamageRequest`，未发生静默降级。
 - 新增 stale generation、未消费 deferred queue 和缺失 owner 的 golden 覆盖；全量测试计数以实际门禁输出为准。
 - 本轮门禁单轮性能记录：mode 2 = 36816 FPS、mode 4 = 9222 FPS；mode 5 = 5848 FPS，仅作性能债务观测，不替代历史多轮基线。
+
+### 4.3 M4 最终验收记录（2026-08-31）
+
+本节只记录本次提交前的实际复测；上面的 1428/1428、历史五轮和单轮数据保留为历史快照，不作为本次结果。全量 xUnit 为 **1467/1467**，静态规则扫描 1342 个测试方法、0 违规，Core build 0 warning/0 error，EXE build 0 error（仅既有 net6.0 EOL warning），`git diff --check` 通过。
+
+| 模式 | 本次 Release FPS | 结论 |
+| --- | --- | --- |
+| mode 2 | 23444 / 23081 / 20807 | 通过硬门禁 |
+| mode 4 | 5141 / 5513 / 4415 | 取中位数 5141，未超过相对基线 5% 回退 |
+| mode 5 | 3292（5/5 关卡 Victory） | 按用户决定仅登记观察债务，不阻塞 M4 |
+
+本阶段已知未切流项：Trigger 的稀疏 `Dictionary/HashSet` 将在 M8 性能工作包替换为固定容量值类型表；完整 typed Catalog、Transfer/Reflect source-death 语义和 legacy owner 清理继续留在 M6/M7。该债务不改变本阶段已验证的 Effect/Trigger 生命周期合同。

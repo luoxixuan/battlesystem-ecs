@@ -38,6 +38,23 @@ namespace BattleSystemECS.Core.GAS
             Sort(comparison); return true;
         }
         public void Clear() { Array.Clear(_items, 0, _count); _count = 0; LastRejection = CommandRejection.None; }
+        public void RemovePrefix(int count)
+        {
+            if (count <= 0) return;
+            if (count >= _count) { Clear(); return; }
+            int remaining = _count - count;
+            Array.Copy(_items, count, _items, 0, remaining);
+            Array.Clear(_items, remaining, count);
+            _count = remaining;
+        }
+        public void RemoveAt(int index)
+        {
+            if (index < 0 || index >= _count) return;
+            int remaining = _count - index - 1;
+            if (remaining > 0) Array.Copy(_items, index + 1, _items, index, remaining);
+            _items[_count - 1] = default(T);
+            _count--;
+        }
         public void ResetOverflowCount() { OverflowCount = 0; }
     }
 

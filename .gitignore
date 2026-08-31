@@ -61,3 +61,7 @@ Data/Saves/checkpoint.json
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 graft/
+
+# 本地门禁/压测输出（可重建，不纳入提交；测试失败时可能包含大型 dump）
+artifacts/
+**/TestResults/

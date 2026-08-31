@@ -12,6 +12,8 @@ namespace BattleSystemECS.Core.GAS
         public void Sort(System.Comparison<GameplayEvent> comparison) => _buffer.Sort(comparison);
         public bool TryMerge(GameplayEventQueue source, System.Comparison<GameplayEvent> comparison, bool critical = false) { if (source == null) throw new System.ArgumentNullException(nameof(source)); return _buffer.TryMerge(source._buffer, comparison, critical); }
         public void Clear() => _buffer.Clear();
+        public void RemovePrefix(int count) => _buffer.RemovePrefix(count);
+        public void RemoveAt(int index) => _buffer.RemoveAt(index);
         public void ResetDiagnostics() => _buffer.ResetOverflowCount();
     }
 }
