@@ -120,6 +120,55 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
+        // Bug 回归：已有 stack-key 的 refresh/stack 复用必须回写有效的 out handle，并保持层数语义。
+        // EffectId/TagId 使用本测试隔离注入值，避免依赖生产 Catalog 内容。
+        public void ReapplyingExistingStackKeyReturnsExistingEffectHandle()
+        {
+            var store = new ComponentStore();
+            int source = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            int target = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            var sourceHandle = store.GetEntityHandle(source);
+            var targetHandle = store.GetEntityHandle(target);
+
+            var refresh = new GameplayEffectDefinition(new EffectId(880), EffectType.Duration,
+                Array.Empty<ModifierDefinition>(), 2f, 0f, ClockId.Combat,
+                StackingBehavior.DurationRefresh, 1, RefreshPolicy.Duration,
+                SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent,
+                default(TagId), Array.Empty<ExecutionId>(), stackKey: new TagId(881));
+            Assert.True(store.GameplayEffectsRuntime.TryApply(refresh.Id, refresh, sourceHandle, targetHandle,
+                out var first, ownerPlayerId: 0));
+            Assert.True(first.IsValid);
+            Assert.True(store.GameplayEffects.TryGet(first, out var initialRuntime, out _, out _));
+            Assert.Equal(2f, initialRuntime.RemainingTime, 3);
+            store.GameplayEffectsRuntime.Tick(0.5f, ClockId.Combat);
+            Assert.True(store.GameplayEffects.TryGet(first, out var tickedRuntime, out _, out _));
+            Assert.Equal(1.5f, tickedRuntime.RemainingTime, 3);
+            Assert.True(store.GameplayEffectsRuntime.TryApply(refresh.Id, refresh, sourceHandle, targetHandle,
+                out var refreshed, ownerPlayerId: 0));
+            Assert.Equal(first, refreshed);
+            Assert.True(refreshed.IsValid);
+            Assert.True(store.GameplayEffects.TryGet(refreshed, out var refreshedRuntime, out _, out _));
+            Assert.Equal(2f, refreshedRuntime.RemainingTime, 3);
+
+            var stacked = new GameplayEffectDefinition(new EffectId(882), EffectType.Duration,
+                Array.Empty<ModifierDefinition>(), 2f, 0f, ClockId.Combat,
+                StackingBehavior.MaxStacksRefresh, 3, RefreshPolicy.StacksAndDuration,
+                SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent,
+                default(TagId), Array.Empty<ExecutionId>(), stackKey: new TagId(883));
+            Assert.True(store.GameplayEffectsRuntime.TryApply(stacked.Id, stacked, sourceHandle, targetHandle,
+                out var stackFirst, ownerPlayerId: 0));
+            Assert.True(stackFirst.IsValid);
+            Assert.True(store.GameplayEffects.TryGet(stackFirst, out var firstStacked, out _, out _));
+            Assert.Equal(1, firstStacked.StackCount);
+            Assert.True(store.GameplayEffectsRuntime.TryApply(stacked.Id, stacked, sourceHandle, targetHandle,
+                out var stackUpdated, stackDelta: 1, ownerPlayerId: 0));
+            Assert.Equal(stackFirst, stackUpdated);
+            Assert.True(stackUpdated.IsValid);
+            Assert.True(store.GameplayEffects.TryGet(stackUpdated, out var updatedStacked, out _, out _));
+            Assert.Equal(2, updatedStacked.StackCount);
+        }
+
+        [Fact]
         public void SourceDeathRemovePolicyClearsEffectBeforeNextTick()
         {
             var store = new ComponentStore(); int source = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1); int target = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1); var def = new GameplayEffectDefinition(new EffectId(79), EffectType.Periodic, Array.Empty<ModifierDefinition>(), 4f, 1f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None, SourceDeathPolicy.Remove, EffectPayloadKind.Damage, default(TagId), Array.Empty<ExecutionId>(), periodicMagnitude: 1f); Assert.True(store.GameplayEffectsRuntime.TryApply(def.Id, def, store.GetEntityHandle(source), store.GetEntityHandle(target), out _, ownerPlayerId: 0)); store.DestroyEntity(source); store.GameplayEffectsRuntime.Tick(1f, ClockId.Combat); Assert.Equal(0, store.GetEffectCount(target));

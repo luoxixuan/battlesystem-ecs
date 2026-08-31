@@ -290,11 +290,11 @@ M4 不删除旧 `GameplayEffectDef`、旧 timer 或旧 Trigger 代码。对应 E
 
 mode 5 不得伪造为通过，也不因该债务删除或改写历史日志；待后续稳定观察/专门性能阶段再处理。
 
-### 4.1 本次语义收口复测
+### 4.1 历史语义收口复测记录
 
-本次工作树复测（2026-08-31，构建产物未改阈值）：mode 2 五轮为 49295 / 46601 / 48944 / 42434 / 49940 FPS；mode 4 五轮为 10088 / 10123 / 10424 / 10019 / 10292 FPS。mode 5 按用户决定只执行一轮，结果为 7137 FPS（5/5 关卡胜利）；该单轮结果不能替代历史五轮基线，mode 5 性能债务继续保留。
+本机历史执行记录（2026-08-31，构建产物未改阈值）：mode 2 五轮为 49295 / 46601 / 48944 / 42434 / 49940 FPS；mode 4 五轮为 10088 / 10123 / 10424 / 10019 / 10292 FPS。mode 5 按用户决定只执行一轮，结果为 7137 FPS（5/5 关卡胜利）；该单轮结果不能替代历史五轮基线，mode 5 性能债务继续保留。
 
-### 4.2 生命周期与请求边界复核（2026-08-31）
+### 4.2 生命周期与请求边界历史复核（2026-08-31）
 
 - `KillConfirmed` 由唯一 `ResolveEnemiesKilledThisFrame` 路径在奖励、生命周期回调、塔击杀结算和 `DestroyEntity` 完成后发布；事件保留死亡队列中的旧 source/target generation handle。
 - `DamageResolver` 的 validated adapter 仍解析完整 `index + generation + active` handle；stale handle 即使索引复用也会拒绝。
@@ -304,14 +304,40 @@ mode 5 不得伪造为通过，也不因该债务删除或改写历史日志；�
 - 新增 stale generation、未消费 deferred queue 和缺失 owner 的 golden 覆盖；全量测试计数以实际门禁输出为准。
 - 本轮门禁单轮性能记录：mode 2 = 36816 FPS、mode 4 = 9222 FPS；mode 5 = 5848 FPS，仅作性能债务观测，不替代历史多轮基线。
 
-### 4.3 M4 最终验收记录（2026-08-31）
+### 4.3 M4 历史验收快照（不可复核）
 
-本节只记录本次提交前的实际复测；上面的 1428/1428、历史五轮和单轮数据保留为历史快照，不作为本次结果。全量 xUnit 为 **1467/1467**，静态规则扫描 1342 个测试方法、0 违规，Core build 0 warning/0 error，EXE build 0 error（仅既有 net6.0 EOL warning），`git diff --check` 通过。
+本节整段仅保留历史快照，不是当前结果或退出证据。引用的 benchmark artifact 在当前工作树不可定位，故其中的 mode2/4/5 数值不可复现；监督复核曾指出 mode4 约回退 33%、mode5 约回退 55%，这些历史结论不得与 4.5 的当前审计样本混用。
 
-| 模式 | 本次 Release FPS | 结论 |
+| 模式 | 历史记录（不可复核） | 备注 |
 | --- | --- | --- |
-| mode 2 | 23444 / 23081 / 20807 | 通过硬门禁 |
-| mode 4 | 5141 / 5513 / 4415 | 取中位数 5141，未超过相对基线 5% 回退 |
-| mode 5 | 3292（5/5 关卡 Victory） | 按用户决定仅登记观察债务，不阻塞 M4 |
+| mode 2 | 23444 / 23081 / 20807 | 历史快照，不判定门禁 |
+| mode 4 | 5141 / 5513 / 4415（历史快照，不可复现） | 监督记录约回退 33%，但不可据此判定当前闸门 |
+| mode 5 | 3292（5/5 关卡 Victory，历史快照） | 按用户决定仅登记观察债务，不阻塞本轮语义修补 |
 
-本阶段已知未切流项：Trigger 的稀疏 `Dictionary/HashSet` 将在 M8 性能工作包替换为固定容量值类型表；完整 typed Catalog、Transfer/Reflect source-death 语义和 legacy owner 清理继续留在 M6/M7。该债务不改变本阶段已验证的 Effect/Trigger 生命周期合同。
+本阶段已知未切流项：Trigger 的稀疏 `Dictionary/HashSet` 将在 M8 性能工作包替换为固定容量值类型表；完整 typed Catalog、Transfer/Reflect source-death 语义和 legacy owner 清理继续留在 M6/M7，不能在 M4 退出时虚报完成。该债务不改变本阶段已验证的 Effect/Trigger 生命周期合同；语义测试通过，但性能连续样本仍需满足统一 ±5% 闸门并完成双轴 Standards/Spec 复审后才能宣称 M4 退出。
+
+### 4.4 本机门禁执行记录（2026-08-31）
+
+文档引用的旧 `artifacts/benchmark-final-20260831.log` 在本工作树不可定位，不能用来复现上节历史数值。相对计算统一采用 [ecs-gas-m0-baseline.md](ecs-gas-m0-baseline.md) 的最新 M0 复跑基线（mode2 `14953`、mode4 `7699`、mode5 `7342`）。先按门禁顺序执行 `dotnet build BattleSystemECS.Core`，再执行 `dotnet build BattleSystemECS.csproj`，随后使用同一 Debug 构建产物和默认 `game_config.json` 配置运行：
+
+```text
+cmd /c "echo 2|dotnet run --no-build --project BattleSystemECS.csproj"  -> mode 2: 39946 / 41585 / 41801 FPS (median 41585)
+cmd /c "echo 4|dotnet run --no-build --project BattleSystemECS.csproj"  -> mode 4: 9027 / 8024 / 7253 FPS (median 8024)
+dotnet run --no-build --project BattleSystemECS.csproj -- 5              -> mode 5: 1509 FPS, 5/5 Victory
+```
+
+相对统一 M0 基线的计算为：mode2 `(41585 - 14953) / 14953 = +178.10%`，mode4 `(8024 - 7699) / 7699 = +4.22%`，mode5 `(1509 - 7342) / 7342 = -79.45%`。这些先前结果没有形成可审计的连续样本；mode5 按用户豁免登记为观察债务，不阻塞本轮，也不等于规范门禁通过。独立 Standards 复跑 mode4 `8048 / 6076 / 7864`（median `7864`，`+2.14%`）也不足以证明稳定。旧 5141 数值及其约 -33% 的监督差异仅作为不可复核历史保留，不得与当前结论混用。
+
+原始临时日志还保留了 build 后 mode2 首轮 `5163 FPS` 的异常低值；随后连续三轮为 `39946 / 41585 / 41801`，因此采用连续稳定三轮的中位数而非单次幸运值。该波动说明压测仍受运行环境影响，后续比较必须继续使用同一构建、配置和多轮中位数。
+
+### 4.5 dirty working-tree 执行记录（2026-08-31）
+
+以下结果是 dirty working-tree 执行记录：结果对象为 `HEAD=e0bb4f4d2439c8773f4823a03ce2d87b62512429` 加 3 个未提交文件：`Core/GAS/GameplayRuntime.cs`、`BattleSystemECS.Tests/Framework/GameplayRuntimeTests.cs`、`docs/ecs-gas-migration-combat.md`。DLL 在这些源码改动存在时重新构建，故包含前两个代码文件的未提交改动；文档文件不进入 DLL。默认 `game_config.json` SHA-256 为 `CF235A2627E0D0513717350161A2BD40ACC1E9AA913E141A1CB5585E41CAC978`，`.NET SDK 9.0.311`，`bin/Debug/net6.0/BattleSystemECS.dll` SHA-256 为 `B39DA88249A69E7CC5DAA046BD5E27903B752864E9FA874EB3D9C6F4F3E29416`。顺序为 `dotnet build BattleSystemECS.Core` → `dotnet build BattleSystemECS.csproj`；每个模式先预热 1 次，再连续测量（mode5 按豁免测量 1 次）。完整原始输出仅作为执行机器的临时本地附录，提交后不可独立复核：`C:\Users\ADMINI~1\AppData\Local\Temp\battlesystem-ecs-audit-20260831.log`。
+
+```text
+cmd /c "echo 2|dotnet run --no-build --project BattleSystemECS.csproj"  # warmup 46109; measured 40792, 46561, 42000, 37433, 45214
+cmd /c "echo 4|dotnet run --no-build --project BattleSystemECS.csproj"  # warmup 8914; measured 9488, 9183, 8262, 9599, 9639
+dotnet run --no-build --project BattleSystemECS.csproj -- 5              # measured 6299 FPS, 5/5 Victory
+```
+
+统计规则：丢弃每个模式的预热值，五次测量取中位数；spread 为 `(max-min)/median`。相对 [M0 基线](ecs-gas-m0-baseline.md)（mode2 `14953`、mode4 `7699`、mode5 `7342`）分别为：mode2 median `42000`，`+180.88%`，spread `21.74%`；mode4 median `9488`，`+23.24%`，spread `14.51%`；mode5 `6299`，`-14.21%`，按用户豁免保留为观察债务，不等于规范通过。按 plan/AGENTS 已定义的硬门禁，mode2/mode4 的相对基线中位数及逐轮结果均未出现超过 5% 的回退；spread 本身没有被定义为硬失败阈值，现作为可审计性/稳定性观察债务记录。mode4 的运行环境波动仍需后续稳定观察，不能仅凭单次结果或 spread 宣称性能改善。

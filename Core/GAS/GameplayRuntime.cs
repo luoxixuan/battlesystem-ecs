@@ -50,6 +50,7 @@ namespace BattleSystemECS.Core.GAS
                 if (definition.Stacking == StackingBehavior.None || definition.Stacking == StackingBehavior.DurationRefresh)
                 {
                     if (definition.Refresh != RefreshPolicy.None) { RefreshRuntime(ref existing, definition); if (!UpdateActive(target, existing)) return false; }
+                    handle = existing.Handle;
                     Publish(new GameplayEvent(GameplayEventType.EffectApplied, source, target, existing.Handle, id, DamageFlags.None, _store.AllocateGameplaySequence(targetId), tag: definition.Tag, ownerPlayerId: ownerPlayerId));
                     return true;
                 }
@@ -70,6 +71,7 @@ namespace BattleSystemECS.Core.GAS
                 }
                 if (definition.Refresh == RefreshPolicy.StacksAndDuration || definition.Stacking == StackingBehavior.MaxStacksRefresh) RefreshRuntime(ref existing, definition);
                 if (!UpdateActive(target, existing)) return false;
+                handle = existing.Handle;
                 Publish(new GameplayEvent(GameplayEventType.EffectApplied, source, target, existing.Handle, id, DamageFlags.None, _store.AllocateGameplaySequence(targetId), tag: definition.Tag, ownerPlayerId: ownerPlayerId));
                 return true;
             }
