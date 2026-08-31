@@ -39,6 +39,8 @@ namespace BattleSystemECS.Systems
         // the queue stage would require duplicating the apply pass for no behavioral gain.
         private readonly ConcurrentBag<ReflectEvent>[] _reflectQueue = new ConcurrentBag<ReflectEvent>[2];
         private int _queueIdx = 0;
+        public int RejectedReflectCount { get; private set; }
+        public Core.GAS.DamageRejectionReason LastReflectRejection { get; private set; }
 
         public ReflectTowerSystem(ComponentStore store, int playerId)
         {
@@ -72,7 +74,11 @@ namespace BattleSystemECS.Systems
             {
                 TowerId = towerId,
                 AttackingEnemyId = attackingEnemyId,
-                ReflectDamage = reflectDamage
+                ReflectDamage = reflectDamage,
+                ParentSequence = store.AllocateGameplaySequence(attackingEnemyId),
+                SourceHandle = store.GetEntityHandle(towerId),
+                ProvenanceId = store.CurrentFrame,
+                ProvenanceDepth = 1
             });
         }
 
@@ -100,7 +106,9 @@ namespace BattleSystemECS.Systems
             {
                 TowerId = towerId,
                 AttackingEnemyId = attackingEnemyId,
-                ReflectDamage = damage
+                ReflectDamage = damage,
+                ParentSequence = store.AllocateGameplaySequence(attackingEnemyId),
+                SourceHandle = store.GetEntityHandle(towerId)
             });
         }
 
@@ -158,7 +166,11 @@ namespace BattleSystemECS.Systems
                         {
                             TowerId = nearbyId,
                             AttackingEnemyId = evt.AttackingEnemyId,
-                            ReflectDamage = reflectDamage
+                            ReflectDamage = reflectDamage,
+                            ParentSequence = evt.ParentSequence,
+                            SourceHandle = store.GetEntityHandle(nearbyId),
+                            ProvenanceId = evt.ProvenanceId,
+                            ProvenanceDepth = evt.ProvenanceDepth + 1
                         });
                 }
             }
@@ -181,10 +193,13 @@ namespace BattleSystemECS.Systems
                 if (!store.EnemyActive[enemyId]) continue;
 
                 float dmg = evt.ReflectDamage;
-                store.EnemyHealth[enemyId] -= dmg;
-
-                if (store.EnemyHealth[enemyId] <= 0f)
-                    store.QueueEnemyDeath(enemyId, playerId);
+                var source = evt.SourceHandle.IsValid ? evt.SourceHandle : store.GetEntityHandle(evt.TowerId);
+                var target = store.GetEntityHandle(enemyId);
+                if (source.IsValid && target.IsValid)
+                {
+                    var result = store.DamageResolver.TryApply(new Core.GAS.DamageRequest(source, target, dmg, Components.DamageType.True, Components.ElementType.None, Core.GAS.DamageFlags.Reflect, Core.GAS.DamageAmountStage.Raw, Core.GAS.DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(enemyId), parentSequence: evt.ParentSequence, ownerPlayerId: playerId, provenanceId: evt.ProvenanceId, provenanceDepth: evt.ProvenanceDepth));
+                    if (!result.Accepted) { RejectedReflectCount++; LastReflectRejection = result.Reason; }
+                }
             }
         }
 
@@ -193,6 +208,10 @@ namespace BattleSystemECS.Systems
             public int TowerId { get; init; }
             public int AttackingEnemyId { get; init; }
             public float ReflectDamage { get; init; }
+            public long ParentSequence { get; init; }
+            public Core.GAS.EntityHandle SourceHandle { get; init; }
+            public long ProvenanceId { get; init; }
+            public int ProvenanceDepth { get; init; }
         }
     }
 }

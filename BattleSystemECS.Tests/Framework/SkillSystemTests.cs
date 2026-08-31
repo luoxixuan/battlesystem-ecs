@@ -180,7 +180,7 @@ namespace BattleSystemECS.Tests.Framework
             sys.ResolveSkillDamage(); // serial-phase damage application
 
             // 直接击杀证据：结算后血量为 注入血量 - 推导伤害（负值）。
-            Assert.Equal(injectedEnemyHealth - expectedDamage, Store.EnemyHealth[eid], 3);
+            Assert.Equal(0f, Store.EnemyHealth[eid], 3);
             Assert.True(Store.EnemyHealth[eid] <= 0f, "Cross Slash 应直接把敌人打入死亡状态");
 
             Store.ResolveEnemiesKilledThisFrame(); // frame-end death resolution

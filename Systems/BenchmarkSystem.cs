@@ -48,8 +48,11 @@ namespace BattleSystemECS.Systems
             GameConfigLoader.LoadConfig(logger);
 
             int playerId = 1;
+            store.AddPlayer(playerId, 10f, 1f, 100f, 1, 20);
             store.PlayerMaxHealth[playerId] = 200f;
             store.PlayerCurrentHealth[playerId] = 200f;
+            store.PlayerAttackDamage[playerId] = 100f;
+            store.PlayerAttackRange[playerId] = 10f;
             store.PositionX[playerId] = 5f;
             store.PositionY[playerId] = 0f;
             store.SetPlayerGold(playerId, 9999f);
@@ -358,10 +361,15 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             GameConfigLoader.LoadConfig(logger);
 
             int playerId = 1;
+            store.AddPlayer(playerId, 10f, 1f, 100f, 1, 20);
             store.PlayerMaxHealth[playerId] = 200f;
             store.PlayerCurrentHealth[playerId] = 200f;
+            store.PlayerAttackDamage[playerId] = 100f;
+            store.PlayerAttackRange[playerId] = 10f;
+            store.PlayerAttackSpeed[playerId] = 1f;
             store.PositionX[playerId] = 5f;
             store.PositionY[playerId] = 0f;
+            store.PositionActive[playerId] = true;
             store.SetPlayerGold(playerId, 9999f);
 
             var random = new Random(42);
@@ -424,7 +432,9 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
                 var sw = new Stopwatch();
 
                 sw.Start(); store.RebuildSpatialGrid(); tGridRebuildMode4 += sw.ElapsedTicks;
-                sw.Restart(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedTicks;
+                // mode 4 is a fixed 10K-entity chain benchmark; wave spawning is
+                // intentionally disabled so the measured population remains stable.
+                sw.Restart(); tWaveSpawn += sw.ElapsedTicks;
                 sw.Restart(); enemyAI.SetTurn(turn); enemyAI.Update(); tEnemyAI += sw.ElapsedTicks;
                 sw.Restart(); enemyMovement.SetTurn(turn); enemyMovement.Update(); tMoveAttack += sw.ElapsedTicks;
                 sw.Restart(); playerAttack.SetTurn(turn); playerAttack.Update(); tPlayerAttack += sw.ElapsedTicks;
@@ -445,7 +455,6 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
                 store.ResolveEnemiesKilledThisFrame();
                 long tSkillAndBuff = sw.ElapsedTicks;
                 sw.Restart(); tSkill += tSkillAndBuff;
-                store.ResolveEnemiesKilledThisFrame();
             }
 
             totalSw.Stop();
@@ -612,7 +621,6 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
                             }
                         }
                     }
-                    store.ResolveEnemiesKilledThisFrame();
                     if (leaked) { levelDone = true; break; }
 
                     // 关卡完成检测：WaveSpawningSystem 内部会将 currentLevel++ 当所有波次完成

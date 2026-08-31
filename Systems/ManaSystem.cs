@@ -93,7 +93,7 @@ namespace BattleSystemECS.Systems
                 float current = store.PlayerMana[playerId];
                 float max = store.PlayerMaxMana[playerId];
                 float regenerated = regen * deltaTime;
-                store.PlayerMana[playerId] = Math.Min(current + regenerated, max);
+                store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), regenerated);
             }
         }
 
@@ -119,7 +119,7 @@ namespace BattleSystemECS.Systems
             float actualCost = baseCost * costMult;
             float current = store.PlayerMana[playerId];
             if (current < actualCost) return false;
-            store.PlayerMana[playerId] = current - actualCost;
+            store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), -actualCost);
             return true;
         }
 

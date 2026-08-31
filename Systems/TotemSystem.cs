@@ -283,7 +283,7 @@ namespace BattleSystemECS.Systems
             if (curHp >= maxHp) return; // already full
             float newHp = curHp + amount;
             if (newHp > maxHp) newHp = maxHp;
-            _store.PlayerCurrentHealth[ownerId] = newHp;
+            _store.ApplyPlayerResourceAuthority(ownerId, ownerId, new Core.GAS.AttributeKey(3), amount);
         }
 
         /// <summary>
@@ -299,7 +299,7 @@ namespace BattleSystemECS.Systems
             if (curMana >= maxMana) return; // already full
             float newMana = curMana + amount;
             if (newMana > maxMana) newMana = maxMana;
-            _store.PlayerMana[ownerId] = newMana;
+            _store.ApplyPlayerResourceAuthority(ownerId, ownerId, new Core.GAS.AttributeKey(7), amount);
         }
 
         /// <summary>
@@ -324,7 +324,7 @@ namespace BattleSystemECS.Systems
                 float curHp = _store.EnemyHealth[enemyId];
                 float newHp = curHp - damage;
                 if (newHp < 0f) newHp = 0f;
-                _store.EnemyHealth[enemyId] = newHp;
+                _store.ApplyDamageAuthority(_store.PlayerEntityId, enemyId, damage, 0, stage: Core.GAS.DamageAmountStage.Raw);
             }
         }
 

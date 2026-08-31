@@ -1,6 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
+using BattleSystemECS.Components;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -167,11 +169,10 @@ namespace BattleSystemECS.Systems
                 // Invulnerability check
                 if (store.EnemyIsInvulnerable[enemyId]) continue;
 
-                store.EnemyHealth[enemyId] -= damage;
-                if (store.EnemyHealth[enemyId] <= 0f)
-                {
-                    store.QueueEnemyDeath(enemyId, playerId);
-                }
+                var source = store.GetEntityHandle(store.PlayerEntityId);
+                var target = store.GetEntityHandle(enemyId);
+                if (!source.IsValid || !target.IsValid) continue;
+                store.DamageResolver.TryApply(new DamageRequest(source, target, damage, DamageType.True, ElementType.Ice, DamageFlags.None, DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(enemyId), ownerPlayerId: playerId));
             }
             _frostQueueCount = 0;
         }

@@ -1,6 +1,8 @@
 using System;
 using BattleSystemECS.Config;
 using BattleSystemECS.Core;
+using BattleSystemECS.Components;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -106,20 +108,15 @@ namespace BattleSystemECS.Systems
                 if (maxHp <= 0f) continue;
                 // Round 185: per-frame DoT = maxHp * dotPct * intensity * deltaTime.
                 float rawDmg = maxHp * scaledDotPct * deltaTime;
-                float dmg = _store.ClampDamageToHealthFloor(eid, rawDmg);
-                if (dmg <= 0f) continue;
-                _store.EnemyHealth[eid] -= dmg;
-                // Enqueue the death so ResolveEnemiesKilledThisFrame runs the death handlers
-                // (gold / score / slot release). There is no global "scan for HP<=0" sweeper,
-                // so without this the enemy sits at HP<=0 while still EnemyActive: it keeps
-                // walking (EnemyMovementSystem gates on EnemyActive only), cannot be killed
-                // again (every downstream `HP<=0 continue` guard skips it), and finally costs
-                // a base life at GameManager's leak check. Damage was already floor-clamped
-                // above, so no re-clamp here.
-                if (_store.EnemyHealth[eid] <= 0f)
-                {
-                    _store.QueueEnemyDeath(eid, playerId);
-                }
+                if (rawDmg <= 0f) continue;
+                var target = _store.GetEntityHandle(eid);
+                var source = _store.GetEntityHandle(_store.PlayerEntityId);
+                if (!source.IsValid) return;
+                _store.DamageResolver.TryApply(new Core.GAS.DamageRequest(source, target, rawDmg,
+                    DamageType.True, ElementType.None, DamageFlags.None, DamageAmountStage.Raw,
+                    DamageCommitBoundary.EarlyResolve,
+                    _store.AllocateGameplaySequence(eid),
+                    ownerPlayerId: playerId));
             }
         }
 

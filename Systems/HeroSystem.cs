@@ -3,6 +3,7 @@ using System;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -216,13 +217,12 @@ namespace BattleSystemECS.Systems
                 if (!store.EnemyActive[targetId]) continue;
                 
                 // Apply raw damage to enemy (no last-write-wins stacking)
-                store.EnemyHealth[targetId] -= damage;
-                
-                // Check for death
-                if (store.EnemyHealth[targetId] <= 0f)
-                {
-                    store.QueueEnemyDeath(targetId, playerId);
-                }
+                var source = store.GetEntityHandle(store.PlayerEntityId);
+                var target = store.GetEntityHandle(targetId);
+                if (source.IsValid)
+                    store.DamageResolver.TryApply(new Core.GAS.DamageRequest(source, target, damage, DamageType.True,
+                        ElementType.None, DamageFlags.None, DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve,
+                        store.AllocateGameplaySequence(targetId), ownerPlayerId: playerId));
             }
             
             // Clear queues

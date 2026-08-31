@@ -24,6 +24,9 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             int p0 = Store.CreateEntity();
             int p1 = Store.CreateEntity();
             int p2 = Store.CreateEntity();
+            Store.PositionActive[p0] = true;
+            Store.PositionActive[p1] = true;
+            Store.PositionActive[p2] = true;
             // Default state: all at full HP, MaxHealth=200, positioned on a horizontal line
             for (int i = 0; i < 10; i++)  // MAX_PLAYERS = 10
             {

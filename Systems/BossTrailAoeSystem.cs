@@ -148,7 +148,7 @@ namespace BattleSystemECS.Systems
                     float distSqP = dxp * dxp + dyp * dyp;
                     if (distSqP <= r2)
                     {
-                        store.PlayerCurrentHealth[playerId] -= evt.Damage;
+                        store.ApplyPlayerResourceAuthority(store.GetEntityHandle(evt.EnemyId).Index, playerId, new Core.GAS.AttributeKey(3), -evt.Damage);
                     }
 
                     // (b) Slow all active enemies within the trail radius (excluding self).

@@ -101,7 +101,7 @@ namespace BattleSystemECS.Systems
             if (option.GoldBonus > 0f)
             {
                 float newGold = store.PlayerGold[playerId] + option.GoldBonus;
-                store.PlayerGold[playerId] = newGold;
+                store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(4), option.GoldBonus);
                 renderer.Log($"[BRANCH] +{option.GoldBonus} gold bonus! New gold: {newGold:F0}");
             }
 

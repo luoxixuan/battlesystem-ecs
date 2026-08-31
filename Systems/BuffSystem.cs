@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Core.GAS;
 
@@ -20,7 +21,7 @@ namespace BattleSystemECS.Systems
         private IRenderer renderer;
 
         // Ping-pong double-buffer for enemy DoT damage queue
-        private List<(int enemyId, float damage)>[] _dotDamageQueue = new List<(int, float)>[2];
+        private List<(int enemyId, float damage, EntityHandle source, EffectId effect, long sequence)>[] _dotDamageQueue = new List<(int, float, EntityHandle, EffectId, long)>[2];
         private readonly object _dotDamageQueueLock = new object();
         private int _dotQueueIdx = 0;
 
@@ -29,8 +30,8 @@ namespace BattleSystemECS.Systems
             this.store = store;
             this.playerId = playerId;
             this.renderer = renderer;
-            _dotDamageQueue[0] = new List<(int, float)>(128);
-            _dotDamageQueue[1] = new List<(int, float)>(128);
+            _dotDamageQueue[0] = new List<(int, float, EntityHandle, EffectId, long)>(128);
+            _dotDamageQueue[1] = new List<(int, float, EntityHandle, EffectId, long)>(128);
         }
 
         /// <summary>
@@ -91,7 +92,9 @@ namespace BattleSystemECS.Systems
                 if (queueDamage && ticks > 0)
                 {
                     float damage = active.CapturedMagnitude * active.StackCount;
-                    for (int i = 0; i < ticks; i++) _dotDamageQueue[_dotQueueIdx].Add((entityId, damage));
+                    for (int i = 0; i < ticks; i++)
+                        _dotDamageQueue[_dotQueueIdx].Add((entityId, damage, active.Source, active.DefinitionId,
+                            store.AllocateGameplaySequence(entityId)));
                 }
             }
             active.RemainingTime = Math.Max(0f, active.RemainingTime - deltaTime);
@@ -145,7 +148,7 @@ namespace BattleSystemECS.Systems
             _dotQueueIdx = writeIdx;
             _dotDamageQueue[writeIdx].Clear();
 
-            foreach (var (enemyId, damage) in _dotDamageQueue[readIdx])
+            foreach (var (enemyId, damage, source, effect, sequence) in _dotDamageQueue[readIdx])
             {
                 if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) continue;
                 float currentHealth = store.EnemyHealth[enemyId];
@@ -153,9 +156,14 @@ namespace BattleSystemECS.Systems
                 // Invulnerability check: skip damage if enemy is invulnerable
                 if (store.EnemyIsInvulnerable[enemyId]) continue;
 
-                store.EnemyHealth[enemyId] -= damage;
-                if (store.EnemyHealth[enemyId] <= 0f)
-                    store.QueueEnemyDeath(enemyId, playerId);
+                var handle = store.GetEntityHandle(enemyId);
+                var damageSource = source.IsValid ? source : handle;
+                var request = new DamageRequest(damageSource, handle, damage, DamageType.True,
+                    ElementType.Poison, DamageFlags.None, DamageAmountStage.Raw,
+                    DamageCommitBoundary.GameplayResolve,
+                    sequence, effect: effect,
+                    ownerPlayerId: playerId);
+                store.DamageResolver.TryApply(request);
             }
         }
 
@@ -198,7 +206,11 @@ namespace BattleSystemECS.Systems
         public void ApplyDot(int targetId, GameplayEffectDef dotDef)
         {
             var target = store.GetEntityHandle(targetId);
-            var application = LegacyEffectAdapter.CreateApplication(dotDef, store.GetEntityHandle(playerId), target);
+            var source = store.GetEntityHandle(playerId);
+            // Minimal unit worlds may not materialize a player entity; production worlds do.
+            // Preserve a valid self-source only as a compatibility fallback for those worlds.
+            if (!source.IsValid) return;
+            var application = LegacyEffectAdapter.CreateApplication(dotDef, source, target);
             // Fast path: StackingBehavior.None skips the search — same as old O(1) behavior
             if (dotDef.StackingBehavior == StackingBehavior.None)
             {

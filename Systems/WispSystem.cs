@@ -218,9 +218,7 @@ namespace BattleSystemECS.Systems
             if (currentHp >= maxHp) return;    // already full
 
             float healAmount = maxHp * HEAL_PERCENT_PER_SEC * deltaTime;
-            float newHp = currentHp + healAmount;
-            if (newHp > maxHp) newHp = maxHp;
-            _store.PlayerCurrentHealth[playerId] = newHp;
+            _store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(3), healAmount);
         }
 
         /// <summary>

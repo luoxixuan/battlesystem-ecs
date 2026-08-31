@@ -3,6 +3,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
+using BattleSystemECS.Components;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -191,7 +193,9 @@ namespace BattleSystemECS.Systems
                 if (_towerStealthSystem != null)
                     finalDamage *= _towerStealthSystem.GetStealthDamageMultiplier(towerId);
                 // Apply damage directly to player health
-                store.PlayerCurrentHealth[playerId] -= finalDamage;
+                var playerHandle = store.GetEntityHandle(store.PlayerEntityId);
+                if (playerHandle.IsValid)
+                    store.ResourceResolver.TryApply(new Core.GAS.ResourceRequest(playerHandle, playerHandle, new Core.GAS.AttributeKey(3), -finalDamage, Core.GAS.ResourceOperation.Add, evt.EnemyId, store.AllocateGameplaySequence(playerId), ownerPlayerId: playerId));
 
                 // Reflect tower: if this tower has reflect, queue reflect damage back to the suicide bomber
                 if (_reflectTowerSystem != null && store.TowerReflectRatio[towerId] > 0f)
@@ -266,13 +270,10 @@ namespace BattleSystemECS.Systems
                 float finalDamage = evt.DamageAmount * falloffMult;
 
                 // Apply damage to enemy health (raw damage, not newHealth for two-phase correctness)
-                store.EnemyHealth[enemyId] -= finalDamage;
-
-                // Queue death if HP <= 0
-                if (store.EnemyHealth[enemyId] <= 0f)
-                {
-                    store.QueueEnemyDeath(enemyId, playerId);
-                }
+                var source = store.GetEntityHandle(evt.EnemyId);
+                var target = store.GetEntityHandle(enemyId);
+                if (source.IsValid && target.IsValid)
+                    store.DamageResolver.TryApply(new Core.GAS.DamageRequest(source, target, finalDamage, DamageType.True, ElementType.None, DamageFlags.None, DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(enemyId), ownerPlayerId: playerId));
             }
         }
 

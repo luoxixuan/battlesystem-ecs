@@ -77,6 +77,7 @@ namespace BattleSystemECS.Tests.Features.World
             // Enemy A: 100 HP → should take 0.5 dmg
             // Enemy B: 200 HP → should take 1.0 dmg
             ConfigureSandstorm(dotPct: 0.005f);
+            Store.AddPlayer(0, 1f, 1f, 1f, 1);
             // WeatherSystem.Update() skips a player if PlayerCurrentHealth[playerId] <= 0
             // (pre-existing "dead player skips weather transitions" pattern). Set HP first.
             Store.PlayerCurrentHealth[0] = 100f;

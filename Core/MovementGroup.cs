@@ -175,12 +175,7 @@ namespace BattleSystemECS.Systems
             {
                 var (enemyId, damage) = _damageQueue[i];
                 // Use existing damage application pattern: subtract from current HP, queue death if <= 0.
-                _store.EnemyHealth[enemyId] -= damage;
-                if (_store.EnemyHealth[enemyId] <= 0f)
-                {
-                    // Trap kills: no owner tracking yet, attribute to player 0 (matches EnemyLifeLinkSystem convention).
-                    _store.QueueEnemyDeath(enemyId, 0);
-                }
+                _store.ApplyDamageAuthority(_store.PlayerEntityId, enemyId, damage, 0, stage: Core.GAS.DamageAmountStage.Raw);
             }
         }
     }

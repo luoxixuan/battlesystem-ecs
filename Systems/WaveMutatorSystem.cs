@@ -130,7 +130,7 @@ namespace BattleSystemECS.Systems
                 float maxHealth = store.EnemyMaxHealth[enemyId];
                 if (maxHealth <= 0f) continue;
                 float healAmount = maxHealth * mutator.RegenRate * deltaTime;
-                store.EnemyHealth[enemyId] = Math.Min(store.EnemyHealth[enemyId] + healAmount, maxHealth);
+                store.ApplyEnemyResourceAuthority(enemyId, enemyId, new Core.GAS.AttributeKey(3), healAmount);
             }
         }
 

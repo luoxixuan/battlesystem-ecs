@@ -68,6 +68,8 @@ namespace BattleSystemECS.Core
         {
             store.ApplyComputedAttributeModeAtFrameBoundary();
             store.BeginFrame();
+            store.DamageResolver.EnableDeferred(true);
+            store.ResourceResolver.EnableDeferred(true);
             // Attribute modifiers become visible at the scheduler's aggregate boundary.
             store.SyncComputedAttributeBases();
             store.AttributeAggregator.AggregateDirty();
@@ -102,6 +104,13 @@ namespace BattleSystemECS.Core
             if (Phase == GameState.BuildPhase)
             {
                 Build.Execute(store, deltaTime);
+                // BuildPhase has no combat/death commit. Reject any combat requests
+                // emitted by compatibility systems instead of carrying them into Wave.
+                store.DamageResolver.RejectPending(Core.GAS.DamageCommitBoundary.GameplayResolve);
+                store.ResourceResolver.RejectPendingEnemyDamage();
+                store.ResourceResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
+                store.DamageResolver.EnableDeferred(false);
+                store.ResourceResolver.EnableDeferred(false);
                 return;
             }
 
@@ -152,6 +161,9 @@ namespace BattleSystemECS.Core
 
             // Phase 1: Pre-game (weather, day/night, difficulty, events) — ENEMY side
             PreGame.Execute(store, enemyDt, turn);
+            // Weather and other pre-game producers commit at the explicit early boundary.
+            store.DamageResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.EarlyResolve);
+            store.ResourceResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.EarlyResolve);
 
             // Phase 2: Spawning (waves, nests) — ENEMY side
             Spawning.Execute(store, enemyDt, turn);
@@ -180,11 +192,20 @@ namespace BattleSystemECS.Core
             // Phase 9: Skill resolution + Buff DoT + Bleed — COMBAT side (full speed)
             SkillBuff.Execute(store, combatDt, turn);
 
+            // 战斗与技能阶段产生的资源/伤害请求在此提交边界统一可见。
+            store.DamageResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
+            store.ResourceResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
+
             // Phase 10: Death resolve (uses queued damage, dt-free)
             store.ResolveEnemiesKilledThisFrame();
 
             // Phase 11: Post-death (fission, life link, objective, resources, corpses, combo) — COMBAT side
             PostDeath.Execute(store, combatDt, turn);
+            // 死亡后奖励、治疗与尸体效果沿用同一 Gameplay 提交边界。
+            store.DamageResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
+            store.ResourceResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
+            store.DamageResolver.EnableDeferred(false);
+            store.ResourceResolver.EnableDeferred(false);
 
             // Phase 12: Threat Score EMA update (Round 99 Direction 5)
             // O(MAX_PLAYERS) per-tick: decay the running average using an exponential moving

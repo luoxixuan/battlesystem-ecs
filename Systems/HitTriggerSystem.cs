@@ -116,9 +116,7 @@ namespace BattleSystemECS.Systems
                         {
                             float cur = store.PlayerCurrentHealth[playerId];
                             float max = store.PlayerMaxHealth[playerId];
-                            float next = cur + heal;
-                            if (max > 0f && next > max) next = max;
-                            store.PlayerCurrentHealth[playerId] = next;
+                            store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(3), heal);
                         }
                     }
                 }

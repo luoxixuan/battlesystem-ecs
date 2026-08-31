@@ -37,6 +37,8 @@
 - i-frame、Phaser、Blinker、全局时间缩放和位置事件包装为显式 `GlobalStateNode`/serial node，声明它们的读写和执行策略；
 - `UpdateTimeScale` 产生的 TimeContext 必须在同一帧固定，后续节点不能各自重新计算缩放。
 
+shadow 期间先保持当前字面顺序：`BeginFrame/CC flags → i-frame/Phaser/Blinker(raw delta) → GlobalTimeScaleAdvance → immutable TimeContext → Build/Wave branch`。`GlobalTimeScaleAdvance` 显式写 duration/scale 并返回缩放结果，不再通过 `ref deltaTime` 改写 caller 局部变量；Blinker 把 Pathfinding 声明为 optional dependency，并由图校验其 `disabled/no-op/fail` 策略。
+
 这里的迁移理由是所有权、可选依赖和时序可见性，不是把当前成本描述成固定的 `O(MAX_ENTITIES)`：i-frame/Phaser/Blinker 目前主要遍历活跃实体列表，实际复杂度和 profile 结果应在 M0 记录。
 
 ### 1.3 目标节点映射
@@ -67,6 +69,8 @@
 - `SystemRegistry` 中 21 次 `= null` group-slot 赋值（18 个独立槽位名，`TowerIncome`/`TowerLink`/`TowerOvercharge` 跨 group 重复）：删除，或改成有日志的 Feature flag 注册；这些槽位对应的实现文件可能已经存在，必须以“是否实例化/注册”判断 disabled，而不是以文件是否存在判断；
 - `SystemRegistry.CreateAll/WireDependencies/AssignToGroups` 的构造顺序和 setter 注入；
 - benchmark 手工 composition 与生产 Registry 不一致的问题。
+
+这里有两种不能混用的计数：当前 `SystemRegistry` 有 106 个 `XxxSystem?` 属性，另有一个 `EventBus?`，合计 107 个 nullable 顶层属性；21 是 `AssignToGroups` 中显式写成 `= null` 的 group-slot 赋值次数，对应 18 个独立槽位名。前者用于完整 composition/installer 台账，后者用于 disabled-slot 清理，不能互相推翻。
 
 ### 1.5 M5 退出门槛
 
@@ -121,6 +125,8 @@ M6 还必须先完成 `SkillSystem` 的迁移状态审计：当前文件已经�
 6. 每个 Ability ID 的真实激活、冷却、资源、目标、效果和死亡测试通过后，才关闭旧 case。
 
 `_skillDamageQueue` 必须在 M3 已定义的 `DamageRequest` contract 上收口；Chain Lightning 的“最多目标数、跳转衰减和去重”属于可复用 Targeting/Execution 定义，不应继续作为 `SkillSystem` 私有常量和 switch case 的隐式语义。
+
+因此 `SkillSystem` 在迁移期只是一层兼容 adapter，并有两个独立 cutover：M3 接管 `_skillDamageQueue` 的伤害 writer，M6 接管激活、Targeting 和 Effect 派发。任一 cutover 单独完成都不能把该系统标记为“已迁移”。
 
 `AutoSkillSystem` 可以继续保留为调用 facade，但不能再产生另一套冷却或效果规则。Hero/Tower active 当前只翻冷却和打印日志，必须在切流时接入同一能力管线。
 
@@ -180,6 +186,8 @@ M6 还必须先完成 `SkillSystem` 的迁移状态审计：当前文件已经�
 - `HitConfirmed`、`DamageApplied`、`KillConfirmed`、`TowerPlaced` 等成为一等 Gameplay Event；
 - 订阅者通过 event contract 注册，不再由内容系统互相持有具体类引用；
 - 21 次 group-slot 赋值对应的 18 个独立槽位要么移除，要么在启动日志中明确列为 disabled；实现文件存在但没有 `CreateAll` 实例化的项仍视为未注册，不能把文件存在当成已启用。
+
+M7 要审计全部 107 个 nullable 顶层属性，但不在本阶段重新迁移 106 个 system 的战斗行为：帧节点和 Ability 行为分别已在 M5/M6 切流，M7 负责把既有 composition 收口到 Installer、删除旧 setter/slot 并保留必要 facade。若 M5/M6 尚未完成这些行为切流，不能用扩大 M7 估算来跳过进入条件。
 
 ### 3.3 Engine/Content 分层
 

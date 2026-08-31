@@ -281,7 +281,7 @@ namespace BattleSystemECS.Systems
  // multipliers fire. Element routing (Fire/Ice/Toxic/Holy) lets the existing
  // shield + reaction system apply mitigation correctly.
  var attackElement = MapElementToElementType(element);
- _store.ApplyEnemyDamage(enemyId, tickDamage, attackElement);
+ _store.ApplyDamageAuthority(_store.PlayerEntityId, enemyId, tickDamage, ownerPlayer, element: attackElement, stage: Core.GAS.DamageAmountStage.Raw);
  }
  }
  }

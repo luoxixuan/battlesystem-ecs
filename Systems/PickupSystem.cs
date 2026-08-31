@@ -273,7 +273,7 @@ namespace BattleSystemECS.Systems
                     float currentHealth = store.PlayerCurrentHealth[playerId];
                     float maxHealth = store.PlayerMaxHealth[playerId];
                     float healed = Math.Min(value, maxHealth - currentHealth);
-                    store.PlayerCurrentHealth[playerId] = currentHealth + healed;
+                    store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(3), healed);
                     renderer.Log($"[PICKUP] HealthPack collected: +{healed} HP");
                     break;
                 }
@@ -282,7 +282,7 @@ namespace BattleSystemECS.Systems
                     float currentMana = store.PlayerMana[playerId];
                     float maxMana = store.PlayerMaxMana[playerId];
                     float restored = Math.Min(value, maxMana - currentMana);
-                    store.PlayerMana[playerId] = currentMana + restored;
+                    store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), restored);
                     renderer.Log($"[PICKUP] ManaOrb collected: +{restored} mana");
                     break;
                 }

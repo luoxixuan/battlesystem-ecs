@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Components;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -133,7 +135,7 @@ namespace BattleSystemECS.Systems
             }
 
             // Consume mana
-            store.PlayerMana[playerId] -= manaCost;
+            store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), -manaCost);
 
             // Execute effect based on skill type
             ExecuteSkillEffect(def);
@@ -192,19 +194,14 @@ namespace BattleSystemECS.Systems
                 float armorRed = 1f - (armor / (armor + 50f)); // standard armor formula
                 float finalDmg = rawDmg * Math.Max(0.1f, armorRed);
 
-                float eh = store.EnemyHealth[eid];
-                store.EnemyHealth[eid] = eh - finalDmg;
-
-                if (store.EnemyHealth[eid] <= 0f)
-                {
-                    store.EnemyHealth[eid] = 0f;
-                    // Enqueue the death so ResolveEnemiesKilledThisFrame runs the death
-                    // handlers (gold / score / life-link) and destroys the entity. Without
-                    // this the enemy sits at HP=0 but still EnemyActive: no reward, no slot
-                    // release, and every `EnemyHealth <= 0f` guard downstream skips it.
-                    store.QueueEnemyDeath(eid, playerId);
-                    killed++;
-                }
+                // source handle 表示实际玩家实体；owner 仍表示技能归属玩家槽位。
+                var source = store.GetEntityHandle(store.PlayerEntityId);
+                var target = store.GetEntityHandle(eid);
+                var result = store.DamageResolver.TryApply(new Core.GAS.DamageRequest(source, target, finalDmg,
+                    DamageType.True, ElementType.None, DamageFlags.None, DamageAmountStage.Raw,
+                    DamageCommitBoundary.GameplayResolve,
+                    store.AllocateGameplaySequence(eid), ownerPlayerId: playerId));
+                if (result.DeathQueued) killed++;
             }
 
             renderer.Log($"[GlobalSkill] Meteor Strike: {damage:F0} damage to all enemies, {killed} kills");
@@ -241,10 +238,7 @@ namespace BattleSystemECS.Systems
 
             // Also heal player
             float playerHeal = store.PlayerCurrentHealth[playerId] * def.HealPct;
-            store.PlayerCurrentHealth[playerId] = Math.Min(
-                store.PlayerCurrentHealth[playerId] + playerHeal,
-                store.PlayerMaxHealth[playerId]
-            );
+            store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(3), playerHeal);
 
             renderer.Log($"[GlobalSkill] Emergency Heal: restored {healPct * 100:F0}% HP to {healed} towers");
         }
@@ -253,7 +247,7 @@ namespace BattleSystemECS.Systems
         {
             // Instant gold gain (flat, no temporary multiplier that accumulates)
             float goldGain = def.GoldAmount;
-            store.PlayerGold[playerId] += goldGain;
+            store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(4), goldGain);
 
             renderer.Log($"[GlobalSkill] Gold Burst: +{goldGain:F0} gold");
         }

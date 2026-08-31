@@ -845,7 +845,7 @@ namespace BattleSystemECS.Systems
                 float friendlyMaxHp = store.PlayerMaxHealth[friendlyId];
                 float newHp = store.PlayerCurrentHealth[friendlyId] + currentHeal;
                 if (newHp > friendlyMaxHp) newHp = friendlyMaxHp;
-                store.PlayerCurrentHealth[friendlyId] = newHp;
+                store.ApplyPlayerResourceAuthority(friendlyId, friendlyId, new Core.GAS.AttributeKey(3), currentHeal);
 
                 // Apply shield bonus if requested (small bonus, 0 = no shield)
                 if (shieldPerHit > 0f)
@@ -1204,7 +1204,7 @@ namespace BattleSystemECS.Systems
                 float resist = store.EnemyDamageResistance[enemyId];
                 float finalDmg = resist >= 1f ? 0f : damage * (1f - resist);
 
-                store.ApplyEnemyDamage(enemyId, finalDmg); // accumulation pattern (consistent with TowerAttackSystem)
+                store.ApplyDamageAuthority(store.PlayerEntityId, enemyId, finalDmg, playerId, stage: Core.GAS.DamageAmountStage.PostMitigation);
 
                 if (store.EnemyHealth[enemyId] <= 0f)
                     HandleKill(enemyId);

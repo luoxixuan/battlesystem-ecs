@@ -746,9 +746,7 @@ namespace BattleSystemECS.Systems
             foreach (var evt in _lifestealEvents[lsReadIdx])
             {
                 if (!store.EnemyActive[evt.EnemyId]) continue;
-                store.EnemyHealth[evt.EnemyId] += evt.HealAmount;
-                if (store.EnemyHealth[evt.EnemyId] > store.EnemyMaxHealth[evt.EnemyId])
-                    store.EnemyHealth[evt.EnemyId] = store.EnemyMaxHealth[evt.EnemyId];
+                store.ApplyEnemyResourceAuthority(evt.EnemyId, evt.EnemyId, new Core.GAS.AttributeKey(3), evt.HealAmount);
             }
             // Ping-pong swap
             int lsWriteIdx = 1 - _lifestealEventsIdx;
@@ -854,8 +852,8 @@ namespace BattleSystemECS.Systems
                     // so shield (round 22) and other damage modifiers apply consistently.
                     float dmgA = aMaxHp * InfightDmgFrac;
                     float dmgB = store.EnemyMaxHealth[bId] * InfightDmgFrac;
-                    store.ApplyEnemyDamage(aId, dmgA);
-                    store.ApplyEnemyDamage(bId, dmgB);
+                    store.ApplyDamageAuthority(aId, bId, dmgB, 0, stage: Core.GAS.DamageAmountStage.Raw);
+                    store.ApplyDamageAuthority(bId, aId, dmgA, 0, stage: Core.GAS.DamageAmountStage.Raw);
 
                     // Set cooldowns on both sides so we don't double-trigger the same pair
                     // in the same frame or the next InfightCooldownSec.
@@ -1269,9 +1267,7 @@ namespace BattleSystemECS.Systems
                 }
                 float heal = baseRegen * mult * _currentDeltaTime;
                 if (heal <= 0f) continue;
-                float newHp = currentHp + heal;
-                if (newHp > maxHp) newHp = maxHp;
-                store.EnemyHealth[enemyId] = newHp;
+                store.ApplyEnemyResourceAuthority(enemyId, enemyId, new Core.GAS.AttributeKey(3), heal);
                 touched++;
             }
             BossRegenDrainCount = touched;

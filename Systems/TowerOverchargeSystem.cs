@@ -57,7 +57,7 @@ namespace BattleSystemECS.Systems
             if (store.PlayerMana[playerId] < cfg.MinManaRequired) return;
 
             // Consume mana
-            store.PlayerMana[playerId] -= cfg.ManaCost;
+            store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), -cfg.ManaCost);
 
             // Activate overcharge
             store.TowerIsOvercharged[towerId] = true;

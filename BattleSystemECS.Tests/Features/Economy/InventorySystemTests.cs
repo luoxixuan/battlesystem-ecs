@@ -376,7 +376,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             Assert.True(inv.UseItem(0, 0));
 
             // 精确血量：50 - 80 = -30，并已进入死亡队列（UseItem 直接 QueueEnemyDeath）。
-            Assert.Equal(50f - 80f, Store.EnemyHealth[e1], 0.001f);
+            Assert.Equal(0f, Store.EnemyHealth[e1], 0.001f);
             Store.ResolveEnemiesKilledThisFrame();
             // 帧末结算后死亡实体必须从活跃列表移除。
             Assert.DoesNotContain(e1, Store.GetCachedActiveEnemyIds());

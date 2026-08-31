@@ -65,7 +65,7 @@
 6. Effect/实体 ID 回收；
 7. 同一帧 14 次命中后的计数和触发顺序。
 
-另外单独覆盖 BuildPhase：当前 BuildGroup 可能更新 GlobalSkill 和 Skill，若它们产生战斗性请求而 scheduler 早退，死亡或技能队列可能跨帧滞留。必须先决定 BuildPhase 是否允许产生战斗 Ability/Effect；若允许，必须有通用的 resource/death commit，若不允许，Ability gate 必须明确拒绝战斗效果并定义请求丢弃规则。
+另外单独覆盖 BuildPhase：当前生产 Registry 明确装配 `Skill`、`AutoSkill` 和 `GlobalSkill`，BuildGroup 会执行三者，随后 `FrameScheduler` 明确早退。`Skill`/`AutoSkill` 一旦产生 `_skillDamageQueue`，该队列就不会在 Build 帧 drain，而会保留到首个 Wave；`GlobalSkillSystem.Update` 当前没有用 `isBuildPhase` 阻止 Meteor，致死 Meteor 会留下未提交死亡队列，并使下一帧 `BeginFrame()` 抛出未调用 `ResolveEnemiesKilledThisFrame()` 的保护异常。必须先决定 BuildPhase 是否允许产生战斗 Ability/Effect；若允许，必须有同帧 resource/damage/death commit，若不允许，Ability gate 必须明确拒绝战斗效果并定义请求丢弃规则。
 
 这里的“前置”是 M0 的第一批工作，不是进入 M0 之前必须完成的代码重构。M0 可以先以只读方式建立基线、复现当前行为并完成决策；在 BuildPhase 语义和测试证据缺失时，真正被阻塞的是 M1 结构改动和任何 cutover，不能把“不要立即进入 M0”理解成先改生产路径。
 当前 `game_config.json` 没有 `GlobalSkills` 配置，Meteor 的 BuildPhase 测试需要显式注入测试定义；这说明默认生产路径暂未启用 Meteor，不代表 BuildGroup 的早退语义可以忽略。
@@ -88,17 +88,18 @@ golden 结果不只记录最终 HP，还要记录请求、资源变化、死亡�
 
 | 扫描口径（Core/Systems，排除测试） | 当前结果 | 解释 |
 |---|---:|---|
+| 所有 `EnemyHealth[...]` 原始索引匹配 | 145 行 / 45 个文件（151 次 occurrence） | 同时包含读、判断、初始化、治疗、写入和注释，不能称为“直接写”或“伤害路径” |
 | 严格的 `EnemyHealth[...] -= ...` | 29 行 / 19 个文件 | 包含 `ComponentStore` 的 authority 和 `MovementGroup`，不含等价的 `old - damage`/`newHp` 赋值 |
 | 所有 `EnemyHealth[...]` 赋值或复合赋值候选 | 59 行 / 37 个文件 | 混有初始化、生命周期、治疗、恢复、基准 harness 和真正伤害，不能直接当路径数 |
 | `ApplyEnemyDamage` 生产调用点 | 5 个 | `EnemyAI` 两处、`PlayerTowerAttack`、`Skill`、`TerrainZone`；定义、重载转发、注释和测试不计入 |
 
-审查报告中的“21 个文件”和“23 次调用”只有在另加一组未说明的语义筛选或混入定义/测试时才可能出现，不能作为当前无条件事实。把等价减法、置零、禁用系统和已注册系统分别列出后，“约 30 条路径”仍可作为迁移规模的粗略量级，但 M0 台账必须保存 raw occurrence、生产方法、状态（active/disabled）和唯一 writer，避免把文件数、写点数和路径数混在一起。
+审查报告中的“145 行直接写”实际对应 Core/Systems 的原始索引匹配，包含读取和注释；“23 次调用”则可通过把测试调用和重载转发混入统计得到。两者都不能作为生产伤害来源数。把等价减法、置零、禁用系统和已注册系统分别列出后，只能说当前有数十个候选来源；完整的语义路径数必须等 M0 分类，不能由 grep 行数代替。M0 台账必须保存 raw occurrence、生产方法、状态（active/disabled）和唯一 writer，避免把访问行、写点、文件数和路径数混在一起。
 同理，不能用 5 个 `ApplyEnemyDamage` 调用点与 29 个 `-=` 写点直接计算“84% 绕过”；两者的统计单位不同，比例必须基于同一组已定义的语义伤害请求。
 
 推荐使用只读脚本 `tools/inventory-ecs-gas-migration.ps1` 快速生成候选清单。脚本只做静态候选统计，不替代人工审查：它应输出生产方法名、文件和行号，并将写入点分成 `Init`、`Resource`、`DamageCandidate`、`Unknown` 四类；分类不确定的项必须保留在 Unknown，不能为了让数字好看而自动排除。
 脚本对行注释有基本过滤，但不是 C# 语法解析器；块注释、预处理分支和跨行表达式仍可能出现在候选清单中。`disabledDefinitions` 只探测少数已知系统，完整的 active/disabled 状态必须由 M0 人工确认并记录。
 
-最小用法是 `pwsh -File tools/inventory-ecs-gas-migration.ps1 -OutputPath artifacts/gas-migration-ledger.json`。输出至少包含 `generatedAt`、`commit`、`filesScanned`、`directWrites`、`applyEnemyDamage`、`damageLoops`、`abilityEntrypoints`、`effectTimerOwners`、`nullableGroupSlots`、`registryInjectors` 和 `disabledDefinitions`。`OutputPath` 是可选的；不传时只打印摘要，不修改源码或配置。
+Windows PowerShell 5.1 的最小用法是 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/inventory-ecs-gas-migration.ps1 -OutputPath artifacts/gas-migration-ledger.json`；安装 PowerShell 7 后也可把入口替换为 `pwsh`。输出至少包含 `generatedAt`、`commit`、`filesScanned`、`enemyHealthAccesses`、`directWrites`、`applyEnemyDamage`、`damageLoops`、`abilityEntrypoints`、`effectTimerOwners`、`registryProperties`、`groupAssignments`、`nullableGroupSlots`、`registryInjectors` 和 `disabledDefinitions`。`OutputPath` 是可选的；不传时只打印摘要，不修改源码或配置。
 
 直接写资源的生产点先分为三类，不能机械地全部替换：
 
@@ -224,8 +225,8 @@ Request 可以被拒绝，Event 只表示已验证事实。内部 Gameplay Event
 
 ### 3.3.0 M1 的真实范围：结构拆分而非单纯加 adapter
 
-当前 `GameplayEffectDef` 同时保存静态字段和 `RemainingTime`、`TicksRemaining`、`RefreshDuration` 等运行态字段，`AppliedEffect` 又嵌入 Definition；`BuffSystem` 会直接修改这些嵌套字段。这个事实意味着 M1 的 GAS 部分是一次需要完整影响范围清单的结构拆分，不能按“新增几个类型、旧代码原样继续用”估算为低风险小改动。
-其中 `RefreshDuration` 在当前生产代码里主要由构造/工厂写入，实际刷新分支按 `StackingBehavior` 直接修改 `RemainingTime`；拆分时必须把这两个语义合并到唯一的 Effect runtime，不能只把字段机械搬家。
+当前 `GameplayEffectDef` 同时保存静态字段和 `RemainingTime`、`TicksRemaining` 等实例计数器，`AppliedEffect` 又嵌入整个可变 Definition；`BuffSystem` 会直接修改这些嵌套字段。`RefreshDuration` 虽被 legacy 注释称为 runtime 字段，实质是由 `StackingBehavior` 派生的重复策略，终态应归一为 immutable Definition 中唯一的 `stackingPolicy/refreshPolicy`，由 runtime 执行而不是作为当前实例状态保存。这个事实意味着 M1 的 GAS 部分是一次需要完整影响范围清单的结构拆分，不能按“新增几个类型、旧代码原样继续用”估算为低风险小改动。
+其中 `RefreshDuration` 在当前生产代码里主要由构造/工厂写入，实际刷新分支按 `StackingBehavior` 直接修改 `RemainingTime`；拆分时必须把刷新规则归一到 Definition，把倒计时和规则执行放在 Effect runtime，不能只把字段机械搬家。
 当前生产代码对这些类型的引用需要按方法去重后重新统计；粗扫约为十余处，测试、注释和兼容构造另计。“20-30 处”可以作为待核查的工作量上界，不能当作已经验证的事实。
 
 建议把 M1 的 GAS 工作拆成三个子工作包：

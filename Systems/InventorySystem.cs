@@ -231,7 +231,7 @@ namespace BattleSystemECS.Systems
                     float maxHealth = store.PlayerMaxHealth[playerId];
                     float healed = Math.Min(def.Value, maxHealth - currentHealth);
                     if (healed <= 0f) { renderer?.Log($"[INVENTORY] P{playerId} already at full HP, {def.Name} no-op"); return false; }
-                    store.PlayerCurrentHealth[playerId] = currentHealth + healed;
+                    store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(3), healed);
                     renderer?.Log($"[INVENTORY] P{playerId} used {def.Name}: +{healed} HP");
                     return true;
                 }
@@ -241,13 +241,13 @@ namespace BattleSystemECS.Systems
                     float maxMana = store.PlayerMaxMana[playerId];
                     float restored = Math.Min(def.Value, maxMana - currentMana);
                     if (restored <= 0f) { renderer?.Log($"[INVENTORY] P{playerId} already at full mana, {def.Name} no-op"); return false; }
-                    store.PlayerMana[playerId] = currentMana + restored;
+                    store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), restored);
                     renderer?.Log($"[INVENTORY] P{playerId} used {def.Name}: +{restored} mana");
                     return true;
                 }
                 case InventoryItemType.Shield:
                 {
-                    store.PlayerShield[playerId] += def.Value;
+                    store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(9), def.Value);
                     int dur = def.BuffDuration > 0f ? (int)def.BuffDuration : 0;
                     // Reuse shield duration field; 0 means "permanent until depleted".
                     if (dur > 0) store.PlayerShieldDuration[playerId] = dur;
@@ -297,9 +297,7 @@ namespace BattleSystemECS.Systems
                         float dy = store.PositionY[enemyId] - py;
                         if (dx * dx + dy * dy > rSq) continue;
                         if (store.EnemyIsInvulnerable[enemyId]) continue;
-                        store.EnemyHealth[enemyId] -= def.Value;
-                        if (store.EnemyHealth[enemyId] <= 0f)
-                            store.QueueEnemyDeath(enemyId, playerId);
+                        store.ApplyDamageAuthority(playerId, enemyId, def.Value, playerId, stage: Core.GAS.DamageAmountStage.Raw);
                         hitCount++;
                     }
                     renderer?.Log($"[INVENTORY] P{playerId} used {def.Name}: hit {hitCount} enemies for {def.Value} dmg");

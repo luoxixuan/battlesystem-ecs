@@ -207,7 +207,7 @@ namespace BattleSystemECS.Systems
 
             // All conditions met → execute the cull.
             // Set HP to 0 (mirror DeathMark auto-execute semantics).
-            store.EnemyHealth[enemyId] = 0f;
+            store.ApplyDamageAuthority(playerId, enemyId, currentHp, playerId, flags: Core.GAS.DamageFlags.Execute, stage: Core.GAS.DamageAmountStage.PostMitigation);
 
             // Compute bonus gold FIRST using PRE-increment stacks (per doc contract:
             // "per-stack bonus gold payout on subsequent culls"). Then increment.

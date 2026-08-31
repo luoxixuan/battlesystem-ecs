@@ -148,6 +148,7 @@ namespace BattleSystemECS.Tests.Framework
         public void StackRefreshUpdatesOnlyTypedRuntimeState()
         {
             var store = new ComponentStore();
+            store.AddPlayer(0, 1f, 1f, 1f, 1);
             int target = store.AddEnemy(0, 0, 1, 20, 20, 1, 1, 1);
             var definition = GameplayEffectDef.Periodic("stack-refresh", -1, 1f, 4f, 1f,
                 StackingBehavior.MaxStacksRefresh, 3);

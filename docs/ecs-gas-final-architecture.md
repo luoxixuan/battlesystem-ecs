@@ -138,11 +138,14 @@ AbilityDefinition
   cooldown
   costs[]
   activationPolicy
+  allowedPhases         # Wave / Build / Intermission 等显式位集
   requiredTags / blockedTags
   targetingId
   effectIds[]
   triggerIds[]          # 被动能力可选
 ```
+
+`allowedPhases` 是运行时激活合同，不只是 UI 提示。战斗型 Ability 默认只允许在 Wave；Build 中的资源、建设和准备类 Ability 必须显式声明。`AbilityCommit` 在产生任何 Effect、Damage 或 Resource Request 前校验当前阶段，拒绝时产生带原因的诊断事实。
 
 ### 6.2 TargetingDefinition
 
@@ -446,6 +449,8 @@ Presentation events
 - `Presentation`：只消费已提交事实。
 
 GAS 的 `AbilityCommit`、`EffectTick`、`GameplayEventCommit` 和 `AttributeAggregate` 都是 ECS 帧图中的系统，不拥有第二个调度器。`ResourceResolve` 处理非伤害的治疗、护盾、法力和其他资源请求。
+
+每个 active phase 必须满足提交闭包：该阶段允许产生的 Request 必须在同一帧存在对应的 Effect、Damage、Resource、Event 和 Death commit，或在入口被明确拒绝。帧级命令缓冲不得静默跨越 Build/Wave/Intermission 边界；显式延迟命令必须使用另一种带目标帧和生命周期的合同。
 
 帧内可见性规则固定如下：
 

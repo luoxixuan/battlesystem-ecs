@@ -128,8 +128,8 @@ namespace BattleSystemECS.Systems
 
             store.EnemyMoveSpeed[enemyId] = newMoveSpeed;
             store.EnemyDamage[enemyId] = newDamage;
-            store.EnemyHealth[enemyId] = newHealth;
-            store.EnemyMaxHealth[enemyId] = newMaxHealth;
+            store.SetEnemyResourceAuthority(enemyId, enemyId, new Core.GAS.AttributeKey(3), newHealth);
+            store.SetEnemyResourceAuthority(enemyId, enemyId, new Core.GAS.AttributeKey(2), newMaxHealth);
 
             // Update type name to target monster type
             store.EnemyTypeName[enemyId] = def.TargetMonsterType;

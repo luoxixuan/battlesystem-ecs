@@ -101,12 +101,10 @@ namespace BattleSystemECS.Systems
             foreach (var (healerId, allyId, healAmount) in healEvents)
             {
                 if (!_store.EnemyActive[allyId]) continue;
-                float maxHp = _store.EnemyMaxHealth[allyId];
                 float reduction = _store.EnemyHealingReduction[allyId];
                 float effectiveHeal = reduction > 0f ? healAmount * (1f - reduction) : healAmount;
-                float newHealth = Math.Min(_store.EnemyHealth[allyId] + effectiveHeal, maxHp);
-                _store.EnemyHealth[allyId] = newHealth;
-                _logger.Log($"[HEALER] Enemy {healerId} heals ally {allyId} for {healAmount:F1} HP (suppressed: {effectiveHeal:F1} by {reduction:P0}) ({newHealth:F1}/{maxHp:F1})");
+                _store.ApplyEnemyResourceAuthority(healerId, allyId, new Core.GAS.AttributeKey(3), effectiveHeal);
+                _logger.Log($"[HEALER] Enemy {healerId} heals ally {allyId} for {healAmount:F1} HP (suppressed: {effectiveHeal:F1} by {reduction:P0})");
             }
         }
     }

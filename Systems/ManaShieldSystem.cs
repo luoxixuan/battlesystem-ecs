@@ -112,7 +112,7 @@ namespace BattleSystemECS.Systems
                     // and raise the shield pool. Both writes go through the
                     // store's setters for safety.
                     float newMana = Math.Max(0f, mana - manaCost);
-                    store.PlayerMana[playerId] = newMana;
+                    store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), -manaCost);
                     store.PlayerManaShield[playerId] = currentMana + shieldGain;
                 }
             }

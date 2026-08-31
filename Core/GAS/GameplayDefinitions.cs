@@ -15,7 +15,10 @@ namespace BattleSystemECS.Core.GAS
     public enum SourceDeathPolicy { Persist, Remove }
     public enum ActivationPolicy { Instant, InputPressed, Passive }
     public enum MagnitudeSource { Constant, Attribute, Multiplier }
-    public enum DamageAmountStage { Raw, LegacyMultiplier }
+    public enum DamageAmountStage { Raw, PostCrit, LegacyMultiplier, PostMitigation }
+    [Flags]
+    public enum DamageFlags { None = 0, IgnoreArmor = 1, IgnoreResistance = 2, IgnoreShield = 4, IgnoreInvulnerability = 8, Execute = 16, Reflect = 32, Transfer = 64 }
+    public enum DamageCommitBoundary { EarlyResolve, GameplayResolve }
     public enum SnapshotPolicy { CaptureOnApply, ReevaluateOnRead }
     public enum FirstTickPolicy { NextInterval, Immediate }
     public enum CatchUpPolicy { CatchUpAll, OnePerFrame, SkipMissed }

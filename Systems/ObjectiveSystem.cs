@@ -437,7 +437,7 @@ namespace BattleSystemECS.Systems
  if (!done) continue;
  _store.PlayerSideQuestCompleted[_playerId * ComponentStore.MAX_SIDE_QUESTS + i] = true;
  if (quest.GoldReward >0)
- _store.PlayerGold[_playerId] += quest.GoldReward;
+ _store.ApplyPlayerResourceAuthority(_playerId, _playerId, new Core.GAS.AttributeKey(4), quest.GoldReward);
  if (quest.SoulReward >0 && _store.PlayerSoulCount != null && _playerId < _store.PlayerSoulCount.Length)
  _store.PlayerSoulCount[_playerId] += quest.SoulReward;
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -169,15 +170,10 @@ namespace BattleSystemECS.Systems
                     // both dmgReduction AND dmgTakenIncrease for curses; thorns is its
                     // own thing). Future iteration could add a damage-type field. For
                     // now: raw HP reduction, no shield, no resistance.
-                    float newHp = store.EnemyHealth[enemyId] - tickDamage;
-                    if (newHp < 0f) newHp = 0f;
-                    store.EnemyHealth[enemyId] = newHp;
-                    if (newHp <= 0f)
-                    {
-                        // Queue death — resolved at end of frame so the death handlers
-                        // (gold, score, life-link) see a consistent frame boundary.
-                        store.QueueEnemyDeath(enemyId, playerId);
-                    }
+                    var source = store.GetEntityHandle(emitterId);
+                    var target = store.GetEntityHandle(enemyId);
+                    if (source.IsValid && target.IsValid)
+                        store.DamageResolver.TryApply(new Core.GAS.DamageRequest(source, target, tickDamage, DamageType.True, ElementType.None, DamageFlags.None, DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(enemyId), ownerPlayerId: playerId));
                 }
             }
         }

@@ -123,12 +123,10 @@ namespace BattleSystemECS.Systems
                     switch (nodeType)
                     {
                         case ResourceNodeTypeEnum.GoldMine:
-                            _store.PlayerGold[owner] += produced;
+                            _store.ApplyPlayerResourceAuthority(owner, owner, new Core.GAS.AttributeKey(4), produced);
                             break;
                         case ResourceNodeTypeEnum.ManaSpring:
-                            _store.PlayerMana[owner] = Math.Min(
-                                _store.PlayerMana[owner] + produced,
-                                _store.PlayerMaxMana[owner]);
+                            _store.ApplyPlayerResourceAuthority(owner, owner, new Core.GAS.AttributeKey(7), produced);
                             break;
                         case ResourceNodeTypeEnum.TechRelic:
                             // Research is discrete points — accumulate until >= 1

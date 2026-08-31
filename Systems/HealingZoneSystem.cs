@@ -161,8 +161,7 @@ namespace BattleSystemECS.Systems
             if (currentHealth >= maxHealth) return; // Already at full health
             if (currentHealth <= 0f) return;       // Player dead
 
-            float newHealth = Math.Min(currentHealth + healAmount, maxHealth);
-            _store.PlayerCurrentHealth[playerId] = newHealth;
+            _store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(3), healAmount);
         }
 
         /// <summary>
@@ -201,8 +200,7 @@ namespace BattleSystemECS.Systems
                     float maxHealth = _store.PlayerMaxHealth[enemyId];
                     if (currentHealth > 0f && currentHealth < maxHealth)
                     {
-                        float newHealth = Math.Min(currentHealth + damage, maxHealth);
-                        _store.PlayerCurrentHealth[enemyId] = newHealth;
+                        _store.ApplyPlayerResourceAuthority(_store.PlayerEntityId, enemyId, new Core.GAS.AttributeKey(3), damage);
                     }
                 }
             }

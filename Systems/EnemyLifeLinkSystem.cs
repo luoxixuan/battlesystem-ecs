@@ -29,6 +29,7 @@ namespace BattleSystemECS.Systems
         private readonly IRenderer renderer;
         private List<int> _activeEnemyList;
         private int currentTurn;
+        private int _lastOwnerPlayerId;
 
         // Concurrent queue of link establishment events — processed serially in Update
         private readonly ConcurrentBag<(int linkerId, int targetId, int defId)> _linkQueue =
@@ -189,6 +190,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         private void OnEnemyKilledHandler(int deadId, int playerId)
         {
+            _lastOwnerPlayerId = playerId;
             if (!store.EnemyActive[deadId] && !store.EnemyIsLinked[deadId])
                 return; // Already cleaned up
 
@@ -233,7 +235,10 @@ namespace BattleSystemECS.Systems
                     continue;
 
                 // Apply break damage to survivor
-                store.EnemyHealth[survivorId] -= breakDamage;
+                var source = store.GetEntityHandle(deadId);
+                var target = store.GetEntityHandle(survivorId);
+                if (source.IsValid && target.IsValid)
+                    store.DamageResolver.TryApply(new Core.GAS.DamageRequest(source, target, breakDamage, Components.DamageType.True, Components.ElementType.None, Core.GAS.DamageFlags.None, Core.GAS.DamageAmountStage.Raw, Core.GAS.DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(survivorId), parentSequence: deadId, ownerPlayerId: _lastOwnerPlayerId));
 
                 if (renderer != null)
                 {
@@ -242,10 +247,6 @@ namespace BattleSystemECS.Systems
                 }
 
                 // If survivor dies from break penalty, queue another death
-                if (store.EnemyHealth[survivorId] <= 0f)
-                {
-                    store.QueueEnemyDeath(survivorId, 0); // playerId=0 as approximation
-                }
             }
         }
 

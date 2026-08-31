@@ -248,9 +248,7 @@ namespace BattleSystemECS.Systems
                             int eid = enemyIds[i];
                             if (eid >= 0)
                             {
-                                store.EnemyHealth[eid] = Math.Min(
-                                    store.EnemyHealth[eid] + healAmount,
-                                    store.EnemyMaxHealth[eid]);
+                                store.ApplyEnemyResourceAuthority(eid, eid, new Core.GAS.AttributeKey(3), healAmount);
                             }
                         }
                     }
@@ -270,7 +268,7 @@ namespace BattleSystemECS.Systems
                 float currentHp = store.EnemyHealth[eid];
                 if (currentHp > 0f)
                 {
-                    store.EnemyHealth[eid] = Math.Max(0f, currentHp - damage);
+                    store.ApplyDamageAuthority(playerId, eid, damage, playerId, stage: Core.GAS.DamageAmountStage.Raw);
                 }
             }
 

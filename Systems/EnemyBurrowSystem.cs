@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -143,7 +144,12 @@ namespace BattleSystemECS.Systems
                         // 对目标造成伤害（护甲计算）
                         float targetArmor = store.EnemyArmor[targetId];
                         float finalDmg = Math.Max(0f, dmg - targetArmor * 0.5f);
-                        store.EnemyHealth[targetId] -= finalDmg;
+                        var source = store.GetEntityHandle(enemyId);
+                        var target = store.GetEntityHandle(targetId);
+                        if (source.IsValid)
+                            store.DamageResolver.TryApply(new Core.GAS.DamageRequest(source, target, finalDmg, DamageType.True,
+                                ElementType.None, DamageFlags.None, DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve,
+                                store.AllocateGameplaySequence(targetId), ownerPlayerId: playerId));
                     }
                 }
             }

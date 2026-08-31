@@ -183,8 +183,7 @@ namespace BattleSystemECS.Systems
                 float currentHp = store.EnemyHealth[enemyId];
                 if (currentHp > 0f && !store.EnemyIsInvulnerable[enemyId])
                 {
-                    store.EnemyHealth[enemyId] = 0f;
-                    store.QueueEnemyDeath(enemyId, playerId);
+                    store.ApplyDamageAuthority(playerId, enemyId, currentHp, playerId, flags: Core.GAS.DamageFlags.Execute, stage: Core.GAS.DamageAmountStage.PostMitigation);
                 }
             }
 

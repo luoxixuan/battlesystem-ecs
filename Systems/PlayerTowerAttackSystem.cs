@@ -321,7 +321,7 @@ public void SetWaveNumber(int waveNumber)
                     (finalDamage, linkedDamage, linkedEnemyId) = _lifeLinkSystem.ComputeLinkedDamage(enemyId, finalDamage);
                 }
 
-                store.ApplyEnemyDamage(enemyId, finalDamage);
+                store.ApplyDamageAuthority(store.PlayerEntityId, enemyId, finalDamage, playerId, damageType, element: ElementType.None, stage: Core.GAS.DamageAmountStage.PostMitigation);
                 if (finalDamage > 0f) _battleEventBus.OnDamageDealt(enemyId, finalDamage, damageType.ToString(), wasCrit);
 
                 // Life Link: apply shared damage to linked enemy
@@ -473,9 +473,7 @@ public void SetWaveNumber(int waveNumber)
             float resist = store.EnemyDamageResistance[linkedEnemyId];
             float finalLinkedDmg = resist >= 1f ? 0f : linkedDamage * (1f - resist);
 
-            store.EnemyHealth[linkedEnemyId] -= finalLinkedDmg;
-            // Round 132 Dir 8 — honor Boss Min-Health Floor on player→LifeLink partner route.
-            store.ApplyMinHealthFloorInPlace(linkedEnemyId);
+                store.ApplyDamageAuthority(store.PlayerEntityId, linkedEnemyId, finalLinkedDmg, playerId, stage: Core.GAS.DamageAmountStage.PostMitigation);
 
             // Thorns on linked enemy (if any)
             float thornsRatio = store.EnemyThornsRatio[linkedEnemyId];
@@ -486,10 +484,6 @@ public void SetWaveNumber(int waveNumber)
             }
 
             // Check if linked enemy dies from shared damage
-            if (store.EnemyHealth[linkedEnemyId] <= 0f)
-            {
-                store.QueueEnemyDeath(linkedEnemyId, playerId);
-            }
         }
 
         /// <summary>

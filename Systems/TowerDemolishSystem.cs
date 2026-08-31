@@ -102,11 +102,10 @@ namespace BattleSystemECS.Systems
             if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) return;
 
             float currentHealth = store.EnemyHealth[enemyId];
-            float newHealth = currentHealth - damage;
-            store.EnemyHealth[enemyId] = newHealth;
+            store.ApplyDamageAuthority(store.PlayerEntityId, enemyId, damage, 0, stage: Core.GAS.DamageAmountStage.Raw);
 
             // Queue death if killed — mirror the pattern used by TowerAttackSystem
-            if (newHealth <= 0f && store.EnemyActive[enemyId])
+            if (store.IsEnemyPendingDeath(enemyId) && store.EnemyActive[enemyId])
             {
                 // Find which player owns this tower (playerId from the demolishing tower's context)
                 // For demolish, use playerId=1 (default single-player)

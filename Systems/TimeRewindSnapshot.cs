@@ -141,9 +141,9 @@ namespace BattleSystemECS.Systems
             float restoredHp = store.PlayerSnapshotHP[absSlot];
             if (restoredHp > maxHp) restoredHp = maxHp;
             if (restoredHp < 0f) restoredHp = 0f;
-            store.PlayerCurrentHealth[playerId] = restoredHp;
-            store.PlayerMana[playerId] = store.PlayerSnapshotMana[absSlot];
-            store.PlayerShield[playerId] = store.PlayerSnapshotShield[absSlot];
+            store.SetPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(3), restoredHp);
+            store.SetPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), store.PlayerSnapshotMana[absSlot]);
+            store.SetPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(9), store.PlayerSnapshotShield[absSlot]);
 
             TotalRestores++;
             return actualSeconds;

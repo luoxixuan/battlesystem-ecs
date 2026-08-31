@@ -148,9 +148,11 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(handle.Index)) { failure = BattleSystemECS.Core.GAS.HandleResolveFailure.InvalidIndex; return false; }
             if (_entityGenerations[handle.Index] != handle.Generation) { failure = BattleSystemECS.Core.GAS.HandleResolveFailure.StaleGeneration; return false; }
             if (!PositionActive[handle.Index] && !EnemyActive[handle.Index] && !TowerActive[handle.Index]) { failure = BattleSystemECS.Core.GAS.HandleResolveFailure.Inactive; return false; }
+            if (EnemyActive[handle.Index] && IsEnemyPendingDeath(handle.Index)) { failure = BattleSystemECS.Core.GAS.HandleResolveFailure.Inactive; return false; }
             failure = BattleSystemECS.Core.GAS.HandleResolveFailure.None;
             return true;
         }
+        public bool IsEnemyPendingDeath(int enemyId) => (uint)enemyId < MAX_ENTITIES && Volatile.Read(ref _enemyDeathPending[enemyId]) != 0;
 
         // Expose as read-only references — zero allocation on read. All writes go through internal API (Add/Remove).
         // Caller responsibility: read-only access only. Consistent with ref-return patterns in ECS frameworks.
@@ -264,7 +266,8 @@ namespace BattleSystemECS.Core
         }
 
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
-        private ConcurrentBag<(int enemyId, int playerId)>[] _deathQueue = new ConcurrentBag<(int, int)>[2];
+        private readonly struct DeathEntry { public readonly int EnemyId, PlayerId, Generation; public readonly long Sequence; public readonly GAS.EntityHandle Source; public DeathEntry(int enemyId, int playerId, int generation, long sequence, GAS.EntityHandle source) { EnemyId = enemyId; PlayerId = playerId; Generation = generation; Sequence = sequence; Source = source; } }
+        private ConcurrentBag<DeathEntry>[] _deathQueue = new ConcurrentBag<DeathEntry>[2];
         private int _deathQueueIdx = 0;
 
         // Tower kill queue: (enemyId, playerId, towerId) — parallel-safe
@@ -272,6 +275,11 @@ namespace BattleSystemECS.Core
         private int _towerKillQueueIdx = 0;
 
         private bool _deathQueueResolved = false;
+        private readonly int[] _enemyDeathPending = new int[MAX_ENTITIES];
+        private long _deathEnqueueCount;
+        private int _frameSequence;
+        public long DeathEnqueueCount => Interlocked.Read(ref _deathEnqueueCount);
+        public long DeathResolveCount { get; private set; }
 
         // Combo kill callback — fired once per killed enemy during ResolveEnemiesKilledThisFrame.
         // Safe for serial use only (called from the resolve loop inside a foreach).
@@ -293,6 +301,11 @@ namespace BattleSystemECS.Core
             _deathQueueIdx = 1 - _deathQueueIdx;
             _deathQueue[_deathQueueIdx].Clear();
             _deathQueueResolved = false;
+            DamageResolver.Events.Clear();
+            ResourceResolver.Events.Clear();
+            DamageResolver.BeginFrame();
+            DamageResolver.ResetDiagnostics();
+            ResourceResolver.BeginFrame();
             // Shield-break queue is per-frame by contract: ApplyEnemyDamage appends on every
             // elemental-shield break, and the drain lives in ElementalReactionSystem — which is
             // never constructed (no `new ElementalReactionSystem(` anywhere), so nothing ever
@@ -371,18 +384,27 @@ namespace BattleSystemECS.Core
                 TowerRallyAtkSpdBonus[tid] = 0f;
             }
             CurrentFrame++;
+            _frameSequence = 0;
         }
 
         /// <summary>
         /// Queue an enemy death from a parallel context. Thread-safe.
         /// Must be matched with a later call to ResolveEnemiesKilledThisFrame().
         /// </summary>
-        public void QueueEnemyDeath(int enemyId, int playerId)
+        public void QueueEnemyDeath(int enemyId, int playerId, long sequence = 0L, GAS.EntityHandle source = default(GAS.EntityHandle))
         {
             // H-11 fix: validate IDs are within valid range before queueing
             if (!IsValidEntity(enemyId)) return;
             if (!IsValidPlayer(playerId)) return;
-            _deathQueue[_deathQueueIdx].Add((enemyId, playerId));
+            if (Interlocked.CompareExchange(ref _enemyDeathPending[enemyId], 1, 0) != 0) return;
+            Interlocked.Increment(ref _deathEnqueueCount);
+            _deathQueue[_deathQueueIdx].Add(new DeathEntry(enemyId, playerId, GetEntityHandle(enemyId).Generation, sequence, source));
+        }
+
+        internal long AllocateGameplaySequence(int targetId)
+        {
+            int ordinal = Interlocked.Increment(ref _frameSequence);
+            return ((long)CurrentFrame << 32) | (uint)ordinal;
         }
 
         /// <summary>
@@ -422,16 +444,27 @@ namespace BattleSystemECS.Core
             int readIdx = _deathQueueIdx;
             int writeIdx = 1 - _deathQueueIdx;
             _deathQueueIdx = writeIdx;
-            foreach (var (enemyId, playerId) in _deathQueue[readIdx])
+            foreach (var entry in _deathQueue[readIdx])
             {
+                int enemyId = entry.EnemyId; int playerId = entry.PlayerId;
+                if (GetEntityHandle(enemyId).Generation != entry.Generation) continue;
+                Volatile.Write(ref _enemyDeathPending[enemyId], 0);
                 if (!EnemyActive[enemyId]) continue; // already destroyed this frame
+                EntityHandle oldTarget = new EntityHandle(enemyId, entry.Generation);
+                EntityHandle oldSource = entry.Source.IsValid ? entry.Source : GetEntityHandle(playerId);
                 TotalKills++;
+                DeathResolveCount++;
 
                 // Gold reward logic:
                 // - Thief that escaped (HasStolenGold): no gold reward, but if killed later -> GoldOnReturn bonus
                 // - Thief killed before escaping: normal gold reward (IsThief but HasStolenGold=false)
                 // - Normal enemy: normal gold reward
                 float goldReward;
+                long killSequence = entry.Sequence == 0L ? ((long)CurrentFrame << 32) | (uint)enemyId : entry.Sequence;
+                void AddLifecycleGold(float amount)
+                {
+                    if (amount != 0f) ResourceResolver.ApplyLifecycleGold(playerId, amount, oldSource, killSequence, playerId);
+                }
                 if (EnemyHasStolenGold[enemyId])
                 {
                     // Thief was caught AFTER escaping — award GoldOnReturn bonus instead of normal reward
@@ -458,7 +491,7 @@ namespace BattleSystemECS.Core
                 int killsThisWave = PlayerWaveKillCount[playerId];
                 float decayMult = Math.Max(_waveGoldDecayFloor, 1.0f - killsThisWave * _waveGoldDecayRate);
                 goldReward *= decayMult;
-                PlayerGold[playerId] += goldReward;
+                AddLifecycleGold(goldReward);
                 // Bump per-player kill counter AFTER the gold has been calculated and awarded.
                 // Capped at int.MaxValue-1 to avoid overflow on absurd kill counts (e.g. long benchmarks).
                 if (PlayerWaveKillCount[playerId] < int.MaxValue - 1)
@@ -466,13 +499,13 @@ namespace BattleSystemECS.Core
                     PlayerWaveKillCount[playerId]++;
                 }
                 if (_goldOnEliteKill > 0f && EnemyIsElite[enemyId])
-                    PlayerGold[playerId] += _goldOnEliteKill;
+                    AddLifecycleGold(_goldOnEliteKill);
                 // Death Mark / Execute bonus gold: +50% extra gold for executing a marked enemy.
                 // Self-balancing — only triggers once per enemy (on death), so no chain exploits.
                 if (EnemyMarked[enemyId])
                 {
                     float markBonus = goldReward * EnemyMarkedDamageBonus[enemyId];
-                    PlayerGold[playerId] += markBonus;
+                    AddLifecycleGold(markBonus);
                 }
                 // ── Execute bonus (Round 105 Direction 8) ──────────────────────────
                 // Per-enemy HP-fraction threshold (EnemyExecuteThreshold > 0) opts the enemy in
@@ -485,7 +518,7 @@ namespace BattleSystemECS.Core
                     float execGold = EnemyExecuteBonusGold[enemyId];
                     if (execGold > 0f)
                     {
-                        PlayerGold[playerId] += execGold;
+                        AddLifecycleGold(execGold);
                     }
                     float execMana = EnemyExecuteBonusMana[enemyId];
                     if (execMana > 0f)
@@ -494,7 +527,7 @@ namespace BattleSystemECS.Core
                         // pattern used everywhere else for safe mana writes. Note that when
                         // PlayerMaxMana is 0 (uninitialized player), SetPlayerMana clamps to 0;
                         // this is the established convention across the codebase.
-                        SetPlayerMana(playerId, PlayerMana[playerId] + execMana);
+                        ResourceResolver.ApplyLifecycleMana(playerId, execMana, oldSource, killSequence, playerId);
                     }
                     EnemyExecuted[enemyId] = true;
                 }
@@ -502,6 +535,11 @@ namespace BattleSystemECS.Core
                 // Fire tower kill event (for TowerExperienceSystem XP grant) — serial, safe
                 ResolveTowerKillsThisFrame();
                 DestroyEntity(enemyId);
+                // KillConfirmed 仅在奖励、生命周期回调、塔击杀经验和销毁完成后发布；保留致死命中的旧代句柄。
+                bool killPublished = DamageResolver.Events.TryPublish(new GameplayEvent(
+                    GameplayEventType.KillConfirmed, oldSource, oldTarget,
+                    killSequence), true);
+                DamageResolver.MarkEventPublicationFailure(!killPublished);
             }
             _deathQueue[writeIdx].Clear();
             _deathQueueResolved = true;
@@ -510,9 +548,10 @@ namespace BattleSystemECS.Core
         public ComponentStore()
         {
             ResourceResolver = new GAS.ResourceResolver(this);
+            DamageResolver = new GAS.DamageResolver(this);
             // Initialize ping-pong death queue buffers
-            _deathQueue[0] = new ConcurrentBag<(int, int)>();
-            _deathQueue[1] = new ConcurrentBag<(int, int)>();
+            _deathQueue[0] = new ConcurrentBag<DeathEntry>();
+            _deathQueue[1] = new ConcurrentBag<DeathEntry>();
             // Initialize tower kill queue buffers
             _towerKillQueue[0] = new ConcurrentBag<(int, int, int)>();
             _towerKillQueue[1] = new ConcurrentBag<(int, int, int)>();
@@ -548,6 +587,7 @@ namespace BattleSystemECS.Core
             // Initialize player buffs
             for (int i = 0; i < MAX_PLAYERS; i++)
             {
+                PlayerDamageType[i] = DamageType.Physical;
                 PlayerBuffs[i] = new List<string>();
                 PlayerUnlockedTechs[i] = new HashSet<string>();
                 PlayerBuffFlags[i] = BuffType.None;
@@ -610,6 +650,8 @@ namespace BattleSystemECS.Core
 
         public void DestroyEntity(int entityId)
         {
+            if (!IsValidEntity(entityId)) return;
+            Volatile.Write(ref _enemyDeathPending[entityId], 0);
             ClearComputedAttributes(entityId);
             // ── Phase 1: determine archetype ────────────────────────────────────────
             bool wasEnemy = EnemyActive[entityId];

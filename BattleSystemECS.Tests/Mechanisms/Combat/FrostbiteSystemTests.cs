@@ -17,6 +17,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         private (FrostbiteSystem sys, int playerId) CreateEnv()
         {
             int playerId = Store.CreateEntity();
+            Store.AddPlayer(playerId, 3f, 1f, 1f, 1);
             var sys = new FrostbiteSystem(Store, playerId);
             return (sys, playerId);
         }

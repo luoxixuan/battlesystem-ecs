@@ -62,7 +62,7 @@
 
 | 债务 | 终态方向 | 详述 |
 |---|---|---|
-| 伤害散落在约 30 个语义路径（当前严格 `-=` 为 29 行/19 文件；口径见 foundation） | 单一 `DamageResolver` | combat 文档 M3 |
+| 伤害散落在数十个生产写点和语义来源（当前严格 `-=` 为 29 行/19 文件；完整路径数待 M0 分类，口径见 foundation） | 单一 `DamageResolver` | combat 文档 M3 |
 | GAS 定义外形存在但没有真实属性运行时 | Attribute + Effect runtime | foundation M2、combat M4 |
 | 技能入口和 shape switch 分散 | `GasRuntime.TryActivate` + registry | orchestration M6 |
 | Group/Registry 依赖靠手工顺序 | FrameGraph + Installer | orchestration M5/M7 |
@@ -87,7 +87,7 @@ M5 的 `ISystem` 容器和节点元数据可以在 M1 后并行搭脚手架，�
 
 | 阶段 | 相对规模 | 主要风险 | 主要工具/证据 |
 |---|---|---|---|
-| M0 | S | 基线不可复现、语义未冻结 | 门禁命令、台账脚本、golden/replay |
+| M0 | M | 候选点需人工分类、基线不可复现、语义未冻结 | 门禁命令、台账脚本、golden/replay |
 | M1 | L | 混合 Effect 定义拆分、ID/旧配置兼容、容量策略 | 影响范围清单、Catalog Validator、handle 压力测试 |
 | M2 | M | 新旧属性重复贡献 | Aggregator 单测、computed projection 差分 |
 | M3 | XL | 双重减伤、死亡/时序漂移 | shadow resolver、source cutover、真实帧集成测试 |

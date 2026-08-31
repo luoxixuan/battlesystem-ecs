@@ -117,6 +117,8 @@ namespace BattleSystemECS.Systems
 
         // Map width minus one (used for knockback bound clamping)
         private readonly float _mapWidthMinusOne;
+        public int RejectedTransferCount { get; private set; }
+        public Core.GAS.DamageRejectionReason LastTransferRejection { get; private set; }
 
         // Ping-pong double-buffer for Tesla chain lightning damage events
         // Tuple: (chainId, enemyId, damage, playerId, towerId)
@@ -1681,7 +1683,7 @@ namespace BattleSystemECS.Systems
                                 // see ComponentStore.PlayerEntityId (default 1).
                                 if (store.PlayerEntityId >= 0 && store.PlayerEntityId < ComponentStore.MAX_PLAYERS)
                                 {
-                                    store.PlayerGold[store.PlayerEntityId] += effectValue;
+                                    store.ApplyPlayerResourceAuthority(store.PlayerEntityId, store.PlayerEntityId, new Core.GAS.AttributeKey(4), effectValue);
                                 }
                             }
                             else if (effect == 2)
@@ -1707,14 +1709,7 @@ namespace BattleSystemECS.Systems
                                         // Re-enter the enemy damage path via direct health application
                                         // (skipping damage queue to keep explosion atomic with the
                                         // destructible destruction and avoid recursion in the queue).
-                                        store.EnemyHealth[eid] -= explosionDmg;
-                                        // Round 132 Dir 8 — honor Boss Min-Health Floor (explosion route
-                                        // bypasses ApplyEnemyDamage so we re-clamp here in-place).
-                                        store.ApplyMinHealthFloorInPlace(eid);
-                                        if (store.EnemyHealth[eid] <= 0f)
-                                        {
-                                            store.QueueEnemyDeath(eid, store.PlayerEntityId);
-                                        }
+                                        store.ApplyDamageAuthority(obstacleId, eid, explosionDmg, 0, stage: Core.GAS.DamageAmountStage.Raw);
                                     }
                                 }
                             }
@@ -1925,7 +1920,7 @@ namespace BattleSystemECS.Systems
                 {
                     (finalDmg, linkedDamage, linkedEnemyId) = _lifeLinkSystem.ComputeLinkedDamage(enemyId, finalDmg);
                 }
-                store.EnemyHealth[enemyId] -= finalDmg;
+                store.ApplyDamageAuthority(towerId, enemyId, finalDmg, playerId, stage: Core.GAS.DamageAmountStage.PostMitigation);
                 if (finalDmg > 0f)
                 {
                     long critKey = ((long)enemyId << 32) | (uint)towerId;
@@ -1934,7 +1929,6 @@ namespace BattleSystemECS.Systems
                 }
                 // Round 132 Dir 8 — honor Boss Min-Health Floor (TowerAttackSystem primary hot
                 // path bypasses ApplyEnemyDamage's shield+floor route, so we re-clamp here).
-                store.ApplyMinHealthFloorInPlace(enemyId);
 
                 // ── Threat Score accumulation (Round 99 Direction 5) ──
                 // Accumulate applied damage (post-saturation) into the per-frame accumulator.
@@ -1965,11 +1959,11 @@ namespace BattleSystemECS.Systems
                             if (drain > 0f)
                             {
                                 // Decrement enemy mana first (parallel-safe in serial phase)
-                                store.EnemyCurrentMana[enemyId] = enemyCurMana - drain;
+                                store.ApplyEnemyResourceAuthority(enemyId, enemyId, new Core.GAS.AttributeKey(7), -drain);
                                 // Add to player mana pool, clamped to max
                                 float playerCur = store.PlayerMana[playerId];
                                 float playerMax = store.PlayerMaxMana[playerId];
-                                store.PlayerMana[playerId] = Math.Min(playerMax, playerCur + drain);
+                                store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), drain);
                             }
                         }
                     }
@@ -2308,12 +2302,11 @@ namespace BattleSystemECS.Systems
                 if (coverRange >= 0f && dy > coverRange) continue; // outside cover range
 
                 // Found a protecting vanguard — apply transferred damage to it
-                store.EnemyHealth[vanguardId] -= transferredDamage;
-                // Round 132 Dir 8 — honor Boss Min-Health Floor on vanguard transfer route.
-                store.ApplyMinHealthFloorInPlace(vanguardId);
-                if (store.EnemyHealth[vanguardId] <= 0f)
+                long transferProvenance = store.AllocateGameplaySequence(protectedEnemyId);
+                if (!store.ApplyDamageAuthority(protectedEnemyId, vanguardId, transferredDamage, 0, flags: Core.GAS.DamageFlags.Transfer, parentSequence: transferProvenance, stage: Core.GAS.DamageAmountStage.Raw, provenanceId: transferProvenance, provenanceDepth: 1))
                 {
-                    store.QueueEnemyDeath(vanguardId, store.PlayerEntityId);
+                    RejectedTransferCount++;
+                    LastTransferRejection = store.DamageResolver.LastRejection;
                 }
                 return; // only one vanguard shields each enemy (first match wins)
             }
@@ -2333,9 +2326,7 @@ namespace BattleSystemECS.Systems
             float resist = store.EnemyDamageResistance[linkedEnemyId];
             float finalLinkedDmg = resist >= 1f ? 0f : linkedDamage * (1f - resist);
 
-            store.EnemyHealth[linkedEnemyId] -= finalLinkedDmg;
-            // Round 132 Dir 8 — honor Boss Min-Health Floor on LifeLink partner route.
-            store.ApplyMinHealthFloorInPlace(linkedEnemyId);
+                store.ApplyDamageAuthority(store.PlayerEntityId, linkedEnemyId, finalLinkedDmg, playerId, stage: Core.GAS.DamageAmountStage.PostMitigation);
 
             // Thorns on linked enemy (if any — rare but possible)
             float thornsRatio = store.EnemyThornsRatio[linkedEnemyId];
@@ -2345,12 +2336,7 @@ namespace BattleSystemECS.Systems
                 lock (_thornsQueueLock) { _thornsQueue[_thornsQueueIdx].Add((playerId, thornsDamage)); }
             }
 
-            // Check if linked enemy dies from shared damage
-            if (store.EnemyHealth[linkedEnemyId] <= 0f)
-            {
-                store.QueueEnemyDeath(linkedEnemyId, playerId);
-                store.QueueTowerKill(linkedEnemyId, playerId, -1); // towerId=-1 (shared damage has no tower)
-            }
+            if (store.IsEnemyPendingDeath(linkedEnemyId)) store.QueueTowerKill(linkedEnemyId, playerId, -1);
         }
 
         /// <summary>
@@ -2391,9 +2377,7 @@ namespace BattleSystemECS.Systems
             // Tether: avoid self-damage to invulnerable partner (e.g. immune to physical)
             if (store.EnemyIsInvulnerable[partnerId]) return;
 
-            store.EnemyHealth[partnerId] -= finalShared;
-            // Round 132 Dir 8 — honor Boss Min-Health Floor on Tether partner route.
-            store.ApplyMinHealthFloorInPlace(partnerId);
+                store.ApplyDamageAuthority(enemyId, partnerId, finalShared, playerId, stage: Core.GAS.DamageAmountStage.PostMitigation);
 
             // Thorns on partner (if any)
             float partnerThorns = store.EnemyThornsRatio[partnerId];
@@ -2404,7 +2388,7 @@ namespace BattleSystemECS.Systems
             }
 
             // Tether shared damage can also kill the partner — queue death + kill
-            if (store.EnemyHealth[partnerId] <= 0f)
+            if (store.IsEnemyPendingDeath(partnerId))
             {
                 store.QueueEnemyDeath(partnerId, playerId);
                 store.QueueTowerKill(partnerId, playerId, -1); // towerId=-1 (tether has no source tower)
@@ -2442,13 +2426,7 @@ namespace BattleSystemECS.Systems
                 {
                     // Phase 2: apply chain hop damage
                     if (store.EnemyIsInvulnerable[enemyId]) continue;
-                    store.EnemyHealth[enemyId] -= damage;
-                    // Round 132 Dir 8 — honor Boss Min-Health Floor on chain hop route.
-                    store.ApplyMinHealthFloorInPlace(enemyId);
-                    if (store.EnemyHealth[enemyId] <= 0f)
-                    {
-                        store.QueueEnemyDeath(enemyId, playerId);
-                    }
+                    store.ApplyDamageAuthority(towerId, enemyId, damage, playerId, stage: Core.GAS.DamageAmountStage.PostMitigation);
                 }
             }
         }
@@ -2594,28 +2572,16 @@ namespace BattleSystemECS.Systems
                             float innerRadiusSq = falloffInnerRatio * falloffInnerRatio * splashRadius * splashRadius;
                             if (distSq > innerRadiusSq)
                             {
-                                store.EnemyHealth[enemyId] -= effectiveSplash * falloffOuterMult;
-                                // Round 132 Dir 8 — honor Boss Min-Health Floor on splash outer falloff.
-                                store.ApplyMinHealthFloorInPlace(enemyId);
-                                if (store.EnemyHealth[enemyId] <= 0f)
-                                    store.QueueEnemyDeath(enemyId, playerId);
+                                store.ApplyDamageAuthority(towerId, enemyId, effectiveSplash * falloffOuterMult, playerId, stage: Core.GAS.DamageAmountStage.PostMitigation);
                             }
                             else
                             {
-                                store.EnemyHealth[enemyId] -= effectiveSplash;
-                                // Round 132 Dir 8 — honor Boss Min-Health Floor on splash inner zone.
-                                store.ApplyMinHealthFloorInPlace(enemyId);
-                                if (store.EnemyHealth[enemyId] <= 0f)
-                                    store.QueueEnemyDeath(enemyId, playerId);
+                                store.ApplyDamageAuthority(towerId, enemyId, effectiveSplash, playerId, stage: Core.GAS.DamageAmountStage.PostMitigation);
                             }
                         }
                         else
                         {
-                            store.EnemyHealth[enemyId] -= effectiveSplash;
-                            // Round 132 Dir 8 — honor Boss Min-Health Floor on splash route (no falloff).
-                            store.ApplyMinHealthFloorInPlace(enemyId);
-                            if (store.EnemyHealth[enemyId] <= 0f)
-                                store.QueueEnemyDeath(enemyId, playerId);
+                            store.ApplyDamageAuthority(towerId, enemyId, effectiveSplash, playerId, stage: Core.GAS.DamageAmountStage.PostMitigation);
                         }
                     }
                 }

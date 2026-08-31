@@ -21,6 +21,8 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore store;
         private readonly int playerId;
+        public int RejectedTransferCount { get; private set; }
+        public Core.GAS.DamageRejectionReason LastTransferRejection { get; private set; }
         
         // Thread-safe collection for damage transfer events
         private readonly ConcurrentBag<ProtectorDamageTransferEvent> _transferEvents = new();
@@ -121,7 +123,8 @@ namespace BattleSystemECS.Systems
                         ProtectorId = protectorId,
                         ProtectedAllyId = allyId,
                         DamageTransferRatio = damageTransfer,
-                        TransferFromAlly = allyTransfer
+                        TransferFromAlly = allyTransfer,
+                        ParentSequence = store.AllocateGameplaySequence(allyId)
                     });
 
                     protectedCount++;
@@ -171,10 +174,10 @@ namespace BattleSystemECS.Systems
                 float protectorMaxHealth = store.EnemyMaxHealth[evt.ProtectorId];
                 float damageToTransfer = protectorMaxHealth * transferredDamageRatio * 0.1f; // 10% of protector's max HP per protected ally
 
-                store.EnemyHealth[evt.ProtectorId] -= damageToTransfer;
-                if (store.EnemyHealth[evt.ProtectorId] <= 0f)
+                if (!store.ApplyDamageAuthority(evt.ProtectedAllyId, evt.ProtectorId, damageToTransfer, playerId, flags: Core.GAS.DamageFlags.Transfer, parentSequence: evt.ParentSequence, stage: Core.GAS.DamageAmountStage.Raw, provenanceId: evt.ParentSequence, provenanceDepth: 1))
                 {
-                    store.QueueEnemyDeath(evt.ProtectorId, playerId);
+                    RejectedTransferCount++;
+                    LastTransferRejection = store.DamageResolver.LastRejection;
                 }
             }
         }
@@ -185,6 +188,7 @@ namespace BattleSystemECS.Systems
             public int ProtectedAllyId { get; init; }
             public float DamageTransferRatio { get; init; }
             public float TransferFromAlly { get; init; }
+            public long ParentSequence { get; init; }
         }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -22,6 +23,7 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore store;
         private readonly IRenderer renderer;
         private readonly Random _random;
+        private readonly int _playerId;
 
         // Affix candidates: all available affixes to randomly assign
         private static readonly BuffType[] AFFIX_CANDIDATES = new[]
@@ -38,10 +40,11 @@ namespace BattleSystemECS.Systems
         // Number of affixes to roll per enemy (1 to MAX_AFFIXES_PER_ENEMY)
         private const int MAX_AFFIXES_PER_ENEMY = 3;
 
-        public EnemyAffixSystem(ComponentStore store, IRenderer renderer)
+        public EnemyAffixSystem(ComponentStore store, IRenderer renderer, int playerId = 0)
         {
             this.store = store;
             this.renderer = renderer;
+            _playerId = playerId;
             _random = new Random();
 
             // Subscribe to kill events for AffixVampiric (on-kill healing) and affix death effects
@@ -118,7 +121,7 @@ namespace BattleSystemECS.Systems
                 if ((flags & BuffType.AffixRegen) != 0)
                 {
                     float heal = store.EnemyMaxHealth[id] * 0.02f * deltaTime;
-                    store.EnemyHealth[id] = Math.Min(store.EnemyHealth[id] + heal, store.EnemyMaxHealth[id]);
+                    store.ApplyEnemyResourceAuthority(id, id, new Core.GAS.AttributeKey(3), heal);
                 }
 
                 // AffixTeleporter: random teleport with 5s cooldown
@@ -173,7 +176,7 @@ namespace BattleSystemECS.Systems
             if (!store.HasAffix(killerId, BuffType.AffixVampiric)) return;
             if (killerId < 0 || killerId >= ComponentStore.MAX_ENTITIES) return;
             float heal = store.EnemyMaxHealth[killerId] * 0.05f;
-            store.EnemyHealth[killerId] = Math.Min(store.EnemyHealth[killerId] + heal, store.EnemyMaxHealth[killerId]);
+            store.ApplyEnemyResourceAuthority(killerId, killerId, new Core.GAS.AttributeKey(3), heal);
         }
 
         private void ApplyAoEToNearbyEnemies(int sourceId, float posX, float posY, float damage, float radius)
@@ -190,7 +193,9 @@ namespace BattleSystemECS.Systems
                 float dist = (float)Math.Sqrt(dx * dx + dy * dy);
                 if (dist <= radius)
                 {
-                    store.EnemyHealth[id] -= damage;
+                    var source = store.GetEntityHandle(sourceId);
+                    var target = store.GetEntityHandle(id);
+                    if (source.IsValid && target.IsValid) store.DamageResolver.TryApply(new Core.GAS.DamageRequest(source, target, damage, DamageType.True, ElementType.None, DamageFlags.None, DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(id), ownerPlayerId: _playerId));
                 }
             }
         }
@@ -202,7 +207,9 @@ namespace BattleSystemECS.Systems
             {
                 int id = activeIds[i];
                 if (id == sourceId) continue;
-                store.EnemyHealth[id] -= damage;
+                var source = store.GetEntityHandle(sourceId);
+                var target = store.GetEntityHandle(id);
+                if (source.IsValid && target.IsValid) store.DamageResolver.TryApply(new Core.GAS.DamageRequest(source, target, damage, DamageType.True, ElementType.None, DamageFlags.None, DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(id), ownerPlayerId: _playerId));
             }
         }
     }

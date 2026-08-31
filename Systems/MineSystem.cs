@@ -395,13 +395,7 @@ namespace BattleSystemECS.Systems
                 if (!store.EnemyActive[eid]) continue;
                 if (store.EnemyHealth[eid] <= 0f) continue;
                 if (store.EnemyIsInvulnerable[eid]) continue;
-                float newHp = store.EnemyHealth[eid] - dmg;
-                if (newHp < 0f) newHp = 0f;
-                store.EnemyHealth[eid] = newHp;
-                if (newHp <= 0f)
-                {
-                    store.QueueEnemyDeath(eid, playerId);
-                }
+                store.ApplyDamageAuthority(eid, eid, dmg, playerId, stage: Core.GAS.DamageAmountStage.Raw);
             }
             readQueue.Clear();
         }

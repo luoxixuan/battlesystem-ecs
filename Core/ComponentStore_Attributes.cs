@@ -1,4 +1,6 @@
+using System;
 using BattleSystemECS.Core.GAS;
+using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Core
 {
@@ -6,6 +8,43 @@ namespace BattleSystemECS.Core
     {
         public AttributeAggregator AttributeAggregator { get; } = new AttributeAggregator();
         public ResourceResolver ResourceResolver { get; }
+        public DamageResolver DamageResolver { get; }
+        internal bool ApplyDamageAuthority(int sourceId, int targetId, float amount, int ownerPlayerId, DamageType damageType = DamageType.True, ElementType element = ElementType.None, DamageFlags flags = DamageFlags.None, DamageCommitBoundary boundary = DamageCommitBoundary.GameplayResolve, long parentSequence = 0L, DamageAmountStage stage = DamageAmountStage.PostMitigation, long provenanceId = 0L, int provenanceDepth = 0)
+        {
+            var source = GetEntityHandle(sourceId); var target = GetEntityHandle(targetId);
+            if (!source.IsValid || !target.IsValid) return false;
+            if (!EnemyActive[targetId] || !GetEntityHandle(targetId).Equals(target)) return false;
+            var result = DamageResolver.TryApplyValidated(new DamageRequest(source, target, amount, damageType, element, flags, stage, boundary, AllocateGameplaySequence(targetId), parentSequence, ownerPlayerId: ownerPlayerId, provenanceId: provenanceId, provenanceDepth: provenanceDepth));
+            return result.Accepted;
+        }
+        internal bool ApplyPlayerResourceAuthority(int sourceId, int playerId, AttributeKey resource, float delta, long sequence = 0L)
+        {
+            var source = GetEntityHandle(sourceId); var target = GetEntityHandle(playerId);
+            if (!source.IsValid || !target.IsValid) return false;
+            var result = ResourceResolver.TryApply(new ResourceRequest(source, target, resource, delta, ResourceOperation.Add, 0, sequence == 0L ? AllocateGameplaySequence(playerId) : sequence, ownerPlayerId: playerId));
+            return result.Accepted;
+        }
+        internal bool ApplyEnemyResourceAuthority(int sourceId, int enemyId, AttributeKey resource, float delta, long sequence = 0L, int ownerPlayerId = 0)
+        {
+            var source = GetEntityHandle(sourceId); var target = GetEntityHandle(enemyId);
+            if (!source.IsValid || !target.IsValid) return false;
+            var result = ResourceResolver.TryApply(new ResourceRequest(source, target, resource, delta, ResourceOperation.Add, 0, sequence == 0L ? AllocateGameplaySequence(enemyId) : sequence, ownerPlayerId: ownerPlayerId));
+            return result.Accepted;
+        }
+        internal bool SetPlayerResourceAuthority(int sourceId, int playerId, AttributeKey resource, float value, long sequence = 0L)
+        {
+            var source = GetEntityHandle(sourceId); var target = GetEntityHandle(playerId);
+            if (!source.IsValid || !target.IsValid) return false;
+            var result = ResourceResolver.TryApply(new ResourceRequest(source, target, resource, value, ResourceOperation.Set, 0, sequence == 0L ? AllocateGameplaySequence(playerId) : sequence, ownerPlayerId: playerId));
+            return result.Accepted;
+        }
+        internal bool SetEnemyResourceAuthority(int sourceId, int enemyId, AttributeKey resource, float value, long sequence = 0L)
+        {
+            var source = GetEntityHandle(sourceId); var target = GetEntityHandle(enemyId);
+            if (!source.IsValid || !target.IsValid) return false;
+            var result = ResourceResolver.TryApply(new ResourceRequest(source, target, resource, value, ResourceOperation.Set, 0, sequence == 0L ? AllocateGameplaySequence(enemyId) : sequence, ownerPlayerId: 0));
+            return result.Accepted;
+        }
         /// <summary>Compatibility rollback switch. Disabled preserves all legacy projections.</summary>
         private bool _useComputedAttributes;
         private bool _requestedComputedAttributes;

@@ -333,8 +333,7 @@ namespace BattleSystemECS.Systems
 
             float maxHealth = store.EnemyMaxHealth[enemyId];
             float healAmount = maxHealth * ability.HealAmount;
-            float newHealth = store.EnemyHealth[enemyId] + healAmount;
-            store.EnemyHealth[enemyId] = Math.Min(newHealth, maxHealth);
+            store.ApplyEnemyResourceAuthority(enemyId, enemyId, new Core.GAS.AttributeKey(3), healAmount);
 
             logger.Log($"[ABILITY] Enemy {enemyId} heals for {healAmount:F1} HP ({ability.Name})");
         }
@@ -484,8 +483,7 @@ namespace BattleSystemECS.Systems
                 {
                     float maxHealth = store.EnemyMaxHealth[allyId];
                     float healAmount = maxHealth * ability.HealAmount;
-                    float newHealth = store.EnemyHealth[allyId] + healAmount;
-                    store.EnemyHealth[allyId] = Math.Min(newHealth, maxHealth);
+            store.ApplyEnemyResourceAuthority(enemyId, allyId, new Core.GAS.AttributeKey(3), healAmount);
                     healedCount++;
                 }
             }

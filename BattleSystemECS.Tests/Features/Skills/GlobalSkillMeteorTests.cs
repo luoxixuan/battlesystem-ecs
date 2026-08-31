@@ -92,4 +92,5 @@ public class GlobalSkillMeteorTests : BattleTestBase
         // free-list 回收后，下一个 CreateEntity 必须能拿回同一个 id
         Assert.Equal(eid, Store.CreateEntity());
     }
+
 }

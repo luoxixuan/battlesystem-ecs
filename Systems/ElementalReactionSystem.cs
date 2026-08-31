@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -350,10 +351,11 @@ namespace BattleSystemECS.Systems
                 float currentHealth = store.EnemyHealth[enemyId];
                 if (currentHealth <= 0f) continue;
 
-                store.EnemyHealth[enemyId] -= damage;
+                var source = store.GetEntityHandle(store.PlayerEntityId);
+                var target = store.GetEntityHandle(enemyId);
+                if (!source.IsValid || !target.IsValid) continue;
+                store.DamageResolver.TryApply(new DamageRequest(source, target, damage, DamageType.True, ElementType.None, DamageFlags.None, DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(enemyId), ownerPlayerId: playerId));
                 logger?.Log($"[ELEMENT] {reactionType} reaction on enemy {enemyId}: -{damage:F1} HP");
-                if (store.EnemyHealth[enemyId] <= 0f)
-                    store.QueueEnemyDeath(enemyId, playerId);
             }
         }
 

@@ -2108,88 +2108,23 @@ namespace BattleSystemECS.Core
         /// On shield break, the configured EnemyShieldBreakReaction element is applied to the enemy
         /// via the ElementalReactionSystem pathway.
         /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void ApplyEnemyDamage(int enemyId, float damage, ElementType attackElement)
         {
-            if (!IsValidEntity(enemyId)) return;
-            if (damage <= 0f) return;
-
-            // ── Path Tile Cost (Round 89) — apply waypoint terrain dmg-taken mult (Snow) ──
-            // Default 1.0f (no effect). Only >1.0 (Snow) is expected; the call is cheap
-            // (single array index + multiply) and runs on every damage event including
-            // shield and DoT routes. Skips below 0.01f to avoid amplifying near-zero edge
-            // cases (e.g. absorb ticks).
-            float pathDmgMult = EnemyPathTerrainDmgMult[enemyId];
-            if (pathDmgMult > 1.0001f)
+            // 兼容入口仅转发到统一 resolver；运行时系统必须提交完整 DamageRequest。
+            if (PositionActive[PlayerEntityId] && GetEntityHandle(PlayerEntityId).IsValid)
             {
-                damage *= pathDmgMult;
-            }
-
-            // ── Min-Health Floor (Round 132 Dir 8) ──
-            // If the enemy has a configured HP floor, clamp damage so EnemyHealth never drops
-            // below (MaxHealth × EnemyMinHealthFloor). Default 0f = opt-out, no clamp.
-            // Applies AFTER path terrain mult but BEFORE shield/health split so the floor is
-            // expressed in terms of final health damage. This is the canonical Boss "can't be
-            // one-shot" guard. Cost: 1 array index + 1 compare per damage event.
-            damage = ClampDamageToHealthFloor(enemyId, damage);
-
-            float shield = EnemyShield[enemyId];
-            if (shield <= 0f)
-            {
-                EnemyHealth[enemyId] -= damage;
+                DamageResolver.ApplyLegacy(enemyId, damage, attackElement, PlayerEntityId);
                 return;
             }
+            // 旧测试/存档可能尚未装配玩家实体；此分支只保留兼容适配，不参与运行时系统。
+            if (!IsValidEntity(enemyId) || !EnemyActive[enemyId] || damage <= 0f) return;
+            ResourceResolver.ApplyEnemyDamageResources(enemyId, damage, attackElement, false);
+        }
 
-            // Apply elemental shield modifier if the enemy has a configured shield type
-            // and the incoming attack carries an element tag.
-            float shieldMult = 1f;
-            bool shieldHasElement = EnemyShieldType[enemyId] != ElementType.None;
-            if (shieldHasElement && attackElement != ElementType.None)
-            {
-                if (attackElement == EnemyShieldType[enemyId])
-                {
-                    // Weak element: amplify damage to shield (default 2x)
-                    shieldMult = EnemyShieldWeakMult[enemyId] > 0f ? EnemyShieldWeakMult[enemyId] : 2f;
-                }
-                else
-                {
-                    // Off-element: resist (default 0.5x)
-                    float resist = EnemyShieldResistMult[enemyId];
-                    shieldMult = resist > 0f ? resist : 0.5f;
-                }
-                damage *= shieldMult;
-            }
-
-            if (shield >= damage)
-            {
-                EnemyShield[enemyId] = shield - damage;
-                return;
-            }
-            float remaining = damage - shield;
-            EnemyShield[enemyId] = 0f;
-            EnemyHealth[enemyId] -= remaining;
-
-            // Shield broke — apply break-reaction element to the enemy
-            if (shieldHasElement)
-            {
-                ElementType breakElement = EnemyShieldBreakReaction[enemyId];
-                if (breakElement != ElementType.None)
-                {
-                    float breakDur = EnemyShieldBreakElementDuration[enemyId] > 0f
-                        ? EnemyShieldBreakElementDuration[enemyId]
-                        : 2f;
-                    // Apply element status mask and timer directly (parallel-safe in serial phase)
-                    int elemIdx = ElementOrdinalForShield(breakElement);
-                    if (elemIdx >= 0)
-                    {
-                        EnemyElementStatus[enemyId] |= breakElement;
-                        // Refresh the break-element timer (use the longer of current vs. break duration)
-                        float existing = EnemyElementTimer[enemyId * 4 + elemIdx];
-                        if (existing < breakDur) EnemyElementTimer[enemyId * 4 + elemIdx] = breakDur;
-                        // Enqueue for ElementalReactionSystem to process (check for further reactions)
-                        _pendingShieldBreaks.Add(enemyId);
-                    }
-                }
-            }
+        internal void ApplyEnemyDamageLegacy(int enemyId, float damage, ElementType attackElement, bool ignoreShield = false)
+        {
+            ApplyEnemyDamage(enemyId, damage, attackElement);
         }
 
         private static int ElementOrdinalForShield(ElementType element)

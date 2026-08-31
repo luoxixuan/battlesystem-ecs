@@ -8,8 +8,10 @@ ignored; block-comment/preprocessor edge cases may still be reported and
 must be reviewed manually.
 
 Usage:
-  pwsh -File tools/inventory-ecs-gas-migration.ps1
-  pwsh -File tools/inventory-ecs-gas-migration.ps1 -OutputPath artifacts/gas-migration-ledger.json
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/inventory-ecs-gas-migration.ps1
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/inventory-ecs-gas-migration.ps1 -OutputPath artifacts/gas-migration-ledger.json
+
+PowerShell 7 users may replace powershell.exe with pwsh.
 #>
 [CmdletBinding()]
 param(
@@ -133,6 +135,7 @@ foreach ($directory in $scanDirectories) {
         Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' })
 }
 
+$enemyHealthAccesses = @()
 $directWrites = @()
 $applyCalls = @()
 $queueDeclarations = @()
@@ -140,8 +143,11 @@ $towerAttackQueueDeclarations = @()
 $damageLoops = @()
 $abilityEntrypoints = @()
 $effectTimerOwners = @()
+$registryProperties = @()
+$groupAssignments = @()
 $nullableGroupSlots = @()
 $registryInjectors = @()
+$gameplayEffectUsages = @()
 $newTypeCounts = @{}
 
 $knownDefinitions = @(
@@ -160,6 +166,25 @@ foreach ($file in $productionFiles) {
 
     for ($lineIndex = 0; $lineIndex -lt $lines.Count; $lineIndex++) {
         $rawLine = [string]$lines[$lineIndex]
+
+        # Preserve the broad grep-equivalent metric separately. It deliberately
+        # includes reads and comments so a review cannot relabel it as a writer
+        # count. Executable write candidates are collected from comment-stripped
+        # code below.
+        $rawEnemyHealthMatches = [regex]::Matches(
+            $rawLine,
+            '\b(?:[A-Za-z_][A-Za-z0-9_]*\.)?EnemyHealth\s*\[[^\]]+\]'
+        )
+        if ($rawEnemyHealthMatches.Count -gt 0) {
+            $enemyHealthAccesses += [ordered]@{
+                file = $relative
+                line = $lineIndex + 1
+                occurrenceCount = $rawEnemyHealthMatches.Count
+                isCommentOnly = $rawLine.TrimStart().StartsWith('//')
+                text = $rawLine.Trim()
+            }
+        }
+
         $code = Remove-LineComment -Text $rawLine
         $trimmed = $code.Trim()
         if ($trimmed.Length -eq 0) {
@@ -196,12 +221,18 @@ foreach ($file in $productionFiles) {
 
         if ($code -match '\b(?:[A-Za-z_][A-Za-z0-9_]*\.)?ApplyEnemyDamage\s*\(') {
             $isDeclaration = $code -match '\b(?:public|private|protected|internal)\b[^;]*\bApplyEnemyDamage\s*\('
+            $isOverloadForward = (
+                $relativeNormalized -eq 'Core/ComponentStore_Enemy.cs' -and
+                $currentMethod -eq 'ApplyEnemyDamage' -and
+                -not $isDeclaration
+            )
             $applyCalls += [ordered]@{
                 file = $relative
                 line = $lineIndex + 1
                 method = $currentMethod
                 isDefinition = [bool]$isDeclaration
-                isProductionCaller = ($relativeNormalized -like 'Systems/*' -and -not $isDeclaration)
+                isOverloadForward = [bool]$isOverloadForward
+                isProductionCaller = (-not $isDeclaration -and -not $isOverloadForward)
                 text = $trimmed
             }
         }
@@ -257,28 +288,64 @@ foreach ($file in $productionFiles) {
             }
         }
 
-        if ($relativeNormalized -eq 'Core/SystemRegistry.cs' -and $code -match '\bscheduler\.(?<group>[A-Za-z_][A-Za-z0-9_]*)\.(?<slot>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*null\b') {
-            $nullableGroupSlots += [ordered]@{
+        if ($code -match '\b(GameplayEffectDef|AppliedEffect)\b') {
+            $effectType = [string]$Matches[1]
+            $gameplayEffectUsages += [ordered]@{
                 file = $relative
                 line = $lineIndex + 1
-                group = $Matches['group']
-                slot = $Matches['slot']
+                method = $currentMethod
+                type = $effectType
+                access = if ($code -match ('\bnew\s+' + [regex]::Escape($effectType))) { 'construct' } elseif ($code -match '\b(SetEffect|AddEffect|GetEffect)\b') { 'store-api' } elseif ($code -match '(RemainingTime|TicksRemaining|TimeSinceLastTick|StackCount)') { 'runtime-field' } else { 'reference' }
                 text = $trimmed
             }
         }
 
-        if ($relativeNormalized -eq 'Core/SystemRegistry.cs' -and $null -ne $methodCandidate -and $methodCandidate -match '^(Set|Inject|Wire)') {
-            $registryInjectors += [ordered]@{
-                file = $relative
-                line = $lineIndex + 1
-                method = $methodCandidate
-                text = $trimmed
+        if ($relativeNormalized -eq 'Core/SystemRegistry.cs') {
+            if ($code -match '\bpublic\s+(?<type>[A-Za-z_][A-Za-z0-9_<>.]*)\?\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\{\s*get;\s*private\s+set;\s*\}') {
+                $registryProperties += [ordered]@{
+                    file = $relative
+                    line = $lineIndex + 1
+                    type = $Matches['type']
+                    name = $Matches['name']
+                    text = $trimmed
+                }
+            }
+
+            if ($code -match '\bscheduler\.(?<group>[A-Za-z_][A-Za-z0-9_]*)\.(?<slot>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?<value>[^;]+);') {
+                $assignment = [ordered]@{
+                    file = $relative
+                    line = $lineIndex + 1
+                    group = $Matches['group']
+                    slot = $Matches['slot']
+                    value = $Matches['value'].Trim()
+                    text = $trimmed
+                }
+                $groupAssignments += $assignment
+                if ($assignment.value -eq 'null') {
+                    $nullableGroupSlots += $assignment
+                }
+            }
+
+            if ($code -match '\b(?<owner>[A-Za-z_][A-Za-z0-9_]*)\s*(?:\?\.|\.)\s*(?<method>(?:Set|Inject|Wire)[A-Za-z0-9_]*)\s*\(') {
+                $registryInjectors += [ordered]@{
+                    file = $relative
+                    line = $lineIndex + 1
+                    enclosingMethod = $currentMethod
+                    owner = $Matches['owner']
+                    method = $Matches['method']
+                    text = $trimmed
+                }
             }
         }
     }
 }
 
 $directWriteFiles = @($directWrites | ForEach-Object { $_.file } | Sort-Object -Unique)
+$enemyHealthAccessFiles = @($enemyHealthAccesses | ForEach-Object { $_.file } | Sort-Object -Unique)
+$enemyHealthAccessOccurrenceCount = 0
+foreach ($access in $enemyHealthAccesses) {
+    $enemyHealthAccessOccurrenceCount += [int]$access.occurrenceCount
+}
 $strictDamageWrites = @($directWrites | Where-Object { $_.operator -eq '-=' })
 $damageCandidateWrites = @($directWrites | Where-Object { $_.classification -eq 'DamageCandidate' })
 $productionApplyCalls = @($applyCalls | Where-Object { $_.isProductionCaller })
@@ -311,6 +378,12 @@ $ledger = [ordered]@{
     generatedAt = (Get-Date).ToString('o')
     commit = [string]$commit
     filesScanned = $productionFiles.Count
+    enemyHealthAccesses = [ordered]@{
+        rawLineCount = $enemyHealthAccesses.Count
+        rawOccurrenceCount = [int]$enemyHealthAccessOccurrenceCount
+        uniqueFiles = $enemyHealthAccessFiles.Count
+        items = $enemyHealthAccesses
+    }
     directWrites = [ordered]@{
         rawOccurrences = $directWrites.Count
         uniqueFiles = $directWriteFiles.Count
@@ -334,6 +407,15 @@ $ledger = [ordered]@{
     }
     abilityEntrypoints = $abilityEntrypoints
     effectTimerOwners = $effectTimerOwners
+    registryProperties = [ordered]@{
+        count = $registryProperties.Count
+        systemPropertyCount = @($registryProperties | Where-Object { $_.type -match 'System$' }).Count
+        items = $registryProperties
+    }
+    groupAssignments = [ordered]@{
+        count = $groupAssignments.Count
+        items = $groupAssignments
+    }
     nullableGroupSlots = [ordered]@{
         assignments = $nullableGroupSlots
         assignmentCount = $nullableGroupSlots.Count
@@ -342,19 +424,34 @@ $ledger = [ordered]@{
         uniqueSlotNames = $uniqueNullSlotNames
         uniqueSlotNameCount = $uniqueNullSlotNames.Count
     }
-    registryInjectors = $registryInjectors
+    registryInjectors = [ordered]@{
+        callCount = $registryInjectors.Count
+        calls = $registryInjectors
+    }
+    gameplayEffectUsages = $gameplayEffectUsages
+    compatibilityFacade = [ordered]@{
+        legacyTypes = @('GameplayEffectDef', 'AppliedEffect')
+        runtimeFieldsOnDefinition = @('RemainingTime', 'TicksRemaining')
+        derivedPolicyFieldsOnDefinition = @('RefreshDuration')
+        runtimeOwner = 'Systems/BuffSystem.cs + Core/ComponentStore_World.cs'
+        migrationStatus = 'legacy-facade-required; M1a inventory only'
+    }
     disabledDefinitions = $disabledDefinitions
 }
 
 Write-Output '=== ECS/GAS migration candidate inventory ==='
 Write-Output ("Files scanned: {0}" -f $ledger.filesScanned)
-Write-Output ("EnemyHealth writes: {0} raw occurrences in {1} files; strict -=: {2} occurrences in {3} files; DamageCandidate: {4}" -f `
+Write-Output ("EnemyHealth indexed accesses: {0} raw lines / {1} occurrences in {2} files (reads, writes and comments)" -f `
+    $ledger.enemyHealthAccesses.rawLineCount, $ledger.enemyHealthAccesses.rawOccurrenceCount, $ledger.enemyHealthAccesses.uniqueFiles)
+Write-Output ("EnemyHealth executable write candidates: {0} occurrences in {1} files; strict -=: {2} occurrences in {3} files; DamageCandidate: {4}" -f `
     $ledger.directWrites.rawOccurrences, $ledger.directWrites.uniqueFiles, $ledger.directWrites.strictMinusEqualsOccurrences, $ledger.directWrites.strictMinusEqualsFiles, $ledger.directWrites.damageCandidateOccurrences)
-Write-Output ("ApplyEnemyDamage production callers (Systems only): {0}" -f $productionApplyCalls.Count)
+Write-Output ("ApplyEnemyDamage production callers: {0}" -f $productionApplyCalls.Count)
 Write-Output ("Queue declarations: {0} total ({1} in TowerAttackSystem); nullable group assignments: {2} ({3} unique group slots / {4} unique slot names)" -f `
     $ledger.damageLoops.uniqueQueueCount, $ledger.damageLoops.towerAttackQueueCount, $ledger.nullableGroupSlots.assignmentCount, $ledger.nullableGroupSlots.uniqueGroupSlotCount, $ledger.nullableGroupSlots.uniqueSlotNameCount)
-Write-Output ("Ability entrypoint candidates: {0}; effect timer owner candidates: {1}; registry injectors: {2}" -f `
-    $ledger.abilityEntrypoints.Count, $ledger.effectTimerOwners.Count, $ledger.registryInjectors.Count)
+Write-Output ("Registry nullable properties: {0} ({1} system properties); group assignments: {2}; wiring calls: {3}" -f `
+    $ledger.registryProperties.count, $ledger.registryProperties.systemPropertyCount, $ledger.groupAssignments.count, $ledger.registryInjectors.callCount)
+Write-Output ("Ability entrypoint candidates: {0}; effect timer owner candidates: {1}" -f `
+    $ledger.abilityEntrypoints.Count, $ledger.effectTimerOwners.Count)
 
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
     $destination = $OutputPath

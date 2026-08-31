@@ -64,6 +64,7 @@ namespace BattleSystemECS.Tests.Framework
         {
             Store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
             Store.PlayerMaxHealth[0] = 100f;
+            Store.PlayerMaxMana[0] = 50f;
             Store.PlayerCurrentHealth[0] = 100f;
             Store.PlayerMana[0] = 50f;
             Store.PlayerShield[0] = 20f;
@@ -186,6 +187,7 @@ namespace BattleSystemECS.Tests.Framework
         {
             Store.AddPlayer(0, attackRange: 1f, attackSpeed: 1f, attackDamage: 1f, currentLevel: 1);
             Store.PlayerMaxHealth[0] = 100f;
+            Store.PlayerMaxMana[0] = 50f;
 
             var sys = new TimeRewindSnapshotSystem(Store);
 

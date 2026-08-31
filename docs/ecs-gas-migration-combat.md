@@ -109,7 +109,7 @@ BuildPhase 是同一规则的特殊边界：当前 BuildGroup 仍可能 tick Ski
 
 M3 就要建立事件迁移表，逐项标记旧 `EventBus` 的 `LegacyOnly`/`Bridge`/`GameplayOnly` 状态；M4 才允许 Trigger 消费 `GameplayOnly`。Bridge 期间由新事实单向转发旧事件，按 sequence 去重，不能让旧 publisher 和新 publisher 各发一份。
 
-`TowerAttackSystem.Update` 不能作为一次性“大改”处理：这是一个约 2.9K 行的系统，暴露约 17 个依赖 setter（含 `SetTurn`/配置入口约 19 个 `Set*` 方法），在同一串行调用中按顺序消费主伤害、Tesla chain、splash、bounce、lifesteal、thorns、debuff、knockback 和 fragment 队列，部分分支还依赖本帧目标的死亡状态/位置。迁移时先给 queue item 增加 `parentSequence`/`phase` 等上下文，用 `TowerAttackLegacyAdapter` 保留原有消费顺序并逐项提交统一 Resolver；等每类 queue 都有 golden 测试后，才拆成 FrameGraph 节点。这里的行数、setter 数和队列数都是当前快照的定位指标，不是迁移完成度指标。
+`TowerAttackSystem.Update` 不能作为一次性“大改”处理：这是一个 2923 行的系统，暴露 16 个 system dependency setter，另有 `SetGameConfig`、`SetTurn`、`SetWaveNumber`，共 19 个 `Set*` 方法；构造函数还接收 Store、renderer、TechTree、EventBus 等依赖。它在同一串行调用中按顺序消费主伤害、Tesla chain、splash、bounce、lifesteal、thorns、debuff、knockback 和 fragment 队列，部分分支还依赖本帧目标的死亡状态/位置。迁移时先给 queue item 增加 `parentSequence`/`phase` 等上下文，用 `TowerAttackLegacyAdapter` 保留原有 Phase 2a-3d 消费顺序并逐项提交统一 Resolver；等每类 queue 都有 golden 测试后，才拆成 FrameGraph 节点。这里的行数、setter 数和队列数都是当前快照的定位指标，不是迁移完成度指标。
 
 当前 `TowerAttackSystem` 明确有 8 类双缓冲队列：damage、debuff、heal、thorns、chain、splash、bounce 和 fragment；不要把“队列数量”写成固定七类。台账脚本还应按逻辑队列去重，并记录每类的 producer、drain、容量和是否会直接写资源。
 
@@ -122,7 +122,7 @@ Tower 路径至少要冻结两组顺序样例：`Chain_DoesNotRetargetAlreadyDea
 - `Systems/SkillSystem.cs`：先改 `ResolveSkillDamage` 的 tuple/直接写路径；
 - `Systems/BuffSystem.cs`、`BleedSystem.cs`、`FrostbiteSystem.cs`、`ElementalReactionSystem.cs`：改为生成请求；
 - `Systems/ProjectileSystem.cs`、`WeatherSystem.cs`、`GlobalSkillSystem.cs`：关闭直接 HP 写；
-- `Systems/PlayerTowerAttackSystem.cs`、`TowerAttackSystem.cs`：先扩充队列字段，再逐个迁移主、链、溅射、反弹和生命链接分支；
+- `Systems/PlayerTowerAttackSystem.cs`、`TowerAttackSystem.cs`：先由 legacy adapter 承接并扩充 queue item contract，冻结现有 drain 顺序，再逐个迁移主、链、溅射、反弹和生命链接分支；
 - `Systems/ObstacleSystem.cs`、`HeroSystem.cs`、`InventorySystem.cs`、`ReflectTowerSystem.cs`、`SuicideBombSystem.cs`、`ThornsAuraSystem.cs` 等：按上述三类台账迁移；
 - `Core/MovementGroup.cs` 中可能 lazy construction 的 `DeployableTrapSystem`：先登记为明确 producer，再把其 Movement 阶段伤害纳入同一请求管线；
 - `BenchmarkSystem` 的 mode 2/4/5 harness：同步使用和生产相同的 resolver composition，避免只改生产 Registry。
@@ -258,3 +258,31 @@ M4 不删除旧 `GameplayEffectDef`、旧 timer 或旧 Trigger 代码。对应 E
 - 不把初始化写点、治疗写点和真伤写点用一个“统一伤害”类型粗暴覆盖；
 - 不为了让测试变绿而把 `KillConfirmed` 提前到 `DeathQueued`；
 - 不在同一帧依赖并行回调顺序来决定 14 hits 的效果可见性。
+
+## 4. 2026-08-31 契约复核记录
+
+本次 Damage/Resource/Death resolver 语义收口后，Core build 通过；EXE 显式构建 0 error，但 SDK 对现有 `net6.0` 目标框架报告 1 条 EOL warning。全量 xUnit 为 1428/1428，测试静态规则 0 违规，`git diff --check` 通过。
+
+同一构建产物的五轮压测结果如下（原始完整输出保存在 `artifacts/benchmark-final-20260831.log`；本轮 mode 2/4 复测未发现明显回退）：
+
+| 模式 | 五轮 FPS | 说明 |
+| --- | --- | --- |
+| mode 2 | 42335 / 46879 / 41627 / 39715 / 47678 | 合并热路径，硬门禁通过 |
+| mode 4 | 9826 / 9303 / 9455 / 10075 / 9935 | 真实系统链路，硬门禁通过 |
+| mode 5 | 4681 / 6835 / 6840 / 5637 / 6258 | 原始五轮记录，保留为后续性能债务；本任务不以其阻塞语义收口 |
+
+mode 5 不得伪造为通过，也不因该债务删除或改写历史日志；待后续稳定观察/专门性能阶段再处理。
+
+### 4.1 本次语义收口复测
+
+本次工作树复测（2026-08-31，构建产物未改阈值）：mode 2 五轮为 49295 / 46601 / 48944 / 42434 / 49940 FPS；mode 4 五轮为 10088 / 10123 / 10424 / 10019 / 10292 FPS。mode 5 按用户决定只执行一轮，结果为 7137 FPS（5/5 关卡胜利）；该单轮结果不能替代历史五轮基线，mode 5 性能债务继续保留。
+
+### 4.2 生命周期与请求边界复核（2026-08-31）
+
+- `KillConfirmed` 由唯一 `ResolveEnemiesKilledThisFrame` 路径在奖励、生命周期回调、塔击杀结算和 `DestroyEntity` 完成后发布；事件保留死亡队列中的旧 source/target generation handle。
+- `DamageResolver` 的 validated adapter 仍解析完整 `index + generation + active` handle；stale handle 即使索引复用也会拒绝。
+- Damage/Resource 提交边界先摘出当前批次，提交期间产生的新请求继续进入 deferred queue，下一边界消费；帧开始发现未消费请求会增加诊断计数，不再静默丢弃。
+- `ResourceRequest.OwnerPlayerId` 默认无效值为 `-1`，资源写入必须显式提供 owner；内部玩家适配器已传递目标玩家 ID。
+- Reflect/Transfer 作为未迁移语义仍被 Resolver 明确拒绝并返回 `UnsupportedFlags`；Reflect 系统产生的可迁移真伤继续构造普通 `DamageRequest`，未发生静默降级。
+- 新增 stale generation、未消费 deferred queue 和缺失 owner 的 golden 覆盖；全量测试计数以实际门禁输出为准。
+- 本轮门禁单轮性能记录：mode 2 = 36816 FPS、mode 4 = 9222 FPS；mode 5 = 5848 FPS，仅作性能债务观测，不替代历史多轮基线。

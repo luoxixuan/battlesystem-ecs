@@ -23,6 +23,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             float drainPct, float towerCap, float enemyMaxMana, float enemyCurrentMana)
         {
             int playerId = Store.PlayerEntityId;
+            if (!Store.GetEntityHandle(playerId).IsValid)
+                Store.AddPlayer(playerId, 1f, 1f, 10f, 1);
             Store.PlayerMaxMana[playerId] = PlayerMaxMana;
             Store.PlayerMana[playerId] = 0f;
 
@@ -121,6 +123,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         public void Attack_PlayerManaClampedToMax()
         {
             int playerId = Store.PlayerEntityId;
+            if (!Store.GetEntityHandle(playerId).IsValid)
+                Store.AddPlayer(playerId, 1f, 1f, 10f, 1);
             Store.PlayerMaxMana[playerId] = PlayerMaxMana;
             Store.PlayerMana[playerId] = PlayerMaxMana - 5f; // 几乎满蓝
 
