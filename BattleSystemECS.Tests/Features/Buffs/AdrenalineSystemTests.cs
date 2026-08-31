@@ -322,6 +322,7 @@ namespace BattleSystemECS.Tests.Features.Buffs
             Store.PlayerCooldownReduction[0] = 0f; // 排除 CDR 干扰，只观察 Adrenaline 路径
 
             var skill = new SkillSystem(Store, Renderer, 0, Config);
+            skill.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             skill.Update(1.0f);
 
             Assert.Equal(expectedRemaining, Store.GetAbility(0, 0).CurrentCooldown, 5);

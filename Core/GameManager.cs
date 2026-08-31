@@ -38,6 +38,10 @@ namespace BattleSystemECS.Core
         // 游戏状态机（管理 BuildPhase / WavePhase / Intermission 切换）
         private StateMachine stateMachine;
 
+        internal FrameScheduler SchedulerDiagnostics => scheduler;
+        internal StateMachine StateMachineDiagnostics => stateMachine;
+        internal SystemRegistry RegistryDiagnostics => registry;
+
         // 渲染器
         private IRenderer logger;
         private IBattleEventBus _eventBus;
@@ -138,11 +142,7 @@ namespace BattleSystemECS.Core
             }
 
             // ── Phase + StateMachine 线路 ──
-            scheduler.Phase = GameState.BuildPhase;
-            stateMachine.OnEnter(GameState.BuildPhase, () => { scheduler.Phase = GameState.BuildPhase; });
-            stateMachine.OnEnter(GameState.WavePhase, () => { scheduler.Phase = GameState.WavePhase; });
-            stateMachine.OnEnter(GameState.Intermission, () => { scheduler.Phase = GameState.WavePhase; });
-            stateMachine.OnEnter(GameState.BranchSelection, () => { scheduler.Phase = GameState.WavePhase; });
+            scheduler.BindStateMachine(stateMachine);
 
             logger.Log("[BOOTSTRAP] ========== Game Initialization Complete ==========");
             Console.WriteLine();

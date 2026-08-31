@@ -796,6 +796,10 @@ namespace BattleSystemECS.Core
 
         public void AssignToGroups(FrameScheduler scheduler)
         {
+            scheduler.SetSkillSystem(Skill);
+            scheduler.SetGlobalSkillSystem(GlobalSkill);
+            scheduler.SetHeroSkillSystem(HeroSkill);
+            scheduler.SetTowerActiveSkillSystem(TowerActiveSkill);
             scheduler.ConfigureGameplayRuntime(_runtimeTriggers);
             scheduler.Store.GameplayTriggersRuntime.RegisterEffect(_runtimeComboEffect);
             // ── BuildPhase ──

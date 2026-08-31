@@ -78,6 +78,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             DamagePlayer(p1, 100f);  // p1 at 100 HP
             float before = Store.PlayerCurrentHealth[p1];
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
 
             int healed = sys.CastChainHealPublic(50f, 0f, 0f, 250, "ChainHeal", 0f, 0f);
@@ -95,6 +96,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             DamagePlayer(p1, 50f);
             DamagePlayer(p2, 150f);
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
 
             int healed = sys.CastChainHealPublic(60f, 0f, 0f, 300, "ChainHeal", 0f, 0f);
@@ -116,6 +118,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             DamagePlayer(p1, 80f);
             DamagePlayer(p2, 80f);
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
 
             int healed = sys.CastChainHealPublic(40f, 0f, 0f, 300, "ChainHeal", 0f, 0f);
@@ -145,6 +148,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
                 Store.PositionY[i] = 0f;
             }
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
 
             int healed = sys.CastChainHealPublic(40f, 0f, 0f, 1000, "ChainHeal", 0f, 0f);
@@ -163,6 +167,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             DamagePlayer(p1, 100f);
             DamagePlayer(p2, 100f);
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
 
             int healed = sys.CastChainHealPublic(50f, 0f, 0f, 100, "ChainHeal", 0f, 0f);
@@ -178,6 +183,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             var (p0, p1, p2) = CreateArena();
             DamagePlayer(p1, 10f);  // p1 at 190 HP
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
 
             int healed = sys.CastChainHealPublic(100f, 0f, 0f, 250, "ChainHeal", 0f, 0f);
@@ -197,6 +203,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             // p0 already at 200/200 (full HP) from CreateArena
             // No injured friendlies → 0 heals
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
 
             int healed = sys.CastChainHealPublic(50f, 0f, 0f, 1000, "ChainHeal", 0f, 0f);
@@ -214,6 +221,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             // p1 is at full HP (200/200) — should be skipped
             // No injured friendlies → 0 heals
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
 
             int healed = sys.CastChainHealPublic(50f, 0f, 0f, 1000, "ChainHeal", 0f, 0f);
@@ -229,6 +237,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             var (p0, p1, p2) = CreateArena();
             DamagePlayer(p1, 50f);
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
             float shieldBefore = Store.PlayerShield[p1];
 
@@ -248,6 +257,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             DamagePlayer(p1, 50f);
             float before = Store.PlayerCurrentHealth[p1];
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
 
             int healed = sys.CastChainHealPublic(0f, 0f, 0f, 250, "ChainHeal", 0f, 0f);
@@ -281,6 +291,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             DamagePlayer(p1, 100f);  // p1 at 100 HP
             float shieldBefore = Store.PlayerShield[p1];
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
 
             sys.CastSkill("Test Chain Heal");
@@ -313,6 +324,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             };
             Store.AddAbility(p0, chainHealDef);
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
 
             sys.CastSkill("Test Chain Heal CD");
@@ -339,6 +351,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             var (p0, p1, p2) = CreateArena();
             DamagePlayer(p1, 50f);
             var sys = new SkillSystem(Store, Renderer, p0, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
 
             int healed = sys.CastChainHealPublic(100f, 0f, 0f, 1000, "ChainHeal", 0f, 0f);

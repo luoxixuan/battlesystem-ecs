@@ -342,6 +342,7 @@ namespace BattleSystemECS.Tests.Features.Skills
 
             var necro = new NecromancerSystem(Store, Config, Renderer);
             var skillSys = new SkillSystem(Store, Renderer, playerId, Config);
+            skillSys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             skillSys.InjectNecromancerSystem(necro);
             skillSys.SetTurn(0);
 
@@ -387,6 +388,7 @@ namespace BattleSystemECS.Tests.Features.Skills
 
             // NOTE: deliberately NOT injecting NecromancerSystem — defensive path
             var skillSys = new SkillSystem(Store, Renderer, playerId, Config);
+            skillSys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             skillSys.SetTurn(0);
 
             skillSys.CastSkill("Mass Resurrect");

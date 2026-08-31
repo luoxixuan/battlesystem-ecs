@@ -52,6 +52,8 @@ namespace BattleSystemECS.Systems
 
         // Cached "any slot is configured" sentinel for O(1) fast-path in Update().
         private bool _anySkillConfigured;
+        private PhaseContext _phaseContext = PhaseContext.Unbound;
+        public PhaseContextKind CurrentPhaseContext => _phaseContext.Kind;
 
         public HeroSkillSystem(ComponentStore store, int playerId, string? heroSkillsPath = null, GameConfig? config = null)
         {
@@ -134,6 +136,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void Update(float deltaTime)
         {
+            if (!_phaseContext.AllowsCombat) return;
             if (deltaTime <= 0f) return;
             if (!_anySkillConfigured) return;
 
@@ -163,6 +166,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public bool TriggerHeroSkill(int heroId, int slot)
         {
+            if (!_phaseContext.AllowsCombat) return false;
             if (heroId < 0 || heroId >= ComponentStore.MAX_HEROES) return false;
             if (slot < 0 || slot >= MAX_HERO_SKILLS) return false;
             if (!store.HeroIsDeployed[heroId]) return false;
@@ -178,6 +182,8 @@ namespace BattleSystemECS.Systems
             Console.WriteLine($"[HERO_SKILL] hero={heroId} slot={slot} cast skillId={skillId} ({skillName}) cd={_heroSkillCooldownMax[flatIdx]:F1}s");
             return true;
         }
+
+        internal void SetPhaseContext(PhaseContext context) => _phaseContext = context;
 
         /// <summary>Read-only helper for HUD/renderer.</summary>
         public bool IsHeroSkillReady(int heroId, int slot)

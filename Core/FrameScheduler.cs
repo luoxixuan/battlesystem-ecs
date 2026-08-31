@@ -20,7 +20,26 @@ namespace BattleSystemECS.Core
         private IReadOnlyList<Core.GAS.TriggerDefinition> _gameplayTriggers = Array.Empty<Core.GAS.TriggerDefinition>();
         private float _externalDeltaTime;
 
-        public GameState Phase { get; set; } = GameState.WavePhase;
+        private Systems.SkillSystem? _skillSystem;
+        private Systems.GlobalSkillSystem? _globalSkillSystem;
+        private Systems.HeroSkillSystem? _heroSkillSystem;
+        private Systems.TowerActiveSkillSystem? _towerActiveSkillSystem;
+        private GameState _phase = GameState.WavePhase;
+        public GameState Phase
+        {
+            get => _phase;
+            set
+            {
+                if (_phase == GameState.WavePhase && value != GameState.WavePhase)
+                    RejectPhaseTransitionWork();
+                _phase = value;
+                var context = PhaseContext.FromGameState(value);
+                _skillSystem?.SetPhaseContext(context);
+                _globalSkillSystem?.SetPhaseContext(context);
+                _heroSkillSystem?.SetPhaseContext(context);
+                _towerActiveSkillSystem?.SetPhaseContext(context);
+            }
+        }
         /// <summary>GameplayClock 作为兼容路径的主时钟；其余定义时钟仍各推进一次。</summary>
         public Core.GAS.ClockId GameplayClock { get; set; } = Core.GAS.ClockId.Combat;
 
@@ -70,9 +89,36 @@ namespace BattleSystemECS.Core
             _gameplayTriggers = triggers ?? Array.Empty<Core.GAS.TriggerDefinition>();
         }
 
+        public void SetSkillSystem(Systems.SkillSystem? skillSystem)
+        {
+            _skillSystem = skillSystem;
+            _skillSystem?.SetPhaseContext(PhaseContext.FromGameState(_phase));
+        }
+
+        public void SetGlobalSkillSystem(Systems.GlobalSkillSystem? globalSkillSystem)
+        {
+            _globalSkillSystem = globalSkillSystem;
+            _globalSkillSystem?.SetPhaseContext(PhaseContext.FromGameState(_phase));
+        }
+
+        public void SetHeroSkillSystem(Systems.HeroSkillSystem? system) { _heroSkillSystem = system; _heroSkillSystem?.SetPhaseContext(PhaseContext.FromGameState(_phase)); }
+        public void SetTowerActiveSkillSystem(Systems.TowerActiveSkillSystem? system) { _towerActiveSkillSystem = system; _towerActiveSkillSystem?.SetPhaseContext(PhaseContext.FromGameState(_phase)); }
+
+        public void BindStateMachine(StateMachine stateMachine)
+        {
+            if (stateMachine == null) throw new ArgumentNullException(nameof(stateMachine));
+            Phase = stateMachine.CurrentState;
+            foreach (GameState state in Enum.GetValues(typeof(GameState)))
+            {
+                GameState captured = state;
+                stateMachine.OnEnter(captured, () => Phase = captured);
+            }
+        }
+
         /// <summary>
         /// Execute one full frame of systems, gated by current Phase.
-        /// BuildPhase: economy/UI-only systems. WavePhase/Intermission: full combat pipeline.
+        /// BuildPhase 只执行准备系统，WavePhase 执行完整战斗管线。
+        /// 其他阶段拒绝未提交能力请求并直接返回。
         /// </summary>
         public void Tick(float deltaTime, int turn)
         {
@@ -137,10 +183,37 @@ namespace BattleSystemECS.Core
                 }
                 store.DamageResolver.EnableDeferred(false);
                 store.ResourceResolver.EnableDeferred(false);
+                RejectNonWaveAbilityWork();
+                return;
+            }
+
+            if (Phase != GameState.WavePhase)
+            {
+                store.DamageResolver.RejectPending(Core.GAS.DamageCommitBoundary.GameplayResolve);
+                store.ResourceResolver.RejectPendingEnemyDamage();
+                store.DamageResolver.EnableDeferred(false);
+                store.ResourceResolver.EnableDeferred(false);
+                RejectNonWaveAbilityWork();
                 return;
             }
 
             RunWavePhase(deltaTime, turn);
+        }
+
+        private void RejectNonWaveAbilityWork()
+        {
+            _skillSystem?.RejectPendingSkillDamage(Systems.SkillDamageRejectReason.PhaseNotAllowed);
+            _globalSkillSystem?.RejectPendingActivation();
+        }
+
+        private void RejectPhaseTransitionWork()
+        {
+            _skillSystem?.RejectPendingSkillDamage(Systems.SkillDamageRejectReason.PhaseNotAllowed);
+            _globalSkillSystem?.RejectPendingActivation();
+            store.DamageResolver.RejectAllPending();
+            store.ResourceResolver.RejectAllPending();
+            store.DamageResolver.EnableDeferred(false);
+            store.ResourceResolver.EnableDeferred(false);
         }
 
         /// <summary>

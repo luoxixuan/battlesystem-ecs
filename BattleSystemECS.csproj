@@ -8,6 +8,8 @@
     <Nullable>disable</Nullable>
     <AssemblyName>BattleSystemECS</AssemblyName>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- 仅关闭已停止支持 TFM 的 SDK 提示；编译器和其他 SDK warning 仍保持启用。 -->
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,4 +1,5 @@
 using BattleSystemECS.Config;
+using BattleSystemECS.Core;
 using BattleSystemECS.Systems;
 using BattleSystemECS.Tests.Infrastructure;
 using Xunit;
@@ -31,6 +32,7 @@ public class GlobalSkillMeteorTests : BattleTestBase
         });
 
         var sys = new GlobalSkillSystem(Store, Config, Renderer, PlayerId);
+        sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
         sys.SetTurn(1); // 解锁技能槽（PlayerGlobalSkillUnlocked）
         return sys;
     }

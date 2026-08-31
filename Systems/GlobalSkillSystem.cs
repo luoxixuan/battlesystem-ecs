@@ -32,6 +32,17 @@ namespace BattleSystemECS.Systems
         private readonly bool hasTechTreeSystem;
         private readonly int playerId;
         private int _turn = 0;
+        // 未绑定阶段时默认拒绝，调用方必须显式同步阶段上下文。
+        private PhaseContext _phaseContext = PhaseContext.Unbound;
+        private int _rejectedCandidateCount;
+        private int _rejectedInputCount;
+        private int _successfulActivationCount;
+        public int RejectedCandidateCount => _rejectedCandidateCount;
+        public int RejectedInputCount => _rejectedInputCount;
+        public int RejectedActivationCount => _rejectedCandidateCount + _rejectedInputCount;
+        public int SuccessfulActivationCount => _successfulActivationCount;
+        public SkillDamageRejectReason LastRejectReason { get; private set; }
+        public PhaseContextKind CurrentPhaseContext => _phaseContext.Kind;
 
         // Global skill definitions (from gameConfig.GlobalSkills)
         private const int MAX_GLOBAL_SKILLS = 8;
@@ -60,11 +71,19 @@ namespace BattleSystemECS.Systems
             }
         }
 
+        internal void SetPhaseContext(PhaseContext context) => _phaseContext = context;
+
         /// <summary>
         /// Update global skill cooldowns. Called every frame during BuildPhase and WavePhase.
         /// </summary>
         public void Update(float deltaTime, bool isBuildPhase)
         {
+            _ = isBuildPhase; // 兼容旧调用签名，实际阶段以 PhaseContext 为唯一事实源。
+            if (!_phaseContext.AllowsCombat && !_phaseContext.AllowsPreparationResources)
+            {
+                RejectPendingActivation();
+                return;
+            }
             // Process cooldowns
             for (int i = 0; i < MAX_GLOBAL_SKILLS; i++)
             {
@@ -84,30 +103,41 @@ namespace BattleSystemECS.Systems
             if (!store.PlayerGlobalSkillPressed[playerId]) return;
             store.PlayerGlobalSkillPressed[playerId] = false; // reset after reading
 
-            // Find first available unlocked skill and activate it
+            // 选择当前阶段允许的第一个就绪技能。
             int skillIdx = -1;
+            int rejectedCombat = 0;
             for (int i = 0; i < MAX_GLOBAL_SKILLS; i++)
             {
                 int idx = playerId * MAX_GLOBAL_SKILLS + i;
                 if (!store.PlayerGlobalSkillUnlocked[idx]) continue;
                 if (store.PlayerGlobalSkillCooldown[idx] > 0f) continue;
+                var candidate = GetSkillDef(i);
+                if (_phaseContext.AllowsPreparationResources && candidate != null && !IsBuildAllowed(candidate.SkillType))
+                {
+                    rejectedCombat++;
+                    continue;
+                }
                 skillIdx = i;
                 break;
             }
 
-            if (skillIdx < 0) return;
-            var selected = GetSkillDef(skillIdx);
-            if (isBuildPhase && selected != null && IsCombatSkill(selected.SkillType))
+            if (rejectedCombat > 0)
             {
-                renderer.Log($"[ABILITY_REJECTED] PhaseNotAllowed globalSkill={selected.Name}");
+                _rejectedCandidateCount += rejectedCombat;
+                LastRejectReason = SkillDamageRejectReason.PhaseNotAllowed;
+                renderer.Log("[ABILITY_REJECTED] PhaseNotAllowed globalSkill=combat-candidate");
+            }
+            if (skillIdx < 0)
+            {
                 return;
             }
             TryActivateGlobalSkill(skillIdx);
         }
 
-        private static bool IsCombatSkill(int skillType)
+        private static bool IsBuildAllowed(int skillType)
         {
-            return skillType == (int)GlobalSkillType.MeteorStrike || skillType == (int)GlobalSkillType.TimeStop;
+            return skillType == (int)GlobalSkillType.EmergencyHeal ||
+                   skillType == (int)GlobalSkillType.GoldBurst;
         }
 
         /// <summary>
@@ -124,6 +154,14 @@ namespace BattleSystemECS.Systems
             // Get skill definition
             var def = GetSkillDef(skillIdx);
             if (def == null) return false;
+            if (!_phaseContext.AllowsCombat &&
+                !(_phaseContext.AllowsPreparationResources && IsBuildAllowed(def.SkillType)))
+            {
+                _rejectedCandidateCount++;
+                LastRejectReason = SkillDamageRejectReason.PhaseNotAllowed;
+                renderer.Log($"[ABILITY_REJECTED] PhaseNotAllowed globalSkill={def.Name}");
+                return false;
+            }
 
             // Check mana cost (apply cost multiplier from tech tree)
             float costMult = store.PlayerManaCost[playerId];
@@ -144,7 +182,18 @@ namespace BattleSystemECS.Systems
             store.PlayerGlobalSkillCooldown[idx] = def.Cooldown;
 
             renderer.Log($"[GlobalSkill] Activated: {def.Name}");
+            _successfulActivationCount++;
             return true;
+        }
+
+        public int RejectPendingActivation()
+        {
+            if (!store.PlayerGlobalSkillPressed[playerId]) return 0;
+            store.PlayerGlobalSkillPressed[playerId] = false;
+            _rejectedInputCount++;
+            LastRejectReason = SkillDamageRejectReason.PhaseNotAllowed;
+            renderer.Log("[ABILITY_REJECTED] PhaseNotAllowed source=GlobalSkillPending");
+            return 1;
         }
 
         private GlobalSkillDef? GetSkillDef(int skillIdx)

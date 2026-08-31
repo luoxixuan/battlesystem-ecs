@@ -27,6 +27,12 @@ namespace BattleSystemECS.Systems
         private readonly SkillSystem skillSystem;
         private readonly AutoSkillConfig config;
         private bool _buildPhaseRejectReported;
+        private int _rejectedCandidateCount;
+        private int _successfulCastCount;
+        private SkillDamageRejectReason _lastRejectReason;
+        public int RejectedCandidateCount => _rejectedCandidateCount;
+        public int SuccessfulCastCount => _successfulCastCount;
+        public SkillDamageRejectReason LastRejectReason => _lastRejectReason;
 
         // 选优策略枚举
         private static readonly Random _rng = new Random();
@@ -63,26 +69,51 @@ namespace BattleSystemECS.Systems
             if (candidates.Count == 0)
                 return;
 
+            if (!allowCombat)
+            {
+                int write = 0;
+                for (int read = 0; read < candidates.Count; read++)
+                {
+                    if (SkillSystem.IsBuildAllowedAbility(candidates[read].AreaShape))
+                        candidates[write++] = candidates[read];
+                    else if (!_buildPhaseRejectReported)
+                    {
+                        _rejectedCandidateCount++;
+                        _lastRejectReason = SkillDamageRejectReason.PhaseNotAllowed;
+                        renderer.Log("[ABILITY_REJECTED] PhaseNotAllowed source=AutoSkill");
+                        _buildPhaseRejectReported = true;
+                    }
+                    else
+                    {
+                        _rejectedCandidateCount++;
+                        _lastRejectReason = SkillDamageRejectReason.PhaseNotAllowed;
+                    }
+                }
+                if (write == 0)
+                    return;
+                if (write < candidates.Count)
+                    candidates.RemoveRange(write, candidates.Count - write);
+            }
+
             // 按策略排序
             candidates = SortByStrategy(candidates);
 
             // 施放优先级最高的技能（可配置上限）
             int toCast = Math.Min(candidates.Count, maxCasts);
-            if (!allowCombat)
-            {
-                if (!_buildPhaseRejectReported)
-                {
-                    renderer.Log("[ABILITY_REJECTED] PhaseNotAllowed source=AutoSkill");
-                    _buildPhaseRejectReported = true;
-                }
-                return;
-            }
             for (int i = 0; i < toCast; i++)
             {
                 var skill = candidates[i];
-                skillSystem.CastSkill(skill.Name);
-                renderer.Log($"[AUTOSKILL] Auto-cast '{skill.Name}' (strategy: {config.SelectionStrategy})");
-                castCount++;
+                if (skillSystem.CastSkill(skill.Name))
+                {
+                    renderer.Log($"[AUTOSKILL] Auto-cast '{skill.Name}' (strategy: {config.SelectionStrategy})");
+                    castCount++;
+                    _successfulCastCount++;
+                }
+                else
+                {
+                    _rejectedCandidateCount++;
+                    _lastRejectReason = skillSystem.LastRejectReason;
+                }
             }
 
             if (castCount > 0)

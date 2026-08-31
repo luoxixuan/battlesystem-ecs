@@ -8,6 +8,14 @@ using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
+    public enum SkillDamageRejectReason
+    {
+        None = 0,
+        PhaseNotAllowed = 1,
+        UnsupportedCommitBoundary = 2,
+        NoPending = 3
+    }
+
     /// <summary>
     /// Skill system refactored to use the GAS (Gameplay Ability System) architecture.
     /// Skills are stored as AbilityInstances in ComponentStore, one slot per ability.
@@ -45,6 +53,22 @@ namespace BattleSystemECS.Systems
         // Tuple: (enemyId, rawDamage) — raw damage only; armor reduction handled by PlayerTowerAttackSystem and TowerAttackSystem
         private List<(int enemyId, float damage)>[] _skillDamageQueue = new List<(int, float)>[2];
         private int _skillDamageQueueIdx = 0;
+        private int _pendingSkillDamageCount;
+        private int _rejectedSkillDamageCount;
+        private int _consumedSkillDamageCount;
+        private int _rejectedAbilityCount;
+        private SkillDamageRejectReason _lastRejectReason;
+        private PhaseContext _phaseContext = PhaseContext.Unbound;
+
+        /// <summary>技能伤害请求诊断计数；仅在串行请求/提交边界更新。</summary>
+        public int PendingSkillDamageCount => _pendingSkillDamageCount;
+        public int RejectedSkillDamageCount => _rejectedSkillDamageCount;
+        public int ConsumedSkillDamageCount => _consumedSkillDamageCount;
+        public int RejectedAbilityCount => _rejectedAbilityCount;
+        public SkillDamageRejectReason LastRejectReason => _lastRejectReason;
+        public PhaseContextKind CurrentPhaseContext => _phaseContext.Kind;
+
+        internal void SetPhaseContext(PhaseContext context) => _phaseContext = context;
 
         // 统一的 AoE 命中收集（替代原先每个 Cast 方法各自 Parallel.ForEach + lock 的模式）：
         //   - 敌人数 < ParallelMinEnemies：纯串行直写 _mergedHits（跳过 TPL 启停开销）；
@@ -237,6 +261,24 @@ namespace BattleSystemECS.Systems
             this.deltaTime = deltaTime;
             if (allowCombat) _buildPhaseRejectReported = false;
 
+            if (!_phaseContext.AllowsCombat && !_phaseContext.AllowsPreparationResources)
+            {
+                int unboundCount = store.AbilityCount[playerId];
+                for (int slot = 0; slot < unboundCount; slot++)
+                {
+                    var pending = store.GetAbility(playerId, slot);
+                    if (pending.Definition.Activation != AbilityActivation.Passive || !pending.CanActivate()) continue;
+                    _rejectedAbilityCount++;
+                    _lastRejectReason = SkillDamageRejectReason.PhaseNotAllowed;
+                    if (!_buildPhaseRejectReported)
+                    {
+                        renderer.Log($"[ABILITY_REJECTED] PhaseNotAllowed skill={pending.Definition.Name}");
+                        _buildPhaseRejectReported = true;
+                    }
+                }
+                return;
+            }
+
             // Cooldown decay multipliers are per-player invariants — computed once per
             // frame, not per slot. Applied as deltaTime × cdrFactor × adrFactor:
             //   • CDR (PlayerCooldownReduction): 0 = none, 0.3 = 30% faster; capped at
@@ -265,8 +307,10 @@ namespace BattleSystemECS.Systems
                 // Auto-cast Passive abilities that are ready
                 if (inst.Definition.Activation == AbilityActivation.Passive && inst.CanActivate())
                 {
-                    if (!allowCombat)
+                    if (!IsAbilityAllowed(inst.Definition.AreaShape))
                     {
+                        _rejectedAbilityCount++;
+                        _lastRejectReason = SkillDamageRejectReason.PhaseNotAllowed;
                         if (!_buildPhaseRejectReported)
                         {
                             renderer.Log($"[ABILITY_REJECTED] PhaseNotAllowed skill={inst.Definition.Name}");
@@ -283,7 +327,7 @@ namespace BattleSystemECS.Systems
         /// Cast a named ability.  Dispatches to the ability's area-shape handler
         /// so no string-based branching is needed per skill type.
         /// </summary>
-        public void CastSkill(string skillName)
+        public bool CastSkill(string skillName)
         {
             int count = store.AbilityCount[playerId];
             for (int slot = 0; slot < count; slot++)
@@ -291,25 +335,43 @@ namespace BattleSystemECS.Systems
                 var inst = store.GetAbility(playerId, slot);
                 if (inst.Definition.Name == skillName)
                 {
+                    if (!IsAbilityAllowed(inst.Definition.AreaShape))
+                    {
+                        _rejectedAbilityCount++;
+                        _lastRejectReason = SkillDamageRejectReason.PhaseNotAllowed;
+                        renderer.Log($"[ABILITY_REJECTED] PhaseNotAllowed skill={skillName}");
+                        return false;
+                    }
                     if (!inst.CanActivate())
                     {
                         renderer.Log($"[SKILL] '{skillName}' on cooldown: {inst.CurrentCooldown:F1}s remaining (epsilon-consistent via CanActivate())");
-                        return;
+                        return false;
                     }
                     float cost = inst.Definition.Cost;
                     if (cost > 0f && manaSystem != null && !manaSystem.HasEnoughMana(cost))
                     {
                         renderer.Log($"[SKILL] Not enough mana for '{skillName}': need {cost:F0}, have {manaSystem.GetCurrentMana():F0}");
-                        return;
+                        return false;
                     }
                     ExecuteAbility(inst.Definition, slot);
                     if (cost > 0f && manaSystem != null)
                         manaSystem.ConsumeMana(cost);
-                    return;
+                    return true;
                 }
             }
             renderer.Log($"[SKILL] Unknown ability: '{skillName}'");
+            return false;
         }
+
+        public static bool IsBuildAllowedAbility(int shape)
+        {
+            return shape == AreaShapeType.Heal || shape == AreaShapeType.Shield ||
+                   shape == AreaShapeType.ChainHeal || shape == AreaShapeType.TimeRewind;
+        }
+
+        private bool IsAbilityAllowed(int shape) =>
+            _phaseContext.AllowsCombat ||
+            (_phaseContext.AllowsPreparationResources && IsBuildAllowedAbility(shape));
 
         /// <summary>
         /// Execute an ability by its definition data — area shape drives the damage pattern.
@@ -486,7 +548,7 @@ namespace BattleSystemECS.Systems
                 float enemyX = store.PositionX[closestEnemyId];
                 float enemyY = store.PositionY[closestEnemyId];
 
-                _skillDamageQueue[_skillDamageQueueIdx].Add((closestEnemyId, finalDamage));
+                QueueSkillDamage(closestEnemyId, finalDamage);
 
                 renderer.Log($"[SKILL] {name} queued damage for enemy {closestEnemyId} at ({enemyX:F0},{enemyY:F0}), dmg: {finalDamage:F1}");
                 return 1;
@@ -572,7 +634,7 @@ namespace BattleSystemECS.Systems
             int hitCount = 0;
             foreach (int enemyId in _mergedHits)
             {
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                QueueSkillDamage(enemyId, finalDamage);
                 if (verbose)
                 {
                     float enemyX = store.PositionX[enemyId];
@@ -681,7 +743,7 @@ namespace BattleSystemECS.Systems
                 else
                 {
                     // Fallback: immediate damage if no dotSystem wired
-                    _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                    QueueSkillDamage(enemyId, finalDamage);
                 }
                 hitCount++;
             }
@@ -747,7 +809,7 @@ namespace BattleSystemECS.Systems
 
                 _chainHitBuffer[bestIdx] = true;
                 int bestId = activeEnemyIds[bestIdx];
-                _skillDamageQueue[_skillDamageQueueIdx].Add((bestId, currentDamage));
+                QueueSkillDamage(bestId, currentDamage);
                 totalHit++;
 
                 float bestX = store.PositionX[bestId];
@@ -774,7 +836,9 @@ namespace BattleSystemECS.Systems
         /// with the shield persisting for shieldDuration seconds.
         /// </summary>
         public int CastChainHealPublic(float baseHeal, float playerX, float playerY, int range, string name, float shieldPerHit, float shieldDuration) =>
-            CastChainHeal(baseHeal, playerX, playerY, range, name, shieldPerHit, shieldDuration);
+            IsAbilityAllowed(AreaShapeType.ChainHeal)
+                ? CastChainHeal(baseHeal, playerX, playerY, range, name, shieldPerHit, shieldDuration)
+                : RejectAbility(name);
 
         private int CastChainHeal(float baseHeal, float playerX, float playerY, int range, string name, float shieldPerHit, float shieldDuration)
         {
@@ -925,7 +989,7 @@ namespace BattleSystemECS.Systems
             int hitCount = 0;
             foreach (int enemyId in _mergedHits)
             {
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                QueueSkillDamage(enemyId, finalDamage);
 
                 if (def.FreezeDuration > 0f && def.FreezeChance > 0f)
                 {
@@ -958,7 +1022,7 @@ namespace BattleSystemECS.Systems
             int hitCount = 0;
             foreach (int enemyId in _mergedHits)
             {
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                QueueSkillDamage(enemyId, finalDamage);
 
                 if (def.SlowAmount > 0f && def.SlowDuration > 0f)
                 {
@@ -990,7 +1054,7 @@ namespace BattleSystemECS.Systems
             int hitCount = 0;
             foreach (int enemyId in _mergedHits)
             {
-                _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, finalDamage));
+                QueueSkillDamage(enemyId, finalDamage);
 
                 if (def.PolymorphDuration > 0f)
                 {
@@ -1188,11 +1252,19 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void ResolveSkillDamage()
         {
+            if (!_phaseContext.AllowsCombat)
+            {
+                RejectPendingSkillDamage(SkillDamageRejectReason.UnsupportedCommitBoundary);
+                return;
+            }
             // Phase 2 (serial): ping-pong swap — read from current bag, clear alternate for next frame
             int readIdx = _skillDamageQueueIdx;
             int writeIdx = 1 - _skillDamageQueueIdx;
             _skillDamageQueueIdx = writeIdx;
             _skillDamageQueue[writeIdx].Clear();
+            int consumed = _skillDamageQueue[readIdx].Count;
+            _pendingSkillDamageCount -= consumed;
+            _consumedSkillDamageCount += consumed;
             foreach (var (enemyId, damage) in _skillDamageQueue[readIdx])
             {
                 if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) continue;
@@ -1209,6 +1281,30 @@ namespace BattleSystemECS.Systems
                 if (store.EnemyHealth[enemyId] <= 0f)
                     HandleKill(enemyId);
             }
+            _skillDamageQueue[readIdx].Clear();
+        }
+
+        private void QueueSkillDamage(int enemyId, float damage)
+        {
+            _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, damage));
+            _pendingSkillDamageCount++;
+        }
+
+        /// <summary>
+        /// BuildPhase 的明确边界：技能战斗请求拒绝并消费，避免泄漏到下一 Wave。
+        /// </summary>
+        public int RejectPendingSkillDamage() => RejectPendingSkillDamage(SkillDamageRejectReason.PhaseNotAllowed);
+
+        public int RejectPendingSkillDamage(SkillDamageRejectReason reason)
+        {
+            int rejected = _skillDamageQueue[0].Count + _skillDamageQueue[1].Count;
+            if (rejected > 0)
+                _lastRejectReason = reason;
+            _skillDamageQueue[0].Clear();
+            _skillDamageQueue[1].Clear();
+            _pendingSkillDamageCount = 0;
+            _rejectedSkillDamageCount += rejected;
+            return rejected;
         }
 
         /// <summary>
@@ -1222,6 +1318,13 @@ namespace BattleSystemECS.Systems
                 var inst = store.GetAbility(playerId, slot);
                 if (inst.CanActivate())
                 {
+                    if (!IsAbilityAllowed(inst.Definition.AreaShape))
+                    {
+                        _rejectedAbilityCount++;
+                        _lastRejectReason = SkillDamageRejectReason.PhaseNotAllowed;
+                        renderer.Log($"[ABILITY_REJECTED] PhaseNotAllowed skill={inst.Definition.Name}");
+                        return;
+                    }
                     ExecuteAbility(inst.Definition, slot);
                     return;
                 }
@@ -1273,6 +1376,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public int CastAoeStun(float centerX, float centerY, int radius, float duration, string name)
         {
+            if (!_phaseContext.AllowsCombat) return RejectAbility(name);
             if (_activeEnemyList == null) return 0;
             if (radius <= 0 || duration <= 0f) return 0;
 
@@ -1300,6 +1404,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public int CastAoeRoot(float centerX, float centerY, int radius, float duration, string name)
         {
+            if (!_phaseContext.AllowsCombat) return RejectAbility(name);
             if (_activeEnemyList == null) return 0;
             if (radius <= 0 || duration <= 0f) return 0;
 
@@ -1327,6 +1432,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public int CastAoeKnockback(float centerX, float centerY, int radius, float force, string name)
         {
+            if (!_phaseContext.AllowsCombat) return RejectAbility(name);
             if (_activeEnemyList == null) return 0;
             if (radius <= 0 || force <= 0f) return 0;
 
@@ -1343,6 +1449,14 @@ namespace BattleSystemECS.Systems
             if (hitCount > 0)
                 renderer.Log($"[SKILL] {name} AOE-knockbacked {hitCount} enemies in radius {radius} with force {force:F1}");
             return hitCount;
+        }
+
+        private int RejectAbility(string name)
+        {
+            _rejectedAbilityCount++;
+            _lastRejectReason = SkillDamageRejectReason.PhaseNotAllowed;
+            renderer.Log($"[ABILITY_REJECTED] PhaseNotAllowed skill={name}");
+            return 0;
         }
     }
 }

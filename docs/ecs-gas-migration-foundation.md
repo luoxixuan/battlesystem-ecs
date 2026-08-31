@@ -65,10 +65,12 @@
 6. Effect/实体 ID 回收；
 7. 同一帧 14 次命中后的计数和触发顺序。
 
-另外单独覆盖 BuildPhase：当前生产 Registry 明确装配 `Skill`、`AutoSkill` 和 `GlobalSkill`，BuildGroup 会执行三者，随后 `FrameScheduler` 明确早退。`Skill`/`AutoSkill` 一旦产生 `_skillDamageQueue`，该队列就不会在 Build 帧 drain，而会保留到首个 Wave；`GlobalSkillSystem.Update` 当前没有用 `isBuildPhase` 阻止 Meteor，致死 Meteor 会留下未提交死亡队列，并使下一帧 `BeginFrame()` 抛出未调用 `ResolveEnemiesKilledThisFrame()` 的保护异常。必须先决定 BuildPhase 是否允许产生战斗 Ability/Effect；若允许，必须有同帧 resource/damage/death commit，若不允许，Ability gate 必须明确拒绝战斗效果并定义请求丢弃规则。
+另外单独覆盖 BuildPhase：当前生产 Registry 明确装配 `Skill`、`AutoSkill` 和 `GlobalSkill`，BuildGroup 会执行三者。`SkillBuildBoundaryTests.BuildPhase_PublicCastIsRejectedAndCannotReachFirstWave` 使用真实 Registry/FrameScheduler 验证公开 `CastSkill` 的攻击性能力在入口早拒绝，不扣 mana、不设 cooldown、不执行效果；并验证已在 Wave 产生的旧 damage request 在 BuildGroup 结束时由 `RejectPendingSkillDamage()` 同边界拒绝并清空双缓冲，pending/rejected/consumed、HP、死亡、奖励、渲染副作用和 Resolver pending 均符合预期，首个 Wave不会重放。`SkillBuildBoundaryTests.WavePhase_PublicCastIsConsumedByFramePath` 验证合法 Wave 请求由真实帧路径消费并造成伤害；未绑定的 `CastSkill`、`AutoCastBestSkill`、`TryActivateGlobalSkill`、`CastChainHealPublic`、Passive、HeroSkill、TowerActiveSkill 和公开 AoE CC 入口全部拒绝且无资源/冷却/效果副作用。`DirectResolveInBuildContextRejectsPendingDamage` 覆盖直接 resolver 调用。AutoSkill 只调用 SkillSystem，因此与 SkillSystem 共用同一 allowlist；`CastChainHealPublic` 仅在绑定 Build/Wave 上下文时作为资源恢复能力可用。所有非 Wave tick 都清理 Skill damage queue 和未消费的 GlobalSkill 输入，不能把请求带到下一 Wave。后续仍需为非伤害能力补充统一 GAS contract 和完整覆盖测试。
 
-这里的“前置”是 M0 的第一批工作，不是进入 M0 之前必须完成的代码重构。M0 可以先以只读方式建立基线、复现当前行为并完成决策；在 BuildPhase 语义和测试证据缺失时，真正被阻塞的是 M1 结构改动和任何 cutover，不能把“不要立即进入 M0”理解成先改生产路径。
+这里的“前置”是 M0 的第一批工作，不是进入 M0 之前必须完成的代码重构。当前 BuildPhase 伤害边界已冻结并由生产代码执行；后续 M1 结构改动和任何 cutover 仍需沿用该合同，不能把“不要立即进入 M0”理解成先改生产路径。
 当前 `game_config.json` 没有 `GlobalSkills` 配置，Meteor 的 BuildPhase 测试需要显式注入测试定义；这说明默认生产路径暂未启用 Meteor，不代表 BuildGroup 的早退语义可以忽略。
+
+阶段上下文合同由 `PhaseContext` 显式表达：Unbound、Intermission、LevelComplete、GameOver 和其他未定义状态拒绝全部公开能力入口；Build 仅允许 Skill/AutoSkill 的 Heal、Shield、ChainHeal、TimeRewind 以及 GlobalSkill 的 EmergencyHeal、GoldBurst；Wave 才允许 combat。HeroSkill 和 TowerActiveSkill 当前只有 combat stub，因此仅 Wave 可触发。Passive Skill 复用同一 Skill allowlist。各能力系统的阶段写入口只在 Core 程序集中可见；交互游戏的 `GameManager.Initialize()` 和完整局压测通过 `FrameScheduler` 同步，并由真实组合回归钉住。mode2/4 是 Core 程序集内的手工 benchmark harness，为保持固定 benchmark 定义而直接把 `SkillSystem` 的 internal `PhaseContext` 设为 Wave；它们只证明各自测量路径选择了合法战斗上下文，不是生产 Registry、FrameScheduler 或声明式帧图接线证据。此切片只统一入口、冷却、资源和现有效果副作用边界；Hero/Tower effect dispatch、非伤害能力的声明式 GAS definition、统一 rejection event/count、`FrameScheduler` 对四个能力系统的重复显式广播，以及 `DamageResolver`/`ResourceResolver` 重复的 `RejectAllPending` 清理结构，仍是后续架构判断项，不能据此宣称 FrameGraph、TimeContext 或能力迁移完成。本文测试数量和性能数字均为历史记录，实际门禁以当前工作树运行结果为准。
 
 golden 结果不只记录最终 HP，还要记录请求、资源变化、死亡队列、奖励、Gameplay Event 类型和 sequence 顺序。确定性 replay 应能在相同输入下重现这些结果。
 

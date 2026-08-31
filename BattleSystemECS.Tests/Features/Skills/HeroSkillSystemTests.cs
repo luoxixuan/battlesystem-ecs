@@ -119,6 +119,7 @@ namespace BattleSystemECS.Tests.Features.Skills
         {
             ConfigureDefaultSkills();
             var sys = new HeroSkillSystem(Store, 0, "/nope.json", Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             // HeroIsDeployed[0] is false by default
             bool ok = sys.TriggerHeroSkill(0, 0);
             Assert.False(ok);
@@ -129,6 +130,7 @@ namespace BattleSystemECS.Tests.Features.Skills
         {
             ConfigureDefaultSkills();
             var sys = new HeroSkillSystem(Store, 0, "/nope.json", Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             Assert.False(sys.TriggerHeroSkill(-1, 0));
             Assert.False(sys.TriggerHeroSkill(ComponentStore.MAX_HEROES, 0));
             Assert.False(sys.TriggerHeroSkill(0, -1));
@@ -191,6 +193,7 @@ namespace BattleSystemECS.Tests.Features.Skills
         {
             ConfigureDefaultSkills();
             var sys = new HeroSkillSystem(Store, 0, "/nope.json", Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             // 手动配置 hero 0 / slot 0 的技能（绕过文件 Initialize）。
             ConfigureSkillSlot(sys, 0, 0, skillId: 0, maxCooldown: 5f, cooldown: 2f, markConfigured: true);
 
@@ -214,6 +217,7 @@ namespace BattleSystemECS.Tests.Features.Skills
         {
             ConfigureDefaultSkills();
             var sys = new HeroSkillSystem(Store, 0, "/nope.json", Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             ConfigureSkillSlot(sys, 0, 0, skillId: 0, maxCooldown: 5f, cooldown: 3f); // active cooldown
             Store.HeroIsDeployed[0] = true;
             bool ok = sys.TriggerHeroSkill(0, 0);
@@ -227,11 +231,24 @@ namespace BattleSystemECS.Tests.Features.Skills
         {
             ConfigureDefaultSkills();
             var sys = new HeroSkillSystem(Store, 0, "/nope.json", Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             ConfigureSkillSlot(sys, 0, 0, skillId: 0, maxCooldown: 5f, cooldown: 0f); // ready
             Store.HeroIsDeployed[0] = true;
             bool ok = sys.TriggerHeroSkill(0, 0);
             Assert.True(ok);
             Assert.Equal(5f, sys.GetHeroSkillCooldown(0, 0), 3);
+        }
+
+        [Fact]
+        public void Trigger_UnboundContextRejectsWithoutCooldown()
+        {
+            // Bug 回归：未绑定阶段的 HeroSkill 入口必须拒绝且不得启动冷却。
+            ConfigureDefaultSkills();
+            var sys = new HeroSkillSystem(Store, 0, "/nope.json", Config);
+            ConfigureSkillSlot(sys, 0, 0, skillId: 0, maxCooldown: 5f, cooldown: 0f);
+            Store.HeroIsDeployed[0] = true;
+            Assert.False(sys.TriggerHeroSkill(0, 0));
+            Assert.Equal(0f, sys.GetHeroSkillCooldown(0, 0));
         }
 
         // ─── SkillDefs 优先解析（接线：Data/Configs/skills.json 共享技能表）─────────
@@ -254,6 +271,7 @@ namespace BattleSystemECS.Tests.Features.Skills
                 File.WriteAllText(tmp,
                     "{\"Skills\":[{\"SlotIndex\":0,\"SkillName\":\"Cross Slash\"},{\"SlotIndex\":1,\"SkillName\":\"Guardian Heal\"}]}");
                 var sys = new HeroSkillSystem(Store, 0, heroSkillsPath: tmp, config: Config);
+                sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
                 sys.Initialize();
 
                 Assert.True(sys.HasAnyConfiguredSkill());
@@ -283,6 +301,7 @@ namespace BattleSystemECS.Tests.Features.Skills
             {
                 File.WriteAllText(tmp, "{\"Skills\":[{\"SlotIndex\":2,\"SkillName\":\"Railgun Shot #3\"}]}");
                 var sys = new HeroSkillSystem(Store, 0, heroSkillsPath: tmp, config: Config);
+                sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
                 sys.Initialize();
 
                 Store.HeroIsDeployed[0] = true;

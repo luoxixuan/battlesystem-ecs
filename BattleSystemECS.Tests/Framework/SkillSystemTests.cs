@@ -22,6 +22,7 @@ namespace BattleSystemECS.Tests.Framework
                 p.AttackRange = 3f;
             });
             sys = new SkillSystem(Store, Renderer, pid, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.InitializePlayerSkills();
             return pid;
         }
@@ -41,6 +42,7 @@ namespace BattleSystemECS.Tests.Framework
         {
             int pid = Player(p => { p.X = 5f; p.Y = 0f; p.Health = 200f; });
             var sys = new SkillSystem(Store, Renderer, pid, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.InitializePlayerSkills();
 
             // 注册数量与槽位名称完全由读取到的配置推导，不钉住 3 个技能的字面量。
@@ -169,6 +171,7 @@ namespace BattleSystemECS.Tests.Framework
             int eid = MakeEnemy(5f, 0f, hp: injectedEnemyHealth, gold: injectedGoldReward);
 
             var sys = new SkillSystem(Store, Renderer, pid, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.InitializePlayerSkills();
             sys.SetTurn(0); // required: populates _activeEnemyList before any Cast call
 

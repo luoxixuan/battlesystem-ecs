@@ -33,6 +33,7 @@ namespace BattleSystemECS.Tests.Integration
 
             var atk = new PlayerTowerAttackSystem(Store, Renderer, pid, Config);
             var skill = new SkillSystem(Store, Renderer, pid, Config);
+            skill.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             skill.InitializePlayerSkills();
 
             // 显式注入 3s 冷却：10 次 Update(1f) 后必须精确归零（无 CDR / Adrenaline 加成）。

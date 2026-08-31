@@ -290,7 +290,7 @@ namespace BattleSystemECS.Core
 
         public void BeginFrame()
         {
-            // M-1 fix: detect programming error — BeginFrame called without Resolve
+            // 检测帧生命周期错误：上一帧未完成死亡结算就再次 BeginFrame。
             if (!_deathQueue[_deathQueueIdx].IsEmpty && !_deathQueueResolved)
             {
                 throw new InvalidOperationException(

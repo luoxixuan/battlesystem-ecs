@@ -40,6 +40,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Control
         private SkillSystem NewSystem(int playerId)
         {
             var sys = new SkillSystem(Store, Renderer, playerId, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.SetTurn(0);
             return sys;
         }

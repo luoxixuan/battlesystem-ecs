@@ -46,6 +46,8 @@ namespace BattleSystemECS.Core
             GlobalSkill?.Update(deltaTime, isBuildPhase: true);
             Desperation?.Update();
             ShopReroll?.Update();
+            // Bug 回归：公开 CastSkill 可能在 Build tick 前提交战斗请求，必须在同一边界消费。
+            Skill?.RejectPendingSkillDamage();
         }
     }
 }

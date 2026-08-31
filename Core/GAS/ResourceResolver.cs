@@ -75,6 +75,18 @@ namespace BattleSystemECS.Core.GAS
                 if (write < _pending.Count) _pending.RemoveRange(write, _pending.Count - write);
             }
         }
+        internal void RejectAllPending()
+        {
+            lock (_pendingLock)
+            {
+                int count = _pending.Count;
+                if (count == 0) return;
+                Interlocked.Add(ref _unconsumedRequestCount, count);
+                Interlocked.Add(ref _rejectedCount, count);
+                SetRejection(ResourceRejectionReason.UnsupportedOperation);
+                _pending.Clear();
+            }
+        }
         internal void CommitBoundary(DamageCommitBoundary boundary)
         {
             if (_isCommitting) return;

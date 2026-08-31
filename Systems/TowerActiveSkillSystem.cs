@@ -30,6 +30,8 @@ namespace BattleSystemECS.Systems
     {
         private ComponentStore store;
         private GameConfig? _config;
+        private PhaseContext _phaseContext = PhaseContext.Unbound;
+        public PhaseContextKind CurrentPhaseContext => _phaseContext.Kind;
 
         public TowerActiveSkillSystem(ComponentStore store, GameConfig? config = null)
         {
@@ -51,6 +53,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void Update(float deltaTime)
         {
+            if (!_phaseContext.AllowsCombat) return;
             if (deltaTime <= 0f) return;
             var towerIds = store.ActiveTowerIds;
             for (int i = 0; i < towerIds.Count; i++)
@@ -77,6 +80,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public bool TriggerTowerActive(int towerId)
         {
+            if (!_phaseContext.AllowsCombat) return false;
             if (!ComponentStore.IsValidEntity(towerId)) return false;
             if (!store.TowerActive[towerId]) return false;
             int skillId = store.TowerActiveSkillId[towerId];
@@ -89,6 +93,8 @@ namespace BattleSystemECS.Systems
             Console.WriteLine($"[TOWER_ACTIVE] tower={towerId} ({towerName}) cast skillId={skillId} ({skillName}) cd={store.TowerActiveCooldownMax[towerId]:F1}s");
             return true;
         }
+
+        internal void SetPhaseContext(PhaseContext context) => _phaseContext = context;
 
         /// <summary>
         /// 技能 id → 显示名。id 语义遵循 GameConfig 的归一化索引空间

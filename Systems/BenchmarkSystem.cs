@@ -84,6 +84,7 @@ namespace BattleSystemECS.Systems
             var gold         = new GoldSystem(store, logger);
             var upgrade      = new UpgradeSystem(store, logger, playerId, gameConfig);
             var skill        = new SkillSystem(store, logger, playerId, gameConfig);
+            skill.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             var buffSystem   = new BuffSystem(store, playerId);
             skill.InjectDotSystem(buffSystem);
             var comboSystem  = new ComboSystem(store, gameConfig.Combo);
@@ -404,6 +405,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             var gold          = new GoldSystem(store, logger);
             var upgrade       = new UpgradeSystem(store, logger, playerId, gameConfig);
             var skill         = new SkillSystem(store, logger, playerId, gameConfig);
+            skill.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             var buffSystem    = new BuffSystem(store, playerId);
             var comboSystem   = new ComboSystem(store, gameConfig.Combo);
             skill.InjectDotSystem(buffSystem);
@@ -483,6 +485,59 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
         /// 完整一局压测 — 5 关、真实波次生成、完整战斗流程。
         /// 测量从第一帧到最后一帧的总帧数和墙钟时间，计算真实游戏吞吐量。
         /// </summary>
+        internal static (FrameScheduler scheduler, WaveSpawningSystem waveSpawning, SkillSystem skill)
+            CreateFullGameRuntime(ComponentStore store, GameConfig gameConfig, IRenderer logger, int playerId)
+        {
+            var scheduler = new FrameScheduler(store, gameConfig);
+            var waveSpawning = new WaveSpawningSystem(store, logger, gameConfig);
+            var enemyAbility = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
+            var benchTechTree = new TechTreeSystem(store, logger, playerId, null, gameConfig);
+            var enemyAI = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbility, benchTechTree);
+            var enemyMovement = new EnemyMovementSystem(store, playerId);
+            var playerAttack = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
+            var towerAttack = new TowerAttackSystem(store, logger, null);
+            var auraTower = new AuraTowerSystem(store);
+            var towerShrine = new TowerShrineSystem(store);
+            var projectile = new ProjectileSystem(store, logger);
+            var gold = new GoldSystem(store, logger);
+            var upgrade = new UpgradeSystem(store, logger, playerId, gameConfig);
+            var skill = new SkillSystem(store, logger, playerId, gameConfig);
+            var buffSystem = new BuffSystem(store, playerId);
+            var comboSystem = new ComboSystem(store, gameConfig.Combo);
+            var pathfinding = new PathfindingSystem(store);
+
+            skill.InjectDotSystem(buffSystem);
+            towerAttack.SetBuffSystem(buffSystem);
+            enemyMovement.SetPathfindingSystem(pathfinding);
+            scheduler.SetPathfindingSystem(pathfinding);
+
+            scheduler.Spawning.WaveSpawning = waveSpawning;
+            scheduler.AI.EnemyAI = enemyAI;
+            scheduler.AI.EnemyAbility = enemyAbility;
+            scheduler.AI.Lifesteal = null;
+            scheduler.Movement.EnemyMovement = enemyMovement;
+            scheduler.Movement.Pathfinding = pathfinding;
+            scheduler.Combat.PlayerTowerAttack = playerAttack;
+            scheduler.CombatSetup.PlayerTowerAttack = playerAttack;
+            scheduler.Combat.TowerAttack = towerAttack;
+            scheduler.CombatSetup.TowerAttack = towerAttack;
+            scheduler.Combat.AuraTower = auraTower;
+            scheduler.CombatSetup.AuraTower = auraTower;
+            scheduler.Combat.TowerShrine = towerShrine;
+            scheduler.Combat.Projectile = projectile;
+            scheduler.Build.Gold = gold;
+            scheduler.Build.Upgrade = upgrade;
+            scheduler.Build.Skill = skill;
+            scheduler.CombatSetup.Skill = skill;
+            scheduler.SkillBuff.Skill = skill;
+            scheduler.SetSkillSystem(skill);
+            scheduler.SkillBuff.Buff = buffSystem;
+            scheduler.PostDeath.Combo = comboSystem;
+            scheduler.Phase = GameState.BuildPhase;
+
+            return (scheduler, waveSpawning, skill);
+        }
+
         private void RunFullGameBenchmark()
         {
             Console.WriteLine("\n[BENCHMARK] Full Game: 5 levels, real wave spawning, full combat pipeline");
@@ -499,58 +554,11 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
             store.PositionY[playerId] = 0f;
             store.PositionActive[playerId] = true;
 
-            // 创建所有系统（对齐 GameManager.Initialize）
-            var scheduler = new FrameScheduler(store, gameConfig);
-
-            var waveSpawning = new WaveSpawningSystem(store, logger, gameConfig);
-            var enemyAbility  = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
-            var benchTechTree = new TechTreeSystem(store, logger, playerId, null, gameConfig);
-            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbility, benchTechTree);
-            var enemyMovement = new EnemyMovementSystem(store, playerId);
-            var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
-            var towerAttack   = new TowerAttackSystem(store, logger, null);
-            var auraTower     = new AuraTowerSystem(store);
-            // Round 173 Direction 1 — Shrine Tower. No-op when no Shrine is on the field.
-            var towerShrine   = new TowerShrineSystem(store);
-            var projectile    = new ProjectileSystem(store, logger);
-            var gold          = new GoldSystem(store, logger);
-            var upgrade       = new UpgradeSystem(store, logger, playerId, gameConfig);
-            var skill         = new SkillSystem(store, logger, playerId, gameConfig);
-            var buffSystem    = new BuffSystem(store, playerId);
-            var comboSystem   = new ComboSystem(store, gameConfig.Combo);
-            skill.InjectDotSystem(buffSystem);
-            towerAttack.SetBuffSystem(buffSystem);
-            scheduler.Combat.TowerShrine = towerShrine;
-            var pathfinding   = new PathfindingSystem(store);
-            enemyMovement.SetPathfindingSystem(pathfinding);
-            // Round 182 Direction 6 — Inject PathfindingSystem into FrameScheduler so
-            // TickBlinkerCycle can validate path waypoint counts before advancing node
-            // indices on a blink. Optional dependency; TickBlinkerCycle gracefully
-            // degrades to a no-advance when pathfinding is null.
-            scheduler.SetPathfindingSystem(pathfinding);
-
-            // 布线 FrameScheduler — 按 Phase 分组注入
-            scheduler.Spawning.WaveSpawning   = waveSpawning;
-            scheduler.AI.EnemyAI        = enemyAI;
-            scheduler.AI.EnemyAbility   = enemyAbility;
-            scheduler.AI.Lifesteal     = null; // EnemyLifestealSystem (placeholder, lifesteal inline in EnemyAISystem)
-            scheduler.Movement.EnemyMovement  = enemyMovement;
-            scheduler.Movement.Pathfinding    = pathfinding;
-            scheduler.Combat.PlayerTowerAttack = playerAttack;
-            scheduler.CombatSetup.PlayerTowerAttack = playerAttack;
-            scheduler.Combat.TowerAttack    = towerAttack;
-            scheduler.CombatSetup.TowerAttack    = towerAttack;
-            scheduler.Combat.AuraTower      = auraTower;
-            scheduler.CombatSetup.AuraTower      = auraTower;
-            scheduler.Combat.Projectile     = projectile;
-            scheduler.Build.Gold           = gold;
-            scheduler.Build.Upgrade        = upgrade;
-            scheduler.Build.Skill          = skill;
-            scheduler.CombatSetup.Skill    = skill;
-            scheduler.SkillBuff.Skill      = skill;
-            scheduler.SkillBuff.Buff       = buffSystem;
-            scheduler.PostDeath.Combo      = comboSystem;
-            scheduler.Phase          = GameState.BuildPhase;
+            // 生产压测与回归测试共用同一个组合入口，避免接线测试复制实现。
+            var runtime = CreateFullGameRuntime(store, gameConfig, logger, playerId);
+            FrameScheduler scheduler = runtime.scheduler;
+            WaveSpawningSystem waveSpawning = runtime.waveSpawning;
+            SkillSystem skill = runtime.skill;
 
             // 放塔（对齐交互式游戏）
             int t1 = store.CreateEntity();
@@ -579,6 +587,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
 
                 // ── BuildPhase ──────────────────────────────────
                 scheduler.Phase = GameState.BuildPhase;
+                Debug.Assert(skill.CurrentPhaseContext == PhaseContextKind.Build, "完整局压测的 Build 阶段上下文未同步。");
                 for (int bf = 0; bf < 10; bf++)
                 {
                     totalFrames++;
@@ -587,6 +596,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
 
                 // ── WavePhase ───────────────────────────────────
                 scheduler.Phase = GameState.WavePhase;
+                Debug.Assert(skill.CurrentPhaseContext == PhaseContextKind.Wave, "完整局压测的 Wave 阶段上下文未同步。");
                 bool levelDone = false;
                 int levelMaxFrames = 10000;  // 安全上限，防止死循环
                 int levelFrameStart = totalFrames;
