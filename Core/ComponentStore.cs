@@ -441,9 +441,26 @@ namespace BattleSystemECS.Core
         /// </summary>
         public void ResolveEnemiesKilledThisFrame()
         {
-            int readIdx = _deathQueueIdx;
-            int writeIdx = 1 - _deathQueueIdx;
-            _deathQueueIdx = writeIdx;
+            PrepareEnemiesKilledThisFrame();
+            DispatchPreparedEnemyDeaths();
+        }
+
+        private int _preparedDeathReadIdx=-1;
+        private int _preparedDeathWriteIdx=-1;
+
+        internal void PrepareEnemiesKilledThisFrame()
+        {
+            if(_preparedDeathReadIdx>=0)throw new InvalidOperationException("Prepared death callbacks must be dispatched before preparing another batch.");
+            _preparedDeathReadIdx=_deathQueueIdx;
+            _preparedDeathWriteIdx=1-_deathQueueIdx;
+            _deathQueueIdx=_preparedDeathWriteIdx;
+        }
+
+        internal void DispatchPreparedEnemyDeaths()
+        {
+            if(_preparedDeathReadIdx<0)throw new InvalidOperationException("Death callbacks require a prepared death batch.");
+            int readIdx=_preparedDeathReadIdx;
+            int writeIdx=_preparedDeathWriteIdx;
             foreach (var entry in _deathQueue[readIdx])
             {
                 int enemyId = entry.EnemyId; int playerId = entry.PlayerId;
@@ -543,6 +560,8 @@ namespace BattleSystemECS.Core
             }
             _deathQueue[writeIdx].Clear();
             _deathQueueResolved = true;
+            _preparedDeathReadIdx=-1;
+            _preparedDeathWriteIdx=-1;
         }
 
         public ComponentStore()
@@ -654,6 +673,8 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(entityId)) return;
             Volatile.Write(ref _enemyDeathPending[entityId], 0);
+            // Path modifiers share entity slots; remove the index entry before recycling an active slot.
+            if (PathModifierActive[entityId]) DeactivatePathModifier(entityId);
             ClearComputedAttributes(entityId);
             // ── Phase 1: determine archetype ────────────────────────────────────────
             bool wasEnemy = EnemyActive[entityId];

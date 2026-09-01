@@ -10,6 +10,7 @@ namespace BattleSystemECS.Core
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
             WaveSpawning?.Update();
+            WaveSpawning?.DispatchPendingCallbacks();
             Nest?.SetTurn(turn);
             Nest?.Update(deltaTime);
         }

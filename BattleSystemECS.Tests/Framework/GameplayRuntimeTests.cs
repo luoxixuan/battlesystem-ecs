@@ -89,6 +89,7 @@ namespace BattleSystemECS.Tests.Framework
             var def = new GameplayEffectDefinition(new EffectId(77), EffectType.Periodic, Array.Empty<ModifierDefinition>(), 1f, 1f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.Damage, default(TagId), Array.Empty<ExecutionId>(), periodicMagnitude: 1f);
             Assert.True(store.GameplayEffectsRuntime.TryApply(def.Id, def, store.GetEntityHandle(source), store.GetEntityHandle(target), out _, ownerPlayerId: 0));
             var scheduler = new FrameScheduler(store, new Config.GameConfig()); scheduler.SkillBuff.Buff = null;
+            scheduler.SealGraphComposition();
             scheduler.Tick(1f, 0);
             Assert.Equal(4f, store.EnemyHealth[target]); Assert.Equal(0, store.GetEffectCount(target)); Assert.Contains(GameplayEventType.HitConfirmed, Events(store.DamageResolver.Events)); Assert.Contains(GameplayEventType.EffectExpired, Events(store.GameplayEffectsRuntime.Events));
         }
@@ -286,7 +287,7 @@ namespace BattleSystemECS.Tests.Framework
         [Fact]
         public void LegacyPeriodicIsNotDoubleTicked()
         {
-            var store = new ComponentStore(); store.AddPlayer(0, 10f, 1f, 1f, 1); int enemy = store.AddEnemy(0, 0, 1f, 20f, 20f, 1f, 1, 1); var legacy = new BuffSystem(store, 0); legacy.ApplyDot(enemy, 1f, 2); var typed = new GameplayEffectDefinition(new EffectId(83), EffectType.Periodic, Array.Empty<ModifierDefinition>(), 2f, 1f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.Damage, default(TagId), Array.Empty<ExecutionId>(), periodicMagnitude: 1f); Assert.True(store.GameplayEffectsRuntime.TryApply(typed.Id, typed, store.GetEntityHandle(0), store.GetEntityHandle(enemy), out _, ownerPlayerId: 0)); var scheduler = new FrameScheduler(store, new Config.GameConfig()); scheduler.SkillBuff.Buff = legacy; scheduler.Tick(1f, 0); Assert.Equal(18f, store.EnemyHealth[enemy], 3);
+            var store = new ComponentStore(); store.AddPlayer(0, 10f, 1f, 1f, 1); int enemy = store.AddEnemy(0, 0, 1f, 20f, 20f, 1f, 1, 1); var legacy = new BuffSystem(store, 0); legacy.ApplyDot(enemy, 1f, 2); var typed = new GameplayEffectDefinition(new EffectId(83), EffectType.Periodic, Array.Empty<ModifierDefinition>(), 2f, 1f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.Damage, default(TagId), Array.Empty<ExecutionId>(), periodicMagnitude: 1f); Assert.True(store.GameplayEffectsRuntime.TryApply(typed.Id, typed, store.GetEntityHandle(0), store.GetEntityHandle(enemy), out _, ownerPlayerId: 0)); var scheduler = new FrameScheduler(store, new Config.GameConfig()); scheduler.SkillBuff.Buff = legacy; scheduler.SealGraphComposition(); scheduler.Tick(1f, 0); Assert.Equal(18f, store.EnemyHealth[enemy], 3);
         }
 
         [Fact]
@@ -330,6 +331,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.True(store.GameplayEffectsRuntime.TryApply(instant.Id, instant, store.GetEntityHandle(source), store.GetEntityHandle(target), out _));
             Assert.True(store.GameplayEffectsRuntime.Events.Count > 0);
             var scheduler = new FrameScheduler(store, new Config.GameConfig());
+            scheduler.SealGraphComposition();
             scheduler.Tick(0f, 0);
             Assert.Equal(0, store.GameplayEffectsRuntime.Events.Count);
         }
@@ -367,6 +369,7 @@ namespace BattleSystemECS.Tests.Framework
             }
             var scheduler = new FrameScheduler(store, new Config.GameConfig());
             scheduler.SkillBuff.Buff = null;
+            scheduler.SealGraphComposition();
             scheduler.Tick(1f, 0);
             Assert.Equal(96f, store.EnemyHealth[target], 3);
         }
@@ -416,6 +419,7 @@ namespace BattleSystemECS.Tests.Framework
             var scheduler = new FrameScheduler(store, new Config.GameConfig());
             scheduler.ConfigureGameplayRuntime(new[] { trigger });
             Assert.True(store.GameplayEffectsRuntime.TryApply(killEffect.Id, killEffect, store.GetEntityHandle(0), store.GetEntityHandle(enemy), out _, ownerPlayerId: 0));
+            scheduler.SealGraphComposition();
             scheduler.Tick(1f, 0);
             Assert.False(store.EnemyActive[enemy]);
             Assert.Equal(1, store.GetEffectCount(0));
@@ -438,6 +442,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.True(store.GameplayEffectsRuntime.TryApply(heal.Id, heal, store.GetEntityHandle(source), store.GetEntityHandle(0), out _, ownerPlayerId: 0));
             var scheduler = new FrameScheduler(store, new Config.GameConfig());
             scheduler.ConfigureGameplayRuntime(new[] { trigger });
+            scheduler.SealGraphComposition();
             scheduler.Tick(1f, 0);
             Assert.Equal(7f, store.PlayerCurrentHealth[0], 3);
             Assert.Equal(1, store.GetEffectCount(source));
@@ -454,6 +459,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.True(store.GameplayEffectsRuntime.TryApply(def.Id, def, store.GetEntityHandle(0), store.GetEntityHandle(enemy), out _, ownerPlayerId: 0));
             var scheduler = new FrameScheduler(store, new Config.GameConfig()) { Phase = GameState.BuildPhase };
             scheduler.SkillBuff.Buff = null;
+            scheduler.SealGraphComposition();
             scheduler.Tick(1f, 0);
             Assert.Equal(10f, store.EnemyHealth[enemy], 3);
             Assert.Equal(0, store.DamageResolver.PendingRequestCount);
@@ -473,6 +479,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.True(store.GameplayEffectsRuntime.TryApply(def.Id, def, store.GetEntityHandle(0), store.GetEntityHandle(enemy), out _ , ownerPlayerId: 0));
             var scheduler = new FrameScheduler(store, new Config.GameConfig()) { Phase = GameState.BuildPhase };
             scheduler.SkillBuff.Buff = null;
+            scheduler.SealGraphComposition();
             scheduler.Tick(1f, 0);
             Assert.Equal(10f, store.EnemyHealth[enemy], 3);
             Assert.Equal(0, store.DamageResolver.PendingRequestCount);
@@ -707,6 +714,7 @@ namespace BattleSystemECS.Tests.Framework
             int enemy = store.AddEnemy(0f, 0f, 1f, 10f, 10f, 1f, 1, 1);
             var scheduler = new FrameScheduler(store, new Config.GameConfig());
             scheduler.ConfigureGameplayRuntime(Array.Empty<TriggerDefinition>());
+            scheduler.SealGraphComposition();
             scheduler.Tick(0f, 0);
             Assert.True(store.DamageResolver.TryApply(new DamageRequest(store.GetEntityHandle(0),
                 store.GetEntityHandle(enemy), 1f, DamageType.True, 1L, ownerPlayerId: 0)).Accepted);

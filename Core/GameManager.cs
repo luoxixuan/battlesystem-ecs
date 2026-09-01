@@ -34,6 +34,8 @@ namespace BattleSystemECS.Core
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
+        private readonly FrameSchedulerExecutionMode _schedulerExecutionMode;
+        private readonly Core.GAS.ClockId _effectClock;
 
         // 游戏状态机（管理 BuildPhase / WavePhase / Intermission 切换）
         private StateMachine stateMachine;
@@ -41,6 +43,7 @@ namespace BattleSystemECS.Core
         internal FrameScheduler SchedulerDiagnostics => scheduler;
         internal StateMachine StateMachineDiagnostics => stateMachine;
         internal SystemRegistry RegistryDiagnostics => registry;
+        internal FrameSchedulerExecutionMode ConfiguredExecutionMode => _schedulerExecutionMode;
 
         // 渲染器
         private IRenderer logger;
@@ -64,8 +67,15 @@ namespace BattleSystemECS.Core
         /// <summary>
         /// 初始化游戏管理器
         /// </summary>
-        public GameManager()
+        public GameManager(FrameSchedulerExecutionMode schedulerExecutionMode = FrameSchedulerExecutionMode.Graph,
+            Core.GAS.ClockId effectClock = Core.GAS.ClockId.Combat)
         {
+            if (!Enum.IsDefined(typeof(FrameSchedulerExecutionMode), schedulerExecutionMode))
+                throw new ArgumentOutOfRangeException(nameof(schedulerExecutionMode), schedulerExecutionMode, "Unknown scheduler execution mode.");
+            if (!Enum.IsDefined(typeof(Core.GAS.ClockId), effectClock))
+                throw new ArgumentOutOfRangeException(nameof(effectClock), effectClock, "Unknown effect clock.");
+            _schedulerExecutionMode = schedulerExecutionMode;
+            _effectClock = effectClock;
             // 初始化 SOA 组件存储
             store = new ComponentStore();
             entityManager = new EntityManager(store);
@@ -124,14 +134,8 @@ namespace BattleSystemECS.Core
             registry.CreateAll(store, gameConfig, logger, playerId, stateMachine, _eventBus);
             registry.WireDependencies(store, playerId);
 
-            scheduler = new FrameScheduler(store, gameConfig, _eventBus);
+            scheduler = new FrameScheduler(store, gameConfig, _eventBus, _schedulerExecutionMode, _effectClock);
             registry.AssignToGroups(scheduler);
-            // Round 182 Direction 6 — Inject PathfindingSystem so FrameScheduler's
-            // TickBlinkerCycle can look up path waypoint counts before advancing node
-            // indices on a blink. Optional dependency; TickBlinkerCycle gracefully
-            // degrades to a no-advance when pathfinding is null.
-            scheduler.SetPathfindingSystem(registry.Pathfinding);
-
             // 初始化地形网格
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)
             {

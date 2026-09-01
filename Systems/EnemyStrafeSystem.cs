@@ -96,10 +96,10 @@ namespace BattleSystemECS.Systems
                 if (cooldown > 0f) continue;
 
                 // Roll for dodge (only for periodic mode; event-driven mode rolls in TowerAttackSystem)
-                if (chance < 1f && RandomFloat() > chance) continue;
+                if (chance < 1f && DeterministicRoll(_store.CurrentFrame, enemyId, 10) > chance) continue;
 
                 // Execute periodic strafe — choose random lateral direction
-                int strafeDir = RandomFloat() < 0.5f ? -1 : 1;
+                int strafeDir = DeterministicRoll(_store.CurrentFrame, enemyId, 11) < 0.5f ? -1 : 1;
                 ExecuteStrafe(enemyId, distance, strafeDir);
 
                 // Reset cooldown (periodic strafe recharges)
@@ -117,33 +117,36 @@ namespace BattleSystemECS.Systems
         /// <returns>True if dodge triggered (skip damage)</returns>
         public bool TryTriggerDodge(int enemyId, int attackDirection = 0)
         {
-            if (!_store.EnemyActive[enemyId]) return false;
-
-            float chance = _store.EnemyDodgeChance[enemyId];
-            if (chance <= 0f) return false;
-
-            float cooldown = _store.EnemyDodgeCooldown[enemyId];
-            if (cooldown > 0f) return false; // on cooldown
-
-            // Roll for dodge
-            if (chance < 1f && RandomFloat() >= chance) return false;
-
-            float distance = _store.EnemyDodgeDistance[enemyId];
-            if (distance <= 0f) return false;
-
-            // Strafe AWAY from attack direction (if provided), otherwise random
-            int strafeDir;
-            if (attackDirection != 0)
-                strafeDir = -attackDirection; // opposite to incoming
-            else
-                strafeDir = RandomFloat() < 0.5f ? -1 : 1;
-
-            ExecuteStrafe(enemyId, distance, strafeDir);
-
-            // Set cooldown to 1 turn after event-driven dodge
-            _store.EnemyDodgeCooldown[enemyId] = 1f;
-
+            if (!TryQueueDodge(enemyId, attackDirection, 0, out DodgeFact fact)) return false;
+            ApplyQueuedDodge(fact);
             return true;
+        }
+
+        /// <summary>
+        /// 并行命中阶段只读取 SOA 并生成事实；不写位置、冷却或随机状态。
+        /// </summary>
+        public bool TryQueueDodge(int enemyId, int attackDirection, int salt, out DodgeFact fact)
+        {
+            fact = default(DodgeFact);
+            if (!_store.EnemyActive[enemyId]) return false;
+            float chance = _store.EnemyDodgeChance[enemyId];
+            if (chance <= 0f || _store.EnemyDodgeCooldown[enemyId] > 0f
+                || _store.EnemyDodgeDistance[enemyId] <= 0f) return false;
+
+            float roll = DeterministicRoll(_store.CurrentFrame, enemyId, salt);
+            if (chance < 1f && roll >= chance) return false;
+            int direction = attackDirection != 0 ? -attackDirection
+                : (DeterministicRoll(_store.CurrentFrame, enemyId, salt + 1) < 0.5f ? -1 : 1);
+            fact = new DodgeFact(enemyId, _store.EnemyDodgeDistance[enemyId], direction);
+            return true;
+        }
+
+        /// <summary>屏障后的稳定串行提交；冷却使同一敌人的重复命中只移动一次。</summary>
+        public void ApplyQueuedDodge(DodgeFact fact)
+        {
+            if (!_store.EnemyActive[fact.EnemyId] || _store.EnemyDodgeCooldown[fact.EnemyId] > 0f) return;
+            ExecuteStrafe(fact.EnemyId, fact.Distance, fact.Direction);
+            _store.EnemyDodgeCooldown[fact.EnemyId] = 1f;
         }
 
         /// <summary>
@@ -165,13 +168,23 @@ namespace BattleSystemECS.Systems
             _store.PositionX[enemyId] = newX;
         }
 
-        private static readonly Random _rng = new Random();
-        private static float RandomFloat()
+        private static float DeterministicRoll(int frame, int entityId, int salt)
         {
-            lock (_rng)
+            unchecked
             {
-                return (float)_rng.NextDouble();
+                uint x = (uint)(frame * 1103515245 + entityId * 265443576 + salt * 1013904223);
+                x ^= x >> 16;
+                return (x & 0x00ffffffu) / 16777216f;
             }
+        }
+
+        public readonly struct DodgeFact
+        {
+            public int EnemyId { get; }
+            public float Distance { get; }
+            public int Direction { get; }
+            public DodgeFact(int enemyId, float distance, int direction)
+            { EnemyId = enemyId; Distance = distance; Direction = direction; }
         }
     }
 }

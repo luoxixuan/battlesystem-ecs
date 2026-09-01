@@ -35,10 +35,12 @@ namespace BattleSystemECS.Systems
         public void SetTurn()
         {
             _activeModifierIds.Clear();
-            for (int i = 0; i < ComponentStore.MAX_ENTITIES; i++)
+            var activeModifierIds = store.ActivePathModifierIds;
+            for (int i = 0; i < activeModifierIds.Count; i++)
             {
-                if (store.PathModifierActive[i])
-                    _activeModifierIds.Add(i);
+                int modifierId = activeModifierIds[i];
+                if (store.PathModifierActive[modifierId])
+                    _activeModifierIds.Add(modifierId);
             }
         }
 

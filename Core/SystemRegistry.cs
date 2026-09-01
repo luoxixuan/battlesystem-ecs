@@ -202,6 +202,7 @@ namespace BattleSystemECS.Core
         // ── Environment ──
         public TerrainSystem? Terrain { get; private set; }
         public PathfindingSystem? Pathfinding { get; private set; }
+        public DeployableTrapSystem? DeployableTrap { get; private set; }
         public PathModifierSystem? PathModifier { get; private set; }
         public PullSystem? Pull { get; private set; }
         public WeatherSystem? Weather { get; private set; }
@@ -247,6 +248,7 @@ namespace BattleSystemECS.Core
 
         // ── Magnetize zones (displacement fields, no damage) ──
         public MagnetizeSystem? Magnetize { get; private set; }
+        public SapperSystem? Sapper { get; private set; }
 
         // ── Wisp aura pets (passive support pets: heal/slow/curse) ──
         public WispSystem? Wisp { get; private set; }
@@ -293,6 +295,7 @@ namespace BattleSystemECS.Core
 
             // ── Pathfinding & Movement ──
             Pathfinding = new PathfindingSystem(store);
+            DeployableTrap = new DeployableTrapSystem(store);
             EnemyMovement = new EnemyMovementSystem(store, playerId, config.MapWidth, config);
             EnemyMovement.SetPathfindingSystem(Pathfinding);
             // Round 124 — Direction 1: Boss Path Trail AoE. Create the system and inject it
@@ -564,6 +567,7 @@ namespace BattleSystemECS.Core
 
             // ── Magnetize (displacement fields) ──
             Magnetize = new MagnetizeSystem(store, logger);
+            Sapper = new SapperSystem(store, logger);
 
             // ── Wisp aura pets (Heal / Slow / Curse) ──
             Wisp = new WispSystem(store, logger);
@@ -796,6 +800,16 @@ namespace BattleSystemECS.Core
 
         public void AssignToGroups(FrameScheduler scheduler)
         {
+            AssignToGroupsCore(scheduler, true);
+        }
+
+        internal void AssignToGroupsForValidation(FrameScheduler scheduler)
+        {
+            AssignToGroupsCore(scheduler, false);
+        }
+
+        private void AssignToGroupsCore(FrameScheduler scheduler, bool seal)
+        {
             scheduler.SetSkillSystem(Skill);
             scheduler.SetGlobalSkillSystem(GlobalSkill);
             scheduler.SetHeroSkillSystem(HeroSkill);
@@ -852,6 +866,7 @@ namespace BattleSystemECS.Core
             scheduler.AI.EnemyStrafe = EnemyStrafe;
             scheduler.AI.ReflectTower = ReflectTower;
             scheduler.AI.Magnetize = Magnetize;
+            scheduler.AI.Sapper = Sapper;
 
             // ── Movement ──
             scheduler.Movement.Wound = null;
@@ -863,6 +878,7 @@ namespace BattleSystemECS.Core
             scheduler.Movement.StealGold = null;
             scheduler.Movement.Summon = null;
             scheduler.Movement.PathBlock = PathBlock;
+            scheduler.Movement.DeployableTrap = DeployableTrap;
 
             // ── Terrain + Mutators + Morph ──
             scheduler.Terrain.Terrain = Terrain;
@@ -1018,7 +1034,8 @@ namespace BattleSystemECS.Core
 
             // ── Post-death ──
             scheduler.PostDeath.EnemyFission = EnemyFission;
-            scheduler.PostDeath.LifeLink = LifeLink;
+            scheduler.PostDeath.LifeLink = null;
+            LifeLink?.SetBreakPenaltyDispatchEnabled(false);
             scheduler.PostDeath.Objective = Objective;
             scheduler.PostDeath.ResourceNode = ResourceNode;
             scheduler.PostDeath.TowerIncome = null;
@@ -1035,6 +1052,9 @@ namespace BattleSystemECS.Core
             // has PlayerSoulRegen > 0). OnEnemyKilled credit is event-driven
             // (synchronous in ResolveEnemiesKilledThisFrame, no frame delay).
             scheduler.PostDeath.SoulHarvest = SoulHarvest;
+            if (Pathfinding != null) scheduler.SetPathfindingSystem(Pathfinding);
+            scheduler.ConfigureGraphComposition(FrameGraphCompositionKind.ProductionRegistry);
+            if (seal) scheduler.SealGraphComposition();
         }
     }
 }

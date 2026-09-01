@@ -295,6 +295,35 @@ namespace BattleSystemECS.Tests.Features.Bosses
             Assert.Equal(200f, Store.PlayerCurrentHealth[playerId]);
         }
 
+        [Fact]
+        public void ParallelTrailCollectionDrainsInStableActiveIndexOrderAcrossRounds()
+        {
+            // Bug 回归：ThreadLocal.Values 枚举顺序不得决定 Boss trail 的玩家伤害与减速提交。
+            int playerId=Player(p=>{p.Health=10000f;p.X=0f;p.Y=0f;});
+            const int count=64;
+            var bosses=new int[count];
+            for(int i=0;i<count;i++)
+            {
+                bosses[i]=CreateTrailBoss(0f,0f,radius:3f,damage:1f,slow:0.5f,interval:0.1f);
+            }
+            int victim=Enemy(e=>{e.X=1f;e.Y=0f;});
+            var system=new BossTrailAoeSystem(Store,playerId);
+            for(int round=0;round<8;round++)
+            {
+                Store.PlayerCurrentHealth[playerId]=10000f;
+                Store.EnemySlowFactor[victim]=0f;
+                Store.EnemySlowDurationLeft[victim]=0f;
+                for(int i=0;i<count;i++)Store.EnemyBossTrailLastTriggerProgress[bosses[i]]=0f;
+                system.BeginCollect(count);
+                System.Threading.Tasks.Parallel.For(0,count,ParallelOptionsCache.HotPath,
+                    i=>system.TryQueueTrail(i,bosses[i],0.5f));
+                system.ResolveTrailEvents();
+                Assert.Equal(10000f-count,Store.PlayerCurrentHealth[playerId]);
+                Assert.Equal(0.5f,Store.EnemySlowFactor[victim]);
+                Assert.Equal(1f,Store.EnemySlowDurationLeft[victim]);
+            }
+        }
+
         // ── PathfindingSystem.GetPathWaypointCount ──────────────────────
 
         [Fact]

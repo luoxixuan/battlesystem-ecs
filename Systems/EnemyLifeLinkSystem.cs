@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 
@@ -30,14 +29,13 @@ namespace BattleSystemECS.Systems
         private List<int> _activeEnemyList;
         private int currentTurn;
         private int _lastOwnerPlayerId;
+        private bool _breakPenaltyDispatchEnabled = true;
 
-        // Concurrent queue of link establishment events — processed serially in Update
-        private readonly ConcurrentBag<(int linkerId, int targetId, int defId)> _linkQueue =
-            new ConcurrentBag<(int, int, int)>();
-
-        // Concurrent bag for break penalty damage events — processed after ResolveEnemiesKilledThisFrame
-        private readonly ConcurrentBag<(int deadId, int survivorId, float damage)> _breakPenaltyQueue =
-            new ConcurrentBag<(int, int, float)>();
+        private LinkCandidate[] _linkCandidates=Array.Empty<LinkCandidate>();
+        private bool[] _hasLinkCandidate=Array.Empty<bool>();
+        private int _linkCollectCount;
+        private BreakPenaltyEvent[] _breakPenaltyEvents=Array.Empty<BreakPenaltyEvent>();
+        private int _breakPenaltyCount;
 
         public EnemyLifeLinkSystem(ComponentStore store, GameConfig gameConfig, IRenderer renderer = null)
         {
@@ -47,6 +45,15 @@ namespace BattleSystemECS.Systems
 
             // Subscribe to death events to handle break penalties
             store.OnEnemyKilled += OnEnemyKilledHandler;
+        }
+
+        /// <summary>
+        /// 生产图不启用 source-death 业务结算；保留订阅但显式关闭事实收集，避免无主缓冲增长。
+        /// </summary>
+        internal void SetBreakPenaltyDispatchEnabled(bool enabled)
+        {
+            _breakPenaltyDispatchEnabled = enabled;
+            if (!enabled) _breakPenaltyCount = 0;
         }
 
         /// <summary>
@@ -68,6 +75,9 @@ namespace BattleSystemECS.Systems
                 _activeEnemyList = store.GetCachedActiveEnemyIds();
 
             var activeEnemies = _activeEnemyList;
+            EnsureLinkCapacity(activeEnemies.Count);
+            Array.Clear(_hasLinkCandidate,0,activeEnemies.Count);
+            _linkCollectCount=activeEnemies.Count;
 
             // Phase 1 (parallel): each LifeLinker scans for nearby link candidates and queues link events
             Parallel.For(0, activeEnemies.Count, ParallelOptionsCache.HotPath, i =>
@@ -136,16 +146,19 @@ namespace BattleSystemECS.Systems
                 if (bestTarget >= 0)
                 {
                     // Found a candidate — queue link establishment (processed serially below)
-                    _linkQueue.Add((enemyId, bestTarget, defId));
+                    _linkCandidates[i]=new LinkCandidate(enemyId,bestTarget,defId);
+                    _hasLinkCandidate[i]=true;
                 }
             });
 
-            // Phase 2 (serial): process queued link establishments
-            while (_linkQueue.TryTake(out var linkEvent))
+            // 按活跃敌人索引顺序建立链接，不依赖并行调度。
+            for(int i=0;i<_linkCollectCount;i++)
             {
-                var (linkerId, targetId, defId) = linkEvent;
-                EstablishLink(linkerId, targetId, defId);
+                if(!_hasLinkCandidate[i])continue;
+                LinkCandidate linkEvent=_linkCandidates[i];
+                EstablishLink(linkEvent.LinkerId,linkEvent.TargetId,linkEvent.DefId);
             }
+            _linkCollectCount=0;
         }
 
         /// <summary>
@@ -190,6 +203,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         private void OnEnemyKilledHandler(int deadId, int playerId)
         {
+            if (!_breakPenaltyDispatchEnabled) return;
             _lastOwnerPlayerId = playerId;
             if (!store.EnemyActive[deadId] && !store.EnemyIsLinked[deadId])
                 return; // Already cleaned up
@@ -217,7 +231,8 @@ namespace BattleSystemECS.Systems
             float breakDamage = store.EnemyMaxHealth[deadId] * def.BreakPenaltyDamageFraction;
             if (breakDamage > 0f)
             {
-                _breakPenaltyQueue.Add((deadId, linkedId, breakDamage));
+                EnsureBreakPenaltyCapacity(_breakPenaltyCount+1);
+                _breakPenaltyEvents[_breakPenaltyCount++]=new BreakPenaltyEvent(deadId,linkedId,breakDamage);
             }
         }
 
@@ -226,9 +241,14 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void ResolveBreakPenalties()
         {
-            while (_breakPenaltyQueue.TryTake(out var evt))
+            int count=_breakPenaltyCount;
+            _breakPenaltyCount=0;
+            for(int i=0;i<count;i++)
             {
-                var (deadId, survivorId, breakDamage) = evt;
+                BreakPenaltyEvent evt=_breakPenaltyEvents[i];
+                int deadId=evt.DeadId;
+                int survivorId=evt.SurvivorId;
+                float breakDamage=evt.Damage;
 
                 // Verify survivor is still alive and linked
                 if (!store.EnemyActive[survivorId] || !store.EnemyIsLinked[survivorId])
@@ -346,6 +366,39 @@ namespace BattleSystemECS.Systems
                     store.EnemyLifeLinkCooldownLeft[enemyId] = Math.Max(0f, cooldown - deltaTime);
                 }
             });
+        }
+
+        private void EnsureLinkCapacity(int count)
+        {
+            if(_linkCandidates.Length>=count)return;
+            int capacity=Math.Max(count,Math.Max(16,_linkCandidates.Length*2));
+            Array.Resize(ref _linkCandidates,capacity);
+            Array.Resize(ref _hasLinkCandidate,capacity);
+        }
+
+        private void EnsureBreakPenaltyCapacity(int count)
+        {
+            if(_breakPenaltyEvents.Length>=count)return;
+            int capacity=Math.Max(count,Math.Max(16,_breakPenaltyEvents.Length*2));
+            Array.Resize(ref _breakPenaltyEvents,capacity);
+        }
+
+        private readonly struct LinkCandidate
+        {
+            public int LinkerId{get;}
+            public int TargetId{get;}
+            public int DefId{get;}
+            public LinkCandidate(int linkerId,int targetId,int defId)
+            {LinkerId=linkerId;TargetId=targetId;DefId=defId;}
+        }
+
+        private readonly struct BreakPenaltyEvent
+        {
+            public int DeadId{get;}
+            public int SurvivorId{get;}
+            public float Damage{get;}
+            public BreakPenaltyEvent(int deadId,int survivorId,float damage)
+            {DeadId=deadId;SurvivorId=survivorId;Damage=damage;}
         }
     }
 }

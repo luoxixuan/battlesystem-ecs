@@ -39,7 +39,7 @@ namespace BattleSystemECS.Systems
         public void Update(float deltaTime)
         {
             // Phase 1: Decrement fear durations and set action enum for fearful enemies
-            DecrementFearDurations();
+            DecrementFearDurations(deltaTime);
 
             // Phase 2: Tower aura fear — apply fear to enemies near fear-inducing towers
             ApplyTowerFearAuras();
@@ -52,7 +52,7 @@ namespace BattleSystemECS.Systems
         /// Decrement fear duration for all fearful enemies.
         /// When fear expires, the enemy is no longer feared (but may still be in a fear aura, so re-check each frame).
         /// </summary>
-        private void DecrementFearDurations()
+        private void DecrementFearDurations(float deltaTime)
         {
             var activeEnemyIds = store.GetCachedActiveEnemyIds();
             var count = activeEnemyIds.Count;

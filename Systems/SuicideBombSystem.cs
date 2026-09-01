@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
@@ -17,7 +16,7 @@ namespace BattleSystemECS.Systems
     /// 
     /// Execution: runs in CombatGroup after TowerAttack (enemies have been hit, may be low HP).
     /// The two-phase pattern:
-    ///   Phase 1 (parallel): scan suicide enemies near towers, collect explosion events to ConcurrentBag
+    ///   Phase 1 (parallel): scan suicide enemies near towers, collect into active-index-owned buffers
     ///   Phase 2 (serial): apply collected explosion damage to towers and enemies
     /// </summary>
     public class SuicideBombSystem
@@ -26,10 +25,10 @@ namespace BattleSystemECS.Systems
         private readonly int playerId;
         private readonly ReflectTowerSystem? _reflectTowerSystem;
         private readonly TowerStealthSystem? _towerStealthSystem;
-        private readonly Random _retaliateRng = Rng.Shared;
-        
-        // Thread-safe collection for explosion events (phase 1 parallel collect → phase 2 serial apply)
-        private readonly ConcurrentBag<SuicideExplosionEvent> _explosionEvents = new();
+        private SuicideExplosionEvent[] _explosionEvents=Array.Empty<SuicideExplosionEvent>();
+        private bool[] _hasExplosionEvent=Array.Empty<bool>();
+        private int _explosionCollectCount;
+        private int _currentTurn;
         
         // Cached active enemy list per turn
         private System.Collections.Generic.List<int> _activeEnemyList = null!;
@@ -44,8 +43,8 @@ namespace BattleSystemECS.Systems
 
         public void SetTurn(int turn)
         {
+            _currentTurn=turn;
             _activeEnemyList = store.GetCachedActiveEnemyIds();
-            _explosionEvents.Clear();
         }
 
         public void Update()
@@ -69,6 +68,9 @@ namespace BattleSystemECS.Systems
         {
             var activeEnemyIds = _activeEnemyList;
             var count = activeEnemyIds.Count;
+            EnsureExplosionCapacity(count);
+            Array.Clear(_hasExplosionEvent,0,count);
+            _explosionCollectCount=count;
 
             Parallel.For(0, count, ParallelOptionsCache.HotPath, i =>
             {
@@ -126,7 +128,7 @@ namespace BattleSystemECS.Systems
                 if (foundTarget && nearestDistSq <= triggerRange * triggerRange)
                 {
                     // Queue explosion event (to be processed serially)
-                    _explosionEvents.Add(new SuicideExplosionEvent
+                    _explosionEvents[i]=new SuicideExplosionEvent
                     {
                         EnemyId = enemyId,
                         ExplosionX = enemyX,
@@ -135,7 +137,8 @@ namespace BattleSystemECS.Systems
                         DamageAmount = dmgAmount,
                         TargetTowerX = nearestTowerX,
                         TargetTowerY = nearestTowerY
-                    });
+                    };
+                    _hasExplosionEvent[i]=true;
                 }
             });
         }
@@ -147,9 +150,11 @@ namespace BattleSystemECS.Systems
         /// </summary>
         private void ApplyExplosionDamage()
         {
-            // Process each explosion event
-            foreach (var evt in _explosionEvents)
+            // 按活跃敌人索引顺序应用爆炸，不依赖并行调度。
+            for(int i=0;i<_explosionCollectCount;i++)
             {
+                if(!_hasExplosionEvent[i])continue;
+                SuicideExplosionEvent evt=_explosionEvents[i];
                 // Damage to towers within explosion radius (primary target is the nearest tower)
                 ApplyDamageToTowers(evt);
                 
@@ -159,6 +164,7 @@ namespace BattleSystemECS.Systems
                 // Queue the suicide enemy's own death (it dies in the explosion)
                 store.QueueEnemyDeath(evt.EnemyId, playerId);
             }
+            _explosionCollectCount=0;
         }
 
         /// <summary>
@@ -212,7 +218,7 @@ namespace BattleSystemECS.Systems
                     float retaliateChance = store.TowerRetaliateChance[towerId];
                     if (retaliateChance > 0f)
                     {
-                        if (_retaliateRng.NextDouble() < retaliateChance)
+                        if (DeterministicRoll(evt.EnemyId,towerId,_currentTurn) < retaliateChance)
                         {
                             float retaliateMult = store.TowerRetaliateDamageMult[towerId];
                             if (retaliateMult > 0f)
@@ -286,6 +292,21 @@ namespace BattleSystemECS.Systems
             public float DamageAmount { get; init; }
             public float TargetTowerX { get; init; }
             public float TargetTowerY { get; init; }
+        }
+
+        private void EnsureExplosionCapacity(int count)
+        {
+            if(_explosionEvents.Length>=count)return;
+            int capacity=Math.Max(count,Math.Max(16,_explosionEvents.Length*2));
+            Array.Resize(ref _explosionEvents,capacity);
+            Array.Resize(ref _hasExplosionEvent,capacity);
+        }
+
+        private static double DeterministicRoll(int enemyId,int towerId,int turn)
+        {
+            uint value=(uint)(enemyId*73856093)^(uint)(towerId*19349663)^(uint)(turn*83492791);
+            value^=value<<13;value^=value>>17;value^=value<<5;
+            return (value&0x00FFFFFF)/16777216.0;
         }
     }
 }

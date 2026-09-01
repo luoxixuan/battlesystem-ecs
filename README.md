@@ -25,9 +25,9 @@ BattleSystem-ECS/
 
 | 模式 | 指标 |
 |------|------|
-| **mode5**（完整一局） | **4874 FPS**，410 帧 |
-| **mode2**（合并热路径，10K 敌 ×500 帧） | **8333 FPS** |
-| **mode4**（真实系统链路，10K 敌 ×500 帧） | **5212 FPS** |
+| **mode5**（完整一局） | **4874 FPS**，410 帧（历史 manual baseline） |
+| **mode2**（合并热路径，10K 敌 ×500 帧） | **8333 FPS**（历史 manual baseline） |
+| **mode4**（真实系统链路，10K 敌 ×500 帧） | **5212 FPS**（历史 manual baseline；当前 ProductionGraph deferred 记录见 [orchestration](docs/ecs-gas-migration-orchestration.md)） |
 | **mode3**（微基准测试） | 单系统操作级性能剖析 |
 
 > mode5 最接近真实游戏：5 关全通、真实波次生成。mode4 是主要参考指标。完整变更历史见 [CHANGELOG.md](CHANGELOG.md)。

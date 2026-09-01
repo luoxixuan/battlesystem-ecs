@@ -56,6 +56,22 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
+        public void AddEnemy_UsesNoFissionSentinel_WhileExplicitSpawnConfigIsPreserved()
+        {
+            int manualEnemy = Store.AddEnemy(5f, 19f, 1f, 20f, 20f, 5f, 10, 1);
+
+            Assert.Equal(-1, Store.EnemyFissionDefId[manualEnemy]);
+            Assert.Equal(0, Store.EnemyFissionGeneration[manualEnemy]);
+
+            int configuredEnemy = Store.AddEnemy(7f, 19f, 1f, 20f, 20f, 5f, 10, 1);
+            Store.EnemyFissionDefId[configuredEnemy] = 2;
+            Store.EnemyFissionGeneration[configuredEnemy] = 1;
+
+            Assert.Equal(2, Store.EnemyFissionDefId[configuredEnemy]);
+            Assert.Equal(1, Store.EnemyFissionGeneration[configuredEnemy]);
+        }
+
+        [Fact]
         public void DestroyEntity_ClearsActiveFlags()
         {
             int id = Store.CreateEntity();
@@ -64,6 +80,33 @@ namespace BattleSystemECS.Tests.Framework
             Store.DestroyEntity(id);
             Assert.False(Store.PositionActive[id]);
             Assert.False(Store.EnemyActive[id]);
+        }
+
+        [Fact]
+        public void PathModifierIndexTracksActivationDeactivationAndExpiry()
+        {
+            int first = Store.CreateEntity();
+            int second = Store.CreateEntity();
+            Store.ActivatePathModifier(second, 0f, 0f, 1f, 2, 0);
+            Store.ActivatePathModifier(first, 0f, 0f, 1f, 1, 0, turnsRemaining: 0.5f);
+
+            Assert.Equal(new[] { first, second }, Store.ActivePathModifierIds);
+            Store.ActivatePathModifier(first, 0f, 0f, 1f, 1, 0, turnsRemaining: 0.5f);
+            Assert.Equal(2, Store.ActivePathModifierCount);
+
+            var system = new Systems.PathModifierSystem(Store);
+            system.SetTurn();
+            system.Update(1f);
+
+            Assert.False(Store.PathModifierActive[first]);
+            Assert.True(Store.PathModifierActive[second]);
+            Assert.Equal(new[] { second }, Store.ActivePathModifierIds);
+            Assert.Equal(1, Store.ActivePathModifierCount);
+
+            Store.ActivatePathModifier(first, 0f, 0f, 1f, 1, 0);
+            Store.DestroyEntity(first);
+            Assert.DoesNotContain(first, Store.ActivePathModifierIds);
+            Assert.Equal(1, Store.ActivePathModifierCount);
         }
 
         // ─── Bug#21: GetAllActiveEnemyIds 返回防御性副本 ───────────────────────

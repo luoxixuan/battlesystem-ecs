@@ -41,6 +41,9 @@ namespace BattleSystemECS.Systems
         // Reused dictionary for stack counting — allocated once, cleared per frame.
         // Key = packed (gx * 1000 + gy), value = count. Serial pass, no allocation.
         private readonly Dictionary<long, int> _stackCountDict = new Dictionary<long, int>(1024);
+        // 并行阶段按活跃敌人索引独占写入，串行阶段再按稳定顺序合并到塔。
+        private readonly int[] _palisadeContactTowerByEnemyIndex = new int[ComponentStore.MAX_ENTITIES];
+        private readonly int[] _palisadeTouchedTowerOrder = new int[ComponentStore.MAX_ENTITIES];
 
         public EnemyMovementSystem(Core.ComponentStore store, int playerId, int mapWidth = 10, Config.GameConfig gameConfig = null)
         {
@@ -134,9 +137,11 @@ namespace BattleSystemECS.Systems
             }
 
             var activeEnemyIds = _activeEnemyList;
+            _bossTrailSystem?.BeginCollect(activeEnemyIds.Count);
 
             Parallel.For(0, activeEnemyIds.Count, ParallelOptionsCache.HotPath, i =>
             {
+                _palisadeContactTowerByEnemyIndex[i] = -1;
                 int enemyId = activeEnemyIds[i];
                 if (!store.EnemyActive[enemyId])
                     return;
@@ -271,30 +276,10 @@ namespace BattleSystemECS.Systems
                             store.EnemyStunDurationLeft[enemyId] = newStun;
                             store.EnemyStunFlag[enemyId] = true;
                         }
-                        // Palisade HP damage: enemies in contact deal EnemyContactDamageToPalisade
-                        // (per frame). 0 = no damage (scenery mode). HP <= 0 → DestroyEntity.
-                        // Claude bug scan fix #2: do NOT do RMW on PalisadeHP inside Parallel.For
-                        // (race condition across threads). Instead, accumulate damage in
-                        // PalisadeContactDamageAccumulator (parallel-safe: each enemy writes
-                        // a *fresh* += on a unique frame bucket — concurrent += on the same
-                        // tower index from different threads is OK because the final value is
-                        // read once in the serial pass and we accept last-writer-wins for
-                        // multi-enemy-same-palisade cases (the staggering means one of the N
-                        // hits is the canonical one). Destroy is requested via per-tower
-                        // PalisadeDestroyFlag (also parallel-safe by index).
+                        // 并行阶段只记录本敌人的接触目标，禁止多个敌人对同一塔做共享 RMW。
                         if (PalisadeConfig.EnemyContactDamageToPalisade > 0f
                             && store.PalisadeHP[towerId] > 0f)
-                        {
-                            store.PalisadeContactDamageAccumulator[towerId] +=
-                                PalisadeConfig.EnemyContactDamageToPalisade;
-                            // Peek: if the accumulated damage ≥ current HP, set the destroy
-                            // flag. The actual HP subtraction and DestroyEntity happen in
-                            // the serial pass after Parallel.For.
-                            if (store.PalisadeContactDamageAccumulator[towerId] >= store.PalisadeHP[towerId])
-                            {
-                                store.PalisadeDestroyFlag[towerId] = true;
-                            }
-                        }
+                            _palisadeContactTowerByEnemyIndex[i] = towerId;
                         break;  // one palisade hit per frame is enough
                     }
                 }
@@ -767,7 +752,7 @@ switch (actionEnum)
                             float progress = (float)store.EnemyPathNodeIndex[enemyId] / total;
                             if (progress > 1f) progress = 1f;
                             if (progress < 0f) progress = 0f;
-                            _bossTrailSystem.TryQueueTrail(enemyId, progress);
+                            _bossTrailSystem.TryQueueTrail(i,enemyId, progress);
                         }
                     }
                 }
@@ -778,6 +763,14 @@ switch (actionEnum)
             // Apply per-enemy slow ratio = clamp(1 - stack * PenaltyPerStack, MaxStackSlow, 1.0).
             // This slow ratio will be applied to next frame's movement.
             // O(N) pass, no allocation (dictionary is reused and cleared at end).
+            // 并行屏障后按活跃敌人顺序合并，保证同图同输入得到相同累计伤害。
+            int palisadeTouchedCount = store.ActivePalisadeCount > 0
+                ? MergePalisadeContacts(_palisadeContactTowerByEnemyIndex, activeEnemyIds.Count,
+                    PalisadeConfig.EnemyContactDamageToPalisade, store.PalisadeHP,
+                    store.PalisadeContactDamageAccumulator, store.PalisadeDestroyFlag,
+                    _palisadeTouchedTowerOrder)
+                : 0;
+
             UpdateStackingPenalty();
 
             // ── Serial pass: Boss Trample (步伤) ──
@@ -804,21 +797,12 @@ switch (actionEnum)
             // _activeEnemyList is fine for ≤100K enemies on the rare landing frame).
             ResolveLeapLanding();
 
-            // ── Serial pass: Round 100 Palisade destruction ──
-            // Claude bug scan fix #1: replaced HashSet<int> _palisadeDestroyQueue (NOT
-            // thread-safe inside Parallel.For) with per-tower PalisadeDestroyFlag (parallel-
-            // safe bool[] indexed by towerId). Scan ActiveTowerIds once after Parallel.For
-            // and DestroyEntity any palisade with flag set. While iterating, also apply
-            // accumulated contact damage (Claude bug scan fix #2): PalisadeHP -= accumulator,
-            // then check flag.
-            // The early-out: if no palisades exist or no flags were set, the loop is O(1)
-            // — just check the count and bail. Then reset accumulator + flag arrays.
-            if (store.ActivePalisadeCount > 0)
+            // 串行提交拒绝并行共享写：统一扣除接触伤害，再决定是否销毁塔。
+            if (palisadeTouchedCount > 0)
             {
-                int towerCount = _activeTowerList.Count;
-                for (int t = 0; t < towerCount; t++)
+                for (int t = 0; t < palisadeTouchedCount; t++)
                 {
-                    int towerId = _activeTowerList[t];
+                    int towerId = _palisadeTouchedTowerOrder[t];
                     if (!store.TowerActive[towerId]) continue;
                     if (!store.TowerIsPalisade[towerId]) continue;
                     float dmg = store.PalisadeContactDamageAccumulator[towerId];
@@ -848,6 +832,26 @@ switch (actionEnum)
             {
                 _bossTrailSystem.ResolveTrailEvents();
             }
+        }
+
+        internal static int MergePalisadeContacts(int[] contacts, int contactCount, float damagePerContact,
+            float[] palisadeHp, float[] accumulators, bool[] destroyFlags, int[] touchedTowerOrder)
+        {
+            int touchedCount = 0;
+            for (int i = 0; i < contactCount; i++)
+            {
+                int towerId = contacts[i];
+                if (towerId < 0) continue;
+                if (accumulators[towerId] == 0f)
+                    touchedTowerOrder[touchedCount++] = towerId;
+                accumulators[towerId] += damagePerContact;
+            }
+            for (int i = 0; i < touchedCount; i++)
+            {
+                int towerId = touchedTowerOrder[i];
+                destroyFlags[towerId] = accumulators[towerId] >= palisadeHp[towerId];
+            }
+            return touchedCount;
         }
 
         /// <summary>

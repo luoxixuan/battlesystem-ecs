@@ -28,6 +28,7 @@ namespace BattleSystemECS.Core
             int waveNum = WaveSpawning?.GetCurrentWave() ?? 1;
             int levelNum = WaveSpawning?.GetCurrentLevel() ?? 1;
             RandomEvent?.Update(deltaTime, waveNum, levelNum);
+            RandomEvent?.DispatchPendingCallbacks();
         }
     }
 }

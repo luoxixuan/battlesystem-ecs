@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
@@ -21,9 +20,9 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore store;
         private readonly int playerId;
 
-        // 并行收集出土 AoE 事件，串行 apply
-        private ConcurrentBag<(int enemyId, float dmg, float radius, int playerId)> _emergeAoeQueue =
-            new ConcurrentBag<(int, float, float, int)>();
+        private EmergeAoeEvent[] _emergeAoeEvents=Array.Empty<EmergeAoeEvent>();
+        private bool[] _hasEmergeAoeEvent=Array.Empty<bool>();
+        private int _emergeCollectCount;
 
         public EnemyBurrowSystem(ComponentStore store, int playerId)
         {
@@ -39,10 +38,13 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// 每帧调用：递减钻地计时器、管理状态转换、收集出土 AoE 事件。
         /// </summary>
-        public void Update()
+        public void Update(float deltaTime)
         {
             var activeEnemyIds = store.GetCachedActiveEnemyIds();
             int count = activeEnemyIds.Count;
+            EnsureCollectCapacity(count);
+            Array.Clear(_hasEmergeAoeEvent,0,count);
+            _emergeCollectCount=count;
 
             Parallel.For(0, count, ParallelOptionsCache.HotPath, i =>
             {
@@ -81,7 +83,8 @@ namespace BattleSystemECS.Systems
                         if (emergeDmg > 0f)
                         {
                             float radius = store.EnemyBurrowRadius[enemyId];
-                            _emergeAoeQueue.Add((enemyId, emergeDmg, radius, playerId));
+                            _emergeAoeEvents[i]=new EmergeAoeEvent(enemyId,emergeDmg,radius);
+                            _hasEmergeAoeEvent[i]=true;
                         }
                     }
                     else
@@ -114,12 +117,13 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void ApplyBurrowEffects()
         {
-            foreach (var ev in _emergeAoeQueue)
+            for(int eventIndex=0;eventIndex<_emergeCollectCount;eventIndex++)
             {
-                int enemyId = ev.enemyId;
-                float dmg = ev.dmg;
-                float radius = ev.radius;
-                int pid = ev.playerId;
+                if(!_hasEmergeAoeEvent[eventIndex])continue;
+                EmergeAoeEvent ev=_emergeAoeEvents[eventIndex];
+                int enemyId = ev.EnemyId;
+                float dmg = ev.Damage;
+                float radius = ev.Radius;
 
                 // 获取出土敌人位置作为 AoE 中心
                 float cx = store.PositionX[enemyId];
@@ -153,7 +157,15 @@ namespace BattleSystemECS.Systems
                     }
                 }
             }
-            _emergeAoeQueue.Clear();
+            _emergeCollectCount=0;
+        }
+
+        private void EnsureCollectCapacity(int count)
+        {
+            if(_emergeAoeEvents.Length>=count)return;
+            int capacity=Math.Max(count,Math.Max(16,_emergeAoeEvents.Length*2));
+            Array.Resize(ref _emergeAoeEvents,capacity);
+            Array.Resize(ref _hasEmergeAoeEvent,capacity);
         }
 
         /// <summary>
@@ -171,6 +183,15 @@ namespace BattleSystemECS.Systems
             store.EnemyBurrowRadius[enemyId] = emergeRadius;
             store.EnemyBurrowCooldown[enemyId] = cooldown; // 正数表示冷却中，0 表示可再次钻地
             store.SetEnemyActionEnum(enemyId, EnemyActionType.Burrow);
+        }
+
+        private readonly struct EmergeAoeEvent
+        {
+            public int EnemyId{get;}
+            public float Damage{get;}
+            public float Radius{get;}
+            public EmergeAoeEvent(int enemyId,float damage,float radius)
+            {EnemyId=enemyId;Damage=damage;Radius=radius;}
         }
     }
 }

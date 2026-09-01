@@ -97,6 +97,12 @@ namespace BattleSystemECS.Systems
         /// Fired when a new wave starts (before enemies spawn that wave).
         /// </summary>
         public event System.Action OnWaveStart;
+        private readonly int[] _pendingWaveStarts = new int[4];
+        private int _pendingWaveStartCount;
+        private bool _pendingWaveComplete;
+        private bool _pendingBreatherWaveComplete;
+        private int _pendingCompletedWaveNumber;
+        private int _pendingExpectedKills;
 
         public WaveSpawningSystem(Core.ComponentStore store, IRenderer renderer, GameConfig gameConfig, EnemyAffixSystem enemyAffixSystem = null, IBattleEventBus eventBus = null)
         {
@@ -551,8 +557,6 @@ namespace BattleSystemECS.Systems
             // gets a fresh slate (no carry-over from previous level's kill performance).
             _performanceSpawnMultiplier = 1.0f;
             ClearMultiTypeState();
-            OnWaveStart?.Invoke();
-            _eventBus.OnWaveStarted(currentWave);
         }
 
         private void ClearMultiTypeState()
@@ -614,8 +618,7 @@ namespace BattleSystemECS.Systems
             {
                 InitMultiTypeState(waveConfig);
                 enemiesSpawnedInWave = 0;
-                OnWaveStart?.Invoke();
-                _eventBus.OnWaveStarted(currentWave);
+                QueueWaveStart(currentWave);
             }
 
             if (enemiesSpawnedInWave < waveConfig.GetTotalEnemyCount())
@@ -1110,20 +1113,10 @@ namespace BattleSystemECS.Systems
                 enemiesSpawnedInWave = 0;
                 currentWave++;
 
-                // Trigger adaptive difficulty evaluation (before OnWaveComplete so new difficulty is ready for next wave)
-                // Round 120 Dir 3 — pass ExpectedKillCount from the just-completed wave so
-                // AdaptiveDifficultySystem can compute the rubber-band spawn multiplier.
-                int expectedKills = completedWaveConfig?.ExpectedKillCount ?? 0;
-                _adaptiveDifficulty?.OnWaveComplete(0, expectedKills); // player 0
-
-                // Fire Breather event before the generic event so subscribers (gold/heal/CDR) run first
-                // and are observable in logs before the next-wave hooks. Always non-null when rhythm == Breather.
-                if (wasBreather)
-                {
-                    OnBreatherWaveComplete?.Invoke(completedWaveNumber);
-                }
-
-                OnWaveComplete?.Invoke();
+                _pendingExpectedKills = completedWaveConfig?.ExpectedKillCount ?? 0;
+                _pendingCompletedWaveNumber = completedWaveNumber;
+                _pendingBreatherWaveComplete = wasBreather;
+                _pendingWaveComplete = true;
 
                 if (currentWave > levelConfig.Waves.Count)
                 {
@@ -1132,6 +1125,31 @@ namespace BattleSystemECS.Systems
                     currentWave = 1;
                 }
             }
+        }
+
+        private void QueueWaveStart(int waveNumber)
+        {
+            if (_pendingWaveStartCount >= _pendingWaveStarts.Length)
+                throw new InvalidOperationException("Wave callback queue capacity exceeded before dispatch.");
+            _pendingWaveStarts[_pendingWaveStartCount++] = waveNumber;
+        }
+
+        public void DispatchPendingCallbacks()
+        {
+            for (int i = 0; i < _pendingWaveStartCount; i++)
+            {
+                OnWaveStart?.Invoke();
+                _eventBus.OnWaveStarted(_pendingWaveStarts[i]);
+            }
+            _pendingWaveStartCount = 0;
+
+            if (!_pendingWaveComplete) return;
+            _adaptiveDifficulty?.OnWaveComplete(0, _pendingExpectedKills);
+            if (_pendingBreatherWaveComplete)
+                OnBreatherWaveComplete?.Invoke(_pendingCompletedWaveNumber);
+            OnWaveComplete?.Invoke();
+            _pendingWaveComplete = false;
+            _pendingBreatherWaveComplete = false;
         }
 
         private void InitMultiTypeState(WaveConfig waveConfig)

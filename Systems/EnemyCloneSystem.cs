@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Components;
@@ -37,8 +37,8 @@ namespace BattleSystemECS.Systems
         private readonly Random _spawnRandom = new Random();
 
         // Clone events: processed serially to avoid concurrent writes to ComponentStore
-        private readonly ConcurrentBag<(int masterId, int playerId, float x, float y, GameConfig.CloneDef def)> _cloneQueue =
-            new ConcurrentBag<(int, int, float, float, GameConfig.CloneDef)>();
+        private readonly List<(int masterId, int playerId, float x, float y, GameConfig.CloneDef def)> _cloneQueue =
+            new List<(int, int, float, float, GameConfig.CloneDef)>();
 
         public EnemyCloneSystem(ComponentStore store, GameConfig gameConfig, IRenderer renderer)
         {
@@ -117,10 +117,12 @@ namespace BattleSystemECS.Systems
             }
 
             // Apply all queued clones serially
-            while (_cloneQueue.TryTake(out var cloneEvent))
+            for(int queueIndex=0;queueIndex<_cloneQueue.Count;queueIndex++)
             {
+                var cloneEvent=_cloneQueue[queueIndex];
                 ResolveClone(cloneEvent.masterId, cloneEvent.playerId, cloneEvent.x, cloneEvent.y, cloneEvent.def);
             }
+            _cloneQueue.Clear();
         }
 
         /// <summary>

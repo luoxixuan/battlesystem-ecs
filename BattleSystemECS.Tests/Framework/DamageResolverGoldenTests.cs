@@ -26,6 +26,8 @@ namespace BattleSystemECS.Tests.Framework
                 Assert.True(store.TryGetActiveEffectAt(enemy, 0, out var activeEffect, out _, out _));
                 var scheduler = new FrameScheduler(store, new Config.GameConfig());
                 scheduler.SkillBuff.Buff = buff;
+                // Bug 回归：直接组装测试也必须在首帧前显式验证并封存图。
+                scheduler.SealGraphComposition();
                 var order = new List<string>();
                 store.OnEnemyKilled += (id, killer) =>
                 {
@@ -160,6 +162,8 @@ namespace BattleSystemECS.Tests.Framework
                 weather.ForceWeather(0, Config.WeatherConfig.Sandstorm, 1f, 10f);
                 var scheduler = new FrameScheduler(store, config);
                 scheduler.PreGame.Weather = weather;
+                // Bug 回归：节点接线完成后再封存，禁止 Tick 隐式构图。
+                scheduler.SealGraphComposition();
                 scheduler.Tick(1f, 0);
                 Assert.Equal(9f, store.EnemyHealth[enemy]);
                 Assert.Equal(GameplayEventType.HitConfirmed, store.DamageResolver.Events.Get(0).Type);
@@ -178,6 +182,8 @@ namespace BattleSystemECS.Tests.Framework
                 bleed.ApplyBleedFromTower(1, enemy, 1f, 1f, 3f);
                 var scheduler = new FrameScheduler(store, new Config.GameConfig());
                 scheduler.SkillBuff.Bleed = bleed;
+                // Bug 回归：节点接线完成后再封存，禁止 Tick 隐式构图。
+                scheduler.SealGraphComposition();
                 scheduler.Tick(1f, 0);
                 Assert.Equal(0f, store.EnemyHealth[enemy]);
                 Assert.False(store.EnemyActive[enemy]);

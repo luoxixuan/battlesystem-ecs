@@ -44,5 +44,34 @@ namespace BattleSystemECS.Tests.Framework
             Assert.DoesNotContain("store.SetEffect(", buffSystem, StringComparison.Ordinal);
             Assert.Contains("TryGetActiveEffectAt", buffSystem, StringComparison.Ordinal);
         }
+
+        [Fact]
+        public void FrameCompositionDoesNotRecognizeContentIdentifiers()
+        {
+            string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+            string graph = File.ReadAllText(Path.Combine(root, "Core", "FrameSystemGraph.cs"));
+            string scheduler = File.ReadAllText(Path.Combine(root, "Core", "FrameScheduler.cs"));
+            string source = graph + scheduler;
+
+            // Bug 回归：调度层只能识别通用边界，具体内容标识必须留在 Registry/GAS。
+            Assert.DoesNotContain("new AbilityId", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("new EffectId", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("new TriggerId", source, StringComparison.Ordinal);
+            Assert.DoesNotMatch(new Regex(@"\b(?:ability|effect|skill)[-_]?\d+\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant), source);
+        }
+
+        [Fact]
+        public void LegacyGroupAdaptersHaveNoProductionGraphCallers()
+        {
+            string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+            string scheduler = File.ReadAllText(Path.Combine(root, "Core", "FrameScheduler.cs"));
+            Assert.True(Regex.Matches(scheduler, @"SkillBuff\.ExecuteLegacy\(", RegexOptions.CultureInvariant).Count == 1);
+            Assert.True(Regex.Matches(scheduler, @"PostDeath\.ExecuteLegacy\(", RegexOptions.CultureInvariant).Count == 1);
+
+            // Bug 回归：生产 composition 和 Registry 不得回调 legacy Group facade。
+            foreach (string file in new[] { "FrameSystemGraph.cs", "SystemRegistry.cs", "GameManager.cs" })
+                Assert.DoesNotContain("ExecuteLegacy(", File.ReadAllText(Path.Combine(root, "Core", file)), StringComparison.Ordinal);
+        }
+
     }
 }

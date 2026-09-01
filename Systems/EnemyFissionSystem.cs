@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -36,8 +36,8 @@ namespace BattleSystemECS.Systems
         private readonly Random _spawnRandom = new Random();
 
         // Fission events collected during OnEnemyKilled — processed serially in Update()
-        private readonly ConcurrentBag<(int parentId, int playerId, float deathX, float deathY, FissionDef def, int generation)> _fissionQueue =
-            new ConcurrentBag<(int, int, float, float, FissionDef, int)>();
+        private readonly List<(int parentId, int playerId, float deathX, float deathY, FissionDef def, int generation)> _fissionQueue =
+            new List<(int, int, float, float, FissionDef, int)>();
 
         public EnemyFissionSystem(ComponentStore store, GameConfig gameConfig, IRenderer renderer)
         {
@@ -77,11 +77,13 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void Update()
         {
-            while (_fissionQueue.TryTake(out var evt))
+            for(int queueIndex=0;queueIndex<_fissionQueue.Count;queueIndex++)
             {
+                var evt=_fissionQueue[queueIndex];
                 var (parentId, playerId, deathX, deathY, def, generation) = evt;
                 ResolveFission(parentId, playerId, deathX, deathY, def, generation);
             }
+            _fissionQueue.Clear();
         }
 
         /// <summary>

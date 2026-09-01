@@ -1,7 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
 
@@ -18,25 +15,17 @@ namespace BattleSystemECS.Systems
     ///   (b) Slow to all nearby enemies in the trail radius.
     ///
     /// This system holds NO per-frame state of its own beyond the event queue. The actual
-    /// trigger detection runs inside EnemyMovementSystem's parallel pass, which writes
-    /// trail events to a per-thread list. The Resolve pass drains them here in the serial
-    /// phase (called from EnemyMovementSystem.Update after the parallel loop, similar to
-    /// how R119 phase minion events are drained in EnemyAISystem).
+    /// 触发检测位于 EnemyMovementSystem 的并行段，每个活跃敌人索引独占一个事件槽。
+    /// 并行屏障后由 Resolve 串行按活跃索引顺序提交。
     /// </summary>
     public class BossTrailAoeSystem
     {
         private readonly ComponentStore store;
         private readonly int playerId;
 
-        // Per-thread event lists. ThreadLocal guarantees one List<> per thread; the
-        // parallel pass Appends, the serial pass drains and clears. This is the
-        // concurrency-safe equivalent of the original Dictionary pattern. Matches the
-        // R119 phase minion event pattern. trackAllValues=true so the serial drain
-        // can iterate every per-thread list via ThreadLocal<T>.Values.
-        private readonly ThreadLocal<List<BossTrailEvent>> _threadEvents
-            = new ThreadLocal<List<BossTrailEvent>>(
-                () => new List<BossTrailEvent>(8),
-                trackAllValues: true);
+        private BossTrailEvent[] _events=Array.Empty<BossTrailEvent>();
+        private bool[] _hasEvent=Array.Empty<bool>();
+        private int _collectCount;
 
         // Reused buffer for the "find the current path waypoint count" lookup. We ask the
         // store to compute the total waypoint count once per enemy (EnemyPathId is an int,
@@ -55,10 +44,22 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Get the per-thread event list for the calling thread. ThreadLocal allocates
-        /// one list per thread on first access, so the parallel pass is lock-free.
+        /// 在移动并行段开始前准备 active-index 独占槽。
         /// </summary>
-        private List<BossTrailEvent> GetThreadList() => _threadEvents.Value;
+        public void BeginCollect(int count)
+        {
+            EnsureCapacity(count);
+            Array.Clear(_hasEvent,0,count);
+            _collectCount=count;
+        }
+
+        public void TryQueueTrail(int enemyId,float progress)
+        {
+            int slot=enemyId;
+            EnsureCapacity(slot+1);
+            if(_collectCount<slot+1)_collectCount=slot+1;
+            TryQueueTrail(slot,enemyId,progress);
+        }
 
         /// <summary>
         /// Called from EnemyMovementSystem's Parallel.For body on each enemy. If the enemy
@@ -70,7 +71,7 @@ namespace BattleSystemECS.Systems
         ///   progress     — current path progress in [0, 1] (nodeIndex / totalWaypoints).
         ///                  Pass -1 if the enemy is not on a path (no trail possible).
         /// </summary>
-        public void TryQueueTrail(int enemyId, float progress)
+        public void TryQueueTrail(int activeIndex,int enemyId, float progress)
         {
             if (!store.EnemyIsBossTrail[enemyId]) return;
             if (progress < 0f) return;
@@ -86,8 +87,7 @@ namespace BattleSystemECS.Systems
             // progress is monotonic along a path, so a single signed difference is enough.
             if (progress - last < interval) return;
 
-            var list = GetThreadList();
-            list.Add(new BossTrailEvent
+            _events[activeIndex]=new BossTrailEvent
             {
                 EnemyId = enemyId,
                 X = store.PositionX[enemyId],
@@ -95,7 +95,8 @@ namespace BattleSystemECS.Systems
                 Radius = radius,
                 Damage = dmg,
                 Slow = store.EnemyBossTrailSlow[enemyId],
-            });
+            };
+            _hasEvent[activeIndex]=true;
 
             // Update last-trigger so we don't fire again until progress advances by another
             // interval. We anchor to the threshold we just crossed (not to `progress`),
@@ -114,27 +115,17 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Drain all per-thread event lists serially. Applies (a) damage to player, (b) slow
         /// to all nearby enemies. Called once per frame from EnemyMovementSystem.Update()
-        /// after the Parallel.For loop ends. Clears the per-thread lists for next frame.
+        /// 在 Parallel.For 屏障后串行提交，并清理活跃索引标记供下一帧复用。
         /// </summary>
         public void ResolveTrailEvents()
         {
-            // Quick exit: nothing queued this frame.
-            // ThreadLocal.IsValueCreated is per-thread; we check Values which is
-            // a snapshot of all created thread-locals. Empty Values ⇒ nothing to do.
-            var allLists = _threadEvents.Values;
-            bool any = false;
-            foreach (var l in allLists) { if (l.Count > 0) { any = true; break; } }
-            if (!any) return;
-
             var activeEnemyIds = store.GetCachedActiveEnemyIds();
             int enemyCount = activeEnemyIds.Count;
 
-            foreach (var list in allLists)
+            for(int eventIndex=0;eventIndex<_collectCount;eventIndex++)
             {
-                if (list.Count == 0) continue;
-                for (int i = 0; i < list.Count; i++)
-                {
-                    var evt = list[i];
+                    if(!_hasEvent[eventIndex])continue;
+                    BossTrailEvent evt=_events[eventIndex];
 
                     // (a) Damage to player if within radius. No "is player alive" gate —
                     // matches SuicideBombSystem convention (always apply damage if in range;
@@ -174,9 +165,17 @@ namespace BattleSystemECS.Systems
                             store.ApplyEnemySlow(victimId, evt.Slow, 1);
                         }
                     }
-                }
-                list.Clear();
             }
+            Array.Clear(_hasEvent,0,_collectCount);
+            _collectCount=0;
+        }
+
+        private void EnsureCapacity(int count)
+        {
+            if(_events.Length>=count)return;
+            int capacity=Math.Max(count,Math.Max(16,_events.Length*2));
+            Array.Resize(ref _events,capacity);
+            Array.Resize(ref _hasEvent,capacity);
         }
 
         /// <summary>

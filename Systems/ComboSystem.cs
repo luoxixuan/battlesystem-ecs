@@ -41,14 +41,6 @@ namespace BattleSystemECS.Systems
         {
             this.store = store;
             this.config = config ?? new ComboConfig();
-            // Subscribe to kill events for combo tracking
-            store.OnEnemyKilled += OnEnemyKilledHandler;
-        }
-
-        private void OnEnemyKilledHandler(int enemyId, int playerId)
-        {
-            // Forward to internal handler — separates public event API from combo logic
-            HandleComboIncrement(playerId);
         }
 
         /// <summary>

@@ -137,6 +137,7 @@ namespace BattleSystemECS.Systems
             _zoneConeAngle[zoneId] = coneAngle;
             _zoneConeDir[zoneId] = coneDir;
             _zoneColorHint[zoneId] = colorHint;
+            _activeZoneIds.Add(zoneId);
         }
 
         /// <summary>

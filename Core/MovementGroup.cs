@@ -25,6 +25,7 @@ namespace BattleSystemECS.Systems
         // Same pattern as ObstacleSystem._trapDamageQueue.
         private readonly System.Collections.Generic.List<(int enemyId, float damage)> _damageQueue
             = new System.Collections.Generic.List<(int, float)>(64);
+        private int[] _cooldownEnemyIds = Array.Empty<int>();
 
         public DeployableTrapSystem(ComponentStore store)
         {
@@ -45,11 +46,13 @@ namespace BattleSystemECS.Systems
                 // ToList() is required because we may mutate the dictionary if an enemy dies
                 // and we want to prune entries. For now, just decrement in place.
                 // KeyCollection enumerator is over the live dictionary, so we snapshot the keys.
-                var keyArr = new int[cooldownDict.Count];
-                cooldownDict.Keys.CopyTo(keyArr, 0);
-                for (int k = 0; k < keyArr.Length; k++)
+                if (_cooldownEnemyIds.Length < cooldownDict.Count)
+                    Array.Resize(ref _cooldownEnemyIds, cooldownDict.Count);
+                cooldownDict.Keys.CopyTo(_cooldownEnemyIds, 0);
+                int cooldownEnemyCount=cooldownDict.Count;
+                for (int k = 0; k < cooldownEnemyCount; k++)
                 {
-                    int enemyId = keyArr[k];
+                    int enemyId = _cooldownEnemyIds[k];
                     if (!_store.EnemyActive[enemyId])
                     {
                         // Enemy died — drop its cooldown entry to bound memory.
@@ -195,8 +198,7 @@ namespace BattleSystemECS.Core
         public Systems.EnemyStealGoldSystem? StealGold { get; set; }
         public Systems.PlayerSummonSystem? Summon { get; set; }
         public Systems.PathBlockSystem? PathBlock { get; set; }
-        // ── Deployable traps ── lazy-initialized: assigned by SystemRegistry.AssignToGroups,
-        // or auto-created on first Execute() call if not pre-wired (zero-config fallback).
+        // 可部署陷阱由 composition 显式注册；缺失即按禁用处理。
         public Systems.DeployableTrapSystem? DeployableTrap { get; set; }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
@@ -211,11 +213,8 @@ namespace BattleSystemECS.Core
 
             EnemyMovement?.Update();
 
-            // Deployable traps: passive triggers after movement so newly-stepped-on tiles
-            // are detected this frame. Lazy-init if not pre-wired.
-            if (DeployableTrap == null)
-                DeployableTrap = new Systems.DeployableTrapSystem(store);
-            DeployableTrap.Update();
+            // 可部署陷阱在移动后执行，使本帧新踏入的格子能立即触发。
+            DeployableTrap?.Update();
 
             PathModifier?.SetTurn();
             PathModifier?.Update(deltaTime);

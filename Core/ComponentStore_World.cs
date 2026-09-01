@@ -80,7 +80,7 @@ namespace BattleSystemECS.Core
         // ==================== Threat Score System 组件 (Round 99) ====================
         // PlayerRecentDPS: exponentially-decaying average of player damage output (per player)
         // Used by WaveSpawningSystem to scale enemy HP: high DPS → tougher enemies.
-        // Decay is applied per-frame in FrameScheduler.RunWavePhase (Phase 11 PostDeath) so
+        // 衰减由 ThreatAggregate 帧节点在死亡后提交完成后逐帧执行，因此
         // spawn-time lookup is O(1) and hot-path cost is one float mul + max(0).
         public float[] PlayerRecentDPS = new float[MAX_PLAYERS];
         // PlayerDPSAccumulator: per-frame raw damage dealt (decayed into PlayerRecentDPS)

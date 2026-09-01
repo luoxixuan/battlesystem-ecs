@@ -20,20 +20,14 @@ namespace BattleSystemECS.Systems
         private ComponentStore store;
         private int playerId;
 
-        // Ping-pong double-buffer for bleed damage (parallel collect → serial apply)
-        private (int enemyId, float damage)[] _bleedQueue0 = Array.Empty<(int, float)>();
-        private (int enemyId, float damage)[] _bleedQueue1 = Array.Empty<(int, float)>();
-        private int _bleedQueueIdx = 0;
-        private int _bleedQueueCount = 0;
-        private readonly object _bleedQueueLock = new object();
+        private (int enemyId, float damage)[] _bleedEvents = Array.Empty<(int, float)>();
+        private bool[] _hasBleedEvent = Array.Empty<bool>();
+        private int _bleedCollectCount;
 
         public BleedSystem(ComponentStore store, int playerId)
         {
             this.store = store;
             this.playerId = playerId;
-            // Pre-allocate queues for 512 bleed events per frame (avoid per-frame allocation)
-            _bleedQueue0 = new (int, float)[512];
-            _bleedQueue1 = new (int, float)[512];
         }
 
         /// <summary>
@@ -93,10 +87,12 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = store.GetCachedActiveEnemyIds();
 
             // Phase 1 (parallel): collect bleed damage events — no structural mutations
-            _bleedQueueCount = 0;
-            var queue = _bleedQueueIdx == 0 ? _bleedQueue0 : _bleedQueue1;
+            int count=activeEnemyIds.Count;
+            EnsureCollectCapacity(count);
+            Array.Clear(_hasBleedEvent,0,count);
+            _bleedCollectCount=count;
 
-            Parallel.For(0, activeEnemyIds.Count, ParallelOptionsCache.HotPath, i =>
+            Parallel.For(0, count, ParallelOptionsCache.HotPath, i =>
             {
                 int enemyId = activeEnemyIds[i];
                 if (!store.EnemyActive[enemyId]) return;
@@ -116,13 +112,8 @@ namespace BattleSystemECS.Systems
                     // Damage = stacks * dmgPerStack * maxHealth
                     float totalBleedDmg = stacks * dmgPerStack * maxHealth;
 
-                    lock (_bleedQueueLock)
-                    {
-                        if (_bleedQueueCount < queue.Length)
-                        {
-                            queue[_bleedQueueCount++] = (enemyId, totalBleedDmg);
-                        }
-                    }
+                    _bleedEvents[i]=(enemyId,totalBleedDmg);
+                    _hasBleedEvent[i]=true;
 
                     // Reset timer for next tick (default 1 sec interval)
                     store.EnemyBleedTimer[enemyId] = 1f;
@@ -154,17 +145,10 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void ResolveBleedDamage()
         {
-            int readIdx = _bleedQueueIdx;
-            int writeIdx = 1 - _bleedQueueIdx;
-            _bleedQueueIdx = writeIdx;
-            // Clear write buffer (set count to 0)
-            if (writeIdx == 0) Array.Clear(_bleedQueue0, 0, _bleedQueue0.Length);
-            else Array.Clear(_bleedQueue1, 0, _bleedQueue1.Length);
-
-            var readQueue = readIdx == 0 ? _bleedQueue0 : _bleedQueue1;
-            for (int i = 0; i < _bleedQueueCount; i++)
+            for (int i = 0; i < _bleedCollectCount; i++)
             {
-                var (enemyId, damage) = readQueue[i];
+                if(!_hasBleedEvent[i])continue;
+                var (enemyId, damage) = _bleedEvents[i];
                 if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) continue;
                 if (!store.EnemyActive[enemyId]) continue;
                 float currentHealth = store.EnemyHealth[enemyId];
@@ -177,7 +161,15 @@ namespace BattleSystemECS.Systems
                 if (!source.IsValid || !target.IsValid) continue;
                 store.DamageResolver.TryApply(new DamageRequest(source, target, damage, DamageType.True, ElementType.None, DamageFlags.None, DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(enemyId), ownerPlayerId: playerId));
             }
-            _bleedQueueCount = 0;
+            _bleedCollectCount = 0;
+        }
+
+        private void EnsureCollectCapacity(int count)
+        {
+            if(_bleedEvents.Length>=count)return;
+            int capacity=Math.Max(count,Math.Max(512,_bleedEvents.Length*2));
+            Array.Resize(ref _bleedEvents,capacity);
+            Array.Resize(ref _hasBleedEvent,capacity);
         }
     }
 }

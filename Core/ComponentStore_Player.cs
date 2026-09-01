@@ -945,7 +945,7 @@ PlayerCrestActiveId[entityId] = "";
         // - turns: number of remaining turns (clamped to >= 0; 0 = no-op / immediate clear).
         // - scale: enemy/physics slow-mo factor (clamped to (0, 1] — 0.3 = enemies at 30% speed).
         //          The player's tower/attack systems still receive full dt; only enemy/AI/movement/spatial
-        //          phases consume the scaled dt (see FrameScheduler.RunWavePhase).
+        //          节点统一消费不可变 TimeContext 中缩放后的 EnemyDelta。
         // Refreshing an active bullet-time with a new (turns, scale) overwrites both fields (no max).
         public void ActivateBulletTime(int playerId, float turns, float scale)
         {

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
@@ -24,7 +23,7 @@ namespace BattleSystemECS.Systems
         private TelegraphSystem _telegraphSystem;
 
         // Ping-pong double-buffer for ability events — collected parallel, applied serial.
-        private ConcurrentBag<AbilityEvent>[] _abilityEvents = new ConcurrentBag<AbilityEvent>[2];
+        private readonly List<AbilityEvent>[] _abilityEvents = { new List<AbilityEvent>(64), new List<AbilityEvent>(64) };
         private int _abilityEventsIdx = 0;
 
         // Per-ability cooldown tracking — keyed by enemyId * MAX_ABILITIES_PER_ENTITY + slot
@@ -58,8 +57,6 @@ namespace BattleSystemECS.Systems
                 }
             }
 
-            _abilityEvents[0] = new ConcurrentBag<AbilityEvent>();
-            _abilityEvents[1] = new ConcurrentBag<AbilityEvent>();
         }
 
         /// <summary>
@@ -157,7 +154,7 @@ namespace BattleSystemECS.Systems
         /// the next frame) so that channeling is independent of frame rate. Also called
         /// before any system checks EnemyIsCasting so Movement/AI know the cast is active.
         /// </summary>
-        public void TickCastTimers()
+        public void TickCastTimers(float deltaTime)
         {
             // Iterate the sparse list of currently-channeling enemies (not all active enemies).
             // This keeps the per-frame work O(active channelers) instead of O(active enemies).

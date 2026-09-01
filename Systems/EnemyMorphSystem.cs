@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -32,8 +32,8 @@ namespace BattleSystemECS.Systems
         private readonly IRenderer renderer;
 
         // Morph events: processed serially to avoid concurrent writes to ComponentStore
-        private readonly ConcurrentBag<(int enemyId, int morphDefId)> _morphQueue =
-            new ConcurrentBag<(int, int)>();
+        private readonly List<(int enemyId, int morphDefId)> _morphQueue =
+            new List<(int, int)>();
 
         public EnemyMorphSystem(ComponentStore store, GameConfig gameConfig, IRenderer renderer)
         {
@@ -96,10 +96,12 @@ namespace BattleSystemECS.Systems
             }
 
             // Apply all queued morphs serially
-            while (_morphQueue.TryTake(out var morphEvent))
+            for(int queueIndex=0;queueIndex<_morphQueue.Count;queueIndex++)
             {
+                var morphEvent=_morphQueue[queueIndex];
                 ResolveMorph(morphEvent.enemyId, morphEvent.morphDefId);
             }
+            _morphQueue.Clear();
         }
 
         /// <summary>

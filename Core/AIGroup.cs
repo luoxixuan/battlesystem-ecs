@@ -46,11 +46,11 @@ namespace BattleSystemECS.Core
             // frame (via EnqueueAbility) are visible to Movement and TowerAttack in the same
             // frame. Casts that resolve this frame will be enqueued above and executed next
             // turn (we don't re-enter ExecuteAbilities to keep the frame's resolve order stable).
-            EnemyAbility?.TickCastTimers();
+            EnemyAbility?.TickCastTimers(deltaTime);
             EnemyAbility?.Update();
 
             Burrow?.SetTurn(turn);
-            Burrow?.Update();
+            Burrow?.Update(deltaTime);
             Burrow?.ApplyBurrowEffects();
 
             Necromancer?.SetTurn(turn, turn);
@@ -69,7 +69,7 @@ namespace BattleSystemECS.Core
             Lifesteal?.Update();
 
             Phase?.SetTurn(turn);
-            Phase?.Update();
+            Phase?.Update(deltaTime);
 
             Fear?.SetTurn(turn);
             Fear?.Update(deltaTime);
@@ -80,19 +80,9 @@ namespace BattleSystemECS.Core
             // damage. The two-phase split (Update = decide & damage, RecomputeTowerSlows
             // = roll up TowerSapperSlowMult) keeps the per-tower slow multiplier
             // consistent with the same frame's swing decisions.
-            if (Sapper == null)
-            {
-                // Lazy-init: the AIGroup is constructed in FrameScheduler without
-                // a logger or config reference, so we fall back to a ConsoleLogger
-                // for log output. SapperSystem tolerates any IRenderer, and the
-                // hot path doesn't need GameConfig (all per-sapper stats live on
-                // the ComponentStore). Tests can pre-wire a real logger via
-                // SystemRegistry if they need to assert log output.
-                Sapper = new Systems.SapperSystem(store, new ConsoleLogger());
-            }
-            Sapper.SetTurn(turn, deltaTime);
-            Sapper.Update(deltaTime);
-            Sapper.RecomputeTowerSlows();
+            Sapper?.SetTurn(turn, deltaTime);
+            Sapper?.Update(deltaTime);
+            Sapper?.RecomputeTowerSlows();
         }
     }
 }

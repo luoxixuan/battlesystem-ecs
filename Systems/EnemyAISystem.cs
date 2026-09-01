@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
 using System.Threading;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
@@ -39,25 +38,20 @@ namespace BattleSystemECS.Systems
         private bool _playerHasKnockbackImmunity;
         private float _currentDeltaTime;
 
-        // Attack event batch — ping-pong double-buffer to eliminate per-frame GC allocation.
-        // Collected in parallel phase, executed in serial phase.
-        private ConcurrentBag<AttackEvent>[] _attackEvents = new ConcurrentBag<AttackEvent>[2];
-        private int _attackEventsIdx = 0;
+        private readonly List<AttackEvent> _attackEvents = new List<AttackEvent>();
+        private readonly List<LifestealEvent> _lifestealEvents = new List<LifestealEvent>();
+        private readonly List<DeathEvent> _deathEvents = new List<DeathEvent>();
+        private EnemyAiCollectBuffer[] _collectBuffers = Array.Empty<EnemyAiCollectBuffer>();
 
-        // Lifesteal event batch — ping-pong double-buffer (parallel collect, serial apply)
-        private ConcurrentBag<LifestealEvent>[] _lifestealEvents = new ConcurrentBag<LifestealEvent>[2];
-        private int _lifestealEventsIdx = 0;
-
-        // Round 111 Direction 1 — Boss phase ability event bag. Both the sequential path
-        // (small enemy counts) and the parallel batches (large enemy counts) push into this
-        // bag whenever a phase's AbilityId needs to fire. The bag is drained at the END of
+        // 首领阶段能力批次：小规模顺序路径与大规模并行批次都写各自独占缓冲，
+        // 阶段 AbilityId 触发后在 Update 末尾稳定合并并串行提交。
         // Update() into EnemyAbilitySystem.EnqueueAbility (which is NOT thread-safe — it
         // mutates EnemyIsChanneling / _activeChannelers). One-shot guard is the FiredMask
         // bit already set inside each path before the push, so even if two threads see the
         // same transition in the same frame, only the first wins (CAS on FiredMask).
-        private readonly ConcurrentBag<(int enemyId, string abilityId)> _phaseAbilityEvents = new ConcurrentBag<(int, string)>();
+        private readonly List<(int enemyId, string abilityId)> _phaseAbilityEvents = new List<(int, string)>();
 
-        // Round 119 Dir 3 — Boss phase minion-summon event bag. Pushed in the same Parallel.For
+        // 首领阶段召唤批次：与能力事件共用同一 Parallel.For 的批次独占缓冲，
         // path as _phaseAbilityEvents whenever a phase's (MinionTypeId, MinionCount) trigger
         // fires. Drained serially at end of Update() into WaveSpawningSystem.SpawnMinionNearPosition
         // (which calls AddEnemy — NOT thread-safe). Each event carries the boss id, typeId,
@@ -68,10 +62,10 @@ namespace BattleSystemECS.Systems
         // Round 137 Dir 6 — bag now carries boss element affinity (int ElementType) at fire time
         // so the serial drain can pass it to SpawnMinionNearPosition. Reading the SOA array in
         // the parallel push site is safe (single writer here, per-enemy slot).
-        private readonly ConcurrentBag<(int bossId, int typeId, int count, float x, float y, int elementAffinity)> _phaseMinionEvents
-            = new ConcurrentBag<(int bossId, int typeId, int count, float x, float y, int elementAffinity)>();
+        private readonly List<(int bossId, int typeId, int count, float x, float y, int elementAffinity)> _phaseMinionEvents
+            = new List<(int bossId, int typeId, int count, float x, float y, int elementAffinity)>();
 
-        // Round 129 Dir 2 — Boss phase change event bag. Pushed in BOTH the sequential (small
+        // 首领阶段变化批次：顺序与并行路径都写稳定独占缓冲，
         // enemy count) and parallel (large enemy count) branches whenever a phase transition
         // fires (legacy CSV path uses the in-place `currentPhase` gate; structured path uses
         // EnemyPhaseFiredMask bit). Drained serially at end of Update() into the EventBus.
@@ -79,8 +73,8 @@ namespace BattleSystemECS.Systems
         // music, AoE warning, telemetry) — they subscribe via EventBus.BossPhaseChanged and
         // react to the payload. Drain is always performed (count tracked) even when the event
         // bus is null, matching the pattern of the other two phase-related bags.
-        private readonly ConcurrentBag<BossPhaseChangedEvent> _phaseChangeEvents
-            = new ConcurrentBag<BossPhaseChangedEvent>();
+        private readonly List<BossPhaseChangedEvent> _phaseChangeEvents
+            = new List<BossPhaseChangedEvent>();
 
         // BT evaluation cache — invalidates when enemy health, charge counter, or stun duration changes.
         private float _cachedPlayerHealth = -1;
@@ -101,10 +95,6 @@ namespace BattleSystemECS.Systems
             this.techTreeSystem = techTreeSystem;
             this._eventBus = eventBus ?? new EventBus();
             this._reflectTowerSystem = reflectTowerSystem;
-            _attackEvents[0] = new ConcurrentBag<AttackEvent>();
-            _attackEvents[1] = new ConcurrentBag<AttackEvent>();
-            _lifestealEvents[0] = new ConcurrentBag<LifestealEvent>();
-            _lifestealEvents[1] = new ConcurrentBag<LifestealEvent>();
         }
 
         /// <summary>
@@ -142,10 +132,19 @@ namespace BattleSystemECS.Systems
 
             const int batchSize = 256;
             const int PARALLEL_MIN_ENEMIES = 500;
+            int numBatches=Math.Max(1,(count+batchSize-1)/batchSize);
+            PrepareCollectBuffers(numBatches);
+            _attackEvents.Clear();
+            _lifestealEvents.Clear();
+            _deathEvents.Clear();
+            _phaseAbilityEvents.Clear();
+            _phaseMinionEvents.Clear();
+            _phaseChangeEvents.Clear();
 
             if (count < PARALLEL_MIN_ENEMIES)
             {
                 // Sequential — avoid Parallel.For overhead for small counts (< 2 batches)
+                EnemyAiCollectBuffer collect=_collectBuffers[0];
                 for (int i = 0; i < count; i++)
                 {
                     int enemyId = activeEnemyIds[i];
@@ -185,6 +184,8 @@ namespace BattleSystemECS.Systems
                         store.EnemyEnrageTimer[enemyId] = enrageTimer;
                     }
 
+                    if(TryCollectExpiredDecoy(enemyId,collect))continue;
+
                     // Health-based phase transition
                     string thresholdsStr = store.EnemyPhaseThresholds[enemyId];
                     if (!string.IsNullOrEmpty(thresholdsStr))
@@ -206,7 +207,7 @@ namespace BattleSystemECS.Systems
                                         // the new phase so the payload's OldPhase reflects the
                                         // pre-transition value. HealthFraction is the boss's HP
                                         // fraction AT THE TRANSITION (just below the threshold).
-                                        _phaseChangeEvents.Add(new BossPhaseChangedEvent
+                                        collect.PhaseChanges.Add(new BossPhaseChangedEvent
                                         {
                                             EnemyId = enemyId,
                                             BossTypeName = null, // filled in by drain (serial)
@@ -252,7 +253,7 @@ namespace BattleSystemECS.Systems
                                 // phase index is `ph` (0-indexed of the phase being entered, the
                                 // previously-stored value). HealthFraction is captured at this
                                 // frame's HP ratio (just below the threshold).
-                                _phaseChangeEvents.Add(new BossPhaseChangedEvent
+                                collect.PhaseChanges.Add(new BossPhaseChangedEvent
                                 {
                                     EnemyId = enemyId,
                                     BossTypeName = null, // filled in by drain (serial)
@@ -284,7 +285,7 @@ namespace BattleSystemECS.Systems
                                 string abId = store.EnemyPhaseAbilityIdsFlat[ph, enemyId];
                                 if (!string.IsNullOrEmpty(abId))
                                 {
-                                    _phaseAbilityEvents.Add((enemyId, abId));
+                                    collect.PhaseAbilities.Add((enemyId, abId));
                                 }
                                 // Round 119 Dir 3 — Boss phase minion summon trigger. Reads the
                                 // pre-populated per-(phase,enemy) minion fields and pushes a
@@ -299,7 +300,7 @@ namespace BattleSystemECS.Systems
                                     // (already pre-stored as ElementType int) so SpawnMinionNearPosition
                                     // can apply +10% HP to matching minions.
                                     int bossElem = store.EnemyPhaseElementAffinityFlat[phIdx];
-                                    _phaseMinionEvents.Add((enemyId, minionType, minionCount,
+                                    collect.PhaseMinions.Add((enemyId, minionType, minionCount,
                                         store.PositionX[enemyId], store.PositionY[enemyId], bossElem));
                                 }
                                 firedMask = store.EnemyPhaseFiredMask[enemyId];
@@ -420,7 +421,7 @@ namespace BattleSystemECS.Systems
                     {
                         float param = (actionEnum == EnemyActionType.ChargeAttack)
                             ? store.EnemyChargeParam[enemyId] : 0f;
-                        _attackEvents[_attackEventsIdx].Add(new AttackEvent
+                        collect.Attacks.Add(new AttackEvent
                         {
                             EnemyId = enemyId,
                             ActionType = actionEnum,
@@ -431,10 +432,10 @@ namespace BattleSystemECS.Systems
             }
             else
             {
-                int numBatches = (count + batchSize - 1) / batchSize;
                 Parallel.For(0, numBatches, ParallelOptionsCache.HotPath,
                     batchIdx =>
                 {
+                    EnemyAiCollectBuffer collect=_collectBuffers[batchIdx];
                     int start = batchIdx * batchSize;
                     int end = Math.Min(start + batchSize, count);
 
@@ -470,19 +471,7 @@ namespace BattleSystemECS.Systems
                         // Decoy lifetime countdown — auto-expire finite-lived player-spawned dummies.
                         // Decremented each frame; when <= 0 the decoy is queued for death (no gold).
                         // Done before BT evaluation so the rest of the system skips expired decoys.
-                        if (store.EnemyIsDecoy[enemyId])
-                        {
-                            float decoyLeft = store.EnemyDecoyLifetimeLeft[enemyId] - _currentDeltaTime;
-                            if (decoyLeft <= 0f)
-                            {
-                                store.EnemyDecoyLifetimeLeft[enemyId] = 0f;
-                                // Queue death; ResolveEnemiesKilledThisFrame() at frame end will destroy it.
-                                // Uses playerId as the killer (consistency with other death paths).
-                                store.QueueEnemyDeath(enemyId, playerId);
-                                continue; // skip the rest of AI evaluation for this decoy this frame
-                            }
-                            store.EnemyDecoyLifetimeLeft[enemyId] = decoyLeft;
-                        }
+                        if(TryCollectExpiredDecoy(enemyId,collect))continue;
 
                         // Health-based phase transition
                         string thresholdsStr = store.EnemyPhaseThresholds[enemyId];
@@ -513,8 +502,8 @@ namespace BattleSystemECS.Systems
                                             // Round 129 Dir 2 — push phase-change event. OldPhase
                                             // is the pre-transition value (the CAS saw this same
                                             // value), HealthFraction is the current frame's HP
-                                            // ratio. ConcurrentBag.Add is thread-safe.
-                                            _phaseChangeEvents.Add(new BossPhaseChangedEvent
+                                            // 当前批次独占该列表，屏障后按批次顺序合并。
+                                            collect.PhaseChanges.Add(new BossPhaseChangedEvent
                                             {
                                                 EnemyId = enemyId,
                                                 BossTypeName = null, // filled in by drain (serial)
@@ -561,11 +550,10 @@ namespace BattleSystemECS.Systems
                                         firedMask | bit, firedMask);
                                     if (oldFiredMask == firedMask)
                                     {
-                                        // Round 129 Dir 2 — push phase-change event. ConcurrentBag
-                                        // push is thread-safe; the serial drain later resolves the
+                                        // 当前批次独占阶段变化列表；串行提交时再解析
                                         // BossTypeName via store.GetEnemyTypeName. OldPhase is the
                                         // 0-indexed phase being entered (the value just stored).
-                                        _phaseChangeEvents.Add(new BossPhaseChangedEvent
+                                        collect.PhaseChanges.Add(new BossPhaseChangedEvent
                                         {
                                             EnemyId = enemyId,
                                             BossTypeName = null, // filled in by drain (serial)
@@ -590,7 +578,7 @@ namespace BattleSystemECS.Systems
                                         string abId = store.EnemyPhaseAbilityIdsFlat[ph, enemyId];
                                         if (!string.IsNullOrEmpty(abId))
                                         {
-                                            _phaseAbilityEvents.Add((enemyId, abId));
+                                            collect.PhaseAbilities.Add((enemyId, abId));
                                         }
                                         // Round 119 Dir 3 — Boss phase minion summon trigger (parallel
                                         // path). Same semantics as the sequential path: read pre-populated
@@ -602,7 +590,7 @@ namespace BattleSystemECS.Systems
                                         {
                                             // Round 137 Dir 6 — capture boss element affinity for themed bonus
                                             int bossElem = store.EnemyPhaseElementAffinityFlat[phIdx];
-                                            _phaseMinionEvents.Add((enemyId, minionType, minionCount,
+                                            collect.PhaseMinions.Add((enemyId, minionType, minionCount,
                                                 store.PositionX[enemyId], store.PositionY[enemyId], bossElem));
                                         }
                                         firedMask = store.EnemyPhaseFiredMask[enemyId];
@@ -718,7 +706,7 @@ namespace BattleSystemECS.Systems
                         {
                             float param = (actionEnum == EnemyActionType.ChargeAttack)
                                 ? store.EnemyChargeParam[enemyId] : 0f;
-                            _attackEvents[_attackEventsIdx].Add(new AttackEvent
+                            collect.Attacks.Add(new AttackEvent
                             {
                                 EnemyId = enemyId,
                                 ActionType = actionEnum,
@@ -729,29 +717,28 @@ namespace BattleSystemECS.Systems
                 });
             }
 
-            // Serial action execution
-            int readIdx = _attackEventsIdx;
-            foreach (var evt in _attackEvents[readIdx])
+            MergeCollectBuffers(numBatches);
+
+            for(int i=0;i<_deathEvents.Count;i++)
             {
+                DeathEvent death=_deathEvents[i];
+                store.QueueEnemyDeath(death.EnemyId,death.KillerId);
+            }
+
+            // 按 batch 与活跃敌人索引顺序执行，不依赖 Parallel.For 调度。
+            for(int i=0;i<_attackEvents.Count;i++)
+            {
+                AttackEvent evt=_attackEvents[i];
                 InvokeExecuteActionEnum(evt.EnemyId, evt.ActionType);
             }
 
-            // Ping-pong swap
-            int writeIdx = 1 - _attackEventsIdx;
-            _attackEvents[writeIdx].Clear();
-            _attackEventsIdx = writeIdx;
-
             // Serial lifesteal apply — after all attack actions have been resolved
-            int lsReadIdx = _lifestealEventsIdx;
-            foreach (var evt in _lifestealEvents[lsReadIdx])
+            for(int i=0;i<_lifestealEvents.Count;i++)
             {
+                LifestealEvent evt=_lifestealEvents[i];
                 if (!store.EnemyActive[evt.EnemyId]) continue;
                 store.ApplyEnemyResourceAuthority(evt.EnemyId, evt.EnemyId, new Core.GAS.AttributeKey(3), evt.HealAmount);
             }
-            // Ping-pong swap
-            int lsWriteIdx = 1 - _lifestealEventsIdx;
-            _lifestealEvents[lsWriteIdx].Clear();
-            _lifestealEventsIdx = lsWriteIdx;
 
             // Dodge execution
             foreach (var enemyId in activeEnemyIds)
@@ -935,9 +922,6 @@ namespace BattleSystemECS.Systems
             if (string.IsNullOrEmpty(action))
                 return EnemyActionType.None;
 
-            if (actionCache.TryGetValue(action, out var cached))
-                return cached;
-
             string baseAction = action;
             int underscoreIdx = action.LastIndexOf('_');
             if (underscoreIdx > 0 && underscoreIdx < action.Length - 1)
@@ -947,7 +931,7 @@ namespace BattleSystemECS.Systems
                     baseAction = action.Substring(0, underscoreIdx);
             }
 
-            EnemyActionType result = baseAction switch
+            return baseAction switch
             {
                 "move_to_target" => EnemyActionType.MoveToTarget,
                 "attack_melee" => EnemyActionType.AttackMelee,
@@ -962,11 +946,7 @@ namespace BattleSystemECS.Systems
                 _ => EnemyActionType.None,
             };
 
-            actionCache[action] = result;
-            return result;
         }
-
-        private static readonly ConcurrentDictionary<string, EnemyActionType> actionCache = new ConcurrentDictionary<string, EnemyActionType>();
 
         public void InvokeExecuteActionEnum(int enemyId, EnemyActionType actionEnum)
         {
@@ -1075,7 +1055,7 @@ namespace BattleSystemECS.Systems
                     float healAmount = Math.Min(damage * ratio, cap);
                     if (healAmount > 0f)
                     {
-                        _lifestealEvents[_lifestealEventsIdx].Add(new LifestealEvent
+                        _lifestealEvents.Add(new LifestealEvent
                         {
                             EnemyId = enemyId,
                             HealAmount = healAmount
@@ -1120,7 +1100,7 @@ namespace BattleSystemECS.Systems
                     float healAmount = Math.Min(damage * ratio, cap);
                     if (healAmount > 0f)
                     {
-                        _lifestealEvents[_lifestealEventsIdx].Add(new LifestealEvent
+                        _lifestealEvents.Add(new LifestealEvent
                         {
                             EnemyId = enemyId,
                             HealAmount = healAmount
@@ -1185,7 +1165,7 @@ namespace BattleSystemECS.Systems
                         float healAmount = Math.Min(chargedDamage * ratio, cap);
                         if (healAmount > 0f)
                         {
-                            _lifestealEvents[_lifestealEventsIdx].Add(new LifestealEvent
+                            _lifestealEvents.Add(new LifestealEvent
                             {
                                 EnemyId = enemyId,
                                 HealAmount = healAmount
@@ -1274,32 +1254,34 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Round 111 Direction 1 — drain the phase-ability event bag into EnemyAbilitySystem.
+        /// 将阶段能力批次串行提交给 EnemyAbilitySystem。
         /// Called at the end of Update() (after both sequential and parallel paths complete).
-        /// Uses TryTake in a tight loop to empty the bag without per-iteration allocations.
+        /// 按稳定 batch 合并顺序遍历复用列表，不产生逐项分配。
         /// Drained count is exposed for tests / diagnostics.
         /// </summary>
         public int PhaseAbilityDrainCount { get; private set; }
         private void DrainPhaseAbilityEvents()
         {
             int count = 0;
-            while (_phaseAbilityEvents.TryTake(out var ev))
+            for(int i=0;i<_phaseAbilityEvents.Count;i++)
             {
+                var ev=_phaseAbilityEvents[i];
                 if (enemyAbilitySystem != null && !string.IsNullOrEmpty(ev.abilityId))
                 {
                     enemyAbilitySystem.EnqueueAbility(ev.enemyId, ev.abilityId);
                     count++;
                 }
             }
+            _phaseAbilityEvents.Clear();
             PhaseAbilityDrainCount = count;
         }
 
-        // Round 119 Dir 3 — drain the phase-minion bag into WaveSpawningSystem.SpawnMinionNearPosition.
+        // 将阶段召唤批次串行提交给 WaveSpawningSystem.SpawnMinionNearPosition。
         // Called at the end of Update() (after both sequential and parallel paths complete). Like
         // DrainPhaseAbilityEvents, this is serial and thread-safe. When _waveSpawningSystem is null
-        // (e.g. unit tests without a full GameManager) the bag is drained but no spawn happens —
+        // (e.g. unit tests without a full GameManager) the batch is drained but no spawn happens —
         // the count is still tracked for diagnostics via PhaseMinionDrainCount.
-        // Round 137 Dir 6 — bag now carries the boss's ElementType int; passed to the spawn
+        // 批次携带 Boss 的 ElementType，提交时传给生成入口。
         // overload so minions with matching MonsterConfig.ElementAffinity get a +10% HP bonus.
         public int PhaseMinionDrainCount { get; private set; }
         public int PhaseMinionSpawnedCount { get; private set; }
@@ -1307,13 +1289,15 @@ namespace BattleSystemECS.Systems
         {
             int drained = 0;
             int spawned = 0;
-            while (_phaseMinionEvents.TryTake(out var ev))
+            for(int i=0;i<_phaseMinionEvents.Count;i++)
             {
+                var ev=_phaseMinionEvents[i];
                 drained++;
                 if (_waveSpawningSystem == null) continue;
                 int n = _waveSpawningSystem.SpawnMinionNearPosition(ev.typeId, ev.count, ev.x, ev.y, ev.elementAffinity);
                 spawned += n;
             }
+            _phaseMinionEvents.Clear();
             PhaseMinionDrainCount = drained;
             PhaseMinionSpawnedCount = spawned;
         }
@@ -1327,12 +1311,13 @@ namespace BattleSystemECS.Systems
         // here — that's intentional, mirrors the existing pattern for other drains).
         public int PhaseChangeDrainCount { get; private set; }
         public int PhaseChangePublishCount { get; private set; }
-        private void DrainPhaseChangeEvents()
+        internal void DrainPhaseChangeEvents()
         {
             int count = 0;
             int published = 0;
-            while (_phaseChangeEvents.TryTake(out var ev))
+            for(int i=0;i<_phaseChangeEvents.Count;i++)
             {
+                var ev=_phaseChangeEvents[i];
                 count++;
                 // Resolve BossTypeName in the serial drain (avoids contention on the
                 // EnemyTypeName[] array — push sites can run in parallel).
@@ -1341,8 +1326,51 @@ namespace BattleSystemECS.Systems
                 _eventBus.BossPhaseChanged.Publish(ev);
                 published++;
             }
+            _phaseChangeEvents.Clear();
             PhaseChangeDrainCount = count;
             PhaseChangePublishCount = published;
+        }
+
+        internal void EnqueuePhaseChangeForDiagnostics(BossPhaseChangedEvent value)=>_phaseChangeEvents.Add(value);
+
+        private void PrepareCollectBuffers(int count)
+        {
+            if(_collectBuffers.Length<count)
+            {
+                int capacity=Math.Max(count,Math.Max(4,_collectBuffers.Length*2));
+                var grown=new EnemyAiCollectBuffer[capacity];
+                Array.Copy(_collectBuffers,grown,_collectBuffers.Length);
+                for(int i=_collectBuffers.Length;i<grown.Length;i++)grown[i]=new EnemyAiCollectBuffer();
+                _collectBuffers=grown;
+            }
+            for(int i=0;i<count;i++)_collectBuffers[i].Clear();
+        }
+
+        private void MergeCollectBuffers(int count)
+        {
+            for(int i=0;i<count;i++)
+            {
+                EnemyAiCollectBuffer collect=_collectBuffers[i];
+                _attackEvents.AddRange(collect.Attacks);
+                _phaseAbilityEvents.AddRange(collect.PhaseAbilities);
+                _phaseMinionEvents.AddRange(collect.PhaseMinions);
+                _phaseChangeEvents.AddRange(collect.PhaseChanges);
+                _deathEvents.AddRange(collect.Deaths);
+            }
+        }
+
+        private bool TryCollectExpiredDecoy(int enemyId,EnemyAiCollectBuffer collect)
+        {
+            if(!store.EnemyIsDecoy[enemyId])return false;
+            float decoyLeft=store.EnemyDecoyLifetimeLeft[enemyId]-_currentDeltaTime;
+            if(decoyLeft>0f)
+            {
+                store.EnemyDecoyLifetimeLeft[enemyId]=decoyLeft;
+                return false;
+            }
+            store.EnemyDecoyLifetimeLeft[enemyId]=0f;
+            collect.Deaths.Add(new DeathEvent{EnemyId=enemyId,KillerId=playerId});
+            return true;
         }
 
         private static int ParseDodgeDirection(string action)
@@ -1370,6 +1398,23 @@ namespace BattleSystemECS.Systems
         {
             public int EnemyId;
             public float HealAmount;
+        }
+
+        private struct DeathEvent
+        {
+            public int EnemyId;
+            public int KillerId;
+        }
+
+        private sealed class EnemyAiCollectBuffer
+        {
+            public readonly List<AttackEvent> Attacks=new List<AttackEvent>();
+            public readonly List<(int enemyId,string abilityId)> PhaseAbilities=new List<(int,string)>();
+            public readonly List<(int bossId,int typeId,int count,float x,float y,int elementAffinity)> PhaseMinions=
+                new List<(int,int,int,float,float,int)>();
+            public readonly List<BossPhaseChangedEvent> PhaseChanges=new List<BossPhaseChangedEvent>();
+            public readonly List<DeathEvent> Deaths=new List<DeathEvent>();
+            public void Clear(){Attacks.Clear();PhaseAbilities.Clear();PhaseMinions.Clear();PhaseChanges.Clear();Deaths.Clear();}
         }
     }
 }

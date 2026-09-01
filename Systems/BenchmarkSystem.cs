@@ -9,6 +9,62 @@ using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Systems
 {
+    internal enum BenchmarkCompositionContract
+    {
+        ManualMergedLoop,
+        ProductionRegistryGraph
+    }
+
+    internal enum BenchmarkRunnerKind
+    {
+        ManualMerged,
+        ProductionGraphFixed,
+        GraphFullGame
+    }
+
+    internal readonly struct BenchmarkScenarioDefinition
+    {
+        public int Mode { get; }
+        public BenchmarkRunnerKind Runner { get; }
+        public BenchmarkCompositionContract Composition { get; }
+        public int EnemyCount { get; }
+        public int Frames { get; }
+        public int WarmupFrames { get; }
+        public FrameScenarioKind ScenarioKind { get; }
+        public bool IsHarness { get; }
+
+        public BenchmarkScenarioDefinition(int mode,BenchmarkRunnerKind runner,
+            BenchmarkCompositionContract composition,int enemyCount,int frames,
+            int warmupFrames,FrameScenarioKind scenarioKind=FrameScenarioKind.Gameplay,bool isHarness=false)
+        {Mode=mode;Runner=runner;Composition=composition;EnemyCount=enemyCount;Frames=frames;WarmupFrames=warmupFrames;ScenarioKind=scenarioKind;IsHarness=isHarness;}
+
+        public BenchmarkScenarioDefinition ForHarness(int enemyCount) =>
+            new BenchmarkScenarioDefinition(Mode,Runner,Composition,enemyCount,1,0,ScenarioKind,true);
+    }
+
+    internal readonly struct BenchmarkExecutionEvidence
+    {
+        public BenchmarkCompositionContract Composition { get; }
+        public int FramesExecuted { get; }
+        public int BeginFrameCalls { get; }
+        public int ManualMergedCalls { get; }
+        public int GraphTickCalls { get; }
+        public bool GraphSealed { get; }
+        public string CompositionFingerprint { get; }
+        public GameState FinalState { get; }
+        private readonly int[] _stateEntryCounts;
+        public BenchmarkExecutionEvidence(BenchmarkCompositionContract composition,int framesExecuted,
+            int beginFrameCalls,int manualMergedCalls,int graphTickCalls,bool graphSealed,string compositionFingerprint,
+            GameState finalState,int[] stateEntryCounts)
+        {
+            Composition=composition;FramesExecuted=framesExecuted;BeginFrameCalls=beginFrameCalls;
+            ManualMergedCalls=manualMergedCalls;GraphTickCalls=graphTickCalls;GraphSealed=graphSealed;
+            CompositionFingerprint=compositionFingerprint;FinalState=finalState;
+            _stateEntryCounts=(int[])stateEntryCounts.Clone();
+        }
+        public int StateEntryCount(GameState state)=>_stateEntryCounts[(int)state];
+    }
+
     /// <summary>
     /// Full 12-system benchmark with per-system timing breakdown.
     /// Run via: echo 2 | dotnet run
@@ -18,8 +74,63 @@ namespace BattleSystemECS.Systems
         private const float BENCH_ENEMY_HEALTH = 100f;
 
         private ComponentStore store;
+        private BenchmarkCompositionContract _executedComposition;
+        private int _executedFrames;
+        private int _beginFrameCalls;
+        private int _manualMergedCalls;
+        private int _graphTickCalls;
+        private bool _graphSealed;
+        private string _compositionFingerprint=string.Empty;
+        private readonly int[] _stateEntryCounts=new int[Enum.GetValues(typeof(GameState)).Length];
+        private GameState _finalState=GameState.Init;
 
         public BenchmarkSystem(ComponentStore store) { this.store = store; }
+
+        internal static BenchmarkScenarioDefinition GetScenarioDefinition(int mode) => mode switch
+        {
+            2 => new BenchmarkScenarioDefinition(2,BenchmarkRunnerKind.ManualMerged,
+                BenchmarkCompositionContract.ManualMergedLoop,10000,500,5),
+            4 => new BenchmarkScenarioDefinition(4,BenchmarkRunnerKind.ProductionGraphFixed,
+                BenchmarkCompositionContract.ProductionRegistryGraph,10000,500,0,
+                FrameScenarioKind.FixedPopulationBenchmark),
+            5 => new BenchmarkScenarioDefinition(5,BenchmarkRunnerKind.GraphFullGame,
+                BenchmarkCompositionContract.ProductionRegistryGraph,0,0,0),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported benchmark mode.")
+        };
+
+        internal BenchmarkExecutionEvidence RunCompositionHarness(int mode,int enemyCount=64)
+        {
+            return Dispatch(GetScenarioDefinition(mode).ForHarness(enemyCount));
+        }
+
+        private BenchmarkExecutionEvidence Dispatch(BenchmarkScenarioDefinition definition)
+        {
+            _executedComposition=definition.Composition;
+            _executedFrames=0;
+            _beginFrameCalls=0;
+            _manualMergedCalls=0;
+            _graphTickCalls=0;
+            _graphSealed=false;
+            _compositionFingerprint=string.Empty;
+            Array.Clear(_stateEntryCounts,0,_stateEntryCounts.Length);
+            _finalState=GameState.Init;
+            switch(definition.Runner)
+            {
+                case BenchmarkRunnerKind.ManualMerged:
+                    RunMergedSystemBenchmark(definition.EnemyCount,definition.Frames,definition.WarmupFrames);
+                    break;
+                case BenchmarkRunnerKind.ProductionGraphFixed:
+                    RunProductionGraphBenchmark(definition);
+                    break;
+                case BenchmarkRunnerKind.GraphFullGame:
+                    RunFullGameBenchmark(definition);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(definition),definition.Runner,"Unsupported benchmark runner.");
+            }
+            return new BenchmarkExecutionEvidence(_executedComposition,_executedFrames,_beginFrameCalls,
+                _manualMergedCalls,_graphTickCalls,_graphSealed,_compositionFingerprint,_finalState,_stateEntryCounts);
+        }
 
         public void RunBenchmark(int scenario)
         {
@@ -29,19 +140,20 @@ namespace BattleSystemECS.Systems
                 return;
             }
 
-            if (scenario == 4)
-            {
-                RunRealSystemChainBenchmark(10000, 500);
-                return;
-            }
+            int mode=scenario==4||scenario==5?scenario:2;
+            BenchmarkScenarioDefinition definition=GetScenarioDefinition(mode);
+            if(mode==2&&scenario!=2)
+                definition=new BenchmarkScenarioDefinition(2,definition.Runner,definition.Composition,
+                    scenario,definition.Frames,definition.WarmupFrames);
+            Dispatch(definition);
+        }
 
-            if (scenario == 5)
-            {
-                RunFullGameBenchmark();
-                return;
-            }
-
+        private void RunMergedSystemBenchmark(int scenario,int frames,int warmupFrames)
+        {
+            _compositionFingerprint="manual-merged-loop:v1";
             Console.WriteLine($"\n[BENCHMARK] Full 12-System Benchmark: {scenario} entities");
+            Console.WriteLine($"[BENCHMARK] Composition: {_compositionFingerprint} (lower bound; not production FrameGraph wiring evidence).");
+            Console.WriteLine($"[BENCHMARK] Composition-Fingerprint: {_compositionFingerprint}");
 
             var logger = new ConsoleLogger();
             var gameConfig = new GameConfig();
@@ -102,10 +214,8 @@ namespace BattleSystemECS.Systems
             store.AddTower(t2, TowerType.Sniper, 25f, 5, 1f, 1, 100f);
             store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
 
-            int frames = 500;
-
             // Warm-up (BeginFrame is optional since Resolve clears _deathQueue)
-            for (int f = 0; f < 5; f++)
+            for (int f = 0; f < warmupFrames; f++)
             {
                 int turn = f + 6;
                 store.BeginFrame();
@@ -135,6 +245,9 @@ namespace BattleSystemECS.Systems
             {
                 int turn = f + 6;
                 store.BeginFrame(); // BeginFrame called each frame so Resolve clears _deathQueue
+                _beginFrameCalls++;
+                _manualMergedCalls++;
+                _executedFrames++;
                 var sw = new Stopwatch();
 
                 sw.Start(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedTicks;
@@ -351,15 +464,13 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             Console.WriteLine($"[MICRO]   Steps 1-6 sum:               {t6/ticksPerMs,7:F2} ms");
         }
 
-        // ── Mode 4: Real system-chain benchmark ──────────────────────────────────
-        private void RunRealSystemChainBenchmark(int scenario, int frames)
+        // ── 模式 4：生产 Registry FrameGraph 压测 ──────────────────────────────────
+        private void RunProductionGraphBenchmark(BenchmarkScenarioDefinition definition)
         {
-            Console.WriteLine($"\n[BENCHMARK] Real System Chain: {scenario} enemies x {frames} frames");
-            Console.WriteLine("[BENCHMARK] Using actual system.Update() calls, not hand-merged loops.");
+            Console.WriteLine($"\n[BENCHMARK] Production FrameGraph: {definition.EnemyCount} enemies x {definition.Frames} frames");
 
             var logger = new ConsoleLogger();
-            var gameConfig = new GameConfig();
-            GameConfigLoader.LoadConfig(logger);
+            var gameConfig = GameConfigLoader.LoadConfig(logger);
 
             int playerId = 1;
             store.AddPlayer(playerId, 10f, 1f, 100f, 1, 20);
@@ -373,8 +484,18 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             store.PositionActive[playerId] = true;
             store.SetPlayerGold(playerId, 9999f);
 
+            var runtime=BenchmarkCompositionFactory.Create(store,gameConfig,logger,playerId,
+                scenarioKind:definition.ScenarioKind);
+            FrameScheduler scheduler=runtime.Scheduler;
+            _graphSealed=scheduler.IsCompositionSealed;
+            _compositionFingerprint=runtime.ExecutionFingerprint(definition.EnemyCount);
+            AttachStateEvidence(runtime.StateMachine);
+            TransitionBenchmarkState(runtime.StateMachine,GameState.BuildPhase);
+            Console.WriteLine($"[BENCHMARK] Composition: production-registry-frame-graph ({runtime.Fingerprint}).");
+            Console.WriteLine($"[BENCHMARK] Composition-Fingerprint: {_compositionFingerprint}");
+
             var random = new Random(42);
-            for (int i = 0; i < scenario; i++)
+            for (int i = 0; i < definition.EnemyCount; i++)
             {
                 float x = random.Next(0, 10);
                 float y = (float)random.Next(10, 19);
@@ -392,153 +513,36 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             store.AddTower(t2, TowerType.Sniper, 25f, 5, 1f, 1, 100f);
             store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
 
-            var enemyAbility = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
-            var benchTechTree = new TechTreeSystem(store, logger, playerId, null, gameConfig);
-            var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbility, benchTechTree);
-            var enemyMovement = new EnemyMovementSystem(store, playerId);
-            var playerAttack  = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
-            var towerAttack   = new TowerAttackSystem(store, logger, null);
-            var auraTower     = new AuraTowerSystem(store);
-            // Round 173 Direction 1 — Shrine Tower. No-op when no Shrine is on the field.
-            var towerShrine   = new TowerShrineSystem(store);
-            var projectile    = new ProjectileSystem(store, logger);
-            var gold          = new GoldSystem(store, logger);
-            var upgrade       = new UpgradeSystem(store, logger, playerId, gameConfig);
-            var skill         = new SkillSystem(store, logger, playerId, gameConfig);
-            skill.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
-            var buffSystem    = new BuffSystem(store, playerId);
-            var comboSystem   = new ComboSystem(store, gameConfig.Combo);
-            skill.InjectDotSystem(buffSystem);
-            towerAttack.SetBuffSystem(buffSystem);
-            var map           = new MapSystem(logger, store);
-            map.SetMapSize(10, 20);
-            var pathfinding   = new PathfindingSystem(store);
-            enemyMovement.SetPathfindingSystem(pathfinding);
-            // Round 182 Direction 6 — No FrameScheduler in this benchmark path (mode 4
-            // stress-test calls systems directly); TickBlinkerCycle is not invoked here,
-            // so the optional pathfinding injection is deferred to the mode 5 path
-            // below where the FrameScheduler is actually constructed.
-            var waveSpawning  = new WaveSpawningSystem(store, logger, gameConfig);
+            TransitionBenchmarkState(runtime.StateMachine,GameState.WavePhase);
 
-            long tWaveSpawn = 0, tEnemyAI = 0, tMoveAttack = 0;
-            long tPlayerAttack = 0, tTowerAttack = 0, tGold = 0, tUpgrade = 0, tSkill = 0;
-            long tGridRebuildMode4 = 0;
+            if(definition.IsHarness)
+            {
+                RunGraphFrame(scheduler,1);
+                return;
+            }
 
             ConsoleLogger.EnableLog = false;
             var totalSw = Stopwatch.StartNew();
 
-            for (int f = 0; f < frames; f++)
-            {
-                int turn = f + 6;
-                store.BeginFrame();
-                var sw = new Stopwatch();
-
-                sw.Start(); store.RebuildSpatialGrid(); tGridRebuildMode4 += sw.ElapsedTicks;
-                // mode 4 is a fixed 10K-entity chain benchmark; wave spawning is
-                // intentionally disabled so the measured population remains stable.
-                sw.Restart(); tWaveSpawn += sw.ElapsedTicks;
-                sw.Restart(); enemyAI.SetTurn(turn); enemyAI.Update(); tEnemyAI += sw.ElapsedTicks;
-                sw.Restart(); enemyMovement.SetTurn(turn); enemyMovement.Update(); tMoveAttack += sw.ElapsedTicks;
-                sw.Restart(); playerAttack.SetTurn(turn); playerAttack.Update(); tPlayerAttack += sw.ElapsedTicks;
-                sw.Restart(); towerAttack.SetTurn(turn); towerAttack.Update(1f); tTowerAttack += sw.ElapsedTicks;
-                sw.Restart(); auraTower.SetTurn(); auraTower.ResolveAuraBuffs();
-                // Round 173 Direction 1 — Shrine aura resolve. O(1) fast-path when
-                //   no Shrine is on the field (sentinel _anyShrineOnField).
-                towerShrine.SetTurn(); towerShrine.ResolveShrineBuffs();
-                sw.Restart(); projectile.Update(1f);
-                sw.Restart(); gold.SetTurn(turn); gold.Update(); tGold += sw.ElapsedTicks;
-                sw.Restart(); upgrade.Update(); tUpgrade += sw.ElapsedTicks;
-                sw.Restart(); skill.Update(1f);
-                skill.AutoCastBestSkill();
-                skill.ResolveSkillDamage();
-                buffSystem.Update(1f);
-                comboSystem.Update(1f);
-                buffSystem.ResolveDotDamage();
-                store.ResolveEnemiesKilledThisFrame();
-                long tSkillAndBuff = sw.ElapsedTicks;
-                sw.Restart(); tSkill += tSkillAndBuff;
-            }
+            for (int f = 0; f < definition.Frames; f++)
+                RunGraphFrame(scheduler,f+6);
 
             totalSw.Stop();
             ConsoleLogger.EnableLog = true;
 
-            double ticksPerMs = Stopwatch.Frequency / 1000.0;
             double msTotal = totalSw.Elapsed.TotalMilliseconds;
-            double fps = 1000.0 / (msTotal / frames);
+            double fps = 1000.0 / (msTotal / definition.Frames);
 
-            Console.WriteLine($"\n[BENCHMARK] Real-system-chain timing ({frames} frames, {scenario} enemies):");
-            Console.WriteLine($"[BENCHMARK]   GridRebuild:    {tGridRebuildMode4/ticksPerMs,7:F2} ms");
-            Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn/ticksPerMs,7:F2} ms");
-Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms");
-            Console.WriteLine($"[BENCHMARK]   EnemyMovement: {tMoveAttack/ticksPerMs,7:F2} ms");
-            Console.WriteLine($"[BENCHMARK]   PlayerAttack:  {tPlayerAttack/ticksPerMs,7:F2} ms");
-            Console.WriteLine($"[BENCHMARK]   TowerAttack:    {tTowerAttack/ticksPerMs,7:F2} ms");
-            Console.WriteLine($"[BENCHMARK]   Gold:           {tGold/ticksPerMs,7:F2} ms");
-            Console.WriteLine($"[BENCHMARK]   Upgrade:        {tUpgrade/ticksPerMs,7:F2} ms");
-            Console.WriteLine($"[BENCHMARK]   Skill:          {tSkill/ticksPerMs,7:F2} ms");
-            Console.WriteLine($"[BENCHMARK]   ----------------------------------------");
+            Console.WriteLine($"\n[BENCHMARK] Production FrameGraph timing ({definition.Frames} frames, {definition.EnemyCount} enemies):");
             Console.WriteLine($"[BENCHMARK]   TOTAL:          {msTotal,7:F2} ms");
-            Console.WriteLine($"\n[BENCHMARK] Throughput: {fps:F0} FPS  ({msTotal/frames:F2} ms/frame)");
+            Console.WriteLine($"\n[BENCHMARK] Throughput: {fps:F0} FPS  ({msTotal/definition.Frames:F2} ms/frame)");
         }
 
         /// <summary>
         /// 完整一局压测 — 5 关、真实波次生成、完整战斗流程。
         /// 测量从第一帧到最后一帧的总帧数和墙钟时间，计算真实游戏吞吐量。
         /// </summary>
-        internal static (FrameScheduler scheduler, WaveSpawningSystem waveSpawning, SkillSystem skill)
-            CreateFullGameRuntime(ComponentStore store, GameConfig gameConfig, IRenderer logger, int playerId)
-        {
-            var scheduler = new FrameScheduler(store, gameConfig);
-            var waveSpawning = new WaveSpawningSystem(store, logger, gameConfig);
-            var enemyAbility = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
-            var benchTechTree = new TechTreeSystem(store, logger, playerId, null, gameConfig);
-            var enemyAI = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbility, benchTechTree);
-            var enemyMovement = new EnemyMovementSystem(store, playerId);
-            var playerAttack = new PlayerTowerAttackSystem(store, logger, playerId, gameConfig);
-            var towerAttack = new TowerAttackSystem(store, logger, null);
-            var auraTower = new AuraTowerSystem(store);
-            var towerShrine = new TowerShrineSystem(store);
-            var projectile = new ProjectileSystem(store, logger);
-            var gold = new GoldSystem(store, logger);
-            var upgrade = new UpgradeSystem(store, logger, playerId, gameConfig);
-            var skill = new SkillSystem(store, logger, playerId, gameConfig);
-            var buffSystem = new BuffSystem(store, playerId);
-            var comboSystem = new ComboSystem(store, gameConfig.Combo);
-            var pathfinding = new PathfindingSystem(store);
-
-            skill.InjectDotSystem(buffSystem);
-            towerAttack.SetBuffSystem(buffSystem);
-            enemyMovement.SetPathfindingSystem(pathfinding);
-            scheduler.SetPathfindingSystem(pathfinding);
-
-            scheduler.Spawning.WaveSpawning = waveSpawning;
-            scheduler.AI.EnemyAI = enemyAI;
-            scheduler.AI.EnemyAbility = enemyAbility;
-            scheduler.AI.Lifesteal = null;
-            scheduler.Movement.EnemyMovement = enemyMovement;
-            scheduler.Movement.Pathfinding = pathfinding;
-            scheduler.Combat.PlayerTowerAttack = playerAttack;
-            scheduler.CombatSetup.PlayerTowerAttack = playerAttack;
-            scheduler.Combat.TowerAttack = towerAttack;
-            scheduler.CombatSetup.TowerAttack = towerAttack;
-            scheduler.Combat.AuraTower = auraTower;
-            scheduler.CombatSetup.AuraTower = auraTower;
-            scheduler.Combat.TowerShrine = towerShrine;
-            scheduler.Combat.Projectile = projectile;
-            scheduler.Build.Gold = gold;
-            scheduler.Build.Upgrade = upgrade;
-            scheduler.Build.Skill = skill;
-            scheduler.CombatSetup.Skill = skill;
-            scheduler.SkillBuff.Skill = skill;
-            scheduler.SetSkillSystem(skill);
-            scheduler.SkillBuff.Buff = buffSystem;
-            scheduler.PostDeath.Combo = comboSystem;
-            scheduler.Phase = GameState.BuildPhase;
-
-            return (scheduler, waveSpawning, skill);
-        }
-
-        private void RunFullGameBenchmark()
+        private void RunFullGameBenchmark(BenchmarkScenarioDefinition definition)
         {
             Console.WriteLine("\n[BENCHMARK] Full Game: 5 levels, real wave spawning, full combat pipeline");
 
@@ -555,10 +559,19 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
             store.PositionActive[playerId] = true;
 
             // 生产压测与回归测试共用同一个组合入口，避免接线测试复制实现。
-            var runtime = CreateFullGameRuntime(store, gameConfig, logger, playerId);
-            FrameScheduler scheduler = runtime.scheduler;
-            WaveSpawningSystem waveSpawning = runtime.waveSpawning;
-            SkillSystem skill = runtime.skill;
+            var runtime = BenchmarkCompositionFactory.Create(store,gameConfig,logger,playerId,
+                scenarioKind:definition.ScenarioKind);
+            FrameScheduler scheduler = runtime.Scheduler;
+            WaveSpawningSystem waveSpawning = runtime.Registry.WaveSpawning
+                ?? throw new InvalidOperationException("Production benchmark requires WaveSpawningSystem.");
+            SkillSystem skill = runtime.Registry.Skill
+                ?? throw new InvalidOperationException("Production benchmark requires SkillSystem.");
+            _graphSealed=scheduler.IsCompositionSealed;
+            _compositionFingerprint=runtime.ExecutionFingerprint(definition.EnemyCount);
+            AttachStateEvidence(runtime.StateMachine);
+            TransitionBenchmarkState(runtime.StateMachine,GameState.BuildPhase);
+            Console.WriteLine($"[BENCHMARK] Composition: production-registry-frame-graph ({runtime.Fingerprint}).");
+            Console.WriteLine($"[BENCHMARK] Composition-Fingerprint: {_compositionFingerprint}");
 
             // 放塔（对齐交互式游戏）
             int t1 = store.CreateEntity();
@@ -568,6 +581,21 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
             int t2 = store.CreateEntity();
             store.PositionX[t2] = 7f; store.PositionY[t2] = 12f;
             store.AddTower(t2, TowerType.Sniper, 25f, 5, 0.8f, 1, 200f);
+
+            if(definition.IsHarness)
+            {
+                RunGraphFrame(scheduler,1);
+                TransitionBenchmarkState(runtime.StateMachine,GameState.WavePhase);
+                RunGraphFrame(scheduler,2);
+                TransitionBenchmarkState(runtime.StateMachine,GameState.Intermission);
+                RunGraphFrame(scheduler,3);
+                TransitionBenchmarkState(runtime.StateMachine,GameState.WavePhase);
+                TransitionBenchmarkState(runtime.StateMachine,GameState.LevelComplete);
+                RunGraphFrame(scheduler,4);
+                TransitionBenchmarkState(runtime.StateMachine,GameState.BuildPhase);
+                TransitionBenchmarkState(runtime.StateMachine,GameState.GameOver);
+                return;
+            }
 
             ConsoleLogger.EnableLog = false;
             var totalSw = Stopwatch.StartNew();
@@ -582,33 +610,39 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
                 var levelConfig = gameConfig.GetLevelConfig(level);
                 if (levelConfig == null) continue;
 
+                if(runtime.StateMachine.CurrentState==GameState.LevelComplete)
+                    TransitionBenchmarkState(runtime.StateMachine,GameState.BuildPhase);
+
                 waveSpawning.SetLevel(level);
                 store.RebuildSpatialGrid();
 
                 // ── BuildPhase ──────────────────────────────────
-                scheduler.Phase = GameState.BuildPhase;
+                Debug.Assert(runtime.StateMachine.CurrentState==GameState.BuildPhase,"完整局压测必须由状态机进入 Build 阶段。");
                 Debug.Assert(skill.CurrentPhaseContext == PhaseContextKind.Build, "完整局压测的 Build 阶段上下文未同步。");
                 for (int bf = 0; bf < 10; bf++)
                 {
                     totalFrames++;
-                    scheduler.TickGameTurn(1f, totalFrames);
+                    RunGraphFrame(scheduler,totalFrames);
                 }
 
                 // ── WavePhase ───────────────────────────────────
-                scheduler.Phase = GameState.WavePhase;
+                TransitionBenchmarkState(runtime.StateMachine,GameState.WavePhase);
                 Debug.Assert(skill.CurrentPhaseContext == PhaseContextKind.Wave, "完整局压测的 Wave 阶段上下文未同步。");
                 bool levelDone = false;
                 int levelMaxFrames = 10000;  // 安全上限，防止死循环
                 int levelFrameStart = totalFrames;
                 while (!levelDone && (totalFrames - levelFrameStart) < levelMaxFrames)
                 {
+                    int waveBefore=waveSpawning.GetCurrentWave();
+                    int spawningLevelBefore=waveSpawning.GetCurrentLevel();
                     totalFrames++;
-                    scheduler.TickGameTurn(1f, totalFrames);
+                    RunGraphFrame(scheduler,totalFrames);
 
                     // 游戏结束检测：玩家死亡
                     if (store.PlayerCurrentHealth[playerId] <= 0f)
                     {
                         endReason = "PlayerDeath";
+                        TransitionBenchmarkState(runtime.StateMachine,GameState.GameOver);
                         levelDone = true;
                         break;
                     }
@@ -616,13 +650,15 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
                     // 敌人到达底部检测
                     var activeEnemyIds = store.GetCachedActiveEnemyIds();
                     bool leaked = false;
+                    bool queuedLeakDeath = false;
                     foreach (var eid in activeEnemyIds)
                     {
                         if (store.EnemyActive[eid] && store.PositionY[eid] <= 0f)
                         {
                             store.DecrementPlayerBaseLives(playerId);
                             store.EnemiesLeakedThisWave[playerId]++; // track leak for adaptive difficulty
-                            store.QueueEnemyDeath(eid, playerId);
+                            scheduler.QueueCurrentFrameEnemyDeath(eid, playerId);
+                            queuedLeakDeath = true;
                             if (store.GetPlayerBaseLives(playerId) <= 0)
                             {
                                 endReason = "BaseDestroyed";
@@ -631,7 +667,14 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
                             }
                         }
                     }
-                    if (leaked) { levelDone = true; break; }
+                    if (queuedLeakDeath)
+                        scheduler.ResolveCurrentFrameDeaths();
+                    if (leaked)
+                    {
+                        TransitionBenchmarkState(runtime.StateMachine,GameState.GameOver);
+                        levelDone = true;
+                        break;
+                    }
 
                     // 关卡完成检测：WaveSpawningSystem 内部会将 currentLevel++ 当所有波次完成
                     int spawnedLevel = waveSpawning.GetCurrentLevel();
@@ -640,7 +683,15 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
                     if (allWavesDone && activeCount == 0)
                     {
                         completedLevels++;
+                        TransitionBenchmarkState(runtime.StateMachine,GameState.LevelComplete);
                         levelDone = true;
+                    }
+                    else if(spawningLevelBefore==waveSpawning.GetCurrentLevel()&&waveBefore!=waveSpawning.GetCurrentWave())
+                    {
+                        TransitionBenchmarkState(runtime.StateMachine,GameState.Intermission);
+                        totalFrames++;
+                        RunGraphFrame(scheduler,totalFrames);
+                        TransitionBenchmarkState(runtime.StateMachine,GameState.WavePhase);
                     }
                 }
 
@@ -651,10 +702,14 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
                 if ((totalFrames - levelFrameStart) >= levelMaxFrames)
                 {
                     endReason = $"Level{level}Timeout";
+                    TransitionBenchmarkState(runtime.StateMachine,GameState.GameOver);
                     Console.WriteLine($"[BENCHMARK] WARNING: Level {level} hit {levelMaxFrames} frame limit!");
                     break;
                 }
             }
+
+            if(endReason=="Victory"&&completedLevels==maxLevels)
+                TransitionBenchmarkState(runtime.StateMachine,GameState.Victory);
 
             totalSw.Stop();
             ConsoleLogger.EnableLog = true;
@@ -669,6 +724,35 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms"
             Console.WriteLine($"[BENCHMARK]   Wall-clock:  {msTotal:F2} ms ({msTotal/1000:F2} s)");
             Console.WriteLine($"[BENCHMARK]   Avg frame:   {msTotal/totalFrames:F3} ms/frame");
             Console.WriteLine($"[BENCHMARK]   Throughput:  {fps:F0} FPS");
+        }
+
+        private void RunGraphFrame(FrameScheduler scheduler,int turn)
+        {
+            scheduler.TickGameTurn(1f,turn);
+            _beginFrameCalls++;
+            _graphTickCalls++;
+            _executedFrames++;
+        }
+
+        private void AttachStateEvidence(StateMachine stateMachine)
+        {
+            _finalState=stateMachine.CurrentState;
+            foreach(GameState state in Enum.GetValues(typeof(GameState)))
+            {
+                GameState captured=state;
+                stateMachine.OnEnter(captured,()=>
+                {
+                    _stateEntryCounts[(int)captured]++;
+                    _finalState=captured;
+                });
+            }
+        }
+
+        private static void TransitionBenchmarkState(StateMachine stateMachine,GameState target)
+        {
+            if(stateMachine.CurrentState==target)return;
+            if(!stateMachine.TransitionTo(target))
+                throw new InvalidOperationException($"Benchmark state transition failed: {stateMachine.CurrentState} -> {target}.");
         }
     }
 }

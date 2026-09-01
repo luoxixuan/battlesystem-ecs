@@ -33,16 +33,17 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore store;
         private readonly int playerId;
         
-        // Damage queue for two-stage parallel attack resolution
-        private readonly int[] _damageQueue = new int[ComponentStore.MAX_ENTITIES];
-        private readonly int[] _targetQueue = new int[ComponentStore.MAX_ENTITIES];
-        private int _damageQueueIdx;
-        private readonly object _damageQueueLock = new object();
+        private readonly int[] _damageByHero = new int[ComponentStore.MAX_HEROES];
+        private readonly int[] _targetByHero = new int[ComponentStore.MAX_HEROES];
+        private readonly bool[] _hasAttackByHero = new bool[ComponentStore.MAX_HEROES];
+        private readonly int[][] _candidateByHero = new int[ComponentStore.MAX_HEROES][];
         
         public HeroSystem(ComponentStore store, int playerId)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this.playerId = playerId;
+            for(int i=0;i<_candidateByHero.Length;i++)
+                _candidateByHero[i]=new int[ComponentStore.MAX_ENTITIES];
         }
 
         public void SetTurn(int turn)
@@ -124,9 +125,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         private void CollectHeroAttacks()
         {
-            int queueIdx = _damageQueueIdx;
-            int count = 0;
-            object lockObj = _damageQueueLock;
+            Array.Clear(_hasAttackByHero,0,_hasAttackByHero.Length);
             
             // Iterate all potential hero slots
             Parallel.For(0, ComponentStore.MAX_HEROES, ParallelOptionsCache.HotPath, i =>
@@ -144,7 +143,7 @@ namespace BattleSystemECS.Systems
                 if (cooldown > 0f) return;
                 
                 // Get enemies in range using SpatialGrid
-                var candidates = new int[ComponentStore.MAX_ENTITIES];
+                int[] candidates = _candidateByHero[i];
                 int candidateCount = 0;
                 store.SpatialGrid.GetEnemiesInRange(store, heroX, heroY, attackRange, candidates, ref candidateCount);
                 
@@ -179,17 +178,10 @@ namespace BattleSystemECS.Systems
                     store.HeroCooldown[i] = attackInterval;
                 }
                 
-                // Collect damage event — use lock for thread-safe queue append
-                lock (lockObj)
-                {
-                    _damageQueue[count] = (int)damage;
-                    _targetQueue[count] = bestTarget;
-                    count++;
-                }
+                _damageByHero[i] = (int)damage;
+                _targetByHero[i] = bestTarget;
+                _hasAttackByHero[i] = true;
             });
-            
-            // Flip queue index for next frame (ping-pong)
-            _damageQueueIdx = 1 - _damageQueueIdx;
         }
 
         /// <summary>
@@ -198,20 +190,11 @@ namespace BattleSystemECS.Systems
         /// </summary>
         private void ResolveHeroDamage()
         {
-            int queueIdx = 1 - _damageQueueIdx; // read from the queue we just wrote to
-            int count = 0;
-            
-            // Count entries (simple approach — iterate up to MAX_ENTITIES)
-            for (int i = 0; i < ComponentStore.MAX_ENTITIES; i++)
+            for (int i = 0; i < ComponentStore.MAX_HEROES; i++)
             {
-                if (_damageQueue[i] == 0 && _targetQueue[i] == 0) break;
-                count++;
-            }
-            
-            for (int i = 0; i < count; i++)
-            {
-                int damage = _damageQueue[i];
-                int targetId = _targetQueue[i];
+                if(!_hasAttackByHero[i])continue;
+                int damage = _damageByHero[i];
+                int targetId = _targetByHero[i];
                 
                 if (targetId < 0 || targetId >= ComponentStore.MAX_ENTITIES) continue;
                 if (!store.EnemyActive[targetId]) continue;
@@ -224,10 +207,6 @@ namespace BattleSystemECS.Systems
                         ElementType.None, DamageFlags.None, DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve,
                         store.AllocateGameplaySequence(targetId), ownerPlayerId: playerId));
             }
-            
-            // Clear queues
-            Array.Clear(_damageQueue, 0, ComponentStore.MAX_ENTITIES);
-            Array.Clear(_targetQueue, 0, ComponentStore.MAX_ENTITIES);
         }
 
         /// <summary>

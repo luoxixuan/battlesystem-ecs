@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 namespace BattleSystemECS.Core
 {
     /// <summary>Post-death resolution: fission, life link penalties, objective, resources, income, corpses, combo.</summary>
@@ -26,22 +27,29 @@ namespace BattleSystemECS.Core
         // are visible to the next Update's regen check.
         public Systems.SoulHarvestSystem? SoulHarvest { get; set; }
 
-        /// <summary>Current game phase, set by FrameScheduler before Execute.</summary>
-        public GameState Phase { get; set; } = GameState.WavePhase;
+        internal void ExecuteLegacy(ComponentStore store, TimeContext time, int turn)
+        {
+            ExecuteCore(store, time.CombatDelta, ToGameState(time.Phase.Kind));
+        }
 
-        public void Execute(ComponentStore store, float deltaTime, int turn)
+        public void Execute(ComponentStore store, float deltaTime, int turn) =>
+            ExecuteCore(store, deltaTime, GameState.WavePhase);
+
+        void ISystemGroup.Execute(ComponentStore store, float deltaTime, int turn) => Execute(store, deltaTime, turn);
+
+        private void ExecuteCore(ComponentStore store, float deltaTime, GameState phase)
         {
             EnemyFission?.Update();
             LifeLink?.ResolveBreakPenalties();
-            Objective?.Update(deltaTime, Phase);
-            ResourceNode?.Update(deltaTime, Phase);
+            Objective?.Update(deltaTime, phase);
+            ResourceNode?.Update(deltaTime, phase);
             TowerIncome?.Update(deltaTime);
             CorpseEffect?.Update(deltaTime);
             Combo?.Update(deltaTime);
             // DoomClock countdown runs in PostDeath so it ticks on the same cadence
             // as the objective score / wave completion bookkeeping. The timer
             // short-circuits to 0 in Update when the run ends.
-            DoomClock?.Update(deltaTime, Phase);
+            DoomClock?.Update(deltaTime, phase);
 
             // Round 196 Direction 3 — Soul Harvest per-frame regen tick. Sentinels
             // short-circuit on PlayerSoulRegen == 0, so cost is O(MAX_PLAYERS) with
@@ -52,5 +60,18 @@ namespace BattleSystemECS.Core
             if (WaveBranch?.IsBranchActive == true)
                 return;
         }
+
+        private static GameState ToGameState(PhaseContextKind phase) => phase switch
+        {
+            PhaseContextKind.Init => GameState.Init,
+            PhaseContextKind.Build => GameState.BuildPhase,
+            PhaseContextKind.Wave => GameState.WavePhase,
+            PhaseContextKind.Intermission => GameState.Intermission,
+            PhaseContextKind.BranchSelection => GameState.BranchSelection,
+            PhaseContextKind.LevelComplete => GameState.LevelComplete,
+            PhaseContextKind.GameOver => GameState.GameOver,
+            PhaseContextKind.Victory => GameState.Victory,
+            _ => GameState.Init
+        };
     }
 }

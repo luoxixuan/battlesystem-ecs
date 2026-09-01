@@ -1,6 +1,6 @@
 #nullable enable
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
 
@@ -24,8 +24,8 @@ namespace BattleSystemECS.Systems
         public int RejectedTransferCount { get; private set; }
         public Core.GAS.DamageRejectionReason LastTransferRejection { get; private set; }
         
-        // Thread-safe collection for damage transfer events
-        private readonly ConcurrentBag<ProtectorDamageTransferEvent> _transferEvents = new();
+        private ProtectorCollectBuffer[] _collectBuffers=Array.Empty<ProtectorCollectBuffer>();
+        private int _collectBufferCount;
         
         // Cached active enemy list per turn
         private System.Collections.Generic.List<int> _activeEnemyList = null!;
@@ -39,7 +39,6 @@ namespace BattleSystemECS.Systems
         public void SetTurn(int turn)
         {
             _activeEnemyList = store.GetCachedActiveEnemyIds();
-            _transferEvents.Clear();
         }
 
         public void Update()
@@ -62,27 +61,36 @@ namespace BattleSystemECS.Systems
         {
             var activeEnemyIds = _activeEnemyList;
             int count = activeEnemyIds.Count;
+            const int batchSize=64;
+            int batchCount=Math.Max(1,(count+batchSize-1)/batchSize);
+            PrepareCollectBuffers(batchCount);
+            _collectBufferCount=batchCount;
 
-            Parallel.For(0, count, ParallelOptionsCache.HotPath, i =>
+            Parallel.For(0, batchCount, ParallelOptionsCache.HotPath, batchIndex =>
             {
-                int protectorId = activeEnemyIds[i];
+                ProtectorCollectBuffer collect=_collectBuffers[batchIndex];
+                int start=batchIndex*batchSize;
+                int end=Math.Min(start+batchSize,count);
+                for(int i=start;i<end;i++)
+                {
+                int protectorId=activeEnemyIds[i];
                 if (!store.EnemyActive[protectorId])
-                    return;
+                    continue;
 
                 // Check if this enemy is a protector
                 if (!store.EnemyIsProtector[protectorId])
-                    return;
+                    continue;
 
                 float protectRadius = store.EnemyProtectRadius[protectorId];
                 float damageTransfer = store.EnemyProtectDamageTransfer[protectorId];
                 int maxTargets = store.EnemyProtectMaxTargets[protectorId];
 
                 if (protectRadius <= 0f || damageTransfer <= 0f)
-                    return;
+                    continue;
 
                 // Protector must be alive to protect
                 if (store.EnemyHealth[protectorId] <= 0f)
-                    return;
+                    continue;
 
                 float protectorX = store.PositionX[protectorId];
                 float protectorY = store.PositionY[protectorId];
@@ -118,16 +126,16 @@ namespace BattleSystemECS.Systems
                         break;
 
                     // Queue damage transfer event
-                    _transferEvents.Add(new ProtectorDamageTransferEvent
+                    collect.Events.Add(new ProtectorDamageTransferEvent
                     {
                         ProtectorId = protectorId,
                         ProtectedAllyId = allyId,
                         DamageTransferRatio = damageTransfer,
-                        TransferFromAlly = allyTransfer,
-                        ParentSequence = store.AllocateGameplaySequence(allyId)
+                        TransferFromAlly = allyTransfer
                     });
 
                     protectedCount++;
+                }
                 }
             });
         }
@@ -138,8 +146,12 @@ namespace BattleSystemECS.Systems
         /// </summary>
         private void ApplyProtectorDamage()
         {
-            foreach (var evt in _transferEvents)
+            for(int batchIndex=0;batchIndex<_collectBufferCount;batchIndex++)
             {
+                List<ProtectorDamageTransferEvent> events=_collectBuffers[batchIndex].Events;
+                for(int eventIndex=0;eventIndex<events.Count;eventIndex++)
+                {
+                ProtectorDamageTransferEvent evt=events[eventIndex];
                 // Skip if protector is no longer active/alive
                 if (!store.EnemyActive[evt.ProtectorId])
                     continue;
@@ -174,12 +186,28 @@ namespace BattleSystemECS.Systems
                 float protectorMaxHealth = store.EnemyMaxHealth[evt.ProtectorId];
                 float damageToTransfer = protectorMaxHealth * transferredDamageRatio * 0.1f; // 10% of protector's max HP per protected ally
 
-                if (!store.ApplyDamageAuthority(evt.ProtectedAllyId, evt.ProtectorId, damageToTransfer, playerId, flags: Core.GAS.DamageFlags.Transfer, parentSequence: evt.ParentSequence, stage: Core.GAS.DamageAmountStage.Raw, provenanceId: evt.ParentSequence, provenanceDepth: 1))
+                long parentSequence=store.AllocateGameplaySequence(evt.ProtectedAllyId);
+                if (!store.ApplyDamageAuthority(evt.ProtectedAllyId, evt.ProtectorId, damageToTransfer, playerId, flags: Core.GAS.DamageFlags.Transfer, parentSequence: parentSequence, stage: Core.GAS.DamageAmountStage.Raw, provenanceId: parentSequence, provenanceDepth: 1))
                 {
                     RejectedTransferCount++;
                     LastTransferRejection = store.DamageResolver.LastRejection;
                 }
+                }
             }
+            _collectBufferCount=0;
+        }
+
+        private void PrepareCollectBuffers(int count)
+        {
+            if(_collectBuffers.Length<count)
+            {
+                int capacity=Math.Max(count,Math.Max(4,_collectBuffers.Length*2));
+                var grown=new ProtectorCollectBuffer[capacity];
+                Array.Copy(_collectBuffers,grown,_collectBuffers.Length);
+                for(int i=_collectBuffers.Length;i<grown.Length;i++)grown[i]=new ProtectorCollectBuffer();
+                _collectBuffers=grown;
+            }
+            for(int i=0;i<count;i++)_collectBuffers[i].Events.Clear();
         }
 
         private readonly struct ProtectorDamageTransferEvent
@@ -188,7 +216,11 @@ namespace BattleSystemECS.Systems
             public int ProtectedAllyId { get; init; }
             public float DamageTransferRatio { get; init; }
             public float TransferFromAlly { get; init; }
-            public long ParentSequence { get; init; }
+        }
+
+        private sealed class ProtectorCollectBuffer
+        {
+            public readonly List<ProtectorDamageTransferEvent> Events=new List<ProtectorDamageTransferEvent>();
         }
     }
 }

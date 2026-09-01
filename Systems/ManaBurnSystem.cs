@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
 
@@ -19,9 +19,14 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore store;
         private readonly int playerId;
 
-        // Ping-pong double-buffer for mana burn events — eliminates per-frame GC allocation.
-        private readonly ConcurrentBag<ManaBurnEvent>[] _manaBurnEvents = new ConcurrentBag<ManaBurnEvent>[2];
-        private int _manaBurnEventsIdx = 0;
+        // 并行段按活跃敌人索引独占写入，串行段按同一稳定顺序提交。
+        private readonly ManaBurnEvent[] _manaBurnEvents = new ManaBurnEvent[ComponentStore.MAX_ENTITIES];
+        private readonly bool[] _hasManaBurnEvent = new bool[ComponentStore.MAX_ENTITIES];
+        private readonly Action<int> _collectBatch;
+        private List<int> _activeEnemyIds;
+        private int _activeEnemyCount;
+        private int _preparedSpan;
+        private const int BatchSize=256;
 
         private struct ManaBurnEvent
         {
@@ -33,8 +38,7 @@ namespace BattleSystemECS.Systems
         {
             this.store = store;
             this.playerId = playerId;
-            _manaBurnEvents[0] = new ConcurrentBag<ManaBurnEvent>();
-            _manaBurnEvents[1] = new ConcurrentBag<ManaBurnEvent>();
+            _collectBatch=CollectBatch;
         }
 
         public void SetTurn(int turn)
@@ -44,14 +48,15 @@ namespace BattleSystemECS.Systems
 
         public void Update()
         {
-            var activeEnemyIds = store.GetActiveEnemyIds();
+            var activeEnemyIds = store.GetCachedActiveEnemyIds();
             int count = activeEnemyIds.Count;
-
+            int clearCount=Math.Max(_preparedSpan,count);
+            if(clearCount>0)Array.Clear(_hasManaBurnEvent,0,clearCount);
+            _preparedSpan=count;
             if (count == 0) return;
 
             // Phase 1: parallel collection of mana burn events
             // Only enemies with EnemyManaBurnAmount > 0 can burn mana
-            int batchSize = 256;
             int parallelThreshold = 500;
 
             if (count < parallelThreshold)
@@ -65,49 +70,43 @@ namespace BattleSystemECS.Systems
                     float burnAmount = store.EnemyManaBurnAmount[enemyId];
                     if (burnAmount <= 0f) continue;
 
-                    _manaBurnEvents[_manaBurnEventsIdx].Add(new ManaBurnEvent
-                    {
-                        EnemyId = enemyId,
-                        BurnAmount = burnAmount
-                    });
+                    _manaBurnEvents[i].EnemyId = enemyId;
+                    _manaBurnEvents[i].BurnAmount = burnAmount;
+                    _hasManaBurnEvent[i] = true;
                 }
             }
             else
             {
                 // Parallel path — batch processing
-                int numBatches = (count + batchSize - 1) / batchSize;
-                Parallel.For(0, numBatches, ParallelOptionsCache.Capped4, batchIdx =>
-                {
-                    int start = batchIdx * batchSize;
-                    int end = Math.Min(start + batchSize, count);
-                    for (int i = start; i < end; i++)
-                    {
-                        int enemyId = activeEnemyIds[i];
-                        if (!store.EnemyActive[enemyId]) continue;
-
-                        float burnAmount = store.EnemyManaBurnAmount[enemyId];
-                        if (burnAmount <= 0f) continue;
-
-                        _manaBurnEvents[_manaBurnEventsIdx].Add(new ManaBurnEvent
-                        {
-                            EnemyId = enemyId,
-                            BurnAmount = burnAmount
-                        });
-                    }
-                });
+                _activeEnemyIds=activeEnemyIds;
+                _activeEnemyCount=count;
+                int numBatches = (count + BatchSize - 1) / BatchSize;
+                Parallel.For(0, numBatches, ParallelOptionsCache.Capped4, _collectBatch);
             }
 
             // Phase 2: serial execution — apply mana drain
-            int readIdx = _manaBurnEventsIdx;
-            foreach (var evt in _manaBurnEvents[readIdx])
+            for (int i = 0; i < count; i++)
             {
+                if (!_hasManaBurnEvent[i]) continue;
+                ManaBurnEvent evt = _manaBurnEvents[i];
                 ApplyManaBurn(evt.EnemyId, evt.BurnAmount);
             }
+        }
 
-            // Ping-pong swap — clear write buffer
-            int writeIdx = 1 - _manaBurnEventsIdx;
-            _manaBurnEvents[writeIdx].Clear();
-            _manaBurnEventsIdx = writeIdx;
+        private void CollectBatch(int batchIdx)
+        {
+            int start=batchIdx*BatchSize;
+            int end=Math.Min(start+BatchSize,_activeEnemyCount);
+            for(int i=start;i<end;i++)
+            {
+                int enemyId=_activeEnemyIds[i];
+                if(!store.EnemyActive[enemyId])continue;
+                float burnAmount=store.EnemyManaBurnAmount[enemyId];
+                if(burnAmount<=0f)continue;
+                _manaBurnEvents[i].EnemyId=enemyId;
+                _manaBurnEvents[i].BurnAmount=burnAmount;
+                _hasManaBurnEvent[i]=true;
+            }
         }
 
         private void ApplyManaBurn(int enemyId, float burnAmount)

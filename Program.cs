@@ -7,11 +7,11 @@ namespace BattleSystemECS
     {
         static void Main(string[] args)
         {
-            // Non-interactive benchmark runner:
-            //   dotnet run 2        → mode 2 benchmark (hand-merged loop)
-            //   dotnet run 4        → mode 4 benchmark (real system chain)
-            //   dotnet run 5        → mode 5 benchmark (full game)
-            //   dotnet run          → interactive game
+            // 非交互压测入口：
+            //   dotnet run 2        → 手工合并循环性能下界
+            //   dotnet run 4        → 生产 Registry FrameGraph 固定负载
+            //   dotnet run 5        → 生产 Registry FrameGraph 完整局观察
+            //   dotnet run          → 交互游戏
             if (args.Length > 0 && int.TryParse(args[0], out int mode))
             {
                 if (mode == 2)
@@ -54,7 +54,7 @@ namespace BattleSystemECS
             Console.WriteLine("1. 运行塔防游戏");
             Console.WriteLine("2. 运行性能测试");
             Console.WriteLine("3. 微基准测试");
-            Console.WriteLine("4. 真实系统链路压测");
+            Console.WriteLine("4. 生产 Registry FrameGraph 固定负载压测");
             string input = Console.ReadLine();
 
             if (input == "2")

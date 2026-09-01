@@ -27,6 +27,7 @@ namespace BattleSystemECS.Tests.Framework
             var waveSpawning = new WaveSpawningSystem(Store, Renderer, Config);
             var scheduler = new FrameScheduler(Store, Config);
             scheduler.Spawning.WaveSpawning = waveSpawning;
+            scheduler.SealGraphComposition();
 
             scheduler.TickGameTurn(1f, 0);
 
@@ -73,6 +74,7 @@ namespace BattleSystemECS.Tests.Framework
             var towerAttack = new TowerAttackSystem(Store, Renderer);
             scheduler.Combat.TowerAttack = towerAttack;
             scheduler.CombatSetup.TowerAttack = towerAttack;
+            scheduler.SealGraphComposition();
 
             // 等价于 GameManager 每帧开头的网格重建。
             RebuildGrid();
@@ -115,6 +117,7 @@ namespace BattleSystemECS.Tests.Framework
             var scheduler = new FrameScheduler(Store, Config);
             scheduler.CombatSetup.PlayerTowerAttack = attack;
             scheduler.Combat.PlayerTowerAttack = attack;
+            scheduler.SealGraphComposition();
             RebuildGrid();
 
             scheduler.Tick(1f, 0);

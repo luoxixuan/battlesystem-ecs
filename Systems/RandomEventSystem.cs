@@ -35,6 +35,11 @@ namespace BattleSystemECS.Systems
         // Events
         public event Action<int, string> OnEventTriggered; // playerId, eventName
         public event Action<int, string> OnEventEnded;     // playerId, eventName
+        private const int MaxPendingCallbacks = ComponentStore.MAX_PLAYERS * 2;
+        private readonly int[] _pendingCallbackPlayer = new int[MaxPendingCallbacks];
+        private readonly byte[] _pendingCallbackKind = new byte[MaxPendingCallbacks];
+        private readonly string[] _pendingCallbackName = new string[MaxPendingCallbacks];
+        private int _pendingCallbackCount;
 
         // Reference to other systems (set by GameManager)
         private WaveSpawningSystem waveSpawning;
@@ -165,8 +170,6 @@ namespace BattleSystemECS.Systems
             store.RandomEventCooldown[playerId] = chosen.Cooldown;
             _eventApplied[playerId] = false;
 
-            // Notify UI
-            OnEventTriggered?.Invoke(playerId, chosen.Name);
         }
 
         private void ApplyEvent(int playerId, int eventType)
@@ -254,6 +257,7 @@ namespace BattleSystemECS.Systems
                     }
                     break;
             }
+            QueueCallback(playerId,GetEventName(eventType),1);
         }
 
         private void ApplyEarthquakeDamage(int playerId, float damage, float slowFactor)
@@ -290,20 +294,7 @@ namespace BattleSystemECS.Systems
         private void EndEvent(int playerId, int eventType)
         {
             var config = gameConfig.RandomEvents;
-            string eventName = "Unknown Event";
-
-            // Find event name
-            if (config != null)
-            {
-                foreach (var evt in config.Events)
-                {
-                    if (evt.EventType == eventType)
-                    {
-                        eventName = evt.Name;
-                        break;
-                    }
-                }
-            }
+            string eventName = GetEventName(eventType);
 
             // Apply end-of-event rewards (bonus gold / research for surviving)
             if (config != null)
@@ -339,7 +330,44 @@ namespace BattleSystemECS.Systems
                 interest.ResetMerchantDiscount(playerId);
             }
 
-            OnEventEnded?.Invoke(playerId, eventName);
+            QueueCallback(playerId, eventName, 2);
+        }
+
+        private string GetEventName(int eventType)
+        {
+            var config=gameConfig.RandomEvents;
+            if(config!=null)
+            {
+                foreach(var evt in config.Events)
+                    if(evt.EventType==eventType)return evt.Name;
+            }
+            return "Unknown Event";
+        }
+
+        private void QueueCallback(int playerId, string eventName, byte kind)
+        {
+            if (_pendingCallbackCount >= MaxPendingCallbacks)
+                throw new InvalidOperationException("Random event callback batch capacity exceeded before dispatch.");
+            int index=_pendingCallbackCount++;
+            _pendingCallbackPlayer[index]=playerId;
+            _pendingCallbackKind[index]=kind;
+            _pendingCallbackName[index]=eventName;
+        }
+
+        public void DispatchPendingCallbacks()
+        {
+            int count=_pendingCallbackCount;
+            _pendingCallbackCount=0;
+            for (int i = 0; i < count; i++)
+            {
+                int playerId=_pendingCallbackPlayer[i];
+                byte kind = _pendingCallbackKind[i];
+                string eventName = _pendingCallbackName[i];
+                _pendingCallbackKind[i] = 0;
+                _pendingCallbackName[i] = null;
+                if (kind == 1) OnEventTriggered?.Invoke(playerId, eventName);
+                else OnEventEnded?.Invoke(playerId, eventName);
+            }
         }
 
         /// <summary>

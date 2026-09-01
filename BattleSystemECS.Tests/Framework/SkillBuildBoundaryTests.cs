@@ -20,14 +20,15 @@ namespace BattleSystemECS.Tests.Framework
             Player(p => { p.Health = 1000f; p.X = 0f; p.Y = 0f; });
             Config.Levels.Clear();
             ConfigureDamageSkill();
+            Config.ManaShield.Enabled = false;
             int enemyId = Enemy(e => { e.X = 2f; e.Y = 0f; e.Health = 100f; e.MaxHealth = 100f; e.GoldReward = 7; });
             var registry = CreateRegistry(events);
             registry.Skill!.SetTurn(0);
             var scheduler = new FrameScheduler(Store, Config, events);
             registry.AssignToGroups(scheduler);
             scheduler.Phase = GameState.BuildPhase;
-            scheduler.Build.Mana = null;
-            scheduler.Build.ManaShield = null;
+            // Bug 回归：composition seal 后不得靠清空 Group 槽绕过生产节点；显式冻结资源输入。
+            Store.PlayerMaxMana[0] = 100f;
             Store.PlayerMana[0] = 100f;
             Store.PlayerManaRegen[0] = 0f;
             float manaBefore = Store.PlayerMana[0];
@@ -532,18 +533,22 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void ManualBenchmarkCompositionRegistersSkillPhaseContext()
+        public void ProductionBenchmarkCompositionRegistersSkillPhaseContext()
         {
             // Bug 回归：完整局压测必须通过生产组合入口注册 SkillSystem。
             int playerId = Player();
-            var runtime = BenchmarkSystem.CreateFullGameRuntime(Store, Config, Renderer, playerId);
+            var runtime = BenchmarkCompositionFactory.Create(Store, Config, Renderer, playerId);
+            var skill = Assert.IsType<SkillSystem>(runtime.Registry.Skill);
 
-            Assert.Same(runtime.skill, runtime.scheduler.Build.Skill);
-            Assert.Same(runtime.skill, runtime.scheduler.CombatSetup.Skill);
-            Assert.Same(runtime.skill, runtime.scheduler.SkillBuff.Skill);
-            Assert.Equal(PhaseContextKind.Build, runtime.skill.CurrentPhaseContext);
-            runtime.scheduler.Phase = GameState.WavePhase;
-            Assert.Equal(PhaseContextKind.Wave, runtime.skill.CurrentPhaseContext);
+            Assert.Same(skill, runtime.Scheduler.Build.Skill);
+            Assert.Same(skill, runtime.Scheduler.CombatSetup.Skill);
+            Assert.Same(skill, runtime.Scheduler.SkillBuff.Skill);
+            Assert.Equal(GameState.Init,runtime.StateMachine.CurrentState);
+            Assert.Equal(PhaseContextKind.Init,skill.CurrentPhaseContext);
+            Assert.True(runtime.StateMachine.TransitionTo(GameState.BuildPhase));
+            Assert.Equal(PhaseContextKind.Build, skill.CurrentPhaseContext);
+            Assert.True(runtime.StateMachine.TransitionTo(GameState.WavePhase));
+            Assert.Equal(PhaseContextKind.Wave, skill.CurrentPhaseContext);
         }
 
         [Fact]

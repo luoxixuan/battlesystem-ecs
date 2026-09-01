@@ -1,6 +1,5 @@
 using System;
-using System.Collections.Concurrent;
-using System.Threading.Tasks;
+using System.Collections.Generic;
 using BattleSystemECS.Core;
 
 namespace BattleSystemECS.Systems
@@ -26,7 +25,7 @@ namespace BattleSystemECS.Systems
         private readonly int playerId;
 
         // Cached active enemy IDs per turn (avoid repeated GetActiveEnemyIds() calls)
-        private int[] _cachedActiveEnemyIds = Array.Empty<int>();
+        private List<int> _cachedActiveEnemyIds;
         private int _cachedCount;
         private bool _turnCached;
 
@@ -41,9 +40,8 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void SetTurn(int currentTurn)
         {
-            var span = store.GetActiveEnemySpan();
-            _cachedActiveEnemyIds = span.ToArray();
-            _cachedCount = _cachedActiveEnemyIds.Length;
+            _cachedActiveEnemyIds = store.GetCachedActiveEnemyIds();
+            _cachedCount = _cachedActiveEnemyIds.Count;
             _turnCached = true;
         }
 
@@ -51,7 +49,7 @@ namespace BattleSystemECS.Systems
         /// Updates all phase timers — decrements timers each frame, ends phase when timer reaches 0.
         /// Also decrements phase cooldowns for enemies that have re-phasing ability.
         /// </summary>
-        public void Update()
+        public void Update(float deltaTime)
         {
             if (!_turnCached || _cachedCount == 0) return;
 
@@ -65,14 +63,14 @@ namespace BattleSystemECS.Systems
                 float cooldown = store.EnemyPhaseCooldown[enemyId];
                 if (cooldown > 0f)
                 {
-                    store.EnemyPhaseCooldown[enemyId] = Math.Max(0f, cooldown - 1f);
+                    store.EnemyPhaseCooldown[enemyId] = Math.Max(0f, cooldown - deltaTime);
                 }
 
                 // Decrement phase timer (tracks remaining time in phased state)
                 float phaseTimer = store.EnemyPhaseTimer[enemyId];
                 if (phaseTimer > 0f)
                 {
-                    store.EnemyPhaseTimer[enemyId] = Math.Max(0f, phaseTimer - 1f);
+                    store.EnemyPhaseTimer[enemyId] = Math.Max(0f, phaseTimer - deltaTime);
                     // When timer hits 0, phase ends
                     if (store.EnemyPhaseTimer[enemyId] <= 0f && store.EnemyIsPhased[enemyId])
                     {

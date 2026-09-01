@@ -228,8 +228,10 @@ namespace BattleSystemECS.Systems
                 float collectRadiusSq = collectRadius * collectRadius;
                 bool collected = false;
 
-                for (int e = 0; e < ComponentStore.MAX_ENTITIES; e++)
+                var activeEnemies = store.ActiveEnemyIds;
+                for (int enemyIndex = 0; enemyIndex < activeEnemies.Count; enemyIndex++)
                 {
+                    int e = activeEnemies[enemyIndex];
                     if (!store.EnemyActive[e]) continue;
                     float dx = store.PositionX[e] - px;
                     float dy = store.PositionY[e] - py;

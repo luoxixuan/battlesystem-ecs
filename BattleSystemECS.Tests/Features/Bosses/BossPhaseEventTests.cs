@@ -201,9 +201,7 @@ namespace BattleSystemECS.Tests.Features.Bosses
         [Fact]
         public void DrainPhaseChangeEvents_MultipleEvents_AllDelivered()
         {
-            // Push 3 events → drain should publish all 3 in a single call. TryTake
-            // is non-deterministic on order (ConcurrentBag), so we assert SET membership
-            // rather than order — the contract is "all events delivered", not FIFO.
+            // Bug 回归：多个 phase 事件必须按收集顺序稳定发布。
             int boss1 = Enemy(e => { e.MoveSpeed = 1f; e.Damage = 5f; e.Name = "Boss1"; });
             int boss2 = Enemy(e => { e.MoveSpeed = 2f; e.MaxHealth = 200f; e.Health = 200f; e.Damage = 5f; e.Name = "Boss2"; });
             int boss3 = Enemy(e => { e.MoveSpeed = 3f; e.MaxHealth = 300f; e.Health = 300f; e.Damage = 5f; e.Name = "Boss3"; });
@@ -222,9 +220,7 @@ namespace BattleSystemECS.Tests.Features.Bosses
             Assert.Equal(3, ai.PhaseChangeDrainCount);
             Assert.Equal(3, ai.PhaseChangePublishCount);
             Assert.Equal(3, ids.Count);
-            Assert.Contains(boss1, ids);
-            Assert.Contains(boss2, ids);
-            Assert.Contains(boss3, ids);
+            Assert.Equal(new[]{boss1,boss2,boss3},ids);
         }
 
         [Fact]
@@ -293,16 +289,7 @@ namespace BattleSystemECS.Tests.Features.Bosses
 
         private static void InjectPhaseChangeEvent(EnemyAISystem ai, BossPhaseChangedEvent ev)
         {
-            // _phaseChangeEvents is a private readonly ConcurrentBag<BossPhaseChangedEvent>.
-            // We grab it via reflection and Add a single event. In production this
-            // happens from EnemyAISystem.Update()'s parallel/sequential paths; for
-            // unit tests we bypass the AI loop and test the drain contract directly.
-            var field = typeof(EnemyAISystem).GetField(
-                "_phaseChangeEvents", // 私有字段 nameof 类外不可用，保留字符串（反射点）
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.NotNull(field); // field must exist
-            var bag = (ConcurrentBag<BossPhaseChangedEvent>)field.GetValue(ai)!;
-            bag.Add(ev);
+            ai.EnqueuePhaseChangeForDiagnostics(ev);
         }
 
         private static void InvokeDrainPhaseChangeEvents(EnemyAISystem ai)
@@ -310,11 +297,7 @@ namespace BattleSystemECS.Tests.Features.Bosses
             // DrainPhaseChangeEvents is a private method. We invoke it via reflection
             // to test the serial-drain contract without running the full Update()
             // (which would require a full GameConfig + WaveSpawningSystem setup).
-            var method = typeof(EnemyAISystem).GetMethod(
-                "DrainPhaseChangeEvents", // 私有方法 nameof 类外不可用，保留字符串（反射点）
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.NotNull(method); // method must exist
-            method.Invoke(ai, null);
+            ai.DrainPhaseChangeEvents();
         }
     }
 }

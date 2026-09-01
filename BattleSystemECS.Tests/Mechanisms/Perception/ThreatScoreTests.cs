@@ -53,6 +53,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Perception
             Store.PlayerRecentDPS[0] = 123f;
             Store.PlayerDPSAccumulator[0] = 45f;
             var scheduler = new FrameScheduler(Store, Config);
+            // Bug 回归：首帧不得承担构图或验证分配。
+            scheduler.SealGraphComposition();
 
             scheduler.Tick(0f, 0); // dt=0：跳过 blending，保留上一帧值
 
@@ -66,6 +68,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Perception
             Store.PlayerRecentDPS[0] = 1000f;
             Store.PlayerDPSAccumulator[0] = 60f;
             var scheduler = new FrameScheduler(Store, Config);
+            // Bug 回归：首帧不得承担构图或验证分配。
+            scheduler.SealGraphComposition();
 
             scheduler.Tick(0.5f, 0);
 

@@ -121,5 +121,70 @@ namespace BattleSystemECS.Tests.Features.Towers
             // Round 95 — tile cache should mark (4, 7) as occupied
             Assert.True(Store.IsTileOccupied(4, 7));
         }
+
+        [Fact]
+        public void ManyEnemiesContactOnePalisade_AccumulatesEveryHitDeterministically()
+        {
+            // Bug 回归：旧实现会在 Parallel.For 内对同一 towerId 做共享 +=，高重复时丢伤害。
+            Player();
+            int towerId = PlacePalisade(4, 4);
+            const int enemyCount = 4096;
+            const int frames = 8;
+            float expectedDamage = enemyCount * frames * PalisadeConfig.EnemyContactDamageToPalisade;
+            Store.PalisadeHP[towerId] = expectedDamage + 100f;
+            Store.PalisadeMaxHP[towerId] = Store.PalisadeHP[towerId];
+            var movement = new EnemyMovementSystem(Store, 0, gameConfig: Config);
+
+            var enemies = new int[enemyCount];
+            for (int i = 0; i < enemyCount; i++)
+                enemies[i] = Enemy(e => { e.X = 4f; e.Y = 4f; e.Health = 10f; e.MaxHealth = 10f; });
+
+            for (int frame = 0; frame < frames; frame++)
+            {
+                for (int i = 0; i < enemyCount; i++)
+                {
+                    Store.EnemyStunFlag[enemies[i]] = false;
+                    Store.EnemyStunDurationLeft[enemies[i]] = 0f;
+                    Store.PositionX[enemies[i]] = 4f;
+                    Store.PositionY[enemies[i]] = 4f;
+                }
+                movement.SetTurn(frame);
+                movement.Update();
+            }
+
+            Assert.Equal(100f, Store.PalisadeHP[towerId], 3);
+            Assert.Equal(0f, Store.PalisadeContactDamageAccumulator[towerId]);
+            Assert.True(Store.TowerActive[towerId]);
+        }
+
+        [Fact]
+        public void PalisadeContactMerge_ProducesExactSumsFlagsAndStableFirstContactOrder()
+        {
+            // Bug 回归：合并顺序与累计结果不能依赖 Parallel.For 的实际调度顺序。
+            int[] contacts = { 5, 3, 5, -1, 3, 8, 5 };
+            int[] expectedOrder = { 5, 3, 8 };
+            for (int run = 0; run < 64; run++)
+            {
+                var hp = new float[16];
+                var accumulators = new float[16];
+                var flags = new bool[16];
+                var order = new int[16];
+                hp[5] = 14f;
+                hp[3] = 11f;
+                hp[8] = 5f;
+
+                int touched = EnemyMovementSystem.MergePalisadeContacts(contacts, contacts.Length, 5f,
+                    hp, accumulators, flags, order);
+
+                Assert.Equal(3, touched);
+                Assert.Equal(expectedOrder, order[..touched]);
+                Assert.Equal(15f, accumulators[5]);
+                Assert.Equal(10f, accumulators[3]);
+                Assert.Equal(5f, accumulators[8]);
+                Assert.True(flags[5]);
+                Assert.False(flags[3]);
+                Assert.True(flags[8]);
+            }
+        }
     }
 }

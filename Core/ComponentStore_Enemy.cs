@@ -27,6 +27,8 @@ namespace BattleSystemECS.Core
         // ActivePathModifierCount: number of active path modifiers in the store
         private int _activePathModifierCount = 0;
         public int ActivePathModifierCount => _activePathModifierCount;
+        private readonly List<int> _activePathModifierIds = new List<int>(64);
+        public IReadOnlyList<int> ActivePathModifierIds => _activePathModifierIds;
         // ==================== 敌人组件的 SOA 存储 ====================
         public float[] EnemyHealth = new float[MAX_ENTITIES];
         public float[] EnemyMaxHealth = new float[MAX_ENTITIES];
@@ -1320,6 +1322,12 @@ namespace BattleSystemECS.Core
             EnemyGoldReward[entityId] = goldReward;
             EnemyWaveNumber[entityId] = waveNumber;
             EnemyActive[entityId] = true;
+            // Optional split-on-death content is assigned explicitly by the wave
+            // spawner. Manual/test enemies must default to no fission; zero is a
+            // valid catalog index and would otherwise accidentally select the first
+            // definition when EnemyFissionSystem observes a kill.
+            EnemyFissionDefId[entityId] = -1;
+            EnemyFissionGeneration[entityId] = 0;
             // Round 196 Direction 3 — Soul Harvest default: 1 soul per kill. Boss/Elite
             // overrides are applied via SetEnemySoulValue() right after AddEnemy. The
             // default keeps the feature fully backward compatible (every kill grants
@@ -2649,8 +2657,14 @@ namespace BattleSystemECS.Core
             PathModifierTargetPathId[modifierId] = targetPathId;
             PathModifierOwnerId[modifierId] = ownerId;
             PathModifierTurnsRemaining[modifierId] = turnsRemaining;
-            PathModifierActive[modifierId] = true;
-            _activePathModifierCount++;
+            if (!PathModifierActive[modifierId])
+            {
+                PathModifierActive[modifierId] = true;
+                int insertIndex = _activePathModifierIds.BinarySearch(modifierId);
+                if (insertIndex < 0) insertIndex = ~insertIndex;
+                _activePathModifierIds.Insert(insertIndex, modifierId);
+                _activePathModifierCount++;
+            }
         }
 
         /// <summary>
@@ -2661,6 +2675,8 @@ namespace BattleSystemECS.Core
             if (modifierId < 0 || modifierId >= MAX_ENTITIES) return;
             if (!PathModifierActive[modifierId]) return;
             PathModifierActive[modifierId] = false;
+            int activeIndex = _activePathModifierIds.IndexOf(modifierId);
+            if (activeIndex >= 0) _activePathModifierIds.RemoveAt(activeIndex);
             _activePathModifierCount = System.Math.Max(0, _activePathModifierCount - 1);
         }
 

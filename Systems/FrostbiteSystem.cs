@@ -25,23 +25,14 @@ namespace BattleSystemECS.Systems
         private ComponentStore store;
         private int playerId;
 
-        // Ping-pong double-buffer for frostbite damage (parallel collect → serial apply)
-        private (int enemyId, float damage)[] _frostQueue0 = Array.Empty<(int, float)>();
-        private (int enemyId, float damage)[] _frostQueue1 = Array.Empty<(int, float)>();
-        private int _frostQueueIdx = 0;
-        private int _frostQueueCount = 0;
-        private readonly object _frostQueueLock = new object();
-        // Overflow guard: tracks total dropped tick events (queue full). BleedSystem
-        // has the same silent-drop behavior; we expose a counter for future observability.
-        private int _overflowDrops = 0;
+        private (int enemyId, float damage)[] _frostEvents = Array.Empty<(int, float)>();
+        private bool[] _hasFrostEvent = Array.Empty<bool>();
+        private int _frostCollectCount;
 
         public FrostbiteSystem(ComponentStore store, int playerId)
         {
             this.store = store;
             this.playerId = playerId;
-            // Pre-allocate queues for 512 frostbite events per frame (avoid per-frame allocation)
-            _frostQueue0 = new (int, float)[512];
-            _frostQueue1 = new (int, float)[512];
         }
 
         /// <summary>
@@ -86,10 +77,12 @@ namespace BattleSystemECS.Systems
             var activeEnemyIds = store.GetCachedActiveEnemyIds();
 
             // Phase 1 (parallel): collect frostbite damage events — no structural mutations
-            _frostQueueCount = 0;
-            var queue = _frostQueueIdx == 0 ? _frostQueue0 : _frostQueue1;
+            int count=activeEnemyIds.Count;
+            EnsureCollectCapacity(count);
+            Array.Clear(_hasFrostEvent,0,count);
+            _frostCollectCount=count;
 
-            Parallel.For(0, activeEnemyIds.Count, ParallelOptionsCache.HotPath, i =>
+            Parallel.For(0, count, ParallelOptionsCache.HotPath, i =>
             {
                 int enemyId = activeEnemyIds[i];
                 if (!store.EnemyActive[enemyId]) return;
@@ -108,19 +101,8 @@ namespace BattleSystemECS.Systems
                     // Damage = pct * maxHealth (e.g. 0.02 * 1000 = 20)
                     float totalFrostDmg = pct * maxHealth;
 
-                    lock (_frostQueueLock)
-                    {
-                        if (_frostQueueCount < queue.Length)
-                        {
-                            queue[_frostQueueCount++] = (enemyId, totalFrostDmg);
-                        }
-                        else
-                        {
-                            // Queue full — record overflow. Drop this tick to avoid blocking.
-                            // BleedSystem has identical behavior; we expose counters for observability.
-                            _overflowDrops++;
-                        }
-                    }
+                    _frostEvents[i]=(enemyId,totalFrostDmg);
+                    _hasFrostEvent[i]=true;
 
                     // Note: timer reset is deferred to the "no expiry" branch below to
                     // avoid a redundant 1f → 0f overwrite when the same frame also expires
@@ -152,16 +134,10 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void ResolveFrostbiteDamage()
         {
-            int readIdx = _frostQueueIdx;
-            int writeIdx = 1 - _frostQueueIdx;
-            _frostQueueIdx = writeIdx;
-            // Queue stores value tuples (no GC refs), so no clear needed — the next
-            // Update() resets _frostQueueCount = 0 and overwrites indices 0..count-1.
-
-            var readQueue = readIdx == 0 ? _frostQueue0 : _frostQueue1;
-            for (int i = 0; i < _frostQueueCount; i++)
+            for (int i = 0; i < _frostCollectCount; i++)
             {
-                var (enemyId, damage) = readQueue[i];
+                if(!_hasFrostEvent[i])continue;
+                var (enemyId, damage) = _frostEvents[i];
                 if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) continue;
                 if (!store.EnemyActive[enemyId]) continue;
                 float currentHealth = store.EnemyHealth[enemyId];
@@ -174,7 +150,15 @@ namespace BattleSystemECS.Systems
                 if (!source.IsValid || !target.IsValid) continue;
                 store.DamageResolver.TryApply(new DamageRequest(source, target, damage, DamageType.True, ElementType.Ice, DamageFlags.None, DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(enemyId), ownerPlayerId: playerId));
             }
-            _frostQueueCount = 0;
+            _frostCollectCount = 0;
+        }
+
+        private void EnsureCollectCapacity(int count)
+        {
+            if(_frostEvents.Length>=count)return;
+            int capacity=Math.Max(count,Math.Max(512,_frostEvents.Length*2));
+            Array.Resize(ref _frostEvents,capacity);
+            Array.Resize(ref _hasFrostEvent,capacity);
         }
     }
 }

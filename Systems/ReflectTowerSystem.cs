@@ -1,6 +1,6 @@
 #nullable enable
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
 
@@ -37,7 +37,7 @@ namespace BattleSystemECS.Systems
         // Both Reflect and Retaliate events share this queue — they are unified at the apply
         // stage, since the semantic is "damage to attacking enemy". Differentiating them at
         // the queue stage would require duplicating the apply pass for no behavioral gain.
-        private readonly ConcurrentBag<ReflectEvent>[] _reflectQueue = new ConcurrentBag<ReflectEvent>[2];
+        private readonly List<ReflectEvent>[] _reflectQueue = { new List<ReflectEvent>(64), new List<ReflectEvent>(64) };
         private int _queueIdx = 0;
         public int RejectedReflectCount { get; private set; }
         public Core.GAS.DamageRejectionReason LastReflectRejection { get; private set; }
@@ -46,13 +46,11 @@ namespace BattleSystemECS.Systems
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this.playerId = playerId;
-            _reflectQueue[0] = new ConcurrentBag<ReflectEvent>();
-            _reflectQueue[1] = new ConcurrentBag<ReflectEvent>();
         }
 
         /// <summary>
         /// Queue a reflect event when a tower is hit by an enemy.
-        /// Called from EnemyAISystem attack execution (parallel safe via ConcurrentBag).
+        /// 由串行攻击提交路径调用，请求在 graph 边界统一结算。
         /// </summary>
         public void QueueReflect(int towerId, int attackingEnemyId, float damageReceived)
         {
@@ -69,7 +67,7 @@ namespace BattleSystemECS.Systems
 
             if (reflectDamage <= 0f) return;
 
-            // Add reflect event (ConcurrentBag is thread-safe, parallel write)
+            // 收集原始反伤请求，后续由串行边界稳定提交。
             _reflectQueue[_queueIdx].Add(new ReflectEvent
             {
                 TowerId = towerId,
@@ -120,11 +118,14 @@ namespace BattleSystemECS.Systems
         {
             int readIdx = _queueIdx;
             int writeIdx = 1 - _queueIdx;
-            _queueIdx = writeIdx;
             _reflectQueue[writeIdx].Clear();
 
-            // Also process aura-propagated reflect events
+            // 原始反伤请求与光环派生请求共同进入 prepared 缓冲，不能只保留派生项。
+            foreach (var evt in _reflectQueue[readIdx])
+                _reflectQueue[writeIdx].Add(evt);
+            _queueIdx = writeIdx;
             ResolveAuraReflect(readIdx);
+            _reflectQueue[readIdx].Clear();
         }
 
         private void ResolveAuraReflect(int readIdx)
@@ -184,8 +185,6 @@ namespace BattleSystemECS.Systems
         {
             int readIdx = _queueIdx;
             int writeIdx = 1 - _queueIdx;
-            _queueIdx = writeIdx;
-            _reflectQueue[writeIdx].Clear();
 
             foreach (var evt in _reflectQueue[readIdx])
             {
@@ -201,6 +200,8 @@ namespace BattleSystemECS.Systems
                     if (!result.Accepted) { RejectedReflectCount++; LastReflectRejection = result.Reason; }
                 }
             }
+            _reflectQueue[readIdx].Clear();
+            _queueIdx = writeIdx;
         }
 
         private readonly struct ReflectEvent

@@ -57,6 +57,8 @@ namespace BattleSystemECS.Tests.Framework
                 Assert.Equal(10f, s.GetPlayerAttackDamageProjection(0));
                 var scheduler = new FrameScheduler(s, new GameConfig());
                 scheduler.Phase = GameState.BuildPhase;
+                // Bug 回归：帧边界测试必须使用已验证并封存的生产调度图。
+                scheduler.SealGraphComposition();
                 scheduler.Tick(0f, 0);
                 Assert.Equal(20f, s.GetPlayerAttackDamageProjection(0));
                 s.UseComputedAttributes = false;
