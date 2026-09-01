@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using BattleSystemECS.Core;
+using BattleSystemECS.Components;
+
 namespace BattleSystemECS.Core.GAS
 {
     public enum AbilityActivationRejectReason { None, InvalidRequest, Cooldown, NoTarget, PhaseNotAllowed, Cost }
@@ -23,8 +28,9 @@ namespace BattleSystemECS.Core.GAS
         public readonly int OwnerId;
         public readonly int Slot;
         public readonly AbilityActivationRejectReason Reason;
-        public AbilityActivationResult(bool accepted, int ownerId, int slot, AbilityActivationRejectReason reason = AbilityActivationRejectReason.None)
-        { Accepted = accepted; OwnerId = ownerId; Slot = slot; Reason = reason; }
+        public readonly int AppliedEffects;
+        public AbilityActivationResult(bool accepted, int ownerId, int slot, AbilityActivationRejectReason reason = AbilityActivationRejectReason.None, int appliedEffects = 0)
+        { Accepted = accepted; OwnerId = ownerId; Slot = slot; Reason = reason; AppliedEffects = appliedEffects; }
     }
 
     /// <summary>
@@ -34,6 +40,57 @@ namespace BattleSystemECS.Core.GAS
     /// </summary>
     public static class GameplayAbilityRuntime
     {
+        /// <summary>Catalog-backed activation boundary used by domain adapters.</summary>
+        public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, float[] cooldowns, AbilityActivationRequest request)
+        {
+            if (store == null || catalog == null || cooldowns == null || request.Slot < 0 || request.Slot >= cooldowns.Length)
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (!catalog.TryGetAbility(request.Ability, out var ability)) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (request.Effect.Value != 0 && !Contains(ability.Effects, request.Effect)) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (request.Trigger.Value != 0 && !Contains(ability.TriggerRefs, request.Trigger)) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            var source = store.GetEntityHandle(request.OwnerId);
+            int targetId = request.TargetId >= 0 ? request.TargetId : request.OwnerId;
+            var target = store.GetEntityHandle(targetId);
+            if (!source.IsValid) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (!target.IsValid) return Reject(request, AbilityActivationRejectReason.NoTarget);
+            var ready = TryActivate(cooldowns, request);
+            if (!ready.Accepted) return ready;
+            int applied = 0;
+            for (int i = 0; i < ability.Effects.Count; i++)
+            {
+                if (!catalog.TryGetEffect(ability.Effects[i], out var effect) ||
+                    !store.GameplayEffectsRuntime.TryApply(effect.Id, effect, source, target, out _, ownerPlayerId: request.OwnerId))
+                    return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                applied++;
+            }
+            for (int i = 0; i < ability.Executions.Count; i++)
+            {
+                if (!catalog.TryGetExecution(ability.Executions[i], out var execution)) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                long sequence = store.AllocateGameplaySequence(targetId);
+                if (execution.Payload == EffectPayloadKind.Damage)
+                {
+                    var result = store.DamageResolver.TryApply(new DamageRequest(source, target, execution.Magnitude,
+                        DamageType.True, ElementType.None, DamageFlags.None, execution.Stage, DamageCommitBoundary.GameplayResolve,
+                        sequence, ability: ability.Id, effect: request.Effect, ownerPlayerId: request.OwnerId));
+                    if (!result.Accepted) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                    applied++;
+                }
+                else if (execution.Payload == EffectPayloadKind.Heal)
+                {
+                    if (!store.ResourceResolver.TryApply(new HealRequest(source, target, execution.Magnitude, sequence, request.OwnerId)).Accepted)
+                        return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                    applied++;
+                }
+            }
+            if (!AbilityCommit(cooldowns, request.Slot, ability.Cooldown)) return Reject(request, AbilityActivationRejectReason.Cooldown);
+            store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.AbilityActivated, source, target,
+                store.AllocateGameplaySequence(targetId), ownerPlayerId: request.OwnerId));
+            return new AbilityActivationResult(true, request.OwnerId, request.Slot, appliedEffects: applied);
+        }
+        private static bool Contains(IReadOnlyList<EffectId> ids, EffectId id) { for (int i = 0; i < ids.Count; i++) if (ids[i].Value == id.Value) return true; return false; }
+        private static bool Contains(IReadOnlyList<TriggerId> ids, TriggerId id) { for (int i = 0; i < ids.Count; i++) if (ids[i].Value == id.Value) return true; return false; }
+        private static AbilityActivationResult Reject(AbilityActivationRequest request, AbilityActivationRejectReason reason) => new AbilityActivationResult(false, request.OwnerId, request.Slot, reason);
+
         public static AbilityActivationResult TryActivate(float[] cooldowns, AbilityActivationRequest request)
         {
             var reason = cooldowns == null || request.Slot < 0 || request.Slot >= (cooldowns?.Length ?? 0)

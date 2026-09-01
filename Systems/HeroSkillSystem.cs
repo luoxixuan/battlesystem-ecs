@@ -174,6 +174,15 @@ namespace BattleSystemECS.Systems
             int skillId = _heroSkillIds[flatIdx];
             if (skillId < 0) return false;
             var activation = new AbilityActivationRequest(heroId, slot, _heroSkillCooldownMax[flatIdx]);
+            var catalog = _config?.CompiledCatalog;
+            if (catalog != null && TryResolveCatalogAbility(catalog, skillId, out var abilityId))
+            {
+                activation = new AbilityActivationRequest(heroId, slot, _heroSkillCooldownMax[flatIdx], heroId, abilityId);
+                var result = GameplayAbilityRuntime.Activate(store, catalog, _heroSkillCooldowns, activation);
+                if (!result.Accepted) return false;
+                Console.WriteLine($"[HERO_SKILL] hero={heroId} slot={slot} ability={abilityId.Value} effects={result.AppliedEffects}");
+                return true;
+            }
             if (!GameplayAbilityRuntime.TryActivate(_heroSkillCooldowns, activation).Accepted) return false;
 
             // Gate passed — flip the cooldown to its max and emit the log.
@@ -236,6 +245,14 @@ namespace BattleSystemECS.Systems
         private SkillConfig? ResolveSkillConfigById(int skillId) => _config?.TryGetSkillById(skillId);
 
         private string ResolveSkillNameById(int skillId) => ResolveSkillConfigById(skillId)?.Name ?? "?";
+
+        private static bool TryResolveCatalogAbility(GameplayCatalog catalog, int skillId, out AbilityId ability)
+        {
+            ability = default(AbilityId);
+            if (skillId < 0 || skillId >= catalog.Abilities.Count) return false;
+            ability = catalog.Abilities[skillId].Id;
+            return catalog.TryGetAbility(ability, out _);
+        }
 
         private float ResolveCooldownForSkill(int skillId)
         {
