@@ -4,6 +4,7 @@ using BattleSystemECS.Components;
 using Xunit;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace BattleSystemECS.Tests.Framework
@@ -644,6 +645,105 @@ namespace BattleSystemECS.Tests.Framework
             timers[0] = 0f;
             store.GameplayPhaseContext = new PhaseContext(PhaseContextKind.Wave);
             Assert.True(GameplayAbilityRuntime.Activate(store, catalog, timers, Request(0)).Accepted);
+        }
+
+        [Fact]
+        public void CooldownArrayAndStoredAbilityAdaptersShareActivationContract()
+        {
+            var external = PlayerStore();
+            var stored = PlayerStore();
+            external.PlayerMana[0] = stored.PlayerMana[0] = 5f;
+            var execution = Execution(EffectPayloadKind.Shield, 2f, ExecutionOperation.ApplyShield);
+            var catalog = Catalog(execution, costs: new[] { new CostDefinition(new AttributeKey(7), 1f) });
+            var timers = new float[1];
+            var slotDefinition = new GameplayAbilityDef("typed", "", 2f, 0f, -1, 0f,
+                AbilityActivation.Instant, AreaShapeType.Single, 1);
+            Assert.True(stored.TryAddAbility(0, slotDefinition));
+
+            var externalResult = GameplayAbilityRuntime.Activate(external, catalog, timers, Request(0));
+            var storedResult = GameplayAbilityRuntime.Activate(stored, catalog, 0, 0, Request(0));
+
+            Assert.Equal(externalResult.Accepted, storedResult.Accepted);
+            Assert.Equal(externalResult.Reason, storedResult.Reason);
+            Assert.Equal(externalResult.AppliedEffects, storedResult.AppliedEffects);
+            Assert.Equal(external.PlayerMana[0], stored.PlayerMana[0]);
+            Assert.Equal(external.PlayerShield[0], stored.PlayerShield[0]);
+            Assert.Equal(timers[0], stored.GetAbility(0, 0).CurrentCooldown);
+            AssertEventTypesEqual(external.DamageResolver.Events, stored.DamageResolver.Events);
+            AssertEventTypesEqual(external.ResourceResolver.Events, stored.ResourceResolver.Events);
+        }
+
+        [Fact]
+        public void SingleAndOneTargetSetShareActivationContract()
+        {
+            var single = PlayerStore();
+            var targetSet = PlayerStore();
+            int singleEnemy = single.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            int setEnemy = targetSet.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            var catalog = Catalog(Execution(EffectPayloadKind.Damage, 3f, ExecutionOperation.ApplyDamage));
+            var singleCooldown = new float[1];
+            var setCooldown = new float[1];
+
+            var singleResult = GameplayAbilityRuntime.Activate(single, catalog, singleCooldown, Request(singleEnemy));
+            var setResult = GameplayAbilityRuntime.ActivateTargets(targetSet, catalog, setCooldown,
+                Request(setEnemy), new[] { setEnemy });
+
+            Assert.Equal(singleResult.Accepted, setResult.Accepted);
+            Assert.Equal(singleResult.Reason, setResult.Reason);
+            Assert.Equal(singleResult.AppliedEffects, setResult.AppliedEffects);
+            Assert.Equal(single.EnemyHealth[singleEnemy], targetSet.EnemyHealth[setEnemy]);
+            Assert.Equal(singleCooldown[0], setCooldown[0]);
+            AssertEventTypesEqual(single.DamageResolver.Events, targetSet.DamageResolver.Events);
+        }
+
+        [Fact]
+        public void HealAdapterAndScaledTargetSetShareActivationContract()
+        {
+            var healAdapter = PlayerStore();
+            var targetSet = PlayerStore();
+            int firstHeal = healAdapter.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            int secondHeal = healAdapter.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            int firstSet = targetSet.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            int secondSet = targetSet.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            healAdapter.EnemyHealth[firstHeal] = targetSet.EnemyHealth[firstSet] = 2f;
+            healAdapter.EnemyHealth[secondHeal] = targetSet.EnemyHealth[secondSet] = 3f;
+            healAdapter.ResourceResolver.EnableDeferred(true);
+            targetSet.ResourceResolver.EnableDeferred(true);
+            var catalog = Catalog(Execution(EffectPayloadKind.Heal, 1f, ExecutionOperation.ApplyHeal));
+            var healCooldown = new float[1];
+            var setCooldown = new float[1];
+
+            var healResult = GameplayAbilityRuntime.ActivateHealTargets(healAdapter, catalog, healCooldown,
+                Request(firstHeal), new[] { firstHeal, secondHeal }, new[] { 2f, 3f });
+            var setResult = GameplayAbilityRuntime.ActivateTargets(targetSet, catalog, setCooldown,
+                Request(firstSet), new[] { firstSet, secondSet }, new[] { 2f, 3f });
+
+            Assert.Equal(healResult.Accepted, setResult.Accepted);
+            Assert.Equal(healResult.Reason, setResult.Reason);
+            Assert.Equal(healResult.AppliedEffects, setResult.AppliedEffects);
+            Assert.Equal(healAdapter.ResourceResolver.PendingRequestCount,
+                targetSet.ResourceResolver.PendingRequestCount);
+            Assert.Equal(healCooldown[0], setCooldown[0]);
+            AssertEventTypesEqual(healAdapter.DamageResolver.Events, targetSet.DamageResolver.Events);
+        }
+
+        [Fact]
+        public void PublicActivationEntriesDelegateToOnePlanInterface()
+        {
+            string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+            string source = File.ReadAllText(Path.Combine(root, "Core", "GAS", "GameplayAbilityRuntime.cs"));
+
+            Assert.Equal(5, source.Split(new[] { "=> ActivateCore(" }, StringSplitOptions.None).Length - 1);
+            Assert.Equal(1, source.Split(new[] { "private static AbilityActivationRejectReason BuildActivationPlan(" },
+                StringSplitOptions.None).Length - 1);
+            Assert.DoesNotContain("ValidateSingleCapacity", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("ValidateBatchCapacity", source, StringComparison.Ordinal);
+        }
+
+        private static void AssertEventTypesEqual(GameplayEventQueue expected, GameplayEventQueue actual)
+        {
+            Assert.Equal(expected.Count, actual.Count);
+            for (int i = 0; i < expected.Count; i++) Assert.Equal(expected.Get(i).Type, actual.Get(i).Type);
         }
 
         private static GameplayEffectDefinition DurationEffect(int id, ModifierDefinition[]? modifiers = null) =>
