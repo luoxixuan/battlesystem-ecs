@@ -336,19 +336,31 @@ namespace BattleSystemECS.Systems
 
         private bool TryExecuteTypedBasicAbility(int enemyId, EnemyAbilityDef ability)
         {
+            bool heal = string.Equals(ability.AbilityType, "self_heal", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(ability.AbilityType, "heal_allies", StringComparison.OrdinalIgnoreCase);
+            bool damage = string.Equals(ability.AbilityType, "aoe_damage", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(ability.AbilityType, "stealth_attack", StringComparison.OrdinalIgnoreCase);
+            if (!heal && !damage) return false;
             var catalog = gameConfig.CompiledCatalog;
-            if (catalog == null || string.IsNullOrWhiteSpace(ability.Name) ||
-                !catalog.TryResolveAlias(ability.Name, out var abilityId) ||
-                !catalog.TryGetAbility(abilityId, out var definition)) return false;
-            int targetId = enemyId;
-            for (int i = 0; i < definition.Executions.Count; i++)
+            if (catalog == null) return false;
+            string alias = ability.Name;
+            if (string.IsNullOrWhiteSpace(alias) || !catalog.TryResolveAlias(alias, out var typedId) ||
+                !catalog.TryGetAbility(typedId, out var typed)) return false;
+            int targetId = heal ? enemyId : playerId;
+            if (targetId < 0 || !store.GetEntityHandle(targetId).IsValid) return false;
+            bool payloadMatches = false;
+            for (int i = 0; i < typed.Executions.Count; i++)
             {
-                if (!catalog.TryGetExecution(definition.Executions[i], out var execution)) return false;
-                if (execution.Payload == EffectPayloadKind.Damage) { targetId = playerId; break; }
+                if (!catalog.TryGetExecution(typed.Executions[i], out var execution)) return false;
+                if ((heal && execution.Payload == EffectPayloadKind.Heal) ||
+                    (damage && execution.Payload == EffectPayloadKind.Damage)) payloadMatches = true;
             }
-            var request = new AbilityActivationRequest(enemyId, 0, ability.Cooldown, targetId, abilityId,
-                definition.Effects.Count > 0 ? definition.Effects[0] : default(EffectId),
-                definition.TriggerRefs.Count > 0 ? definition.TriggerRefs[0] : default(TriggerId));
+            if (!payloadMatches) return false;
+            float magnitude = heal
+                ? store.EnemyMaxHealth[enemyId] * Math.Max(0f, ability.HealAmount)
+                : store.EnemyDamage[enemyId] * Math.Max(0f, ability.DamageMultiplier);
+             var request = new AbilityActivationRequest(enemyId, 0, ability.Cooldown, targetId, typedId,
+                 magnitudeOverride: magnitude);
             var result = GameplayAbilityRuntime.Activate(store, catalog, _abilityCooldownTimers, request);
             if (!result.Accepted) return false;
             logger.Log($"[ABILITY] Enemy {enemyId} typed '{ability.Name}' applied {result.AppliedEffects} effect(s)");

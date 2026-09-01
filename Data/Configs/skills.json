@@ -534,5 +534,61 @@
     "SlowAmount": 0,
     "SlowDuration": 0,
     "Modifiers": []
+  },
+  {
+    "Name": "Self Heal",
+    "Description": "Enemy self-heal catalog entry",
+    "AreaShape": "heal",
+    "Cooldown": 5,
+    "HealPercent": 0.3,
+    "Modifiers": []
+  },
+  {
+    "Name": "Regeneration",
+    "Description": "Enemy regeneration catalog entry",
+    "AreaShape": "heal",
+    "Cooldown": 3,
+    "HealPercent": 0.5,
+    "Modifiers": []
+  },
+  {
+    "Name": "Fortify",
+    "Description": "Enemy fortify heal catalog entry",
+    "AreaShape": "heal",
+    "Cooldown": 6,
+    "HealPercent": 0.5,
+    "Modifiers": []
+  },
+  {
+    "Name": "Group Heal",
+    "Description": "Enemy ally heal catalog entry",
+    "AreaShape": "heal",
+    "Cooldown": 8,
+    "HealPercent": 0.4,
+    "Modifiers": []
+  },
+  {
+    "Name": "AOE Burst",
+    "Description": "Enemy area damage catalog entry",
+    "AreaShape": "single",
+    "Cooldown": 8,
+    "DamageMultiplier": 0.5,
+    "Modifiers": []
+  },
+  {
+    "Name": "AOE Slam",
+    "Description": "Enemy area slam catalog entry",
+    "AreaShape": "single",
+    "Cooldown": 8,
+    "DamageMultiplier": 0.8,
+    "Modifiers": []
+  },
+  {
+    "Name": "Ambush",
+    "Description": "Enemy ambush catalog entry",
+    "AreaShape": "single",
+    "Cooldown": 6,
+    "DamageMultiplier": 2.0,
+    "Modifiers": []
   }
 ]

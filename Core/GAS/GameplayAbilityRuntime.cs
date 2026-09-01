@@ -17,9 +17,16 @@ namespace BattleSystemECS.Core.GAS
         public readonly EffectId Effect;
         public readonly TriggerId Trigger;
         public readonly float Cost;
+        public readonly float MagnitudeOverride;
         public AbilityActivationRequest(int ownerId, int slot, float cooldown, int targetId = -1,
             AbilityId ability = default(AbilityId), EffectId effect = default(EffectId), TriggerId trigger = default(TriggerId), float cost = 0f)
-        { OwnerId = ownerId; Slot = slot; Cooldown = cooldown; TargetId = targetId; Ability = ability; Effect = effect; Trigger = trigger; Cost = cost; }
+            : this(ownerId, slot, cooldown, targetId, ability, effect, trigger, cost, float.NaN) { }
+        public AbilityActivationRequest(int ownerId, int slot, float cooldown, int targetId,
+            AbilityId ability, EffectId effect, TriggerId trigger, float cost, float magnitudeOverride)
+        { OwnerId = ownerId; Slot = slot; Cooldown = cooldown; TargetId = targetId; Ability = ability; Effect = effect; Trigger = trigger; Cost = cost; MagnitudeOverride = magnitudeOverride; }
+        public AbilityActivationRequest(int ownerId, int slot, float cooldown, int targetId,
+            AbilityId ability, float magnitudeOverride)
+            : this(ownerId, slot, cooldown, targetId, ability, default(EffectId), default(TriggerId), 0f, magnitudeOverride) { }
     }
 
     public readonly struct AbilityActivationResult
@@ -66,10 +73,11 @@ namespace BattleSystemECS.Core.GAS
             for (int i = 0; i < ability.Executions.Count; i++)
             {
                 if (!catalog.TryGetExecution(ability.Executions[i], out var execution)) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                float magnitude = float.IsNaN(request.MagnitudeOverride) ? execution.Magnitude : request.MagnitudeOverride;
                 long sequence = store.AllocateGameplaySequence(targetId);
                 if (execution.Payload == EffectPayloadKind.Damage)
                 {
-                    var result = store.DamageResolver.TryApply(new DamageRequest(source, target, execution.Magnitude,
+                    var result = store.DamageResolver.TryApply(new DamageRequest(source, target, magnitude,
                         DamageType.True, ElementType.None, DamageFlags.None, execution.Stage, DamageCommitBoundary.GameplayResolve,
                         sequence, ability: ability.Id, effect: request.Effect, ownerPlayerId: request.OwnerId));
                     if (!result.Accepted) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
@@ -77,7 +85,7 @@ namespace BattleSystemECS.Core.GAS
                 }
                 else if (execution.Payload == EffectPayloadKind.Heal)
                 {
-                    if (!store.ResourceResolver.TryApply(new HealRequest(source, target, execution.Magnitude, sequence, request.OwnerId)).Accepted)
+                    if (!store.ResourceResolver.TryApply(new HealRequest(source, target, magnitude, sequence, request.OwnerId)).Accepted)
                         return Reject(request, AbilityActivationRejectReason.InvalidRequest);
                     applied++;
                 }
