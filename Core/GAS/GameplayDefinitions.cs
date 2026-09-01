@@ -29,6 +29,14 @@ namespace BattleSystemECS.Core.GAS
     public enum CatchUpPolicy { CatchUpAll, OnePerFrame, SkipMissed }
     public enum RelationFilter { Any, Enemies, Allies, Self }
     public enum MaxTargetsPolicy { Derived, Unlimited, Fixed }
+    public readonly struct RuntimeCatalogSpec
+    {
+        public readonly float DamageBonusPerKill;
+        public readonly float MaxMultiplier;
+        public readonly int TriggerThreshold;
+        public RuntimeCatalogSpec(float damageBonusPerKill, float maxMultiplier, int triggerThreshold)
+        { DamageBonusPerKill = damageBonusPerKill; MaxMultiplier = maxMultiplier; TriggerThreshold = triggerThreshold; }
+    }
     [Flags] public enum GameplayPhaseMask { None = 0, Build = 1, Wave = 2, Intermission = 4 }
     public readonly struct ExecutorId : IEquatable<ExecutorId> { public readonly int Value; public ExecutorId(int value) { Value = value; } public bool Equals(ExecutorId other) => Value == other.Value; public override bool Equals(object obj) => obj is ExecutorId other && Equals(other); public override int GetHashCode() => Value; }
     public readonly struct ConsumerId : IEquatable<ConsumerId> { public readonly int Value; public ConsumerId(int value) { Value = value; } public bool Equals(ConsumerId other) => Value == other.Value; public override bool Equals(object obj) => obj is ConsumerId other && Equals(other); public override int GetHashCode() => Value; }

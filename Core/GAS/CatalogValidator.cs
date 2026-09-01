@@ -8,9 +8,15 @@ namespace BattleSystemECS.Core.GAS
         public static void Validate(GameplayCatalog catalog, string path)
         {
             if (catalog == null) throw new CatalogValidationException($"{path}: catalog is null");
+            if (catalog.AbilityDefinitions.Count > CatalogRegistries.MaxAbilities) throw new CatalogValidationException($"{path}: ability capacity exceeded");
+            if (catalog.Effects.Count > CatalogRegistries.MaxEffects) throw new CatalogValidationException($"{path}: effect capacity exceeded");
+            if (catalog.Triggers.Count > CatalogRegistries.MaxTriggers) throw new CatalogValidationException($"{path}: trigger capacity exceeded");
+            if (catalog.Executions.Count > CatalogRegistries.MaxExecutions) throw new CatalogValidationException($"{path}: execution capacity exceeded");
             var ids = new HashSet<int>();
-            foreach (var ability in catalog.AbilityDefinitions)
+            for (int i = 0; i < catalog.AbilityDefinitions.Count; i++)
             {
+                var ability = catalog.AbilityDefinitions[i];
+                if (ability.Id.Value != i) throw new CatalogValidationException($"{path}: ability id {ability.Id.Value} is not contiguous");
                 if (!ids.Add(ability.Id.Value)) throw new CatalogValidationException($"{path}: duplicate ability id {ability.Id.Value} ({ability.Name})");
                 if (!ability.Targeting.Id.Equals(new TargetingId(ability.Id.Value))) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} targeting reference is not closed");
                 if (!CatalogRegistries.TryExecutor(ability.Executor)) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} ({ability.Name}) has unregistered executor");
@@ -34,8 +40,10 @@ namespace BattleSystemECS.Core.GAS
             if (catalog.Effects != null)
             {
                 var effectIds = new HashSet<int>();
-                foreach (var effect in catalog.Effects)
+                for (int i = 0; i < catalog.Effects.Count; i++)
                 {
+                    var effect = catalog.Effects[i];
+                    if (effect.Id.Value != i) throw new CatalogValidationException($"{path}: effect id {effect.Id.Value} is not contiguous");
                     if (!effectIds.Add(effect.Id.Value)) throw new CatalogValidationException($"{path}: duplicate effect id {effect.Id.Value}");
                     if (float.IsNaN(effect.Duration) || float.IsInfinity(effect.Duration) || float.IsNaN(effect.Period) || float.IsInfinity(effect.Period) || effect.Duration < 0 || effect.Period < 0 || effect.MaxStacks < 1) throw new CatalogValidationException($"{path}: invalid duration/period/stack for effect {effect.Id.Value}");
                     if (effect.Type == EffectType.Periodic && (effect.Period <= 0 || effect.Duration <= 0)) throw new CatalogValidationException($"{path}: periodic effect {effect.Id.Value} requires finite duration and period > 0");
@@ -50,6 +58,8 @@ namespace BattleSystemECS.Core.GAS
                     foreach (var modifier in effect.Modifiers) if (!CatalogRegistries.TryAttribute(modifier.Attribute)) throw new CatalogValidationException($"{path}: effect {effect.Id.Value} has unregistered modifier attribute");
                 }
             }
+            for (int i = 0; i < CatalogRegistries.TagCount; i++)
+                if (!CatalogRegistries.TryTag(new TagId(i))) throw new CatalogValidationException($"{path}: tag id {i} is not contiguous");
             if (catalog.Triggers != null) foreach (var trigger in catalog.Triggers)
             {
                 if ((uint)trigger.Id.Value >= (uint)catalog.Triggers.Count || catalog.Triggers[trigger.Id.Value].Id.Value != trigger.Id.Value) throw new CatalogValidationException($"{path}: trigger {trigger.Id.Value} is not contiguous");

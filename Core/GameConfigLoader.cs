@@ -418,6 +418,12 @@ LoadAdrenalineConfig(gameConfig, renderer);
             return (int)ExtractFloat(json, key);
         }
 
+        private static int ExtractInt(string json, string key, int fallback)
+        {
+            int value = ExtractInt(json, key);
+            return value == 0 && json.IndexOf('"' + key + '"', StringComparison.OrdinalIgnoreCase) < 0 ? fallback : value;
+        }
+
 
         private static void ParseBehaviorTrees(GameConfig gameConfig, string jsonArray)
         {
@@ -685,7 +691,8 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 ComboWindowSeconds = ExtractFloat(comboJson, "comboWindowSeconds"),
                 ComboDamageBonusPerKill = ExtractFloat(comboJson, "comboDamageBonusPerKill"),
                 ComboGoldBonusPerKill = ExtractFloat(comboJson, "comboGoldBonusPerKill"),
-                ComboMaxMultiplier = ExtractFloat(comboJson, "comboMaxMultiplier")
+                ComboMaxMultiplier = ExtractFloat(comboJson, "comboMaxMultiplier"),
+                TriggerThreshold = ExtractInt(comboJson, "triggerThreshold", 10)
             };
         }
 

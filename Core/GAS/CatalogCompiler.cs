@@ -32,6 +32,7 @@ namespace BattleSystemECS.Core.GAS
         private readonly IReadOnlyList<TriggerDefinition> _triggersView;
         private readonly IReadOnlyList<GameplayEffectDefinition> _effectsView;
         private readonly IReadOnlyList<ExecutionDefinition> _executionsView;
+        private readonly bool _hasRuntimeExtensions;
         public IReadOnlyList<AbilityCatalogEntry> Abilities => _abilitiesView;
         public IReadOnlyList<AbilityDefinition> AbilityDefinitions => _abilityDefinitionsView;
         public IReadOnlyList<TargetingDefinition> Targetings => _targetingsView;
@@ -40,8 +41,10 @@ namespace BattleSystemECS.Core.GAS
         public IReadOnlyList<GameplayEffectDefinition> Effects => _effectsView;
         public IReadOnlyList<ExecutionDefinition> Executions => _executionsView;
         public IReadOnlyDictionary<string, AbilityId> Aliases => _aliases;
-        internal GameplayCatalog(IReadOnlyList<AbilityDefinition> abilities, IReadOnlyList<TargetingDefinition> targetings, IReadOnlyList<GameplayEffectDefinition> effects, IReadOnlyList<ExecutionDefinition> executions, IReadOnlyList<TriggerDefinition> triggers, IReadOnlyList<ModifierDefinition> modifiers, IReadOnlyDictionary<string, AbilityId> aliases)
+        internal bool HasRuntimeExtensions => _hasRuntimeExtensions;
+        internal GameplayCatalog(IReadOnlyList<AbilityDefinition> abilities, IReadOnlyList<TargetingDefinition> targetings, IReadOnlyList<GameplayEffectDefinition> effects, IReadOnlyList<ExecutionDefinition> executions, IReadOnlyList<TriggerDefinition> triggers, IReadOnlyList<ModifierDefinition> modifiers, IReadOnlyDictionary<string, AbilityId> aliases, bool hasRuntimeExtensions = false)
         {
+            _hasRuntimeExtensions = hasRuntimeExtensions;
             _abilityDefinitions = Copy(abilities); _targetings = Copy(targetings); _effects = Copy(effects); _executions = Copy(executions); _triggers = Copy(triggers); _modifiers = Copy(modifiers); _aliases = new ReadOnlyDictionary<string, AbilityId>(new Dictionary<string, AbilityId>(aliases));
             _abilities = new AbilityCatalogEntry[_abilityDefinitions.Length];
             for (int i = 0; i < _abilities.Length; i++) _abilities[i] = new AbilityCatalogEntry(_abilityDefinitions[i].Id, _abilityDefinitions[i].Name, LegacyAreaShape(_abilityDefinitions[i].Targeting.Shape), DurationFor(_abilityDefinitions[i], _effects, _executions));
@@ -68,6 +71,40 @@ namespace BattleSystemECS.Core.GAS
     /// <summary>Strict bootstrap for canonical skills.json. Legacy game_config skills remain an explicit caller choice.</summary>
     public static class CatalogCompiler
     {
+        public static GameplayCatalog CreateEmpty()
+        {
+            return new GameplayCatalog(Array.Empty<AbilityDefinition>(), Array.Empty<TargetingDefinition>(),
+                Array.Empty<GameplayEffectDefinition>(), Array.Empty<ExecutionDefinition>(),
+                Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
+                new Dictionary<string, AbilityId>(StringComparer.OrdinalIgnoreCase));
+        }
+
+        public static GameplayCatalog CompileRuntimeExtensions(GameplayCatalog catalog, RuntimeCatalogSpec spec)
+        {
+            catalog = catalog ?? CreateEmpty();
+            if (catalog.HasRuntimeExtensions) return catalog;
+            if (spec.TriggerThreshold < 1) throw new CatalogValidationException("runtime catalog: trigger threshold must be positive");
+            if (spec.DamageBonusPerKill < 0f || float.IsNaN(spec.DamageBonusPerKill) || float.IsInfinity(spec.DamageBonusPerKill)) throw new CatalogValidationException("runtime catalog: damage bonus is invalid");
+            if (spec.MaxMultiplier < 1f || float.IsNaN(spec.MaxMultiplier) || float.IsInfinity(spec.MaxMultiplier)) throw new CatalogValidationException("runtime catalog: max multiplier is invalid");
+            int effectId = catalog.Effects.Count;
+            int triggerId = catalog.Triggers.Count;
+            int maxStacks = spec.DamageBonusPerKill > 0f ? Math.Max(1, (int)Math.Ceiling((spec.MaxMultiplier - 1f) / spec.DamageBonusPerKill)) : 1;
+            var effects = new List<GameplayEffectDefinition>(catalog.Effects);
+            effects.Add(new GameplayEffectDefinition(new EffectId(effectId), EffectType.Duration,
+                new[] { new ModifierDefinition(CatalogRegistries.AttackDamage, AttributeModifierOp.Multiply, 1f + spec.DamageBonusPerKill) },
+                0f, 0f, ClockId.Combat, StackingBehavior.MaxStacksRefresh, maxStacks, RefreshPolicy.StacksAndDuration,
+                SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent, CatalogRegistries.SkillTag, Array.Empty<ExecutionId>(),
+                stackKey: CatalogRegistries.SkillTag));
+            var triggers = new List<TriggerDefinition>(catalog.Triggers);
+            triggers.Add(new TriggerDefinition(new TriggerId(triggerId), GameplayEventType.HitConfirmed, new EffectId(effectId),
+                CatalogRegistries.SkillConsumer, scope: TriggerScope.PerSource, threshold: spec.TriggerThreshold,
+                mode: TriggerMode.EveryN, preserveRemainder: true));
+            var extended = new GameplayCatalog(catalog.AbilityDefinitions, catalog.Targetings, effects, catalog.Executions,
+                triggers, catalog.Modifiers, catalog.Aliases, hasRuntimeExtensions: true);
+            CatalogValidator.Validate(extended, "runtime catalog");
+            return extended;
+        }
+
         public static GameplayCatalog Compile(string canonicalSkillsPath, IEnumerable<string> staticSkillPaths = null)
         {
             if (string.IsNullOrEmpty(canonicalSkillsPath) || !File.Exists(canonicalSkillsPath))

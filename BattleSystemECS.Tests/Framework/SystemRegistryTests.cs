@@ -1,6 +1,8 @@
 using BattleSystemECS.Config;
 using BattleSystemECS.Core;
 using BattleSystemECS.Tests.Infrastructure;
+using BattleSystemECS.Core.GAS;
+using System.Reflection;
 
 namespace BattleSystemECS.Tests.Framework
 {
@@ -85,6 +87,33 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(towersBefore, Store.ActiveTowerIds.Count);
             Assert.True(Store.IsPlayerAlive(playerId), "BuildPhase 3 帧后玩家必须仍然存活");
             Assert.True(Store.GetPlayerCurrentHealth(playerId) > 0f, "BuildPhase 不应扣除玩家生命");
+        }
+
+        [Fact]
+        public void Assembly_ComboUsesConfigAndPlayerAttackProjection()
+        {
+            int playerId = Player(p => p.AttackDamage = 100f);
+            GameConfig config = GameConfigLoader.LoadConfig(Renderer);
+            config.Combo.ComboDamageBonusPerKill = 0.2f;
+            config.Combo.ComboMaxMultiplier = 2f;
+            config.Combo.TriggerThreshold = 3;
+            var registry = new SystemRegistry();
+            registry.CreateAll(Store, config, Renderer, playerId, new StateMachine());
+
+            var effect = (GameplayEffectDefinition)typeof(SystemRegistry)
+                .GetField("_runtimeComboEffect", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(registry)!;
+            var triggers = (System.Collections.Generic.List<TriggerDefinition>)typeof(SystemRegistry)
+                .GetField("_runtimeTriggers", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(registry)!;
+            Assert.Equal(new AttributeKey(0), effect.Modifiers[0].Attribute);
+            Assert.Equal(AttributeModifierOp.Multiply, effect.Modifiers[0].Operation);
+            Assert.Equal(1.2f, effect.Modifiers[0].Magnitude);
+            Assert.Equal(3, triggers[0].Threshold);
+            registry.WireDependencies(Store, playerId);
+            var scheduler = new FrameScheduler(Store, config);
+            registry.AssignToGroups(scheduler);
+            scheduler.Phase = GameState.BuildPhase;
+            scheduler.Tick(1f, 0);
+            Assert.True(Store.UseComputedAttributes);
         }
 
         // ─── Bug 回归：构造顺序不得让消费者捕获 null ─────────────────────────

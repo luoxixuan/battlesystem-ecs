@@ -95,7 +95,10 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP] 1. Loading Game Configuration...");
 
             // 加载游戏配置
-            gameConfig = GameConfigLoader.LoadConfig(logger);
+            // Production bootstrap validates the typed ability catalog before any
+            // system is constructed. Legacy fallback remains available only to
+            // explicit tests/tools via LoadConfig.
+            gameConfig = GameConfigLoader.LoadStrictCatalog(logger);
 
             logger.Log("[BOOTSTRAP]    - Configuration loaded successfully!");
             logger.Log("[BOOTSTRAP]    - Monster Types: " + gameConfig.MonsterTypes.Count);

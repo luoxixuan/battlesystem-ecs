@@ -1528,6 +1528,8 @@ namespace BattleSystemECS.Config
         public float ComboGoldBonusPerKill { get; set; } = 0.10f;
         /// <summary>Maximum combo damage multiplier. Default: 3.0f (reached at 40 kills)</summary>
         public float ComboMaxMultiplier { get; set; } = 3.0f;
+        /// <summary>命中事实累计到该次数后触发一次连击效果。</summary>
+        public int TriggerThreshold { get; set; } = 10;
     }
 
     /// <summary>

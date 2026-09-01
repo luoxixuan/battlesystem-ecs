@@ -272,15 +272,19 @@ namespace BattleSystemECS.Core
 
         public void CreateAll(ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus = null)
         {
-            _runtimeComboEffect = new Core.GAS.GameplayEffectDefinition(new Core.GAS.EffectId(9001), Core.GAS.EffectType.Duration,
-                // 旧 Duration=0 兼容映射为 Infinite，连击效果不会因零时长被拒绝。
-                new[] { new Core.GAS.ModifierDefinition(new Core.GAS.AttributeKey(8), Core.GAS.AttributeModifierOp.Add, 0.30f) }, 0f, 0f,
-                Core.GAS.ClockId.Combat, Core.GAS.StackingBehavior.MaxStacksRefresh, 5, Core.GAS.RefreshPolicy.StacksAndDuration,
-                Core.GAS.SourceDeathPolicy.Persist, Core.GAS.EffectPayloadKind.GameplayEvent, default(Core.GAS.TagId), Array.Empty<Core.GAS.ExecutionId>(), stackKey: new Core.GAS.TagId(9001));
+            if (config == null) throw new ArgumentNullException(nameof(config));
+            // Computed projections are a production contract. The request is applied at
+            // the first frame boundary so no partially aggregated state is observable.
+            store.UseComputedAttributes = true;
+            var combo = config.Combo ?? new ComboConfig();
+            if (combo.TriggerThreshold < 1) throw new Core.GAS.CatalogValidationException("Combo.triggerThreshold must be positive");
+            if (combo.ComboDamageBonusPerKill < 0f || combo.ComboMaxMultiplier < 1f)
+                throw new Core.GAS.CatalogValidationException("Combo damage bonus/max multiplier is invalid");
+            config.CompiledCatalog = Core.GAS.CatalogCompiler.CompileRuntimeExtensions(config.CompiledCatalog,
+                new Core.GAS.RuntimeCatalogSpec(combo.ComboDamageBonusPerKill, combo.ComboMaxMultiplier, combo.TriggerThreshold));
+            _runtimeComboEffect = config.CompiledCatalog.Effects[config.CompiledCatalog.Effects.Count - 1];
             _runtimeTriggers.Clear();
-            _runtimeTriggers.Add(new Core.GAS.TriggerDefinition(new Core.GAS.TriggerId(9001), Core.GAS.GameplayEventType.HitConfirmed,
-                new Core.GAS.EffectId(9001), Core.GAS.CatalogRegistries.SkillConsumer, scope: Core.GAS.TriggerScope.PerSource,
-                threshold: 10, mode: Core.GAS.TriggerMode.EveryN, preserveRemainder: true));
+            _runtimeTriggers.Add(config.CompiledCatalog.Triggers[config.CompiledCatalog.Triggers.Count - 1]);
             var battleEb = battleEventBus ?? NullEventBus.Instance;
 
             // ── EventBus (needed early by several systems) ──

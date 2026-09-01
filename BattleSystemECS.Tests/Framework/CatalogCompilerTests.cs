@@ -83,6 +83,29 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
+        public void RuntimeExtensionsCompileStableEffectAndTriggerIds()
+        {
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "Data", "Configs", "skills.json");
+            var baseCatalog = CatalogCompiler.Compile(path);
+            var extended = CatalogCompiler.CompileRuntimeExtensions(baseCatalog, new RuntimeCatalogSpec(0.2f, 2f, 3));
+            var repeated = CatalogCompiler.CompileRuntimeExtensions(extended, new RuntimeCatalogSpec(0.9f, 9f, 99));
+            Assert.Same(extended, repeated);
+            Assert.Equal(baseCatalog.Effects.Count, extended.Effects[extended.Effects.Count - 1].Id.Value);
+            Assert.Equal(baseCatalog.Triggers.Count, extended.Triggers[extended.Triggers.Count - 1].Id.Value);
+            Assert.Equal(new AttributeKey(0), extended.Effects[extended.Effects.Count - 1].Modifiers[0].Attribute);
+            Assert.Equal(3, extended.Triggers[extended.Triggers.Count - 1].Threshold);
+        }
+
+        [Fact]
+        public void RuntimeExtensionsRejectInvalidThresholdAndMultiplier()
+        {
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "Data", "Configs", "skills.json");
+            var catalog = CatalogCompiler.Compile(path);
+            Assert.Throws<CatalogValidationException>(() => CatalogCompiler.CompileRuntimeExtensions(catalog, new RuntimeCatalogSpec(0.1f, 2f, 0)));
+            Assert.Throws<CatalogValidationException>(() => CatalogCompiler.CompileRuntimeExtensions(catalog, new RuntimeCatalogSpec(-0.1f, 2f, 1)));
+        }
+
+        [Fact]
         public void StaticStaticAliasConflictFailsFastWhileCanonicalWins()
         {
             string canonical = Path.Combine(AppContext.BaseDirectory, "Data", "Configs", "skills.json");
