@@ -9,7 +9,9 @@ namespace BattleSystemECS.Core.GAS
         private readonly bool[] _active;
         private readonly int[] _nextFree;
         private int _freeHead;
+        private int _freeCount;
         public int Capacity => _active.Length;
+        public int FreeCount => _freeCount;
         public int AllocationFailures { get; private set; }
         public int InvalidResolveCount { get; private set; }
         public int StaleResolveCount { get; private set; }
@@ -25,6 +27,7 @@ namespace BattleSystemECS.Core.GAS
             for (int i = 0; i < capacity - 1; i++) _nextFree[i] = i + 1;
             _nextFree[capacity - 1] = -1;
             _freeHead = 0;
+            _freeCount = capacity;
         }
         public bool TryAllocate(out EffectHandle handle)
         {
@@ -40,6 +43,7 @@ namespace BattleSystemECS.Core.GAS
             _freeHead = _nextFree[index];
             _generations[index] = _generations[index] == int.MaxValue ? 1 : _generations[index] + 1;
             _active[index] = true;
+            _freeCount--;
             handle = new EffectHandle(index, _generations[index]);
             LastFailure = HandleResolveFailure.None;
             LastPoolFailure = EffectPoolFailure.None;
@@ -50,6 +54,7 @@ namespace BattleSystemECS.Core.GAS
         {
             if (!TryResolve(handle, out _, out failure)) return false;
             _active[handle.Index] = false;
+            _freeCount++;
             _nextFree[handle.Index] = _freeHead;
             _freeHead = handle.Index;
             LastFailure = HandleResolveFailure.None;

@@ -37,6 +37,8 @@ namespace BattleSystemECS.Systems
         // list compact. Synchronized implicitly because TickCastTimers + EnqueueAbility +
         // InterruptCast all run on the main game thread (no parallel writes).
         private readonly List<int> _activeChannelers = new List<int>(64);
+        private readonly List<int> _healTargets = new List<int>(256);
+        private readonly List<float> _healMagnitudes = new List<float>(256);
 
         private enum SpecialWorldAction { None, SummonEnemy, PrepareStealth }
 
@@ -407,13 +409,13 @@ namespace BattleSystemECS.Systems
             if (!payloadMatches) return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.UnsupportedDefinition);
             if (groupHeal)
             {
-                var targets = new List<int>();
-                var magnitudes = new List<float>();
-                CollectHealTargets(enemyId, ability, targets, magnitudes);
+                _healTargets.Clear();
+                _healMagnitudes.Clear();
+                CollectHealTargets(enemyId, ability, _healTargets, _healMagnitudes);
                 var groupRequest = new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown, -1, typedId,
                     default(EffectId), default(TriggerId), 0f, float.NaN, playerId);
                 var groupResult = GameplayAbilityRuntime.ActivateHealTargets(store, catalog, _abilityCooldownTimers,
-                    groupRequest, targets, magnitudes);
+                    groupRequest, _healTargets, _healMagnitudes);
                 if (groupResult.Accepted)
                     logger.Log($"[ABILITY] Enemy {enemyId} typed '{ability.Name}' healed {groupResult.AppliedEffects} allies");
                 return groupResult;

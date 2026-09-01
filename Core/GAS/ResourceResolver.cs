@@ -47,6 +47,63 @@ namespace BattleSystemECS.Core.GAS
         public int RequestOverflowCount => Volatile.Read(ref _requestOverflowCount);
         public int UnconsumedRequestCount => Volatile.Read(ref _unconsumedRequestCount);
         public ResourceResolver(ComponentStore store) { _store = store ?? throw new ArgumentNullException(nameof(store)); }
+        internal bool CanAccept(int requestCount, int criticalEventCount)
+        {
+            if (requestCount < 0 || criticalEventCount < 0 || !Events.CanPublish(criticalEventCount, true)) return false;
+            if (!_deferred) return true;
+            lock (_pendingLock) return _pending.Count <= MaxPendingRequests - requestCount;
+        }
+
+        internal ResourceApplyResult TryApply(ShieldRequest request, int ownerPlayerId)
+        {
+            ResourceApplyResult RejectShield(ResourceRejectionReason reason)
+            {
+                SetRejection(reason);
+                Interlocked.Increment(ref _rejectedCount);
+                return new ResourceApplyResult(false, 0f, reason);
+            }
+
+            if (!_store.TryResolve(request.Source, out _, out _) ||
+                !_store.TryResolve(request.Target, out int targetId, out _) ||
+                (uint)targetId >= ComponentStore.MAX_PLAYERS || !_store.PositionActive[targetId])
+                return RejectShield(ResourceRejectionReason.InvalidTarget);
+            if (ownerPlayerId < 0 || ownerPlayerId >= ComponentStore.MAX_PLAYERS)
+                return RejectShield(ResourceRejectionReason.InvalidOwner);
+            if (request.Amount <= 0f || request.Duration < 0f ||
+                float.IsNaN(request.Amount) || float.IsInfinity(request.Amount) ||
+                float.IsNaN(request.Duration) || float.IsInfinity(request.Duration) || request.Clock != ClockId.Combat)
+                return RejectShield(ResourceRejectionReason.InvalidValue);
+            if (!Events.CanPublish(1, true))
+                return RejectShield(ResourceRejectionReason.RequestQueueOverflow);
+
+            float before = _store.PlayerShield[targetId];
+            _store.PlayerShield[targetId] = Math.Max(0f, before + request.Amount);
+            if (request.Duration > _store.PlayerShieldDuration[targetId])
+                _store.PlayerShieldDuration[targetId] = request.Duration;
+            Events.TryPublish(new GameplayEvent(GameplayEventType.ShieldChanged, request.Source, request.Target,
+                request.Sequence, ownerPlayerId: ownerPlayerId), true);
+            return new ResourceApplyResult(true, _store.PlayerShield[targetId] - before, ResourceRejectionReason.None);
+        }
+
+        internal void TickTimedShields(float deltaTime, ClockId clock)
+        {
+            if (clock != ClockId.Combat || deltaTime <= 0f) return;
+            for (int playerId = 0; playerId < ComponentStore.MAX_PLAYERS; playerId++)
+            {
+                float remaining = _store.PlayerShieldDuration[playerId];
+                if (remaining <= 0f) continue;
+                remaining -= deltaTime;
+                if (remaining > 0f) { _store.PlayerShieldDuration[playerId] = remaining; continue; }
+                _store.PlayerShieldDuration[playerId] = 0f;
+                if (_store.PlayerShield[playerId] <= 0f) continue;
+                _store.PlayerShield[playerId] = 0f;
+                var handle = _store.GetEntityHandle(playerId);
+                if (handle.IsValid)
+                    if (!Events.TryPublish(new GameplayEvent(GameplayEventType.ShieldChanged, handle, handle,
+                        _store.AllocateGameplaySequence(playerId), ownerPlayerId: playerId), true))
+                        Volatile.Write(ref _eventPublicationFailed, 1);
+            }
+        }
         /// <summary>提交独立的治疗请求；治疗不是通用资源写入。</summary>
         public ResourceApplyResult TryApply(HealRequest request)
         {

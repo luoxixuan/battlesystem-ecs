@@ -24,6 +24,12 @@ namespace BattleSystemECS.Core.GAS
             }
             _items[_count++] = value; LastRejection = CommandRejection.None; return true;
         }
+        public bool CanAdd(int count, bool critical = false)
+        {
+            if (count < 0) return false;
+            int limit = critical ? Capacity : Capacity - Reserved;
+            return _count <= limit - count;
+        }
         public T Get(int index) => index >= 0 && index < _count ? _items[index] : throw new ArgumentOutOfRangeException(nameof(index));
         public void Sort(Comparison<T> comparison) { if (comparison == null) throw new ArgumentNullException(nameof(comparison)); Array.Sort(_items, 0, _count, Comparer<T>.Create(comparison)); }
         public bool TryMerge(CommandBuffer<T> source, Comparison<T> comparison, bool critical = false) {

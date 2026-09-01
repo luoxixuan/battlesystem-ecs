@@ -2,6 +2,8 @@ using BattleSystemECS.Core;
 using BattleSystemECS.Core.GAS;
 using Xunit;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace BattleSystemECS.Tests.Framework
 {
@@ -257,6 +259,201 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(0, store.GetEffectCount(0));
             Assert.Equal(0, store.GameplayEffectsRuntime.Events.Count);
         }
+
+        [Fact]
+        public void CapacityPlanRejectsTwoEffectsBeforeFirstEffectOrCostCommits()
+        {
+            var store = PlayerStore();
+            store.PlayerMana[0] = 5f;
+            var source = store.GetEntityHandle(0);
+            for (int i = 0; i < ComponentStore.MAX_ACTIVE_EFFECTS_PER_ENTITY - 1; i++)
+            {
+                var existing = DurationEffect(100 + i);
+                Assert.True(store.GameplayEffectsRuntime.TryApply(existing.Id, existing, source, source, out _),
+                    $"effect {i}, active={store.GetEffectCount(0)}, rejection={store.GameplayEffectsRuntime.Rejections}");
+            }
+            int effectCount = store.GetEffectCount(0);
+            int effectEvents = store.GameplayEffectsRuntime.Events.Count;
+            var first = DurationEffect(0);
+            var second = DurationEffect(1);
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 1, 1, 1, 1);
+            var ability = new AbilityDefinition(new AbilityId(0), "capacity", targeting, ClockId.Combat, 2f,
+                GameplayPhaseMask.Wave, new[] { first.Id, second.Id }, Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
+                costs: new[] { new CostDefinition(new AttributeKey(7), 1f) });
+            var catalog = new GameplayCatalog(new[] { ability }, new[] { targeting }, new[] { first, second },
+                Array.Empty<ExecutionDefinition>(), Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
+                new Dictionary<string, AbilityId>());
+            var cooldowns = new float[1];
+
+            var result = GameplayAbilityRuntime.Activate(store, catalog, cooldowns, Request(0));
+
+            Assert.False(result.Accepted);
+            Assert.Equal(effectCount, store.GetEffectCount(0));
+            Assert.Equal(effectEvents, store.GameplayEffectsRuntime.Events.Count);
+            Assert.Equal(5f, store.PlayerMana[0]);
+            Assert.Equal(0f, cooldowns[0]);
+        }
+
+        [Fact]
+        public void CombinedHealAndCostCapacityRejectsWithoutPartialWrites()
+        {
+            var store = PlayerStore();
+            store.PlayerCurrentHealth[0] = 2f;
+            store.PlayerMana[0] = 5f;
+            store.ResourceResolver.EnableDeferred(true);
+            var handle = store.GetEntityHandle(0);
+            for (int i = 0; i < ResourceResolver.MaxPendingRequests - 1; i++)
+                Assert.True(store.ResourceResolver.TryApply(new ResourceRequest(handle, handle, new AttributeKey(7),
+                    0f, store.AllocateGameplaySequence(0), 0)).Accepted);
+            int pending = store.ResourceResolver.PendingRequestCount;
+            var catalog = Catalog(Execution(EffectPayloadKind.Heal, 2f, ExecutionOperation.ApplyHeal),
+                costs: new[] { new CostDefinition(new AttributeKey(7), 1f) });
+            var cooldowns = new float[1];
+
+            var result = GameplayAbilityRuntime.Activate(store, catalog, cooldowns, Request(0));
+
+            Assert.False(result.Accepted);
+            Assert.Equal(pending, store.ResourceResolver.PendingRequestCount);
+            Assert.Equal(2f, store.PlayerCurrentHealth[0]);
+            Assert.Equal(5f, store.PlayerMana[0]);
+            Assert.Equal(0f, cooldowns[0]);
+            Assert.Equal(0, store.DamageResolver.Events.Count);
+        }
+
+        [Fact]
+        public void MultiTargetHealCommitsCostEventAndCooldownOnceAndRejectsSecondSameFrame()
+        {
+            var store = PlayerStore();
+            store.PlayerMana[0] = 5f;
+            int first = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            int second = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            store.EnemyHealth[first] = 3f;
+            store.EnemyHealth[second] = 4f;
+            store.ResourceResolver.EnableDeferred(true);
+            var catalog = Catalog(Execution(EffectPayloadKind.Heal, 1f, ExecutionOperation.ApplyHeal),
+                costs: new[] { new CostDefinition(new AttributeKey(7), 1f) });
+            var cooldowns = new float[1];
+            var request = Request(first);
+            var targets = new[] { first, second };
+            var magnitudes = new[] { 2f, 3f };
+
+            var accepted = GameplayAbilityRuntime.ActivateHealTargets(store, catalog, cooldowns, request, targets, magnitudes);
+            int pending = store.ResourceResolver.PendingRequestCount;
+            int events = store.DamageResolver.Events.Count;
+            var rejected = GameplayAbilityRuntime.ActivateHealTargets(store, catalog, cooldowns, request, targets, magnitudes);
+
+            Assert.True(accepted.Accepted);
+            Assert.Equal(targets.Length, accepted.AppliedEffects);
+            Assert.Equal(3, pending);
+            Assert.Equal(1, events);
+            Assert.Equal(2f, cooldowns[0]);
+            Assert.False(rejected.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.Cooldown, rejected.Reason);
+            Assert.Equal(pending, store.ResourceResolver.PendingRequestCount);
+            Assert.Equal(events, store.DamageResolver.Events.Count);
+        }
+
+        [Fact]
+        public void ShieldDurationUsesCombatClockAndPublishesExpirationEvent()
+        {
+            var store = PlayerStore();
+            const float configuredDuration = 5f;
+            var execution = Execution(EffectPayloadKind.Shield, 3f, ExecutionOperation.ApplyShield,
+                duration: configuredDuration);
+            var result = Activate(store, Catalog(execution), 0);
+
+            Assert.True(result.Accepted);
+            Assert.Equal(3f, store.PlayerShield[0]);
+            Assert.Equal(configuredDuration, store.PlayerShieldDuration[0]);
+            Assert.Equal(GameplayEventType.ShieldChanged, store.ResourceResolver.Events.Get(0).Type);
+            store.GameplayEffectsRuntime.Tick(configuredDuration, ClockId.Enemy);
+            Assert.Equal(configuredDuration, store.PlayerShieldDuration[0]);
+            store.GameplayEffectsRuntime.Tick(configuredDuration - 1f, ClockId.Combat);
+            Assert.Equal(3f, store.PlayerShield[0]);
+            store.GameplayEffectsRuntime.Tick(1f, ClockId.Combat);
+            Assert.Equal(0f, store.PlayerShield[0]);
+            Assert.Equal(0f, store.PlayerShieldDuration[0]);
+            Assert.Equal(2, store.ResourceResolver.Events.Count);
+            Assert.Equal(GameplayEventType.ShieldChanged, store.ResourceResolver.Events.Get(1).Type);
+        }
+
+        [Fact]
+        public void ActivationEventCapacityRejectsBeforeShieldCostOrCooldown()
+        {
+            var store = PlayerStore();
+            store.PlayerMana[0] = 5f;
+            var handle = store.GetEntityHandle(0);
+            var filler = new GameplayEvent(GameplayEventType.HitConfirmed, handle, handle, 1L);
+            for (int i = 0; i < store.DamageResolver.Events.Capacity; i++)
+                Assert.True(store.DamageResolver.Events.TryPublish(filler, true));
+            var catalog = Catalog(Execution(EffectPayloadKind.Shield, 2f, ExecutionOperation.ApplyShield, duration: 5f),
+                costs: new[] { new CostDefinition(new AttributeKey(7), 1f) });
+            var cooldowns = new float[1];
+
+            var result = GameplayAbilityRuntime.Activate(store, catalog, cooldowns, Request(0));
+
+            Assert.False(result.Accepted);
+            Assert.Equal(0f, store.PlayerShield[0]);
+            Assert.Equal(5f, store.PlayerMana[0]);
+            Assert.Equal(0f, cooldowns[0]);
+            Assert.Equal(0, store.ResourceResolver.Events.Count);
+        }
+
+        [Fact]
+        public void ModifierCapacityRejectsBeforeEffectOrCooldown()
+        {
+            var store = PlayerStore();
+            var source = store.GetEntityHandle(0);
+            var modifiers = new ModifierDefinition[store.GameplayEffectsRuntime.ModifierCapacity - 1];
+            var modifier = new ModifierDefinition(new AttributeKey(8), AttributeModifierOp.Add, 0.01f);
+            for (int i = 0; i < modifiers.Length; i++) modifiers[i] = modifier;
+            var existing = DurationEffect(100, modifiers);
+            Assert.True(store.GameplayEffectsRuntime.TryApply(existing.Id, existing, source, source, out _));
+            int before = store.GetEffectCount(0);
+            var requested = DurationEffect(0, new[] { modifier, modifier });
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 1, 1, 1, 1);
+            var ability = new AbilityDefinition(new AbilityId(0), "modifiers", targeting, ClockId.Combat, 2f,
+                GameplayPhaseMask.Wave, new[] { requested.Id }, Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer);
+            var catalog = new GameplayCatalog(new[] { ability }, new[] { targeting }, new[] { requested },
+                Array.Empty<ExecutionDefinition>(), Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
+                new Dictionary<string, AbilityId>());
+            var cooldowns = new float[1];
+
+            var result = GameplayAbilityRuntime.Activate(store, catalog, cooldowns, Request(0));
+
+            Assert.False(result.Accepted);
+            Assert.Equal(before, store.GetEffectCount(0));
+            Assert.Equal(0f, cooldowns[0]);
+        }
+
+        [Fact]
+        public void MultiHitAbilityTreatsLaterHitAfterLethalCommitAsSuccessfulNoOp()
+        {
+            var store = PlayerStore();
+            int enemy = store.AddEnemy(0, 0, 1f, 3f, 3f, 1f, 1, 1);
+            var executions = new[]
+            {
+                Execution(EffectPayloadKind.Damage, 4f, ExecutionOperation.ApplyDamage, id: 0),
+                Execution(EffectPayloadKind.Damage, 5f, ExecutionOperation.ApplyDamage, id: 1)
+            };
+            var cooldowns = new float[1];
+
+            var result = GameplayAbilityRuntime.Activate(store, Catalog(executions), cooldowns, Request(enemy));
+
+            Assert.True(result.Accepted);
+            Assert.Equal(0f, store.EnemyHealth[enemy]);
+            Assert.True(store.IsEnemyPendingDeath(enemy));
+            Assert.Equal(2f, cooldowns[0]);
+            Assert.Contains(Enumerable.Range(0, store.DamageResolver.Events.Count),
+                i => store.DamageResolver.Events.Get(i).Type == GameplayEventType.AbilityActivated);
+        }
+
+        private static GameplayEffectDefinition DurationEffect(int id, ModifierDefinition[]? modifiers = null) =>
+            new GameplayEffectDefinition(new EffectId(id), EffectType.Duration, modifiers ?? Array.Empty<ModifierDefinition>(),
+                3f, 0f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None, SourceDeathPolicy.Persist,
+                EffectPayloadKind.GameplayEvent, new TagId(id), Array.Empty<ExecutionId>());
 
         private static ComponentStore PlayerStore()
         {

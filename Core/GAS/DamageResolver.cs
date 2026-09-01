@@ -53,6 +53,12 @@ namespace BattleSystemECS.Core.GAS
         internal void ResetDiagnostics() { Interlocked.Exchange(ref _requestsValidated, 0); Interlocked.Exchange(ref _requestsFastPath, 0); Interlocked.Exchange(ref _factsPublished, 0); }
         internal void MarkEventPublicationFailure(bool failed) { if (failed) Volatile.Write(ref _eventPublicationFailed, 1); }
         public DamageResolver(ComponentStore store) { _store = store ?? throw new ArgumentNullException(nameof(store)); }
+        internal bool CanAccept(int requestCount, int criticalEventCount)
+        {
+            if (requestCount < 0 || criticalEventCount < 0 || !Events.CanPublish(criticalEventCount, true)) return false;
+            if (!_deferred) return true;
+            lock (_pendingLock) return _pending.Count <= MaxPendingRequests - requestCount;
+        }
         internal void BeginFrame() { Volatile.Write(ref _eventPublicationFailed, 0); Volatile.Write(ref _lastCommittedBoundary, (int)DamageCommitBoundary.EarlyResolve); Volatile.Write(ref _earlyBoundaryClosed, 0); lock (_pendingLock) { if (_pending.Count != 0) { Interlocked.Add(ref _unconsumedRequestCount, _pending.Count); Interlocked.Add(ref _rejectedCount, _pending.Count); SetRejection(DamageRejectionReason.UnconsumedRequests); _pending.Clear(); } } }
         private void SetRejection(DamageRejectionReason reason) { lock (_diagnosticsLock) _lastRejection = reason; }
         internal void EnableDeferred(bool value) { _deferred = value; }

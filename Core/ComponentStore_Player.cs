@@ -853,18 +853,6 @@ PlayerCrestActiveId[entityId] = "";
                     PlayerSlowDuration[i]--;
                     if (PlayerSlowDuration[i] <= 0) PlayerSlowFactor[i] = 0f;
                 }
-                // Shield duration decrements per turn (1 second per turn in this engine)
-                if (PlayerShieldDuration[i] > 0f)
-                {
-                    PlayerShieldDuration[i] -= 1f;
-                    if (PlayerShieldDuration[i] <= 0f)
-                    {
-                        PlayerShieldDuration[i] = 0f;
-                        PlayerShield[i] = 0f;
-                        // Log shield dissipation — use static no-op to avoid Console.WriteLine/IO overhead in hot path
-                        FileLogger.LogHotPath($"[SHIELD] 护盾消散！ playerId={i}");
-                    }
-                }
             }
         }
 

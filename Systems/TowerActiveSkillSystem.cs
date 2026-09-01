@@ -33,6 +33,7 @@ namespace BattleSystemECS.Systems
     {
         private ComponentStore store;
         private GameConfig? _config;
+        private readonly CompatibilityCatalogEntry?[] _compatibilityCatalogs = new CompatibilityCatalogEntry?[ComponentStore.MAX_ENTITIES];
         private PhaseContext _phaseContext = PhaseContext.Unbound;
         public PhaseContextKind CurrentPhaseContext => _phaseContext.Kind;
         public AbilityActivationResult LastActivation { get; private set; }
@@ -101,20 +102,7 @@ namespace BattleSystemECS.Systems
             {
                 if (_config?.StrictCatalogReferences == true)
                     return Reject(towerId, AbilityActivationRejectReason.UnsupportedDefinition);
-                var skill = configuredSkill;
-                if (skill == null)
-                    skill = new SkillConfig { Name = $"tower-active-{skillId}", DamageMultiplier = 1f, Cooldown = store.TowerActiveCooldownMax[towerId] };
-                var exec = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage,
-                    skill.DamageMultiplier > 0f ? store.TowerAttackDamage[towerId] * skill.DamageMultiplier : store.TowerAttackDamage[towerId],
-                    CatalogRegistries.SkillTag, MagnitudeSource.Constant, DamageAmountStage.Raw, operation: ExecutionOperation.ApplyDamage);
-                var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 1, 1, 1, 1);
-                catalog = new GameplayCatalog(new[] { new AbilityDefinition(new AbilityId(skillId), skill.Name, targeting, ClockId.Combat,
-                    store.TowerActiveCooldownMax[towerId], GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
-                    CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, executions: new[] { exec.Id }) },
-                    new[] { targeting }, Array.Empty<GameplayEffectDefinition>(), new[] { exec }, Array.Empty<TriggerDefinition>(),
-                    Array.Empty<ModifierDefinition>(), new Dictionary<string, AbilityId>(StringComparer.OrdinalIgnoreCase) { [skill.Name] = new AbilityId(skillId) });
-                catalog.TryGetAbility(new AbilityId(skillId), out catalogAbility);
-                abilityId = new AbilityId(skillId);
+                ResolveCompatibilityCatalog(towerId, skillId, configuredSkill, out catalog, out abilityId, out catalogAbility);
             }
             if (catalog == null || !catalog.TryGetAbility(abilityId, out catalogAbility))
                 return Reject(towerId, AbilityActivationRejectReason.UnsupportedDefinition);
@@ -129,6 +117,53 @@ namespace BattleSystemECS.Systems
             // Compatibility audit marker: cooldown ownership is inside
             // GameplayAbilityRuntime.AbilityCommit, never this adapter.
             return result;
+        }
+
+        private void ResolveCompatibilityCatalog(int towerId, int skillId, SkillConfig? skill,
+            out GameplayCatalog catalog, out AbilityId abilityId, out AbilityDefinition ability)
+        {
+            float attackDamage = store.TowerAttackDamage[towerId];
+            float cooldown = store.TowerActiveCooldownMax[towerId];
+            float multiplier = skill != null && skill.DamageMultiplier > 0f ? skill.DamageMultiplier : 1f;
+            var cached = _compatibilityCatalogs[towerId];
+            if (cached != null && cached.SkillId == skillId && cached.Skill == skill &&
+                cached.AttackDamage.Equals(attackDamage) && cached.Cooldown.Equals(cooldown) && cached.Multiplier.Equals(multiplier))
+            {
+                catalog = cached.Catalog;
+                abilityId = cached.AbilityId;
+                ability = cached.Ability;
+                return;
+            }
+
+            string name = skill?.Name ?? $"tower-active-{skillId}";
+            abilityId = new AbilityId(0);
+            var execution = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage, attackDamage * multiplier,
+                CatalogRegistries.SkillTag, MagnitudeSource.Constant, DamageAmountStage.Raw, operation: ExecutionOperation.ApplyDamage);
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 1, 1, 1, 1);
+            ability = new AbilityDefinition(abilityId, name, targeting, ClockId.Combat, cooldown, GameplayPhaseMask.Wave,
+                Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(), CatalogRegistries.SkillExecutor,
+                CatalogRegistries.SkillConsumer, executions: new[] { execution.Id });
+            catalog = new GameplayCatalog(new[] { ability }, new[] { targeting }, Array.Empty<GameplayEffectDefinition>(),
+                new[] { execution }, Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
+                new Dictionary<string, AbilityId>(StringComparer.OrdinalIgnoreCase) { [name] = abilityId });
+            _compatibilityCatalogs[towerId] = new CompatibilityCatalogEntry(skillId, skill, attackDamage, cooldown,
+                multiplier, catalog, abilityId, ability);
+        }
+
+        private sealed class CompatibilityCatalogEntry
+        {
+            public readonly int SkillId;
+            public readonly SkillConfig? Skill;
+            public readonly float AttackDamage, Cooldown, Multiplier;
+            public readonly GameplayCatalog Catalog;
+            public readonly AbilityId AbilityId;
+            public readonly AbilityDefinition Ability;
+            public CompatibilityCatalogEntry(int skillId, SkillConfig? skill, float attackDamage, float cooldown,
+                float multiplier, GameplayCatalog catalog, AbilityId abilityId, AbilityDefinition ability)
+            {
+                SkillId = skillId; Skill = skill; AttackDamage = attackDamage; Cooldown = cooldown; Multiplier = multiplier;
+                Catalog = catalog; AbilityId = abilityId; Ability = ability;
+            }
         }
 
         private AbilityActivationResult Reject(int towerId, AbilityActivationRejectReason reason) =>

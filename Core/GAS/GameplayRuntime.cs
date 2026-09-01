@@ -25,6 +25,34 @@ namespace BattleSystemECS.Core.GAS
         public int ModifierCapacity { get; } = 8192;
         public int EventCapacity { get; }
         public GameplayEffectRuntime(ComponentStore store, int eventCapacity = DefaultEventCapacity) { _store = store ?? throw new ArgumentNullException(nameof(store)); EventCapacity = Math.Max(1, eventCapacity); Events = new GameplayEventQueue(EventCapacity, Math.Min(64, EventCapacity / 8)); }
+        internal bool CanApplyPlan(int targetId, int runtimeSlots, int modifierCount, int eventCount)
+        {
+            if (!ComponentStore.IsValidEntity(targetId) || runtimeSlots < 0 || modifierCount < 0 || eventCount < 0) return false;
+            return _store.ActiveEffectCount[targetId] <= ComponentStore.MAX_ACTIVE_EFFECTS_PER_ENTITY - runtimeSlots &&
+                _store.GameplayEffectPool.FreeCount >= runtimeSlots &&
+                _modifierHandleCount <= ModifierCapacity - modifierCount && Events.CanPublish(eventCount, true);
+        }
+        internal bool CanApplyDefinition(GameplayEffectDefinition definition, int targetId)
+        {
+            if (!ComponentStore.IsValidEntity(targetId) || !IsDurationContractValid(definition)) return false;
+            if (definition.Type == EffectType.Duration && definition.DurationPolicy == DurationPolicy.Duration &&
+                (definition.Duration <= 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration))) return false;
+            if (definition.Type == EffectType.Duration && definition.DurationPolicy == DurationPolicy.Infinite &&
+                (definition.Duration != 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration))) return false;
+            if (definition.Type == EffectType.Periodic)
+            {
+                if (definition.DurationPolicy != DurationPolicy.Duration || definition.Duration <= 0f ||
+                    float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration) ||
+                    !definition.Periodic.HasValue || !ValidatePeriodicPayload(definition.Periodic.Value, targetId)) return false;
+                float magnitude = definition.Periodic.Value.Magnitude;
+                if (definition.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent &&
+                    (magnitude <= 0f || float.IsNaN(magnitude) || float.IsInfinity(magnitude))) return false;
+            }
+            for (int i = 0; i < definition.Modifiers.Count; i++)
+                if (!AttributeSchema.Default.TryGet(definition.Modifiers[i].Attribute, out var attribute) || !attribute.AllowsModifiers)
+                    return false;
+            return true;
+        }
 
         public bool TryApply(EffectId id, GameplayEffectDefinition definition, EntityHandle source, EntityHandle target, out EffectHandle handle, int stackDelta = 1, float snapshot = float.NaN, int ownerPlayerId = -1, long provenanceId = 0L)
         {
@@ -229,6 +257,7 @@ namespace BattleSystemECS.Core.GAS
 
         public int Tick(float deltaTime, ClockId clock)
         {
+            _store.ResourceResolver.TickTimedShields(deltaTime, clock);
             if (ActiveRuntimeCount == 0) return 0;
             int expired = 0;
             for (int n = 0; n < _runtimeEntityIds.Count; n++)
