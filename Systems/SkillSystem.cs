@@ -82,6 +82,17 @@ namespace BattleSystemECS.Systems
         private const int ParallelMinEnemies = 500;
         private List<int>[] _hitBatchBuffers = new List<int>[8];
         private readonly List<int> _mergedHits = new List<int>(64);
+        private readonly Dictionary<int, Func<AbilityExecutionContext, int>> _shapeHandlers = new Dictionary<int, Func<AbilityExecutionContext, int>>();
+
+        private readonly struct AbilityExecutionContext
+        {
+            public readonly GameplayAbilityDef Definition;
+            public readonly float Damage;
+            public readonly float X;
+            public readonly float Y;
+            public AbilityExecutionContext(GameplayAbilityDef definition, float damage, float x, float y)
+            { Definition = definition; Damage = damage; X = x; Y = y; }
+        }
 
         // Chain Lightning constants
         private const int CHAIN_LIGHTNING_MAX_TARGETS = 4;  // primary + 3 chain targets
@@ -110,6 +121,33 @@ namespace BattleSystemECS.Systems
             this.dotSystem = null; // wired up via InjectDotSystem after construction
             _skillDamageQueue[0] = new List<Core.GAS.DamageRequest>(256);
             _skillDamageQueue[1] = new List<Core.GAS.DamageRequest>(256);
+            RegisterShapeHandlers();
+        }
+
+        private void RegisterShapeHandlers()
+        {
+            _shapeHandlers[AreaShapeType.Single] = c => CastSingleTarget(c.Damage, c.X, c.Y, c.Definition.AreaRadius, c.Definition.Name);
+            _shapeHandlers[AreaShapeType.Cross] = c => CastCrossArea(c.Damage, c.X, c.Y, c.Definition.AreaRadius, c.Definition.Name);
+            _shapeHandlers[AreaShapeType.Box] = c => CastBoxArea(c.Damage, c.X, c.Y, c.Definition.AreaRadius, c.Definition.Name);
+            _shapeHandlers[AreaShapeType.Circle] = c => CastCircleArea(c.Damage, c.X, c.Y, c.Definition.AreaRadius, c.Definition.Name, c.Definition);
+            _shapeHandlers[AreaShapeType.Chain] = c => CastChainLightning(c.Damage, c.X, c.Y, c.Definition.AreaRadius, c.Definition.Name);
+            _shapeHandlers[AreaShapeType.Heal] = c => { CastHeal(c.Definition); return 0; };
+            _shapeHandlers[AreaShapeType.Shield] = c => { CastShield(c.Definition); return 0; };
+            _shapeHandlers[AreaShapeType.Line] = c => CastLineArea(c.Damage, c.X, c.Y, c.Definition.AreaRadius, c.Definition.Name);
+            _shapeHandlers[AreaShapeType.Freeze] = c => CastFreezeArea(c.Damage, c.X, c.Y, c.Definition.AreaRadius, c.Definition.Name, c.Definition);
+            _shapeHandlers[AreaShapeType.Cone] = c => CastConeArea(c.Damage, c.X, c.Y, c.Definition.AreaRadius, c.Definition.Name, c.Definition.ConeAngleDegrees);
+            _shapeHandlers[AreaShapeType.GroundTarget] = c => CastGroundTarget(c.Damage, c.Definition.AreaRadius, c.Definition.Name);
+            _shapeHandlers[AreaShapeType.Slow] = c => CastSlowArea(c.Damage, c.X, c.Y, c.Definition.AreaRadius, c.Definition.Name, c.Definition);
+            _shapeHandlers[AreaShapeType.TimeWarp] = c => { CastTimeWarp(c.Definition); return 0; };
+            _shapeHandlers[AreaShapeType.Summon] = c => { CastSummon(c.Definition); return 0; };
+            _shapeHandlers[AreaShapeType.HealingZone] = c => CastHealingZone(c.Definition);
+            _shapeHandlers[AreaShapeType.Polymorph] = c => CastPolymorphArea(c.Damage, c.X, c.Y, c.Definition.AreaRadius, c.Definition.Name, c.Definition);
+            _shapeHandlers[AreaShapeType.TimeRewind] = c => { CastTimeRewind(c.Definition); return 0; };
+            _shapeHandlers[AreaShapeType.ChainHeal] = c => CastChainHealAbility(c.Definition, c.X, c.Y);
+            _shapeHandlers[AreaShapeType.MassResurrect] = c => CastMassResurrect(c.Definition, c.X, c.Y);
+            _shapeHandlers[AreaShapeType.AoeStun] = c => CastAoeStun(c.X, c.Y, c.Definition.AreaRadius, c.Definition.AoeStunDuration, c.Definition.Name);
+            _shapeHandlers[AreaShapeType.AoeRoot] = c => CastAoeRoot(c.X, c.Y, c.Definition.AreaRadius, c.Definition.AoeRootDuration, c.Definition.Name);
+            _shapeHandlers[AreaShapeType.AoeKnockback] = c => CastAoeKnockback(c.X, c.Y, c.Definition.AreaRadius, c.Definition.AoeKnockbackForce, c.Definition.Name);
         }
         public void InjectDotSystem(BuffSystem dotSystem)
         {
@@ -381,6 +419,27 @@ namespace BattleSystemECS.Systems
         /// Execute an ability by its definition data — area shape drives the damage pattern.
         /// </summary>
         private void ExecuteAbility(GameplayAbilityDef def, int slot)
+        {
+            float baseDamage = techTreeSystem != null ? techTreeSystem.GetFinalAttackDamage() : store.GetPlayerAttackDamage(playerId);
+            float finalDamage = (def.DamageMultiplierAttr < 0) ? baseDamage * def.FixedBaseDamage : baseDamage;
+            finalDamage *= _waveDifficultyMult;
+            float playerX = store.PositionX[playerId];
+            float playerY = store.PositionY[playerId];
+            if (!_shapeHandlers.TryGetValue(def.AreaShape, out var handler))
+            {
+                _rejectedAbilityCount++;
+                _lastRejectReason = SkillDamageRejectReason.UnsupportedCommitBoundary;
+                renderer.Log($"[ABILITY_REJECTED] UnsupportedShape shape={def.AreaShape} skill={def.Name}");
+                return;
+            }
+            int enemiesHit = handler(new AbilityExecutionContext(def, finalDamage, playerX, playerY));
+            GameplayAbilityRuntime.AbilityCommit(store, playerId, slot);
+            renderer.Log($"[SKILL] {def.Name} cast! Hit {enemiesHit} enemies, cooldown: {def.Cooldown}s");
+        }
+
+        // Kept as a compatibility implementation for old replay fixtures. New
+        // activation paths enter through the registry-based method above.
+        private void ExecuteAbilityLegacySwitch(GameplayAbilityDef def, int slot)
         {
             float baseDamage = techTreeSystem != null ? techTreeSystem.GetFinalAttackDamage() : store.GetPlayerAttackDamage(playerId);
             // Use FixedBaseDamage multiplier when DamageMultiplierAttr == -1
