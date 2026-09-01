@@ -51,7 +51,9 @@ namespace BattleSystemECS.Systems
         private float _enemySlowResistance = 0f;    // from techTreeSystem.GetSlowResistance()
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         // Tuple: (enemyId, rawDamage) — raw damage only; armor reduction handled by PlayerTowerAttackSystem and TowerAttackSystem
-        private List<(int enemyId, float damage)>[] _skillDamageQueue = new List<(int, float)>[2];
+        // Typed GAS requests are staged here until the graph's damage commit.
+        // This is a compatibility projection, not a second damage owner.
+        private List<Core.GAS.DamageRequest>[] _skillDamageQueue = new List<Core.GAS.DamageRequest>[2];
         private int _skillDamageQueueIdx = 0;
         private int _pendingSkillDamageCount;
         private int _rejectedSkillDamageCount;
@@ -106,8 +108,8 @@ namespace BattleSystemECS.Systems
             this.gameConfig = gameConfig;
             this.techTreeSystem = techTreeSystem;
             this.dotSystem = null; // wired up via InjectDotSystem after construction
-            _skillDamageQueue[0] = new List<(int, float)>(256);
-            _skillDamageQueue[1] = new List<(int, float)>(256);
+            _skillDamageQueue[0] = new List<Core.GAS.DamageRequest>(256);
+            _skillDamageQueue[1] = new List<Core.GAS.DamageRequest>(256);
         }
         public void InjectDotSystem(BuffSystem dotSystem)
         {
@@ -1265,20 +1267,16 @@ namespace BattleSystemECS.Systems
             int consumed = _skillDamageQueue[readIdx].Count;
             _pendingSkillDamageCount -= consumed;
             _consumedSkillDamageCount += consumed;
-            foreach (var (enemyId, damage) in _skillDamageQueue[readIdx])
+            foreach (var request in _skillDamageQueue[readIdx])
             {
+                if (!store.TryResolve(request.Target, out int enemyId, out _)) continue;
                 if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) continue;
                 if (store.EnemyHealth[enemyId] <= 0f) continue; // already dead this frame
                 // Invulnerability check: skip damage if enemy is invulnerable
                 if (store.EnemyIsInvulnerable[enemyId]) continue;
 
-                // Apply damage resistance (tech tree provides global reduction to all enemy damage taken)
-                float resist = store.EnemyDamageResistance[enemyId];
-                float finalDmg = resist >= 1f ? 0f : damage * (1f - resist);
-
-                store.ApplyDamageAuthority(store.PlayerEntityId, enemyId, finalDmg, playerId, stage: Core.GAS.DamageAmountStage.PostMitigation);
-
-                if (store.EnemyHealth[enemyId] <= 0f)
+                var result = store.DamageResolver.TryApply(request);
+                if (result.Accepted && !result.Deferred && store.EnemyHealth[enemyId] <= 0f)
                     HandleKill(enemyId);
             }
             _skillDamageQueue[readIdx].Clear();
@@ -1286,7 +1284,14 @@ namespace BattleSystemECS.Systems
 
         private void QueueSkillDamage(int enemyId, float damage)
         {
-            _skillDamageQueue[_skillDamageQueueIdx].Add((enemyId, damage));
+            if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES || damage <= 0f) return;
+            var source = store.GetEntityHandle(store.PlayerEntityId);
+            var target = store.GetEntityHandle(enemyId);
+            var request = new Core.GAS.DamageRequest(source, target, damage, Components.DamageType.True,
+                Components.ElementType.None, Core.GAS.DamageFlags.None, Core.GAS.DamageAmountStage.Raw,
+                Core.GAS.DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(enemyId),
+                ownerPlayerId: playerId);
+            _skillDamageQueue[_skillDamageQueueIdx].Add(request);
             _pendingSkillDamageCount++;
         }
 
