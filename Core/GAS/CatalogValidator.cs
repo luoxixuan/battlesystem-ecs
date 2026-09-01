@@ -5,19 +5,19 @@ namespace BattleSystemECS.Core.GAS
 {
     public static class CatalogValidator
     {
+        private const int MaxCatalogEntries = 4096;
+
         public static void Validate(GameplayCatalog catalog, string path)
         {
             if (catalog == null) throw new CatalogValidationException($"{path}: catalog is null");
-            if (catalog.AbilityDefinitions.Count > CatalogRegistries.MaxAbilities) throw new CatalogValidationException($"{path}: ability capacity exceeded");
-            if (catalog.Effects.Count > CatalogRegistries.MaxEffects) throw new CatalogValidationException($"{path}: effect capacity exceeded");
-            if (catalog.Triggers.Count > CatalogRegistries.MaxTriggers) throw new CatalogValidationException($"{path}: trigger capacity exceeded");
+            ValidateCapacity(catalog, path);
             if (catalog.Executions.Count > CatalogRegistries.MaxExecutions) throw new CatalogValidationException($"{path}: execution capacity exceeded");
             var ids = new HashSet<int>();
             for (int i = 0; i < catalog.AbilityDefinitions.Count; i++)
             {
                 var ability = catalog.AbilityDefinitions[i];
-                if (ability.Id.Value != i) throw new CatalogValidationException($"{path}: ability id {ability.Id.Value} is not contiguous");
                 if (!ids.Add(ability.Id.Value)) throw new CatalogValidationException($"{path}: duplicate ability id {ability.Id.Value} ({ability.Name})");
+                if (ability.Id.Value != i) throw new CatalogValidationException($"{path}: ability id {ability.Id.Value} is not contiguous at index {i}");
                 if (!ability.Targeting.Id.Equals(new TargetingId(ability.Id.Value))) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} targeting reference is not closed");
                 if (!CatalogRegistries.TryExecutor(ability.Executor)) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} ({ability.Name}) has unregistered executor");
                 if (!CatalogRegistries.TryConsumer(ability.Consumer)) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} ({ability.Name}) has unregistered consumer");
@@ -43,8 +43,8 @@ namespace BattleSystemECS.Core.GAS
                 for (int i = 0; i < catalog.Effects.Count; i++)
                 {
                     var effect = catalog.Effects[i];
-                    if (effect.Id.Value != i) throw new CatalogValidationException($"{path}: effect id {effect.Id.Value} is not contiguous");
                     if (!effectIds.Add(effect.Id.Value)) throw new CatalogValidationException($"{path}: duplicate effect id {effect.Id.Value}");
+                    if (effect.Id.Value != i) throw new CatalogValidationException($"{path}: effect id {effect.Id.Value} is not contiguous at index {i}");
                     if (float.IsNaN(effect.Duration) || float.IsInfinity(effect.Duration) || float.IsNaN(effect.Period) || float.IsInfinity(effect.Period) || effect.Duration < 0 || effect.Period < 0 || effect.MaxStacks < 1) throw new CatalogValidationException($"{path}: invalid duration/period/stack for effect {effect.Id.Value}");
                     if (effect.Type == EffectType.Periodic && (effect.Period <= 0 || effect.Duration <= 0)) throw new CatalogValidationException($"{path}: periodic effect {effect.Id.Value} requires finite duration and period > 0");
                     if (effect.Type == EffectType.Instant && effect.DurationPolicy != DurationPolicy.Instant) throw new CatalogValidationException($"{path}: instant effect {effect.Id.Value} has incompatible duration policy");
@@ -76,6 +76,18 @@ namespace BattleSystemECS.Core.GAS
                     throw new CatalogValidationException($"{path}: invalid execution magnitude/duration for id {execution.Id.Value}");
             }
             if (catalog.Aliases != null) foreach (var alias in catalog.Aliases) if ((uint)alias.Value.Value >= (uint)catalog.AbilityDefinitions.Count) throw new CatalogValidationException($"{path}: alias '{alias.Key}' references missing ability {alias.Value.Value}");
+            for (int i = 0; i < catalog.Abilities.Count; i++)
+            {
+                var legacy = catalog.Abilities[i];
+                if (legacy.Id.Value != i || legacy.Id.Value != catalog.AbilityDefinitions[i].Id.Value || !string.Equals(legacy.Name, catalog.AbilityDefinitions[i].Name, StringComparison.OrdinalIgnoreCase))
+                    throw new CatalogValidationException($"{path}: legacy ability mapping is not closed at index {i}");
+            }
+        }
+
+        private static void ValidateCapacity(GameplayCatalog catalog, string path)
+        {
+            if (catalog.Abilities.Count > MaxCatalogEntries || catalog.AbilityDefinitions.Count > MaxCatalogEntries || catalog.Targetings.Count > MaxCatalogEntries || catalog.Effects.Count > MaxCatalogEntries || catalog.Executions.Count > MaxCatalogEntries || catalog.Triggers.Count > MaxCatalogEntries || catalog.Modifiers.Count > MaxCatalogEntries)
+                throw new CatalogValidationException($"{path}: catalog exceeds capacity {MaxCatalogEntries}");
         }
     }
 }

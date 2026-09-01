@@ -18,17 +18,35 @@ namespace BattleSystemECS.Config
             string directory = staticDirectory ?? Path.Combine("Data", "Skills");
             var files = Directory.Exists(directory) ? Directory.GetFiles(directory, "*.json") : throw new CatalogValidationException($"{directory}: static skill directory not found");
             var catalog = CatalogCompiler.Compile(canonical, files);
-            var config = LoadConfig(renderer);
+            var config = LoadConfigStrict(renderer);
             config.CompiledCatalog = catalog;
+            string configDirectory = Path.GetDirectoryName(canonical) ?? Path.Combine("Data", "Configs");
+            ValidateStrictReferences(config, catalog, Path.Combine(configDirectory, "hero_skills.json"));
             return config;
         }
 
         public static GameConfig LoadConfig(IRenderer renderer)
         {
+            return LoadConfigInternal(renderer, strict: false);
+        }
+
+        /// <summary>
+        /// Production bootstrap variant. Configuration errors are reported as a structured
+        /// validation exception; the compatibility loader remains the only path allowed to
+        /// synthesize defaults after an input failure.
+        /// </summary>
+        public static GameConfig LoadConfigStrict(IRenderer renderer)
+        {
+            return LoadConfigInternal(renderer, strict: true);
+        }
+
+        private static GameConfig LoadConfigInternal(IRenderer renderer, bool strict)
+        {
             try
             {
                 if (!File.Exists(CONFIG_FILE))
                 {
+                    if (strict) throw new CatalogValidationException($"{CONFIG_FILE}: configuration file not found");
                     renderer.Log("[CONFIG] Configuration file not found: " + CONFIG_FILE);
                     renderer.Log("[CONFIG] Using default configuration");
                     return GetDefaultConfig();
@@ -38,6 +56,7 @@ namespace BattleSystemECS.Config
 
                 if (string.IsNullOrWhiteSpace(jsonContent))
                 {
+                    if (strict) throw new CatalogValidationException($"{CONFIG_FILE}: configuration file is empty");
                     renderer.Log("[CONFIG] Configuration file is empty: " + CONFIG_FILE);
                     renderer.Log("[CONFIG] Using default configuration");
                     return GetDefaultConfig();
@@ -159,6 +178,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
 
                 if (gameConfig == null)
                 {
+                    if (strict) throw new CatalogValidationException($"{CONFIG_FILE}: parser returned null");
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
                     renderer.Log("[CONFIG] Using default configuration");
                     return GetDefaultConfig();
@@ -173,8 +193,35 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                if (strict)
+                {
+                    if (ex is CatalogValidationException) throw;
+                    throw new CatalogValidationException($"{CONFIG_FILE}: {ex.Message}");
+                }
                 renderer.Log("[ERROR] Failed to load configuration from " + CONFIG_FILE + ": " + ex.Message);
                 return GetDefaultConfig();
+            }
+        }
+
+        private static void ValidateStrictReferences(GameConfig config, GameplayCatalog catalog, string heroSkillsPath)
+        {
+            if (config == null) throw new CatalogValidationException($"{CONFIG_FILE}: configuration is null");
+            if (config.Player == null) throw new CatalogValidationException($"{CONFIG_FILE}: missing Player configuration");
+            if (config.MonsterTypes == null || config.MonsterTypes.Count == 0) throw new CatalogValidationException($"{CONFIG_FILE}: missing MonsterTypes");
+            if (config.Levels == null || config.Levels.Count == 0) throw new CatalogValidationException($"{CONFIG_FILE}: missing Levels");
+            if (!File.Exists(heroSkillsPath)) throw new CatalogValidationException($"{heroSkillsPath}: hero skill configuration not found");
+            string heroJson = File.ReadAllText(heroSkillsPath);
+            if (string.IsNullOrWhiteSpace(heroJson)) throw new CatalogValidationException($"{heroSkillsPath}: hero skill configuration is empty");
+            var hero = HeroSkillSystem.HeroSkillsConfigLoader.Parse(heroJson);
+            if (hero == null || hero.Skills == null) throw new CatalogValidationException($"{heroSkillsPath}: invalid hero skill configuration");
+            if (hero.Skills.Count == 0) throw new CatalogValidationException($"{heroSkillsPath}: no hero skill bindings declared");
+            var slots = new HashSet<int>();
+            foreach (var slot in hero.Skills)
+            {
+                if (slot.SlotIndex < 0) throw new CatalogValidationException($"{heroSkillsPath}: invalid SlotIndex {slot.SlotIndex}");
+                if (!slots.Add(slot.SlotIndex)) throw new CatalogValidationException($"{heroSkillsPath}: duplicate SlotIndex {slot.SlotIndex}");
+                if (string.IsNullOrWhiteSpace(slot.SkillName)) throw new CatalogValidationException($"{heroSkillsPath}: missing SkillName at slot {slot.SlotIndex}");
+                if (!catalog.TryResolveAlias(slot.SkillName, out _)) throw new CatalogValidationException($"{heroSkillsPath}: unknown SkillName '{slot.SkillName}' at slot {slot.SlotIndex}");
             }
         }
 
