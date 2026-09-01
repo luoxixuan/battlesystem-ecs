@@ -218,16 +218,19 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             if (config.Levels == null || config.Levels.Count == 0) throw new CatalogValidationException($"{CONFIG_FILE}: missing Levels");
             string heroJson = ReadStrictJsonObject(heroSkillsPath, "hero skill configuration");
             HeroSkillSystem.HeroSkillsConfigDef hero;
-            try { hero = HeroSkillSystem.HeroSkillsConfigLoader.Parse(heroJson); }
+            try { hero = HeroSkillSystem.HeroSkillsConfigLoader.Parse(heroJson, heroSkillsPath); }
             catch (Exception error) { throw ConfigLoadFailure(heroSkillsPath, error.Message); }
             if (hero == null || hero.Skills == null) throw ConfigLoadFailure(heroSkillsPath, "invalid hero skill configuration");
             if (hero.Skills.Count == 0) throw ConfigLoadFailure(heroSkillsPath, "no hero skill bindings declared");
             var slots = new HashSet<int>();
             foreach (var slot in hero.Skills)
             {
-                if (slot.SlotIndex < 0) throw ConfigLoadFailure(heroSkillsPath, $"invalid SlotIndex {slot.SlotIndex}");
-                if (!slots.Add(slot.SlotIndex)) throw ConfigLoadFailure(heroSkillsPath, $"duplicate SlotIndex {slot.SlotIndex}");
-                if (string.IsNullOrWhiteSpace(slot.SkillName)) throw ConfigLoadFailure(heroSkillsPath, $"missing SkillName at slot {slot.SlotIndex}");
+                if (slot.SlotIndex < 0 || slot.SlotIndex >= HeroSkillSystem.MAX_HERO_SKILLS)
+                    throw ConfigLoadFailure(heroSkillsPath, $"invalid $.Skills[].SlotIndex {slot.SlotIndex}");
+                if (!slots.Add(slot.SlotIndex))
+                    throw ConfigLoadFailure(heroSkillsPath, $"duplicate $.Skills[].SlotIndex {slot.SlotIndex}");
+                if (string.IsNullOrWhiteSpace(slot.SkillName))
+                    throw ConfigLoadFailure(heroSkillsPath, $"missing $.Skills[].SkillName at slot {slot.SlotIndex}");
                 RequireClosedAlias(catalog, slot.SkillName,
                     $"{ConfigPathLabel(heroSkillsPath)}: slot {slot.SlotIndex}");
             }

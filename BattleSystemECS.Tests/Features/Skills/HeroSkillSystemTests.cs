@@ -62,12 +62,52 @@ namespace BattleSystemECS.Tests.Features.Skills
         }
 
         [Fact]
-        public void Parser_SkipsEntryWithEmptyName()
+        public void Parser_RejectsEntryWithEmptyName()
         {
             var json = "{ \"Skills\": [ { \"SlotIndex\": 0, \"SkillName\": \"\" }, { \"SlotIndex\": 1, \"SkillName\": \"Keep\" } ] }";
-            var def = HeroSkillSystem.HeroSkillsConfigLoader.Parse(json);
-            Assert.Single(def!.Skills!);
-            Assert.Equal("Keep", def.Skills![0].SkillName);
+            var error = Assert.Throws<CatalogValidationException>(() =>
+                HeroSkillSystem.HeroSkillsConfigLoader.Parse(json, "Data/Configs/test-hero.json"));
+            Assert.Contains("Data/Configs/test-hero.json", error.Message);
+            Assert.Contains("$.Skills[0].SkillName", error.Message);
+        }
+
+        [Theory]
+        [InlineData("{\"Skills\":[{\"SkillName\":\"Cross Slash\"}]}", "$.Skills[0].SlotIndex")]
+        [InlineData("{\"Skills\":[{\"SlotIndex\":\"0\",\"SkillName\":\"Cross Slash\"}]}", "$.Skills[0].SlotIndex")]
+        [InlineData("{\"Skills\":[{\"SlotIndex\":0.5,\"SkillName\":\"Cross Slash\"}]}", "$.Skills[0].SlotIndex")]
+        [InlineData("{\"Skills\":[{\"SlotIndex\":-1,\"SkillName\":\"Cross Slash\"}]}", "$.Skills[0].SlotIndex")]
+        [InlineData("{\"Skills\":[{\"SlotIndex\":4,\"SkillName\":\"Cross Slash\"}]}", "$.Skills[0].SlotIndex")]
+        [InlineData("{\"Skills\":[{\"SlotIndex\":0,\"SkillName\":\"Cross Slash\"},{\"SlotIndex\":0,\"SkillName\":\"Cold Nova\"}]}", "$.Skills[1].SlotIndex")]
+        public void Parser_RejectsInvalidSlotIndexWithSourceAndJsonPath(string json, string jsonPath)
+        {
+            const string source = "Data/Configs/test-hero.json";
+            var error = Assert.Throws<CatalogValidationException>(() =>
+                HeroSkillSystem.HeroSkillsConfigLoader.Parse(json, source));
+
+            Assert.Contains(source, error.Message);
+            Assert.Contains(jsonPath, error.Message);
+        }
+
+        [Fact]
+        public void Initialize_InvalidSlotRejectsWholeFileInsteadOfPartiallyApplyingValidEntries()
+        {
+            Config.SkillDefs.Add(new SkillConfig { Name = "Cross Slash", Cooldown = 7f });
+            string tmp = Path.Combine(Path.GetTempPath(), "hero_skills_invalid_" + Guid.NewGuid().ToString("N") + ".json");
+            try
+            {
+                File.WriteAllText(tmp,
+                    "{\"Skills\":[{\"SlotIndex\":0,\"SkillName\":\"Cross Slash\"},{\"SlotIndex\":4,\"SkillName\":\"Cross Slash\"}]}");
+                var sys = new HeroSkillSystem(Store, 0, tmp, Config);
+
+                sys.Initialize();
+
+                Assert.False(sys.HasAnyConfiguredSkill());
+                Assert.Equal(-1, sys.GetHeroSkillId(0, 0));
+            }
+            finally
+            {
+                File.Delete(tmp);
+            }
         }
 
         // ─── System tests (use real store + minimal config) ──────────────────
@@ -368,13 +408,15 @@ namespace BattleSystemECS.Tests.Features.Skills
             Store.HeroIsDeployed[0] = true;
             Store.HeroIsDeployed[1] = true;
             const int slot = 2;
+            Assert.True(config.CompiledCatalog!.TryResolveAlias("Guardian Heal", out var abilityId));
+            Assert.True(config.CompiledCatalog.TryGetAbility(abilityId, out var ability));
 
             Assert.True(sys.TriggerHeroSkill(1, slot));
             Assert.Equal(0f, sys.GetHeroSkillCooldown(0, slot));
-            Assert.True(sys.GetHeroSkillCooldown(1, slot) > 0f);
+            Assert.Equal(ability.Cooldown, sys.GetHeroSkillCooldown(1, slot));
             Assert.False(sys.TriggerHeroSkill(1, slot));
             Assert.True(sys.TriggerHeroSkill(0, slot));
-            Assert.True(sys.GetHeroSkillCooldown(0, slot) > 0f);
+            Assert.Equal(ability.Cooldown, sys.GetHeroSkillCooldown(0, slot));
         }
     }
 }

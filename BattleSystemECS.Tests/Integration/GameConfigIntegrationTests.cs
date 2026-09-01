@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Xunit;
 using BattleSystemECS.Tests.Infrastructure;
@@ -231,16 +232,27 @@ namespace BattleSystemECS.Tests.Integration
         }
 
         [Fact]
-        public void SkillDefs_HeroSkillSlots_ResolveWithRealConfig()
+        public void SkillDefs_HeroSkillSlots_MatchCompiledCatalogWithRealConfig()
         {
-            // 端到端接线断言：接线前 hero_skills.json 引用的精选技能名（"Cross Slash" 等）
-            // 只在占位玩家技能栏里找 → 解析恒失败 → HasAnySkillConfigured 恒 false。
-            var config = GameConfigLoader.LoadConfig(Renderer);
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
             Assert.NotEmpty(config.SkillDefs);
+            Assert.NotNull(config.CompiledCatalog);
 
-            var sys = new HeroSkillSystem(Store, 0, heroSkillsPath: "Data/Configs/hero_skills.json", config: config);
+            const string heroPath = "Data/Configs/hero_skills.json";
+            var bindings = HeroSkillSystem.HeroSkillsConfigLoader.Parse(File.ReadAllText(heroPath), heroPath);
+            var sys = new HeroSkillSystem(Store, 0, heroSkillsPath: heroPath, config: config);
             sys.Initialize();
             Assert.True(sys.HasAnyConfiguredSkill(), "hero_skills.json 引用的技能名未能在 SkillDefs/Skills 解析");
+
+            Assert.NotEmpty(bindings.Skills!);
+            foreach (var binding in bindings.Skills!)
+            {
+                Assert.True(config.CompiledCatalog!.TryResolveAlias(binding.SkillName!, out var abilityId),
+                    $"{binding.SkillName} has no compiled catalog alias");
+                Assert.True(config.CompiledCatalog.TryGetAbility(abilityId, out var ability));
+                Assert.Equal(abilityId.Value, sys.GetHeroSkillId(0, binding.SlotIndex));
+                Assert.Equal(ability.Cooldown, sys.GetHeroSkillCooldownMax(0, binding.SlotIndex));
+            }
         }
 
         [Fact]

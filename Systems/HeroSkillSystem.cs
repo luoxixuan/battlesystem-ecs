@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.Json;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Core.GAS;
@@ -106,15 +107,12 @@ namespace BattleSystemECS.Systems
             try
             {
                 string json = File.ReadAllText(_heroSkillsPath);
-                var def = HeroSkillsConfigLoader.Parse(json);
+                var def = HeroSkillsConfigLoader.Parse(json, _heroSkillsPath);
                 if (def?.Skills == null) return;
 
                 foreach (var entry in def.Skills)
                 {
-                    if (entry.SlotIndex < 0 || entry.SlotIndex >= MAX_HERO_SKILLS) continue;
-                    if (string.IsNullOrWhiteSpace(entry.SkillName)) continue;
-
-                    int resolvedId = ResolveSkillIdByName(entry.SkillName);
+                    int resolvedId = ResolveSkillIdByName(entry.SkillName!);
                     if (resolvedId < 0) continue;
 
                     // Apply to all hero slots (every hero shares the same skill set —
@@ -298,13 +296,6 @@ namespace BattleSystemECS.Systems
             return catalog.Aliases != null && catalog.Aliases.TryGetValue(skillName, out ability) && catalog.TryGetAbility(ability, out _);
         }
 
-        private int FindFirstActiveEnemy()
-        {
-            var ids = store.ActiveEnemyIds;
-            for (int i = 0; i < ids.Count; i++) if (store.EnemyActive[ids[i]]) return ids[i];
-            return -1;
-        }
-
         private float ResolveCooldownForSkill(int skillId)
         {
             // Cooldown is in seconds per the SkillConfig contract. Default to 5s if not set
@@ -313,7 +304,7 @@ namespace BattleSystemECS.Systems
             return cd > 0f ? cd : 5f;
         }
 
-        // ── Internal config DTO + parser (no Newtonsoft / System.Text.Json dep needed) ──
+        // ── Internal config DTO + parser ──
 
         public class HeroSkillsConfigDef
         {
@@ -328,100 +319,67 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Minimal JSON parser for the hero_skills.json shape. Avoids pulling in a
-        /// JSON dependency and matches the project's "minimal deps" convention.
-        /// Public so tests can drive it without a fixture file.
+        /// Strict parser for the hero_skills.json shape. Public so tests can drive
+        /// it without a fixture file.
         /// </summary>
         public static class HeroSkillsConfigLoader
         {
-            public static HeroSkillsConfigDef? Parse(string json)
+            public static HeroSkillsConfigDef Parse(string json, string sourcePath = "hero_skills.json")
             {
-                // Treat empty / whitespace as a valid empty def (not an error).
                 if (string.IsNullOrWhiteSpace(json)) return new HeroSkillsConfigDef();
-                var def = new HeroSkillsConfigDef();
-                def.Skills = new List<HeroSkillSlotEntry>();
+                using var document = JsonDocument.Parse(json);
+                JsonElement root = document.RootElement;
+                if (root.ValueKind != JsonValueKind.Object)
+                    throw Invalid(sourcePath, "$", "expected an object");
 
-                // Find the "Skills": [ ... ] block and pull each { ... } object.
-                int arrStart = json.IndexOf("\"Skills\"", StringComparison.OrdinalIgnoreCase);
-                if (arrStart < 0) return def;
-                int bracket = json.IndexOf('[', arrStart);
-                if (bracket < 0) return def;
-                int depth = 0;
-                int arrEnd = -1;
-                for (int i = bracket; i < json.Length; i++)
-                {
-                    if (json[i] == '[') depth++;
-                    else if (json[i] == ']')
-                    {
-                        depth--;
-                        if (depth == 0) { arrEnd = i; break; }
-                    }
-                }
-                if (arrEnd < 0) return def;
+                var def = new HeroSkillsConfigDef { Skills = new List<HeroSkillSlotEntry>() };
+                if (TryGetProperty(root, "Description", out var description) &&
+                    description.ValueKind == JsonValueKind.String)
+                    def.Description = description.GetString();
+                if (!TryGetProperty(root, "Skills", out var skills)) return def;
+                if (skills.ValueKind != JsonValueKind.Array)
+                    throw Invalid(sourcePath, "$.Skills", "expected an array");
 
-                string body = json.Substring(bracket + 1, arrEnd - bracket - 1);
-                int pos = 0;
-                while (pos < body.Length)
+                var declaredSlots = new HashSet<int>();
+                int index = 0;
+                foreach (JsonElement node in skills.EnumerateArray())
                 {
-                    int objStart = body.IndexOf('{', pos);
-                    if (objStart < 0) break;
-                    int objDepth = 0;
-                    int objEnd = -1;
-                    for (int i = objStart; i < body.Length; i++)
-                    {
-                        if (body[i] == '{') objDepth++;
-                        else if (body[i] == '}')
-                        {
-                            objDepth--;
-                            if (objDepth == 0) { objEnd = i; break; }
-                        }
-                    }
-                    if (objEnd < 0) break;
-                    string obj = body.Substring(objStart, objEnd - objStart + 1);
-                    var entry = ParseEntry(obj);
-                    if (entry != null) def.Skills.Add(entry);
-                    pos = objEnd + 1;
+                    string entryPath = "$.Skills[" + index + "]";
+                    if (node.ValueKind != JsonValueKind.Object)
+                        throw Invalid(sourcePath, entryPath, "expected an object");
+                    if (!TryGetProperty(node, "SlotIndex", out var slotNode))
+                        throw Invalid(sourcePath, entryPath + ".SlotIndex", "property is required");
+                    if (slotNode.ValueKind != JsonValueKind.Number || !slotNode.TryGetInt32(out int slot))
+                        throw Invalid(sourcePath, entryPath + ".SlotIndex", "expected an integer");
+                    if (slot < 0 || slot >= MAX_HERO_SKILLS)
+                        throw Invalid(sourcePath, entryPath + ".SlotIndex",
+                            "must be in range 0.." + (MAX_HERO_SKILLS - 1));
+                    if (!declaredSlots.Add(slot))
+                        throw Invalid(sourcePath, entryPath + ".SlotIndex", "duplicate slot " + slot);
+                    if (!TryGetProperty(node, "SkillName", out var nameNode) ||
+                        nameNode.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(nameNode.GetString()))
+                        throw Invalid(sourcePath, entryPath + ".SkillName", "non-empty string is required");
+
+                    def.Skills.Add(new HeroSkillSlotEntry { SlotIndex = slot, SkillName = nameNode.GetString() });
+                    index++;
                 }
                 return def;
             }
 
-            private static HeroSkillSlotEntry? ParseEntry(string obj)
+            private static bool TryGetProperty(JsonElement node, string name, out JsonElement value)
             {
-                int slot = ExtractInt(obj, "SlotIndex");
-                string? name = ExtractString(obj, "SkillName");
-                if (string.IsNullOrEmpty(name)) return null;
-                return new HeroSkillSlotEntry { SlotIndex = slot, SkillName = name };
+                foreach (JsonProperty property in node.EnumerateObject())
+                    if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        value = property.Value;
+                        return true;
+                    }
+                value = default(JsonElement);
+                return false;
             }
 
-            private static int ExtractInt(string obj, string key)
-            {
-                int k = obj.IndexOf("\"" + key + "\"", StringComparison.OrdinalIgnoreCase);
-                if (k < 0) return 0;
-                int colon = obj.IndexOf(':', k);
-                if (colon < 0) return 0;
-                int i = colon + 1;
-                while (i < obj.Length && (obj[i] == ' ' || obj[i] == '\t')) i++;
-                int start = i;
-                bool neg = false;
-                if (i < obj.Length && obj[i] == '-') { neg = true; i++; }
-                while (i < obj.Length && (obj[i] >= '0' && obj[i] <= '9')) i++;
-                if (i == start) return 0;
-                if (!int.TryParse(obj.Substring(start, i - start), out int v)) return 0;
-                return neg ? -v : v;
-            }
-
-            private static string? ExtractString(string obj, string key)
-            {
-                int k = obj.IndexOf("\"" + key + "\"", StringComparison.OrdinalIgnoreCase);
-                if (k < 0) return null;
-                int colon = obj.IndexOf(':', k);
-                if (colon < 0) return null;
-                int q1 = obj.IndexOf('"', colon + 1);
-                if (q1 < 0) return null;
-                int q2 = obj.IndexOf('"', q1 + 1);
-                if (q2 < 0) return null;
-                return obj.Substring(q1 + 1, q2 - q1 - 1);
-            }
+            private static CatalogValidationException Invalid(string sourcePath, string jsonPath, string reason) =>
+                new CatalogValidationException($"{sourcePath}: {jsonPath}: {reason}");
         }
     }
 }
