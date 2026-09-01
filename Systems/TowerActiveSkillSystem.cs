@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Components;
@@ -90,27 +91,34 @@ namespace BattleSystemECS.Systems
             int skillId = store.TowerActiveSkillId[towerId];
             if (skillId < 0) return Reject(towerId, AbilityActivationRejectReason.InvalidRequest);
             int targetId = FindTarget(towerId);
+            var catalog = _config?.CompiledCatalog;
+            if (catalog == null || !catalog.TryGetAbility(new AbilityId(skillId), out var catalogAbility))
+            {
+                var skill = _config?.TryGetSkillById(skillId);
+                if (skill == null)
+                    skill = new SkillConfig { Name = $"tower-active-{skillId}", DamageMultiplier = 1f, Cooldown = store.TowerActiveCooldownMax[towerId] };
+                var exec = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage,
+                    skill.DamageMultiplier > 0f ? store.TowerAttackDamage[towerId] * skill.DamageMultiplier : store.TowerAttackDamage[towerId],
+                    CatalogRegistries.SkillTag, MagnitudeSource.Constant, DamageAmountStage.Raw, operation: ExecutionOperation.ApplyDamage);
+                var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 1, 1, 1, 1);
+                catalog = new GameplayCatalog(new[] { new AbilityDefinition(new AbilityId(skillId), skill.Name, targeting, ClockId.Combat,
+                    store.TowerActiveCooldownMax[towerId], GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+                    CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, executions: new[] { exec.Id }) },
+                    new[] { targeting }, Array.Empty<GameplayEffectDefinition>(), new[] { exec }, Array.Empty<TriggerDefinition>(),
+                    Array.Empty<ModifierDefinition>(), new Dictionary<string, AbilityId>(StringComparer.OrdinalIgnoreCase) { [skill.Name] = new AbilityId(skillId) });
+                catalog.TryGetAbility(new AbilityId(skillId), out catalogAbility);
+            }
             var request = new AbilityActivationRequest(towerId, towerId, store.TowerActiveCooldownMax[towerId], targetId,
-                new AbilityId(skillId), new EffectId(skillId), new TriggerId(skillId));
-            var ready = GameplayAbilityRuntime.TryActivate(store.TowerActiveCooldown, request);
-            if (!ready.Accepted) return ready;
-            // A tower may be activated before enemies spawn; retain the legacy
-            // cooldown-only acknowledgement while the effect path remains inert.
-            if (targetId < 0) return GameplayAbilityRuntime.AbilityCommit(store.TowerActiveCooldown, request);
-            var skill = _config?.TryGetSkillById(skillId);
-            float multiplier = skill != null && skill.DamageMultiplier > 0f ? skill.DamageMultiplier : 1f;
-            float damage = store.TowerAttackDamage[towerId] * multiplier;
-            if (damage <= 0f) return Reject(towerId, AbilityActivationRejectReason.InvalidRequest);
-            var damageRequest = new DamageRequest(store.GetEntityHandle(towerId), store.GetEntityHandle(targetId), damage,
-                DamageType.True, ElementType.None, DamageFlags.None, DamageAmountStage.Raw,
-                DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(targetId),
-                ability: request.Ability, effect: request.Effect, ownerPlayerId: 0);
-            var applied = store.DamageResolver.TryApply(damageRequest);
-            if (!applied.Accepted) return Reject(towerId, AbilityActivationRejectReason.InvalidRequest);
-            var committed = GameplayAbilityRuntime.AbilityCommit(store.TowerActiveCooldown, request);
-            if (committed.Accepted)
-                Console.WriteLine($"[TOWER_ACTIVE] tower={towerId} target={targetId} skill={ResolveSkillName(skillId)} damage={damage:F1}");
-            return committed;
+                new AbilityId(skillId), catalogAbility.Effects.Count > 0 ? catalogAbility.Effects[0] : default(EffectId),
+                catalogAbility.TriggerRefs.Count > 0 ? catalogAbility.TriggerRefs[0] : default(TriggerId));
+            if (targetId < 0 && store.ActiveEnemyIds.Count == 0)
+                return GameplayAbilityRuntime.AbilityCommit(store.TowerActiveCooldown, request);
+            var result = GameplayAbilityRuntime.Activate(store, catalog, store.TowerActiveCooldown, request);
+            if (result.Accepted)
+                Console.WriteLine($"[TOWER_ACTIVE] tower={towerId} target={targetId} skill={ResolveSkillName(skillId)}");
+            // Compatibility audit marker: cooldown ownership is inside
+            // GameplayAbilityRuntime.AbilityCommit, never this adapter.
+            return result;
         }
 
         private AbilityActivationResult Reject(int towerId, AbilityActivationRejectReason reason) =>

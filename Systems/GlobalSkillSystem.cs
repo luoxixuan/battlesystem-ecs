@@ -175,14 +175,37 @@ namespace BattleSystemECS.Systems
             // Consume mana
             store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), -manaCost);
 
-            // Execute effect based on skill type
-            ExecuteSkillEffect(def);
+            // Catalog is authoritative when the global definition is present in
+            // the compiled content table. The switch remains a compatibility
+            // projection for legacy fixtures that intentionally do not load the
+            // global content catalog.
+            bool catalogActivated = TryActivateCatalogGlobal(def);
+            if (!catalogActivated)
+                ExecuteSkillEffect(def);
 
             // Start cooldown
-            GameplayAbilityRuntime.AbilityCommit(store.PlayerGlobalSkillCooldown, activation);
+            if (!catalogActivated)
+                GameplayAbilityRuntime.AbilityCommit(store.PlayerGlobalSkillCooldown, activation);
 
             renderer.Log($"[GlobalSkill] Activated: {def.Name}");
             _successfulActivationCount++;
+            return true;
+        }
+
+        private bool TryActivateCatalogGlobal(GlobalSkillDef def)
+        {
+            var catalog = gameConfig.CompiledCatalog;
+            if (catalog == null || !catalog.TryResolveAlias(def.Name, out var abilityId)) return false;
+            if (!catalog.TryGetAbility(abilityId, out var ability)) return false;
+            int slot = -1;
+            for (int i = 0; i < gameConfig.GlobalSkills.Count; i++)
+                if (ReferenceEquals(gameConfig.GlobalSkills[i], def) || string.Equals(gameConfig.GlobalSkills[i].Name, def.Name, StringComparison.OrdinalIgnoreCase)) { slot = i; break; }
+            if (slot < 0 || slot >= MAX_GLOBAL_SKILLS) return false;
+            var request = new AbilityActivationRequest(playerId, slot, def.Cooldown,
+                playerId, abilityId, ability.Effects.Count > 0 ? ability.Effects[0] : default(EffectId),
+                ability.TriggerRefs.Count > 0 ? ability.TriggerRefs[0] : default(TriggerId));
+            var result = GameplayAbilityRuntime.Activate(store, catalog, store.PlayerGlobalSkillCooldown, request);
+            if (!result.Accepted) return false;
             return true;
         }
 
