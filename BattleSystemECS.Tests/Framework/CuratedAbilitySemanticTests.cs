@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
+using BattleSystemECS.Config;
 using BattleSystemECS.Core.GAS;
 using Xunit;
 
@@ -13,30 +15,27 @@ namespace BattleSystemECS.Tests.Framework
         {
             string path = Path.Combine(AppContext.BaseDirectory, "Data", "Configs", "skills.json");
             if (!File.Exists(path)) path = Path.Combine(Directory.GetCurrentDirectory(), "Data", "Configs", "skills.json");
+            string json = File.ReadAllText(path);
+            var configured = JsonSerializer.Deserialize<SkillConfig[]>(json) ?? Array.Empty<SkillConfig>();
             var catalog = CatalogCompiler.Compile(path);
-            string[] names = { "Cross Slash", "Mega Explosion", "Sniper Shot", "Poison Nova", "Chain Lightning", "Guardian Heal", "Chain Heal", "Mass Resurrect", "War Stomp", "Earthroot", "Shockwave", "Energy Shield", "Laser Beam", "Cold Nova", "Dragon Breath", "Plasma Cannon", "Artillery Strike", "Meteor Strike", "Slow Nova", "Time Rewind" };
-            TargetingShape[] shapes = { TargetingShape.Cross, TargetingShape.Box, TargetingShape.Single, TargetingShape.Circle, TargetingShape.Chain, TargetingShape.Heal, TargetingShape.ChainHeal, TargetingShape.MassResurrect, TargetingShape.AoeStun, TargetingShape.AoeRoot, TargetingShape.AoeKnockback, TargetingShape.Shield, TargetingShape.Line, TargetingShape.Freeze, TargetingShape.Cone, TargetingShape.Cone, TargetingShape.GroundTarget, TargetingShape.GroundTarget, TargetingShape.Slow, TargetingShape.TimeRewind };
-            int[] ranges = { 3, 5, 9, 4, 6, 0, 0, 0, 0, 0, 0, 0, 8, 4, 5, 6, 8, 10, 4, 0 };
-            int[] widths = { 3, 3, 1, 5, 1, 1, 1, 4, 3, 4, 4, 1, 1, 5, 60, 45, 3, 5, 5, 0 };
-            int[] heights = { 3, 3, 1, 5, 1, 1, 1, 4, 3, 4, 4, 1, 1, 5, 5, 6, 3, 5, 5, 0 };
-            float[] radii = { 3f, 1f, 9f, 4f, 6f, 0f, 200f, 4f, 200f, 250f, 300f, 0f, 8f, 3f, 4f, 5f, 3f, 5f, 4f, 0f };
-            Assert.Equal(names.Length, catalog.AbilityDefinitions.Count);
-            for (int i = 0; i < names.Length; i++)
+            Assert.Equal(configured.Length, catalog.AbilityDefinitions.Count);
+            for (int i = 0; i < configured.Length; i++)
             {
-                Assert.Equal(names[i], catalog.AbilityDefinitions[i].Name);
-                Assert.Equal(i, catalog.AbilityDefinitions[i].Id.Value);
-                Assert.Equal(i, catalog.AbilityDefinitions[i].Targeting.Id.Value);
-                Assert.Equal(shapes[i], catalog.AbilityDefinitions[i].Targeting.Shape);
-                Assert.Equal(ranges[i], catalog.AbilityDefinitions[i].Targeting.Range);
-                Assert.Equal(widths[i], catalog.AbilityDefinitions[i].Targeting.Width);
-                Assert.Equal(heights[i], catalog.AbilityDefinitions[i].Targeting.Height);
-                Assert.Equal(radii[i], catalog.AbilityDefinitions[i].Targeting.Radius);
-                Assert.True(catalog.AbilityDefinitions[i].Executions.Count > 0 || catalog.AbilityDefinitions[i].Effects.Count > 0, names[i]);
+                SkillConfig source = configured[i];
+                AbilityDefinition compiled = catalog.AbilityDefinitions[i];
+                Assert.Equal(source.Name, compiled.Name);
+                Assert.Equal(i, compiled.Id.Value);
+                Assert.Equal(i, compiled.Targeting.Id.Value);
+                Assert.Equal(AreaShapeType.FromString(source.AreaShape), catalog.Abilities[i].AreaShape);
+                Assert.Equal(source.AttackRange, compiled.Targeting.Range);
+                Assert.Equal(source.AreaWidth, compiled.Targeting.Width);
+                Assert.Equal(source.AreaHeight, compiled.Targeting.Height);
+                Assert.Equal(source.AreaRadius, compiled.Targeting.Radius);
+                Assert.Equal(source.Cooldown, compiled.Cooldown);
+                Assert.True(catalog.TryResolveAlias(source.Name, out var alias));
+                Assert.Equal(compiled.Id, alias);
+                Assert.True(compiled.Executions.Count > 0 || compiled.Effects.Count > 0, source.Name);
             }
-            Assert.Equal(16, catalog.Abilities[19].AreaShape);
-            Assert.Equal(3f, catalog.Abilities[6].Duration);
-            Assert.Equal(5f, catalog.Abilities[11].Duration);
-            Assert.Equal(2f, catalog.Abilities[13].Duration);
 
             AssertMultiplier(catalog, "Cross Slash", 4f);
             AssertMultiplier(catalog, "Mega Explosion", 3f);

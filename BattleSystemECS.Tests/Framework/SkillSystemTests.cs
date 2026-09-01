@@ -196,32 +196,50 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void CatalogActivationStagesTypedDamageAndCommitsOnlyAfterValidation()
+        public void CatalogActivationPublishesResolverFactsAndSchedulerDoesNotReplayDamage()
         {
             int pid = Player(p => { p.X = 0f; p.Y = 0f; p.Health = 100f; p.AttackDamage = 10f; });
             int enemy = MakeEnemy(1f, 0f, hp: 100f);
             Config.Skills.Clear();
             Config.Skills.Add(new SkillConfig { Name = "catalog-skill", AreaShape = "single", AreaRadius = 3, DamageMultiplier = 2f, Cooldown = 3f });
             var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 3, 1, 1, 1);
-            var execution = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage, 2f, CatalogRegistries.SkillTag,
-                MagnitudeSource.Multiplier, DamageAmountStage.LegacyMultiplier, operation: ExecutionOperation.ApplyDamage);
+            var execution = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage, 20f, CatalogRegistries.SkillTag,
+                MagnitudeSource.Constant, DamageAmountStage.Raw, operation: ExecutionOperation.ApplyDamage);
             Config.CompiledCatalog = new GameplayCatalog(new[] { new AbilityDefinition(new AbilityId(0), "catalog-skill", targeting,
                 ClockId.Combat, 3f, GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
                 CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, executions: new[] { execution.Id }) },
                 new[] { targeting }, Array.Empty<GameplayEffectDefinition>(), new[] { execution }, Array.Empty<TriggerDefinition>(),
                 Array.Empty<ModifierDefinition>(), new System.Collections.Generic.Dictionary<string, AbilityId> { ["catalog-skill"] = new AbilityId(0) });
-            var sys = new SkillSystem(Store, Renderer, pid, Config);
-            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
+            Config.Levels.Clear();
+            Config.ManaShield.Enabled = false;
+            var registry = new SystemRegistry();
+            registry.CreateAll(Store, Config, Renderer, pid, new StateMachine(), NullEventBus.Instance);
+            registry.WireDependencies(Store, pid);
+            var sys = registry.Skill!;
             sys.InitializePlayerSkills();
             sys.SetTurn(0);
             Assert.Equal(3f, Store.GetAbility(pid, 0).Definition.Cooldown);
 
+            var scheduler = new FrameScheduler(Store, Config);
+            registry.AssignToGroups(scheduler);
+            scheduler.Phase = GameState.WavePhase;
+
+            int resolverEventsBefore = Store.DamageResolver.Events.Count;
             var result = sys.TryActivateCatalogAbility(new AbilityId(0));
-            Assert.True(result.Accepted);
+            Assert.True(result.Accepted, result.Reason.ToString());
+            Assert.Equal(0, sys.PendingSkillDamageCount);
+            Assert.Equal(0, Store.DamageResolver.PendingRequestCount);
+            Assert.Equal(80f, Store.EnemyHealth[enemy]);
             Assert.Equal(3f, Store.GetAbility(pid, 0).CurrentCooldown);
-            Assert.Equal(1, sys.PendingSkillDamageCount);
-            sys.ResolveSkillDamage();
-            Assert.True(Store.EnemyHealth[enemy] < 100f);
+            Assert.Equal(resolverEventsBefore + 3, Store.DamageResolver.Events.Count);
+            Assert.Equal(GameplayEventType.AbilityActivated, Store.DamageResolver.Events.Get(resolverEventsBefore + 2).Type);
+
+            scheduler.Tick(0f, 0);
+
+            Assert.Equal(0, Store.DamageResolver.PendingRequestCount);
+            Assert.Equal(3f, Store.GetAbility(pid, 0).CurrentCooldown);
+            Assert.Equal(80f, Store.EnemyHealth[enemy]);
+            Assert.Equal(0, Store.DamageResolver.Events.Count);
         }
 
         [Fact]

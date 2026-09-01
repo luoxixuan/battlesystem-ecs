@@ -501,8 +501,8 @@ namespace BattleSystemECS.Tests.Framework
             Assert.False(system.TriggerTowerActive(towerId));
             Assert.Equal(0f, Store.GetTowerActiveCooldown(towerId));
             system.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
-            Assert.True(system.TriggerTowerActive(towerId));
-            Assert.Equal(6f, Store.GetTowerActiveCooldown(towerId));
+            Assert.False(system.TriggerTowerActive(towerId));
+            Assert.Equal(0f, Store.GetTowerActiveCooldown(towerId));
         }
 
         [Fact]

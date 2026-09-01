@@ -6,6 +6,7 @@ using System.Reflection;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Tests.Features.Skills
 {
@@ -312,6 +313,48 @@ namespace BattleSystemECS.Tests.Features.Skills
             {
                 File.Delete(tmp);
             }
+        }
+
+        [Fact]
+        public void StrictCatalog_CanonicalHealUsesRealPlayerSourceTargetAndCooldown()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            int playerId = Player(p => { p.EntityId = 0; p.X = 0f; p.Y = 0f; p.Health = 100f; });
+            var sys = new HeroSkillSystem(Store, playerId, "Data/Configs/hero_skills.json", config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
+            sys.Initialize();
+            Store.HeroIsDeployed[0] = true;
+
+            const int slot = 2;
+            int skillId = sys.GetHeroSkillId(0, slot);
+            Assert.True(config.CompiledCatalog!.TryResolveAlias("Guardian Heal", out var abilityId));
+            Assert.Equal(abilityId.Value, skillId);
+            Assert.Equal(playerId, Store.PlayerEntityId);
+            Assert.True(Store.PositionActive[playerId]);
+            Assert.True(Store.GetEntityHandle(playerId).IsValid);
+
+            Assert.True(sys.TriggerHeroSkill(0, slot));
+            Assert.Equal(config.CompiledCatalog.AbilityDefinitions[abilityId.Value].Cooldown,
+                sys.GetHeroSkillCooldown(0, slot));
+            Assert.True(sys.GetHeroSkillCooldown(0, slot) > 0f);
+            Assert.False(sys.TriggerHeroSkill(0, slot));
+        }
+
+        [Fact]
+        public void StrictCatalog_DamageSkillWithoutActiveTargetRejectsWithoutCooldown()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            int playerId = Player(p => { p.EntityId = 0; p.Health = 100f; });
+            var sys = new HeroSkillSystem(Store, playerId, "Data/Configs/hero_skills.json", config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
+            sys.Initialize();
+            Store.HeroIsDeployed[0] = true;
+
+            Assert.True(config.CompiledCatalog!.TryResolveAlias("Cross Slash", out var abilityId));
+            Assert.Equal(abilityId.Value, sys.GetHeroSkillId(0, 0));
+            Assert.False(sys.TriggerHeroSkill(0, 0));
+            Assert.Equal(0f, sys.GetHeroSkillCooldown(0, 0));
+            Assert.Equal(0, Store.DamageResolver.PendingRequestCount);
         }
     }
 }
