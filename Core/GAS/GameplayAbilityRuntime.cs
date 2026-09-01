@@ -289,6 +289,36 @@ namespace BattleSystemECS.Core.GAS
             EntityHandle source, EntityHandle target, int targetId) =>
             store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.AbilityActivated, source, target,
                 store.AllocateGameplaySequence(targetId), ownerPlayerId: request.OwnerId));
+        public static AbilityActivationResult ActivateHealTargets(ComponentStore store, GameplayCatalog catalog,
+            float[] cooldowns, AbilityActivationRequest request, IReadOnlyList<int> targetIds,
+            IReadOnlyList<float> magnitudes)
+        {
+            if (store == null || catalog == null || cooldowns == null || targetIds == null || magnitudes == null ||
+                targetIds.Count != magnitudes.Count || request.Slot < 0 || request.Slot >= cooldowns.Length)
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (targetIds.Count == 0) return Reject(request, AbilityActivationRejectReason.NoTarget);
+            if (!catalog.TryGetAbility(request.Ability, out var ability) || ability.Effects.Count != 0)
+                return Reject(request, AbilityActivationRejectReason.UnsupportedDefinition);
+            for (int i = 0; i < ability.Executions.Count; i++)
+                if (!catalog.TryGetExecution(ability.Executions[i], out var execution) || execution.Payload != EffectPayloadKind.Heal)
+                    return Reject(request, AbilityActivationRejectReason.UnsupportedDefinition);
+            if (store.ResourceResolver.PendingRequestCount + targetIds.Count > ResourceResolver.MaxPendingRequests)
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            var source = store.GetEntityHandle(request.OwnerId);
+            if (!source.IsValid) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            for (int i = 0; i < targetIds.Count; i++)
+                if (!store.GetEntityHandle(targetIds[i]).IsValid || !store.EnemyActive[targetIds[i]] ||
+                    float.IsNaN(magnitudes[i]) || float.IsInfinity(magnitudes[i]) || magnitudes[i] <= 0f)
+                    return Reject(request, AbilityActivationRejectReason.NoTarget);
+            for (int i = 0; i < targetIds.Count; i++)
+                if (!store.ResourceResolver.TryApply(new HealRequest(source, store.GetEntityHandle(targetIds[i]), magnitudes[i],
+                    store.AllocateGameplaySequence(targetIds[i]), request.OwnerPlayerId)).Accepted)
+                    throw new InvalidOperationException("prevalidated multi-target heal was rejected during commit");
+            if (!AbilityCommit(cooldowns, request.Slot, ability.Cooldown))
+                throw new InvalidOperationException("prevalidated multi-target cooldown commit failed");
+            return new AbilityActivationResult(true, request.OwnerId, request.Slot, appliedEffects: targetIds.Count);
+        }
+
         private static bool Contains(IReadOnlyList<EffectId> ids, EffectId id) { for (int i = 0; i < ids.Count; i++) if (ids[i].Value == id.Value) return true; return false; }
         private static bool Contains(IReadOnlyList<TriggerId> ids, TriggerId id) { for (int i = 0; i < ids.Count; i++) if (ids[i].Value == id.Value) return true; return false; }
         private static AbilityActivationResult Reject(AbilityActivationRequest request, AbilityActivationRejectReason reason) => new AbilityActivationResult(false, request.OwnerId, request.Slot, reason);

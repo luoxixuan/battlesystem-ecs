@@ -494,6 +494,12 @@ namespace BattleSystemECS.Systems
                     renderer.Log($"[ABILITY_REJECTED] {activation.Reason} skill={skillName}");
                 return activation.Accepted;
             }
+            if (gameConfig?.StrictCatalogReferences == true)
+            {
+                _rejectedAbilityCount++;
+                renderer.Log($"[ABILITY_REJECTED] UnsupportedDefinition skill={skillName}");
+                return false;
+            }
             int count = store.AbilityCount[playerId];
             for (int slot = 0; slot < count; slot++)
             {

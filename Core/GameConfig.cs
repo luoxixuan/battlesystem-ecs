@@ -1754,6 +1754,7 @@ namespace BattleSystemECS.Config
     public class GameConfig
     {
         public GameplayCatalog CompiledCatalog { get; internal set; }
+        internal bool StrictCatalogReferences { get; set; }
         public PlayerConfig Player { get; set; } = new PlayerConfig();
         // 玩家技能栏（game_config.json "Skills" 数组）—— SkillSystem.InitializePlayerSkills 的数据源。
         public List<SkillConfig> Skills { get; set; } = new List<SkillConfig>();

@@ -92,9 +92,16 @@ namespace BattleSystemECS.Systems
             if (skillId < 0) return Reject(towerId, AbilityActivationRejectReason.InvalidRequest);
             int targetId = FindTarget(towerId);
             var catalog = _config?.CompiledCatalog;
-            if (catalog == null || !catalog.TryGetAbility(new AbilityId(skillId), out var catalogAbility))
+            var configuredSkill = _config?.TryGetSkillById(skillId);
+            AbilityId abilityId = default(AbilityId);
+            AbilityDefinition catalogAbility = default(AbilityDefinition);
+            bool resolved = catalog != null && configuredSkill != null &&
+                catalog.TryResolveAlias(configuredSkill.Name, out abilityId) && catalog.TryGetAbility(abilityId, out catalogAbility);
+            if (!resolved)
             {
-                var skill = _config?.TryGetSkillById(skillId);
+                if (_config?.StrictCatalogReferences == true)
+                    return Reject(towerId, AbilityActivationRejectReason.UnsupportedDefinition);
+                var skill = configuredSkill;
                 if (skill == null)
                     skill = new SkillConfig { Name = $"tower-active-{skillId}", DamageMultiplier = 1f, Cooldown = store.TowerActiveCooldownMax[towerId] };
                 var exec = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage,
@@ -107,9 +114,12 @@ namespace BattleSystemECS.Systems
                     new[] { targeting }, Array.Empty<GameplayEffectDefinition>(), new[] { exec }, Array.Empty<TriggerDefinition>(),
                     Array.Empty<ModifierDefinition>(), new Dictionary<string, AbilityId>(StringComparer.OrdinalIgnoreCase) { [skill.Name] = new AbilityId(skillId) });
                 catalog.TryGetAbility(new AbilityId(skillId), out catalogAbility);
+                abilityId = new AbilityId(skillId);
             }
+            if (catalog == null || !catalog.TryGetAbility(abilityId, out catalogAbility))
+                return Reject(towerId, AbilityActivationRejectReason.UnsupportedDefinition);
             var request = new AbilityActivationRequest(towerId, towerId, store.TowerActiveCooldownMax[towerId], targetId,
-                new AbilityId(skillId), catalogAbility.Effects.Count > 0 ? catalogAbility.Effects[0] : default(EffectId),
+                abilityId, catalogAbility.Effects.Count > 0 ? catalogAbility.Effects[0] : default(EffectId),
                 catalogAbility.TriggerRefs.Count > 0 ? catalogAbility.TriggerRefs[0] : default(TriggerId));
             if (targetId < 0)
                 return Reject(towerId, AbilityActivationRejectReason.NoTarget);

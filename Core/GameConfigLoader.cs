@@ -19,9 +19,11 @@ namespace BattleSystemECS.Config
             var files = Directory.Exists(directory) ? Directory.GetFiles(directory, "*.json") : throw new CatalogValidationException($"{directory}: static skill directory not found");
             var catalog = CatalogCompiler.Compile(canonical, files);
             var config = LoadConfigStrict(renderer);
+            catalog = CatalogCompiler.CompileEnemyExtensions(catalog, config.EnemyAbilities);
             config.CompiledCatalog = catalog;
             string configDirectory = Path.GetDirectoryName(canonical) ?? Path.Combine("Data", "Configs");
             ValidateStrictReferences(config, catalog, Path.Combine(configDirectory, "hero_skills.json"));
+            config.StrictCatalogReferences = true;
             return config;
         }
 
@@ -68,7 +70,7 @@ namespace BattleSystemECS.Config
                 LoadBehaviorTrees(gameConfig, renderer);
 
                 // Load enemy abilities
-                LoadEnemyAbilities(gameConfig, renderer);
+                LoadEnemyAbilities(gameConfig, renderer, strict);
 
                 // Load phase behaviors
                 LoadPhaseBehaviors(gameConfig, renderer);
@@ -203,7 +205,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
         }
 
-        private static void ValidateStrictReferences(GameConfig config, GameplayCatalog catalog, string heroSkillsPath)
+        internal static void ValidateStrictReferences(GameConfig config, GameplayCatalog catalog, string heroSkillsPath)
         {
             if (config == null) throw new CatalogValidationException($"{CONFIG_FILE}: configuration is null");
             if (config.Player == null) throw new CatalogValidationException($"{CONFIG_FILE}: missing Player configuration");
@@ -221,9 +223,112 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 if (slot.SlotIndex < 0) throw new CatalogValidationException($"{heroSkillsPath}: invalid SlotIndex {slot.SlotIndex}");
                 if (!slots.Add(slot.SlotIndex)) throw new CatalogValidationException($"{heroSkillsPath}: duplicate SlotIndex {slot.SlotIndex}");
                 if (string.IsNullOrWhiteSpace(slot.SkillName)) throw new CatalogValidationException($"{heroSkillsPath}: missing SkillName at slot {slot.SlotIndex}");
-                if (!catalog.TryResolveAlias(slot.SkillName, out _)) throw new CatalogValidationException($"{heroSkillsPath}: unknown SkillName '{slot.SkillName}' at slot {slot.SlotIndex}");
+                RequireClosedAlias(catalog, slot.SkillName, $"{heroSkillsPath}: slot {slot.SlotIndex}");
             }
+
+            for (int i = 0; i < config.Skills.Count; i++)
+                RequireClosedAlias(catalog, config.Skills[i]?.Name, $"{CONFIG_FILE}: Skills[{i}]");
+
+            for (int i = 0; i < config.GlobalSkills.Count; i++)
+                RequireClosedAlias(catalog, config.GlobalSkills[i]?.Name, $"{CONFIG_FILE}: GlobalSkills[{i}]");
+
+            for (int i = 0; i < config.TowerTypes.Count; i++)
+            {
+                var tower = config.TowerTypes[i];
+                if (tower == null) throw new CatalogValidationException($"{CONFIG_FILE}: Towers[{i}] is null");
+                if (tower.ActiveSkillId >= 0)
+                {
+                    var skill = config.TryGetSkillById(tower.ActiveSkillId);
+                    if (skill == null) throw new CatalogValidationException($"{CONFIG_FILE}: Towers[{i}] ActiveSkillId {tower.ActiveSkillId} is unknown");
+                    RequireClosedAlias(catalog, skill.Name, $"{CONFIG_FILE}: Towers[{i}].ActiveSkillId");
+                }
+                if (tower.SpecialAbility != null && !string.IsNullOrWhiteSpace(tower.SpecialAbility.AbilityType))
+                    RequireClosedAlias(catalog, NormalizeAlias(tower.SpecialAbility.AbilityType), $"{CONFIG_FILE}: Towers[{i}].SpecialAbility");
+            }
+
+            if (config.AutoSkill != null && config.AutoSkill.Enabled && config.Skills.Count == 0)
+                throw new CatalogValidationException($"{CONFIG_FILE}: AutoSkill requires at least one catalog-backed skill");
+
+            var enemyById = new Dictionary<string, EnemyAbilityDef>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < config.EnemyAbilities.Count; i++)
+            {
+                var enemy = config.EnemyAbilities[i];
+                if (enemy == null || string.IsNullOrWhiteSpace(enemy.Id))
+                    throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: missing Id at index {i}");
+                if (!enemyById.TryAdd(enemy.Id, enemy))
+                    throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: duplicate Id '{enemy.Id}'");
+                var byName = RequireClosedAlias(catalog, enemy.Name, $"Data/Configs/enemy_abilities.json: {enemy.Id}");
+                var byId = RequireClosedAlias(catalog, enemy.Id, $"Data/Configs/enemy_abilities.json: {enemy.Id}");
+                ValidateEnemyExecution(catalog, byId, enemy);
+            }
+
+            foreach (var tree in config.BehaviorTrees)
+            {
+                if (tree.Value?.Nodes == null) continue;
+                foreach (var node in tree.Value.Nodes)
+                {
+                    string reference = node.Value?.AbilityId;
+                    if (string.IsNullOrWhiteSpace(reference)) continue;
+                    if (!enemyById.ContainsKey(reference))
+                        throw new CatalogValidationException($"Data/Configs/behavior_trees.json: unknown AbilityId '{reference}' in tree '{tree.Key}'");
+                    RequireClosedAlias(catalog, reference, $"Data/Configs/behavior_trees.json: tree '{tree.Key}' node '{node.Key}'");
+                }
+            }
+
+            foreach (var monster in config.MonsterTypes)
+            {
+                if (monster?.Phases == null) continue;
+                foreach (var phase in monster.Phases)
+                {
+                    if (string.IsNullOrWhiteSpace(phase?.AbilityId)) continue;
+                    if (!enemyById.ContainsKey(phase.AbilityId))
+                        throw new CatalogValidationException($"{CONFIG_FILE}: monster '{monster.Name}' references unknown phase AbilityId '{phase.AbilityId}'");
+                    RequireClosedAlias(catalog, phase.AbilityId, $"{CONFIG_FILE}: monster '{monster.Name}' phase");
+                }
+            }
+
+            foreach (var phase in config.PhaseBehaviors)
+                foreach (string ability in phase.Value?.UnlockAbilities ?? new List<string>())
+                    RequireClosedAlias(catalog, ability, $"Data/Configs/phase_behavior.json: phase '{phase.Key}'");
         }
+
+        private static AbilityId RequireClosedAlias(GameplayCatalog catalog, string alias, string source)
+        {
+            if (string.IsNullOrWhiteSpace(alias) || !catalog.TryResolveAlias(alias, out var abilityId) ||
+                !catalog.TryGetAbility(abilityId, out var ability))
+                throw new CatalogValidationException($"{source}: unknown catalog alias '{alias}'");
+            int targetingId = ability.Targeting.Id.Value;
+            if ((uint)targetingId >= (uint)catalog.Targetings.Count || catalog.Targetings[targetingId].Id.Value != targetingId)
+                throw new CatalogValidationException($"{source}: ability '{alias}' has an unclosed TargetingId");
+            foreach (var execution in ability.Executions)
+                if (!catalog.TryGetExecution(execution, out _)) throw new CatalogValidationException($"{source}: ability '{alias}' has an unclosed ExecutionId {execution.Value}");
+            foreach (var effect in ability.Effects)
+                if (!catalog.TryGetEffect(effect, out _)) throw new CatalogValidationException($"{source}: ability '{alias}' has an unclosed EffectId {effect.Value}");
+            foreach (var trigger in ability.TriggerRefs)
+                if (!catalog.TryGetTrigger(trigger, out _)) throw new CatalogValidationException($"{source}: ability '{alias}' has an unclosed TriggerId {trigger.Value}");
+            return abilityId;
+        }
+
+        private static void ValidateEnemyExecution(GameplayCatalog catalog, AbilityId abilityId, EnemyAbilityDef source)
+        {
+            string type = (source.AbilityType ?? string.Empty).ToLowerInvariant();
+            EffectPayloadKind? required = type == "self_heal" || type == "heal_allies" ? EffectPayloadKind.Heal
+                : type == "aoe_damage" ? EffectPayloadKind.Damage
+                : type == "stun_aoe" ? EffectPayloadKind.CrowdControl
+                : type == "slow_aoe" ? EffectPayloadKind.Slow
+                : (EffectPayloadKind?)null;
+            bool explicitAdapter = type == "summon_minion" || type == "stealth_attack";
+            bool explicitUnsupported = type == "buff_allies" || type == "silence_tower" || type == "dispel_tower";
+            if (!required.HasValue && !explicitAdapter && !explicitUnsupported)
+                throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: unsupported AbilityType '{source.AbilityType}' for '{source.Id}'");
+            if (!required.HasValue) return;
+            catalog.TryGetAbility(abilityId, out var ability);
+            foreach (var executionId in ability.Executions)
+                if (catalog.TryGetExecution(executionId, out var execution) && execution.Payload == required.Value) return;
+            throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: '{source.Id}' requires typed {required.Value} execution");
+        }
+
+        private static string NormalizeAlias(string value) => value.Replace('_', ' ').Replace('-', ' ');
 
         private static void LoadBehaviorTrees(GameConfig gameConfig, IRenderer renderer)
         {
@@ -250,27 +355,42 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
         }
 
-        private static void LoadEnemyAbilities(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadEnemyAbilities(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string abFile = "Data/Configs/enemy_abilities.json";
             try
             {
                 if (!File.Exists(abFile))
                 {
+                    if (strict) throw new CatalogValidationException($"{abFile}: enemy ability configuration not found");
                     renderer.Log("[ABILITY] Enemy abilities file not found: " + abFile + ", using empty list");
                     return;
                 }
                 string json = File.ReadAllText(abFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    if (strict) throw new CatalogValidationException($"{abFile}: enemy ability configuration is empty");
                     renderer.Log("[ABILITY] Enemy abilities file is empty: " + abFile);
                     return;
                 }
+                if (strict)
+                {
+                    using (var document = System.Text.Json.JsonDocument.Parse(json))
+                        if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
+                            throw new CatalogValidationException($"{abFile}: expected an array");
+                }
                 ParseEnemyAbilities(gameConfig, json);
+                if (strict && gameConfig.EnemyAbilities.Count == 0)
+                    throw new CatalogValidationException($"{abFile}: no enemy abilities declared");
                 renderer.Log("[ABILITY] Loaded " + gameConfig.EnemyAbilities.Count + " enemy abilities from " + abFile);
             }
             catch (Exception ex)
             {
+                if (strict)
+                {
+                    if (ex is CatalogValidationException) throw;
+                    throw new CatalogValidationException($"{abFile}: {ex.Message}");
+                }
                 renderer.Log("[ABILITY] Failed to load enemy abilities: " + ex.Message);
             }
         }
@@ -835,6 +955,8 @@ LoadAdrenalineConfig(gameConfig, renderer);
             tower.SlowDuration = ExtractFloat(json, "SlowDuration");
             tower.TargetingMode = (TowerTargetingMode)ExtractInt(json, "TargetingMode");
             tower.SpecialAbility = ParseTowerSpecialAbility(json);
+            tower.ActiveSkillId = ExtractInt(json, "ActiveSkillId", -1);
+            tower.ActiveCooldown = ExtractFloat(json, "ActiveCooldown");
             tower.ProjectileHoming = ExtractBool(json, "ProjectileHoming");
             // Round 114 — Predictive Aim / Lead Targeting
             // Parse the optional LeadAimFactor (default 0f = no lead, straight aim).

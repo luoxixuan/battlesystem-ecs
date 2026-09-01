@@ -57,15 +57,19 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void EnemyMissingCatalogAliasUsesExplicitCompatibilityBoundary()
+        public void EnemyStrictUnsupportedDefinitionRejectsWithoutStateMutation()
         {
             int enemy = Enemy();
-            Config.EnemyAbilities.Add(new EnemyAbilityDef { Id = "matrix-legacy", Name = "matrix-legacy", AbilityType = "unsupported" });
-            var source = System.IO.File.ReadAllText(System.IO.Path.Combine("..", "..", "..", "..", "Systems", "EnemyAbilitySystem.cs"));
-            Assert.Contains("gameConfig.CompiledCatalog", source);
-            Assert.Contains("TryResolveAlias", source);
-            Assert.Contains("Legacy handlers remain adapters", source);
+            Config.StrictCatalogReferences = true;
+            Config.CompiledCatalog = CatalogCompiler.CreateEmpty();
+            Config.EnemyAbilities.Add(new EnemyAbilityDef { Id = "matrix-unsupported", Name = "matrix-unsupported", AbilityType = "buff_allies", DamageMultiplier = 2f, BuffDuration = 10 });
+            var system = new EnemyAbilitySystem(Store, Renderer, 0, Config);
+            float damageBonus = Store.EnemyBuffDamageBonus[enemy];
+            system.EnqueueAbility(enemy, "matrix-unsupported");
+            system.ExecuteAbilities();
             Assert.True(Store.EnemyActive[enemy]);
+            Assert.Equal(damageBonus, Store.EnemyBuffDamageBonus[enemy]);
+            Assert.True(Renderer.HasLogContaining("UnsupportedDefinition"));
         }
 
         [Fact]

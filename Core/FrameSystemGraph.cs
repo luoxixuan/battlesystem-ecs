@@ -293,7 +293,10 @@ namespace BattleSystemECS.Core
             r.AddWaveAt(g.Taunt,"combat.taunt.resolve",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.TowerState,FrameResource.EnemyControl,FrameResource.TauntPrepared},new[]{FrameResource.EnemyControl},(x,c)=>x.ResolveTauntAssignments());
             r.AddWave(g.TowerActiveSkill,"combat.tower-active-skill.update",FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PhaseState,FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.TowerState},(x,c)=>x.Update(c.Delta));
             r.AddWave(g.Aggro,"combat.aggro.update",FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyControl},new[]{FrameResource.EnemyControl},(x,c)=>x.Update(c.Delta));
-            r.AddWave(g.HeroSkill,"combat.hero-skill.update",FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PhaseState,FrameResource.HeroState},new[]{FrameResource.HeroState},(x,c)=>x.Update(c.Delta));
+            r.AddWave(g.HeroSkill,"combat.hero-skill.update",FrameExecutionSemantics.SerialUpdate,
+                new[]{FrameResource.PhaseState,FrameResource.HeroState,FrameResource.EntityLifecycle,FrameResource.EnemyHealth},
+                new[]{FrameResource.HeroState,FrameResource.DamageRequests,FrameResource.ResourceRequests,FrameResource.GameplayEvents},
+                (x,c)=>x.Update(c.Delta));
             r.AddWave(g.EchoClone,"combat.echo-clone.update",FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.RealTimeState},new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},(x,c)=>x.Update(c.Delta));
             r.AddWaveAt(g.Bloodlust,"combat.bloodlust.update",FrameTimeDomain.None,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.TowerState},(x,c)=>x.Update(c.Turn));
             r.AddWave(g.Momentum,"combat.momentum.update",FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.PlayerAttributes,FrameResource.TowerState},new[]{FrameResource.PlayerAttributes,FrameResource.TowerState},(x,c)=>x.Update(c.Delta));

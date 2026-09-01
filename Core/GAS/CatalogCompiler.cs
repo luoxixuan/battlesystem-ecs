@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Collections.ObjectModel;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Core.GAS
 {
@@ -103,6 +104,132 @@ namespace BattleSystemECS.Core.GAS
                 triggers, catalog.Modifiers, catalog.Aliases, hasRuntimeExtensions: true);
             CatalogValidator.Validate(extended, "runtime catalog");
             return extended;
+        }
+
+        /// <summary>
+        /// Compiles enemy configuration references into the same immutable catalog used by
+        /// player-facing abilities. Existing canonical definitions win; enemy ids are added
+        /// as aliases so behavior-tree references and display names resolve to one AbilityId.
+        /// </summary>
+        public static GameplayCatalog CompileEnemyExtensions(GameplayCatalog catalog, IReadOnlyList<EnemyAbilityDef> enemyAbilities)
+        {
+            catalog = catalog ?? CreateEmpty();
+            if (enemyAbilities == null || enemyAbilities.Count == 0) return catalog;
+
+            var abilities = new List<AbilityDefinition>(catalog.AbilityDefinitions);
+            var targetings = new List<TargetingDefinition>(catalog.Targetings);
+            var executions = new List<ExecutionDefinition>(catalog.Executions);
+            var aliases = new Dictionary<string, AbilityId>(catalog.Aliases, StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < enemyAbilities.Count; i++)
+            {
+                var source = enemyAbilities[i];
+                if (source == null || string.IsNullOrWhiteSpace(source.Id) || string.IsNullOrWhiteSpace(source.Name))
+                    throw new CatalogValidationException($"enemy abilities: missing id/name at index {i}");
+
+                bool hasNameAlias = aliases.TryGetValue(source.Name, out var abilityId);
+                bool needsTypedDefinition = RequiredEnemyPayload(source.AbilityType, out var requiredPayload);
+                bool nameIsCompatible = hasNameAlias && (!needsTypedDefinition ||
+                    AbilityContainsPayload(abilities, executions, abilityId, requiredPayload));
+                if (!nameIsCompatible)
+                {
+                    abilityId = new AbilityId(abilities.Count);
+                    var executionIds = new List<ExecutionId>();
+                    TargetingShape shape = TargetingShape.Single;
+                    EffectPayloadKind payload = EffectPayloadKind.GameplayEvent;
+                    ExecutionOperation operation = ExecutionOperation.Default;
+                    float magnitude = 0f;
+                    float duration = 0f;
+
+                    switch ((source.AbilityType ?? string.Empty).ToLowerInvariant())
+                    {
+                        case "self_heal":
+                        case "heal_allies":
+                            shape = TargetingShape.Heal;
+                            payload = EffectPayloadKind.Heal;
+                            operation = ExecutionOperation.ApplyHeal;
+                            magnitude = source.HealAmount;
+                            break;
+                        case "aoe_damage":
+                            shape = TargetingShape.Circle;
+                            payload = EffectPayloadKind.Damage;
+                            operation = ExecutionOperation.ApplyDamage;
+                            magnitude = source.DamageMultiplier;
+                            break;
+                        case "stun_aoe":
+                            shape = TargetingShape.AoeStun;
+                            payload = EffectPayloadKind.CrowdControl;
+                            operation = ExecutionOperation.ApplyCrowdControl;
+                            magnitude = source.StunDuration;
+                            duration = source.StunDuration;
+                            break;
+                        case "slow_aoe":
+                            shape = TargetingShape.Slow;
+                            payload = EffectPayloadKind.Slow;
+                            operation = ExecutionOperation.ApplySlow;
+                            magnitude = source.SlowFactor;
+                            duration = source.SlowDuration;
+                            break;
+                    }
+
+                    // Zero-execution definitions are explicit world-action or unsupported
+                    // entries. Runtime adapters decide which of those can execute.
+                    if (operation != ExecutionOperation.Default)
+                    {
+                        var executionId = new ExecutionId(executions.Count);
+                        executions.Add(new ExecutionDefinition(executionId, payload, Math.Max(0f, magnitude),
+                            CatalogRegistries.SkillTag, MagnitudeSource.Multiplier, DamageAmountStage.LegacyMultiplier,
+                            Math.Max(0f, duration), operation));
+                        executionIds.Add(executionId);
+                    }
+
+                    var targeting = new TargetingDefinition(new TargetingId(abilityId.Value), shape,
+                        (int)Math.Max(0f, source.AoeRadius), 1, 1, shape == TargetingShape.Heal ? 0 : 1,
+                        radius: Math.Max(0f, source.AoeRadius),
+                        relation: shape == TargetingShape.Heal ? RelationFilter.Allies : RelationFilter.Enemies,
+                        maxTargetsMode: shape == TargetingShape.Heal ? MaxTargetsPolicy.Unlimited : MaxTargetsPolicy.Fixed);
+                    targetings.Add(targeting);
+                    string compiledName = hasNameAlias ? source.Name + " [" + source.Id + "]" : source.Name;
+                    abilities.Add(new AbilityDefinition(abilityId, compiledName, targeting, ClockId.Combat,
+                        Math.Max(0f, source.Cooldown), GameplayPhaseMask.Wave, Array.Empty<EffectId>(),
+                        Array.Empty<ModifierDefinition>(), CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
+                        executions: executionIds.ToArray()));
+                    if (!hasNameAlias) aliases.Add(source.Name, abilityId);
+                }
+
+                if (aliases.TryGetValue(source.Id, out var existing) && existing.Value != abilityId.Value)
+                    throw new CatalogValidationException($"enemy abilities: alias '{source.Id}' is ambiguous");
+                aliases[source.Id] = abilityId;
+            }
+
+            var extended = new GameplayCatalog(abilities, targetings, catalog.Effects, executions,
+                catalog.Triggers, catalog.Modifiers, aliases, catalog.HasRuntimeExtensions);
+            CatalogValidator.Validate(extended, "enemy ability catalog extensions");
+            return extended;
+        }
+
+        private static bool RequiredEnemyPayload(string abilityType, out EffectPayloadKind payload)
+        {
+            string type = (abilityType ?? string.Empty).ToLowerInvariant();
+            if (type == "self_heal" || type == "heal_allies") { payload = EffectPayloadKind.Heal; return true; }
+            if (type == "aoe_damage") { payload = EffectPayloadKind.Damage; return true; }
+            if (type == "stun_aoe") { payload = EffectPayloadKind.CrowdControl; return true; }
+            if (type == "slow_aoe") { payload = EffectPayloadKind.Slow; return true; }
+            payload = EffectPayloadKind.GameplayEvent;
+            return false;
+        }
+
+        private static bool AbilityContainsPayload(IReadOnlyList<AbilityDefinition> abilities,
+            IReadOnlyList<ExecutionDefinition> executions, AbilityId abilityId, EffectPayloadKind payload)
+        {
+            if ((uint)abilityId.Value >= (uint)abilities.Count) return false;
+            var ability = abilities[abilityId.Value];
+            for (int i = 0; i < ability.Executions.Count; i++)
+            {
+                int executionId = ability.Executions[i].Value;
+                if ((uint)executionId < (uint)executions.Count && executions[executionId].Payload == payload) return true;
+            }
+            return false;
         }
 
         public static GameplayCatalog Compile(string canonicalSkillsPath, IEnumerable<string> staticSkillPaths = null)

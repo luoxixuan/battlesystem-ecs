@@ -54,6 +54,9 @@ namespace BattleSystemECS.Systems
         // Cached "any slot is configured" sentinel for O(1) fast-path in Update().
         private bool _anySkillConfigured;
         private PhaseContext _phaseContext = PhaseContext.Unbound;
+        public AbilityActivationResult LastActivation { get; private set; }
+        private int _pendingHeroId = -1;
+        private int _pendingSlot = -1;
         public PhaseContextKind CurrentPhaseContext => _phaseContext.Kind;
 
         public HeroSkillSystem(ComponentStore store, int playerId, string? heroSkillsPath = null, GameConfig? config = null)
@@ -154,6 +157,24 @@ namespace BattleSystemECS.Systems
                     GameplayAbilityRuntime.TickCooldown(_heroSkillCooldowns, flatIdx, deltaTime);
                 }
             }
+            if (_pendingHeroId >= 0)
+            {
+                int heroId = _pendingHeroId;
+                int slot = _pendingSlot;
+                _pendingHeroId = -1;
+                _pendingSlot = -1;
+                TriggerHeroSkill(heroId, slot);
+            }
+        }
+
+        /// <summary>Queues one input activation for the production frame node.</summary>
+        public bool RequestHeroSkill(int heroId, int slot)
+        {
+            if (_pendingHeroId >= 0 || heroId < 0 || heroId >= ComponentStore.MAX_HEROES ||
+                slot < 0 || slot >= MAX_HERO_SKILLS) return false;
+            _pendingHeroId = heroId;
+            _pendingSlot = slot;
+            return true;
         }
 
         /// <summary>
@@ -180,7 +201,7 @@ namespace BattleSystemECS.Systems
                 _heroSkillCooldowns[flatIdx] = _heroSkillCooldownMax[flatIdx];
                 return true;
             }
-            if (!TryResolveCatalogAbility(catalog, skillId, out var abilityId) ||
+            if (!TryResolveCatalogAbility(catalog, ResolveSkillNameById(skillId), out var abilityId) ||
                 !catalog.TryGetAbility(abilityId, out var ability)) return false;
 
             int targetId = store.PlayerEntityId;
@@ -197,6 +218,7 @@ namespace BattleSystemECS.Systems
             var activation = new AbilityActivationRequest(store.PlayerEntityId, slot,
                 _heroSkillCooldownMax[flatIdx], targetId, abilityId);
             var result = GameplayAbilityRuntime.Activate(store, catalog, _heroSkillCooldowns, activation);
+            LastActivation = result;
             if (!result.Accepted) return false;
             Console.WriteLine($"[HERO_SKILL] hero={heroId} slot={slot} ability={abilityId.Value} effects={result.AppliedEffects}");
             return true;
@@ -256,13 +278,11 @@ namespace BattleSystemECS.Systems
 
         private string ResolveSkillNameById(int skillId) => ResolveSkillConfigById(skillId)?.Name ?? "?";
 
-        private static bool TryResolveCatalogAbility(GameplayCatalog catalog, int skillId, out AbilityId ability)
+        private static bool TryResolveCatalogAbility(GameplayCatalog catalog, string skillName, out AbilityId ability)
         {
             ability = default(AbilityId);
-            if (skillId < 0) return false;
-            string name = catalog.AbilityDefinitions.Count > skillId ? catalog.AbilityDefinitions[skillId].Name : string.Empty;
-            if (string.IsNullOrWhiteSpace(name)) return false;
-            return catalog.Aliases != null && catalog.Aliases.TryGetValue(name, out ability) && catalog.TryGetAbility(ability, out _);
+            if (string.IsNullOrWhiteSpace(skillName)) return false;
+            return catalog.Aliases != null && catalog.Aliases.TryGetValue(skillName, out ability) && catalog.TryGetAbility(ability, out _);
         }
 
         private int FindFirstActiveEnemy()
