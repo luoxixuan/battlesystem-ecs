@@ -316,16 +316,24 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 : type == "aoe_damage" ? EffectPayloadKind.Damage
                 : type == "stun_aoe" ? EffectPayloadKind.CrowdControl
                 : type == "slow_aoe" ? EffectPayloadKind.Slow
+                : type == "summon_minion" || type == "stealth_attack" ? EffectPayloadKind.WorldAction
                 : (EffectPayloadKind?)null;
-            bool explicitAdapter = type == "summon_minion" || type == "stealth_attack";
+            ExecutionOperation requiredOperation = type == "self_heal" || type == "heal_allies" ? ExecutionOperation.ApplyHeal
+                : type == "aoe_damage" ? ExecutionOperation.ApplyDamage
+                : type == "stun_aoe" ? ExecutionOperation.ApplyCrowdControl
+                : type == "slow_aoe" ? ExecutionOperation.ApplySlow
+                : type == "summon_minion" ? ExecutionOperation.SummonEnemy
+                : type == "stealth_attack" ? ExecutionOperation.PrepareStealth
+                : ExecutionOperation.Default;
             bool explicitUnsupported = type == "buff_allies" || type == "silence_tower" || type == "dispel_tower";
-            if (!required.HasValue && !explicitAdapter && !explicitUnsupported)
+            if (!required.HasValue && !explicitUnsupported)
                 throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: unsupported AbilityType '{source.AbilityType}' for '{source.Id}'");
             if (!required.HasValue) return;
             catalog.TryGetAbility(abilityId, out var ability);
             foreach (var executionId in ability.Executions)
-                if (catalog.TryGetExecution(executionId, out var execution) && execution.Payload == required.Value) return;
-            throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: '{source.Id}' requires typed {required.Value} execution");
+                if (catalog.TryGetExecution(executionId, out var execution) && execution.Payload == required.Value &&
+                    execution.Operation == requiredOperation) return;
+            throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: '{source.Id}' requires typed {required.Value}/{requiredOperation} execution");
         }
 
         private static string NormalizeAlias(string value) => value.Replace('_', ' ').Replace('-', ' ');

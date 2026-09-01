@@ -104,6 +104,114 @@ namespace BattleSystemECS.Tests.Integration
         }
 
         [Fact]
+        public void EnemyWorldActionsActivateCatalogBeforeExactlyOneAdapterCommit()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            int player = Player();
+            int summoner = Enemy(e =>
+            {
+                e.X = 2f; e.Y = 3f; e.Health = 100f; e.MaxHealth = 100f;
+                e.Damage = 20f; e.MoveSpeed = 1f; e.GoldReward = 6;
+            });
+            int ambusher = Enemy(e => { e.X = 0f; e.Y = 0f; e.Health = 100f; e.MaxHealth = 100f; });
+            var system = new EnemyAbilitySystem(Store, Renderer, player, config);
+            int activeBefore = Store.ActiveEnemyIds.Count;
+
+            system.EnqueueAbility(summoner, "summon_minion");
+            system.ExecuteAbilities();
+            Assert.Equal(activeBefore + 1, Store.ActiveEnemyIds.Count);
+            int minion = Store.ActiveEnemyIds[Store.ActiveEnemyIds.Count - 1];
+            Assert.Equal(Store.PositionX[summoner], Store.PositionX[minion]);
+            Assert.Equal(Store.PositionY[summoner], Store.PositionY[minion]);
+            system.EnqueueAbility(summoner, "summon_minion");
+            system.ExecuteAbilities();
+            Assert.Equal(activeBefore + 1, Store.ActiveEnemyIds.Count);
+
+            Assert.Equal(1f, Store.EnemyStealthMultiplier[ambusher]);
+            system.EnqueueAbility(ambusher, "stealth_strike_1");
+            system.ExecuteAbilities();
+            var stealth = Assert.Single(config.EnemyAbilities, ability => ability.Id == "stealth_strike_1");
+            Assert.Equal(stealth.DamageMultiplier, Store.EnemyStealthMultiplier[ambusher]);
+            system.EnqueueAbility(ambusher, "stealth_strike_1");
+            system.ExecuteAbilities();
+            Assert.Equal(stealth.DamageMultiplier, Store.EnemyStealthMultiplier[ambusher]);
+        }
+
+        [Fact]
+        public void MismatchedWorldActionDefinitionRejectsWithoutWorldOrCooldownSideEffects()
+        {
+            var source = new EnemyAbilityDef
+            {
+                Id = "summon_minion", Name = "Summon Minion", AbilityType = "summon_minion",
+                Cooldown = 12f, MinionHealthMult = 0.3f, MinionDamageMult = 0.3f
+            };
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single,
+                0, 1, 1, 1, relation: RelationFilter.Self, maxTargetsMode: MaxTargetsPolicy.Fixed);
+            var wrong = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.WorldAction, 1f,
+                CatalogRegistries.SkillTag, operation: ExecutionOperation.PrepareStealth);
+            var ability = new AbilityDefinition(new AbilityId(0), source.Name, targeting, ClockId.Combat, source.Cooldown,
+                GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, executions: new[] { wrong.Id });
+            var config = new GameConfig
+            {
+                StrictCatalogReferences = true,
+                EnemyAbilities = new List<EnemyAbilityDef> { source },
+                CompiledCatalog = new GameplayCatalog(new[] { ability }, new[] { targeting },
+                    Array.Empty<GameplayEffectDefinition>(), new[] { wrong }, Array.Empty<TriggerDefinition>(),
+                    Array.Empty<ModifierDefinition>(), new Dictionary<string, AbilityId>
+                    {
+                        [source.Id] = ability.Id,
+                        [source.Name] = ability.Id
+                    })
+            };
+            int player = Player();
+            int summoner = Enemy(e => { e.Health = 100f; e.MaxHealth = 100f; e.Damage = 10f; });
+            var wrongCatalog = config.CompiledCatalog;
+            config.CompiledCatalog = CatalogCompiler.CreateEmpty();
+            var missingSystem = new EnemyAbilitySystem(Store, Renderer, player, config);
+            int activeBefore = Store.ActiveEnemyIds.Count;
+            missingSystem.EnqueueAbility(summoner, source.Id);
+            missingSystem.ExecuteAbilities();
+            Assert.Equal(activeBefore, Store.ActiveEnemyIds.Count);
+
+            config.CompiledCatalog = wrongCatalog;
+            var system = new EnemyAbilitySystem(Store, Renderer, player, config);
+
+            system.EnqueueAbility(summoner, source.Id);
+            system.ExecuteAbilities();
+            Assert.Equal(activeBefore, Store.ActiveEnemyIds.Count);
+
+            config.CompiledCatalog = CatalogCompiler.CompileEnemyExtensions(CatalogCompiler.CreateEmpty(),
+                config.EnemyAbilities);
+            var corrected = new EnemyAbilitySystem(Store, Renderer, player, config);
+            corrected.EnqueueAbility(summoner, source.Id);
+            corrected.ExecuteAbilities();
+            Assert.Equal(activeBefore + 1, Store.ActiveEnemyIds.Count);
+        }
+
+        [Fact]
+        public void StrictBootstrapRejectsWorldActionWithMismatchedOperation()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            var catalog = config.CompiledCatalog!;
+            Assert.True(catalog.TryResolveAlias("summon_minion", out var summonId));
+            Assert.True(catalog.TryGetAbility(summonId, out var summon));
+            ExecutionId executionId = Assert.Single(summon.Executions);
+            var executions = new ExecutionDefinition[catalog.Executions.Count];
+            for (int i = 0; i < executions.Length; i++) executions[i] = catalog.Executions[i];
+            var original = executions[executionId.Value];
+            executions[executionId.Value] = new ExecutionDefinition(original.Id, original.Payload,
+                original.Magnitude, original.Tag, original.MagnitudeSource, original.Stage,
+                original.Duration, ExecutionOperation.PrepareStealth);
+            var wrong = new GameplayCatalog(catalog.AbilityDefinitions, catalog.Targetings, catalog.Effects,
+                executions, catalog.Triggers, catalog.Modifiers, catalog.Aliases, catalog.HasRuntimeExtensions);
+
+            var validation = Assert.Throws<CatalogValidationException>(() =>
+                GameConfigLoader.ValidateStrictReferences(config, wrong, HeroSkillsPath));
+            Assert.Contains("SummonEnemy", validation.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void HeroEntriesReachResourceDamageDeathAndPresentationThroughProductionTick()
         {
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);

@@ -37,6 +37,8 @@ namespace BattleSystemECS.Systems
         private int _rejectedCandidateCount;
         private int _rejectedInputCount;
         private int _successfulActivationCount;
+        private readonly List<int> _catalogTargets = new List<int>(64);
+        private readonly List<float> _catalogMagnitudeScales = new List<float>(64);
         public int RejectedCandidateCount => _rejectedCandidateCount;
         public int RejectedInputCount => _rejectedInputCount;
         public int RejectedActivationCount => _rejectedCandidateCount + _rejectedInputCount;
@@ -205,9 +207,32 @@ namespace BattleSystemECS.Systems
                 if (ReferenceEquals(gameConfig.GlobalSkills[i], def) || string.Equals(gameConfig.GlobalSkills[i].Name, def.Name, StringComparison.OrdinalIgnoreCase)) { slot = i; break; }
             if (slot < 0 || slot >= MAX_GLOBAL_SKILLS) return false;
             var request = new AbilityActivationRequest(playerId, slot, def.Cooldown,
-                playerId, abilityId, ability.Effects.Count > 0 ? ability.Effects[0] : default(EffectId),
-                ability.TriggerRefs.Count > 0 ? ability.TriggerRefs[0] : default(TriggerId), manaCost);
-            result = GameplayAbilityRuntime.Activate(store, catalog, store.PlayerGlobalSkillCooldown, request);
+                playerId, abilityId, ability.Effects.Count > 0 ? ability.Effects[0] : (EffectId?)null,
+                ability.TriggerRefs.Count > 0 ? ability.TriggerRefs[0] : (TriggerId?)null, manaCost,
+                ownerPlayerId: playerId);
+            if (ability.Targeting.Relation == RelationFilter.Self)
+            {
+                result = GameplayAbilityRuntime.Activate(store, catalog, store.PlayerGlobalSkillCooldown, request);
+                return true;
+            }
+            bool collected = ability.Targeting.Relation == RelationFilter.Allies
+                ? TargetingRuntime.TryCollectAllyTargets(store, playerId, ability.Targeting,
+                    _catalogTargets, _catalogMagnitudeScales)
+                : TargetingRuntime.TryCollectEnemyTargets(store, playerId, ability.Targeting,
+                    _catalogTargets, _catalogMagnitudeScales);
+            if (!collected)
+            {
+                result = new AbilityActivationResult(false, playerId, slot,
+                    AbilityActivationRejectReason.UnsupportedDefinition);
+                return true;
+            }
+            if (_catalogTargets.Count == 0)
+            {
+                result = new AbilityActivationResult(false, playerId, slot, AbilityActivationRejectReason.NoTarget);
+                return true;
+            }
+            result = GameplayAbilityRuntime.ActivateTargets(store, catalog, store.PlayerGlobalSkillCooldown,
+                request, _catalogTargets, _catalogMagnitudeScales);
             return true;
         }
 

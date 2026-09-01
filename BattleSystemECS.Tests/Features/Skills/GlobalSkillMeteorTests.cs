@@ -1,5 +1,8 @@
 using BattleSystemECS.Config;
 using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
+using System;
+using System.Collections.Generic;
 using BattleSystemECS.Systems;
 using BattleSystemECS.Tests.Infrastructure;
 using Xunit;
@@ -93,6 +96,38 @@ public class GlobalSkillMeteorTests : BattleTestBase
 
         // free-list 回收后，下一个 CreateEntity 必须能拿回同一个 id
         Assert.Equal(eid, Store.CreateEntity());
+    }
+
+    [Fact]
+    public void StrictCatalogMeteorUsesGroundTargetSetInsteadOfPlayerEntity()
+    {
+        var config = new GameConfig { StrictCatalogReferences = true };
+        config.GlobalSkills.Add(new GlobalSkillDef
+        {
+            Name = "typed-meteor", SkillType = (int)GlobalSkillType.MeteorStrike,
+            ManaCost = 0f, Cooldown = 3f
+        });
+        var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.GroundTarget,
+            3, 3, 3, 0, radius: 3f, relation: RelationFilter.Enemies,
+            maxTargetsMode: MaxTargetsPolicy.Unlimited);
+        var execution = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage, 5f,
+            CatalogRegistries.SkillTag, operation: ExecutionOperation.ApplyDamage);
+        var ability = new AbilityDefinition(new AbilityId(0), "typed-meteor", targeting, ClockId.Combat, 3f,
+            GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+            CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, executions: new[] { execution.Id });
+        config.CompiledCatalog = new GameplayCatalog(new[] { ability }, new[] { targeting },
+            Array.Empty<GameplayEffectDefinition>(), new[] { execution }, Array.Empty<TriggerDefinition>(),
+            Array.Empty<ModifierDefinition>(), new Dictionary<string, AbilityId> { [ability.Name] = ability.Id });
+        Player(p => { p.X = 0f; p.Y = 0f; p.Health = 100f; });
+        int inside = Enemy(e => { e.X = 1f; e.Y = 0f; e.Health = 1000f; e.MaxHealth = 1000f; });
+        int outside = Enemy(e => { e.X = 50f; e.Y = 0f; e.Health = 1000f; e.MaxHealth = 1000f; });
+        var system = new GlobalSkillSystem(Store, config, Renderer, PlayerId);
+        system.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
+        system.SetTurn(1);
+
+        Assert.True(system.TryActivateGlobalSkill(0));
+        Assert.Equal(995f, Store.EnemyHealth[inside]);
+        Assert.Equal(1000f, Store.EnemyHealth[outside]);
     }
 
 }

@@ -1,5 +1,6 @@
 using BattleSystemECS.Core;
 using BattleSystemECS.Core.GAS;
+using BattleSystemECS.Components;
 using Xunit;
 using System;
 using System.Collections.Generic;
@@ -80,6 +81,80 @@ namespace BattleSystemECS.Tests.Framework
                 new AbilityActivationRequest(0, 0, 1f, 0, ability: ability.Id));
             Assert.False(result.Accepted);
             Assert.Equal(AbilityActivationRejectReason.InvalidRequest, result.Reason);
+        }
+
+        [Fact]
+        public void OptionalEffectAndTriggerDistinguishValidZeroExplicitInvalidZeroAndAbsent()
+        {
+            var store = PlayerStore();
+            var effect = new GameplayEffectDefinition(new EffectId(0), EffectType.Duration,
+                Array.Empty<ModifierDefinition>(), 2f, 0f, ClockId.Combat, StackingBehavior.None, 1,
+                RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent,
+                CatalogRegistries.SkillTag, Array.Empty<ExecutionId>());
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 1, 1, 1, 1);
+            var trigger = new TriggerDefinition(new TriggerId(0), GameplayEventType.HitConfirmed,
+                effect.Id, CatalogRegistries.SkillConsumer);
+            var withZero = new AbilityDefinition(new AbilityId(0), "with-zero", targeting, ClockId.Combat, 1f,
+                GameplayPhaseMask.Wave, new[] { effect.Id }, Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
+                triggerRefs: new[] { trigger.Id });
+            var withZeroCatalog = new GameplayCatalog(new[] { withZero }, new[] { targeting }, new[] { effect },
+                Array.Empty<ExecutionDefinition>(), new[] { trigger }, Array.Empty<ModifierDefinition>(),
+                new System.Collections.Generic.Dictionary<string, AbilityId>());
+            var validZero = GameplayAbilityRuntime.Activate(store, withZeroCatalog, new float[1],
+                new AbilityActivationRequest(0, 0, 1f, 0, withZero.Id,
+                    effect: new EffectId(0), trigger: new TriggerId(0)));
+            Assert.True(validZero.Accepted, $"reason={validZero.Reason}; effectRejections={store.GameplayEffectsRuntime.Rejections}");
+            Assert.Equal(1, store.GetEffectCount(0));
+
+            var execution = Execution(EffectPayloadKind.Shield, 2f, ExecutionOperation.ApplyShield);
+            var noEffectCatalog = Catalog(execution);
+            var invalidZero = GameplayAbilityRuntime.Activate(store, noEffectCatalog, new float[1],
+                new AbilityActivationRequest(0, 0, 1f, 0, new AbilityId(0),
+                    effect: new EffectId(0), trigger: new TriggerId(0)));
+            Assert.False(invalidZero.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.InvalidRequest, invalidZero.Reason);
+
+            var absent = GameplayAbilityRuntime.Activate(store, noEffectCatalog, new float[1],
+                new AbilityActivationRequest(0, 0, 1f, 0, new AbilityId(0), effect: null));
+            Assert.True(absent.Accepted);
+        }
+
+        [Fact]
+        public void TowerSourceKeepsPlayerOwnerAndEnemyTargetAcrossPayloadFacts()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 10f, 1);
+            int tower = store.CreateEntity();
+            store.AddTower(tower, TowerType.Basic, 10f, 5, 1f, 1, 10f);
+            int enemy = store.AddEnemy(1f, 0f, 0f, 100f, 100f, 0f, 0, 1);
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 5, 1, 1, 1,
+                relation: RelationFilter.Enemies, maxTargetsMode: MaxTargetsPolicy.Fixed);
+            var executions = new[]
+            {
+                Execution(EffectPayloadKind.Damage, 3f, ExecutionOperation.ApplyDamage, id: 0),
+                Execution(EffectPayloadKind.Shield, 2f, ExecutionOperation.ApplyShield, id: 1),
+                Execution(EffectPayloadKind.GameplayEvent, 1f, ExecutionOperation.Default, id: 2)
+            };
+            var ability = new AbilityDefinition(new AbilityId(0), "tower-owned", targeting, ClockId.Combat, 1f,
+                GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
+                executions: new[] { executions[0].Id, executions[1].Id, executions[2].Id });
+            var catalog = new GameplayCatalog(new[] { ability }, new[] { targeting },
+                Array.Empty<GameplayEffectDefinition>(), executions, Array.Empty<TriggerDefinition>(),
+                Array.Empty<ModifierDefinition>(), new System.Collections.Generic.Dictionary<string, AbilityId>());
+
+            var result = GameplayAbilityRuntime.Activate(store, catalog, new float[store.TowerActiveCooldown.Length],
+                new AbilityActivationRequest(tower, tower, 1f, enemy, ability.Id, ownerPlayerId: 0));
+            Assert.True(result.Accepted, result.Reason.ToString());
+            Assert.True(store.DamageResolver.Events.Count >= 4);
+            for (int i = 0; i < store.DamageResolver.Events.Count; i++)
+            {
+                var fact = store.DamageResolver.Events.Get(i);
+                Assert.Equal(tower, fact.Source.Index);
+                Assert.Equal(enemy, fact.Target.Index);
+                Assert.Equal(0, fact.OwnerPlayerId);
+            }
         }
 
         [Fact]

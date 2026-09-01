@@ -9,8 +9,8 @@ namespace BattleSystemECS.Core.GAS
         internal static IReadOnlyList<T> List<T>(IReadOnlyList<T> values) { var copy = new T[values == null ? 0 : values.Count]; if (values != null) for (int i = 0; i < copy.Length; i++) copy[i] = values[i]; return Array.AsReadOnly(copy); }
     }
     public enum TargetingShape { Single, Cross, Box, Circle, Chain, Heal, Shield, Line, Freeze, Cone, GroundTarget, Slow, TimeRewind, ChainHeal, MassResurrect, AoeStun, AoeRoot, AoeKnockback }
-    public enum EffectPayloadKind { Damage, Heal, Shield, Resurrect, Resource, CrowdControl, Slow, GameplayEvent }
-    public enum ExecutionOperation { Default, ApplyDamage, ApplyHeal, ApplyShield, Resurrect, RestoreSnapshot, ApplyCrowdControl, ApplySlow }
+    public enum EffectPayloadKind { Damage, Heal, Shield, Resurrect, Resource, CrowdControl, Slow, GameplayEvent, WorldAction }
+    public enum ExecutionOperation { Default, ApplyDamage, ApplyHeal, ApplyShield, Resurrect, RestoreSnapshot, ApplyCrowdControl, ApplySlow, SummonEnemy, PrepareStealth }
     public enum RefreshPolicy { None, Duration, StacksAndDuration }
     public enum SourceDeathPolicy { Persist, Remove }
     public enum DurationPolicy { Instant, Duration, Infinite }

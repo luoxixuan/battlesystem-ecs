@@ -130,7 +130,8 @@ namespace BattleSystemECS.Core.GAS
                 bool hasNameAlias = aliases.TryGetValue(source.Name, out var abilityId);
                 bool needsTypedDefinition = RequiredEnemyPayload(source.AbilityType, out var requiredPayload);
                 bool nameIsCompatible = hasNameAlias && (!needsTypedDefinition ||
-                    AbilityContainsPayload(abilities, executions, abilityId, requiredPayload));
+                    AbilityContainsPayload(abilities, executions, abilityId, requiredPayload,
+                        RequiredEnemyOperation(source.AbilityType)));
                 if (!nameIsCompatible)
                 {
                     abilityId = new AbilityId(abilities.Count);
@@ -170,6 +171,18 @@ namespace BattleSystemECS.Core.GAS
                             magnitude = source.SlowFactor;
                             duration = source.SlowDuration;
                             break;
+                        case "summon_minion":
+                            shape = TargetingShape.Single;
+                            payload = EffectPayloadKind.WorldAction;
+                            operation = ExecutionOperation.SummonEnemy;
+                            magnitude = 1f;
+                            break;
+                        case "stealth_attack":
+                            shape = TargetingShape.Single;
+                            payload = EffectPayloadKind.WorldAction;
+                            operation = ExecutionOperation.PrepareStealth;
+                            magnitude = 1f;
+                            break;
                     }
 
                     // Zero-execution definitions are explicit world-action or unsupported
@@ -183,11 +196,17 @@ namespace BattleSystemECS.Core.GAS
                         executionIds.Add(executionId);
                     }
 
+                    bool group = string.Equals(source.AbilityType, "heal_allies", StringComparison.OrdinalIgnoreCase) ||
+                                 string.Equals(source.AbilityType, "aoe_damage", StringComparison.OrdinalIgnoreCase) ||
+                                 string.Equals(source.AbilityType, "stun_aoe", StringComparison.OrdinalIgnoreCase) ||
+                                 string.Equals(source.AbilityType, "slow_aoe", StringComparison.OrdinalIgnoreCase);
+                    bool self = string.Equals(source.AbilityType, "self_heal", StringComparison.OrdinalIgnoreCase) ||
+                                payload == EffectPayloadKind.WorldAction;
                     var targeting = new TargetingDefinition(new TargetingId(abilityId.Value), shape,
-                        (int)Math.Max(0f, source.AoeRadius), 1, 1, shape == TargetingShape.Heal ? 0 : 1,
+                        (int)Math.Max(0f, source.AoeRadius), 1, 1, group ? 0 : 1,
                         radius: Math.Max(0f, source.AoeRadius),
-                        relation: shape == TargetingShape.Heal ? RelationFilter.Allies : RelationFilter.Enemies,
-                        maxTargetsMode: shape == TargetingShape.Heal ? MaxTargetsPolicy.Unlimited : MaxTargetsPolicy.Fixed);
+                        relation: self ? RelationFilter.Self : shape == TargetingShape.Heal ? RelationFilter.Allies : RelationFilter.Enemies,
+                        maxTargetsMode: group ? MaxTargetsPolicy.Unlimited : MaxTargetsPolicy.Fixed);
                     targetings.Add(targeting);
                     string compiledName = hasNameAlias ? source.Name + " [" + source.Id + "]" : source.Name;
                     abilities.Add(new AbilityDefinition(abilityId, compiledName, targeting, ClockId.Combat,
@@ -215,19 +234,36 @@ namespace BattleSystemECS.Core.GAS
             if (type == "aoe_damage") { payload = EffectPayloadKind.Damage; return true; }
             if (type == "stun_aoe") { payload = EffectPayloadKind.CrowdControl; return true; }
             if (type == "slow_aoe") { payload = EffectPayloadKind.Slow; return true; }
+            if (type == "summon_minion" || type == "stealth_attack") { payload = EffectPayloadKind.WorldAction; return true; }
             payload = EffectPayloadKind.GameplayEvent;
             return false;
         }
 
+        private static ExecutionOperation RequiredEnemyOperation(string abilityType)
+        {
+            switch ((abilityType ?? string.Empty).ToLowerInvariant())
+            {
+                case "self_heal": case "heal_allies": return ExecutionOperation.ApplyHeal;
+                case "aoe_damage": return ExecutionOperation.ApplyDamage;
+                case "stun_aoe": return ExecutionOperation.ApplyCrowdControl;
+                case "slow_aoe": return ExecutionOperation.ApplySlow;
+                case "summon_minion": return ExecutionOperation.SummonEnemy;
+                case "stealth_attack": return ExecutionOperation.PrepareStealth;
+                default: return ExecutionOperation.Default;
+            }
+        }
+
         private static bool AbilityContainsPayload(IReadOnlyList<AbilityDefinition> abilities,
-            IReadOnlyList<ExecutionDefinition> executions, AbilityId abilityId, EffectPayloadKind payload)
+            IReadOnlyList<ExecutionDefinition> executions, AbilityId abilityId, EffectPayloadKind payload,
+            ExecutionOperation operation)
         {
             if ((uint)abilityId.Value >= (uint)abilities.Count) return false;
             var ability = abilities[abilityId.Value];
             for (int i = 0; i < ability.Executions.Count; i++)
             {
                 int executionId = ability.Executions[i].Value;
-                if ((uint)executionId < (uint)executions.Count && executions[executionId].Payload == payload) return true;
+                if ((uint)executionId < (uint)executions.Count && executions[executionId].Payload == payload &&
+                    executions[executionId].Operation == operation) return true;
             }
             return false;
         }
@@ -359,10 +395,20 @@ namespace BattleSystemECS.Core.GAS
                         if (staticNames.Contains(name)) throw new CatalogValidationException($"{skillPath}: static skill alias conflict '{name}'");
                         if (aliases.ContainsKey(name)) continue; // curated entries have precedence
                         staticNames.Add(name);
-                        var entry = new AbilityCatalogEntry(new AbilityId(abilities.Count), name, AreaShapeType.Single, 0f);
+                        TargetingShape staticShape = staticRecord.Width > 1 || staticRecord.Height > 1
+                            ? TargetingShape.Box : TargetingShape.Single;
+                        var entry = new AbilityCatalogEntry(new AbilityId(abilities.Count), name, (int)staticShape, 0f);
                         var staticExecution = new ExecutionId(executions.Count);
                         executions.Add(new ExecutionDefinition(staticExecution, EffectPayloadKind.Damage, staticRecord.DamageMultiplier, CatalogRegistries.SkillTag, MagnitudeSource.Multiplier, DamageAmountStage.LegacyMultiplier));
-                        typedAbilities.Add(new AbilityDefinition(entry.Id, name, new TargetingDefinition(new TargetingId(entry.Id.Value), TargetingShape.Single, staticRecord.Range, staticRecord.Width, staticRecord.Height, 1), ClockId.Combat, staticRecord.Cooldown, GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(), CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, ActivationPolicy.Instant, staticRecord.ManaCost, new[] { staticExecution }, staticRecord.ManaCost > 0 ? new[] { new CostDefinition(CatalogRegistries.Mana, staticRecord.ManaCost) } : Array.Empty<CostDefinition>()));
+                        typedAbilities.Add(new AbilityDefinition(entry.Id, name,
+                            new TargetingDefinition(new TargetingId(entry.Id.Value), staticShape, staticRecord.Range,
+                                staticRecord.Width, staticRecord.Height, staticShape == TargetingShape.Single ? 1 : 0,
+                                relation: RelationFilter.Enemies,
+                                maxTargetsMode: staticShape == TargetingShape.Single ? MaxTargetsPolicy.Fixed : MaxTargetsPolicy.Unlimited),
+                            ClockId.Combat, staticRecord.Cooldown, GameplayPhaseMask.Wave, Array.Empty<EffectId>(),
+                            Array.Empty<ModifierDefinition>(), CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
+                            ActivationPolicy.Instant, staticRecord.ManaCost, new[] { staticExecution },
+                            staticRecord.ManaCost > 0 ? new[] { new CostDefinition(CatalogRegistries.Mana, staticRecord.ManaCost) } : Array.Empty<CostDefinition>()));
                         targetings.Add(typedAbilities[typedAbilities.Count - 1].Targeting);
                         abilities.Add(entry);
                         AddAlias(aliases, name, entry.Id, skillPath);
@@ -403,7 +449,17 @@ namespace BattleSystemECS.Core.GAS
             {
                 case "single": parsed = TargetingShape.Single; break; case "cross": parsed = TargetingShape.Cross; break; case "box": parsed = TargetingShape.Box; break; case "circle": parsed = TargetingShape.Circle; break; case "chain": parsed = TargetingShape.Chain; break; case "heal": parsed = TargetingShape.Heal; break; case "shield": parsed = TargetingShape.Shield; break; case "line": parsed = TargetingShape.Line; break; case "freeze": parsed = TargetingShape.Freeze; break; case "cone": parsed = TargetingShape.Cone; break; case "groundtarget": parsed = TargetingShape.GroundTarget; break; case "slow": parsed = TargetingShape.Slow; break; case "timerwind": parsed = TargetingShape.TimeRewind; break; case "chainheal": parsed = TargetingShape.ChainHeal; break; case "massresurrect": parsed = TargetingShape.MassResurrect; break; case "aoestun": parsed = TargetingShape.AoeStun; break; case "aoeroot": parsed = TargetingShape.AoeRoot; break; case "aoeknockback": parsed = TargetingShape.AoeKnockback; break; default: throw new CatalogValidationException($"{path}: unknown target shape '{value}' for id {id}");
             }
-            return new TargetingDefinition(new TargetingId(id), parsed, Int(node, "AttackRange", path, id), Int(node, "AreaWidth", path, id), Int(node, "AreaHeight", path, id), 1, Number(node, "AreaRadius", 0f, path, id), Number(node, "ConeAngleDegrees", 0f, path, id));
+            bool self = parsed == TargetingShape.Heal || parsed == TargetingShape.Shield ||
+                        parsed == TargetingShape.TimeRewind ||
+                        parsed == TargetingShape.MassResurrect;
+            bool fixedTarget = parsed == TargetingShape.Single || self;
+            bool chain = parsed == TargetingShape.Chain || parsed == TargetingShape.ChainHeal;
+            return new TargetingDefinition(new TargetingId(id), parsed, Int(node, "AttackRange", path, id),
+                Int(node, "AreaWidth", path, id), Int(node, "AreaHeight", path, id), chain ? 4 : fixedTarget ? 1 : 0,
+                Number(node, "AreaRadius", 0f, path, id), Number(node, "ConeAngleDegrees", 0f, path, id),
+                relation: parsed == TargetingShape.ChainHeal ? RelationFilter.Allies :
+                    self ? RelationFilter.Self : RelationFilter.Enemies,
+                maxTargetsMode: chain || fixedTarget ? MaxTargetsPolicy.Fixed : MaxTargetsPolicy.Unlimited);
         }
         private static int Int(JsonElement node, string property, string path, int id) { if (!node.TryGetProperty(property, out var value)) return 0; if (!value.TryGetInt32(out var number) || number < 0) throw new CatalogValidationException($"{path}: invalid {property} for id {id}"); return number; }
         private static TagId ParseTag(string value, string path, int id) { if (!CatalogRegistries.TryTag(value, out var tag)) throw new CatalogValidationException($"{path}: unknown effect tag '{value}' for id {id}"); return tag; }

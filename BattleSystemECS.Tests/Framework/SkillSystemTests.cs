@@ -257,5 +257,48 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(AbilityActivationRejectReason.UnsupportedDefinition, result.Reason);
             Assert.Equal(0f, Store.GetAbility(pid, 0).CurrentCooldown);
         }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void StrictAutomaticEntrypointsUseCatalogActivationWithoutLegacyDamageQueue(bool passive)
+        {
+            int pid = Player(p => { p.X = 0f; p.Y = 0f; p.Health = 100f; p.AttackDamage = 10f; });
+            int enemy = MakeEnemy(1f, 0f, hp: 100f);
+            Config.StrictCatalogReferences = true;
+            Config.Skills.Clear();
+            Config.Skills.Add(new SkillConfig
+            {
+                Name = "automatic-catalog", AreaShape = "circle", AreaRadius = 3,
+                DamageMultiplier = 1f, Cooldown = 2f, AutoCast = passive
+            });
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Circle,
+                3, 3, 3, 0, radius: 3f, relation: RelationFilter.Enemies,
+                maxTargetsMode: MaxTargetsPolicy.Unlimited);
+            var execution = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage, 5f,
+                CatalogRegistries.SkillTag, operation: ExecutionOperation.ApplyDamage);
+            var ability = new AbilityDefinition(new AbilityId(0), "automatic-catalog", targeting,
+                ClockId.Combat, 2f, GameplayPhaseMask.Wave, Array.Empty<EffectId>(),
+                Array.Empty<ModifierDefinition>(), CatalogRegistries.SkillExecutor,
+                CatalogRegistries.SkillConsumer, executions: new[] { execution.Id });
+            Config.CompiledCatalog = new GameplayCatalog(new[] { ability }, new[] { targeting },
+                Array.Empty<GameplayEffectDefinition>(), new[] { execution }, Array.Empty<TriggerDefinition>(),
+                Array.Empty<ModifierDefinition>(), new System.Collections.Generic.Dictionary<string, AbilityId>
+                {
+                    [ability.Name] = ability.Id
+                });
+            var sys = new SkillSystem(Store, Renderer, pid, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
+            sys.InitializePlayerSkills();
+            sys.SetTurn(0);
+
+            if (passive) sys.Update(0f);
+            else sys.AutoCastBestSkill();
+
+            Assert.Equal(95f, Store.EnemyHealth[enemy]);
+            Assert.Equal(0, sys.PendingSkillDamageCount);
+            Assert.Equal(0, Store.DamageResolver.PendingRequestCount);
+            Assert.Equal(2f, Store.GetAbility(pid, 0).CurrentCooldown);
+        }
     }
 }

@@ -1283,6 +1283,7 @@ namespace BattleSystemECS.Core
         }
 
         public int NextEntityId => nextEntityId;
+        public bool HasEntityCapacity => nextEntityId < MAX_ENTITIES || !freeEntityIds.IsEmpty;
 
         public string GetEntityName(int entityId)
         {

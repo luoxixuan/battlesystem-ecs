@@ -356,5 +356,25 @@ namespace BattleSystemECS.Tests.Features.Skills
             Assert.Equal(0f, sys.GetHeroSkillCooldown(0, 0));
             Assert.Equal(0, Store.DamageResolver.PendingRequestCount);
         }
+
+        [Fact]
+        public void StrictCatalog_HeroesUsingSameSlotKeepIndependentCooldowns()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            int playerId = Player(p => { p.EntityId = 0; p.Health = 100f; });
+            var sys = new HeroSkillSystem(Store, playerId, "Data/Configs/hero_skills.json", config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
+            sys.Initialize();
+            Store.HeroIsDeployed[0] = true;
+            Store.HeroIsDeployed[1] = true;
+            const int slot = 2;
+
+            Assert.True(sys.TriggerHeroSkill(1, slot));
+            Assert.Equal(0f, sys.GetHeroSkillCooldown(0, slot));
+            Assert.True(sys.GetHeroSkillCooldown(1, slot) > 0f);
+            Assert.False(sys.TriggerHeroSkill(1, slot));
+            Assert.True(sys.TriggerHeroSkill(0, slot));
+            Assert.True(sys.GetHeroSkillCooldown(0, slot) > 0f);
+        }
     }
 }

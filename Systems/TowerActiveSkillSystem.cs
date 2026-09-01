@@ -35,6 +35,8 @@ namespace BattleSystemECS.Systems
         private GameConfig? _config;
         private readonly CompatibilityCatalogEntry?[] _compatibilityCatalogs = new CompatibilityCatalogEntry?[ComponentStore.MAX_ENTITIES];
         private PhaseContext _phaseContext = PhaseContext.Unbound;
+        private readonly List<int> _catalogTargets = new List<int>(32);
+        private readonly List<float> _catalogMagnitudeScales = new List<float>(32);
         public PhaseContextKind CurrentPhaseContext => _phaseContext.Kind;
         public AbilityActivationResult LastActivation { get; private set; }
 
@@ -91,13 +93,13 @@ namespace BattleSystemECS.Systems
             if (!ComponentStore.IsValidEntity(towerId) || !store.TowerActive[towerId]) return Reject(towerId, AbilityActivationRejectReason.InvalidRequest);
             int skillId = store.TowerActiveSkillId[towerId];
             if (skillId < 0) return Reject(towerId, AbilityActivationRejectReason.InvalidRequest);
-            int targetId = FindTarget(towerId);
             var catalog = _config?.CompiledCatalog;
             var configuredSkill = _config?.TryGetSkillById(skillId);
             AbilityId abilityId = default(AbilityId);
             AbilityDefinition catalogAbility = default(AbilityDefinition);
             bool resolved = catalog != null && configuredSkill != null &&
                 catalog.TryResolveAlias(configuredSkill.Name, out abilityId) && catalog.TryGetAbility(abilityId, out catalogAbility);
+            bool useTypedTargeting = resolved;
             if (!resolved)
             {
                 if (_config?.StrictCatalogReferences == true)
@@ -106,12 +108,26 @@ namespace BattleSystemECS.Systems
             }
             if (catalog == null || !catalog.TryGetAbility(abilityId, out catalogAbility))
                 return Reject(towerId, AbilityActivationRejectReason.UnsupportedDefinition);
+            int targetId = useTypedTargeting ? towerId : FindTarget(towerId);
+            if (targetId < 0) return Reject(towerId, AbilityActivationRejectReason.NoTarget);
+            bool selfTarget = catalogAbility.Targeting.Relation == RelationFilter.Self;
+            if (useTypedTargeting && !selfTarget)
+            {
+                if (!TargetingRuntime.TryCollectEnemyTargets(store, towerId, catalogAbility.Targeting,
+                        _catalogTargets, _catalogMagnitudeScales))
+                    return Reject(towerId, AbilityActivationRejectReason.UnsupportedDefinition);
+                if (_catalogTargets.Count == 0)
+                    return Reject(towerId, AbilityActivationRejectReason.NoTarget);
+                targetId = _catalogTargets[0];
+            }
             var request = new AbilityActivationRequest(towerId, towerId, store.TowerActiveCooldownMax[towerId], targetId,
-                abilityId, catalogAbility.Effects.Count > 0 ? catalogAbility.Effects[0] : default(EffectId),
-                catalogAbility.TriggerRefs.Count > 0 ? catalogAbility.TriggerRefs[0] : default(TriggerId));
-            if (targetId < 0)
-                return Reject(towerId, AbilityActivationRejectReason.NoTarget);
-            var result = GameplayAbilityRuntime.Activate(store, catalog, store.TowerActiveCooldown, request);
+                abilityId, catalogAbility.Effects.Count > 0 ? catalogAbility.Effects[0] : (EffectId?)null,
+                catalogAbility.TriggerRefs.Count > 0 ? catalogAbility.TriggerRefs[0] : (TriggerId?)null,
+                ownerPlayerId: store.PlayerEntityId);
+            var result = !useTypedTargeting || selfTarget
+                ? GameplayAbilityRuntime.Activate(store, catalog, store.TowerActiveCooldown, request)
+                : GameplayAbilityRuntime.ActivateTargets(store, catalog, store.TowerActiveCooldown, request,
+                    _catalogTargets, _catalogMagnitudeScales);
             if (result.Accepted)
                 Console.WriteLine($"[TOWER_ACTIVE] tower={towerId} target={targetId} skill={ResolveSkillName(skillId)}");
             // Compatibility audit marker: cooldown ownership is inside

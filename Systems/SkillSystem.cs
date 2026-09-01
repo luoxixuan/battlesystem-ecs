@@ -91,25 +91,24 @@ namespace BattleSystemECS.Systems
             if (slot < 0) return CatalogReject(abilityId, AbilityActivationRejectReason.InvalidRequest);
             if (!IsAbilityAllowed((int)definition.Targeting.Shape))
                 return CatalogReject(abilityId, AbilityActivationRejectReason.PhaseNotAllowed, slot);
-            int targetId = playerId;
-            for (int i = 0; i < definition.Executions.Count; i++)
-            {
-                if (!catalog.TryGetExecution(definition.Executions[i], out var execution))
-                    return CatalogReject(abilityId, AbilityActivationRejectReason.UnsupportedDefinition, slot);
-                if (execution.Payload == EffectPayloadKind.Damage)
-                {
-                    targetId = -1;
-                    var enemies = store.ActiveEnemyIds;
-                    for (int j = 0; j < enemies.Count; j++)
-                        if (store.EnemyActive[enemies[j]] && store.EnemyHealth[enemies[j]] > 0f) { targetId = enemies[j]; break; }
-                    if (targetId < 0) return CatalogReject(abilityId, AbilityActivationRejectReason.NoTarget, slot);
-                    break;
-                }
-            }
-            var request = new AbilityActivationRequest(playerId, slot, definition.Cooldown, targetId, abilityId,
-                definition.Effects.Count > 0 ? definition.Effects[0] : default(EffectId),
-                definition.TriggerRefs.Count > 0 ? definition.TriggerRefs[0] : default(TriggerId));
-            return GameplayAbilityRuntime.Activate(store, catalog, playerId, slot, request, this);
+            bool selfTarget = definition.Targeting.Relation == RelationFilter.Self;
+            var request = new AbilityActivationRequest(playerId, slot, definition.Cooldown, playerId, abilityId,
+                definition.Effects.Count > 0 ? definition.Effects[0] : (EffectId?)null,
+                definition.TriggerRefs.Count > 0 ? definition.TriggerRefs[0] : (TriggerId?)null,
+                ownerPlayerId: playerId);
+            if (selfTarget)
+                return GameplayAbilityRuntime.Activate(store, catalog, playerId, slot, request, this);
+            bool collected = definition.Targeting.Relation == RelationFilter.Allies
+                ? TargetingRuntime.TryCollectAllyTargets(store, playerId, definition.Targeting,
+                    _catalogTargets, _catalogMagnitudeScales)
+                : TargetingRuntime.TryCollectEnemyTargets(store, playerId, definition.Targeting,
+                    _catalogTargets, _catalogMagnitudeScales);
+            if (!collected)
+                return CatalogReject(abilityId, AbilityActivationRejectReason.UnsupportedDefinition, slot);
+            if (_catalogTargets.Count == 0)
+                return CatalogReject(abilityId, AbilityActivationRejectReason.NoTarget, slot);
+            return GameplayAbilityRuntime.ActivateTargets(store, catalog, playerId, slot, request,
+                _catalogTargets, _catalogMagnitudeScales, this);
         }
 
         bool IAbilityPayloadHandler.CanCommit(AbilityPayloadContext context)
@@ -147,31 +146,17 @@ namespace BattleSystemECS.Systems
             if (context.Execution.Payload == EffectPayloadKind.Resource)
                 return timeRewindSystem.RestoreFromSnapshot(playerId, context.Magnitude) >= 0f ? 1 : 0;
 
-            float radius = context.Ability.Targeting.Radius > 0f
-                ? context.Ability.Targeting.Radius : context.Ability.Targeting.Range;
-            float radiusSquared = radius * radius;
-            float x = store.PositionX[playerId];
-            float y = store.PositionY[playerId];
-            int applied = 0;
-            var enemies = store.ActiveEnemyIds;
-            for (int i = 0; i < enemies.Count; i++)
-            {
-                int enemyId = enemies[i];
-                if (!store.EnemyActive[enemyId] || store.EnemyHealth[enemyId] <= 0f) continue;
-                float dx = store.PositionX[enemyId] - x;
-                float dy = store.PositionY[enemyId] - y;
-                if (dx * dx + dy * dy > radiusSquared) continue;
-                if (context.Execution.Payload == EffectPayloadKind.Slow)
-                    store.ApplyEnemySlow(enemyId, context.Magnitude, Math.Max(1, (int)Math.Ceiling(context.Execution.Duration)));
-                else if (context.Ability.Targeting.Shape == TargetingShape.AoeRoot)
-                    store.ApplyEnemyRoot(enemyId, Math.Max(1, (int)Math.Ceiling(context.Magnitude)));
-                else if (context.Ability.Targeting.Shape == TargetingShape.AoeKnockback)
-                    store.ApplyEnemyKnockback(enemyId, context.Magnitude);
-                else
-                    store.ApplyEnemyStun(enemyId, Math.Max(1, (int)Math.Ceiling(context.Magnitude)));
-                applied++;
-            }
-            return applied;
+            int enemyId = context.Target.Index;
+            if (!store.EnemyActive[enemyId] || store.EnemyHealth[enemyId] <= 0f) return 0;
+            if (context.Execution.Payload == EffectPayloadKind.Slow)
+                store.ApplyEnemySlow(enemyId, context.Magnitude, Math.Max(1, (int)Math.Ceiling(context.Execution.Duration)));
+            else if (context.Ability.Targeting.Shape == TargetingShape.AoeRoot)
+                store.ApplyEnemyRoot(enemyId, Math.Max(1, (int)Math.Ceiling(context.Magnitude)));
+            else if (context.Ability.Targeting.Shape == TargetingShape.AoeKnockback)
+                store.ApplyEnemyKnockback(enemyId, context.Magnitude);
+            else
+                store.ApplyEnemyStun(enemyId, Math.Max(1, (int)Math.Ceiling(context.Magnitude)));
+            return 1;
         }
 
         private int FindSlot(string name)
@@ -197,6 +182,8 @@ namespace BattleSystemECS.Systems
         private const int ParallelMinEnemies = 500;
         private List<int>[] _hitBatchBuffers = new List<int>[8];
         private readonly List<int> _mergedHits = new List<int>(64);
+        private readonly List<int> _catalogTargets = new List<int>(64);
+        private readonly List<float> _catalogMagnitudeScales = new List<float>(64);
         private readonly Dictionary<int, Func<AbilityExecutionContext, int>> _shapeHandlers = new Dictionary<int, Func<AbilityExecutionContext, int>>();
 
         private readonly struct AbilityExecutionContext
@@ -475,7 +462,8 @@ namespace BattleSystemECS.Systems
                         }
                         continue;
                     }
-                    ExecuteAbility(inst.Definition, slot);
+                    if (!TryActivateCatalogProjection(inst.Definition, out _))
+                        ExecuteAbility(inst.Definition, slot);
                 }
             }
         }
@@ -532,6 +520,24 @@ namespace BattleSystemECS.Systems
             }
             renderer.Log($"[SKILL] Unknown ability: '{skillName}'");
             return false;
+        }
+
+        private bool TryActivateCatalogProjection(GameplayAbilityDef definition, out bool accepted)
+        {
+            accepted = false;
+            var catalog = gameConfig?.CompiledCatalog;
+            if (catalog != null && catalog.TryResolveAlias(definition.Name, out var abilityId))
+            {
+                var activation = TryActivateCatalogAbility(abilityId);
+                accepted = activation.Accepted;
+                if (!accepted)
+                    renderer.Log($"[ABILITY_REJECTED] {activation.Reason} skill={definition.Name}");
+                return true;
+            }
+            if (gameConfig?.StrictCatalogReferences != true) return false;
+            _rejectedAbilityCount++;
+            renderer.Log($"[ABILITY_REJECTED] UnsupportedDefinition skill={definition.Name}");
+            return true;
         }
 
         public static bool IsBuildAllowedAbility(int shape)
@@ -1520,7 +1526,8 @@ namespace BattleSystemECS.Systems
                         renderer.Log($"[ABILITY_REJECTED] PhaseNotAllowed skill={inst.Definition.Name}");
                         return;
                     }
-                    ExecuteAbility(inst.Definition, slot);
+                    if (!TryActivateCatalogProjection(inst.Definition, out _))
+                        ExecuteAbility(inst.Definition, slot);
                     return;
                 }
             }

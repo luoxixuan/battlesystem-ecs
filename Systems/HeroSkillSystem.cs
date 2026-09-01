@@ -53,6 +53,8 @@ namespace BattleSystemECS.Systems
 
         // Cached "any slot is configured" sentinel for O(1) fast-path in Update().
         private bool _anySkillConfigured;
+        private readonly List<int> _catalogTargets = new List<int>(16);
+        private readonly List<float> _catalogMagnitudeScales = new List<float>(16);
         private PhaseContext _phaseContext = PhaseContext.Unbound;
         public AbilityActivationResult LastActivation { get; private set; }
         private int _pendingHeroId = -1;
@@ -197,27 +199,33 @@ namespace BattleSystemECS.Systems
             var catalog = _config?.CompiledCatalog;
             if (catalog == null)
             {
-                if (!GameplayAbilityRuntime.TryActivate(_heroSkillCooldowns, new AbilityActivationRequest(heroId, slot, _heroSkillCooldownMax[flatIdx])).Accepted) return false;
+                if (!GameplayAbilityRuntime.TryActivate(_heroSkillCooldowns,
+                        new AbilityActivationRequest(store.PlayerEntityId, flatIdx, _heroSkillCooldownMax[flatIdx],
+                            ownerPlayerId: store.PlayerEntityId)).Accepted) return false;
                 _heroSkillCooldowns[flatIdx] = _heroSkillCooldownMax[flatIdx];
                 return true;
             }
             if (!TryResolveCatalogAbility(catalog, ResolveSkillNameById(skillId), out var abilityId) ||
                 !catalog.TryGetAbility(abilityId, out var ability)) return false;
 
-            int targetId = store.PlayerEntityId;
-            for (int i = 0; i < ability.Executions.Count; i++)
+            bool selfTarget = ability.Targeting.Relation == RelationFilter.Self;
+            var activation = new AbilityActivationRequest(store.PlayerEntityId, flatIdx,
+                _heroSkillCooldownMax[flatIdx], store.PlayerEntityId, abilityId,
+                ownerPlayerId: store.PlayerEntityId);
+            AbilityActivationResult result;
+            if (selfTarget)
+                result = GameplayAbilityRuntime.Activate(store, catalog, _heroSkillCooldowns, activation);
+            else
             {
-                if (!catalog.TryGetExecution(ability.Executions[i], out var execution)) return false;
-                if (execution.Payload == EffectPayloadKind.Damage)
-                {
-                    targetId = FindFirstActiveEnemy();
-                    if (targetId < 0) return false;
-                    break;
-                }
+                bool collected = ability.Targeting.Relation == RelationFilter.Allies
+                    ? TargetingRuntime.TryCollectAllyTargets(store, store.PlayerEntityId, ability.Targeting,
+                        _catalogTargets, _catalogMagnitudeScales)
+                    : TargetingRuntime.TryCollectEnemyTargets(store, store.PlayerEntityId, ability.Targeting,
+                        _catalogTargets, _catalogMagnitudeScales);
+                if (!collected || _catalogTargets.Count == 0) return false;
+                result = GameplayAbilityRuntime.ActivateTargets(store, catalog, _heroSkillCooldowns, activation,
+                    _catalogTargets, _catalogMagnitudeScales);
             }
-            var activation = new AbilityActivationRequest(store.PlayerEntityId, slot,
-                _heroSkillCooldownMax[flatIdx], targetId, abilityId);
-            var result = GameplayAbilityRuntime.Activate(store, catalog, _heroSkillCooldowns, activation);
             LastActivation = result;
             if (!result.Accepted) return false;
             Console.WriteLine($"[HERO_SKILL] hero={heroId} slot={slot} ability={abilityId.Value} effects={result.AppliedEffects}");

@@ -13,7 +13,7 @@ namespace BattleSystemECS.Systems
     /// Handles enemy-cast abilities: self_heal, aoe_damage, buff_allies.
     /// Two-phase pattern: parallel collection → serial apply.
     /// </summary>
-    public class EnemyAbilitySystem
+    public class EnemyAbilitySystem : IAbilityPayloadHandler
     {
         private readonly ComponentStore store;
         private readonly IRenderer logger;
@@ -21,6 +21,7 @@ namespace BattleSystemECS.Systems
         private readonly GameConfig gameConfig;
         private readonly EventBus _eventBus;
         private readonly Dictionary<string, EnemyAbilityDef> _abilityLookup;
+        private readonly Dictionary<int, EnemyAbilityDef> _specialDefinitions = new Dictionary<int, EnemyAbilityDef>();
         private TelegraphSystem _telegraphSystem;
 
         // Ping-pong double-buffer for ability events — collected parallel, applied serial.
@@ -69,6 +70,15 @@ namespace BattleSystemECS.Systems
                         _abilityLookup[id] = ab;
                     }
                 }
+            }
+
+            var catalog = gameConfig.CompiledCatalog;
+            if (catalog != null)
+            {
+                foreach (var ability in _abilityLookup.Values)
+                    if (ResolveSpecialWorldAction(ability.AbilityType) != SpecialWorldAction.None &&
+                        catalog.TryResolveAlias(ability.Id, out var abilityId))
+                        _specialDefinitions[abilityId.Value] = ability;
             }
 
         }
@@ -308,9 +318,9 @@ namespace BattleSystemECS.Systems
                 var special = ResolveSpecialWorldAction(ability.AbilityType);
                 if (special != SpecialWorldAction.None)
                 {
-                    ExecuteSpecialWorldAction(enemyId, ability, special);
-                    GameplayAbilityRuntime.AbilityCommit(_abilityCooldownTimers,
-                        new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown));
+                    var result = TryExecuteTypedSpecialAbility(enemyId, ability, special);
+                    if (!result.Accepted)
+                        logger.Log($"[ABILITY_REJECTED] {result.Reason} enemyAbility={ability.Id}");
                     return;
                 }
 
@@ -368,13 +378,67 @@ namespace BattleSystemECS.Systems
 
         private bool CanDispatchStrict(EnemyAbilityDef ability)
         {
-            if (ResolveSpecialWorldAction(ability.AbilityType) != SpecialWorldAction.None) return true;
             string type = (ability.AbilityType ?? string.Empty).ToLowerInvariant();
             if (type == "buff_allies" || type == "silence_tower" || type == "dispel_tower") return false;
+            var catalog = gameConfig.CompiledCatalog;
+            if (ResolveSpecialWorldAction(ability.AbilityType) != SpecialWorldAction.None)
+            {
+                if (catalog == null || !catalog.TryResolveAlias(ability.Id, out var specialId) ||
+                    !catalog.TryGetAbility(specialId, out var specialAbility)) return false;
+                ExecutionOperation required = type == "summon_minion"
+                    ? ExecutionOperation.SummonEnemy : ExecutionOperation.PrepareStealth;
+                for (int i = 0; i < specialAbility.Executions.Count; i++)
+                    if (catalog.TryGetExecution(specialAbility.Executions[i], out var execution) &&
+                        execution.Payload == EffectPayloadKind.WorldAction && execution.Operation == required)
+                        return true;
+                return false;
+            }
             if (type != "self_heal" && type != "heal_allies" && type != "aoe_damage" &&
                 type != "stun_aoe" && type != "slow_aoe") return false;
-            var catalog = gameConfig.CompiledCatalog;
             return catalog != null && catalog.TryResolveAlias(ability.Id, out var id) && catalog.TryGetAbility(id, out _);
+        }
+
+        private AbilityActivationResult TryExecuteTypedSpecialAbility(int enemyId, EnemyAbilityDef ability,
+            SpecialWorldAction special)
+        {
+            var catalog = gameConfig.CompiledCatalog;
+            if (catalog == null || !catalog.TryResolveAlias(ability.Id, out var abilityId) ||
+                !catalog.TryGetAbility(abilityId, out var typed))
+                return new AbilityActivationResult(false, enemyId, CooldownSlot(enemyId),
+                    AbilityActivationRejectReason.UnsupportedDefinition);
+            ExecutionOperation required = special == SpecialWorldAction.SummonEnemy
+                ? ExecutionOperation.SummonEnemy : ExecutionOperation.PrepareStealth;
+            bool matched = false;
+            for (int i = 0; i < typed.Executions.Count; i++)
+                if (catalog.TryGetExecution(typed.Executions[i], out var execution) &&
+                    execution.Payload == EffectPayloadKind.WorldAction && execution.Operation == required)
+                    matched = true;
+            if (!matched) return new AbilityActivationResult(false, enemyId, CooldownSlot(enemyId),
+                AbilityActivationRejectReason.UnsupportedDefinition);
+            var request = new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown,
+                enemyId, abilityId, ownerPlayerId: playerId);
+            return GameplayAbilityRuntime.Activate(store, catalog, _abilityCooldownTimers, request, this);
+        }
+
+        bool IAbilityPayloadHandler.CanCommit(AbilityPayloadContext context)
+        {
+            if (context.Execution.Payload != EffectPayloadKind.WorldAction ||
+                !_specialDefinitions.TryGetValue(context.Ability.Id.Value, out var ability) ||
+                !store.EnemyActive[context.Source.Index]) return false;
+            if (context.Execution.Operation == ExecutionOperation.SummonEnemy)
+                return store.HasEntityCapacity;
+            return context.Execution.Operation == ExecutionOperation.PrepareStealth &&
+                   ability.DamageMultiplier > 0f;
+        }
+
+        int IAbilityPayloadHandler.Commit(AbilityPayloadContext context)
+        {
+            if (!_specialDefinitions.TryGetValue(context.Ability.Id.Value, out var ability)) return 0;
+            if (context.Execution.Operation == ExecutionOperation.SummonEnemy)
+                return EnemyWorldActionAdapter.Summon(store, logger, context.Source.Index, ability);
+            if (context.Execution.Operation == ExecutionOperation.PrepareStealth)
+                return EnemyWorldActionAdapter.PrepareStealth(store, logger, context.Source.Index, ability);
+            return 0;
         }
 
         private AbilityActivationResult TryExecuteTypedBasicAbility(int enemyId, EnemyAbilityDef ability)
@@ -413,7 +477,7 @@ namespace BattleSystemECS.Systems
                 _healMagnitudes.Clear();
                 CollectHealTargets(enemyId, ability, _healTargets, _healMagnitudes);
                 var groupRequest = new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown, -1, typedId,
-                    default(EffectId), default(TriggerId), 0f, float.NaN, playerId);
+                    null, null, 0f, float.NaN, playerId);
                 var groupResult = GameplayAbilityRuntime.ActivateHealTargets(store, catalog, _abilityCooldownTimers,
                     groupRequest, _healTargets, _healMagnitudes);
                 if (groupResult.Accepted)
@@ -452,8 +516,8 @@ namespace BattleSystemECS.Systems
 
         private void ExecuteSpecialWorldAction(int enemyId, EnemyAbilityDef ability, SpecialWorldAction action)
         {
-            if (action == SpecialWorldAction.SummonEnemy) ExecuteSummonMinion(enemyId, ability);
-            else if (action == SpecialWorldAction.PrepareStealth) ExecuteStealthAttack(enemyId, ability);
+            if (action == SpecialWorldAction.SummonEnemy) EnemyWorldActionAdapter.Summon(store, logger, enemyId, ability);
+            else if (action == SpecialWorldAction.PrepareStealth) EnemyWorldActionAdapter.PrepareStealth(store, logger, enemyId, ability);
         }
 
         private static int CooldownSlot(int enemyId) => enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY;
@@ -627,52 +691,52 @@ namespace BattleSystemECS.Systems
 
         private void ExecuteStealthAttack(int enemyId, EnemyAbilityDef ability)
         {
-            // Stealth attack: enhanced damage when attacking from stealth.
-            // Set the EnemyStealthMultiplier so the next attack in EnemyAISystem applies extra damage.
-            // EnemyStealthMultiplier is a dedicated field (not shared with EnemyBuffDamageBonus).
-            if (ability.DamageMultiplier <= 0f) return;
-
-            // Use Math.Max to preserve the strongest stealth bonus if multiple stealth_attack
-            // abilities fire in quick succession.
-            float existingMult = store.EnemyStealthMultiplier[enemyId];
-            store.EnemyStealthMultiplier[enemyId] = Math.Max(existingMult, ability.DamageMultiplier);
-            logger.Log($"[ABILITY] Enemy {enemyId} prepares stealth attack with {store.EnemyStealthMultiplier[enemyId]:F1}x damage multiplier ({ability.Name})");
+            EnemyWorldActionAdapter.PrepareStealth(store, logger, enemyId, ability);
         }
 
         private void ExecuteSummonMinion(int enemyId, EnemyAbilityDef ability)
         {
-            // Summon a weak minion at the enemy's position.
-            // Note: Creates a minimal entity with Normal type so it participates in active enemy iteration.
-            // The minion will use default stats (0) and will be killed quickly.
-            // Full implementation would require proper entity initialization through WaveSpawningSystem.
-            float enemyX = store.PositionX[enemyId];
-            float enemyY = store.PositionY[enemyId];
+            EnemyWorldActionAdapter.Summon(store, logger, enemyId, ability);
+        }
 
-            int minionId = store.CreateEntity();
-            if (minionId < 0) return;
+        private static class EnemyWorldActionAdapter
+        {
+            internal static int PrepareStealth(ComponentStore store, IRenderer logger, int enemyId,
+                EnemyAbilityDef ability)
+            {
+                if (ability.DamageMultiplier <= 0f) return 0;
+                float existing = store.EnemyStealthMultiplier[enemyId];
+                store.EnemyStealthMultiplier[enemyId] = Math.Max(existing, ability.DamageMultiplier);
+                logger.Log($"[ABILITY] Enemy {enemyId} prepares stealth attack with {store.EnemyStealthMultiplier[enemyId]:F1}x damage multiplier ({ability.Name})");
+                return 1;
+            }
 
-            // Set minion properties (30% of summoner's stats by default)
-            float healthMult = ability.MinionHealthMult > 0 ? ability.MinionHealthMult : 0.3f;
-            float damageMult = ability.MinionDamageMult > 0 ? ability.MinionDamageMult : 0.3f;
-            float baseHealth = store.EnemyMaxHealth[enemyId];
-            float baseDamage = store.EnemyDamage[enemyId];
-
-            store.EnemyHealth[minionId] = baseHealth * healthMult;
-            store.EnemyMaxHealth[minionId] = baseHealth * healthMult;
-            store.EnemyDamage[minionId] = baseDamage * damageMult;
-            store.EnemyMoveSpeed[minionId] = store.EnemyMoveSpeed[enemyId];
-            store.EnemyGoldReward[minionId] = Math.Max(1, store.EnemyGoldReward[enemyId] / 3);
-            store.EnemyWaveNumber[minionId] = store.EnemyWaveNumber[enemyId];
-            store.EnemyActive[minionId] = true;
-            store.EnemyTypeName[minionId] = "Normal";
-            store.PositionX[minionId] = enemyX;
-            store.PositionY[minionId] = enemyY;
-            store.PositionActive[minionId] = true;
-            store.SetEntityName(minionId, $"Minion_{minionId}");
-            // Add to active enemy list so minion is visible to TowerAttackSystem, EnemyMovementSystem, etc.
-            store.AddActiveEnemyId(minionId);
-
-            logger.Log($"[ABILITY] Enemy {enemyId} summons minion {minionId} (HP: {baseHealth * healthMult:F0}, DMG: {baseDamage * damageMult:F0}) ({ability.Name})");
+            internal static int Summon(ComponentStore store, IRenderer logger, int enemyId,
+                EnemyAbilityDef ability)
+            {
+                int minionId = store.CreateEntity();
+                if (minionId < 0)
+                    throw new InvalidOperationException("prevalidated summon capacity was unavailable during commit");
+                float healthMult = ability.MinionHealthMult > 0 ? ability.MinionHealthMult : 0.3f;
+                float damageMult = ability.MinionDamageMult > 0 ? ability.MinionDamageMult : 0.3f;
+                float baseHealth = store.EnemyMaxHealth[enemyId];
+                float baseDamage = store.EnemyDamage[enemyId];
+                store.EnemyHealth[minionId] = baseHealth * healthMult;
+                store.EnemyMaxHealth[minionId] = baseHealth * healthMult;
+                store.EnemyDamage[minionId] = baseDamage * damageMult;
+                store.EnemyMoveSpeed[minionId] = store.EnemyMoveSpeed[enemyId];
+                store.EnemyGoldReward[minionId] = Math.Max(1, store.EnemyGoldReward[enemyId] / 3);
+                store.EnemyWaveNumber[minionId] = store.EnemyWaveNumber[enemyId];
+                store.EnemyActive[minionId] = true;
+                store.EnemyTypeName[minionId] = "Normal";
+                store.PositionX[minionId] = store.PositionX[enemyId];
+                store.PositionY[minionId] = store.PositionY[enemyId];
+                store.PositionActive[minionId] = true;
+                store.SetEntityName(minionId, $"Minion_{minionId}");
+                store.AddActiveEnemyId(minionId);
+                logger.Log($"[ABILITY] Enemy {enemyId} summons minion {minionId} (HP: {baseHealth * healthMult:F0}, DMG: {baseDamage * damageMult:F0}) ({ability.Name})");
+                return 1;
+            }
         }
 
         private void ExecuteSilenceTower(int enemyId, EnemyAbilityDef ability)
