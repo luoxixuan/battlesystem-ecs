@@ -267,7 +267,8 @@ namespace BattleSystemECS.Systems
                 for (int slot = 0; slot < unboundCount; slot++)
                 {
                     var pending = store.GetAbility(playerId, slot);
-                    if (pending.Definition.Activation != AbilityActivation.Passive || !pending.CanActivate()) continue;
+                    if (pending.Definition.Activation != AbilityActivation.Passive ||
+                        !GameplayAbilityRuntime.TryActivate(store, playerId, slot, out _)) continue;
                     _rejectedAbilityCount++;
                     _lastRejectReason = SkillDamageRejectReason.PhaseNotAllowed;
                     if (!_buildPhaseRejectReported)
@@ -300,12 +301,13 @@ namespace BattleSystemECS.Systems
                 var inst = store.GetAbility(playerId, slot);
                 if (inst.CurrentCooldown > 0f)
                 {
-                    inst.CurrentCooldown = Math.Max(0f, inst.CurrentCooldown - deltaTime * cdrFactor * adrFactor);
-                    store.SetAbility(playerId, slot, inst);
+                    GameplayAbilityRuntime.TickCooldown(store, playerId, slot, deltaTime * cdrFactor * adrFactor);
+                    inst = store.GetAbility(playerId, slot);
                 }
 
                 // Auto-cast Passive abilities that are ready
-                if (inst.Definition.Activation == AbilityActivation.Passive && inst.CanActivate())
+                if (inst.Definition.Activation == AbilityActivation.Passive &&
+                    GameplayAbilityRuntime.TryActivate(store, playerId, slot, out _))
                 {
                     if (!IsAbilityAllowed(inst.Definition.AreaShape))
                     {
@@ -342,7 +344,7 @@ namespace BattleSystemECS.Systems
                         renderer.Log($"[ABILITY_REJECTED] PhaseNotAllowed skill={skillName}");
                         return false;
                     }
-                    if (!inst.CanActivate())
+                    if (!GameplayAbilityRuntime.TryActivate(store, playerId, slot, out _))
                     {
                         renderer.Log($"[SKILL] '{skillName}' on cooldown: {inst.CurrentCooldown:F1}s remaining (epsilon-consistent via CanActivate())");
                         return false;
@@ -475,9 +477,7 @@ namespace BattleSystemECS.Systems
             }
 
             // Start cooldown
-            var inst = store.GetAbility(playerId, slot);
-            inst.CurrentCooldown = def.Cooldown;
-            store.SetAbility(playerId, slot, inst);
+            GameplayAbilityRuntime.AbilityCommit(store, playerId, slot);
 
             renderer.Log($"[SKILL] {def.Name} cast! Hit {enemiesHit} enemies, cooldown: {def.Cooldown}s");
         }
