@@ -4,7 +4,7 @@ using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Core.GAS
 {
-    /// <summary>Deterministic typed target selection for player-originated abilities.</summary>
+    /// <summary>为玩家来源能力提供确定性的类型化选目标。</summary>
     public static class TargetingRuntime
     {
         private const int DerivedChainTargets = 4;

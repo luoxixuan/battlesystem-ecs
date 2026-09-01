@@ -274,8 +274,7 @@ namespace BattleSystemECS.Core
         public void CreateAll(ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus = null)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
-            // Computed projections are a production contract. The request is applied at
-            // the first frame boundary so no partially aggregated state is observable.
+            // 计算属性投影属于生产合同，在首个帧边界应用，避免暴露部分聚合状态。
             store.UseComputedAttributes = true;
             var combo = config.Combo ?? new ComboConfig();
             if (combo.TriggerThreshold < 1) throw new Core.GAS.CatalogValidationException("Combo.triggerThreshold must be positive");

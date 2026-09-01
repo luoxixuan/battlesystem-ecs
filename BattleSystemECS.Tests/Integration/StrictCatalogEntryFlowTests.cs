@@ -63,16 +63,17 @@ namespace BattleSystemECS.Tests.Integration
             int second = Enemy(e => { e.X = 0f; e.Y = 1f; e.Health = 30f; e.MaxHealth = 200f; });
             var system = new EnemyAbilitySystem(Store, Renderer, player, config);
             system.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
-            var healDef = Assert.Single(config.EnemyAbilities, ability => ability.Id == "healer_aoe_heal");
+            var healDef = FindEnemyAbility(config, ExecutionOperation.ApplyHeal,
+                (source, _) => source.AoeRadius > 0f).Source;
 
-            system.EnqueueAbility(healer, "healer_aoe_heal");
+            system.EnqueueAbility(healer, healDef.Id);
             system.ExecuteAbilities();
 
             Assert.Equal(20f + 100f * healDef.HealAmount, Store.EnemyHealth[first], 3);
             Assert.Equal(30f + 200f * healDef.HealAmount, Store.EnemyHealth[second], 3);
             float firstAfter = Store.EnemyHealth[first];
             float secondAfter = Store.EnemyHealth[second];
-            system.EnqueueAbility(healer, "healer_aoe_heal");
+            system.EnqueueAbility(healer, healDef.Id);
             system.ExecuteAbilities();
             Assert.Equal(firstAfter, Store.EnemyHealth[first]);
             Assert.Equal(secondAfter, Store.EnemyHealth[second]);
@@ -93,12 +94,12 @@ namespace BattleSystemECS.Tests.Integration
                     new AttributeKey(7), 1f, i + 1, ownerPlayerId: 0)).Accepted);
             var blockedSystem = new EnemyAbilitySystem(blockedStore, Renderer, 0, config);
             blockedSystem.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
-            blockedSystem.EnqueueAbility(blockedHealer, "healer_aoe_heal");
+            blockedSystem.EnqueueAbility(blockedHealer, healDef.Id);
             blockedSystem.ExecuteAbilities();
             Assert.Equal(20f, blockedStore.EnemyHealth[blockedFirst]);
             Assert.Equal(30f, blockedStore.EnemyHealth[blockedSecond]);
             blockedStore.BeginFrame();
-            blockedSystem.EnqueueAbility(blockedHealer, "healer_aoe_heal");
+            blockedSystem.EnqueueAbility(blockedHealer, healDef.Id);
             blockedSystem.ExecuteAbilities();
             blockedStore.ResourceResolver.CommitBoundary(DamageCommitBoundary.GameplayResolve);
             Assert.Equal(20f + 100f * healDef.HealAmount, blockedStore.EnemyHealth[blockedFirst], 3);
@@ -118,24 +119,25 @@ namespace BattleSystemECS.Tests.Integration
             int ambusher = Enemy(e => { e.X = 0f; e.Y = 0f; e.Health = 100f; e.MaxHealth = 100f; });
             var system = new EnemyAbilitySystem(Store, Renderer, player, config);
             system.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
+            var summon = FindEnemyAbility(config, ExecutionOperation.SummonEnemy).Source;
+            var stealth = FindEnemyAbility(config, ExecutionOperation.PrepareStealth).Source;
             int activeBefore = Store.ActiveEnemyIds.Count;
 
-            system.EnqueueAbility(summoner, "summon_minion");
+            system.EnqueueAbility(summoner, summon.Id);
             system.ExecuteAbilities();
             Assert.Equal(activeBefore + 1, Store.ActiveEnemyIds.Count);
             int minion = Store.ActiveEnemyIds[Store.ActiveEnemyIds.Count - 1];
             Assert.Equal(Store.PositionX[summoner], Store.PositionX[minion]);
             Assert.Equal(Store.PositionY[summoner], Store.PositionY[minion]);
-            system.EnqueueAbility(summoner, "summon_minion");
+            system.EnqueueAbility(summoner, summon.Id);
             system.ExecuteAbilities();
             Assert.Equal(activeBefore + 1, Store.ActiveEnemyIds.Count);
 
             Assert.Equal(1f, Store.EnemyStealthMultiplier[ambusher]);
-            system.EnqueueAbility(ambusher, "stealth_strike_1");
+            system.EnqueueAbility(ambusher, stealth.Id);
             system.ExecuteAbilities();
-            var stealth = Assert.Single(config.EnemyAbilities, ability => ability.Id == "stealth_strike_1");
             Assert.Equal(stealth.DamageMultiplier, Store.EnemyStealthMultiplier[ambusher]);
-            system.EnqueueAbility(ambusher, "stealth_strike_1");
+            system.EnqueueAbility(ambusher, stealth.Id);
             system.ExecuteAbilities();
             Assert.Equal(stealth.DamageMultiplier, Store.EnemyStealthMultiplier[ambusher]);
         }
@@ -145,7 +147,7 @@ namespace BattleSystemECS.Tests.Integration
         {
             var source = new EnemyAbilityDef
             {
-                Id = "summon_minion", Name = "Summon Minion", AbilityType = "summon_minion",
+                Id = "test-world-action", Name = "Test World Action", AbilityType = "summon_minion",
                 Cooldown = 12f, MinionHealthMult = 0.3f, MinionDamageMult = 0.3f
             };
             var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single,
@@ -200,8 +202,7 @@ namespace BattleSystemECS.Tests.Integration
         {
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);
             var catalog = config.CompiledCatalog!;
-            Assert.True(catalog.TryResolveAlias("summon_minion", out var summonId));
-            Assert.True(catalog.TryGetAbility(summonId, out var summon));
+            var (_, summon) = FindEnemyAbility(config, ExecutionOperation.SummonEnemy);
             ExecutionId executionId = Assert.Single(summon.Executions);
             var executions = new ExecutionDefinition[catalog.Executions.Count];
             for (int i = 0; i < executions.Length; i++) executions[i] = catalog.Executions[i];
@@ -234,36 +235,38 @@ namespace BattleSystemECS.Tests.Integration
             registry.AssignToGroups(scheduler);
             scheduler.Phase = GameState.WavePhase;
             Store.HeroIsDeployed[0] = true;
+            var heal = FindHeroBinding(config, ability => ability.Targeting.Relation == RelationFilter.Self &&
+                HasPayload(config, ability, EffectPayloadKind.Heal));
+            var status = FindHeroBinding(config, ability => ability.Targeting.Relation == RelationFilter.Enemies &&
+                ability.Effects.Count > 0);
+            var damage = FindHeroBinding(config, ability => ability.Targeting.Relation == RelationFilter.Enemies &&
+                ability.Effects.Count == 0 && HasPayload(config, ability, EffectPayloadKind.Damage));
 
-            Assert.True(registry.HeroSkill!.RequestHeroSkill(0, 2));
+            Assert.True(registry.HeroSkill!.RequestHeroSkill(0, heal.Slot));
             scheduler.Tick(0.016f, 0);
             Assert.True(Store.PlayerCurrentHealth[player] > 40f);
-            Assert.True(config.CompiledCatalog!.TryResolveAlias("Cold Nova", out var coldNova));
-            Assert.True(config.CompiledCatalog.TryGetAbility(coldNova, out var coldDefinition));
-            EffectId coldEffect = Assert.Single(coldDefinition.Effects);
-            Assert.True(registry.HeroSkill.RequestHeroSkill(0, 3));
+            EffectId statusEffect = Assert.Single(status.Ability.Effects);
+            Assert.True(registry.HeroSkill.RequestHeroSkill(0, status.Slot));
             scheduler.Tick(0.016f, 1);
             Assert.Contains(Enumerable.Range(0, Store.GetEffectCount(enemy)), slot =>
-                Store.TryGetActiveEffectAt(enemy, slot, out _, out var definition, out _) && definition.Id == coldEffect);
+                Store.TryGetActiveEffectAt(enemy, slot, out _, out var definition, out _) && definition.Id == statusEffect);
             Store.EnemyInvulnFramesLeft[enemy] = 0;
             Store.EnemyBlinkIFramesLeft[enemy] = 0f;
-            Assert.True(config.CompiledCatalog!.TryResolveAlias("Cross Slash", out var crossSlash));
-            Assert.Equal(crossSlash.Value, registry.HeroSkill.GetHeroSkillId(0, 0));
-            Assert.True(registry.HeroSkill.IsHeroSkillReady(0, 0));
-            Assert.True(config.CompiledCatalog.TryGetAbility(crossSlash, out var crossDefinition));
-            Assert.True(registry.HeroSkill.RequestHeroSkill(0, 0));
+            Store.EnemyHealth[enemy] = 10f;
+            Store.PlayerMana[player] = 100f;
+            Assert.Equal(damage.Ability.Id.Value, registry.HeroSkill.GetHeroSkillId(0, damage.Slot));
+            Assert.True(registry.HeroSkill.IsHeroSkillReady(0, damage.Slot));
+            Assert.True(registry.HeroSkill.RequestHeroSkill(0, damage.Slot));
             scheduler.Tick(0.016f, 2);
             Assert.True(registry.HeroSkill.LastActivation.Accepted,
-                $"activation={registry.HeroSkill.LastActivation.Reason}; effects={crossDefinition.Effects.Count}; executions={crossDefinition.Executions.Count}");
+                $"activation={registry.HeroSkill.LastActivation.Reason}; effects={damage.Ability.Effects.Count}; executions={damage.Ability.Executions.Count}; damage={Store.DamageResolver.LastRejection}; pending={Store.DamageResolver.PendingRequestCount}; mana={Store.PlayerMana[player]}");
 
             Assert.False(Store.EnemyActive[enemy]);
             Assert.Equal(1, Store.TotalKills);
             Assert.True(Store.PlayerGold[player] >= expectedReward);
             Assert.True(events.KillEvents.Count >= 2);
             Assert.Equal(new[] { "killed", "destroyed" }, events.KillEvents.Take(2));
-            Assert.True(config.CompiledCatalog!.TryResolveAlias("Guardian Heal", out var heal));
-            Assert.True(config.CompiledCatalog.TryResolveAlias("Cross Slash", out var damage));
-            Assert.NotEqual(heal, damage);
+            Assert.NotEqual(heal.Ability.Id, damage.Ability.Id);
         }
 
         [Fact]
@@ -407,7 +410,7 @@ namespace BattleSystemECS.Tests.Integration
         public void EnemyDamageUsesTypedPlayerResolverForShieldHealthEventsAndDeathFacts()
         {
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);
-            var source = config.EnemyAbilities.First(def => string.Equals(def.AbilityType, "aoe_damage", StringComparison.OrdinalIgnoreCase));
+            var source = FindEnemyAbility(config, ExecutionOperation.ApplyDamage).Source;
             int player = Player(p => { p.X = 0f; p.Y = 0f; p.AttackDamage = 0f; p.AttackRange = 0f; });
             Store.PlayerMaxHealth[player] = Store.PlayerCurrentHealth[player] = 20f;
             Store.PlayerShield[player] = 5f;
@@ -456,11 +459,12 @@ namespace BattleSystemECS.Tests.Integration
                 ability.Targeting.Relation == RelationFilter.Enemies && HasPayload(config, ability, EffectPayloadKind.Damage));
             Store.SetTowerActiveSkill(tower, damage.Id.Value, damage.Cooldown);
             Store.HeroIsDeployed[0] = true;
-            var enemyAbility = config.EnemyAbilities.First(def => string.Equals(def.AbilityType, "aoe_damage", StringComparison.OrdinalIgnoreCase));
+            var enemyAbility = FindEnemyAbility(config, ExecutionOperation.ApplyDamage).Source;
+            int heroSlot = FindHeroBinding(config, _ => true).Slot;
 
             Assert.True(registry.Skill!.RequestCatalogAbility(damage.Id));
             Assert.True(registry.TowerActiveSkill!.RequestTowerActive(tower));
-            Assert.True(registry.HeroSkill!.RequestHeroSkill(0, 0));
+            Assert.True(registry.HeroSkill!.RequestHeroSkill(0, heroSlot));
             registry.EnemyAbility!.EnqueueAbility(enemy, enemyAbility.Id);
             Store.PlayerGlobalSkillPressed[player] = true;
             scheduler.Phase = GameState.BuildPhase;
@@ -494,6 +498,34 @@ namespace BattleSystemECS.Tests.Integration
 
         private static AbilityDefinition FindCatalogAbility(GameConfig config, Func<AbilityDefinition, bool> predicate) =>
             config.CompiledCatalog!.AbilityDefinitions.First(predicate);
+
+        private static (EnemyAbilityDef Source, AbilityDefinition Ability) FindEnemyAbility(GameConfig config,
+            ExecutionOperation operation, Func<EnemyAbilityDef, AbilityDefinition, bool>? predicate = null)
+        {
+            foreach (var source in config.EnemyAbilities)
+            {
+                if (!config.CompiledCatalog!.TryResolveAlias(source.Id, out var id) ||
+                    !config.CompiledCatalog.TryGetAbility(id, out var ability) ||
+                    predicate != null && !predicate(source, ability)) continue;
+                if (ability.Executions.Any(executionId =>
+                        config.CompiledCatalog.TryGetExecution(executionId, out var execution) &&
+                        execution.Operation == operation)) return (source, ability);
+            }
+            throw new Xunit.Sdk.XunitException($"Missing enemy ability operation {operation}");
+        }
+
+        private static (int Slot, AbilityDefinition Ability) FindHeroBinding(GameConfig config,
+            Func<AbilityDefinition, bool> predicate)
+        {
+            var bindings = HeroSkillSystem.HeroSkillsConfigLoader.Parse(File.ReadAllText(HeroSkillsPath), HeroSkillsPath);
+            foreach (var binding in bindings.Skills ?? Enumerable.Empty<HeroSkillSystem.HeroSkillSlotEntry>())
+            {
+                if (binding.SkillName != null && config.CompiledCatalog!.TryResolveAlias(binding.SkillName, out var id) &&
+                    config.CompiledCatalog.TryGetAbility(id, out var ability) && predicate(ability))
+                    return (binding.SlotIndex, ability);
+            }
+            throw new Xunit.Sdk.XunitException("Missing hero binding for requested catalog behavior");
+        }
 
         private static bool HasPayload(GameConfig config, AbilityDefinition ability, EffectPayloadKind payload) =>
             ability.Executions.Any(id => config.CompiledCatalog!.TryGetExecution(id, out var execution) && execution.Payload == payload);

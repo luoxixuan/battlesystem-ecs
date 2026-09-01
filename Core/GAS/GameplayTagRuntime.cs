@@ -3,7 +3,7 @@ using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Core.GAS
 {
-    /// <summary>Queries tags granted by active gameplay effects.</summary>
+    /// <summary>查询生效中的玩法效果授予的标签。</summary>
     public static class GameplayTagRuntime
     {
         public static bool Matches(ComponentStore store, int entityId,

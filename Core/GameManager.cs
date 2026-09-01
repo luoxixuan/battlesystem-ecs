@@ -95,9 +95,7 @@ namespace BattleSystemECS.Core
             logger.Log("[BOOTSTRAP] 1. Loading Game Configuration...");
 
             // 加载游戏配置
-            // Production bootstrap validates the typed ability catalog before any
-            // system is constructed. Legacy fallback remains available only to
-            // explicit tests/tools via LoadConfig.
+            // 构造系统前先校验类型化能力目录；旧回退仅供显式测试和工具通过 LoadConfig 使用。
             gameConfig = GameConfigLoader.LoadStrictCatalog(logger);
 
             logger.Log("[BOOTSTRAP]    - Configuration loaded successfully!");

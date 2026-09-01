@@ -172,14 +172,11 @@ namespace BattleSystemECS.Systems
                 return false;
             }
 
-            // Cost multiplier is projected into the typed activation request.
+            // 将消耗倍率投影到类型化激活请求。
             float costMult = store.PlayerManaCost[playerId];
             float manaCost = def.ManaCost * costMult;
 
-            // Catalog is authoritative when the global definition is present in
-            // the compiled content table. The switch remains a compatibility
-            // projection for legacy fixtures that intentionally do not load the
-            // global content catalog.
+            // 编译内容表存在全局定义时以目录为准；开关只兼容有意不加载目录的旧测试夹具。
             if (TryActivateCatalogGlobal(def, manaCost, out var catalogResult))
             {
                 if (!catalogResult.Accepted) return false;
@@ -194,7 +191,7 @@ namespace BattleSystemECS.Systems
                 ExecuteSkillEffect(def);
                 if (!GameplayAbilityRuntime.AbilityCommit(store.PlayerGlobalSkillCooldown, activation).Accepted)
                     return false;
-                // Compatibility-only definitions have no typed cost to commit.
+                // 兼容定义没有需要提交的类型化消耗。
                 store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), -manaCost);
             }
 

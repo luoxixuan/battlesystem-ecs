@@ -168,7 +168,7 @@ namespace BattleSystemECS.Systems
             }
         }
 
-        /// <summary>Queues one input activation for the production frame node.</summary>
+        /// <summary>为生产帧节点排队一次输入激活。</summary>
         public bool RequestHeroSkill(int heroId, int slot)
         {
             if (_pendingHeroId >= 0 || heroId < 0 || heroId >= ComponentStore.MAX_HEROES ||
@@ -308,7 +308,7 @@ namespace BattleSystemECS.Systems
             return cd > 0f ? cd : 5f;
         }
 
-        // ── Internal config DTO + parser ──
+        // 内部配置 DTO 与解析器
 
         public class HeroSkillsConfigDef
         {
@@ -323,8 +323,7 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Strict parser for the hero_skills.json shape. Public so tests can drive
-        /// it without a fixture file.
+        /// 严格解析 hero_skills.json；公开以便测试无需夹具文件即可驱动。
         /// </summary>
         public static class HeroSkillsConfigLoader
         {

@@ -52,8 +52,7 @@ namespace BattleSystemECS.Systems
         private float _enemySlowResistance = 0f;    // from techTreeSystem.GetSlowResistance()
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
         // Tuple: (enemyId, rawDamage) — raw damage only; armor reduction handled by PlayerTowerAttackSystem and TowerAttackSystem
-        // Typed GAS requests are staged here until the graph's damage commit.
-        // This is a compatibility projection, not a second damage owner.
+        // 类型化 GAS 请求暂存在此，等待帧图伤害提交；这里是兼容投影，不是第二个伤害所有者。
         private List<Core.GAS.DamageRequest>[] _skillDamageQueue = new List<Core.GAS.DamageRequest>[2];
         private int _skillDamageQueueIdx = 0;
         private int _pendingSkillDamageCount;
@@ -82,9 +81,8 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Catalog-first activation boundary. Legacy skill slots are only a
-        /// compatibility projection; targeting and execution references must be
-        /// closed in the compiled catalog before a cooldown can be committed.
+        /// 目录优先的激活边界。旧技能槽仅作兼容投影；提交冷却前，选目标与执行引用
+        /// 必须在编译目录中闭合。
         /// </summary>
         public AbilityActivationResult TryActivateCatalogAbility(AbilityId abilityId)
         {
@@ -558,8 +556,7 @@ namespace BattleSystemECS.Systems
             return true;
         }
 
-        // Kept as a compatibility implementation for old replay fixtures. New
-        // activation paths enter through the registry-based method above.
+        // 保留给旧回放夹具；新激活路径从上方基于目录的方法进入。
         private void ExecuteAbilityLegacySwitch(GameplayAbilityDef def, int slot)
         {
             float baseDamage = techTreeSystem != null ? techTreeSystem.GetFinalAttackDamage() : store.GetPlayerAttackDamage(playerId);

@@ -59,8 +59,8 @@ namespace BattleSystemECS.Core.GAS
     }
 
     /// <summary>
-    /// Domain extension for payloads that need services outside the GAS store.
-    /// CanCommit is a read-only planning pass; once it returns true, Commit must not reject.
+    /// 供需要 GAS 存储外部服务的载荷扩展。
+    /// CanCommit 是只读规划；返回 true 后 Commit 不得拒绝。
     /// </summary>
     public interface IAbilityPayloadHandler
     {
@@ -70,9 +70,7 @@ namespace BattleSystemECS.Core.GAS
     }
 
     /// <summary>
-    /// Single writer for ability-slot activation state. Legacy systems may inspect
-    /// definitions, but cooldown ownership stays in the ECS ability store through
-    /// this boundary.
+    /// 能力槽激活状态的唯一写入者。旧系统可读取定义，但冷却归 ECS 能力存储所有。
     /// </summary>
     public static class GameplayAbilityRuntime
     {
@@ -192,21 +190,21 @@ namespace BattleSystemECS.Core.GAS
             }
         }
 
-        /// <summary>Catalog-backed activation boundary used by domain adapters.</summary>
+        /// <summary>领域适配器使用的目录激活边界。</summary>
         public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, float[] cooldowns,
             AbilityActivationRequest request, IAbilityPayloadHandler payloadHandler = null)
             => ActivateCore(store, catalog, new CooldownArrayActivationState(cooldowns, request.Slot),
                 request, ActivationTargetSet.Single(request.TargetId >= 0 ? request.TargetId : request.OwnerId), payloadHandler);
 
-        /// <summary>Catalog-backed activation for ECS ability slots.</summary>
+        /// <summary>ECS 能力槽的目录激活入口。</summary>
         public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, int entityId, int slot,
             AbilityActivationRequest request, IAbilityPayloadHandler payloadHandler = null)
             => ActivateCore(store, catalog, new StoredAbilityActivationState(store, entityId, slot),
                 request, ActivationTargetSet.Single(request.TargetId >= 0 ? request.TargetId : request.OwnerId), payloadHandler);
 
         /// <summary>
-        /// Catalog-backed activation over a deterministic target set. Validation, cost,
-        /// cooldown, and activation publication happen once; payloads execute once per target.
+        /// 在确定性目标集上激活目录能力。校验、消耗、冷却和激活发布各执行一次，
+        /// 载荷对每个目标执行一次。
         /// </summary>
         public static AbilityActivationResult ActivateTargets(ComponentStore store, GameplayCatalog catalog,
             float[] cooldowns, AbilityActivationRequest request, IReadOnlyList<int> targetIds,

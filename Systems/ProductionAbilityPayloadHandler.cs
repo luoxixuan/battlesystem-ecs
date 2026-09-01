@@ -4,7 +4,7 @@ using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
-    /// <summary>Production adapter for payloads implemented outside the GAS store.</summary>
+    /// <summary>适配在 GAS 存储外实现的生产载荷。</summary>
     public sealed class ProductionAbilityPayloadHandler : IAbilityPayloadHandler
     {
         private readonly ComponentStore _store;

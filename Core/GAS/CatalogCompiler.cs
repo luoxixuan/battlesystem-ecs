@@ -107,9 +107,8 @@ namespace BattleSystemECS.Core.GAS
         }
 
         /// <summary>
-        /// Compiles enemy configuration references into the same immutable catalog used by
-        /// player-facing abilities. Existing canonical definitions win; enemy ids are added
-        /// as aliases so behavior-tree references and display names resolve to one AbilityId.
+        /// 将敌人配置引用编译进玩家能力共用的不可变目录。规范定义优先，敌人 id
+        /// 作为别名加入，使行为树引用和显示名称归一到同一个 AbilityId。
         /// </summary>
         public static GameplayCatalog CompileEnemyExtensions(GameplayCatalog catalog, IReadOnlyList<EnemyAbilityDef> enemyAbilities)
         {
@@ -200,8 +199,7 @@ namespace BattleSystemECS.Core.GAS
                             break;
                     }
 
-                    // Zero-execution definitions are explicit world-action or unsupported
-                    // entries. Runtime adapters decide which of those can execute.
+                    // 无执行项的定义表示世界动作或不受支持的条目，由运行时适配器决定是否执行。
                     if (operation != ExecutionOperation.Default)
                     {
                         var executionId = new ExecutionId(executions.Count);

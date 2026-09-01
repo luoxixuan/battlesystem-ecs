@@ -15,8 +15,7 @@ namespace BattleSystemECS.Systems
     /// powerful AOE attached to that specific tower). This system handles:
     ///   • per-frame cooldown tick (so the gate resolves in seconds, not frames)
     ///   • the public TriggerTowerActive(towerId) API the player/HUD calls on input
-    ///   • a typed activation request into the shared ability runtime, followed by a
-    ///     resolver-owned damage request against the selected enemy
+    ///   • 先向共享能力运行时提交类型化激活请求，再由解析器向选中敌人提交伤害请求
     ///
     /// Design notes:
     ///   • Inert by default: ActiveSkillId == -1 → no field writes, no per-tick work
@@ -92,8 +91,7 @@ namespace BattleSystemECS.Systems
         /// bound to a tower's active skill. Returns true if the cast succeeded
         /// (i.e. the tower was ready and the cooldown gate was passed).
         ///
-        /// The bool-returning method is retained as the public compatibility adapter;
-        /// callers needing rejection diagnostics should use ActivateTower.
+        /// 返回 bool 的方法保留为公开兼容适配器；需要拒绝诊断的调用方应使用 ActivateTower。
         /// </summary>
         public bool TriggerTowerActive(int towerId)
         {
@@ -148,8 +146,7 @@ namespace BattleSystemECS.Systems
                     _catalogTargets, _catalogMagnitudeScales, _payloadHandler);
             if (result.Accepted)
                 Console.WriteLine($"[TOWER_ACTIVE] tower={towerId} target={targetId} skill={ResolveSkillName(skillId)}");
-            // Compatibility audit marker: cooldown ownership is inside
-            // GameplayAbilityRuntime.AbilityCommit, never this adapter.
+            // 兼容审计：冷却归 GameplayAbilityRuntime.AbilityCommit 所有，不属于此适配器。
             return result;
         }
 

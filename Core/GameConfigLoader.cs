@@ -34,9 +34,7 @@ namespace BattleSystemECS.Config
         }
 
         /// <summary>
-        /// Production bootstrap variant. Configuration errors are reported as a structured
-        /// validation exception; the compatibility loader remains the only path allowed to
-        /// synthesize defaults after an input failure.
+        /// 生产启动入口。配置错误以结构化校验异常报告；只有兼容加载器可在输入失败后合成默认值。
         /// </summary>
         public static GameConfig LoadConfigStrict(IRenderer renderer)
         {

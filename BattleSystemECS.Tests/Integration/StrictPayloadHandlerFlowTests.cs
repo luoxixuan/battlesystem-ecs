@@ -18,10 +18,35 @@ namespace BattleSystemECS.Tests.Integration
             Path.Combine(Directory.GetCurrentDirectory(), "Data", "Configs", "hero_skills.json");
 
         [Fact]
-        public void StrictHeroMassResurrectBindingUsesSharedProductionHandlerAndPublishesActivation()
+        public void EnemyControlCompilerValidatorAndProductionRegistrySharePayloadContracts()
         {
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);
-            string path = WriteHeroBinding("Mass Resurrect");
+            var catalog = config.CompiledCatalog!;
+
+            foreach (var source in config.EnemyAbilities)
+            {
+                Assert.True(EnemyAbilityTypeRegistry.TryResolve(source.AbilityType, out var type));
+                Assert.True(type.Payload.HasValue);
+                Assert.True(catalog.TryResolveAlias(source.Id, out var abilityId));
+                Assert.True(catalog.TryGetAbility(abilityId, out var ability));
+                var matching = ability.Executions
+                    .Select(id => catalog.Executions[id.Value])
+                    .Where(execution => execution.Payload == type.Payload.Value &&
+                        execution.Operation == type.Operation)
+                    .ToArray();
+                Assert.NotEmpty(matching);
+                Assert.All(matching, execution => Assert.True(
+                    ProductionAbilityPayloadRegistry.Supports(execution),
+                    $"{source.AbilityType}: {execution.Payload}/{execution.Operation}"));
+            }
+        }
+
+        [Fact]
+        public void StrictHeroResurrectBindingUsesSharedProductionHandlerAndPublishesActivation()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            var resurrect = FindSkillAbility(config, ExecutionOperation.Resurrect);
+            string path = WriteHeroBinding(resurrect.Name);
             try
             {
                 GameConfigLoader.ValidateStrictReferences(config, config.CompiledCatalog!, path);
@@ -56,10 +81,11 @@ namespace BattleSystemECS.Tests.Integration
         }
 
         [Fact]
-        public void StrictTowerTimeRewindBindingRestoresOwnerResourcesWithTowerSourceFacts()
+        public void StrictTowerResourceRestoreBindingRestoresOwnerResourcesWithTowerSourceFacts()
         {
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);
-            int rewindSkill = config.GetSkillIdByName("Time Rewind");
+            var rewind = FindSkillAbility(config, ExecutionOperation.RestoreSnapshot);
+            int rewindSkill = config.GetSkillIdByName(rewind.Name);
             Assert.True(rewindSkill >= 0);
             config.TowerTypes.Add(new TowerConfig { Name = "Rewind Test Tower", ActiveSkillId = rewindSkill });
             GameConfigLoader.ValidateStrictReferences(config, config.CompiledCatalog!, DefaultHeroSkillsPath);
@@ -74,7 +100,7 @@ namespace BattleSystemECS.Tests.Integration
             Store.PlayerMana[player] = 20f;
             Store.PlayerShield[player] = 30f;
             int tower = RawTower(2, 3, damage: 1f, range: 5);
-            Store.SetTowerActiveSkill(tower, rewindSkill, 5f);
+            Store.SetTowerActiveSkill(tower, rewindSkill, rewind.Cooldown);
             registry.TowerActiveSkill!.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
 
             Assert.True(registry.TowerActiveSkill.TriggerTowerActive(tower));
@@ -102,8 +128,7 @@ namespace BattleSystemECS.Tests.Integration
         {
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);
             var catalog = config.CompiledCatalog!;
-            Assert.True(catalog.TryResolveAlias("Time Rewind", out var abilityId));
-            Assert.True(catalog.TryGetAbility(abilityId, out var ability));
+            var ability = FindSkillAbility(config, ExecutionOperation.RestoreSnapshot);
             ExecutionId executionId = Assert.Single(ability.Executions);
             var executions = catalog.Executions.ToArray();
             var original = executions[executionId.Value];
@@ -121,10 +146,11 @@ namespace BattleSystemECS.Tests.Integration
         }
 
         [Fact]
-        public void MassResurrectCapacityFailureDoesNotClaimCorpseCommitCooldownOrPublishActivation()
+        public void ResurrectCapacityFailureDoesNotClaimCorpseCommitCooldownOrPublishActivation()
         {
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);
-            string path = WriteHeroBinding("Mass Resurrect");
+            var resurrect = FindSkillAbility(config, ExecutionOperation.Resurrect);
+            string path = WriteHeroBinding(resurrect.Name);
             try
             {
                 GameConfigLoader.ValidateStrictReferences(config, config.CompiledCatalog!, path);
@@ -158,10 +184,11 @@ namespace BattleSystemECS.Tests.Integration
         }
 
         [Fact]
-        public void TimeRewindCapacityFailureDoesNotPartiallyRestoreOrCommitCooldown()
+        public void ResourceRestoreCapacityFailureDoesNotPartiallyRestoreOrCommitCooldown()
         {
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);
-            int rewindSkill = config.GetSkillIdByName("Time Rewind");
+            var rewind = FindSkillAbility(config, ExecutionOperation.RestoreSnapshot);
+            int rewindSkill = config.GetSkillIdByName(rewind.Name);
             int player = Player();
             var registry = CreateProduction(config, player);
             Store.PlayerCurrentHealth[player] = 80f;
@@ -172,7 +199,7 @@ namespace BattleSystemECS.Tests.Integration
             Store.PlayerMana[player] = 20f;
             Store.PlayerShield[player] = 30f;
             int tower = RawTower(0, 0, damage: 1f, range: 5);
-            Store.SetTowerActiveSkill(tower, rewindSkill, 5f);
+            Store.SetTowerActiveSkill(tower, rewindSkill, rewind.Cooldown);
             registry.TowerActiveSkill!.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             Store.ResourceResolver.EnableDeferred(true);
             var handle = Store.GetEntityHandle(player);
@@ -208,6 +235,18 @@ namespace BattleSystemECS.Tests.Integration
                 if (gameplayEvent.Type == type) return gameplayEvent;
             }
             throw new Xunit.Sdk.XunitException($"Missing gameplay event {type}");
+        }
+
+        private static AbilityDefinition FindSkillAbility(GameConfig config, ExecutionOperation operation)
+        {
+            foreach (var ability in config.CompiledCatalog!.AbilityDefinitions)
+            {
+                if (config.GetSkillIdByName(ability.Name) < 0) continue;
+                if (ability.Executions.Any(executionId =>
+                        config.CompiledCatalog.TryGetExecution(executionId, out var execution) &&
+                        execution.Operation == operation)) return ability;
+            }
+            throw new Xunit.Sdk.XunitException($"Missing skill ability operation {operation}");
         }
 
         private static string WriteHeroBinding(string skillName)

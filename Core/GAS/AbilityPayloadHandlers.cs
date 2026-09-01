@@ -2,7 +2,7 @@ using System;
 
 namespace BattleSystemECS.Core.GAS
 {
-    /// <summary>Authoritative production support table for typed execution definitions.</summary>
+    /// <summary>类型化执行定义的生产支持表。</summary>
     public static class ProductionAbilityPayloadRegistry
     {
         public static bool Supports(ExecutionDefinition execution)
@@ -28,7 +28,7 @@ namespace BattleSystemECS.Core.GAS
             actual == ExecutionOperation.Default || actual == expected;
     }
 
-    /// <summary>Fixed production composition for domain payload adapters.</summary>
+    /// <summary>领域载荷适配器的固定生产组合。</summary>
     public sealed class AbilityPayloadHandlerChain : IAbilityPayloadHandler
     {
         private readonly IAbilityPayloadHandler[] _handlers;

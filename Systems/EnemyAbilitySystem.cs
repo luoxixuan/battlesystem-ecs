@@ -28,8 +28,7 @@ namespace BattleSystemECS.Systems
         private readonly List<AbilityEvent>[] _abilityEvents = { new List<AbilityEvent>(64), new List<AbilityEvent>(64) };
         private int _abilityEventsIdx = 0;
 
-        // EnemyAbilityCooldownOwner: enemy abilities have a separate domain-owned
-        // timer bank; activation still crosses the shared typed runtime seam.
+        // EnemyAbilityCooldownOwner：敌人能力使用领域自有计时器，激活仍经过共享类型化运行时边界。
         private readonly float[] _abilityCooldownTimers = new float[ComponentStore.MAX_ENTITIES * ComponentStore.MAX_ABILITIES_PER_ENTITY];
 
         // Sparse list of currently-channeling enemy ids. Avoids iterating all active enemies
@@ -333,7 +332,7 @@ namespace BattleSystemECS.Systems
                 return;
             }
 
-            // Compatibility-only projection for fixtures that deliberately omit strict bootstrap.
+            // 仅供有意绕过严格启动的测试夹具兼容投影。
             if (TryExecuteTypedBasicAbility(enemyId, ability).Accepted) return;
 
             if (!EnemyAbilityTypeRegistry.TryResolve(ability.AbilityType, out var compatibilityType))
@@ -816,7 +815,7 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Synchronizes the legacy tower attack gate from the canonical silence tag.
+        /// 从规范沉默标签同步旧塔攻击门控。
         /// </summary>
         public void Update()
         {
