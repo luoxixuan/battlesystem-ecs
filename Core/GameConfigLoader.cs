@@ -48,7 +48,7 @@ namespace BattleSystemECS.Config
             {
                 if (!File.Exists(CONFIG_FILE))
                 {
-                    if (strict) throw new CatalogValidationException($"{CONFIG_FILE}: configuration file not found");
+                    RequireStrictInput(strict, CONFIG_FILE, "configuration file not found");
                     renderer.Log("[CONFIG] Configuration file not found: " + CONFIG_FILE);
                     renderer.Log("[CONFIG] Using default configuration");
                     return GetDefaultConfig();
@@ -58,103 +58,107 @@ namespace BattleSystemECS.Config
 
                 if (string.IsNullOrWhiteSpace(jsonContent))
                 {
-                    if (strict) throw new CatalogValidationException($"{CONFIG_FILE}: configuration file is empty");
+                    RequireStrictInput(strict, CONFIG_FILE, "configuration file is empty");
                     renderer.Log("[CONFIG] Configuration file is empty: " + CONFIG_FILE);
                     renderer.Log("[CONFIG] Using default configuration");
                     return GetDefaultConfig();
                 }
 
+                using (var document = System.Text.Json.JsonDocument.Parse(jsonContent))
+                    RequireJsonKind(strict, CONFIG_FILE, document.RootElement,
+                        System.Text.Json.JsonValueKind.Object, "a JSON object");
+
                 var gameConfig = ParseGameConfig(jsonContent);
 
                 // Load behavior trees
-                LoadBehaviorTrees(gameConfig, renderer);
+                LoadBehaviorTrees(gameConfig, renderer, strict);
 
                 // Load enemy abilities
                 LoadEnemyAbilities(gameConfig, renderer, strict);
 
                 // Load phase behaviors
-                LoadPhaseBehaviors(gameConfig, renderer);
+                LoadPhaseBehaviors(gameConfig, renderer, strict);
 
                 // Load weather config
-                LoadWeatherConfig(gameConfig, renderer);
+                LoadWeatherConfig(gameConfig, renderer, strict);
 
                 // Load terrain config
-                LoadTerrainConfig(gameConfig, renderer);
+                LoadTerrainConfig(gameConfig, renderer, strict);
 
                 // Load wave mutators config
-                LoadWaveMutatorsConfig(gameConfig, renderer);
+                LoadWaveMutatorsConfig(gameConfig, renderer, strict);
 
                 // Load pickup definitions
-                LoadPickupDefs(gameConfig, renderer);
+                LoadPickupDefs(gameConfig, renderer, strict);
 
                 // Load inventory item definitions (Round 130)
-                LoadItemDefs(gameConfig, renderer);
-                LoadCraftingRecipes(gameConfig, renderer);
+                LoadItemDefs(gameConfig, renderer, strict);
+                LoadCraftingRecipes(gameConfig, renderer, strict);
 
                 // Load shared skill definition table (SkillDefs): curated skills from
                 // Data/Configs/skills.json + per-file static defs from Data/Skills/*.json,
                 // deduplicated by name (curated wins). Consumed by name-lookup paths
                 // (HeroSkillSystem, TowerActiveSkillSystem); player skill bar (Skills)
                 // still comes from game_config.json above.
-                LoadSkillDefs(gameConfig, renderer);
+                LoadSkillDefs(gameConfig, renderer, strict);
 
                 // Load enemy fission definitions
-                LoadFissionDefs(gameConfig, renderer);
+                LoadFissionDefs(gameConfig, renderer, strict);
 
                 // Load enemy morph definitions
-                LoadMorphDefs(gameConfig, renderer);
+                LoadMorphDefs(gameConfig, renderer, strict);
 
                 // Load corpse ground effect definitions (direction 9)
-                LoadCorpseEffectDefs(gameConfig, renderer);
+                LoadCorpseEffectDefs(gameConfig, renderer, strict);
 
                 // Load elemental terrain zone definitions (Direction 2 — Round 200)
-                LoadTerrainZoneDefs(gameConfig, renderer);
+                LoadTerrainZoneDefs(gameConfig, renderer, strict);
 
                 // Load tower affix (reforge) definitions (Round 34, Reforge — Split A)
-                LoadTowerAffixDefs(gameConfig, renderer);
+                LoadTowerAffixDefs(gameConfig, renderer, strict);
 
                 // Load tower-vs-enemy type effectiveness matrix (Round 143 Direction 1)
-                LoadTowerEffectiveness(gameConfig, renderer);
+                LoadTowerEffectiveness(gameConfig, renderer, strict);
 
                 // Load per-tower modifier pool (Round 145 Direction 3 — 塔类型专精重随)
                 // The system rolls ONE modifier per tower at placement time from this
                 // weighted pool. Missing file → safe empty pool → towers spawn with
                 // ModifierId == -1 (a no-op fast path).
-                LoadTowerModifiers(gameConfig, renderer);
+                LoadTowerModifiers(gameConfig, renderer, strict);
 
                 // Load summon definitions (direction 1: player-summoned combat units)
-                LoadSummonDefs(gameConfig, renderer);
+                LoadSummonDefs(gameConfig, renderer, strict);
 
                 // Load random mid-wave event definitions (direction 9)
-                LoadRandomEventDefs(gameConfig, renderer);
+                LoadRandomEventDefs(gameConfig, renderer, strict);
 
                 // Load daily challenge modifier pool (Round 105 Direction 9)
                 // and resolve today's daily seed into the GameConfig. Safe no-op
                 // when the JSON is missing or the pool is empty — the daily
                 // system is opt-in.
-                LoadDailyModifierPool(gameConfig, renderer);
+                LoadDailyModifierPool(gameConfig, renderer, strict);
                 ResolveDailyChallenge(gameConfig, renderer);
 
                 // Round175 Direction1 — Mana Shield config (mana → damage shield)
- LoadManaShieldConfig(gameConfig, renderer);
+ LoadManaShieldConfig(gameConfig, renderer, strict);
 
  // Round178 Direction6 — Pre-fight Buff Selection (BuildPhase末「3选1」出战 buff)
  // Reads Data/Configs/prefight_buffs.json if present; otherwise the GameConfig
  // keeps its coded PreFightBuffConfig defaults (Enabled=true, OptionsPerWave=3,
  // Pool=Array.Empty<PreFightBuffOptionDef>()). All knobs are optional.
- LoadPreFightBuffConfig(gameConfig, renderer);
+ LoadPreFightBuffConfig(gameConfig, renderer, strict);
 
  // Round174+ Direction3 — Momentum (global per-(wave-time) ramping damage /
  // attack-speed buff). Reads Data/Configs/momentum.json if present; otherwise
  // the GameConfig keeps its coded MomentumConfig defaults (Enabled=true,
  // TierDuration=30s, MaxTiers=10, DamageBonusPerTier=0.02, SpeedBonusPerTier
  // =0.01, ResetOnWave=true). All knobs are optional.
- LoadMomentumConfig(gameConfig, renderer);
+ LoadMomentumConfig(gameConfig, renderer, strict);
 
 // Round 207 Direction 2 — Adrenaline (low-HP / critical-HP player-side buff +
 // one-shot Rush). Reads Data/Configs/adrenaline.json if present; otherwise
 // the GameConfig keeps its coded AdrenalineConfig defaults. All knobs are optional.
-LoadAdrenalineConfig(gameConfig, renderer);
+LoadAdrenalineConfig(gameConfig, renderer, strict);
 
  // Round 178+ Direction 5 — Tide / Crest (wave-indexed periodic buffs).
  // Reads Data/Configs/crests.json if present; otherwise the GameConfig
@@ -162,25 +166,25 @@ LoadAdrenalineConfig(gameConfig, renderer);
  // <CrestDef>()). The JSON file ships a small default roster (CrestOfFury
  // / CrestOfBounty / TideOfHealing / CrestOfFortitude) that gets the
  // system working out of the box.
- LoadCrestConfig(gameConfig, renderer);
+ LoadCrestConfig(gameConfig, renderer, strict);
 
  // Load damage saturation tunables (Round92 Direction1: per-enemy diminishing returns
  // on incoming damage within a short rolling window). All three knobs are optional —
  // missing fields fall back to the safe defaults in DamageSaturationConfig.
- LoadDamageSaturationConfig(gameConfig, renderer);
+ LoadDamageSaturationConfig(gameConfig, renderer, strict);
 
                 // Load destructible object definitions (Round 95 Direction 5: tower-attackable objects
                 // with on-destroy effects like gold drop or AoE explosion).
-                LoadDestructibleDefs(gameConfig, renderer);
+                LoadDestructibleDefs(gameConfig, renderer, strict);
 
                 // Load mark subsystem config (Round 107 Direction 6: target mark debuff).
                 // Opt-in: missing JSON file or missing fields fall back to MarkSubsystemConfig
                 // safe defaults (decay=1.0s, cap=100, no per-mark type registered).
-                LoadMarkConfig(gameConfig, renderer);
+                LoadMarkConfig(gameConfig, renderer, strict);
 
                 if (gameConfig == null)
                 {
-                    if (strict) throw new CatalogValidationException($"{CONFIG_FILE}: parser returned null");
+                    RequireStrictInput(strict, CONFIG_FILE, "parser returned null");
                     renderer.Log("[ERROR] Failed to parse configuration: parser returned null");
                     renderer.Log("[CONFIG] Using default configuration");
                     return GetDefaultConfig();
@@ -198,7 +202,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 if (strict)
                 {
                     if (ex is CatalogValidationException) throw;
-                    throw new CatalogValidationException($"{CONFIG_FILE}: {ex.Message}");
+                    throw ConfigLoadFailure(CONFIG_FILE, ex.Message);
                 }
                 renderer.Log("[ERROR] Failed to load configuration from " + CONFIG_FILE + ": " + ex.Message);
                 return GetDefaultConfig();
@@ -211,19 +215,20 @@ LoadAdrenalineConfig(gameConfig, renderer);
             if (config.Player == null) throw new CatalogValidationException($"{CONFIG_FILE}: missing Player configuration");
             if (config.MonsterTypes == null || config.MonsterTypes.Count == 0) throw new CatalogValidationException($"{CONFIG_FILE}: missing MonsterTypes");
             if (config.Levels == null || config.Levels.Count == 0) throw new CatalogValidationException($"{CONFIG_FILE}: missing Levels");
-            if (!File.Exists(heroSkillsPath)) throw new CatalogValidationException($"{heroSkillsPath}: hero skill configuration not found");
-            string heroJson = File.ReadAllText(heroSkillsPath);
-            if (string.IsNullOrWhiteSpace(heroJson)) throw new CatalogValidationException($"{heroSkillsPath}: hero skill configuration is empty");
-            var hero = HeroSkillSystem.HeroSkillsConfigLoader.Parse(heroJson);
-            if (hero == null || hero.Skills == null) throw new CatalogValidationException($"{heroSkillsPath}: invalid hero skill configuration");
-            if (hero.Skills.Count == 0) throw new CatalogValidationException($"{heroSkillsPath}: no hero skill bindings declared");
+            string heroJson = ReadStrictJsonObject(heroSkillsPath, "hero skill configuration");
+            HeroSkillSystem.HeroSkillsConfigDef hero;
+            try { hero = HeroSkillSystem.HeroSkillsConfigLoader.Parse(heroJson); }
+            catch (Exception error) { throw ConfigLoadFailure(heroSkillsPath, error.Message); }
+            if (hero == null || hero.Skills == null) throw ConfigLoadFailure(heroSkillsPath, "invalid hero skill configuration");
+            if (hero.Skills.Count == 0) throw ConfigLoadFailure(heroSkillsPath, "no hero skill bindings declared");
             var slots = new HashSet<int>();
             foreach (var slot in hero.Skills)
             {
-                if (slot.SlotIndex < 0) throw new CatalogValidationException($"{heroSkillsPath}: invalid SlotIndex {slot.SlotIndex}");
-                if (!slots.Add(slot.SlotIndex)) throw new CatalogValidationException($"{heroSkillsPath}: duplicate SlotIndex {slot.SlotIndex}");
-                if (string.IsNullOrWhiteSpace(slot.SkillName)) throw new CatalogValidationException($"{heroSkillsPath}: missing SkillName at slot {slot.SlotIndex}");
-                RequireClosedAlias(catalog, slot.SkillName, $"{heroSkillsPath}: slot {slot.SlotIndex}");
+                if (slot.SlotIndex < 0) throw ConfigLoadFailure(heroSkillsPath, $"invalid SlotIndex {slot.SlotIndex}");
+                if (!slots.Add(slot.SlotIndex)) throw ConfigLoadFailure(heroSkillsPath, $"duplicate SlotIndex {slot.SlotIndex}");
+                if (string.IsNullOrWhiteSpace(slot.SkillName)) throw ConfigLoadFailure(heroSkillsPath, $"missing SkillName at slot {slot.SlotIndex}");
+                RequireClosedAlias(catalog, slot.SkillName,
+                    $"{ConfigPathLabel(heroSkillsPath)}: slot {slot.SlotIndex}");
             }
 
             for (int i = 0; i < config.Skills.Count; i++)
@@ -311,54 +316,98 @@ LoadAdrenalineConfig(gameConfig, renderer);
 
         private static void ValidateEnemyExecution(GameplayCatalog catalog, AbilityId abilityId, EnemyAbilityDef source)
         {
-            string type = (source.AbilityType ?? string.Empty).ToLowerInvariant();
-            EffectPayloadKind? required = type == "self_heal" || type == "heal_allies" ? EffectPayloadKind.Heal
-                : type == "aoe_damage" ? EffectPayloadKind.Damage
-                : type == "stun_aoe" ? EffectPayloadKind.CrowdControl
-                : type == "slow_aoe" ? EffectPayloadKind.Slow
-                : type == "summon_minion" || type == "stealth_attack" ? EffectPayloadKind.WorldAction
-                : (EffectPayloadKind?)null;
-            ExecutionOperation requiredOperation = type == "self_heal" || type == "heal_allies" ? ExecutionOperation.ApplyHeal
-                : type == "aoe_damage" ? ExecutionOperation.ApplyDamage
-                : type == "stun_aoe" ? ExecutionOperation.ApplyCrowdControl
-                : type == "slow_aoe" ? ExecutionOperation.ApplySlow
-                : type == "summon_minion" ? ExecutionOperation.SummonEnemy
-                : type == "stealth_attack" ? ExecutionOperation.PrepareStealth
-                : ExecutionOperation.Default;
-            bool explicitUnsupported = type == "buff_allies" || type == "silence_tower" || type == "dispel_tower";
-            if (!required.HasValue && !explicitUnsupported)
+            if (!EnemyAbilityTypeRegistry.TryResolve(source.AbilityType, out var type))
                 throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: unsupported AbilityType '{source.AbilityType}' for '{source.Id}'");
-            if (!required.HasValue) return;
+            if (!type.Payload.HasValue) return;
             catalog.TryGetAbility(abilityId, out var ability);
             foreach (var executionId in ability.Executions)
-                if (catalog.TryGetExecution(executionId, out var execution) && execution.Payload == required.Value &&
-                    execution.Operation == requiredOperation) return;
-            throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: '{source.Id}' requires typed {required.Value}/{requiredOperation} execution");
+                if (catalog.TryGetExecution(executionId, out var execution) && execution.Payload == type.Payload.Value &&
+                    execution.Operation == type.Operation) return;
+            throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: '{source.Id}' requires typed {type.Payload.Value}/{type.Operation} execution");
         }
 
         private static string NormalizeAlias(string value) => value.Replace('_', ' ').Replace('-', ' ');
 
-        private static void LoadBehaviorTrees(GameConfig gameConfig, IRenderer renderer)
+        private static CatalogValidationException ConfigLoadFailure(string path, string reason)
+        {
+            return new CatalogValidationException($"{ConfigPathLabel(path)}: {reason}");
+        }
+
+        private static string ConfigPathLabel(string path)
+        {
+            string fullPath;
+            try { fullPath = Path.GetFullPath(path); }
+            catch { fullPath = path; }
+            return $"{path} ({fullPath})";
+        }
+
+        private static void ThrowIfStrict(bool strict, string path, Exception error)
+        {
+            if (!strict) return;
+            if (error is CatalogValidationException) throw error;
+            throw ConfigLoadFailure(path, error.Message);
+        }
+
+        private static void RequireStrictInput(bool strict, string path, string reason)
+        {
+            if (strict) throw ConfigLoadFailure(path, reason);
+        }
+
+        private static void RequireJsonKind(bool strict, string path, System.Text.Json.JsonElement root,
+            System.Text.Json.JsonValueKind expectedKind, string expectedDescription)
+        {
+            if (root.ValueKind == expectedKind) return;
+            string reason = "expected " + expectedDescription;
+            if (strict) throw ConfigLoadFailure(path, reason);
+            throw new InvalidDataException(path + ": " + reason);
+        }
+
+        private static string ReadStrictJsonObject(string path, string description)
+        {
+            try
+            {
+                if (!File.Exists(path)) throw ConfigLoadFailure(path, description + " not found");
+                string json = File.ReadAllText(path);
+                if (string.IsNullOrWhiteSpace(json)) throw ConfigLoadFailure(path, description + " is empty");
+                using (var document = System.Text.Json.JsonDocument.Parse(json))
+                    RequireJsonKind(true, path, document.RootElement,
+                        System.Text.Json.JsonValueKind.Object, "an object");
+                return json;
+            }
+            catch (Exception error)
+            {
+                if (error is CatalogValidationException) throw;
+                throw ConfigLoadFailure(path, error.Message);
+            }
+        }
+
+        private static void LoadBehaviorTrees(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string btFile = "Data/Configs/behavior_trees.json";
             try
             {
                 if (!File.Exists(btFile))
                 {
+                    RequireStrictInput(strict, btFile, "behavior tree configuration not found");
                     renderer.Log("[BT] Behavior trees file not found: " + btFile + ", using empty map");
                     return;
                 }
                 string json = File.ReadAllText(btFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, btFile, "behavior tree configuration is empty");
                     renderer.Log("[BT] Behavior trees file is empty: " + btFile);
                     return;
                 }
+                using (var document = System.Text.Json.JsonDocument.Parse(json))
+                    RequireJsonKind(strict, btFile, document.RootElement,
+                        System.Text.Json.JsonValueKind.Array, "an array");
                 ParseBehaviorTrees(gameConfig, json);
                 renderer.Log("[BT] Loaded " + gameConfig.BehaviorTrees.Count + " behavior trees from " + btFile);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, btFile, ex);
                 renderer.Log("[BT] Failed to load behavior trees: " + ex.Message);
             }
         }
@@ -370,60 +419,59 @@ LoadAdrenalineConfig(gameConfig, renderer);
             {
                 if (!File.Exists(abFile))
                 {
-                    if (strict) throw new CatalogValidationException($"{abFile}: enemy ability configuration not found");
+                    RequireStrictInput(strict, abFile, "enemy ability configuration not found");
                     renderer.Log("[ABILITY] Enemy abilities file not found: " + abFile + ", using empty list");
                     return;
                 }
                 string json = File.ReadAllText(abFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
-                    if (strict) throw new CatalogValidationException($"{abFile}: enemy ability configuration is empty");
+                    RequireStrictInput(strict, abFile, "enemy ability configuration is empty");
                     renderer.Log("[ABILITY] Enemy abilities file is empty: " + abFile);
                     return;
                 }
-                if (strict)
-                {
-                    using (var document = System.Text.Json.JsonDocument.Parse(json))
-                        if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
-                            throw new CatalogValidationException($"{abFile}: expected an array");
-                }
+                using (var document = System.Text.Json.JsonDocument.Parse(json))
+                    RequireJsonKind(strict, abFile, document.RootElement,
+                        System.Text.Json.JsonValueKind.Array, "an array");
                 ParseEnemyAbilities(gameConfig, json);
                 if (strict && gameConfig.EnemyAbilities.Count == 0)
-                    throw new CatalogValidationException($"{abFile}: no enemy abilities declared");
+                    throw ConfigLoadFailure(abFile, "no enemy abilities declared");
                 renderer.Log("[ABILITY] Loaded " + gameConfig.EnemyAbilities.Count + " enemy abilities from " + abFile);
             }
             catch (Exception ex)
             {
-                if (strict)
-                {
-                    if (ex is CatalogValidationException) throw;
-                    throw new CatalogValidationException($"{abFile}: {ex.Message}");
-                }
+                ThrowIfStrict(strict, abFile, ex);
                 renderer.Log("[ABILITY] Failed to load enemy abilities: " + ex.Message);
             }
         }
 
-        private static void LoadPhaseBehaviors(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadPhaseBehaviors(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string phaseFile = "Data/Configs/phase_behavior.json";
             try
             {
                 if (!File.Exists(phaseFile))
                 {
+                    RequireStrictInput(strict, phaseFile, "phase behavior configuration not found");
                     renderer.Log("[PHASE] Phase behavior file not found: " + phaseFile + ", using defaults");
                     return;
                 }
                 string json = File.ReadAllText(phaseFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, phaseFile, "phase behavior configuration is empty");
                     renderer.Log("[PHASE] Phase behavior file is empty: " + phaseFile);
                     return;
                 }
+                using (var document = System.Text.Json.JsonDocument.Parse(json))
+                    RequireJsonKind(strict, phaseFile, document.RootElement,
+                        System.Text.Json.JsonValueKind.Object, "an object");
                 ParsePhaseBehaviors(gameConfig, json);
                 renderer.Log("[PHASE] Loaded " + gameConfig.PhaseBehaviors.Count + " phase behaviors from " + phaseFile);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, phaseFile, ex);
                 renderer.Log("[PHASE] Failed to load phase behaviors: " + ex.Message);
             }
         }
@@ -1650,7 +1698,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             return skill;
         }
 
-        private static void LoadWeatherConfig(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadWeatherConfig(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string weatherFile = "Data/Configs/weather.json";
             try
@@ -1663,14 +1711,19 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(weatherFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, weatherFile, "weather configuration is empty");
                     renderer.Log("[WEATHER] Weather config file is empty: " + weatherFile);
                     return;
                 }
+                using (var document = System.Text.Json.JsonDocument.Parse(json))
+                    RequireJsonKind(strict, weatherFile, document.RootElement,
+                        System.Text.Json.JsonValueKind.Object, "an object");
                 ParseWeatherConfig(gameConfig, json);
                 renderer.Log("[WEATHER] Loaded weather config from " + weatherFile);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, weatherFile, ex);
                 renderer.Log("[WEATHER] Failed to load weather config: " + ex.Message);
             }
         }
@@ -1754,7 +1807,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             catch { return defaultValue; }
         }
 
-        private static void LoadWaveMutatorsConfig(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadWaveMutatorsConfig(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string mutatorFile = "Data/Configs/wave_mutators.json";
             try
@@ -1767,6 +1820,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(mutatorFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, mutatorFile, "wave mutator configuration is empty");
                     renderer.Log("[MUTATOR] Wave mutators config file is empty: " + mutatorFile);
                     return;
                 }
@@ -1799,11 +1853,12 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, mutatorFile, ex);
                 renderer.Log("[MUTATOR] Failed to load wave mutators config: " + ex.Message);
             }
         }
 
-        private static void LoadTerrainConfig(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadTerrainConfig(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string terrainFile = "Data/Configs/terrain.json";
             try
@@ -1816,6 +1871,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(terrainFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, terrainFile, "terrain configuration is empty");
                     renderer.Log("[TERRAIN] Terrain config file is empty: " + terrainFile);
                     return;
                 }
@@ -1858,11 +1914,12 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, terrainFile, ex);
                 renderer.Log("[TERRAIN] Failed to load terrain config: " + ex.Message);
             }
         }
 
-        private static void LoadPickupDefs(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadPickupDefs(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string pickupFile = "Data/Configs/pickup_defs.json";
             try
@@ -1875,6 +1932,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(pickupFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, pickupFile, "pickup definition configuration is empty");
                     renderer.Log("[PICKUP] Pickup defs file is empty: " + pickupFile);
                     return;
                 }
@@ -1900,6 +1958,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, pickupFile, ex);
                 renderer.Log("[PICKUP] Failed to load pickup defs: " + ex.Message);
             }
         }
@@ -1911,7 +1970,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         // 消费方：HeroSkillSystem / TowerActiveSkillSystem 的按名解析（优先 SkillDefs，
         // 回退 Skills）。玩家技能栏（Skills）仍来自 game_config.json 主文件。
 
-        private static void LoadSkillDefs(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadSkillDefs(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string curatedFile = "Data/Configs/skills.json";
             const string staticDir = "Data/Skills";
@@ -1925,9 +1984,14 @@ LoadAdrenalineConfig(gameConfig, renderer);
                     {
                         curatedCount = ParseSkillDefsArrayJson(gameConfig, json);
                     }
+                    else
+                    {
+                        RequireStrictInput(strict, curatedFile, "curated skill definition configuration is empty");
+                    }
                 }
                 else
                 {
+                    RequireStrictInput(strict, curatedFile, "curated skill definition configuration not found");
                     renderer.Log("[SKILLDEF] Curated skill defs file not found: " + curatedFile);
                 }
 
@@ -1939,10 +2003,18 @@ LoadAdrenalineConfig(gameConfig, renderer);
                         try
                         {
                             string json = File.ReadAllText(path);
-                            if (string.IsNullOrWhiteSpace(json)) continue;
+                            if (string.IsNullOrWhiteSpace(json))
+                            {
+                                RequireStrictInput(strict, path, "static skill definition is empty");
+                                continue;
+                            }
                             using (var doc = System.Text.Json.JsonDocument.Parse(json))
                             {
-                                if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                                if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+                                {
+                                    RequireStrictInput(strict, path, "expected an object");
+                                    continue;
+                                }
                                 var def = ParseSkillDefElement(doc.RootElement);
                                 if (string.IsNullOrEmpty(def.Name) || NameExists(gameConfig, def.Name)) { skipped++; continue; }
                                 gameConfig.SkillDefs.Add(def);
@@ -1951,12 +2023,14 @@ LoadAdrenalineConfig(gameConfig, renderer);
                         }
                         catch (Exception ex)
                         {
+                            ThrowIfStrict(strict, path, ex);
                             renderer.Log("[SKILLDEF] Failed to parse " + path + ": " + ex.Message);
                         }
                     }
                 }
                 else
                 {
+                    RequireStrictInput(strict, staticDir, "static skill definition directory not found");
                     renderer.Log("[SKILLDEF] Static skill defs directory not found: " + staticDir);
                 }
 
@@ -1965,6 +2039,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, curatedFile, ex);
                 renderer.Log("[SKILLDEF] Failed to load skill defs: " + ex.Message);
             }
         }
@@ -2090,7 +2165,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         // Name (display), ItemType (semantic category), Value/BuffDuration/Radius
         // (typed meaning per ItemType), MaxStack (per-slot count cap).
         // On parse failure, ItemDefs stays empty (InventorySystem fast-paths on empty).
-        private static void LoadItemDefs(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadItemDefs(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string itemFile = "Data/Configs/items.json";
             try
@@ -2103,6 +2178,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(itemFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, itemFile, "item definition configuration is empty");
                     renderer.Log("[INVENTORY] Item defs file is empty: " + itemFile);
                     return;
                 }
@@ -2131,6 +2207,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, itemFile, ex);
                 renderer.Log("[INVENTORY] Failed to load item defs: " + ex.Message);
             }
         }
@@ -2162,7 +2239,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         // fast-paths on the empty array (no crashes, no auto-success). ItemId and Count
         // are clamped to safe ranges so a malformed config can't craft a -1 stack or
         // produce billions of items.
-        private static void LoadCraftingRecipes(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadCraftingRecipes(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string recipeFile = "Data/Configs/crafting_recipes.json";
             try
@@ -2175,6 +2252,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(recipeFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, recipeFile, "crafting recipe configuration is empty");
                     renderer.Log("[CRAFTING] Recipe file is empty: " + recipeFile);
                     return;
                 }
@@ -2207,6 +2285,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, recipeFile, ex);
                 renderer.Log("[CRAFTING] Failed to load recipes: " + ex.Message);
             }
         }
@@ -2247,7 +2326,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             return v;
         }
 
-        private static void LoadFissionDefs(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadFissionDefs(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string fissionFile = "Data/Configs/enemy_fission.json";
             try
@@ -2260,12 +2339,14 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(fissionFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, fissionFile, "enemy fission configuration is empty");
                     renderer.Log("[FISSION] Enemy fission config file is empty: " + fissionFile);
                     return;
                 }
 
                 var doc = System.Text.Json.JsonDocument.Parse(json);
                 var root = doc.RootElement;
+                RequireJsonKind(strict, fissionFile, root, System.Text.Json.JsonValueKind.Array, "an array");
 
                 if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
                 {
@@ -2290,11 +2371,12 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, fissionFile, ex);
                 renderer.Log("[FISSION] Failed to load fission defs: " + ex.Message);
             }
         }
 
-        private static void LoadMorphDefs(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadMorphDefs(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string morphFile = "Data/Configs/enemy_morphs.json";
             try
@@ -2307,12 +2389,14 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(morphFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, morphFile, "enemy morph configuration is empty");
                     renderer.Log("[MORPH] Enemy morph config file is empty: " + morphFile);
                     return;
                 }
 
                 var doc = System.Text.Json.JsonDocument.Parse(json);
                 var root = doc.RootElement;
+                RequireJsonKind(strict, morphFile, root, System.Text.Json.JsonValueKind.Array, "an array");
 
                 if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
                 {
@@ -2338,11 +2422,12 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, morphFile, ex);
                 renderer.Log("[MORPH] Failed to load morph defs: " + ex.Message);
             }
         }
 
-        private static void LoadCorpseEffectDefs(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadCorpseEffectDefs(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string corpseFile = "Data/Configs/corpse_effects.json";
             try
@@ -2353,8 +2438,15 @@ LoadAdrenalineConfig(gameConfig, renderer);
                     return;
                 }
                 string json = File.ReadAllText(corpseFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    RequireStrictInput(strict, corpseFile, "corpse effect configuration is empty");
+                    renderer.Log("[CORPSE] Corpse effect defs file is empty: " + corpseFile);
+                    return;
+                }
                 var doc = System.Text.Json.JsonDocument.Parse(json);
                 var root = doc.RootElement;
+                RequireJsonKind(strict, corpseFile, root, System.Text.Json.JsonValueKind.Array, "an array");
 
                 if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
                 {
@@ -2399,6 +2491,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, corpseFile, ex);
                 renderer.Log("[CORPSE] Failed to load corpse effect defs: " + ex.Message);
             }
         }
@@ -2409,7 +2502,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         /// Each zone carries element type, base DPS, slow-per-stack, max stacks, lifetime, radius,
         /// tick interval, expand-over-time. Defaults to safe empty list on missing file.
         /// </summary>
-        private static void LoadTerrainZoneDefs(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadTerrainZoneDefs(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string file = "Data/Configs/terrain_zones.json";
             try
@@ -2420,8 +2513,15 @@ LoadAdrenalineConfig(gameConfig, renderer);
                     return;
                 }
                 string json = File.ReadAllText(file);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    RequireStrictInput(strict, file, "terrain zone configuration is empty");
+                    renderer.Log("[TERRAIN_ZONE] Terrain zone defs file is empty: " + file);
+                    return;
+                }
                 var doc = System.Text.Json.JsonDocument.Parse(json);
                 var root = doc.RootElement;
+                RequireJsonKind(strict, file, root, System.Text.Json.JsonValueKind.Array, "an array");
 
                 var defs = new List<GameConfig.TerrainZoneDef>();
                 if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
@@ -2448,6 +2548,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, file, ex);
                 renderer.Log("[TERRAIN_ZONE] Failed to load terrain zone defs: " + ex.Message);
             }
         }
@@ -2457,7 +2558,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         /// Reforge — Split A: data layer + affix slot infrastructure. The actual reroll
         /// API is implemented in Split B.
         /// </summary>
-        private static void LoadTowerAffixDefs(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadTowerAffixDefs(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string affixFile = "Data/Configs/tower_affixes.json";
             try
@@ -2470,11 +2571,13 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(affixFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, affixFile, "tower affix configuration is empty");
                     renderer.Log("[AFFIX] Tower affix defs file is empty: " + affixFile);
                     return;
                 }
                 var doc = System.Text.Json.JsonDocument.Parse(json);
                 var root = doc.RootElement;
+                RequireJsonKind(strict, affixFile, root, System.Text.Json.JsonValueKind.Array, "an array");
 
                 if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
                 {
@@ -2498,6 +2601,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, affixFile, ex);
                 renderer.Log("[AFFIX] Failed to load tower affix defs: " + ex.Message);
             }
         }
@@ -2514,7 +2618,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         /// GameConfig.TowerEffectivenessMatrix. Missing entries default to 1.0 at lookup time.
         /// Safe no-op when the file is missing (effectiveness disabled).
         /// </summary>
-        private static void LoadTowerEffectiveness(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadTowerEffectiveness(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string effFile = "Data/Configs/tower_effectiveness.json";
             try
@@ -2527,6 +2631,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(effFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, effFile, "tower effectiveness configuration is empty");
                     renderer.Log("[EFFECTIVENESS] Tower effectiveness file is empty: " + effFile);
                     return;
                 }
@@ -2547,6 +2652,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 }
                 if (!found)
                 {
+                    RequireStrictInput(strict, effFile, "expected an object containing an array");
                     renderer.Log("[EFFECTIVENESS] No array root in " + effFile);
                     return;
                 }
@@ -2578,6 +2684,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, effFile, ex);
                 renderer.Log("[EFFECTIVENESS] Failed to load tower effectiveness: " + ex.Message);
             }
         }
@@ -2589,7 +2696,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         /// modifiers are ONE roll per tower at placement (Round 145 Direction 3).
         /// Missing file → safe empty pool (no modifiers rolled — towers spawn with -1).
         /// </summary>
-        private static void LoadTowerModifiers(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadTowerModifiers(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string modFile = "Data/Configs/tower_modifiers.json";
             try
@@ -2603,15 +2710,23 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(modFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, modFile, "tower modifier configuration is empty");
                     renderer.Log("[TOWER-MODIFIER] Modifier file is empty: " + modFile);
                     gameConfig.TowerModifiers = Array.Empty<GameConfig.TowerModifierDef>();
                     return;
                 }
                 var arr = System.Text.Json.JsonSerializer.Deserialize<List<GameConfig.TowerModifierDef>>(json,
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                if (arr == null || arr.Count == 0)
+                if (arr == null)
                 {
+                    RequireStrictInput(strict, modFile, "tower modifier configuration deserialized to null");
                     renderer.Log("[TOWER-MODIFIER] No modifiers parsed from " + modFile);
+                    gameConfig.TowerModifiers = Array.Empty<GameConfig.TowerModifierDef>();
+                    return;
+                }
+                if (arr.Count == 0)
+                {
+                    renderer.Log("[TOWER-MODIFIER] Empty modifier pool in " + modFile);
                     gameConfig.TowerModifiers = Array.Empty<GameConfig.TowerModifierDef>();
                     return;
                 }
@@ -2632,6 +2747,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, modFile, ex);
                 renderer.Log("[TOWER-MODIFIER] Failed to load tower modifiers: " + ex.Message);
                 gameConfig.TowerModifiers = Array.Empty<GameConfig.TowerModifierDef>();
             }
@@ -2640,7 +2756,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         /// <summary>
         /// Load random event definitions from Data/Configs/random_events.json.
         /// </summary>
-        private static void LoadRandomEventDefs(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadRandomEventDefs(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string eventFile = "Data/Configs/random_events.json";
             try
@@ -2651,6 +2767,12 @@ LoadAdrenalineConfig(gameConfig, renderer);
                     return;
                 }
                 string json = File.ReadAllText(eventFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    RequireStrictInput(strict, eventFile, "random event configuration is empty");
+                    renderer.Log("[EVENT] Random event defs file is empty: " + eventFile);
+                    return;
+                }
                 var doc = System.Text.Json.JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
@@ -2660,6 +2782,13 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 if (root.TryGetProperty("minEventGap", out var meg))
                     config.MinEventGap = (float)meg.GetDouble();
 
+                if (!root.TryGetProperty("events", out var declaredEvents) ||
+                    declaredEvents.ValueKind != System.Text.Json.JsonValueKind.Array)
+                {
+                    RequireStrictInput(strict, eventFile, "expected an events array");
+                    renderer.Log("[EVENT] No events array in " + eventFile + ", events disabled");
+                    return;
+                }
                 if (root.TryGetProperty("events", out var eventsElem) && eventsElem.ValueKind == System.Text.Json.JsonValueKind.Array)
                 {
                     foreach (var elem in eventsElem.EnumerateArray())
@@ -2685,6 +2814,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, eventFile, ex);
                 renderer.Log("[EVENT] Failed to load random event defs: " + ex.Message);
             }
         }
@@ -2695,7 +2825,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         /// Missing or empty file → empty pool → daily system is a no-op (stock values).
         /// Optional <c>modifierCount</c> at the top level overrides the default 3.
         /// </summary>
-        private static void LoadDailyModifierPool(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadDailyModifierPool(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string file = "Data/Configs/daily_modifiers.json";
             try
@@ -2708,6 +2838,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(file);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, file, "daily modifier configuration is empty");
                     renderer.Log("[DAILY] Daily modifier file is empty: " + file);
                     return;
                 }
@@ -2717,6 +2848,13 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 {
                     int newCount = mc.GetInt32();
                     if (newCount > 0) gameConfig.DailyModifierCount = newCount;
+                }
+                if (!root.TryGetProperty("modifiers", out var declaredModifiers) ||
+                    declaredModifiers.ValueKind != System.Text.Json.JsonValueKind.Array)
+                {
+                    RequireStrictInput(strict, file, "expected a modifiers array");
+                    renderer.Log("[DAILY] No modifiers array in " + file + ", daily challenge disabled");
+                    return;
                 }
                 if (root.TryGetProperty("modifiers", out var arr) && arr.ValueKind == System.Text.Json.JsonValueKind.Array)
                 {
@@ -2737,6 +2875,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, file, ex);
                 renderer.Log("[DAILY] Failed to load daily modifier defs: " + ex.Message);
             }
         }
@@ -2781,7 +2920,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
         }
 
-        private static void LoadSummonDefs(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadSummonDefs(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string summonFile = "Data/Configs/summons.json";
             try
@@ -2794,12 +2933,14 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(summonFile);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, summonFile, "summon definition configuration is empty");
                     renderer.Log("[SUMMON] Summon defs file is empty: " + summonFile);
                     return;
                 }
 
                 var doc = System.Text.Json.JsonDocument.Parse(json);
                 var root = doc.RootElement;
+                RequireJsonKind(strict, summonFile, root, System.Text.Json.JsonValueKind.Array, "an array");
 
                 if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
                 {
@@ -2828,6 +2969,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, summonFile, ex);
                 renderer.Log("[SUMMON] Failed to load summon defs: " + ex.Message);
             }
         }
@@ -2858,7 +3000,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         /// is set to a sentinel value of -1 to signal "do not apply saturation" — checked in
         /// the per-damage hot path).
         /// </summary>
-        private static void LoadDamageSaturationConfig(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadDamageSaturationConfig(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string satFile = "Data/Configs/damage_saturation.json";
             try
@@ -2869,6 +3011,12 @@ LoadAdrenalineConfig(gameConfig, renderer);
                     return;
                 }
                 string json = File.ReadAllText(satFile);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    RequireStrictInput(strict, satFile, "damage saturation configuration is empty");
+                    renderer.Log("[SATURATION] Damage saturation config is empty: " + satFile + ", using defaults");
+                    return;
+                }
                 if (string.IsNullOrWhiteSpace(json))
                 {
                     renderer.Log("[SATURATION] Damage saturation config is empty: " + satFile);
@@ -2900,6 +3048,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, satFile, ex);
                 renderer.Log("[SATURATION] Failed to load damage saturation config: " + ex.Message + " — using defaults");
             }
         }
@@ -2910,7 +3059,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         /// destructible system is opt-in (empty DestructibleDefs → no destructibles spawned
         /// → no hot-path overhead). Per-entry fields fall back to safe defaults when absent.
         /// </summary>
-        private static void LoadDestructibleDefs(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadDestructibleDefs(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string file = "Data/Configs/destructibles.json";
             try
@@ -2923,6 +3072,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(file);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, file, "destructible configuration is empty");
                     renderer.Log("[DESTRUCTIBLE] Destructible config is empty: " + file);
                     return;
                 }
@@ -2930,6 +3080,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 var root = doc.RootElement;
                 if (!root.TryGetProperty("Destructibles", out var arr) || arr.ValueKind != System.Text.Json.JsonValueKind.Array)
                 {
+                    RequireStrictInput(strict, file, "expected a Destructibles array");
                     renderer.Log("[DESTRUCTIBLE] No 'Destructibles' array in " + file + " — opt-in, no destructibles");
                     return;
                 }
@@ -2959,6 +3110,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, file, ex);
                 renderer.Log("[DESTRUCTIBLE] Failed to load destructible config: " + ex.Message + " — no destructibles will spawn");
             }
         }
@@ -2969,7 +3121,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         /// array is informational/logged only; per-mark-type wiring (e.g. which tower
         /// applies which mark) is done via monster/tower configs, not in this loader.
         /// </summary>
-        private static void LoadMarkConfig(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadMarkConfig(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string file = "Data/Configs/marks.json";
             try
@@ -2982,6 +3134,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 string json = File.ReadAllText(file);
                 if (string.IsNullOrWhiteSpace(json))
                 {
+                    RequireStrictInput(strict, file, "mark configuration is empty");
                     renderer.Log("[MARK] Mark config is empty: " + file + " — using defaults");
                     return;
                 }
@@ -3012,6 +3165,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, file, ex);
                 renderer.Log("[MARK] Failed to load mark config: " + ex.Message + " — using MarkSubsystemConfig defaults");
             }
         }
@@ -3024,7 +3178,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
  /// into PreFightBuffOptionDef entries; missing fields fall back to
  /// per-field defaults so the file can be partial without breaking.
  /// </summary>
- private static void LoadPreFightBuffConfig(GameConfig gameConfig, IRenderer renderer)
+ private static void LoadPreFightBuffConfig(GameConfig gameConfig, IRenderer renderer, bool strict)
  {
      const string file = "Data/Configs/prefight_buffs.json";
      try
@@ -3035,7 +3189,11 @@ LoadAdrenalineConfig(gameConfig, renderer);
              return;
          }
          string json = File.ReadAllText(file);
-         if (string.IsNullOrWhiteSpace(json)) return;
+         if (string.IsNullOrWhiteSpace(json))
+         {
+             RequireStrictInput(strict, file, "pre-fight buff configuration is empty");
+             return;
+         }
          using var doc = System.Text.Json.JsonDocument.Parse(json);
          var root = doc.RootElement;
 
@@ -3071,6 +3229,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
      }
      catch (Exception ex)
      {
+         ThrowIfStrict(strict, file, ex);
          renderer.Log("[PREFIGHT] Failed to load prefight_buffs config: " + ex.Message + " — using coded defaults");
      }
  }
@@ -3084,7 +3243,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         /// optional — missing fields fall back to those defaults so the
         /// file can be partial without breaking the loader.
         /// </summary>
-        private static void LoadMomentumConfig(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadMomentumConfig(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string file = "Data/Configs/momentum.json";
             try
@@ -3095,6 +3254,11 @@ LoadAdrenalineConfig(gameConfig, renderer);
                     return;
                 }
                 string json = File.ReadAllText(file);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    RequireStrictInput(strict, file, "momentum configuration is empty");
+                    return;
+                }
                 // Sentinel-tolerant: System.Text.Json is happy with missing
                 // fields, they fall back to the coded property defaults
                 // (Enabled=true, TierDuration=30f, MaxTiers=10, etc).
@@ -3105,6 +3269,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 var cfg = System.Text.Json.JsonSerializer.Deserialize<MomentumConfig>(json, opts);
                 if (cfg == null)
                 {
+                    RequireStrictInput(strict, file, "momentum configuration deserialized to null");
                     renderer.Log("[MOMENTUM] momentum.json deserialized to null, using coded defaults");
                     return;
                 }
@@ -3113,6 +3278,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, file, ex);
                 renderer.Log("[MOMENTUM] Failed to load momentum config: " + ex.Message + " — using coded defaults");
             }
         }
@@ -3127,7 +3293,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         /// fall back to those defaults so the file can be partial without breaking
         /// the loader (System.Text.Json is happy with missing properties).
         /// </summary>
-        private static void LoadAdrenalineConfig(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadAdrenalineConfig(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string file = "Data/Configs/adrenaline.json";
             try
@@ -3138,6 +3304,11 @@ LoadAdrenalineConfig(gameConfig, renderer);
                     return;
                 }
                 string json = File.ReadAllText(file);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    RequireStrictInput(strict, file, "adrenaline configuration is empty");
+                    return;
+                }
                 // Sentinel-tolerant: System.Text.Json is happy with missing fields,
                 // they fall back to the coded property defaults.
                 var opts = new System.Text.Json.JsonSerializerOptions
@@ -3147,6 +3318,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 var cfg = System.Text.Json.JsonSerializer.Deserialize<AdrenalineConfig>(json, opts);
                 if (cfg == null)
                 {
+                    RequireStrictInput(strict, file, "adrenaline configuration deserialized to null");
                     renderer.Log("[ADRENALINE] adrenaline.json deserialized to null, using coded defaults");
                     return;
                 }
@@ -3155,6 +3327,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, file, ex);
                 renderer.Log("[ADRENALINE] Failed to load adrenaline config: " + ex.Message + " — using coded defaults");
             }
         }
@@ -3167,7 +3340,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
  /// knobs are optional — missing fields fall back to those defaults so
  /// the file can be partial without breaking the loader.
  /// </summary>
- private static void LoadManaShieldConfig(GameConfig gameConfig, IRenderer renderer)
+ private static void LoadManaShieldConfig(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string file = "Data/Configs/mana_shield.json";
             try
@@ -3178,7 +3351,11 @@ LoadAdrenalineConfig(gameConfig, renderer);
                     return;
                 }
                 string json = File.ReadAllText(file);
-                if (string.IsNullOrWhiteSpace(json)) return;
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    RequireStrictInput(strict, file, "mana shield configuration is empty");
+                    return;
+                }
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
@@ -3193,6 +3370,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, file, ex);
                 renderer.Log("[MANASHIELD] Failed to load mana_shield config: " + ex.Message + " — using coded defaults");
             }
         }
@@ -3208,7 +3386,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
         /// property defaults so the file can be partial without breaking
         /// the loader.
         /// </summary>
-        private static void LoadCrestConfig(GameConfig gameConfig, IRenderer renderer)
+        private static void LoadCrestConfig(GameConfig gameConfig, IRenderer renderer, bool strict)
         {
             const string file = "Data/Configs/crests.json";
             try
@@ -3219,6 +3397,11 @@ LoadAdrenalineConfig(gameConfig, renderer);
                     return;
                 }
                 string json = File.ReadAllText(file);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    RequireStrictInput(strict, file, "crest configuration is empty");
+                    return;
+                }
                 var opts = new System.Text.Json.JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
@@ -3226,6 +3409,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
                 var cfg = System.Text.Json.JsonSerializer.Deserialize<CrestConfig>(json, opts);
                 if (cfg == null)
                 {
+                    RequireStrictInput(strict, file, "crest configuration deserialized to null");
                     renderer.Log("[CREST] crests.json deserialized to null, using coded defaults");
                     return;
                 }
@@ -3235,6 +3419,7 @@ LoadAdrenalineConfig(gameConfig, renderer);
             }
             catch (Exception ex)
             {
+                ThrowIfStrict(strict, file, ex);
                 renderer.Log("[CREST] Failed to load crests config: " + ex.Message + " — using coded defaults");
             }
         }

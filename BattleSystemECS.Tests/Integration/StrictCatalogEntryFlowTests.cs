@@ -256,6 +256,30 @@ namespace BattleSystemECS.Tests.Integration
             Assert.NotEqual(heal, damage);
         }
 
+        [Fact]
+        public void EnemyAbilityTypeRegistryMatchesCompiledExecutionContracts()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            var catalog = config.CompiledCatalog!;
+
+            foreach (var source in config.EnemyAbilities)
+            {
+                Assert.True(EnemyAbilityTypeRegistry.TryResolve(source.AbilityType, out var type),
+                    $"Unregistered enemy ability type '{source.AbilityType}'");
+                Assert.Equal(source.AbilityType, type.Name, ignoreCase: true);
+                Assert.True(catalog.TryResolveAlias(source.Id, out var abilityId));
+                Assert.True(catalog.TryGetAbility(abilityId, out var ability));
+
+                if (type.DispatchMode == EnemyAbilityDispatchMode.TypedCatalog)
+                {
+                    Assert.True(type.Payload.HasValue);
+                    Assert.Contains(ability.Executions, executionId =>
+                        catalog.TryGetExecution(executionId, out var execution) &&
+                        execution.Payload == type.Payload.Value && execution.Operation == type.Operation);
+                }
+            }
+        }
+
         private void AssertStrictReject(Action<GameConfig> mutate, string expected)
         {
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);

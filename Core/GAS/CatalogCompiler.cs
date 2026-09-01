@@ -126,61 +126,44 @@ namespace BattleSystemECS.Core.GAS
                 var source = enemyAbilities[i];
                 if (source == null || string.IsNullOrWhiteSpace(source.Id) || string.IsNullOrWhiteSpace(source.Name))
                     throw new CatalogValidationException($"enemy abilities: missing id/name at index {i}");
+                if (!EnemyAbilityTypeRegistry.TryResolve(source.AbilityType, out var type))
+                    throw new CatalogValidationException($"enemy abilities: unsupported AbilityType '{source.AbilityType}' for '{source.Id}'");
 
                 bool hasNameAlias = aliases.TryGetValue(source.Name, out var abilityId);
-                bool needsTypedDefinition = RequiredEnemyPayload(source.AbilityType, out var requiredPayload);
+                bool needsTypedDefinition = type.Payload.HasValue;
+                EffectPayloadKind requiredPayload = type.Payload.GetValueOrDefault();
                 bool nameIsCompatible = hasNameAlias && (!needsTypedDefinition ||
                     AbilityContainsPayload(abilities, executions, abilityId, requiredPayload,
-                        RequiredEnemyOperation(source.AbilityType)));
+                        type.Operation));
                 if (!nameIsCompatible)
                 {
                     abilityId = new AbilityId(abilities.Count);
                     var executionIds = new List<ExecutionId>();
-                    TargetingShape shape = TargetingShape.Single;
-                    EffectPayloadKind payload = EffectPayloadKind.GameplayEvent;
-                    ExecutionOperation operation = ExecutionOperation.Default;
+                    TargetingShape shape = type.Targeting;
+                    EffectPayloadKind payload = type.Payload ?? EffectPayloadKind.GameplayEvent;
+                    ExecutionOperation operation = type.Operation;
                     float magnitude = 0f;
                     float duration = 0f;
 
-                    switch ((source.AbilityType ?? string.Empty).ToLowerInvariant())
+                    switch (type.Kind)
                     {
-                        case "self_heal":
-                        case "heal_allies":
-                            shape = TargetingShape.Heal;
-                            payload = EffectPayloadKind.Heal;
-                            operation = ExecutionOperation.ApplyHeal;
+                        case EnemyAbilityKind.SelfHeal:
+                        case EnemyAbilityKind.HealAllies:
                             magnitude = source.HealAmount;
                             break;
-                        case "aoe_damage":
-                            shape = TargetingShape.Circle;
-                            payload = EffectPayloadKind.Damage;
-                            operation = ExecutionOperation.ApplyDamage;
+                        case EnemyAbilityKind.AoeDamage:
                             magnitude = source.DamageMultiplier;
                             break;
-                        case "stun_aoe":
-                            shape = TargetingShape.AoeStun;
-                            payload = EffectPayloadKind.CrowdControl;
-                            operation = ExecutionOperation.ApplyCrowdControl;
+                        case EnemyAbilityKind.StunAoe:
                             magnitude = source.StunDuration;
                             duration = source.StunDuration;
                             break;
-                        case "slow_aoe":
-                            shape = TargetingShape.Slow;
-                            payload = EffectPayloadKind.Slow;
-                            operation = ExecutionOperation.ApplySlow;
+                        case EnemyAbilityKind.SlowAoe:
                             magnitude = source.SlowFactor;
                             duration = source.SlowDuration;
                             break;
-                        case "summon_minion":
-                            shape = TargetingShape.Single;
-                            payload = EffectPayloadKind.WorldAction;
-                            operation = ExecutionOperation.SummonEnemy;
-                            magnitude = 1f;
-                            break;
-                        case "stealth_attack":
-                            shape = TargetingShape.Single;
-                            payload = EffectPayloadKind.WorldAction;
-                            operation = ExecutionOperation.PrepareStealth;
+                        case EnemyAbilityKind.SummonMinion:
+                        case EnemyAbilityKind.StealthAttack:
                             magnitude = 1f;
                             break;
                     }
@@ -225,32 +208,6 @@ namespace BattleSystemECS.Core.GAS
                 catalog.Triggers, catalog.Modifiers, aliases, catalog.HasRuntimeExtensions);
             CatalogValidator.Validate(extended, "enemy ability catalog extensions");
             return extended;
-        }
-
-        private static bool RequiredEnemyPayload(string abilityType, out EffectPayloadKind payload)
-        {
-            string type = (abilityType ?? string.Empty).ToLowerInvariant();
-            if (type == "self_heal" || type == "heal_allies") { payload = EffectPayloadKind.Heal; return true; }
-            if (type == "aoe_damage") { payload = EffectPayloadKind.Damage; return true; }
-            if (type == "stun_aoe") { payload = EffectPayloadKind.CrowdControl; return true; }
-            if (type == "slow_aoe") { payload = EffectPayloadKind.Slow; return true; }
-            if (type == "summon_minion" || type == "stealth_attack") { payload = EffectPayloadKind.WorldAction; return true; }
-            payload = EffectPayloadKind.GameplayEvent;
-            return false;
-        }
-
-        private static ExecutionOperation RequiredEnemyOperation(string abilityType)
-        {
-            switch ((abilityType ?? string.Empty).ToLowerInvariant())
-            {
-                case "self_heal": case "heal_allies": return ExecutionOperation.ApplyHeal;
-                case "aoe_damage": return ExecutionOperation.ApplyDamage;
-                case "stun_aoe": return ExecutionOperation.ApplyCrowdControl;
-                case "slow_aoe": return ExecutionOperation.ApplySlow;
-                case "summon_minion": return ExecutionOperation.SummonEnemy;
-                case "stealth_attack": return ExecutionOperation.PrepareStealth;
-                default: return ExecutionOperation.Default;
-            }
         }
 
         private static bool AbilityContainsPayload(IReadOnlyList<AbilityDefinition> abilities,

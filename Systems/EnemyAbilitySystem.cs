@@ -41,15 +41,6 @@ namespace BattleSystemECS.Systems
         private readonly List<int> _healTargets = new List<int>(256);
         private readonly List<float> _healMagnitudes = new List<float>(256);
 
-        private enum SpecialWorldAction { None, SummonEnemy, PrepareStealth }
-
-        private static SpecialWorldAction ResolveSpecialWorldAction(string abilityType)
-        {
-            if (string.Equals(abilityType, "summon_minion", StringComparison.OrdinalIgnoreCase)) return SpecialWorldAction.SummonEnemy;
-            if (string.Equals(abilityType, "stealth_attack", StringComparison.OrdinalIgnoreCase)) return SpecialWorldAction.PrepareStealth;
-            return SpecialWorldAction.None;
-        }
-
         public EnemyAbilitySystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EventBus eventBus = null)
         {
             this.store = store;
@@ -76,7 +67,8 @@ namespace BattleSystemECS.Systems
             if (catalog != null)
             {
                 foreach (var ability in _abilityLookup.Values)
-                    if (ResolveSpecialWorldAction(ability.AbilityType) != SpecialWorldAction.None &&
+                    if (EnemyAbilityTypeRegistry.TryResolve(ability.AbilityType, out var type) &&
+                        type.DispatchMode == EnemyAbilityDispatchMode.RuntimeAdapter &&
                         catalog.TryResolveAlias(ability.Id, out var abilityId))
                         _specialDefinitions[abilityId.Value] = ability;
             }
@@ -315,10 +307,10 @@ namespace BattleSystemECS.Systems
         {
             if (gameConfig.StrictCatalogReferences)
             {
-                var special = ResolveSpecialWorldAction(ability.AbilityType);
-                if (special != SpecialWorldAction.None)
+                if (EnemyAbilityTypeRegistry.TryResolve(ability.AbilityType, out var type) &&
+                    type.DispatchMode == EnemyAbilityDispatchMode.RuntimeAdapter)
                 {
-                    var result = TryExecuteTypedSpecialAbility(enemyId, ability, special);
+                    var result = TryExecuteTypedSpecialAbility(enemyId, ability, type);
                     if (!result.Accepted)
                         logger.Log($"[ABILITY_REJECTED] {result.Reason} enemyAbility={ability.Id}");
                     return;
@@ -333,40 +325,43 @@ namespace BattleSystemECS.Systems
             // Compatibility-only projection for fixtures that deliberately omit strict bootstrap.
             if (TryExecuteTypedBasicAbility(enemyId, ability).Accepted) return;
 
-            switch (ability.AbilityType)
+            if (!EnemyAbilityTypeRegistry.TryResolve(ability.AbilityType, out var compatibilityType))
             {
-                case "self_heal":
+                logger.Log($"[ABILITY] Unknown ability type '{ability.AbilityType}' on enemy {enemyId}, ignoring");
+            }
+            else switch (compatibilityType.Kind)
+            {
+                case EnemyAbilityKind.SelfHeal:
                     ExecuteSelfHeal(enemyId, ability);
                     break;
-                case "aoe_damage":
+                case EnemyAbilityKind.AoeDamage:
                     ExecuteAoeDamage(enemyId, ability);
                     break;
-                case "buff_allies":
+                case EnemyAbilityKind.BuffAllies:
                     ExecuteBuffAllies(enemyId, ability);
                     break;
-                case "stun_aoe":
+                case EnemyAbilityKind.StunAoe:
                     ExecuteStunAoe(enemyId, ability);
                     break;
-                case "slow_aoe":
+                case EnemyAbilityKind.SlowAoe:
                     ExecuteSlowAoe(enemyId, ability);
                     break;
-                case "heal_allies":
+                case EnemyAbilityKind.HealAllies:
                     ExecuteHealAllies(enemyId, ability);
                     break;
-                case "stealth_attack":
+                case EnemyAbilityKind.StealthAttack:
                     ExecuteStealthAttack(enemyId, ability);
                     break;
-                case "summon_minion":
+                case EnemyAbilityKind.SummonMinion:
                     ExecuteSummonMinion(enemyId, ability);
                     break;
-                case "silence_tower":
+                case EnemyAbilityKind.SilenceTower:
                     ExecuteSilenceTower(enemyId, ability);
                     break;
-                case "dispel_tower":
+                case EnemyAbilityKind.DispelTower:
                     ExecuteDispelTower(enemyId, ability);
                     break;
                 default:
-                    // Unknown ability type — log and set cooldown to prevent infinite retry
                     logger.Log($"[ABILITY] Unknown ability type '{ability.AbilityType}' on enemy {enemyId}, ignoring");
                     break;
             }
@@ -378,40 +373,31 @@ namespace BattleSystemECS.Systems
 
         private bool CanDispatchStrict(EnemyAbilityDef ability)
         {
-            string type = (ability.AbilityType ?? string.Empty).ToLowerInvariant();
-            if (type == "buff_allies" || type == "silence_tower" || type == "dispel_tower") return false;
+            if (!EnemyAbilityTypeRegistry.TryResolve(ability.AbilityType, out var type)) return false;
+            if (type.DispatchMode == EnemyAbilityDispatchMode.CompatibilityOnly) return false;
             var catalog = gameConfig.CompiledCatalog;
-            if (ResolveSpecialWorldAction(ability.AbilityType) != SpecialWorldAction.None)
-            {
-                if (catalog == null || !catalog.TryResolveAlias(ability.Id, out var specialId) ||
-                    !catalog.TryGetAbility(specialId, out var specialAbility)) return false;
-                ExecutionOperation required = type == "summon_minion"
-                    ? ExecutionOperation.SummonEnemy : ExecutionOperation.PrepareStealth;
-                for (int i = 0; i < specialAbility.Executions.Count; i++)
-                    if (catalog.TryGetExecution(specialAbility.Executions[i], out var execution) &&
-                        execution.Payload == EffectPayloadKind.WorldAction && execution.Operation == required)
-                        return true;
-                return false;
-            }
-            if (type != "self_heal" && type != "heal_allies" && type != "aoe_damage" &&
-                type != "stun_aoe" && type != "slow_aoe") return false;
-            return catalog != null && catalog.TryResolveAlias(ability.Id, out var id) && catalog.TryGetAbility(id, out _);
+            if (catalog == null || !catalog.TryResolveAlias(ability.Id, out var id) ||
+                !catalog.TryGetAbility(id, out var typed)) return false;
+            if (type.DispatchMode != EnemyAbilityDispatchMode.RuntimeAdapter) return true;
+            for (int i = 0; i < typed.Executions.Count; i++)
+                if (catalog.TryGetExecution(typed.Executions[i], out var execution) &&
+                    execution.Payload == EffectPayloadKind.WorldAction && execution.Operation == type.Operation)
+                    return true;
+            return false;
         }
 
         private AbilityActivationResult TryExecuteTypedSpecialAbility(int enemyId, EnemyAbilityDef ability,
-            SpecialWorldAction special)
+            EnemyAbilityTypeDescriptor type)
         {
             var catalog = gameConfig.CompiledCatalog;
             if (catalog == null || !catalog.TryResolveAlias(ability.Id, out var abilityId) ||
                 !catalog.TryGetAbility(abilityId, out var typed))
                 return new AbilityActivationResult(false, enemyId, CooldownSlot(enemyId),
                     AbilityActivationRejectReason.UnsupportedDefinition);
-            ExecutionOperation required = special == SpecialWorldAction.SummonEnemy
-                ? ExecutionOperation.SummonEnemy : ExecutionOperation.PrepareStealth;
             bool matched = false;
             for (int i = 0; i < typed.Executions.Count; i++)
                 if (catalog.TryGetExecution(typed.Executions[i], out var execution) &&
-                    execution.Payload == EffectPayloadKind.WorldAction && execution.Operation == required)
+                    execution.Payload == EffectPayloadKind.WorldAction && execution.Operation == type.Operation)
                     matched = true;
             if (!matched) return new AbilityActivationResult(false, enemyId, CooldownSlot(enemyId),
                 AbilityActivationRejectReason.UnsupportedDefinition);
@@ -443,20 +429,18 @@ namespace BattleSystemECS.Systems
 
         private AbilityActivationResult TryExecuteTypedBasicAbility(int enemyId, EnemyAbilityDef ability)
         {
-            bool heal = string.Equals(ability.AbilityType, "self_heal", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(ability.AbilityType, "heal_allies", StringComparison.OrdinalIgnoreCase);
-            bool damage = string.Equals(ability.AbilityType, "aoe_damage", StringComparison.OrdinalIgnoreCase);
-            bool control = string.Equals(ability.AbilityType, "stun_aoe", StringComparison.OrdinalIgnoreCase);
-            bool slow = string.Equals(ability.AbilityType, "slow_aoe", StringComparison.OrdinalIgnoreCase);
-            if (!heal && !damage && !control && !slow)
+            if (!EnemyAbilityTypeRegistry.TryResolve(ability.AbilityType, out var type) ||
+                type.DispatchMode != EnemyAbilityDispatchMode.TypedCatalog || !type.Payload.HasValue)
                 return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.UnsupportedDefinition);
+            bool heal = type.Payload.Value == EffectPayloadKind.Heal;
+            bool damage = type.Payload.Value == EffectPayloadKind.Damage;
             var catalog = gameConfig.CompiledCatalog;
             if (catalog == null) return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.UnsupportedDefinition);
             string alias = ability.Id;
             if (string.IsNullOrWhiteSpace(alias) || !catalog.TryResolveAlias(alias, out var typedId) ||
                 !catalog.TryGetAbility(typedId, out var typed))
                 return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.UnsupportedDefinition);
-            bool groupHeal = heal && string.Equals(ability.AbilityType, "heal_allies", StringComparison.OrdinalIgnoreCase);
+            bool groupHeal = type.Kind == EnemyAbilityKind.HealAllies;
             int targetId = heal ? enemyId : playerId;
             if (targetId < 0 || !store.GetEntityHandle(targetId).IsValid)
                 return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.NoTarget);
@@ -465,10 +449,7 @@ namespace BattleSystemECS.Systems
             {
                 if (!catalog.TryGetExecution(typed.Executions[i], out var execution))
                     return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.UnsupportedDefinition);
-                if ((heal && execution.Payload == EffectPayloadKind.Heal) ||
-                    (damage && execution.Payload == EffectPayloadKind.Damage) ||
-                    (control && execution.Payload == EffectPayloadKind.CrowdControl) ||
-                    (slow && execution.Payload == EffectPayloadKind.Slow)) payloadMatches = true;
+                if (execution.Payload == type.Payload.Value) payloadMatches = true;
             }
             if (!payloadMatches) return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.UnsupportedDefinition);
             if (groupHeal)
@@ -512,12 +493,6 @@ namespace BattleSystemECS.Systems
                 targets.Add(target);
                 magnitudes.Add(magnitude);
             }
-        }
-
-        private void ExecuteSpecialWorldAction(int enemyId, EnemyAbilityDef ability, SpecialWorldAction action)
-        {
-            if (action == SpecialWorldAction.SummonEnemy) EnemyWorldActionAdapter.Summon(store, logger, enemyId, ability);
-            else if (action == SpecialWorldAction.PrepareStealth) EnemyWorldActionAdapter.PrepareStealth(store, logger, enemyId, ability);
         }
 
         private static int CooldownSlot(int enemyId) => enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY;
