@@ -81,6 +81,8 @@ namespace BattleSystemECS.Core.GAS
                 if (execution.Id.Value != i) throw new CatalogValidationException($"{path}: execution id {execution.Id.Value} is not contiguous");
                 if (float.IsNaN(execution.Magnitude) || float.IsInfinity(execution.Magnitude) || execution.Magnitude < 0f || float.IsNaN(execution.Duration) || float.IsInfinity(execution.Duration) || execution.Duration < 0f)
                     throw new CatalogValidationException($"{path}: invalid execution magnitude/duration for id {execution.Id.Value}");
+                if (!ProductionAbilityPayloadRegistry.Supports(execution))
+                    throw new CatalogValidationException($"{path}: execution {execution.Id.Value} has no production handler for {execution.Payload}/{execution.Operation}");
             }
             if (catalog.Aliases != null) foreach (var alias in catalog.Aliases) if ((uint)alias.Value.Value >= (uint)catalog.AbilityDefinitions.Count) throw new CatalogValidationException($"{path}: alias '{alias.Key}' references missing ability {alias.Value.Value}");
             for (int i = 0; i < catalog.Abilities.Count; i++)

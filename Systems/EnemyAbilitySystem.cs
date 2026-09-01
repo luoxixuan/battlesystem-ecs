@@ -40,6 +40,7 @@ namespace BattleSystemECS.Systems
         private readonly List<int> _activeChannelers = new List<int>(64);
         private readonly List<int> _healTargets = new List<int>(256);
         private readonly List<float> _healMagnitudes = new List<float>(256);
+        private IAbilityPayloadHandler _payloadHandler;
 
         public EnemyAbilitySystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EventBus eventBus = null)
         {
@@ -48,6 +49,7 @@ namespace BattleSystemECS.Systems
             this.playerId = playerId;
             this.gameConfig = gameConfig;
             this._eventBus = eventBus ?? new EventBus();
+            _payloadHandler = this;
 
             // Build ability lookup from config
             _abilityLookup = new Dictionary<string, EnemyAbilityDef>();
@@ -411,8 +413,14 @@ namespace BattleSystemECS.Systems
                 AbilityActivationRejectReason.UnsupportedDefinition);
             var request = new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown,
                 enemyId, abilityId, ownerPlayerId: playerId);
-            return GameplayAbilityRuntime.Activate(store, catalog, _abilityCooldownTimers, request, this);
+            return GameplayAbilityRuntime.Activate(store, catalog, _abilityCooldownTimers, request, _payloadHandler);
         }
+
+        bool IAbilityPayloadHandler.Supports(ExecutionDefinition execution) =>
+            execution.Payload == EffectPayloadKind.Damage &&
+                (execution.Operation == ExecutionOperation.Default || execution.Operation == ExecutionOperation.ApplyDamage) ||
+            execution.Payload == EffectPayloadKind.WorldAction &&
+                (execution.Operation == ExecutionOperation.SummonEnemy || execution.Operation == ExecutionOperation.PrepareStealth);
 
         bool IAbilityPayloadHandler.CanCommit(AbilityPayloadContext context)
         {
@@ -453,6 +461,12 @@ namespace BattleSystemECS.Systems
             if (context.Execution.Operation == ExecutionOperation.PrepareStealth)
                 return EnemyWorldActionAdapter.PrepareStealth(store, logger, context.Source.Index, ability);
             return 0;
+        }
+
+        internal void SetPayloadHandler(IAbilityPayloadHandler sharedHandler)
+        {
+            if (sharedHandler == null) throw new ArgumentNullException(nameof(sharedHandler));
+            _payloadHandler = new AbilityPayloadHandlerChain(this, sharedHandler);
         }
 
         private AbilityActivationResult TryExecuteTypedBasicAbility(int enemyId, EnemyAbilityDef ability)
@@ -499,7 +513,7 @@ namespace BattleSystemECS.Systems
                 : float.NaN;
              var request = new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown, targetId, typedId,
                  magnitudeOverride: magnitude, ownerPlayerId: playerId);
-            var result = GameplayAbilityRuntime.Activate(store, catalog, _abilityCooldownTimers, request, this);
+            var result = GameplayAbilityRuntime.Activate(store, catalog, _abilityCooldownTimers, request, _payloadHandler);
             if (result.Accepted)
                 logger.Log($"[ABILITY] Enemy {enemyId} typed '{ability.Name}' applied {result.AppliedEffects} effect(s)");
             return result;

@@ -38,6 +38,7 @@ namespace BattleSystemECS.Systems
         private readonly List<int> _catalogTargets = new List<int>(32);
         private readonly List<float> _catalogMagnitudeScales = new List<float>(32);
         private int _pendingTowerId = -1;
+        private IAbilityPayloadHandler? _payloadHandler;
         public PhaseContextKind CurrentPhaseContext => _phaseContext.Kind;
         public AbilityActivationResult LastActivation { get; private set; }
 
@@ -121,7 +122,8 @@ namespace BattleSystemECS.Systems
             }
             if (catalog == null || !catalog.TryGetAbility(abilityId, out catalogAbility))
                 return Reject(towerId, AbilityActivationRejectReason.UnsupportedDefinition);
-            int targetId = useTypedTargeting ? towerId : FindTarget(towerId);
+            int targetId = useTypedTargeting && UsesOwnerTarget(catalog, catalogAbility)
+                ? store.PlayerEntityId : useTypedTargeting ? towerId : FindTarget(towerId);
             if (targetId < 0) return Reject(towerId, AbilityActivationRejectReason.NoTarget);
             bool selfTarget = catalogAbility.Targeting.Relation == RelationFilter.Self;
             if (useTypedTargeting && !selfTarget)
@@ -138,9 +140,9 @@ namespace BattleSystemECS.Systems
                 catalogAbility.TriggerRefs.Count > 0 ? catalogAbility.TriggerRefs[0] : (TriggerId?)null,
                 ownerPlayerId: store.PlayerEntityId);
             var result = !useTypedTargeting || selfTarget
-                ? GameplayAbilityRuntime.Activate(store, catalog, store.TowerActiveCooldown, request)
+                ? GameplayAbilityRuntime.Activate(store, catalog, store.TowerActiveCooldown, request, _payloadHandler)
                 : GameplayAbilityRuntime.ActivateTargets(store, catalog, store.TowerActiveCooldown, request,
-                    _catalogTargets, _catalogMagnitudeScales);
+                    _catalogTargets, _catalogMagnitudeScales, _payloadHandler);
             if (result.Accepted)
                 Console.WriteLine($"[TOWER_ACTIVE] tower={towerId} target={targetId} skill={ResolveSkillName(skillId)}");
             // Compatibility audit marker: cooldown ownership is inside
@@ -214,12 +216,27 @@ namespace BattleSystemECS.Systems
             return best;
         }
 
+        private static bool UsesOwnerTarget(GameplayCatalog catalog, AbilityDefinition ability)
+        {
+            for (int i = 0; i < ability.Executions.Count; i++)
+            {
+                if (!catalog.TryGetExecution(ability.Executions[i], out var execution)) continue;
+                if (execution.Payload == EffectPayloadKind.Resurrect && execution.Operation == ExecutionOperation.Resurrect ||
+                    execution.Payload == EffectPayloadKind.Resource && execution.Operation == ExecutionOperation.RestoreSnapshot)
+                    return true;
+            }
+            return false;
+        }
+
         internal void SetPhaseContext(PhaseContext context)
         {
             _phaseContext = context;
             store.GameplayPhaseContext = context;
             if (!context.AllowsCombat) _pendingTowerId = -1;
         }
+
+        internal void SetPayloadHandler(IAbilityPayloadHandler payloadHandler) =>
+            _payloadHandler = payloadHandler ?? throw new ArgumentNullException(nameof(payloadHandler));
 
         /// <summary>
         /// 技能 id → 显示名。id 语义遵循 GameConfig 的归一化索引空间

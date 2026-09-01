@@ -46,6 +46,7 @@ namespace BattleSystemECS.Core
         // Round 175 Direction 1 — Mana Shield: mana → damage-absorption shield
         public ManaShieldSystem? ManaShield { get; private set; }
         public GlobalSkillSystem? GlobalSkill { get; private set; }
+        public ProductionAbilityPayloadHandler? AbilityPayloads { get; private set; }
         // Round 107 Direction 6 — Target Mark subsystem (stack-based debuff counter)
         public MarkSystem? Mark { get; private set; }
         // Round 200 Direction 5 — Death Mark subsystem (stack-based execute counter + damage bonus)
@@ -689,6 +690,14 @@ namespace BattleSystemECS.Core
             // dependency: null-safe at the call site (ExecuteAbility case 18 logs a
             // warning and returns 0 if not injected).
             Skill?.InjectNecromancerSystem(Necromancer);
+            if (Necromancer == null || TimeRewind == null)
+                throw new InvalidOperationException("production ability payload dependencies are not constructed");
+            AbilityPayloads = new ProductionAbilityPayloadHandler(store, Necromancer, TimeRewind);
+            Skill?.SetPayloadHandler(AbilityPayloads);
+            HeroSkill?.SetPayloadHandler(AbilityPayloads);
+            TowerActiveSkill?.SetPayloadHandler(AbilityPayloads);
+            GlobalSkill?.SetPayloadHandler(AbilityPayloads);
+            EnemyAbility?.SetPayloadHandler(AbilityPayloads);
 
             // ── Mark wiring: subscribe to OnEnemyKilled to free the per-entity
             //    threshold-fired latch on enemy destroy (avoids ID-reuse leakage). ──

@@ -57,6 +57,7 @@ namespace BattleSystemECS.Systems
         private readonly List<int> _catalogTargets = new List<int>(16);
         private readonly List<float> _catalogMagnitudeScales = new List<float>(16);
         private PhaseContext _phaseContext = PhaseContext.Unbound;
+        private IAbilityPayloadHandler? _payloadHandler;
         public AbilityActivationResult LastActivation { get; private set; }
         private int _pendingHeroId = -1;
         private int _pendingSlot = -1;
@@ -212,7 +213,7 @@ namespace BattleSystemECS.Systems
                 ownerPlayerId: store.PlayerEntityId);
             AbilityActivationResult result;
             if (selfTarget)
-                result = GameplayAbilityRuntime.Activate(store, catalog, _heroSkillCooldowns, activation);
+                result = GameplayAbilityRuntime.Activate(store, catalog, _heroSkillCooldowns, activation, _payloadHandler);
             else
             {
                 bool collected = ability.Targeting.Relation == RelationFilter.Allies
@@ -222,7 +223,7 @@ namespace BattleSystemECS.Systems
                         _catalogTargets, _catalogMagnitudeScales);
                 if (!collected || _catalogTargets.Count == 0) return false;
                 result = GameplayAbilityRuntime.ActivateTargets(store, catalog, _heroSkillCooldowns, activation,
-                    _catalogTargets, _catalogMagnitudeScales);
+                    _catalogTargets, _catalogMagnitudeScales, _payloadHandler);
             }
             LastActivation = result;
             if (!result.Accepted) return false;
@@ -236,6 +237,9 @@ namespace BattleSystemECS.Systems
             store.GameplayPhaseContext = context;
             if (!context.AllowsCombat) { _pendingHeroId = -1; _pendingSlot = -1; }
         }
+
+        internal void SetPayloadHandler(IAbilityPayloadHandler payloadHandler) =>
+            _payloadHandler = payloadHandler ?? throw new ArgumentNullException(nameof(payloadHandler));
 
         /// <summary>Read-only helper for HUD/renderer.</summary>
         public bool IsHeroSkillReady(int heroId, int slot)

@@ -192,6 +192,7 @@ namespace BattleSystemECS.Systems
         {
             if (radius <= 0f) return 0;
             if (hpFraction <= 0f) hpFraction = 0.3f; // safety default (matches direction spec)
+            if (!CanMassResurrect(centerX, centerY, radius)) return 0;
             float radiusSq = radius * radius;
             int revived = 0;
 
@@ -211,9 +212,10 @@ namespace BattleSystemECS.Systems
                 if (age > ComponentStore.MAX_CORPSE_AGE_SEC) continue;
 
                 // Claim & spawn
+                int minionId = SpawnReanimatedMinion(i, playerId, hpFraction, centerX, centerY, radius, isNecromancer: false);
+                if (minionId < 0) throw new InvalidOperationException("prevalidated mass resurrect capacity was exhausted during commit");
                 _store.CorpseOwnerId[i] = playerId;
                 _store.CorpseReanimated[i] = true;
-                SpawnReanimatedMinion(i, playerId, hpFraction, centerX, centerY, radius, isNecromancer: false);
                 revived++;
             }
             if (revived > 0)
@@ -221,6 +223,23 @@ namespace BattleSystemECS.Systems
                 _logger?.Log($"[MASS-RES] Player {playerId} mass-resurrected {revived} corpses within radius {radius:F1} (hpFraction={hpFraction:F2})");
             }
             return revived;
+        }
+
+        public bool CanMassResurrect(float centerX, float centerY, float radius)
+        {
+            if (radius <= 0f || float.IsNaN(radius) || float.IsInfinity(radius)) return false;
+            float radiusSq = radius * radius;
+            int required = 0;
+            for (int i = 0; i < ComponentStore.MAX_CORPSE_QUEUE; i++)
+            {
+                if (!_store.CorpseActive[i] || _store.CorpseReanimated[i] || _store.CorpseOwnerId[i] >= 0) continue;
+                float dx = _store.CorpseX[i] - centerX;
+                float dy = _store.CorpseY[i] - centerY;
+                if (dx * dx + dy * dy > radiusSq) continue;
+                if (_currentSimTime - _store.CorpseDeathTime[i] > ComponentStore.MAX_CORPSE_AGE_SEC) continue;
+                required++;
+            }
+            return required <= _store.AvailableEntityCapacity;
         }
 
         // ── Shared spawn helper (refactored out of TryResurrectCorpse, Round 133) ──

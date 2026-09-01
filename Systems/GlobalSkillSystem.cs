@@ -39,6 +39,7 @@ namespace BattleSystemECS.Systems
         private int _successfulActivationCount;
         private readonly List<int> _catalogTargets = new List<int>(64);
         private readonly List<float> _catalogMagnitudeScales = new List<float>(64);
+        private IAbilityPayloadHandler? _payloadHandler;
         public int RejectedCandidateCount => _rejectedCandidateCount;
         public int RejectedInputCount => _rejectedInputCount;
         public int RejectedActivationCount => _rejectedCandidateCount + _rejectedInputCount;
@@ -218,7 +219,7 @@ namespace BattleSystemECS.Systems
                 ownerPlayerId: playerId);
             if (ability.Targeting.Relation == RelationFilter.Self)
             {
-                result = GameplayAbilityRuntime.Activate(store, catalog, store.PlayerGlobalSkillCooldown, request);
+                result = GameplayAbilityRuntime.Activate(store, catalog, store.PlayerGlobalSkillCooldown, request, _payloadHandler);
                 return true;
             }
             bool collected = ability.Targeting.Relation == RelationFilter.Allies
@@ -238,9 +239,12 @@ namespace BattleSystemECS.Systems
                 return true;
             }
             result = GameplayAbilityRuntime.ActivateTargets(store, catalog, store.PlayerGlobalSkillCooldown,
-                request, _catalogTargets, _catalogMagnitudeScales);
+                request, _catalogTargets, _catalogMagnitudeScales, _payloadHandler);
             return true;
         }
+
+        internal void SetPayloadHandler(IAbilityPayloadHandler payloadHandler) =>
+            _payloadHandler = payloadHandler ?? throw new ArgumentNullException(nameof(payloadHandler));
 
         public int RejectPendingActivation()
         {

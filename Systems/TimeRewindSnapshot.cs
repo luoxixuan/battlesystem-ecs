@@ -122,6 +122,11 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public float RestoreFromSnapshot(int playerId, float secondsBack)
         {
+            return RestoreFromSnapshot(playerId, playerId, secondsBack);
+        }
+
+        public float RestoreFromSnapshot(int sourceEntityId, int playerId, float secondsBack)
+        {
             if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) return -1f;
             int filled = store.PlayerSnapshotFilled[playerId];
             if (filled == 0) return -1f;
@@ -141,9 +146,10 @@ namespace BattleSystemECS.Systems
             float restoredHp = store.PlayerSnapshotHP[absSlot];
             if (restoredHp > maxHp) restoredHp = maxHp;
             if (restoredHp < 0f) restoredHp = 0f;
-            store.SetPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(3), restoredHp);
-            store.SetPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), store.PlayerSnapshotMana[absSlot]);
-            store.SetPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(9), store.PlayerSnapshotShield[absSlot]);
+            if (!store.SetPlayerResourceAuthority(sourceEntityId, playerId, new Core.GAS.AttributeKey(3), restoredHp) ||
+                !store.SetPlayerResourceAuthority(sourceEntityId, playerId, new Core.GAS.AttributeKey(7), store.PlayerSnapshotMana[absSlot]) ||
+                !store.SetPlayerResourceAuthority(sourceEntityId, playerId, new Core.GAS.AttributeKey(9), store.PlayerSnapshotShield[absSlot]))
+                throw new InvalidOperationException("prevalidated rewind resource capacity was exhausted during commit");
 
             TotalRestores++;
             return actualSeconds;

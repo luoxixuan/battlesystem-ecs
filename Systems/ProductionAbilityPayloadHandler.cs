@@ -1,0 +1,60 @@
+using System;
+using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
+
+namespace BattleSystemECS.Systems
+{
+    /// <summary>Production adapter for payloads implemented outside the GAS store.</summary>
+    public sealed class ProductionAbilityPayloadHandler : IAbilityPayloadHandler
+    {
+        private readonly ComponentStore _store;
+        private readonly NecromancerSystem _necromancer;
+        private readonly TimeRewindSnapshotSystem _timeRewind;
+
+        public ProductionAbilityPayloadHandler(ComponentStore store, NecromancerSystem necromancer,
+            TimeRewindSnapshotSystem timeRewind)
+        {
+            _store = store ?? throw new ArgumentNullException(nameof(store));
+            _necromancer = necromancer ?? throw new ArgumentNullException(nameof(necromancer));
+            _timeRewind = timeRewind ?? throw new ArgumentNullException(nameof(timeRewind));
+        }
+
+        public bool Supports(ExecutionDefinition execution) =>
+            execution.Payload == EffectPayloadKind.Resurrect && execution.Operation == ExecutionOperation.Resurrect ||
+            execution.Payload == EffectPayloadKind.Resource && execution.Operation == ExecutionOperation.RestoreSnapshot;
+
+        public bool CanCommit(AbilityPayloadContext context)
+        {
+            if (!Supports(context.Execution) || !context.Source.IsValid) return false;
+            int owner = context.Request.OwnerPlayerId;
+            if ((uint)owner >= ComponentStore.MAX_PLAYERS || !_store.GetEntityHandle(owner).IsValid) return false;
+            if (context.Execution.Payload == EffectPayloadKind.Resource)
+                return context.Magnitude >= 0f && !float.IsNaN(context.Magnitude) && !float.IsInfinity(context.Magnitude) &&
+                       _timeRewind.GetSampleCount(owner) > 0 && _store.ResourceResolver.CanAccept(3, 3);
+
+            float radius = context.Ability.Targeting.Radius > 0f
+                ? context.Ability.Targeting.Radius : context.Ability.Targeting.Range;
+            float fraction = context.Magnitude > 0f ? context.Magnitude : 0.3f;
+            return !float.IsNaN(fraction) && !float.IsInfinity(fraction) &&
+                   _necromancer.CanMassResurrect(_store.PositionX[context.Source.Index],
+                       _store.PositionY[context.Source.Index], radius);
+        }
+
+        public int Commit(AbilityPayloadContext context)
+        {
+            int owner = context.Request.OwnerPlayerId;
+            if (context.Execution.Payload == EffectPayloadKind.Resurrect)
+            {
+                float radius = context.Ability.Targeting.Radius > 0f
+                    ? context.Ability.Targeting.Radius : context.Ability.Targeting.Range;
+                return _necromancer.MassResurrect(owner, _store.PositionX[context.Source.Index],
+                    _store.PositionY[context.Source.Index], radius,
+                    context.Magnitude > 0f ? context.Magnitude : 0.3f);
+            }
+
+            float restored = _timeRewind.RestoreFromSnapshot(context.Source.Index, owner, context.Magnitude);
+            if (restored < 0f) throw new InvalidOperationException("prevalidated rewind snapshot was unavailable during commit");
+            return 1;
+        }
+    }
+}

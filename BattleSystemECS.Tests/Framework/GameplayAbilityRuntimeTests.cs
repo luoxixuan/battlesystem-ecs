@@ -702,6 +702,7 @@ namespace BattleSystemECS.Tests.Framework
             public int CommitCount { get; private set; }
             public EffectPayloadKind LastPayload { get; private set; }
             public RecordingPayloadHandler(EffectPayloadKind supported) { _supported = supported; }
+            public bool Supports(ExecutionDefinition execution) => execution.Payload == _supported;
             public bool CanCommit(AbilityPayloadContext context) => context.Execution.Payload == _supported;
             public int Commit(AbilityPayloadContext context)
             {

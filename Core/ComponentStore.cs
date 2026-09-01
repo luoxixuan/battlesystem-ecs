@@ -1285,6 +1285,7 @@ namespace BattleSystemECS.Core
 
         public int NextEntityId => nextEntityId;
         public bool HasEntityCapacity => nextEntityId < MAX_ENTITIES || !freeEntityIds.IsEmpty;
+        public int AvailableEntityCapacity => Math.Max(0, MAX_ENTITIES - Volatile.Read(ref nextEntityId)) + freeEntityIds.Count;
 
         public string GetEntityName(int entityId)
         {

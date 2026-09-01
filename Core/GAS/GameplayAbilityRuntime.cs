@@ -64,6 +64,7 @@ namespace BattleSystemECS.Core.GAS
     /// </summary>
     public interface IAbilityPayloadHandler
     {
+        bool Supports(ExecutionDefinition execution);
         bool CanCommit(AbilityPayloadContext context);
         int Commit(AbilityPayloadContext context);
     }
@@ -265,7 +266,11 @@ namespace BattleSystemECS.Core.GAS
                     return AbilityActivationRejectReason.UnsupportedDefinition;
                 float magnitude = ResolveMagnitude(store, execution, request.MagnitudeOverride, source.Index);
                 var context = new AbilityPayloadContext(store, ability, execution, request, source, target, magnitude);
-                if (payloadHandler != null && payloadHandler.CanCommit(context)) continue;
+                if (payloadHandler != null && payloadHandler.Supports(execution))
+                {
+                    if (!payloadHandler.CanCommit(context)) return AbilityActivationRejectReason.InvalidRequest;
+                    continue;
+                }
                 if (!CanCommitBuiltIn(context)) return IsBuiltInOperation(execution)
                     ? AbilityActivationRejectReason.InvalidRequest
                     : AbilityActivationRejectReason.UnsupportedDefinition;
@@ -275,8 +280,59 @@ namespace BattleSystemECS.Core.GAS
             return AbilityActivationRejectReason.None;
         }
 
-        private static bool ValidateCapacityPlan(ComponentStore store, GameplayCatalog catalog, AbilityDefinition ability,
-            AbilityActivationRequest request, EntityHandle target, IAbilityPayloadHandler payloadHandler)
+        private static bool ValidateBatchCapacity(ComponentStore store, GameplayCatalog catalog,
+            AbilityDefinition ability, AbilityActivationRequest request, EntityHandle source,
+            IReadOnlyList<int> targetIds, IReadOnlyList<float> magnitudeScales,
+            IAbilityPayloadHandler payloadHandler)
+        {
+            long runtimeSlots = 0;
+            long modifiers = 0;
+            for (int i = 0; i < ability.Effects.Count; i++)
+            {
+                catalog.TryGetEffect(ability.Effects[i], out var effect);
+                if (effect.Type != EffectType.Instant) runtimeSlots++;
+                modifiers += effect.Modifiers.Count;
+            }
+            long damageRequests = 0;
+            long damageEvents = 1;
+            long resourceRequests = 0;
+            long resourceEvents = 0;
+            for (int targetIndex = 0; targetIndex < targetIds.Count; targetIndex++)
+            {
+                var target = store.GetEntityHandle(targetIds[targetIndex]);
+                float scale = magnitudeScales == null ? 1f : magnitudeScales[targetIndex];
+                var targetRequest = request.ForTarget(targetIds[targetIndex], scale);
+                for (int i = 0; i < ability.Executions.Count; i++)
+                {
+                    catalog.TryGetExecution(ability.Executions[i], out var execution);
+                    float magnitude = ResolveMagnitude(store, execution, targetRequest, source.Index);
+                    var context = new AbilityPayloadContext(store, ability, execution, targetRequest,
+                        source, target, magnitude);
+                    if (payloadHandler != null && payloadHandler.Supports(execution)) continue;
+                    switch (execution.Payload)
+                    {
+                        case EffectPayloadKind.Damage: damageRequests++; damageEvents += 3; break;
+                        case EffectPayloadKind.Heal:
+                        case EffectPayloadKind.Shield: resourceRequests++; resourceEvents++; break;
+                        case EffectPayloadKind.GameplayEvent: damageEvents++; break;
+                    }
+                }
+            }
+            for (int i = 0; i < ability.Costs.Count; i++)
+                if (EffectiveCost(ability, request, i) != 0f) { resourceRequests++; resourceEvents++; }
+            long effectEvents = (long)ability.Effects.Count * targetIds.Count;
+            if (runtimeSlots > int.MaxValue || modifiers > int.MaxValue || effectEvents > int.MaxValue ||
+                damageRequests > int.MaxValue || damageEvents > int.MaxValue ||
+                resourceRequests > int.MaxValue || resourceEvents > int.MaxValue) return false;
+            return store.GameplayEffectsRuntime.CanApplyPlan(targetIds, (int)runtimeSlots, (int)modifiers,
+                       (int)effectEvents) &&
+                   store.DamageResolver.CanAccept((int)damageRequests, (int)damageEvents) &&
+                   store.ResourceResolver.CanAccept((int)resourceRequests, (int)resourceEvents);
+        }
+
+        private static bool ValidateSingleCapacity(ComponentStore store, GameplayCatalog catalog,
+            AbilityDefinition ability, AbilityActivationRequest request, EntityHandle source, EntityHandle target,
+            IAbilityPayloadHandler payloadHandler)
         {
             int runtimeSlots = 0, modifiers = 0, effectEvents = ability.Effects.Count;
             int damageRequests = 0, damageEvents = 1;
@@ -290,10 +346,9 @@ namespace BattleSystemECS.Core.GAS
             for (int i = 0; i < ability.Executions.Count; i++)
             {
                 catalog.TryGetExecution(ability.Executions[i], out var execution);
-                float magnitude = ResolveMagnitude(store, execution, request.MagnitudeOverride, request.OwnerId);
-                var context = new AbilityPayloadContext(store, ability, execution, request,
-                    store.GetEntityHandle(request.OwnerId), target, magnitude);
-                if (payloadHandler != null && payloadHandler.CanCommit(context)) continue;
+                var context = new AbilityPayloadContext(store, ability, execution, request, source, target,
+                    ResolveMagnitude(store, execution, request, source.Index));
+                if (payloadHandler != null && payloadHandler.Supports(execution)) continue;
                 switch (execution.Payload)
                 {
                     case EffectPayloadKind.Damage: damageRequests++; damageEvents += 3; break;
@@ -326,7 +381,10 @@ namespace BattleSystemECS.Core.GAS
                 catalog.TryGetExecution(ability.Executions[i], out var execution);
                 float magnitude = ResolveMagnitude(store, execution, request.MagnitudeOverride, source.Index);
                 var context = new AbilityPayloadContext(store, ability, execution, request, source, target, magnitude);
-                if (payloadHandler != null && payloadHandler.CanCommit(context)) applied += Math.Max(0, payloadHandler.Commit(context));
+                if (payloadHandler != null && payloadHandler.Supports(execution))
+                    applied += Math.Max(0, payloadHandler.Commit(context));
+                else if (damageInThisPlanQueuedTargetDeath && execution.Payload == EffectPayloadKind.Damage &&
+                         store.IsEnemyPendingDeath(target.Index)) applied++;
                 else if (!CommitBuiltIn(context)) return -1;
                 else applied++;
             }
