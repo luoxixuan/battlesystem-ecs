@@ -5,7 +5,7 @@ using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Core.GAS
 {
-    public enum AbilityActivationRejectReason { None, InvalidRequest, Cooldown, NoTarget, PhaseNotAllowed, Cost }
+    public enum AbilityActivationRejectReason { None, InvalidRequest, Cooldown, NoTarget, PhaseNotAllowed, Cost, UnsupportedDefinition }
 
     public readonly struct AbilityActivationRequest
     {

@@ -3,6 +3,7 @@ using Xunit;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Tests.Framework
 {
@@ -192,6 +193,51 @@ namespace BattleSystemECS.Tests.Framework
             Assert.DoesNotContain(eid, Store.ActiveEnemyIds);
             Assert.Equal(1, Store.TotalKills);
             Assert.Equal((float)injectedGoldReward, Store.GetPlayerGold(pid), 3);
+        }
+
+        [Fact]
+        public void CatalogActivationStagesTypedDamageAndCommitsOnlyAfterValidation()
+        {
+            int pid = Player(p => { p.X = 0f; p.Y = 0f; p.Health = 100f; p.AttackDamage = 10f; });
+            int enemy = MakeEnemy(1f, 0f, hp: 100f);
+            Config.Skills.Clear();
+            Config.Skills.Add(new SkillConfig { Name = "catalog-skill", AreaShape = "single", AreaRadius = 3, DamageMultiplier = 2f, Cooldown = 3f });
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 3, 1, 1, 1);
+            var execution = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage, 2f, CatalogRegistries.SkillTag,
+                MagnitudeSource.Multiplier, DamageAmountStage.LegacyMultiplier, operation: ExecutionOperation.ApplyDamage);
+            Config.CompiledCatalog = new GameplayCatalog(new[] { new AbilityDefinition(new AbilityId(0), "catalog-skill", targeting,
+                ClockId.Combat, 3f, GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, executions: new[] { execution.Id }) },
+                new[] { targeting }, Array.Empty<GameplayEffectDefinition>(), new[] { execution }, Array.Empty<TriggerDefinition>(),
+                Array.Empty<ModifierDefinition>(), new System.Collections.Generic.Dictionary<string, AbilityId> { ["catalog-skill"] = new AbilityId(0) });
+            var sys = new SkillSystem(Store, Renderer, pid, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
+            sys.InitializePlayerSkills();
+            sys.SetTurn(0);
+            Assert.Equal(3f, Store.GetAbility(pid, 0).Definition.Cooldown);
+
+            var result = sys.TryActivateCatalogAbility(new AbilityId(0));
+            Assert.True(result.Accepted);
+            Assert.Equal(3f, Store.GetAbility(pid, 0).CurrentCooldown);
+            Assert.Equal(1, sys.PendingSkillDamageCount);
+            sys.ResolveSkillDamage();
+            Assert.True(Store.EnemyHealth[enemy] < 100f);
+        }
+
+        [Fact]
+        public void UnknownCatalogAbilityIsRejectedWithoutCooldownMutation()
+        {
+            int pid = Player(p => { p.X = 0f; p.Y = 0f; p.Health = 100f; });
+            Config.Skills.Clear();
+            Config.Skills.Add(new SkillConfig { Name = "catalog-skill", AreaShape = "single", Cooldown = 3f });
+            var sys = new SkillSystem(Store, Renderer, pid, Config);
+            sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
+            sys.InitializePlayerSkills();
+
+            var result = sys.TryActivateCatalogAbility(new AbilityId(77));
+            Assert.False(result.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.UnsupportedDefinition, result.Reason);
+            Assert.Equal(0f, Store.GetAbility(pid, 0).CurrentCooldown);
         }
     }
 }

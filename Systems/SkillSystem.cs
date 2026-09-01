@@ -70,6 +70,50 @@ namespace BattleSystemECS.Systems
         public SkillDamageRejectReason LastRejectReason => _lastRejectReason;
         public PhaseContextKind CurrentPhaseContext => _phaseContext.Kind;
 
+        /// <summary>
+        /// Catalog-first activation boundary. Legacy skill slots are only a
+        /// compatibility projection; targeting and execution references must be
+        /// closed in the compiled catalog before a cooldown can be committed.
+        /// </summary>
+        public AbilityActivationResult TryActivateCatalogAbility(AbilityId abilityId)
+        {
+            var catalog = gameConfig?.CompiledCatalog;
+            if (catalog == null || !catalog.TryGetAbility(abilityId, out var definition))
+                return CatalogReject(abilityId, AbilityActivationRejectReason.UnsupportedDefinition);
+            if ((uint)definition.Targeting.Id.Value >= (uint)catalog.Targetings.Count ||
+                !catalog.TryGetAbility(abilityId, out _))
+                return CatalogReject(abilityId, AbilityActivationRejectReason.UnsupportedDefinition);
+            for (int i = 0; i < definition.Executions.Count; i++)
+                if (!catalog.TryGetExecution(definition.Executions[i], out _))
+                    return CatalogReject(abilityId, AbilityActivationRejectReason.UnsupportedDefinition);
+
+            int slot = FindSlot(definition.Name);
+            if (slot < 0) return CatalogReject(abilityId, AbilityActivationRejectReason.InvalidRequest);
+            if (!IsAbilityAllowed((int)definition.Targeting.Shape))
+                return CatalogReject(abilityId, AbilityActivationRejectReason.PhaseNotAllowed, slot);
+            if (!GameplayAbilityRuntime.TryActivate(store, playerId, slot, out _))
+                return new AbilityActivationResult(false, playerId, slot, AbilityActivationRejectReason.Cooldown);
+
+            // The slot stores the legacy projection for old callers; execution
+            // still passes through the catalog validation above and the typed
+            // damage staging path below.
+            var instance = store.GetAbility(playerId, slot);
+            if (!ExecuteAbility(instance.Definition, slot, definition))
+                return CatalogReject(abilityId, AbilityActivationRejectReason.UnsupportedDefinition, slot);
+            return new AbilityActivationResult(true, playerId, slot);
+        }
+
+        private int FindSlot(string name)
+        {
+            int count = store.AbilityCount[playerId];
+            for (int slot = 0; slot < count; slot++)
+                if (string.Equals(store.GetAbility(playerId, slot).Definition.Name, name, System.StringComparison.OrdinalIgnoreCase)) return slot;
+            return -1;
+        }
+
+        private static AbilityActivationResult CatalogReject(AbilityId abilityId, AbilityActivationRejectReason reason, int slot = -1) =>
+            new AbilityActivationResult(false, abilityId.Value, slot, reason);
+
         internal void SetPhaseContext(PhaseContext context) => _phaseContext = context;
 
         // 统一的 AoE 命中收集（替代原先每个 Cast 方法各自 Parallel.ForEach + lock 的模式）：
@@ -371,6 +415,14 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public bool CastSkill(string skillName)
         {
+            var catalog = gameConfig?.CompiledCatalog;
+            if (catalog != null && catalog.TryResolveAlias(skillName, out var catalogId))
+            {
+                var activation = TryActivateCatalogAbility(catalogId);
+                if (!activation.Accepted)
+                    renderer.Log($"[ABILITY_REJECTED] {activation.Reason} skill={skillName}");
+                return activation.Accepted;
+            }
             int count = store.AbilityCount[playerId];
             for (int slot = 0; slot < count; slot++)
             {
@@ -418,23 +470,25 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Execute an ability by its definition data — area shape drives the damage pattern.
         /// </summary>
-        private void ExecuteAbility(GameplayAbilityDef def, int slot)
+        private bool ExecuteAbility(GameplayAbilityDef def, int slot, AbilityDefinition? catalogDefinition = null)
         {
             float baseDamage = techTreeSystem != null ? techTreeSystem.GetFinalAttackDamage() : store.GetPlayerAttackDamage(playerId);
             float finalDamage = (def.DamageMultiplierAttr < 0) ? baseDamage * def.FixedBaseDamage : baseDamage;
             finalDamage *= _waveDifficultyMult;
             float playerX = store.PositionX[playerId];
             float playerY = store.PositionY[playerId];
-            if (!_shapeHandlers.TryGetValue(def.AreaShape, out var handler))
+            int shape = catalogDefinition.HasValue ? (int)catalogDefinition.Value.Targeting.Shape : def.AreaShape;
+            if (!_shapeHandlers.TryGetValue(shape, out var handler))
             {
                 _rejectedAbilityCount++;
                 _lastRejectReason = SkillDamageRejectReason.UnsupportedCommitBoundary;
-                renderer.Log($"[ABILITY_REJECTED] UnsupportedShape shape={def.AreaShape} skill={def.Name}");
-                return;
+                renderer.Log($"[ABILITY_REJECTED] UnsupportedShape shape={shape} skill={def.Name}");
+                return false;
             }
             int enemiesHit = handler(new AbilityExecutionContext(def, finalDamage, playerX, playerY));
-            GameplayAbilityRuntime.AbilityCommit(store, playerId, slot);
+            if (!GameplayAbilityRuntime.AbilityCommit(store, playerId, slot)) return false;
             renderer.Log($"[SKILL] {def.Name} cast! Hit {enemiesHit} enemies, cooldown: {def.Cooldown}s");
+            return true;
         }
 
         // Kept as a compatibility implementation for old replay fixtures. New
