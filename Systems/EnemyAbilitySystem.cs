@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Components;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -26,7 +27,8 @@ namespace BattleSystemECS.Systems
         private readonly List<AbilityEvent>[] _abilityEvents = { new List<AbilityEvent>(64), new List<AbilityEvent>(64) };
         private int _abilityEventsIdx = 0;
 
-        // Per-ability cooldown tracking — keyed by enemyId * MAX_ABILITIES_PER_ENTITY + slot
+        // EnemyAbilityCooldownOwner: enemy abilities have a separate domain-owned
+        // timer bank; activation still crosses the shared typed runtime seam.
         private readonly float[] _abilityCooldownTimers = new float[ComponentStore.MAX_ENTITIES * ComponentStore.MAX_ABILITIES_PER_ENTITY];
 
         // Sparse list of currently-channeling enemy ids. Avoids iterating all active enemies
@@ -86,7 +88,8 @@ namespace BattleSystemECS.Systems
             if (!_abilityLookup.TryGetValue(abilityId, out var ability)) return;
 
             int timerIdx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY;
-            if (_abilityCooldownTimers[timerIdx] > 0f) return;
+            var activation = new AbilityActivationRequest(enemyId, 0, ability.Cooldown);
+            if (!GameplayAbilityRuntime.TryActivate(_abilityCooldownTimers, activation).Accepted) return;
 
             // If enemy is already channeling, ignore new ability requests (channel is locked).
             if (store.EnemyIsChanneling[enemyId]) return;
@@ -135,7 +138,7 @@ namespace BattleSystemECS.Systems
             {
                 int idx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY; // slot 0
                 if (_abilityCooldownTimers[idx] > 0f)
-                    _abilityCooldownTimers[idx] -= deltaTime;
+                    GameplayAbilityRuntime.TickCooldown(_abilityCooldownTimers, idx, deltaTime);
 
                 // Round 124: tick down per-enemy disarm duration (independent of ability cooldowns)
                 float disarmLeft = store.EnemyDisarmDurationLeft[enemyId];
@@ -321,7 +324,8 @@ namespace BattleSystemECS.Systems
             }
 
             int timerIdx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY;
-            _abilityCooldownTimers[timerIdx] = ability.Cooldown;
+            GameplayAbilityRuntime.AbilityCommit(_abilityCooldownTimers,
+                new AbilityActivationRequest(enemyId, 0, ability.Cooldown));
         }
 
         private void ExecuteSelfHeal(int enemyId, EnemyAbilityDef ability)
