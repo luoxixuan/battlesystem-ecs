@@ -37,8 +37,16 @@ namespace BattleSystemECS.Systems
         private PhaseContext _phaseContext = PhaseContext.Unbound;
         private readonly List<int> _catalogTargets = new List<int>(32);
         private readonly List<float> _catalogMagnitudeScales = new List<float>(32);
+        private int _pendingTowerId = -1;
         public PhaseContextKind CurrentPhaseContext => _phaseContext.Kind;
         public AbilityActivationResult LastActivation { get; private set; }
+
+        public bool RequestTowerActive(int towerId)
+        {
+            if (_pendingTowerId >= 0 || !ComponentStore.IsValidEntity(towerId) || !store.TowerActive[towerId]) return false;
+            _pendingTowerId = towerId;
+            return true;
+        }
 
         public TowerActiveSkillSystem(ComponentStore store, GameConfig? config = null)
         {
@@ -60,16 +68,21 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void Update(float deltaTime)
         {
-            if (!_phaseContext.AllowsCombat) return;
-            if (deltaTime <= 0f) return;
+            if (!_phaseContext.AllowsCombat) { _pendingTowerId = -1; return; }
             var towerIds = store.ActiveTowerIds;
-            for (int i = 0; i < towerIds.Count; i++)
+            if (deltaTime > 0f) for (int i = 0; i < towerIds.Count; i++)
             {
                 int towerId = towerIds[i];
                 if (!store.TowerActive[towerId]) continue;
                 // Fast skip: no active skill → cooldown is 0, no work to do
                 if (store.TowerActiveSkillId[towerId] < 0) continue;
                 GameplayAbilityRuntime.TickCooldown(store.TowerActiveCooldown, towerId, deltaTime);
+            }
+            if (_pendingTowerId >= 0)
+            {
+                int towerId = _pendingTowerId;
+                _pendingTowerId = -1;
+                LastActivation = ActivateTower(towerId);
             }
         }
 
@@ -201,7 +214,12 @@ namespace BattleSystemECS.Systems
             return best;
         }
 
-        internal void SetPhaseContext(PhaseContext context) => _phaseContext = context;
+        internal void SetPhaseContext(PhaseContext context)
+        {
+            _phaseContext = context;
+            store.GameplayPhaseContext = context;
+            if (!context.AllowsCombat) _pendingTowerId = -1;
+        }
 
         /// <summary>
         /// 技能 id → 显示名。id 语义遵循 GameConfig 的归一化索引空间

@@ -232,7 +232,12 @@ namespace BattleSystemECS.Systems
             return true;
         }
 
-        internal void SetPhaseContext(PhaseContext context) => _phaseContext = context;
+        internal void SetPhaseContext(PhaseContext context)
+        {
+            _phaseContext = context;
+            store.GameplayPhaseContext = context;
+            if (!context.AllowsCombat) { _pendingHeroId = -1; _pendingSlot = -1; }
+        }
 
         /// <summary>Read-only helper for HUD/renderer.</summary>
         public bool IsHeroSkillReady(int heroId, int slot)

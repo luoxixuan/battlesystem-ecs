@@ -404,6 +404,7 @@ namespace BattleSystemECS.Core
                 else
                 {
                     logger.Log("[INFO] Player died! Game Over.");
+                    _eventBus.OnGameOver(false);
                     return false;
                 }
             }

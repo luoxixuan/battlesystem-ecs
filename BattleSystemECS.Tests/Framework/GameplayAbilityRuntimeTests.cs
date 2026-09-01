@@ -13,7 +13,7 @@ namespace BattleSystemECS.Tests.Framework
         [Fact]
         public void TryActivateDoesNotMutateUntilAbilityCommit()
         {
-            var store = new ComponentStore();
+            var store = WaveStore();
             int player = 0;
             store.AddPlayer(player, 10f, 1f, 1f, 1);
             var def = new GameplayAbilityDef("runtime", "", 3f, 0f, -1, 1f, AbilityActivation.Instant, AreaShapeType.Single, 1);
@@ -29,7 +29,7 @@ namespace BattleSystemECS.Tests.Framework
         [Fact]
         public void AbilityCommitRejectsCooldownSlot()
         {
-            var store = new ComponentStore();
+            var store = WaveStore();
             int player = 0;
             store.AddPlayer(player, 10f, 1f, 1f, 1);
             var def = new GameplayAbilityDef("runtime", "", 3f, 0f, -1, 1f, AbilityActivation.Instant, AreaShapeType.Single, 1);
@@ -42,7 +42,7 @@ namespace BattleSystemECS.Tests.Framework
         [Fact]
         public void CatalogActivationCommitsDamageAndPublishesAbilityEvent()
         {
-            var store = new ComponentStore();
+            var store = WaveStore();
             store.AddPlayer(0, 20f, 1f, 1f, 1);
             int enemy = store.AddEnemy(0, 0, 1, 10f, 10f, 1, 1, 1);
             var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 10, 1, 1, 1);
@@ -56,7 +56,7 @@ namespace BattleSystemECS.Tests.Framework
             var timers = new float[1];
             var result = GameplayAbilityRuntime.Activate(store, catalog, timers,
                 new AbilityActivationRequest(0, 0, 0f, enemy, ability: ability.Id));
-            Assert.True(result.Accepted);
+            Assert.True(result.Accepted, result.Reason.ToString());
             Assert.Equal(1, result.AppliedEffects);
             Assert.Equal(2f, timers[0]);
             bool published = false;
@@ -68,7 +68,7 @@ namespace BattleSystemECS.Tests.Framework
         [Fact]
         public void CatalogActivationRejectsUnmappedEffectReference()
         {
-            var store = new ComponentStore();
+            var store = WaveStore();
             store.AddPlayer(0, 10f, 1f, 1f, 1);
             var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 1, 1, 1, 1);
             var ability = new AbilityDefinition(new AbilityId(0), "typed", targeting, ClockId.Combat, 1f,
@@ -123,7 +123,7 @@ namespace BattleSystemECS.Tests.Framework
         [Fact]
         public void TowerSourceKeepsPlayerOwnerAndEnemyTargetAcrossPayloadFacts()
         {
-            var store = new ComponentStore();
+            var store = WaveStore();
             store.AddPlayer(0, 10f, 1f, 10f, 1);
             int tower = store.CreateEntity();
             store.AddTower(tower, TowerType.Basic, 10f, 5, 1f, 1, 10f);
@@ -133,13 +133,12 @@ namespace BattleSystemECS.Tests.Framework
             var executions = new[]
             {
                 Execution(EffectPayloadKind.Damage, 3f, ExecutionOperation.ApplyDamage, id: 0),
-                Execution(EffectPayloadKind.Shield, 2f, ExecutionOperation.ApplyShield, id: 1),
-                Execution(EffectPayloadKind.GameplayEvent, 1f, ExecutionOperation.Default, id: 2)
+                Execution(EffectPayloadKind.GameplayEvent, 1f, ExecutionOperation.Default, id: 1)
             };
             var ability = new AbilityDefinition(new AbilityId(0), "tower-owned", targeting, ClockId.Combat, 1f,
                 GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
                 CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
-                executions: new[] { executions[0].Id, executions[1].Id, executions[2].Id });
+                executions: new[] { executions[0].Id, executions[1].Id });
             var catalog = new GameplayCatalog(new[] { ability }, new[] { targeting },
                 Array.Empty<GameplayEffectDefinition>(), executions, Array.Empty<TriggerDefinition>(),
                 Array.Empty<ModifierDefinition>(), new System.Collections.Generic.Dictionary<string, AbilityId>());
@@ -163,7 +162,7 @@ namespace BattleSystemECS.Tests.Framework
             var store = PlayerStore();
             store.PlayerCurrentHealth[0] = 4f;
             var result = Activate(store, Catalog(Execution(EffectPayloadKind.Heal, 3f, ExecutionOperation.ApplyHeal)), 0);
-            Assert.True(result.Accepted);
+            Assert.True(result.Accepted, result.Reason.ToString());
             Assert.Equal(7f, store.PlayerCurrentHealth[0]);
         }
 
@@ -172,7 +171,7 @@ namespace BattleSystemECS.Tests.Framework
         {
             var store = PlayerStore();
             var result = Activate(store, Catalog(Execution(EffectPayloadKind.Shield, 5f, ExecutionOperation.ApplyShield)), 0);
-            Assert.True(result.Accepted);
+            Assert.True(result.Accepted, result.Reason.ToString());
             Assert.Equal(5f, store.PlayerShield[0]);
         }
 
@@ -525,14 +524,143 @@ namespace BattleSystemECS.Tests.Framework
                 i => store.DamageResolver.Events.Get(i).Type == GameplayEventType.AbilityActivated);
         }
 
+        [Fact]
+        public void MultiHitAbilityStillRejectsTargetThatWasPendingDeathBeforeActivation()
+        {
+            var store = PlayerStore();
+            int enemy = store.AddEnemy(0, 0, 1f, 3f, 3f, 1f, 1, 1);
+            store.QueueEnemyDeath(enemy, 0);
+            var executions = new[]
+            {
+                Execution(EffectPayloadKind.Damage, 4f, ExecutionOperation.ApplyDamage, id: 0),
+                Execution(EffectPayloadKind.Damage, 5f, ExecutionOperation.ApplyDamage, id: 1)
+            };
+            var cooldowns = new float[1];
+
+            var result = GameplayAbilityRuntime.Activate(store, Catalog(executions), cooldowns, Request(enemy));
+
+            Assert.False(result.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.InvalidRequest, result.Reason);
+            Assert.Equal(3f, store.EnemyHealth[enemy]);
+            Assert.Equal(0f, cooldowns[0]);
+            Assert.DoesNotContain(Enumerable.Range(0, store.DamageResolver.Events.Count),
+                i => store.DamageResolver.Events.Get(i).Type == GameplayEventType.AbilityActivated);
+        }
+
+        [Fact]
+        public void PhaseRejectionDoesNotCommitCostCooldownPayloadOrEvent()
+        {
+            var store = PlayerStore();
+            store.GameplayPhaseContext = new PhaseContext(PhaseContextKind.Build);
+            store.PlayerMana[0] = 10f;
+            var timers = new float[1];
+            var catalog = Catalog(Execution(EffectPayloadKind.Shield, 3f, ExecutionOperation.ApplyShield),
+                costs: new[] { new CostDefinition(new AttributeKey(7), 4f) });
+
+            var result = GameplayAbilityRuntime.Activate(store, catalog, timers, Request(0));
+
+            Assert.False(result.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.PhaseNotAllowed, result.Reason);
+            Assert.Equal(10f, store.PlayerMana[0]);
+            Assert.Equal(0f, store.PlayerShield[0]);
+            Assert.Equal(0f, timers[0]);
+            Assert.Equal(0, store.DamageResolver.Events.Count);
+            Assert.Equal(0, store.ResourceResolver.Events.Count);
+        }
+
+        [Fact]
+        public void AbilityTagsUseActiveGrantedTagsAndBlockedTagRejectsWithoutCommit()
+        {
+            var store = PlayerStore();
+            var required = new TagId(2);
+            var blocked = new TagId(3);
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Shield, 0, 1, 1, 1,
+                relation: RelationFilter.Self, maxTargetsMode: MaxTargetsPolicy.Fixed);
+            var execution = Execution(EffectPayloadKind.Shield, 2f, ExecutionOperation.ApplyShield);
+            var ability = new AbilityDefinition(new AbilityId(0), "tagged", targeting, ClockId.Combat, 2f,
+                GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
+                executions: new[] { execution.Id }, requiredTags: new[] { required }, blockedTags: new[] { blocked });
+            var catalog = new GameplayCatalog(new[] { ability }, new[] { targeting }, Array.Empty<GameplayEffectDefinition>(),
+                new[] { execution }, Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
+                new Dictionary<string, AbilityId>());
+            var timers = new float[1];
+
+            var missing = GameplayAbilityRuntime.Activate(store, catalog, timers, Request(0));
+            Assert.Equal(AbilityActivationRejectReason.TagRequirementsNotMet, missing.Reason);
+            var classificationOnly = new GameplayEffectDefinition(new EffectId(6), EffectType.Duration,
+                Array.Empty<ModifierDefinition>(), 5f, 0f, ClockId.Combat, StackingBehavior.None, 1,
+                RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent,
+                required, Array.Empty<ExecutionId>());
+            Assert.True(store.GameplayEffectsRuntime.TryApply(classificationOnly.Id, classificationOnly,
+                store.GetEntityHandle(0), store.GetEntityHandle(0), out var classificationHandle, ownerPlayerId: 0));
+            var classificationRejected = GameplayAbilityRuntime.Activate(store, catalog, timers, Request(0));
+            Assert.Equal(AbilityActivationRejectReason.TagRequirementsNotMet, classificationRejected.Reason);
+            Assert.True(store.GameplayEffectsRuntime.Remove(store.GetEntityHandle(0), classificationHandle));
+            var grant = new GameplayEffectDefinition(new EffectId(7), EffectType.Duration,
+                Array.Empty<ModifierDefinition>(), 5f, 0f, ClockId.Combat, StackingBehavior.None, 1,
+                RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent,
+                CatalogRegistries.SkillTag, Array.Empty<ExecutionId>(), grantedTags: new[] { required });
+            Assert.True(store.GameplayEffectsRuntime.TryApply(grant.Id, grant, store.GetEntityHandle(0),
+                store.GetEntityHandle(0), out var handle, ownerPlayerId: 0));
+            var accepted = GameplayAbilityRuntime.Activate(store, catalog, timers, Request(0));
+            Assert.True(accepted.Accepted, accepted.Reason.ToString());
+            Assert.True(store.GameplayEffectsRuntime.Remove(store.GetEntityHandle(0), handle));
+            timers[0] = 0f;
+            var removed = GameplayAbilityRuntime.Activate(store, catalog, timers, Request(0));
+            Assert.Equal(AbilityActivationRejectReason.TagRequirementsNotMet, removed.Reason);
+            var block = new GameplayEffectDefinition(new EffectId(8), EffectType.Duration,
+                Array.Empty<ModifierDefinition>(), 5f, 0f, ClockId.Combat, StackingBehavior.None, 1,
+                RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent,
+                CatalogRegistries.SkillTag, Array.Empty<ExecutionId>(), grantedTags: new[] { required, blocked });
+            Assert.True(store.GameplayEffectsRuntime.TryApply(block.Id, block, store.GetEntityHandle(0),
+                store.GetEntityHandle(0), out _, ownerPlayerId: 0));
+            float shield = store.PlayerShield[0];
+            var rejected = GameplayAbilityRuntime.Activate(store, catalog, timers, Request(0));
+            Assert.Equal(AbilityActivationRejectReason.TagRequirementsNotMet, rejected.Reason);
+            Assert.Equal(shield, store.PlayerShield[0]);
+            Assert.Equal(0f, timers[0]);
+        }
+
+        [Fact]
+        public void CombinedPhaseMaskAcceptsBuildAndWaveWhileUnboundRejects()
+        {
+            var store = PlayerStore();
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Shield, 0, 1, 1, 1,
+                relation: RelationFilter.Self, maxTargetsMode: MaxTargetsPolicy.Fixed);
+            var execution = Execution(EffectPayloadKind.Shield, 1f, ExecutionOperation.ApplyShield);
+            var ability = new AbilityDefinition(new AbilityId(0), "phase-combination", targeting, ClockId.Combat, 1f,
+                GameplayPhaseMask.Build | GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, executions: new[] { execution.Id });
+            var catalog = new GameplayCatalog(new[] { ability }, new[] { targeting }, Array.Empty<GameplayEffectDefinition>(),
+                new[] { execution }, Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
+                new Dictionary<string, AbilityId>());
+            var timers = new float[1];
+            store.GameplayPhaseContext = PhaseContext.Unbound;
+            Assert.Equal(AbilityActivationRejectReason.PhaseNotAllowed,
+                GameplayAbilityRuntime.Activate(store, catalog, timers, Request(0)).Reason);
+            store.GameplayPhaseContext = new PhaseContext(PhaseContextKind.Build);
+            Assert.True(GameplayAbilityRuntime.Activate(store, catalog, timers, Request(0)).Accepted);
+            timers[0] = 0f;
+            store.GameplayPhaseContext = new PhaseContext(PhaseContextKind.Wave);
+            Assert.True(GameplayAbilityRuntime.Activate(store, catalog, timers, Request(0)).Accepted);
+        }
+
         private static GameplayEffectDefinition DurationEffect(int id, ModifierDefinition[]? modifiers = null) =>
             new GameplayEffectDefinition(new EffectId(id), EffectType.Duration, modifiers ?? Array.Empty<ModifierDefinition>(),
                 3f, 0f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None, SourceDeathPolicy.Persist,
                 EffectPayloadKind.GameplayEvent, new TagId(id), Array.Empty<ExecutionId>());
 
-        private static ComponentStore PlayerStore()
+        private static ComponentStore WaveStore()
         {
             var store = new ComponentStore();
+            store.GameplayPhaseContext = new PhaseContext(PhaseContextKind.Wave);
+            return store;
+        }
+
+        private static ComponentStore PlayerStore()
+        {
+            var store = WaveStore();
             store.AddPlayer(0, 10f, 1f, 1f, 1);
             store.PlayerMaxHealth[0] = 10f;
             store.PlayerMaxMana[0] = 10f;

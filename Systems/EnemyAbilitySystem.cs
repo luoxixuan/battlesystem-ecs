@@ -83,6 +83,14 @@ namespace BattleSystemECS.Systems
             _telegraphSystem = telegraphSystem;
         }
 
+        internal void SetPhaseContext(PhaseContext context)
+        {
+            store.GameplayPhaseContext = context;
+            if (context.AllowsCombat) return;
+            _abilityEvents[0].Clear();
+            _abilityEvents[1].Clear();
+        }
+
         /// <summary>
         /// Reset cooldowns for a new turn.
         /// </summary>
@@ -408,6 +416,11 @@ namespace BattleSystemECS.Systems
 
         bool IAbilityPayloadHandler.CanCommit(AbilityPayloadContext context)
         {
+            if (context.Execution.Payload == EffectPayloadKind.Damage &&
+                (uint)context.Target.Index < ComponentStore.MAX_PLAYERS)
+                return store.ResourceResolver.CanApplyPlayerDamage(new PlayerDamageRequest(context.Source,
+                    context.Target, context.Magnitude, 0L,
+                    context.Ability.Id, context.Target.Index));
             if (context.Execution.Payload != EffectPayloadKind.WorldAction ||
                 !_specialDefinitions.TryGetValue(context.Ability.Id.Value, out var ability) ||
                 !store.EnemyActive[context.Source.Index]) return false;
@@ -419,6 +432,21 @@ namespace BattleSystemECS.Systems
 
         int IAbilityPayloadHandler.Commit(AbilityPayloadContext context)
         {
+            if (context.Execution.Payload == EffectPayloadKind.Damage &&
+                (uint)context.Target.Index < ComponentStore.MAX_PLAYERS)
+            {
+                var result = store.ResourceResolver.TryApply(new PlayerDamageRequest(context.Source, context.Target,
+                    context.Magnitude, store.AllocateGameplaySequence(context.Target.Index), context.Ability.Id,
+                    context.Target.Index));
+                if (!result.Accepted) throw new InvalidOperationException("prevalidated player damage was rejected during commit");
+                _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
+                {
+                    Damage = result.Applied,
+                    RemainingHealth = store.PlayerCurrentHealth[context.Target.Index],
+                    AttackerId = context.Source.Index
+                });
+                return 1;
+            }
             if (!_specialDefinitions.TryGetValue(context.Ability.Id.Value, out var ability)) return 0;
             if (context.Execution.Operation == ExecutionOperation.SummonEnemy)
                 return EnemyWorldActionAdapter.Summon(store, logger, context.Source.Index, ability);
@@ -471,7 +499,7 @@ namespace BattleSystemECS.Systems
                 : float.NaN;
              var request = new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown, targetId, typedId,
                  magnitudeOverride: magnitude, ownerPlayerId: playerId);
-            var result = GameplayAbilityRuntime.Activate(store, catalog, _abilityCooldownTimers, request);
+            var result = GameplayAbilityRuntime.Activate(store, catalog, _abilityCooldownTimers, request, this);
             if (result.Accepted)
                 logger.Log($"[ABILITY] Enemy {enemyId} typed '{ability.Name}' applied {result.AppliedEffects} effect(s)");
             return result;

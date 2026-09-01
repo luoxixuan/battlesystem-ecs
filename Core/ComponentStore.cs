@@ -17,6 +17,7 @@ namespace BattleSystemECS.Core
     /// </summary>
     public partial class ComponentStore : IDisposable
     {
+        internal PhaseContext GameplayPhaseContext { get; set; } = PhaseContext.Unbound;
         #region Constants & Helpers
         public const int MAX_ENTITIES = 100000;
 

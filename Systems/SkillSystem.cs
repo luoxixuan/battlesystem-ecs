@@ -61,6 +61,7 @@ namespace BattleSystemECS.Systems
         private int _rejectedAbilityCount;
         private SkillDamageRejectReason _lastRejectReason;
         private PhaseContext _phaseContext = PhaseContext.Unbound;
+        private int _pendingCatalogAbilityId = -1;
 
         /// <summary>技能伤害请求诊断计数；仅在串行请求/提交边界更新。</summary>
         public int PendingSkillDamageCount => _pendingSkillDamageCount;
@@ -68,7 +69,16 @@ namespace BattleSystemECS.Systems
         public int ConsumedSkillDamageCount => _consumedSkillDamageCount;
         public int RejectedAbilityCount => _rejectedAbilityCount;
         public SkillDamageRejectReason LastRejectReason => _lastRejectReason;
+        public AbilityActivationResult LastCatalogActivation { get; private set; }
         public PhaseContextKind CurrentPhaseContext => _phaseContext.Kind;
+
+        public bool RequestCatalogAbility(AbilityId abilityId)
+        {
+            if (_pendingCatalogAbilityId >= 0 || gameConfig?.CompiledCatalog == null ||
+                !gameConfig.CompiledCatalog.TryGetAbility(abilityId, out _)) return false;
+            _pendingCatalogAbilityId = abilityId.Value;
+            return true;
+        }
 
         /// <summary>
         /// Catalog-first activation boundary. Legacy skill slots are only a
@@ -170,7 +180,12 @@ namespace BattleSystemECS.Systems
         private static AbilityActivationResult CatalogReject(AbilityId abilityId, AbilityActivationRejectReason reason, int slot = -1) =>
             new AbilityActivationResult(false, abilityId.Value, slot, reason);
 
-        internal void SetPhaseContext(PhaseContext context) => _phaseContext = context;
+        internal void SetPhaseContext(PhaseContext context)
+        {
+            _phaseContext = context;
+            store.GameplayPhaseContext = context;
+            if (!context.AllowsCombat) _pendingCatalogAbilityId = -1;
+        }
 
         // 统一的 AoE 命中收集（替代原先每个 Cast 方法各自 Parallel.ForEach + lock 的模式）：
         //   - 敌人数 < ParallelMinEnemies：纯串行直写 _mergedHits（跳过 TPL 启停开销）；
@@ -402,6 +417,19 @@ namespace BattleSystemECS.Systems
         {
             this.deltaTime = deltaTime;
             if (allowCombat) _buildPhaseRejectReported = false;
+
+            if (_pendingCatalogAbilityId >= 0)
+            {
+                int requestedId = _pendingCatalogAbilityId;
+                _pendingCatalogAbilityId = -1;
+                if (_phaseContext.AllowsCombat)
+                    LastCatalogActivation = TryActivateCatalogAbility(new AbilityId(requestedId));
+                else
+                {
+                    _rejectedAbilityCount++;
+                    _lastRejectReason = SkillDamageRejectReason.PhaseNotAllowed;
+                }
+            }
 
             if (!_phaseContext.AllowsCombat && !_phaseContext.AllowsPreparationResources)
             {

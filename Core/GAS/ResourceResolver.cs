@@ -54,6 +54,39 @@ namespace BattleSystemECS.Core.GAS
             lock (_pendingLock) return _pending.Count <= MaxPendingRequests - requestCount;
         }
 
+        internal bool CanApplyPlayerDamage(PlayerDamageRequest request)
+        {
+            if (!_store.TryResolve(request.Source, out _, out _) ||
+                !_store.TryResolve(request.Target, out int targetId, out _) ||
+                (uint)targetId >= ComponentStore.MAX_PLAYERS || !_store.PositionActive[targetId] ||
+                _store.PlayerCurrentHealth[targetId] <= 0f || request.OwnerPlayerId != targetId ||
+                request.RawAmount <= 0f || float.IsNaN(request.RawAmount) || float.IsInfinity(request.RawAmount))
+                return false;
+            return Events.CanPublish(2, true);
+        }
+
+        internal ResourceApplyResult TryApply(PlayerDamageRequest request)
+        {
+            if (!CanApplyPlayerDamage(request))
+            {
+                SetRejection(ResourceRejectionReason.InvalidTarget);
+                Interlocked.Increment(ref _rejectedCount);
+                return new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidTarget);
+            }
+            int playerId = request.Target.Index;
+            float beforeHealth = _store.PlayerCurrentHealth[playerId];
+            float beforeShield = _store.PlayerShield[playerId];
+            _store.DecreasePlayerHealth(playerId, request.RawAmount);
+            float applied = Math.Max(0f, beforeHealth - _store.PlayerCurrentHealth[playerId]) +
+                            Math.Max(0f, beforeShield - _store.PlayerShield[playerId]);
+            Events.TryPublish(new GameplayEvent(GameplayEventType.DamageApplied, request.Source, request.Target,
+                request.Sequence, ownerPlayerId: request.OwnerPlayerId), true);
+            if (_store.PlayerCurrentHealth[playerId] <= 0f)
+                Events.TryPublish(new GameplayEvent(GameplayEventType.DeathQueued, request.Source, request.Target,
+                    request.Sequence, ownerPlayerId: request.OwnerPlayerId), true);
+            return new ResourceApplyResult(true, applied, ResourceRejectionReason.None);
+        }
+
         internal ResourceApplyResult TryApply(ShieldRequest request, int ownerPlayerId)
         {
             ResourceApplyResult RejectShield(ResourceRejectionReason reason)

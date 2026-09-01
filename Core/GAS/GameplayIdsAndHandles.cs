@@ -97,6 +97,17 @@ namespace BattleSystemECS.Core.GAS
         private DamageRequest(EntityHandle source, EntityHandle target, float amount, DamageType type, ElementType element, DamageFlags flags, DamageAmountStage stage, DamageCommitBoundary boundary, long sequence, long parentSequence, AbilityId ability, EffectId effect, int ownerPlayerId, ExecutionContext context, long provenanceId, int provenanceDepth, bool allowMissingSource) { Source = source; Target = target; RawAmount = amount; DamageType = type; ElementType = element; Flags = flags; AmountStage = stage; CommitBoundary = boundary; Sequence = sequence; ParentSequence = parentSequence; Ability = ability; Effect = effect; OwnerPlayerId = ownerPlayerId; Context = context; ProvenanceId = provenanceId; ProvenanceDepth = provenanceDepth; AllowMissingSource = allowMissingSource; }
         internal static DamageRequest ForPersistentEffect(EntityHandle source, EntityHandle target, float amount, DamageType type, ElementType element, DamageFlags flags, DamageAmountStage stage, DamageCommitBoundary boundary, long sequence, EffectId effect, int ownerPlayerId, ExecutionContext context, long provenanceId, int provenanceDepth) => new DamageRequest(source, target, amount, type, element, flags, stage, boundary, sequence, 0L, default(AbilityId), effect, ownerPlayerId, context, provenanceId, provenanceDepth, true);
     }
+    public readonly struct PlayerDamageRequest
+    {
+        public readonly EntityHandle Source, Target;
+        public readonly float RawAmount;
+        public readonly long Sequence;
+        public readonly AbilityId Ability;
+        public readonly int OwnerPlayerId;
+        public PlayerDamageRequest(EntityHandle source, EntityHandle target, float amount, long sequence,
+            AbilityId ability = default(AbilityId), int ownerPlayerId = -1)
+        { Source = source; Target = target; RawAmount = amount; Sequence = sequence; Ability = ability; OwnerPlayerId = ownerPlayerId; }
+    }
     public readonly struct HealRequest { public readonly EntityHandle Source, Target; public readonly float RawAmount; public readonly long Sequence; public readonly int OwnerPlayerId; internal readonly bool AllowMissingSource; public HealRequest(EntityHandle source, EntityHandle target, float amount, long sequence, int ownerPlayerId = -1) : this(source, target, amount, sequence, ownerPlayerId, false) { } public HealRequest(EntityHandle source, EntityHandle target, float amount, long sequence) : this(source, target, amount, sequence, -1, false) { } private HealRequest(EntityHandle source, EntityHandle target, float amount, long sequence, int ownerPlayerId, bool allowMissingSource) { Source = source; Target = target; RawAmount = amount; Sequence = sequence; OwnerPlayerId = ownerPlayerId; AllowMissingSource = allowMissingSource; } internal static HealRequest ForPersistentEffect(EntityHandle source, EntityHandle target, float amount, long sequence, int ownerPlayerId) => new HealRequest(source, target, amount, sequence, ownerPlayerId, true); }
     public readonly struct ShieldRequest { public readonly EntityHandle Source, Target; public readonly float Amount, Duration; public readonly ClockId Clock; public readonly long Sequence; public ShieldRequest(EntityHandle source, EntityHandle target, float amount, float duration, ClockId clock, long sequence) { Source = source; Target = target; Amount = amount; Duration = duration; Clock = clock; Sequence = sequence; } }
     public enum ResourceOperation { Add, Set }

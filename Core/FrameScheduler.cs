@@ -67,10 +67,12 @@ namespace BattleSystemECS.Core
                     RejectPhaseTransitionWork();
                 _phase = value;
                 var context = PhaseContext.FromGameState(value);
+                store.GameplayPhaseContext = context;
                 _skillSystem?.SetPhaseContext(context);
                 _globalSkillSystem?.SetPhaseContext(context);
                 _heroSkillSystem?.SetPhaseContext(context);
                 _towerActiveSkillSystem?.SetPhaseContext(context);
+                AI.EnemyAbility?.SetPhaseContext(context);
             }
         }
         // ── System groups — one per logical phase ──
@@ -97,6 +99,7 @@ namespace BattleSystemECS.Core
             FrameScenarioKind scenarioKind = FrameScenarioKind.Gameplay)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
+            store.GameplayPhaseContext = PhaseContext.FromGameState(_phase);
             _ = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));
             if (!Enum.IsDefined(typeof(FrameSchedulerExecutionMode), executionMode))
                 throw new ArgumentOutOfRangeException(nameof(executionMode), executionMode, "Unknown scheduler execution mode.");

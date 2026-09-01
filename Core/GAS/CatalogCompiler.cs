@@ -210,6 +210,64 @@ namespace BattleSystemECS.Core.GAS
             return extended;
         }
 
+        public static GameplayCatalog CompileGlobalSkillExtensions(GameplayCatalog catalog,
+            IReadOnlyList<GlobalSkillDef> globalSkills)
+        {
+            catalog = catalog ?? CreateEmpty();
+            if (globalSkills == null || globalSkills.Count == 0) return catalog;
+            var abilities = new List<AbilityDefinition>(catalog.AbilityDefinitions);
+            var targetings = new List<TargetingDefinition>(catalog.Targetings);
+            var executions = new List<ExecutionDefinition>(catalog.Executions);
+            var aliases = new Dictionary<string, AbilityId>(catalog.Aliases, StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < globalSkills.Count; i++)
+            {
+                var source = globalSkills[i];
+                if (source == null || string.IsNullOrWhiteSpace(source.Name))
+                    throw new CatalogValidationException($"global skills: missing name at index {i}");
+                if (aliases.ContainsKey(source.Name)) continue;
+                var abilityId = new AbilityId(abilities.Count);
+                var executionId = new ExecutionId(executions.Count);
+                TargetingShape shape;
+                RelationFilter relation;
+                GameplayPhaseMask phases;
+                ExecutionDefinition execution;
+                switch ((GlobalSkillType)source.SkillType)
+                {
+                    case GlobalSkillType.MeteorStrike:
+                        shape = TargetingShape.Circle; relation = RelationFilter.Enemies; phases = GameplayPhaseMask.Wave;
+                        execution = new ExecutionDefinition(executionId, EffectPayloadKind.Damage,
+                            Math.Max(0f, source.DamagePct), CatalogRegistries.SkillTag,
+                            MagnitudeSource.Constant, DamageAmountStage.Raw, operation: ExecutionOperation.ApplyDamage);
+                        break;
+                    case GlobalSkillType.EmergencyHeal:
+                        shape = TargetingShape.Heal; relation = RelationFilter.Self;
+                        phases = GameplayPhaseMask.Build | GameplayPhaseMask.Wave;
+                        execution = new ExecutionDefinition(executionId, EffectPayloadKind.Heal,
+                            Math.Max(0f, source.HealPct), CatalogRegistries.SkillTag,
+                            MagnitudeSource.Constant, operation: ExecutionOperation.ApplyHeal);
+                        break;
+                    default:
+                        throw new CatalogValidationException($"global skills: unsupported typed SkillType {source.SkillType} at index {i}");
+                }
+                executions.Add(execution);
+                var targeting = new TargetingDefinition(new TargetingId(abilityId.Value), shape,
+                    int.MaxValue, 1, 1, relation == RelationFilter.Self ? 1 : 0,
+                    radius: int.MaxValue, relation: relation,
+                    maxTargetsMode: relation == RelationFilter.Self ? MaxTargetsPolicy.Fixed : MaxTargetsPolicy.Unlimited);
+                targetings.Add(targeting);
+                abilities.Add(new AbilityDefinition(abilityId, source.Name, targeting, ClockId.Combat,
+                    Math.Max(0f, source.Cooldown), phases, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+                    CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
+                    executions: new[] { executionId },
+                    costs: source.ManaCost > 0f ? new[] { new CostDefinition(CatalogRegistries.Mana, source.ManaCost) } : Array.Empty<CostDefinition>()));
+                aliases.Add(source.Name, abilityId);
+            }
+            var extended = new GameplayCatalog(abilities, targetings, catalog.Effects, executions,
+                catalog.Triggers, catalog.Modifiers, aliases, catalog.HasRuntimeExtensions);
+            CatalogValidator.Validate(extended, "global skill catalog extensions");
+            return extended;
+        }
+
         private static bool AbilityContainsPayload(IReadOnlyList<AbilityDefinition> abilities,
             IReadOnlyList<ExecutionDefinition> executions, AbilityId abilityId, EffectPayloadKind payload,
             ExecutionOperation operation)
@@ -286,7 +344,10 @@ namespace BattleSystemECS.Core.GAS
                             int maxStacks = Int(mod, "StackLimitCount", canonicalSkillsPath, id); if (maxStacks < 1) maxStacks = 1;
                             var effectExecutionId = new ExecutionId(executions.Count);
                             executions.Add(new ExecutionDefinition(effectExecutionId, modType == "CrowdControl" ? EffectPayloadKind.CrowdControl : EffectPayloadKind.Damage, magnitude, tag, MagnitudeSource.Constant, DamageAmountStage.Raw, Number(mod, "Duration", duration, canonicalSkillsPath, id), modType == "CrowdControl" ? ExecutionOperation.ApplyCrowdControl : ExecutionOperation.ApplyDamage));
-                            effects.Add(new GameplayEffectDefinition(new EffectId(effectIndex), period > 0 ? EffectType.Periodic : EffectType.Duration, Array.Empty<ModifierDefinition>(), Number(mod, "Duration", duration, canonicalSkillsPath, id), period, ClockId.Combat, stacking, maxStacks, stacking == StackingBehavior.None ? RefreshPolicy.None : RefreshPolicy.Duration, SourceDeathPolicy.Persist, modType == "CrowdControl" ? EffectPayloadKind.CrowdControl : EffectPayloadKind.Damage, tag, new[] { executions[executions.Count - 1].Id }));
+                            var grantedTags = ParseTags(mod, "GrantedTags", canonicalSkillsPath, id);
+                            var blockedEffectTags = ParseTags(mod, "BlockedTags", canonicalSkillsPath, id);
+                            EnsureNoTagConflict(grantedTags, blockedEffectTags, canonicalSkillsPath, id, "effect");
+                            effects.Add(new GameplayEffectDefinition(new EffectId(effectIndex), period > 0 ? EffectType.Periodic : EffectType.Duration, Array.Empty<ModifierDefinition>(), Number(mod, "Duration", duration, canonicalSkillsPath, id), period, ClockId.Combat, stacking, maxStacks, stacking == StackingBehavior.None ? RefreshPolicy.None : RefreshPolicy.Duration, SourceDeathPolicy.Persist, modType == "CrowdControl" ? EffectPayloadKind.CrowdControl : EffectPayloadKind.Damage, tag, new[] { executions[executions.Count - 1].Id }, grantedTags, blockedEffectTags));
                             effectIds.Add(new EffectId(effectIndex));
                             AddAlias(aliases, modName, new AbilityId(id), canonicalSkillsPath);
                         }
@@ -328,7 +389,10 @@ namespace BattleSystemECS.Core.GAS
                     }
                     var entry = new AbilityCatalogEntry(new AbilityId(id), name, (int)targeting.Shape, duration);
                     int manaCost = Int(node, "ManaCost", canonicalSkillsPath, id);
-                    typedAbilities.Add(new AbilityDefinition(new AbilityId(id), name, targeting, ClockId.Combat, Number(node, "Cooldown", 0f, canonicalSkillsPath, id), GameplayPhaseMask.Wave, effectIds.ToArray(), abilityModifiers.ToArray(), CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, ActivationPolicy.Instant, manaCost, abilityExecutions.ToArray(), manaCost > 0 ? new[] { new CostDefinition(CatalogRegistries.Mana, manaCost) } : Array.Empty<CostDefinition>()));
+                    var requiredTags = ParseTags(node, "RequiredTags", canonicalSkillsPath, id);
+                    var blockedTags = ParseTags(node, "BlockedTags", canonicalSkillsPath, id);
+                    EnsureNoTagConflict(requiredTags, blockedTags, canonicalSkillsPath, id, "ability");
+                    typedAbilities.Add(new AbilityDefinition(new AbilityId(id), name, targeting, ClockId.Combat, Number(node, "Cooldown", 0f, canonicalSkillsPath, id), ParseAllowedPhases(node, targeting.Shape, canonicalSkillsPath, id), effectIds.ToArray(), abilityModifiers.ToArray(), CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, ActivationPolicy.Instant, manaCost, abilityExecutions.ToArray(), manaCost > 0 ? new[] { new CostDefinition(CatalogRegistries.Mana, manaCost) } : Array.Empty<CostDefinition>(), requiredTags, blockedTags));
                     abilities.Add(entry);
                     AddAlias(aliases, name, entry.Id, canonicalSkillsPath);
                     id++;
@@ -357,15 +421,20 @@ namespace BattleSystemECS.Core.GAS
                         var entry = new AbilityCatalogEntry(new AbilityId(abilities.Count), name, (int)staticShape, 0f);
                         var staticExecution = new ExecutionId(executions.Count);
                         executions.Add(new ExecutionDefinition(staticExecution, EffectPayloadKind.Damage, staticRecord.DamageMultiplier, CatalogRegistries.SkillTag, MagnitudeSource.Multiplier, DamageAmountStage.LegacyMultiplier));
-                        typedAbilities.Add(new AbilityDefinition(entry.Id, name,
-                            new TargetingDefinition(new TargetingId(entry.Id.Value), staticShape, staticRecord.Range,
+                        var staticTargeting = new TargetingDefinition(new TargetingId(entry.Id.Value), staticShape, staticRecord.Range,
                                 staticRecord.Width, staticRecord.Height, staticShape == TargetingShape.Single ? 1 : 0,
+                                requiredTags: ParseTags(node, "TargetRequiredTags", skillPath, entry.Id.Value),
+                                blockedTags: ParseTags(node, "TargetBlockedTags", skillPath, entry.Id.Value),
                                 relation: RelationFilter.Enemies,
-                                maxTargetsMode: staticShape == TargetingShape.Single ? MaxTargetsPolicy.Fixed : MaxTargetsPolicy.Unlimited),
-                            ClockId.Combat, staticRecord.Cooldown, GameplayPhaseMask.Wave, Array.Empty<EffectId>(),
+                                maxTargetsMode: staticShape == TargetingShape.Single ? MaxTargetsPolicy.Fixed : MaxTargetsPolicy.Unlimited);
+                        var staticRequired = ParseTags(node, "RequiredTags", skillPath, entry.Id.Value);
+                        var staticBlocked = ParseTags(node, "BlockedTags", skillPath, entry.Id.Value);
+                        EnsureNoTagConflict(staticRequired, staticBlocked, skillPath, entry.Id.Value, "ability");
+                        typedAbilities.Add(new AbilityDefinition(entry.Id, name, staticTargeting,
+                            ClockId.Combat, staticRecord.Cooldown, ParseAllowedPhases(node, staticShape, skillPath, entry.Id.Value), Array.Empty<EffectId>(),
                             Array.Empty<ModifierDefinition>(), CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
                             ActivationPolicy.Instant, staticRecord.ManaCost, new[] { staticExecution },
-                            staticRecord.ManaCost > 0 ? new[] { new CostDefinition(CatalogRegistries.Mana, staticRecord.ManaCost) } : Array.Empty<CostDefinition>()));
+                            staticRecord.ManaCost > 0 ? new[] { new CostDefinition(CatalogRegistries.Mana, staticRecord.ManaCost) } : Array.Empty<CostDefinition>(), staticRequired, staticBlocked));
                         targetings.Add(typedAbilities[typedAbilities.Count - 1].Targeting);
                         abilities.Add(entry);
                         AddAlias(aliases, name, entry.Id, skillPath);
@@ -411,12 +480,64 @@ namespace BattleSystemECS.Core.GAS
                         parsed == TargetingShape.MassResurrect;
             bool fixedTarget = parsed == TargetingShape.Single || self;
             bool chain = parsed == TargetingShape.Chain || parsed == TargetingShape.ChainHeal;
+            var requiredTags = ParseTags(node, "TargetRequiredTags", path, id);
+            var blockedTags = ParseTags(node, "TargetBlockedTags", path, id);
+            EnsureNoTagConflict(requiredTags, blockedTags, path, id, "targeting");
             return new TargetingDefinition(new TargetingId(id), parsed, Int(node, "AttackRange", path, id),
                 Int(node, "AreaWidth", path, id), Int(node, "AreaHeight", path, id), chain ? 4 : fixedTarget ? 1 : 0,
                 Number(node, "AreaRadius", 0f, path, id), Number(node, "ConeAngleDegrees", 0f, path, id),
+                requiredTags, blockedTags,
                 relation: parsed == TargetingShape.ChainHeal ? RelationFilter.Allies :
                     self ? RelationFilter.Self : RelationFilter.Enemies,
                 maxTargetsMode: chain || fixedTarget ? MaxTargetsPolicy.Fixed : MaxTargetsPolicy.Unlimited);
+        }
+        private static GameplayPhaseMask ParseAllowedPhases(JsonElement node, TargetingShape shape, string path, int id)
+        {
+            if (!node.TryGetProperty("AllowedPhases", out var phases))
+                return IsPreparationShape(shape) ? GameplayPhaseMask.Build | GameplayPhaseMask.Wave : GameplayPhaseMask.Wave;
+            if (phases.ValueKind != JsonValueKind.Array)
+                throw new CatalogValidationException($"{path}: AllowedPhases must be an array for id {id}");
+            GameplayPhaseMask result = GameplayPhaseMask.None;
+            foreach (var phase in phases.EnumerateArray())
+            {
+                if (phase.ValueKind != JsonValueKind.String)
+                    throw new CatalogValidationException($"{path}: AllowedPhases contains a non-string value for id {id}");
+                string value = phase.GetString();
+                if (string.Equals(value, "Build", StringComparison.OrdinalIgnoreCase)) result |= GameplayPhaseMask.Build;
+                else if (string.Equals(value, "Wave", StringComparison.OrdinalIgnoreCase)) result |= GameplayPhaseMask.Wave;
+                else if (string.Equals(value, "Intermission", StringComparison.OrdinalIgnoreCase)) result |= GameplayPhaseMask.Intermission;
+                else throw new CatalogValidationException($"{path}: unknown gameplay phase '{value}' for id {id}");
+            }
+            if (result == GameplayPhaseMask.None) throw new CatalogValidationException($"{path}: AllowedPhases is empty for id {id}");
+            return result;
+        }
+        private static bool IsPreparationShape(TargetingShape shape) =>
+            shape == TargetingShape.Heal || shape == TargetingShape.Shield || shape == TargetingShape.ChainHeal ||
+            shape == TargetingShape.TimeRewind || shape == TargetingShape.MassResurrect;
+        private static TagId[] ParseTags(JsonElement node, string property, string path, int id)
+        {
+            if (!node.TryGetProperty(property, out var tags)) return Array.Empty<TagId>();
+            if (tags.ValueKind != JsonValueKind.Array)
+                throw new CatalogValidationException($"{path}: {property} must be an array for id {id}");
+            var result = new List<TagId>();
+            var seen = new HashSet<int>();
+            foreach (var value in tags.EnumerateArray())
+            {
+                if (value.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(value.GetString()) ||
+                    !CatalogRegistries.TryTag(value.GetString(), out var tag))
+                    throw new CatalogValidationException($"{path}: unknown tag in {property} for id {id}");
+                if (!seen.Add(tag.Value)) throw new CatalogValidationException($"{path}: duplicate tag '{value.GetString()}' in {property} for id {id}");
+                result.Add(tag);
+            }
+            return result.ToArray();
+        }
+        private static void EnsureNoTagConflict(IReadOnlyList<TagId> required, IReadOnlyList<TagId> blocked,
+            string path, int id, string scope)
+        {
+            for (int i = 0; i < required.Count; i++)
+                for (int j = 0; j < blocked.Count; j++)
+                    if (required[i].Equals(blocked[j]))
+                        throw new CatalogValidationException($"{path}: {scope} required/blocked tag conflict for id {id}");
         }
         private static int Int(JsonElement node, string property, string path, int id) { if (!node.TryGetProperty(property, out var value)) return 0; if (!value.TryGetInt32(out var number) || number < 0) throw new CatalogValidationException($"{path}: invalid {property} for id {id}"); return number; }
         private static TagId ParseTag(string value, string path, int id) { if (!CatalogRegistries.TryTag(value, out var tag)) throw new CatalogValidationException($"{path}: unknown effect tag '{value}' for id {id}"); return tag; }

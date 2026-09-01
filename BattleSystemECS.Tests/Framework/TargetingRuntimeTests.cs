@@ -53,7 +53,7 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void UnsupportedTargetTagFilterRejectsWithoutReturningPartialTargets()
+        public void RequiredTargetTagWithNoMatchingCandidateReturnsAnEmptySelection()
         {
             var store = Store();
             Enemy(store, 1f, 0f, 100f);
@@ -63,7 +63,7 @@ namespace BattleSystemECS.Tests.Framework
             var targets = new List<int> { 77 };
             var scales = new List<float> { 1f };
 
-            Assert.False(TargetingRuntime.TryCollectEnemyTargets(store, 0, definition, targets, scales));
+            Assert.True(TargetingRuntime.TryCollectEnemyTargets(store, 0, definition, targets, scales));
             Assert.Empty(targets);
             Assert.Empty(scales);
         }
@@ -237,9 +237,47 @@ namespace BattleSystemECS.Tests.Framework
                 Assert.Equal(10f + i * 10f, blocked.PlayerCurrentHealth[i + 1]);
         }
 
+        [Fact]
+        public void RequiredTargetTagFiltersSingleAndEveryChainHopAndExplicitTargetsCannotBypass()
+        {
+            var store = Store();
+            int untagged = Enemy(store, 0.5f, 0f, 10f);
+            int first = Enemy(store, 1f, 0f, 10f);
+            int second = Enemy(store, 2f, 0f, 10f);
+            var required = new TagId(2);
+            var grant = new GameplayEffectDefinition(new EffectId(7), EffectType.Duration,
+                Array.Empty<ModifierDefinition>(), 5f, 0f, ClockId.Combat, StackingBehavior.None, 1,
+                RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent,
+                CatalogRegistries.SkillTag, Array.Empty<ExecutionId>(), grantedTags: new[] { required });
+            Assert.True(store.GameplayEffectsRuntime.TryApply(grant.Id, grant, store.GetEntityHandle(0),
+                store.GetEntityHandle(first), out _, ownerPlayerId: 0));
+            Assert.True(store.GameplayEffectsRuntime.TryApply(grant.Id, grant, store.GetEntityHandle(0),
+                store.GetEntityHandle(second), out _, ownerPlayerId: 0));
+            var single = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 10, 1, 1, 1,
+                requiredTags: new[] { required }, relation: RelationFilter.Enemies, maxTargetsMode: MaxTargetsPolicy.Fixed);
+            var targets = new List<int>();
+            var scales = new List<float>();
+            Assert.True(TargetingRuntime.TryCollectEnemyTargets(store, 0, single, targets, scales));
+            Assert.Equal(new[] { first }, targets);
+            var chain = new TargetingDefinition(new TargetingId(0), TargetingShape.Chain, 10, 1, 1, 3,
+                requiredTags: new[] { required }, relation: RelationFilter.Enemies, maxTargetsMode: MaxTargetsPolicy.Fixed);
+            Assert.True(TargetingRuntime.TryCollectEnemyTargets(store, 0, chain, targets, scales));
+            Assert.Equal(new[] { first, second }, targets);
+            var damage = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage, 1f,
+                CatalogRegistries.SkillTag, operation: ExecutionOperation.ApplyDamage);
+            var timers = new float[1];
+            var rejected = GameplayAbilityRuntime.ActivateTargets(store, Catalog(single, damage), timers,
+                new AbilityActivationRequest(0, 0, 1f, untagged, new AbilityId(0), ownerPlayerId: 0),
+                new[] { untagged });
+            Assert.Equal(AbilityActivationRejectReason.TagRequirementsNotMet, rejected.Reason);
+            Assert.Equal(10f, store.EnemyHealth[untagged]);
+            Assert.Equal(0f, timers[0]);
+        }
+
         private static ComponentStore Store()
         {
             var store = new ComponentStore();
+            store.GameplayPhaseContext = new PhaseContext(PhaseContextKind.Wave);
             store.AddPlayer(0, 100f, 1f, 1f, 1);
             store.PositionX[0] = 0f;
             store.PositionY[0] = 0f;

@@ -18,8 +18,7 @@ namespace BattleSystemECS.Core.GAS
                 !store.GetEntityHandle(sourceEntityId).IsValid) return false;
             targetIds.Clear();
             magnitudeScales.Clear();
-            if (definition.Relation != RelationFilter.Allies || definition.Shape != TargetingShape.ChainHeal ||
-                definition.RequiredTags.Count != 0 || definition.BlockedTags.Count != 0) return false;
+            if (definition.Relation != RelationFilter.Allies || definition.Shape != TargetingShape.ChainHeal) return false;
             int limit = ResolveLimit(definition);
             float originX = store.PositionX[sourceEntityId];
             float originY = store.PositionY[sourceEntityId];
@@ -33,7 +32,8 @@ namespace BattleSystemECS.Core.GAS
                 for (int player = 0; player < ComponentStore.MAX_PLAYERS; player++)
                 {
                     if (player == sourceEntityId || targetIds.Contains(player) ||
-                        !store.GetEntityHandle(player).IsValid || !store.PositionActive[player]) continue;
+                        !store.GetEntityHandle(player).IsValid || !store.PositionActive[player] ||
+                        !GameplayTagRuntime.Matches(store, player, definition.RequiredTags, definition.BlockedTags)) continue;
                     float current = store.PlayerCurrentHealth[player];
                     float maximum = store.PlayerMaxHealth[player];
                     float deficit = maximum - current;
@@ -68,8 +68,7 @@ namespace BattleSystemECS.Core.GAS
                 return false;
             targetIds.Clear();
             magnitudeScales.Clear();
-            if ((definition.Relation != RelationFilter.Any && definition.Relation != RelationFilter.Enemies) ||
-                definition.RequiredTags.Count != 0 || definition.BlockedTags.Count != 0)
+            if (definition.Relation != RelationFilter.Any && definition.Relation != RelationFilter.Enemies)
                 return false;
 
             float sourceX = store.PositionX[sourceEntityId];
@@ -82,7 +81,7 @@ namespace BattleSystemECS.Core.GAS
             var enemies = store.ActiveEnemyIds;
             if (definition.Shape == TargetingShape.Single)
             {
-                int nearest = FindNearest(store, enemies, sourceX, sourceY, Range(definition), targetIds);
+                int nearest = FindNearest(store, enemies, sourceX, sourceY, Range(definition), targetIds, definition);
                 if (nearest >= 0)
                 {
                     targetIds.Add(nearest);
@@ -94,7 +93,7 @@ namespace BattleSystemECS.Core.GAS
             for (int i = 0; i < enemies.Count && targetIds.Count < limit; i++)
             {
                 int enemyId = enemies[i];
-                if (!IsCandidate(store, enemyId)) continue;
+                if (!IsCandidate(store, enemyId, definition)) continue;
                 float dx = store.PositionX[enemyId] - sourceX;
                 float dy = store.PositionY[enemyId] - sourceY;
                 if (!Contains(definition, dx, dy)) continue;
@@ -114,7 +113,7 @@ namespace BattleSystemECS.Core.GAS
             float range = Range(definition);
             while (targetIds.Count < limit)
             {
-                int nearest = FindNearest(store, enemies, x, y, range, targetIds);
+                int nearest = FindNearest(store, enemies, x, y, range, targetIds, definition);
                 if (nearest < 0) break;
                 targetIds.Add(nearest);
                 magnitudeScales.Add(magnitude);
@@ -126,7 +125,7 @@ namespace BattleSystemECS.Core.GAS
         }
 
         private static int FindNearest(ComponentStore store, IReadOnlyList<int> enemies, float x, float y,
-            float range, List<int> excluded)
+            float range, List<int> excluded, TargetingDefinition definition)
         {
             float maxDistanceSquared = range * range;
             float nearestDistanceSquared = float.MaxValue;
@@ -134,7 +133,7 @@ namespace BattleSystemECS.Core.GAS
             for (int i = 0; i < enemies.Count; i++)
             {
                 int enemyId = enemies[i];
-                if (!IsCandidate(store, enemyId) || excluded.Contains(enemyId)) continue;
+                if (!IsCandidate(store, enemyId, definition) || excluded.Contains(enemyId)) continue;
                 float dx = store.PositionX[enemyId] - x;
                 float dy = store.PositionY[enemyId] - y;
                 float distanceSquared = dx * dx + dy * dy;
@@ -149,8 +148,9 @@ namespace BattleSystemECS.Core.GAS
             return nearest;
         }
 
-        private static bool IsCandidate(ComponentStore store, int enemyId) =>
-            ComponentStore.IsValidEntity(enemyId) && store.EnemyActive[enemyId] && store.EnemyHealth[enemyId] > 0f;
+        private static bool IsCandidate(ComponentStore store, int enemyId, TargetingDefinition definition) =>
+            ComponentStore.IsValidEntity(enemyId) && store.EnemyActive[enemyId] && store.EnemyHealth[enemyId] > 0f &&
+            GameplayTagRuntime.Matches(store, enemyId, definition.RequiredTags, definition.BlockedTags);
 
         private static bool Contains(TargetingDefinition definition, float dx, float dy)
         {

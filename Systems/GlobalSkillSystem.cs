@@ -73,7 +73,13 @@ namespace BattleSystemECS.Systems
             }
         }
 
-        internal void SetPhaseContext(PhaseContext context) => _phaseContext = context;
+        internal void SetPhaseContext(PhaseContext context)
+        {
+            _phaseContext = context;
+            store.GameplayPhaseContext = context;
+            if (!context.AllowsCombat && !context.AllowsPreparationResources)
+                RejectPendingActivation();
+        }
 
         /// <summary>
         /// Update global skill cooldowns. Called every frame during BuildPhase and WavePhase.

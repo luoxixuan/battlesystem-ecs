@@ -859,6 +859,7 @@ namespace BattleSystemECS.Core
             // ── AI ──
             scheduler.AI.EnemyAI = EnemyAI;
             scheduler.AI.EnemyAbility = EnemyAbility;
+            EnemyAbility?.SetPhaseContext(PhaseContext.FromGameState(scheduler.Phase));
             scheduler.AI.Burrow = EnemyBurrow;
             scheduler.AI.Necromancer = Necromancer;
             scheduler.AI.LifeLink = LifeLink;

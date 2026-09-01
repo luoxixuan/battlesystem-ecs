@@ -20,6 +20,7 @@ namespace BattleSystemECS.Config
             var catalog = CatalogCompiler.Compile(canonical, files);
             var config = LoadConfigStrict(renderer);
             catalog = CatalogCompiler.CompileEnemyExtensions(catalog, config.EnemyAbilities);
+            catalog = CatalogCompiler.CompileGlobalSkillExtensions(catalog, config.GlobalSkills);
             config.CompiledCatalog = catalog;
             string configDirectory = Path.GetDirectoryName(canonical) ?? Path.Combine("Data", "Configs");
             ValidateStrictReferences(config, catalog, Path.Combine(configDirectory, "hero_skills.json"));
@@ -863,6 +864,23 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
                 }
             }
 
+            int globalSkillsStart = jsonContent.IndexOf("\"GlobalSkills\"", StringComparison.Ordinal);
+            if (globalSkillsStart != -1)
+            {
+                int arrayStart = jsonContent.IndexOf('[', globalSkillsStart);
+                if (arrayStart != -1)
+                {
+                    int arrayEnd = FindMatchingBrace(jsonContent, arrayStart);
+                    if (arrayEnd != -1)
+                    {
+                        string globalsJson = jsonContent.Substring(arrayStart, arrayEnd - arrayStart);
+                        gameConfig.GlobalSkills = System.Text.Json.JsonSerializer.Deserialize<List<GlobalSkillDef>>(
+                            globalsJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                            ?? new List<GlobalSkillDef>();
+                    }
+                }
+            }
+
             // Parse "Towers" array (game_config.json uses "Towers" key, not "TowerTypes")
             int towersStart = jsonContent.IndexOf("\"Towers\"");
             if (towersStart != -1)
@@ -1675,8 +1693,10 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             skill.Name = ExtractString(json, "Name");
             skill.Description = ExtractString(json, "Description");
             skill.DamageMultiplier = ExtractFloat(json, "DamageMultiplier");
+            skill.AreaShape = ExtractString(json, "AreaShape");
             skill.AreaWidth = ExtractInt(json, "AreaWidth");
             skill.AreaHeight = ExtractInt(json, "AreaHeight");
+            skill.AreaRadius = ExtractInt(json, "AreaRadius");
             skill.AttackRange = ExtractInt(json, "AttackRange");
             skill.Cooldown = ExtractFloat(json, "Cooldown");
             string autoCastStr = ExtractString(json, "AutoCast");
@@ -1691,6 +1711,9 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             skill.SlowAmount = ExtractFloat(json, "SlowAmount");
             skill.SlowDuration = ExtractFloat(json, "SlowDuration");
             skill.ManaCost = ExtractFloat(json, "ManaCost");
+            skill.HealPercent = ExtractFloat(json, "HealPercent");
+            skill.ShieldAmount = ExtractFloat(json, "ShieldAmount");
+            skill.ShieldDuration = ExtractFloat(json, "ShieldDuration");
             // Round 136 Direction 2 — AOE CC group control
             skill.AoeStunDuration = ExtractFloat(json, "AoeStunDuration");
             skill.AoeRootDuration = ExtractFloat(json, "AoeRootDuration");

@@ -19,6 +19,9 @@ namespace BattleSystemECS.Core.GAS
                 if (!ids.Add(ability.Id.Value)) throw new CatalogValidationException($"{path}: duplicate ability id {ability.Id.Value} ({ability.Name})");
                 if (ability.Id.Value != i) throw new CatalogValidationException($"{path}: ability id {ability.Id.Value} is not contiguous at index {i}");
                 if (!ability.Targeting.Id.Equals(new TargetingId(ability.Id.Value))) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} targeting reference is not closed");
+                const GameplayPhaseMask knownPhases = GameplayPhaseMask.Build | GameplayPhaseMask.Wave | GameplayPhaseMask.Intermission;
+                if (ability.AllowedPhases == GameplayPhaseMask.None || (ability.AllowedPhases & ~knownPhases) != 0)
+                    throw new CatalogValidationException($"{path}: ability {ability.Id.Value} ({ability.Name}) has invalid allowed phases");
                 if (!CatalogRegistries.TryExecutor(ability.Executor)) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} ({ability.Name}) has unregistered executor");
                 if (!CatalogRegistries.TryConsumer(ability.Consumer)) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} ({ability.Name}) has unregistered consumer");
                 foreach (var cost in ability.Costs) if (!CatalogRegistries.TryAttribute(cost.Resource)) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} ({ability.Name}) has unregistered cost attribute");
@@ -36,6 +39,10 @@ namespace BattleSystemECS.Core.GAS
             {
                 if (targeting.Range < 0 || targeting.Width < 0 || targeting.Height < 0)
                     throw new CatalogValidationException($"{path}: invalid targeting range/size");
+                foreach (var tag in targeting.RequiredTags)
+                    if (!CatalogRegistries.TryTag(tag)) throw new CatalogValidationException($"{path}: targeting {targeting.Id.Value} has unregistered required tag");
+                foreach (var tag in targeting.BlockedTags)
+                    if (!CatalogRegistries.TryTag(tag)) throw new CatalogValidationException($"{path}: targeting {targeting.Id.Value} has unregistered blocked tag");
             }
             if (catalog.Effects != null)
             {

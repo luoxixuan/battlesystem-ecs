@@ -4333,6 +4333,20 @@
                },
     "Skills":  [
                    {
+                       "Description":  "Restore player health through the canonical gameplay catalog.",
+                       "Hotkey":  "H",
+                       "AttackRange":  0,
+                       "Cooldown":  20,
+                       "Name":  "Guardian Heal",
+                       "AreaShape":  "heal",
+                       "AreaWidth":  1,
+                       "AreaHeight":  1,
+                       "AreaRadius":  0,
+                       "DamageMultiplier":  0,
+                       "HealPercent":  0.3,
+                       "AutoCast":  true
+                   },
+                   {
                        "Description":  "1x1 Circuit Breaker",
                        "Hotkey":  "1",
                        "AttackRange":  3,
@@ -6275,6 +6289,18 @@
                        "LevelNumber":  5
                    }
                ],
+           "GlobalSkills": [
+               {
+                   "Name": "Orbital Strike",
+                   "Description": "Call down a battlefield-wide strike.",
+                   "SkillType": 0,
+                   "ManaCost": 20.0,
+                   "Cooldown": 12.0,
+                   "DamagePct": 25.0,
+                   "MaxDamage": 25.0,
+                   "Hotkey": "Q"
+               }
+           ],
            "Combo": {
                "comboWindowSeconds": 3.0,
                "comboDamageBonusPerKill": 0.05,

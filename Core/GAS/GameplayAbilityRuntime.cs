@@ -5,7 +5,7 @@ using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Core.GAS
 {
-    public enum AbilityActivationRejectReason { None, InvalidRequest, Cooldown, NoTarget, PhaseNotAllowed, Cost, UnsupportedDefinition }
+    public enum AbilityActivationRejectReason { None, InvalidRequest, Cooldown, NoTarget, PhaseNotAllowed, TagRequirementsNotMet, Cost, UnsupportedDefinition }
 
     public readonly struct AbilityActivationRequest
     {
@@ -127,11 +127,134 @@ namespace BattleSystemECS.Core.GAS
             return new AbilityActivationResult(true, request.OwnerId, slot, appliedEffects: applied);
         }
 
+        /// <summary>
+        /// Catalog-backed activation over a deterministic target set. Validation, cost,
+        /// cooldown, and activation publication happen once; payloads execute once per target.
+        /// </summary>
+        public static AbilityActivationResult ActivateTargets(ComponentStore store, GameplayCatalog catalog,
+            float[] cooldowns, AbilityActivationRequest request, IReadOnlyList<int> targetIds,
+            IReadOnlyList<float> magnitudeOverrides = null, IAbilityPayloadHandler payloadHandler = null)
+        {
+            if (store == null || catalog == null || cooldowns == null || targetIds == null || targetIds.Count == 0 ||
+                request.Slot < 0 || request.Slot >= cooldowns.Length ||
+                (magnitudeOverrides != null && magnitudeOverrides.Count != targetIds.Count) || HasDuplicateTargets(targetIds))
+                return Reject(request, targetIds == null || targetIds.Count == 0
+                    ? AbilityActivationRejectReason.NoTarget : AbilityActivationRejectReason.InvalidRequest);
+            if (!catalog.TryGetAbility(request.Ability, out var ability))
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (request.Effect.HasValue && !Contains(ability.Effects, request.Effect.Value))
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (request.Trigger.HasValue && !Contains(ability.TriggerRefs, request.Trigger.Value))
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            var source = store.GetEntityHandle(request.OwnerId);
+            if (!source.IsValid) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            var ready = TryActivate(cooldowns, request);
+            if (!ready.Accepted) return ready;
+            if (!ValidateCosts(store, ability, request, source))
+                return Reject(request, AbilityActivationRejectReason.Cost);
+
+            for (int i = 0; i < targetIds.Count; i++)
+            {
+                var target = store.GetEntityHandle(targetIds[i]);
+                if (!target.IsValid) return Reject(request, AbilityActivationRejectReason.NoTarget);
+                float magnitudeScale = magnitudeOverrides == null ? 1f : magnitudeOverrides[i];
+                if (float.IsNaN(magnitudeScale) || float.IsInfinity(magnitudeScale) || magnitudeScale <= 0f)
+                    return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                var targetRequest = request.ForTarget(targetIds[i], magnitudeScale);
+                var validation = ValidatePlan(store, catalog, ability, targetRequest, source, target,
+                    payloadHandler, false);
+                if (validation != AbilityActivationRejectReason.None) return Reject(request, validation);
+            }
+            if (!ValidateBatchCapacity(store, catalog, ability, request, source, targetIds,
+                    magnitudeOverrides, payloadHandler))
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+
+            int applied = 0;
+            for (int i = 0; i < targetIds.Count; i++)
+            {
+                var target = store.GetEntityHandle(targetIds[i]);
+                float magnitudeScale = magnitudeOverrides == null ? 1f : magnitudeOverrides[i];
+                int targetApplied = CommitPlan(store, catalog, ability,
+                    request.ForTarget(targetIds[i], magnitudeScale), source, target, payloadHandler, false);
+                if (targetApplied < 0) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                applied += targetApplied;
+            }
+            if (!CommitCosts(store, ability, request, source))
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            cooldowns[request.Slot] = Math.Max(0f, ability.Cooldown);
+            var firstTarget = store.GetEntityHandle(targetIds[0]);
+            PublishActivation(store, request, source, firstTarget, targetIds[0]);
+            return new AbilityActivationResult(true, request.OwnerId, request.Slot, appliedEffects: applied);
+        }
+
+        public static AbilityActivationResult ActivateTargets(ComponentStore store, GameplayCatalog catalog,
+            int entityId, int slot, AbilityActivationRequest request, IReadOnlyList<int> targetIds,
+            IReadOnlyList<float> magnitudeScales = null, IAbilityPayloadHandler payloadHandler = null)
+        {
+            if (store == null || catalog == null || targetIds == null || targetIds.Count == 0 ||
+                entityId < 0 || entityId >= ComponentStore.MAX_ENTITIES ||
+                slot < 0 || slot >= store.AbilityCount[entityId] ||
+                (magnitudeScales != null && magnitudeScales.Count != targetIds.Count) || HasDuplicateTargets(targetIds))
+                return Reject(request, targetIds == null || targetIds.Count == 0
+                    ? AbilityActivationRejectReason.NoTarget : AbilityActivationRejectReason.InvalidRequest);
+            if (!catalog.TryGetAbility(request.Ability, out var ability))
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (request.Effect.HasValue && !Contains(ability.Effects, request.Effect.Value))
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (request.Trigger.HasValue && !Contains(ability.TriggerRefs, request.Trigger.Value))
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            var source = store.GetEntityHandle(request.OwnerId);
+            if (!source.IsValid) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (!TryActivate(store, entityId, slot, out _))
+                return new AbilityActivationResult(false, request.OwnerId, slot, AbilityActivationRejectReason.Cooldown);
+            if (!ValidateCosts(store, ability, request, source))
+                return Reject(request, AbilityActivationRejectReason.Cost);
+
+            for (int i = 0; i < targetIds.Count; i++)
+            {
+                var target = store.GetEntityHandle(targetIds[i]);
+                if (!target.IsValid) return Reject(request, AbilityActivationRejectReason.NoTarget);
+                float scale = magnitudeScales == null ? 1f : magnitudeScales[i];
+                if (float.IsNaN(scale) || float.IsInfinity(scale) || scale <= 0f)
+                    return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                var validation = ValidatePlan(store, catalog, ability, request.ForTarget(targetIds[i], scale),
+                    source, target, payloadHandler, false);
+                if (validation != AbilityActivationRejectReason.None) return Reject(request, validation);
+            }
+            if (!ValidateBatchCapacity(store, catalog, ability, request, source, targetIds,
+                    magnitudeScales, payloadHandler))
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+
+            int applied = 0;
+            for (int i = 0; i < targetIds.Count; i++)
+            {
+                int targetApplied = CommitPlan(store, catalog, ability,
+                    request.ForTarget(targetIds[i], magnitudeScales == null ? 1f : magnitudeScales[i]),
+                    source, store.GetEntityHandle(targetIds[i]), payloadHandler, false);
+                if (targetApplied < 0) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                applied += targetApplied;
+            }
+            if (!CommitCosts(store, ability, request, source))
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            var instance = store.GetAbility(entityId, slot);
+            instance.Activate();
+            store.SetAbility(entityId, slot, instance);
+            PublishActivation(store, request, source, store.GetEntityHandle(targetIds[0]), targetIds[0]);
+            return new AbilityActivationResult(true, request.OwnerId, slot, appliedEffects: applied);
+        }
+
         private static AbilityActivationRejectReason ValidatePlan(ComponentStore store, GameplayCatalog catalog,
             AbilityDefinition ability, AbilityActivationRequest request, EntityHandle source, EntityHandle target,
-            IAbilityPayloadHandler payloadHandler)
+            IAbilityPayloadHandler payloadHandler, bool validateCosts = true)
         {
-            if (!ValidateCosts(store, ability, request, source)) return AbilityActivationRejectReason.Cost;
+            GameplayPhaseMask phase = PhaseMask(store.GameplayPhaseContext.Kind);
+            if (phase == GameplayPhaseMask.None || (ability.AllowedPhases & phase) == 0)
+                return AbilityActivationRejectReason.PhaseNotAllowed;
+            if (!GameplayTagRuntime.Matches(store, source.Index, ability.RequiredTags, ability.BlockedTags) ||
+                !GameplayTagRuntime.Matches(store, target.Index,
+                    ability.Targeting.RequiredTags, ability.Targeting.BlockedTags))
+                return AbilityActivationRejectReason.TagRequirementsNotMet;
+            if (validateCosts && !ValidateCosts(store, ability, request, source)) return AbilityActivationRejectReason.Cost;
             for (int i = 0; i < ability.Effects.Count; i++)
                 if (!catalog.TryGetEffect(ability.Effects[i], out var effect) ||
                     !store.GameplayEffectsRuntime.CanApplyDefinition(effect, target.Index))
@@ -143,7 +266,9 @@ namespace BattleSystemECS.Core.GAS
                 float magnitude = ResolveMagnitude(store, execution, request.MagnitudeOverride, source.Index);
                 var context = new AbilityPayloadContext(store, ability, execution, request, source, target, magnitude);
                 if (payloadHandler != null && payloadHandler.CanCommit(context)) continue;
-                if (!CanCommitBuiltIn(context)) return AbilityActivationRejectReason.UnsupportedDefinition;
+                if (!CanCommitBuiltIn(context)) return IsBuiltInOperation(execution)
+                    ? AbilityActivationRejectReason.InvalidRequest
+                    : AbilityActivationRejectReason.UnsupportedDefinition;
             }
             if (!ValidateCapacityPlan(store, catalog, ability, request, target, payloadHandler))
                 return AbilityActivationRejectReason.InvalidRequest;
@@ -222,8 +347,7 @@ namespace BattleSystemECS.Core.GAS
             {
                 case EffectPayloadKind.Damage:
                     return Matches(execution.Operation, ExecutionOperation.ApplyDamage) && magnitude > 0f && enemy &&
-                        context.Request.OwnerPlayerId >= 0 &&
-                        context.Request.OwnerPlayerId < ComponentStore.MAX_PLAYERS;
+                        context.Request.OwnerPlayerId >= 0 && context.Request.OwnerPlayerId < ComponentStore.MAX_PLAYERS;
                 case EffectPayloadKind.Heal:
                     return Matches(execution.Operation, ExecutionOperation.ApplyHeal) && magnitude > 0f && (player || enemy);
                 case EffectPayloadKind.Shield:
@@ -238,6 +362,20 @@ namespace BattleSystemECS.Core.GAS
                     return execution.Operation == ExecutionOperation.Default;
                 default:
                     return false;
+            }
+        }
+
+        private static bool IsBuiltInOperation(ExecutionDefinition execution)
+        {
+            switch (execution.Payload)
+            {
+                case EffectPayloadKind.Damage: return Matches(execution.Operation, ExecutionOperation.ApplyDamage);
+                case EffectPayloadKind.Heal: return Matches(execution.Operation, ExecutionOperation.ApplyHeal);
+                case EffectPayloadKind.Shield: return Matches(execution.Operation, ExecutionOperation.ApplyShield);
+                case EffectPayloadKind.Slow: return Matches(execution.Operation, ExecutionOperation.ApplySlow);
+                case EffectPayloadKind.CrowdControl: return Matches(execution.Operation, ExecutionOperation.ApplyCrowdControl);
+                case EffectPayloadKind.GameplayEvent: return execution.Operation == ExecutionOperation.Default;
+                default: return false;
             }
         }
 
@@ -348,7 +486,8 @@ namespace BattleSystemECS.Core.GAS
             IReadOnlyList<float> magnitudes)
         {
             if (store == null || catalog == null || cooldowns == null || targetIds == null || magnitudes == null ||
-                targetIds.Count != magnitudes.Count || request.Slot < 0 || request.Slot >= cooldowns.Length)
+                targetIds.Count != magnitudes.Count || request.Slot < 0 || request.Slot >= cooldowns.Length ||
+                HasDuplicateTargets(targetIds))
                 return Reject(request, AbilityActivationRejectReason.InvalidRequest);
             if (targetIds.Count == 0) return Reject(request, AbilityActivationRejectReason.NoTarget);
             if (!catalog.TryGetAbility(request.Ability, out var ability) || ability.Effects.Count != 0)
@@ -360,18 +499,22 @@ namespace BattleSystemECS.Core.GAS
                     return Reject(request, AbilityActivationRejectReason.UnsupportedDefinition);
             var source = store.GetEntityHandle(request.OwnerId);
             if (!source.IsValid) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            GameplayPhaseMask phase = PhaseMask(store.GameplayPhaseContext.Kind);
+            if (phase == GameplayPhaseMask.None || (ability.AllowedPhases & phase) == 0)
+                return Reject(request, AbilityActivationRejectReason.PhaseNotAllowed);
+            if (!GameplayTagRuntime.Matches(store, source.Index, ability.RequiredTags, ability.BlockedTags))
+                return Reject(request, AbilityActivationRejectReason.TagRequirementsNotMet);
             if (!ValidateCosts(store, ability, request, source)) return Reject(request, AbilityActivationRejectReason.Cost);
-            for (int i = 0; i < targetIds.Count; i++)
-                if (!store.GetEntityHandle(targetIds[i]).IsValid || !store.EnemyActive[targetIds[i]] ||
-                    float.IsNaN(magnitudes[i]) || float.IsInfinity(magnitudes[i]) || magnitudes[i] <= 0f)
-                    return Reject(request, AbilityActivationRejectReason.NoTarget);
             int costRequests = 0;
-            for (int i = 0; i < ability.Costs.Count; i++)
-                if (EffectiveCost(ability, request, i) != 0f) costRequests++;
-            int resourceRequests = targetIds.Count + costRequests;
-            if (!store.ResourceResolver.CanAccept(resourceRequests, resourceRequests) ||
+            for (int i = 0; i < ability.Costs.Count; i++) if (EffectiveCost(ability, request, i) != 0f) costRequests++;
+            if (!store.ResourceResolver.CanAccept(targetIds.Count + costRequests, targetIds.Count + costRequests) ||
                 !store.DamageResolver.CanAccept(0, 1))
                 return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            for (int i = 0; i < targetIds.Count; i++)
+                if (!store.GetEntityHandle(targetIds[i]).IsValid || !store.EnemyActive[targetIds[i]] ||
+                    !GameplayTagRuntime.Matches(store, targetIds[i], ability.Targeting.RequiredTags, ability.Targeting.BlockedTags) ||
+                    float.IsNaN(magnitudes[i]) || float.IsInfinity(magnitudes[i]) || magnitudes[i] <= 0f)
+                    return Reject(request, AbilityActivationRejectReason.NoTarget);
             for (int i = 0; i < targetIds.Count; i++)
                 if (!store.ResourceResolver.TryApply(new HealRequest(source, store.GetEntityHandle(targetIds[i]), magnitudes[i],
                     store.AllocateGameplaySequence(targetIds[i]), request.OwnerPlayerId)).Accepted)
@@ -386,18 +529,40 @@ namespace BattleSystemECS.Core.GAS
 
         private static bool Contains(IReadOnlyList<EffectId> ids, EffectId id) { for (int i = 0; i < ids.Count; i++) if (ids[i].Value == id.Value) return true; return false; }
         private static bool Contains(IReadOnlyList<TriggerId> ids, TriggerId id) { for (int i = 0; i < ids.Count; i++) if (ids[i].Value == id.Value) return true; return false; }
-        private static AbilityActivationResult Reject(AbilityActivationRequest request, AbilityActivationRejectReason reason) => new AbilityActivationResult(false, request.OwnerId, request.Slot, reason);
-
-        private static float ResolveMagnitude(ComponentStore store, ExecutionDefinition execution, float requested, int sourceId)
+        private static bool HasDuplicateTargets(IReadOnlyList<int> targetIds)
         {
-            if (!float.IsNaN(requested)) return requested;
-            if (execution.MagnitudeSource != MagnitudeSource.Multiplier) return execution.Magnitude;
-            float basis = store.EnemyActive[sourceId] ? store.EnemyDamage[sourceId]
-                : store.TowerActive[sourceId] ? store.TowerAttackDamage[sourceId]
-                : sourceId == store.PlayerEntityId ? store.GetPlayerAttackDamageProjection(sourceId)
-                : 0f;
-            return Math.Max(0f, basis * execution.Magnitude);
+            for (int i = 0; i < targetIds.Count; i++)
+                for (int j = i + 1; j < targetIds.Count; j++)
+                    if (targetIds[i] == targetIds[j]) return true;
+            return false;
         }
+        private static GameplayPhaseMask PhaseMask(PhaseContextKind phase)
+        {
+            switch (phase)
+            {
+                case PhaseContextKind.Build: return GameplayPhaseMask.Build;
+                case PhaseContextKind.Wave: return GameplayPhaseMask.Wave;
+                case PhaseContextKind.Intermission: return GameplayPhaseMask.Intermission;
+                default: return GameplayPhaseMask.None;
+            }
+        }
+        private static float ResolveMagnitude(ComponentStore store, ExecutionDefinition execution,
+            AbilityActivationRequest request, int sourceId)
+        {
+            float magnitude;
+            if (!float.IsNaN(request.MagnitudeOverride)) magnitude = request.MagnitudeOverride;
+            else if (execution.MagnitudeSource != MagnitudeSource.Multiplier) magnitude = execution.Magnitude;
+            else
+            {
+                float basis = store.EnemyActive[sourceId] ? store.EnemyDamage[sourceId]
+                    : store.TowerActive[sourceId] ? store.TowerAttackDamage[sourceId]
+                    : sourceId == store.PlayerEntityId ? store.GetPlayerAttackDamageProjection(sourceId)
+                    : 0f;
+                magnitude = Math.Max(0f, basis * execution.Magnitude);
+            }
+            return magnitude * request.MagnitudeScale;
+        }
+        private static AbilityActivationResult Reject(AbilityActivationRequest request, AbilityActivationRejectReason reason) => new AbilityActivationResult(false, request.OwnerId, request.Slot, reason);
 
         public static AbilityActivationResult TryActivate(float[] cooldowns, AbilityActivationRequest request)
         {

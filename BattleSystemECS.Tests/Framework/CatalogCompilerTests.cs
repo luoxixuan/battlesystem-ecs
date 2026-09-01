@@ -120,5 +120,23 @@ namespace BattleSystemECS.Tests.Framework
             try { Assert.Throws<CatalogValidationException>(() => CatalogCompiler.Compile(canonical, new[] { first, second })); }
             finally { Directory.Delete(root, true); }
         }
+
+        [Theory]
+        [InlineData("[\"missing-tag\"]", "unknown tag")]
+        [InlineData("[\"Fire\",\"Fire\"]", "duplicate tag")]
+        public void StrictTagCompilationRejectsUnknownAndDuplicateIds(string tags, string expected)
+        {
+            string path = Path.Combine(Path.GetTempPath(), "catalog-tags-" + Guid.NewGuid().ToString("N") + ".json");
+            File.WriteAllText(path, "[{\"Name\":\"tagged\",\"AreaShape\":\"shield\",\"AttackRange\":0," +
+                "\"AreaWidth\":1,\"AreaHeight\":1,\"Cooldown\":1,\"ShieldAmount\":1," +
+                "\"ShieldDuration\":1,\"AllowedPhases\":[\"Build\",\"Wave\"],\"RequiredTags\":" + tags + ",\"Modifiers\":[]}]");
+            try
+            {
+                var error = Assert.Throws<CatalogValidationException>(() => CatalogCompiler.Compile(path));
+                Assert.Contains(expected, error.Message, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains(path, error.Message, StringComparison.Ordinal);
+            }
+            finally { File.Delete(path); }
+        }
     }
 }

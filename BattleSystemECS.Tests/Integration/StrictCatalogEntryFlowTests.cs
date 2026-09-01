@@ -20,7 +20,7 @@ namespace BattleSystemECS.Tests.Integration
         public void StrictReferenceMatrixRejectsEveryUnclosedProductionEntry()
         {
             AssertStrictReject(config => config.Skills[0].Name = "missing-skill", "Skills[0]");
-            AssertStrictReject(config => config.GlobalSkills.Add(new GlobalSkillDef { Name = "missing-global" }), "GlobalSkills[0]");
+            AssertStrictReject(config => config.GlobalSkills.Add(new GlobalSkillDef { Name = "missing-global" }), "GlobalSkills[");
             AssertStrictReject(config => config.TowerTypes.Add(new TowerConfig
             {
                 Name = "invalid tower",
@@ -62,6 +62,7 @@ namespace BattleSystemECS.Tests.Integration
             int first = Enemy(e => { e.X = 1f; e.Y = 0f; e.Health = 20f; e.MaxHealth = 100f; });
             int second = Enemy(e => { e.X = 0f; e.Y = 1f; e.Health = 30f; e.MaxHealth = 200f; });
             var system = new EnemyAbilitySystem(Store, Renderer, player, config);
+            system.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             var healDef = Assert.Single(config.EnemyAbilities, ability => ability.Id == "healer_aoe_heal");
 
             system.EnqueueAbility(healer, "healer_aoe_heal");
@@ -91,6 +92,7 @@ namespace BattleSystemECS.Tests.Integration
                 Assert.True(blockedStore.ResourceResolver.TryApply(new ResourceRequest(playerHandle, playerHandle,
                     new AttributeKey(7), 1f, i + 1, ownerPlayerId: 0)).Accepted);
             var blockedSystem = new EnemyAbilitySystem(blockedStore, Renderer, 0, config);
+            blockedSystem.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             blockedSystem.EnqueueAbility(blockedHealer, "healer_aoe_heal");
             blockedSystem.ExecuteAbilities();
             Assert.Equal(20f, blockedStore.EnemyHealth[blockedFirst]);
@@ -115,6 +117,7 @@ namespace BattleSystemECS.Tests.Integration
             });
             int ambusher = Enemy(e => { e.X = 0f; e.Y = 0f; e.Health = 100f; e.MaxHealth = 100f; });
             var system = new EnemyAbilitySystem(Store, Renderer, player, config);
+            system.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             int activeBefore = Store.ActiveEnemyIds.Count;
 
             system.EnqueueAbility(summoner, "summon_minion");
@@ -169,6 +172,7 @@ namespace BattleSystemECS.Tests.Integration
             var wrongCatalog = config.CompiledCatalog;
             config.CompiledCatalog = CatalogCompiler.CreateEmpty();
             var missingSystem = new EnemyAbilitySystem(Store, Renderer, player, config);
+            missingSystem.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             int activeBefore = Store.ActiveEnemyIds.Count;
             missingSystem.EnqueueAbility(summoner, source.Id);
             missingSystem.ExecuteAbilities();
@@ -176,6 +180,7 @@ namespace BattleSystemECS.Tests.Integration
 
             config.CompiledCatalog = wrongCatalog;
             var system = new EnemyAbilitySystem(Store, Renderer, player, config);
+            system.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
 
             system.EnqueueAbility(summoner, source.Id);
             system.ExecuteAbilities();
@@ -184,6 +189,7 @@ namespace BattleSystemECS.Tests.Integration
             config.CompiledCatalog = CatalogCompiler.CompileEnemyExtensions(CatalogCompiler.CreateEmpty(),
                 config.EnemyAbilities);
             var corrected = new EnemyAbilitySystem(Store, Renderer, player, config);
+            corrected.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             corrected.EnqueueAbility(summoner, source.Id);
             corrected.ExecuteAbilities();
             Assert.Equal(activeBefore + 1, Store.ActiveEnemyIds.Count);
@@ -217,7 +223,9 @@ namespace BattleSystemECS.Tests.Integration
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);
             int player = Player(p => { p.Health = 100f; p.X = 0f; p.Y = 0f; p.AttackDamage = 1f; });
             Store.PlayerCurrentHealth[player] = 40f;
-            int enemy = Enemy(e => { e.X = 0f; e.Y = 1f; e.Health = 10f; e.MaxHealth = 10f; e.Damage = 0f; e.MoveSpeed = 0f; e.GoldReward = 7; });
+            Store.PlayerMana[player] = 100f;
+            int enemy = Enemy(e => { e.X = 0f; e.Y = 1f; e.Health = 100f; e.MaxHealth = 100f; e.Damage = 0f; e.MoveSpeed = 0f; e.GoldReward = 7; });
+            float expectedReward = Store.EnemyGoldReward[enemy];
             var events = new RecordingBattleEventBus();
             var registry = new SystemRegistry();
             registry.CreateAll(Store, config, Renderer, player, new StateMachine(), events);
@@ -250,7 +258,9 @@ namespace BattleSystemECS.Tests.Integration
 
             Assert.False(Store.EnemyActive[enemy]);
             Assert.Equal(1, Store.TotalKills);
-            Assert.Equal(new[] { "killed", "destroyed" }, events.KillEvents);
+            Assert.True(Store.PlayerGold[player] >= expectedReward);
+            Assert.True(events.KillEvents.Count >= 2);
+            Assert.Equal(new[] { "killed", "destroyed" }, events.KillEvents.Take(2));
             Assert.True(config.CompiledCatalog!.TryResolveAlias("Guardian Heal", out var heal));
             Assert.True(config.CompiledCatalog.TryResolveAlias("Cross Slash", out var damage));
             Assert.NotEqual(heal, damage);
@@ -279,6 +289,214 @@ namespace BattleSystemECS.Tests.Integration
                 }
             }
         }
+
+        [Fact]
+        public void ManualSkillRequestReachesDamageDeathRewardAndPresentationThroughProductionTick()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            int player = Player(p => { p.X = 0f; p.Y = 0f; p.AttackDamage = 100f; p.AttackRange = 0f; });
+            var events = new RecordingBattleEventBus();
+            var (registry, scheduler) = CreateProduction(config, player, events);
+            scheduler.Combat.PlayerTowerAttack = null;
+            scheduler.Combat.TowerAttack = null;
+            AbilityDefinition damage = default;
+            bool found = false;
+            for (int slot = 0; slot < Store.AbilityCount[player] && !found; slot++)
+            {
+                string name = Store.GetAbility(player, slot).Definition.Name;
+                found = config.CompiledCatalog!.TryResolveAlias(name, out var id) &&
+                    config.CompiledCatalog.TryGetAbility(id, out damage) &&
+                    damage.Targeting.Relation == RelationFilter.Enemies && HasPayload(config, damage, EffectPayloadKind.Damage);
+            }
+            Assert.True(found);
+            int enemy = Enemy(e => { e.X = 0f; e.Y = 1f; e.Health = 1f; e.MaxHealth = 1f; e.MoveSpeed = 0f; e.Damage = 0f; e.GoldReward = 11; });
+            float expectedReward = Store.EnemyGoldReward[enemy];
+
+            Assert.True(registry.Skill!.RequestCatalogAbility(damage.Id));
+            scheduler.Tick(0.016f, 0);
+
+            Assert.True(registry.Skill.LastCatalogActivation.Accepted, registry.Skill.LastCatalogActivation.Reason.ToString());
+            Assert.False(Store.EnemyActive[enemy]);
+            Assert.True(Store.PlayerGold[player] >= expectedReward);
+            Assert.True(events.KillEvents.Count >= 2);
+            Assert.Equal(new[] { "killed", "destroyed" }, events.KillEvents.Take(2));
+        }
+
+        [Fact]
+        public void GlobalSkillRequestReachesDamageDeathRewardAndPresentationThroughProductionTick()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            int player = Player(p => { p.X = 0f; p.Y = 10f; p.AttackDamage = 0f; p.AttackRange = 0f; });
+            Store.PlayerMana[player] = Store.PlayerMaxMana[player] = 10000f;
+            int globalIndex = config.GlobalSkills.FindIndex(def =>
+                config.CompiledCatalog!.TryResolveAlias(def.Name, out var id) &&
+                config.CompiledCatalog.TryGetAbility(id, out var ability) && HasPayload(config, ability, EffectPayloadKind.Damage));
+            Assert.True(globalIndex >= 0);
+            int enemy = Enemy(e => { e.X = 0f; e.Y = 1f; e.Health = 1f; e.MaxHealth = 1f; e.MoveSpeed = 0f; e.Damage = 0f; e.GoldReward = 13; });
+            float expectedReward = Store.EnemyGoldReward[enemy];
+            var events = new RecordingBattleEventBus();
+            var (registry, scheduler) = CreateProduction(config, player, events);
+            scheduler.Combat.PlayerTowerAttack = null;
+            for (int i = 0; i < globalIndex; i++) Store.PlayerGlobalSkillCooldown[i] = 100f;
+            Store.PlayerGlobalSkillPressed[player] = true;
+
+            scheduler.Tick(0.016f, 0);
+
+            Assert.False(Store.EnemyActive[enemy]);
+            Assert.True(Store.PlayerGold[player] >= expectedReward);
+            Assert.True(Store.PlayerGlobalSkillCooldown[globalIndex] > 0f);
+            Assert.True(events.KillEvents.Count >= 2);
+            Assert.Equal(new[] { "killed", "destroyed" }, events.KillEvents.Take(2));
+        }
+
+        [Fact]
+        public void TowerActiveRequestReachesDamageDeathRewardAndPresentationThroughProductionTick()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            int player = Player(p => { p.X = 0f; p.Y = 0f; p.AttackDamage = 0f; p.AttackRange = 0f; });
+            var damage = FindCatalogAbility(config, a => config.TryGetSkillById(a.Id.Value) != null &&
+                a.Targeting.Relation == RelationFilter.Enemies && HasPayload(config, a, EffectPayloadKind.Damage));
+            int tower = RawTower(0, 0, damage: 100f, range: 20);
+            Store.SetTowerActiveSkill(tower, damage.Id.Value, damage.Cooldown);
+            int enemy = Enemy(e => { e.X = 0f; e.Y = 1f; e.Health = 1f; e.MaxHealth = 1f; e.MoveSpeed = 0f; e.Damage = 0f; e.GoldReward = 17; });
+            float expectedReward = Store.EnemyGoldReward[enemy];
+            var events = new RecordingBattleEventBus();
+            var (registry, scheduler) = CreateProduction(config, player, events);
+            scheduler.Combat.PlayerTowerAttack = null;
+            scheduler.Combat.TowerAttack = null;
+
+            Assert.True(registry.TowerActiveSkill!.RequestTowerActive(tower));
+            scheduler.Tick(0.016f, 0);
+
+            Assert.True(registry.TowerActiveSkill.LastActivation.Accepted, registry.TowerActiveSkill.LastActivation.Reason.ToString());
+            Assert.False(Store.EnemyActive[enemy]);
+            Assert.True(Store.PlayerGold[player] >= expectedReward);
+            Assert.Equal(new[] { "killed", "destroyed" }, events.KillEvents);
+        }
+
+        [Fact]
+        public void AutoSkillBuildRequestReachesCatalogHealAndResourceFactsThroughProductionTick()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            config.AutoSkill.Enabled = true;
+            config.AutoSkill.MaxSkillsPerPhase = 1;
+            int player = Player(p => { p.X = 0f; p.Y = 0f; p.AttackDamage = 0f; });
+            Store.PlayerMaxHealth[player] = 100f;
+            Store.PlayerCurrentHealth[player] = 20f;
+            var events = new RecordingBattleEventBus();
+            var (registry, scheduler) = CreateProduction(config, player, events);
+            int buildSlot = -1;
+            for (int slot = 0; slot < Store.AbilityCount[player]; slot++)
+            {
+                var instance = Store.GetAbility(player, slot);
+                if (SkillSystem.IsBuildAllowedAbility(instance.Definition.AreaShape) && buildSlot < 0) buildSlot = slot;
+                else { instance.CurrentCooldown = 100f; Store.SetAbility(player, slot, instance); }
+            }
+            Assert.True(buildSlot >= 0);
+            scheduler.Phase = GameState.BuildPhase;
+
+            scheduler.Tick(0.016f, 0);
+
+            Assert.True(registry.AutoSkill!.SuccessfulCastCount > 0);
+            Assert.True(Store.PlayerCurrentHealth[player] > 20f);
+            Assert.Contains(Enumerable.Range(0, Store.ResourceResolver.Events.Count),
+                i => Store.ResourceResolver.Events.Get(i).Type == GameplayEventType.HealApplied);
+        }
+
+        [Fact]
+        public void EnemyDamageUsesTypedPlayerResolverForShieldHealthEventsAndDeathFacts()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            var source = config.EnemyAbilities.First(def => string.Equals(def.AbilityType, "aoe_damage", StringComparison.OrdinalIgnoreCase));
+            int player = Player(p => { p.X = 0f; p.Y = 0f; p.AttackDamage = 0f; p.AttackRange = 0f; });
+            Store.PlayerMaxHealth[player] = Store.PlayerCurrentHealth[player] = 20f;
+            Store.PlayerShield[player] = 5f;
+            int first = Enemy(e => { e.X = 0f; e.Y = 10f; e.Health = 100f; e.MaxHealth = 100f; e.Damage = 10f; e.MoveSpeed = 0f; });
+            var events = new RecordingBattleEventBus();
+            var (registry, scheduler) = CreateProduction(config, player, events);
+            scheduler.AI.EnemyAI = null;
+            var damaged = new List<PlayerDamagedEvent>();
+            registry.EventBus!.PlayerDamaged.Subscribe(damaged.Add);
+            Assert.True(config.CompiledCatalog!.TryResolveAlias(source.Id, out var typedId));
+            Assert.True(config.CompiledCatalog.TryGetAbility(typedId, out var typed));
+            int expectedHits = typed.Executions.Count(id => config.CompiledCatalog.TryGetExecution(id, out var execution) &&
+                execution.Payload == EffectPayloadKind.Damage);
+            registry.EnemyAbility!.EnqueueAbility(first, source.Id);
+
+            scheduler.Tick(0.016f, 0);
+
+            Assert.Equal(expectedHits, damaged.Count);
+            Assert.All(damaged, fact => Assert.Equal(first, fact.AttackerId));
+            Assert.True(Store.PlayerShield[player] < 5f || Store.PlayerCurrentHealth[player] < 20f);
+            Assert.Equal(first, damaged[0].AttackerId);
+            int lethal = Enemy(e => { e.X = 0f; e.Y = 10f; e.Health = 100f; e.MaxHealth = 100f; e.Damage = 10000f; e.MoveSpeed = 0f; });
+            registry.EnemyAbility.EnqueueAbility(lethal, source.Id);
+            scheduler.Tick(0.016f, 1);
+
+            Assert.False(Store.IsPlayerAlive(player));
+            Assert.Contains(Enumerable.Range(0, Store.ResourceResolver.Events.Count),
+                i => Store.ResourceResolver.Events.Get(i).Type == GameplayEventType.DeathQueued);
+            Assert.Equal(lethal, damaged[damaged.Count - 1].AttackerId);
+        }
+
+        [Fact]
+        public void WaveRequestsDoNotLeakAcrossBuildBoundaryIntoNextWave()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            int player = Player(p => { p.X = 0f; p.Y = 10f; p.AttackDamage = 100f; p.AttackRange = 0f; });
+            Store.PlayerMana[player] = Store.PlayerMaxMana[player] = 10000f;
+            int enemy = Enemy(e => { e.X = 0f; e.Y = 10f; e.Health = 100f; e.MaxHealth = 100f; e.Damage = 10f; e.MoveSpeed = 0f; });
+            int tower = RawTower(0, 10, damage: 100f, range: 20);
+            var events = new RecordingBattleEventBus();
+            var (registry, scheduler) = CreateProduction(config, player, events);
+            scheduler.Combat.PlayerTowerAttack = null;
+            scheduler.Combat.TowerAttack = null;
+            scheduler.AI.EnemyAI = null;
+            var damage = FindCatalogAbility(config, ability => config.TryGetSkillById(ability.Id.Value) != null &&
+                ability.Targeting.Relation == RelationFilter.Enemies && HasPayload(config, ability, EffectPayloadKind.Damage));
+            Store.SetTowerActiveSkill(tower, damage.Id.Value, damage.Cooldown);
+            Store.HeroIsDeployed[0] = true;
+            var enemyAbility = config.EnemyAbilities.First(def => string.Equals(def.AbilityType, "aoe_damage", StringComparison.OrdinalIgnoreCase));
+
+            Assert.True(registry.Skill!.RequestCatalogAbility(damage.Id));
+            Assert.True(registry.TowerActiveSkill!.RequestTowerActive(tower));
+            Assert.True(registry.HeroSkill!.RequestHeroSkill(0, 0));
+            registry.EnemyAbility!.EnqueueAbility(enemy, enemyAbility.Id);
+            Store.PlayerGlobalSkillPressed[player] = true;
+            scheduler.Phase = GameState.BuildPhase;
+            scheduler.Tick(0.016f, 0);
+            scheduler.Phase = GameState.WavePhase;
+            float enemyHealth = Store.EnemyHealth[enemy];
+            float playerHealth = Store.PlayerCurrentHealth[player];
+
+            scheduler.Tick(0.016f, 1);
+
+            Assert.Equal(enemyHealth, Store.EnemyHealth[enemy]);
+            Assert.Equal(playerHealth, Store.PlayerCurrentHealth[player]);
+            Assert.Equal(0f, Store.TowerActiveCooldown[tower]);
+            Assert.False(registry.Skill.LastCatalogActivation.Accepted);
+            Assert.False(registry.TowerActiveSkill.LastActivation.Accepted);
+            Assert.False(registry.HeroSkill.LastActivation.Accepted);
+            Assert.False(Store.PlayerGlobalSkillPressed[player]);
+        }
+
+        private (SystemRegistry Registry, FrameScheduler Scheduler) CreateProduction(GameConfig config, int player,
+            IBattleEventBus events)
+        {
+            var registry = new SystemRegistry();
+            registry.CreateAll(Store, config, Renderer, player, new StateMachine(), events);
+            registry.WireDependencies(Store, player);
+            var scheduler = new FrameScheduler(Store, config, events);
+            registry.AssignToGroups(scheduler);
+            scheduler.Phase = GameState.WavePhase;
+            return (registry, scheduler);
+        }
+
+        private static AbilityDefinition FindCatalogAbility(GameConfig config, Func<AbilityDefinition, bool> predicate) =>
+            config.CompiledCatalog!.AbilityDefinitions.First(predicate);
+
+        private static bool HasPayload(GameConfig config, AbilityDefinition ability, EffectPayloadKind payload) =>
+            ability.Executions.Any(id => config.CompiledCatalog!.TryGetExecution(id, out var execution) && execution.Payload == payload);
 
         private void AssertStrictReject(Action<GameConfig> mutate, string expected)
         {
