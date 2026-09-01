@@ -1,5 +1,23 @@
 namespace BattleSystemECS.Core.GAS
 {
+    public readonly struct AbilityActivationRequest
+    {
+        public readonly int OwnerId;
+        public readonly int Slot;
+        public readonly float Cooldown;
+        public AbilityActivationRequest(int ownerId, int slot, float cooldown)
+        { OwnerId = ownerId; Slot = slot; Cooldown = cooldown; }
+    }
+
+    public readonly struct AbilityActivationResult
+    {
+        public readonly bool Accepted;
+        public readonly int OwnerId;
+        public readonly int Slot;
+        public AbilityActivationResult(bool accepted, int ownerId, int slot)
+        { Accepted = accepted; OwnerId = ownerId; Slot = slot; }
+    }
+
     /// <summary>
     /// Single writer for ability-slot activation state. Legacy systems may inspect
     /// definitions, but cooldown ownership stays in the ECS ability store through
@@ -7,6 +25,18 @@ namespace BattleSystemECS.Core.GAS
     /// </summary>
     public static class GameplayAbilityRuntime
     {
+        public static AbilityActivationResult TryActivate(float[] cooldowns, AbilityActivationRequest request)
+        {
+            bool accepted = TryActivate(cooldowns, request.Slot);
+            return new AbilityActivationResult(accepted, request.OwnerId, request.Slot);
+        }
+
+        public static AbilityActivationResult AbilityCommit(float[] cooldowns, AbilityActivationRequest request)
+        {
+            bool accepted = AbilityCommit(cooldowns, request.Slot, request.Cooldown);
+            return new AbilityActivationResult(accepted, request.OwnerId, request.Slot);
+        }
+
         public static bool TryActivate(float[] cooldowns, int index)
         {
             return cooldowns != null && index >= 0 && index < cooldowns.Length && cooldowns[index] <= 0f;

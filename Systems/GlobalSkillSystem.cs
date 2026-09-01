@@ -149,11 +149,11 @@ namespace BattleSystemECS.Systems
 
             int idx = playerId * MAX_GLOBAL_SKILLS + skillIdx;
             if (!store.PlayerGlobalSkillUnlocked[idx]) return false;
-            if (!GameplayAbilityRuntime.TryActivate(store.PlayerGlobalSkillCooldown, idx)) return false;
-
             // Get skill definition
             var def = GetSkillDef(skillIdx);
             if (def == null) return false;
+            var activation = new AbilityActivationRequest(playerId, skillIdx, def.Cooldown);
+            if (!GameplayAbilityRuntime.TryActivate(store.PlayerGlobalSkillCooldown, activation).Accepted) return false;
             if (!_phaseContext.AllowsCombat &&
                 !(_phaseContext.AllowsPreparationResources && IsBuildAllowed(def.SkillType)))
             {
@@ -179,7 +179,7 @@ namespace BattleSystemECS.Systems
             ExecuteSkillEffect(def);
 
             // Start cooldown
-            GameplayAbilityRuntime.AbilityCommit(store.PlayerGlobalSkillCooldown, idx, def.Cooldown);
+            GameplayAbilityRuntime.AbilityCommit(store.PlayerGlobalSkillCooldown, activation);
 
             renderer.Log($"[GlobalSkill] Activated: {def.Name}");
             _successfulActivationCount++;
