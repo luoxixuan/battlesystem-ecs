@@ -19,6 +19,7 @@ namespace BattleSystemECS.Config
             var files = Directory.Exists(directory) ? Directory.GetFiles(directory, "*.json") : throw new CatalogValidationException($"{directory}: static skill directory not found");
             var catalog = CatalogCompiler.Compile(canonical, files);
             var config = LoadConfigStrict(renderer);
+            CatalogCompiler.ValidatePlayerSkillAliases(catalog, config.Skills, CONFIG_FILE);
             catalog = CatalogCompiler.CompileEnemyExtensions(catalog, config.EnemyAbilities);
             catalog = CatalogCompiler.CompileGlobalSkillExtensions(catalog, config.GlobalSkills);
             config.CompiledCatalog = catalog;
@@ -67,7 +68,9 @@ namespace BattleSystemECS.Config
                     RequireJsonKind(strict, CONFIG_FILE, document.RootElement,
                         System.Text.Json.JsonValueKind.Object, "a JSON object");
 
-                var gameConfig = ParseGameConfig(jsonContent);
+                var gameConfig = strict
+                    ? TypedGameConfigParser.ParseProduction(jsonContent, CONFIG_FILE)
+                    : ParseLegacyGameConfig(jsonContent);
 
                 // Load behavior trees
                 LoadBehaviorTrees(gameConfig, renderer, strict);
@@ -404,7 +407,8 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
                 using (var document = System.Text.Json.JsonDocument.Parse(json))
                     RequireJsonKind(strict, btFile, document.RootElement,
                         System.Text.Json.JsonValueKind.Array, "an array");
-                ParseBehaviorTrees(gameConfig, json);
+                if (strict) gameConfig.BehaviorTrees = TypedGameConfigParser.ParseBehaviorTrees(json, btFile);
+                else ParseBehaviorTrees(gameConfig, json);
                 renderer.Log("[BT] Loaded " + gameConfig.BehaviorTrees.Count + " behavior trees from " + btFile);
             }
             catch (Exception ex)
@@ -435,7 +439,8 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
                 using (var document = System.Text.Json.JsonDocument.Parse(json))
                     RequireJsonKind(strict, abFile, document.RootElement,
                         System.Text.Json.JsonValueKind.Array, "an array");
-                ParseEnemyAbilities(gameConfig, json);
+                if (strict) gameConfig.EnemyAbilities = TypedGameConfigParser.ParseEnemyAbilities(json, abFile);
+                else ParseEnemyAbilities(gameConfig, json);
                 if (strict && gameConfig.EnemyAbilities.Count == 0)
                     throw ConfigLoadFailure(abFile, "no enemy abilities declared");
                 renderer.Log("[ABILITY] Loaded " + gameConfig.EnemyAbilities.Count + " enemy abilities from " + abFile);
@@ -468,7 +473,8 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
                 using (var document = System.Text.Json.JsonDocument.Parse(json))
                     RequireJsonKind(strict, phaseFile, document.RootElement,
                         System.Text.Json.JsonValueKind.Object, "an object");
-                ParsePhaseBehaviors(gameConfig, json);
+                if (strict) gameConfig.PhaseBehaviors = TypedGameConfigParser.ParsePhaseBehaviors(json, phaseFile);
+                else ParsePhaseBehaviors(gameConfig, json);
                 renderer.Log("[PHASE] Loaded " + gameConfig.PhaseBehaviors.Count + " phase behaviors from " + phaseFile);
             }
             catch (Exception ex)
@@ -796,7 +802,7 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             return gameConfig;
         }
 
-        private static GameConfig ParseGameConfig(string jsonContent)
+        private static GameConfig ParseLegacyGameConfig(string jsonContent)
         {
             var gameConfig = new GameConfig();
 
@@ -1747,7 +1753,8 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
                 using (var document = System.Text.Json.JsonDocument.Parse(json))
                     RequireJsonKind(strict, weatherFile, document.RootElement,
                         System.Text.Json.JsonValueKind.Object, "an object");
-                ParseWeatherConfig(gameConfig, json);
+                if (strict) gameConfig.Weather = TypedGameConfigParser.ParseWeather(json, weatherFile);
+                else ParseWeatherConfig(gameConfig, json);
                 renderer.Log("[WEATHER] Loaded weather config from " + weatherFile);
             }
             catch (Exception ex)
@@ -2005,6 +2012,15 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             const string staticDir = "Data/Skills";
             try
             {
+                if (strict)
+                {
+                    if (!Directory.Exists(staticDir))
+                        throw ConfigLoadFailure(staticDir, "static skill definition directory not found");
+                    string[] paths = Directory.GetFiles(staticDir, "skill_*.json");
+                    gameConfig.SkillDefs = TypedGameConfigParser.LoadSkillDefinitions(curatedFile, paths);
+                    renderer.Log("[SKILLDEF] Loaded " + gameConfig.SkillDefs.Count + " typed skill definitions");
+                    return;
+                }
                 int curatedCount = 0;
                 if (File.Exists(curatedFile))
                 {

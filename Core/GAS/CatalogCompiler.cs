@@ -304,6 +304,76 @@ namespace BattleSystemECS.Core.GAS
             return extended;
         }
 
+        /// <summary>
+        /// The player skill bar is the lowest-precedence compatibility source. Every entry
+        /// must resolve to a canonical or static definition and may only repeat non-default
+        /// fields when they agree with that winning definition.
+        /// </summary>
+        public static void ValidatePlayerSkillAliases(GameplayCatalog catalog,
+            IReadOnlyList<SkillConfig> playerSkills, string sourcePath)
+        {
+            if (catalog == null) throw new CatalogValidationException(sourcePath + ": compiled catalog is missing");
+            if (playerSkills == null) throw new CatalogValidationException(sourcePath + ":$.Skills: player skill list is null");
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < playerSkills.Count; i++)
+            {
+                var source = playerSkills[i];
+                string path = sourcePath + ":$.Skills[" + i + "]";
+                if (source == null || string.IsNullOrWhiteSpace(source.Name))
+                    throw new CatalogValidationException(path + ".Name: required string is missing");
+                if (!names.Add(source.Name))
+                    throw new CatalogValidationException(path + ".Name: duplicate player alias '" + source.Name + "'");
+                if (!catalog.TryResolveAlias(source.Name, out var id) || !catalog.TryGetAbility(id, out var ability))
+                    throw new CatalogValidationException(path + ".Name: alias '" + source.Name + "' is not declared by canonical or static skills");
+
+                AssertCompatible(source.Cooldown, ability.Cooldown, path + ".Cooldown");
+                AssertCompatible(source.AttackRange, ability.Targeting.Range, path + ".AttackRange");
+                AssertCompatible(source.AreaWidth, ability.Targeting.Width, path + ".AreaWidth");
+                AssertCompatible(source.AreaHeight, ability.Targeting.Height, path + ".AreaHeight");
+                AssertCompatible(source.AreaRadius, ability.Targeting.Radius, path + ".AreaRadius");
+                if (!string.IsNullOrWhiteSpace(source.AreaShape))
+                {
+                    TargetingShape shape = ParseShapeName(source.AreaShape, path + ".AreaShape");
+                    if (shape != ability.Targeting.Shape)
+                        throw new CatalogValidationException(path + ".AreaShape: conflicts with higher-precedence definition");
+                }
+            }
+        }
+
+        private static void AssertCompatible(float lowerPriorityValue, float winningValue, string path)
+        {
+            if (lowerPriorityValue == 0f) return;
+            if (float.IsNaN(lowerPriorityValue) || float.IsInfinity(lowerPriorityValue) ||
+                Math.Abs(lowerPriorityValue - winningValue) > 0.0001f)
+                throw new CatalogValidationException(path + ": conflicts with higher-precedence definition");
+        }
+
+        private static TargetingShape ParseShapeName(string value, string path)
+        {
+            switch (value.Trim().ToLowerInvariant())
+            {
+                case "single": return TargetingShape.Single;
+                case "cross": return TargetingShape.Cross;
+                case "box": return TargetingShape.Box;
+                case "circle": return TargetingShape.Circle;
+                case "chain": return TargetingShape.Chain;
+                case "heal": return TargetingShape.Heal;
+                case "shield": return TargetingShape.Shield;
+                case "line": return TargetingShape.Line;
+                case "freeze": return TargetingShape.Freeze;
+                case "cone": return TargetingShape.Cone;
+                case "groundtarget": return TargetingShape.GroundTarget;
+                case "slow": return TargetingShape.Slow;
+                case "timerwind": return TargetingShape.TimeRewind;
+                case "chainheal": return TargetingShape.ChainHeal;
+                case "massresurrect": return TargetingShape.MassResurrect;
+                case "aoestun": return TargetingShape.AoeStun;
+                case "aoeroot": return TargetingShape.AoeRoot;
+                case "aoeknockback": return TargetingShape.AoeKnockback;
+                default: throw new CatalogValidationException(path + ": unknown target shape '" + value + "'");
+            }
+        }
+
         private static bool AbilityContainsPayload(IReadOnlyList<AbilityDefinition> abilities,
             IReadOnlyList<ExecutionDefinition> executions, AbilityId abilityId, EffectPayloadKind payload,
             ExecutionOperation operation)
