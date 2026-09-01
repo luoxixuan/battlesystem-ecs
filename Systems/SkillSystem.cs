@@ -91,16 +91,25 @@ namespace BattleSystemECS.Systems
             if (slot < 0) return CatalogReject(abilityId, AbilityActivationRejectReason.InvalidRequest);
             if (!IsAbilityAllowed((int)definition.Targeting.Shape))
                 return CatalogReject(abilityId, AbilityActivationRejectReason.PhaseNotAllowed, slot);
-            if (!GameplayAbilityRuntime.TryActivate(store, playerId, slot, out _))
-                return new AbilityActivationResult(false, playerId, slot, AbilityActivationRejectReason.Cooldown);
-
-            // The slot stores the legacy projection for old callers; execution
-            // still passes through the catalog validation above and the typed
-            // damage staging path below.
-            var instance = store.GetAbility(playerId, slot);
-            if (!ExecuteAbility(instance.Definition, slot, definition))
-                return CatalogReject(abilityId, AbilityActivationRejectReason.UnsupportedDefinition, slot);
-            return new AbilityActivationResult(true, playerId, slot);
+            int targetId = playerId;
+            for (int i = 0; i < definition.Executions.Count; i++)
+            {
+                if (!catalog.TryGetExecution(definition.Executions[i], out var execution))
+                    return CatalogReject(abilityId, AbilityActivationRejectReason.UnsupportedDefinition, slot);
+                if (execution.Payload == EffectPayloadKind.Damage)
+                {
+                    targetId = -1;
+                    var enemies = store.ActiveEnemyIds;
+                    for (int j = 0; j < enemies.Count; j++)
+                        if (store.EnemyActive[enemies[j]] && store.EnemyHealth[enemies[j]] > 0f) { targetId = enemies[j]; break; }
+                    if (targetId < 0) return CatalogReject(abilityId, AbilityActivationRejectReason.NoTarget, slot);
+                    break;
+                }
+            }
+            var request = new AbilityActivationRequest(playerId, slot, definition.Cooldown, targetId, abilityId,
+                definition.Effects.Count > 0 ? definition.Effects[0] : default(EffectId),
+                definition.TriggerRefs.Count > 0 ? definition.TriggerRefs[0] : default(TriggerId));
+            return GameplayAbilityRuntime.Activate(store, catalog, playerId, slot, request);
         }
 
         private int FindSlot(string name)

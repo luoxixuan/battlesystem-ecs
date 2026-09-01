@@ -336,34 +336,19 @@ namespace BattleSystemECS.Systems
 
         private bool TryExecuteTypedBasicAbility(int enemyId, EnemyAbilityDef ability)
         {
-            bool heal = string.Equals(ability.AbilityType, "self_heal", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(ability.AbilityType, "heal_allies", StringComparison.OrdinalIgnoreCase);
-            bool damage = string.Equals(ability.AbilityType, "aoe_damage", StringComparison.OrdinalIgnoreCase) ||
-                          string.Equals(ability.AbilityType, "stealth_attack", StringComparison.OrdinalIgnoreCase);
-            if (!heal && !damage) return false;
-            int targetId = heal ? enemyId : playerId;
-            if (targetId < 0 || !store.GetEntityHandle(targetId).IsValid) return false;
-            float magnitude = heal
-                ? store.EnemyMaxHealth[enemyId] * Math.Max(0f, ability.HealAmount)
-                : store.EnemyDamage[enemyId] * Math.Max(0f, ability.DamageMultiplier);
-            var execution = new ExecutionDefinition(new ExecutionId(0),
-                heal ? EffectPayloadKind.Heal : EffectPayloadKind.Damage, magnitude,
-                CatalogRegistries.SkillTag, MagnitudeSource.Constant,
-                DamageAmountStage.Raw, 0f,
-                heal ? ExecutionOperation.ApplyHeal : ExecutionOperation.ApplyDamage);
-            var targeting = new TargetingDefinition(new TargetingId(0),
-                heal ? TargetingShape.Heal : TargetingShape.Single, ability.AoeRadius, 1, 1, 1,
-                ability.AoeRadius);
-            var typed = new AbilityDefinition(new AbilityId(0), ability.Id ?? ability.Name ?? "enemy",
-                targeting, ClockId.Combat, ability.Cooldown, GameplayPhaseMask.Wave,
-                Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
-                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
-                executions: new[] { execution.Id });
-            var catalog = new GameplayCatalog(new[] { typed }, new[] { targeting },
-                Array.Empty<GameplayEffectDefinition>(), new[] { execution },
-                Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
-                new Dictionary<string, AbilityId>(StringComparer.OrdinalIgnoreCase) { [typed.Name] = typed.Id });
-            var request = new AbilityActivationRequest(enemyId, 0, ability.Cooldown, targetId, typed.Id);
+            var catalog = gameConfig.CompiledCatalog;
+            if (catalog == null || string.IsNullOrWhiteSpace(ability.Name) ||
+                !catalog.TryResolveAlias(ability.Name, out var abilityId) ||
+                !catalog.TryGetAbility(abilityId, out var definition)) return false;
+            int targetId = enemyId;
+            for (int i = 0; i < definition.Executions.Count; i++)
+            {
+                if (!catalog.TryGetExecution(definition.Executions[i], out var execution)) return false;
+                if (execution.Payload == EffectPayloadKind.Damage) { targetId = playerId; break; }
+            }
+            var request = new AbilityActivationRequest(enemyId, 0, ability.Cooldown, targetId, abilityId,
+                definition.Effects.Count > 0 ? definition.Effects[0] : default(EffectId),
+                definition.TriggerRefs.Count > 0 ? definition.TriggerRefs[0] : default(TriggerId));
             var result = GameplayAbilityRuntime.Activate(store, catalog, _abilityCooldownTimers, request);
             if (!result.Accepted) return false;
             logger.Log($"[ABILITY] Enemy {enemyId} typed '{ability.Name}' applied {result.AppliedEffects} effect(s)");

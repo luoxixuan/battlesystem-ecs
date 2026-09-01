@@ -87,6 +87,56 @@ namespace BattleSystemECS.Core.GAS
                 store.AllocateGameplaySequence(targetId), ownerPlayerId: request.OwnerId));
             return new AbilityActivationResult(true, request.OwnerId, request.Slot, appliedEffects: applied);
         }
+
+        /// <summary>Catalog-backed activation for ECS ability slots.</summary>
+        public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, int entityId, int slot, AbilityActivationRequest request)
+        {
+            if (store == null || catalog == null || entityId < 0 || entityId >= ComponentStore.MAX_ENTITIES ||
+                slot < 0 || slot >= store.AbilityCount[entityId])
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (!catalog.TryGetAbility(request.Ability, out var ability))
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            var source = store.GetEntityHandle(request.OwnerId);
+            int targetId = request.TargetId >= 0 ? request.TargetId : request.OwnerId;
+            var target = store.GetEntityHandle(targetId);
+            if (!source.IsValid) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (!target.IsValid) return Reject(request, AbilityActivationRejectReason.NoTarget);
+            if (!TryActivate(store, entityId, slot, out _))
+                return new AbilityActivationResult(false, request.OwnerId, slot, AbilityActivationRejectReason.Cooldown);
+            int applied = 0;
+            for (int i = 0; i < ability.Effects.Count; i++)
+            {
+                if (!catalog.TryGetEffect(ability.Effects[i], out var effect) ||
+                    !store.GameplayEffectsRuntime.TryApply(effect.Id, effect, source, target, out _, ownerPlayerId: request.OwnerId))
+                    return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                applied++;
+            }
+            for (int i = 0; i < ability.Executions.Count; i++)
+            {
+                if (!catalog.TryGetExecution(ability.Executions[i], out var execution)) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                long sequence = store.AllocateGameplaySequence(targetId);
+                if (execution.Payload == EffectPayloadKind.Damage)
+                {
+                    if (!store.DamageResolver.TryApply(new DamageRequest(source, target, execution.Magnitude,
+                        DamageType.True, ElementType.None, DamageFlags.None, execution.Stage, DamageCommitBoundary.GameplayResolve,
+                        sequence, ability: ability.Id, effect: request.Effect, ownerPlayerId: request.OwnerId)).Accepted)
+                        return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                    applied++;
+                }
+                else if (execution.Payload == EffectPayloadKind.Heal)
+                {
+                    if (!store.ResourceResolver.TryApply(new HealRequest(source, target, execution.Magnitude, sequence, request.OwnerId)).Accepted)
+                        return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                    applied++;
+                }
+            }
+            var instance = store.GetAbility(entityId, slot);
+            instance.Activate();
+            store.SetAbility(entityId, slot, instance);
+            store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.AbilityActivated, source, target,
+                store.AllocateGameplaySequence(targetId), ownerPlayerId: request.OwnerId));
+            return new AbilityActivationResult(true, request.OwnerId, slot, appliedEffects: applied);
+        }
         private static bool Contains(IReadOnlyList<EffectId> ids, EffectId id) { for (int i = 0; i < ids.Count; i++) if (ids[i].Value == id.Value) return true; return false; }
         private static bool Contains(IReadOnlyList<TriggerId> ids, TriggerId id) { for (int i = 0; i < ids.Count; i++) if (ids[i].Value == id.Value) return true; return false; }
         private static AbilityActivationResult Reject(AbilityActivationRequest request, AbilityActivationRejectReason reason) => new AbilityActivationResult(false, request.OwnerId, request.Slot, reason);

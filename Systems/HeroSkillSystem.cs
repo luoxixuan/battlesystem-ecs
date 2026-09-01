@@ -174,7 +174,13 @@ namespace BattleSystemECS.Systems
             int skillId = _heroSkillIds[flatIdx];
             if (skillId < 0) return false;
             var catalog = _config?.CompiledCatalog;
-            if (catalog == null || !TryResolveCatalogAbility(catalog, skillId, out var abilityId) ||
+            if (catalog == null)
+            {
+                if (!GameplayAbilityRuntime.TryActivate(_heroSkillCooldowns, new AbilityActivationRequest(heroId, slot, _heroSkillCooldownMax[flatIdx])).Accepted) return false;
+                _heroSkillCooldowns[flatIdx] = _heroSkillCooldownMax[flatIdx];
+                return true;
+            }
+            if (!TryResolveCatalogAbility(catalog, skillId, out var abilityId) ||
                 !catalog.TryGetAbility(abilityId, out var ability)) return false;
 
             int targetId = store.PlayerEntityId;

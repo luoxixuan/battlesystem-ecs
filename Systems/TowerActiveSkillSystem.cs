@@ -111,8 +111,8 @@ namespace BattleSystemECS.Systems
             var request = new AbilityActivationRequest(towerId, towerId, store.TowerActiveCooldownMax[towerId], targetId,
                 new AbilityId(skillId), catalogAbility.Effects.Count > 0 ? catalogAbility.Effects[0] : default(EffectId),
                 catalogAbility.TriggerRefs.Count > 0 ? catalogAbility.TriggerRefs[0] : default(TriggerId));
-            if (targetId < 0 && store.ActiveEnemyIds.Count == 0)
-                return GameplayAbilityRuntime.AbilityCommit(store.TowerActiveCooldown, request);
+            if (targetId < 0)
+                return Reject(towerId, AbilityActivationRejectReason.NoTarget);
             var result = GameplayAbilityRuntime.Activate(store, catalog, store.TowerActiveCooldown, request);
             if (result.Accepted)
                 Console.WriteLine($"[TOWER_ACTIVE] tower={towerId} target={targetId} skill={ResolveSkillName(skillId)}");

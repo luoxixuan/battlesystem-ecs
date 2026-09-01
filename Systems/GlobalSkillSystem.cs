@@ -172,20 +172,20 @@ namespace BattleSystemECS.Systems
                 return false;
             }
 
-            // Consume mana
-            store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), -manaCost);
-
             // Catalog is authoritative when the global definition is present in
             // the compiled content table. The switch remains a compatibility
             // projection for legacy fixtures that intentionally do not load the
             // global content catalog.
             bool catalogActivated = TryActivateCatalogGlobal(def);
             if (!catalogActivated)
+            {
                 ExecuteSkillEffect(def);
+                if (!GameplayAbilityRuntime.AbilityCommit(store.PlayerGlobalSkillCooldown, activation).Accepted)
+                    return false;
+            }
 
-            // Start cooldown
-            if (!catalogActivated)
-                GameplayAbilityRuntime.AbilityCommit(store.PlayerGlobalSkillCooldown, activation);
+            // Resource mutation is committed only after the ability path succeeds.
+            store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), -manaCost);
 
             renderer.Log($"[GlobalSkill] Activated: {def.Name}");
             _successfulActivationCount++;
