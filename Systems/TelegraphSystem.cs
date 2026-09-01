@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BattleSystemECS.Config;
 using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -49,6 +50,10 @@ namespace BattleSystemECS.Systems
         private int[] _zonePlayerId = new int[MAX_TELEGRAPH_ZONES];
         // Source enemy ID (for telegraph visualization)
         private int[] _zoneSourceEnemyId = new int[MAX_TELEGRAPH_ZONES];
+        private EntityHandle[] _zoneSources = new EntityHandle[MAX_TELEGRAPH_ZONES];
+        private EntityHandle[] _zoneTargets = new EntityHandle[MAX_TELEGRAPH_ZONES];
+        private AbilityId[] _zoneAbilities = new AbilityId[MAX_TELEGRAPH_ZONES];
+        private int[] _zoneOwnerPlayerIds = new int[MAX_TELEGRAPH_ZONES];
         // Zone type: 0=circle (default), 1=box, 2=cone
         private int[] _zoneShape = new int[MAX_TELEGRAPH_ZONES];
         // Cone angle in degrees (only used when zoneShape=2)
@@ -100,9 +105,35 @@ namespace BattleSystemECS.Systems
             if (duration <= 0f)
             {
                 // No telegraph — apply damage instantly
-                ApplyDamageToPlayer(enemyId, damage, playerId);
+                ApplyDamageToPlayer(_store.GetEntityHandle(enemyId), _store.GetEntityHandle(playerId),
+                    damage, default(AbilityId), playerId);
                 return;
             }
+
+            if (TryQueueTelegraphZone(_store.GetEntityHandle(enemyId), _store.GetEntityHandle(playerId),
+                x, y, radius, duration, damage, default(AbilityId), playerId,
+                shape, coneAngle, coneDir, colorHint)) return;
+
+            _logger.Log($"[TELEGRAPH] WARNING: zone pool exhausted ({MAX_TELEGRAPH_ZONES}), applying compatibility damage immediately");
+            ApplyDamageToPlayer(_store.GetEntityHandle(enemyId), _store.GetEntityHandle(playerId),
+                damage, default(AbilityId), playerId);
+        }
+
+        public bool CanQueueTelegraphZone(float duration)
+        {
+            if (duration <= 0f || _activeZoneIds.Count >= MAX_TELEGRAPH_ZONES) return false;
+            for (int i = 0; i < MAX_TELEGRAPH_ZONES; i++) if (!_zoneActive[i]) return true;
+            return false;
+        }
+
+        public bool TryQueueTelegraphZone(EntityHandle source, EntityHandle target,
+            float x, float y, float radius, float duration, float damage, AbilityId ability,
+            int ownerPlayerId, int shape = SHAPE_CIRCLE, float coneAngle = 60f,
+            float coneDir = 0f, int colorHint = 0)
+        {
+            if (!source.IsValid || !target.IsValid || damage <= 0f ||
+                ownerPlayerId < 0 || ownerPlayerId >= ComponentStore.MAX_PLAYERS ||
+                colorHint < 0 || colorHint > 2 || !CanQueueTelegraphZone(duration)) return false;
 
             // Find free slot
             int zoneId = -1;
@@ -117,12 +148,7 @@ namespace BattleSystemECS.Systems
                 }
             }
             if (zoneId < 0)
-            {
-                _logger.Log($"[TELEGRAPH] WARNING: zone pool exhausted ({MAX_TELEGRAPH_ZONES}), dropping telegraph zone");
-                // Fallback: apply damage instantly
-                ApplyDamageToPlayer(enemyId, damage, playerId);
-                return;
-            }
+                return false;
 
             _zoneActive[zoneId] = true;
             _zoneX[zoneId] = x;
@@ -131,13 +157,18 @@ namespace BattleSystemECS.Systems
             _zoneDuration[zoneId] = duration;
             _zoneRemaining[zoneId] = duration;
             _zoneDamage[zoneId] = damage;
-            _zonePlayerId[zoneId] = playerId;
-            _zoneSourceEnemyId[zoneId] = enemyId;
+            _zonePlayerId[zoneId] = target.Index;
+            _zoneSourceEnemyId[zoneId] = source.Index;
+            _zoneSources[zoneId] = source;
+            _zoneTargets[zoneId] = target;
+            _zoneAbilities[zoneId] = ability;
+            _zoneOwnerPlayerIds[zoneId] = ownerPlayerId;
             _zoneShape[zoneId] = shape;
             _zoneConeAngle[zoneId] = coneAngle;
             _zoneConeDir[zoneId] = coneDir;
             _zoneColorHint[zoneId] = colorHint;
             _activeZoneIds.Add(zoneId);
+            return true;
         }
 
         /// <summary>
@@ -156,9 +187,8 @@ namespace BattleSystemECS.Systems
                 {
                     // Zone expired — apply damage and deactivate
                     float damage = _zoneDamage[zoneId];
-                    int enemyId = _zoneSourceEnemyId[zoneId];
-                    int playerId = _zonePlayerId[zoneId];
-                    ApplyDamageToPlayer(enemyId, damage, playerId);
+                    ApplyDamageToPlayer(_zoneSources[zoneId], _zoneTargets[zoneId], damage,
+                        _zoneAbilities[zoneId], _zoneOwnerPlayerIds[zoneId]);
                     DeactivateZone(zoneId);
                 }
             }
@@ -209,26 +239,33 @@ namespace BattleSystemECS.Systems
             }
         }
 
-        private void ApplyDamageToPlayer(int enemyId, float damage, int playerId)
+        private void ApplyDamageToPlayer(EntityHandle source, EntityHandle target, float damage,
+            AbilityId ability, int ownerPlayerId)
         {
             if (damage <= 0f) return;
-            _store.DecreasePlayerHealth(playerId, damage);
-            float remaining = _store.GetPlayerCurrentHealth(playerId);
+            var result = _store.ResourceResolver.TryApply(new PlayerDamageRequest(source, target, damage,
+                _store.AllocateGameplaySequence(target.Index), ability, ownerPlayerId));
+            if (!result.Accepted) return;
+            float remaining = _store.GetPlayerCurrentHealth(target.Index);
 
             _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
             {
-                Damage = damage,
+                Damage = result.Applied,
                 RemainingHealth = remaining,
-                AttackerId = enemyId
+                AttackerId = source.Index
             });
 
-            _logger.Log($"[TELEGRAPH] AoE hits player for {damage:F1} damage (HP: {remaining:F1})");
+            _logger.Log($"[TELEGRAPH] AoE hits player for {result.Applied:F1} damage (HP: {remaining:F1})");
         }
 
         private void DeactivateZone(int zoneId)
         {
             _zoneActive[zoneId] = false;
             _zoneRemaining[zoneId] = 0f;
+            _zoneSources[zoneId] = default(EntityHandle);
+            _zoneTargets[zoneId] = default(EntityHandle);
+            _zoneAbilities[zoneId] = default(AbilityId);
+            _zoneOwnerPlayerIds[zoneId] = -1;
             // Remove from active list
             for (int i = _activeZoneIds.Count - 1; i >= 0; i--)
             {

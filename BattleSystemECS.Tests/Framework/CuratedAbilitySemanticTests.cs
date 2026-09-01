@@ -64,7 +64,13 @@ namespace BattleSystemECS.Tests.Framework
             AssertPeriodic(catalog, "Dragon Breath", 5f, 3f, 1f);
             AssertPeriodic(catalog, "Meteor Strike", 4f, 3f, 1f);
             var cold = Find(catalog, "Cold Nova");
-            Assert.Contains(cold.Effects, id => catalog.Effects[id.Value].Payload == EffectPayloadKind.CrowdControl && catalog.Effects[id.Value].Duration == 2f && catalog.Effects[id.Value].Executions.Any(x => catalog.Executions[x.Value].Magnitude == 0f));
+            Assert.Contains(cold.Executions, id =>
+            {
+                var execution = catalog.Executions[id.Value];
+                return execution.Payload == EffectPayloadKind.Freeze &&
+                    execution.Operation == ExecutionOperation.ApplyFreeze &&
+                    execution.Magnitude == 2f && execution.Probability == 0.3f;
+            });
         }
 
         private static void AssertMultiplier(GameplayCatalog catalog, string name, float value)

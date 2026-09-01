@@ -25,14 +25,13 @@ namespace BattleSystemECS.Tests.Integration
 
             foreach (var source in config.EnemyAbilities)
             {
-                Assert.True(EnemyAbilityTypeRegistry.TryResolve(source.AbilityType, out var type));
-                Assert.True(type.Payload.HasValue);
+                Assert.True(EnemyAbilityTypeRegistry.TryResolve(source, out _, out var payload, out var operation));
                 Assert.True(catalog.TryResolveAlias(source.Id, out var abilityId));
                 Assert.True(catalog.TryGetAbility(abilityId, out var ability));
                 var matching = ability.Executions
                     .Select(id => catalog.Executions[id.Value])
-                    .Where(execution => execution.Payload == type.Payload.Value &&
-                        execution.Operation == type.Operation)
+                    .Where(execution => execution.Payload == payload &&
+                        execution.Operation == operation)
                     .ToArray();
                 Assert.NotEmpty(matching);
                 Assert.All(matching, execution => Assert.True(

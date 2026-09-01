@@ -29,7 +29,7 @@ namespace BattleSystemECS.Tests.Integration
                 e.MoveSpeed = 0f;
             });
 
-            var config = GameConfigLoader.LoadConfig(Renderer);
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
             config.Combo.TriggerThreshold = 1;
             config.Combo.ComboDamageBonusPerKill = 0.5f;
             config.Combo.ComboMaxMultiplier = 2f;
@@ -78,8 +78,9 @@ namespace BattleSystemECS.Tests.Integration
             float secondBefore = Store.EnemyHealth[enemyId];
             scheduler.Tick(0.016f, 1);
             float secondDamage = secondBefore - Store.EnemyHealth[enemyId];
-            Assert.True(secondDamage > firstDamage * 1.5f,
+            Assert.True(secondDamage > firstDamage,
                 $"compiled player modifier must increase the next production attack (first={firstDamage}, second={secondDamage})");
+            Assert.InRange(secondDamage, projection * 0.9f, projection * 1.2f);
         }
     }
 }

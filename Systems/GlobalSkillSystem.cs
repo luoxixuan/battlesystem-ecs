@@ -183,6 +183,12 @@ namespace BattleSystemECS.Systems
             }
             else
             {
+                if (gameConfig.StrictCatalogReferences)
+                {
+                    _rejectedCandidateCount++;
+                    LastRejectReason = SkillDamageRejectReason.UnsupportedCommitBoundary;
+                    return false;
+                }
                 if (store.PlayerMana[playerId] < manaCost)
                 {
                     renderer.Log($"[GlobalSkill] Not enough mana for {def.Name} ({manaCost} required)");
@@ -194,7 +200,6 @@ namespace BattleSystemECS.Systems
                 // 兼容定义没有需要提交的类型化消耗。
                 store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), -manaCost);
             }
-
             renderer.Log($"[GlobalSkill] Activated: {def.Name}");
             _successfulActivationCount++;
             return true;

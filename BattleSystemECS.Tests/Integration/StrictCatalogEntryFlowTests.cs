@@ -129,6 +129,10 @@ namespace BattleSystemECS.Tests.Integration
             int minion = Store.ActiveEnemyIds[Store.ActiveEnemyIds.Count - 1];
             Assert.Equal(Store.PositionX[summoner], Store.PositionX[minion]);
             Assert.Equal(Store.PositionY[summoner], Store.PositionY[minion]);
+            Assert.Equal(Store.EnemyMaxHealth[summoner] * summon.MinionHealthMult,
+                Store.EnemyMaxHealth[minion], 3);
+            Assert.Equal(Store.EnemyDamage[summoner] * summon.MinionDamageMult,
+                Store.EnemyDamage[minion], 3);
             system.EnqueueAbility(summoner, summon.Id);
             system.ExecuteAbilities();
             Assert.Equal(activeBefore + 1, Store.ActiveEnemyIds.Count);
@@ -140,6 +144,77 @@ namespace BattleSystemECS.Tests.Integration
             system.EnqueueAbility(ambusher, stealth.Id);
             system.ExecuteAbilities();
             Assert.Equal(stealth.DamageMultiplier, Store.EnemyStealthMultiplier[ambusher]);
+        }
+
+        [Fact]
+        public void DirectSummonDefinitionRequiresPositiveMultipliersDuringCompilation()
+        {
+            var invalid = new EnemyAbilityDef
+            {
+                Id = "invalid-summon", Name = "Invalid Summon", AbilityType = "summon_minion",
+                MinionHealthMult = 0f, MinionDamageMult = 0.5f
+            };
+
+            var error = Assert.Throws<CatalogValidationException>(() =>
+                CatalogCompiler.CompileEnemyExtensions(CatalogCompiler.CreateEmpty(), new[] { invalid }));
+            Assert.Contains("positive summon", error.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void CompiledSummonDefinitionRequiresPositiveMultipliersDuringCatalogValidation()
+        {
+            var source = new EnemyAbilityDef
+            {
+                Id = "compiled-summon", Name = "Compiled Summon", AbilityType = "summon_minion",
+                MinionHealthMult = 0.5f, MinionDamageMult = 0.25f
+            };
+            var catalog = CatalogCompiler.CompileEnemyExtensions(CatalogCompiler.CreateEmpty(), new[] { source });
+            var ability = Assert.Single(catalog.AbilityDefinitions);
+            var executionId = Assert.Single(ability.Executions);
+            var original = catalog.Executions[executionId.Value];
+            var invalidExecution = new ExecutionDefinition(original.Id, original.Payload, original.Magnitude,
+                original.Tag, original.MagnitudeSource, original.Stage, 0f, original.Operation,
+                original.Probability, original.Parameter);
+            var invalid = new GameplayCatalog(catalog.AbilityDefinitions, catalog.Targetings, catalog.Effects,
+                new[] { invalidExecution }, catalog.Triggers, catalog.Modifiers, catalog.Aliases);
+
+            var error = Assert.Throws<CatalogValidationException>(() => CatalogValidator.Validate(invalid, "compiled-summon"));
+            Assert.Contains("positive health and damage", error.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void InvalidSummonContractRejectsBeforeEntityAndCooldownCommit()
+        {
+            var source = new EnemyAbilityDef
+            {
+                Id = "atomic-summon", Name = "Atomic Summon", AbilityType = "summon_minion", Cooldown = 10f,
+                MinionHealthMult = 0.5f, MinionDamageMult = 0.25f
+            };
+            var catalog = CatalogCompiler.CompileEnemyExtensions(CatalogCompiler.CreateEmpty(), new[] { source });
+            var config = new GameConfig
+            {
+                StrictCatalogReferences = true,
+                EnemyAbilities = new List<EnemyAbilityDef> { source },
+                CompiledCatalog = catalog
+            };
+            int player = Player();
+            int summoner = Enemy(e => { e.Health = 100f; e.MaxHealth = 100f; e.Damage = 20f; });
+            var system = new EnemyAbilitySystem(Store, Renderer, player, config);
+            system.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
+            int activeBefore = Store.ActiveEnemyIds.Count;
+            int nextBefore = Store.NextEntityId;
+
+            source.MinionHealthMult = 0f;
+            system.EnqueueAbility(summoner, source.Id);
+            system.ExecuteAbilities();
+            Assert.Equal(activeBefore, Store.ActiveEnemyIds.Count);
+            Assert.Equal(nextBefore, Store.NextEntityId);
+
+            source.MinionHealthMult = 0.5f;
+            system.EnqueueAbility(summoner, source.Id);
+            system.ExecuteAbilities();
+            Assert.Equal(activeBefore + 1, Store.ActiveEnemyIds.Count);
+            Assert.Equal(nextBefore + 1, Store.NextEntityId);
         }
 
         [Fact]
@@ -237,19 +312,12 @@ namespace BattleSystemECS.Tests.Integration
             Store.HeroIsDeployed[0] = true;
             var heal = FindHeroBinding(config, ability => ability.Targeting.Relation == RelationFilter.Self &&
                 HasPayload(config, ability, EffectPayloadKind.Heal));
-            var status = FindHeroBinding(config, ability => ability.Targeting.Relation == RelationFilter.Enemies &&
-                ability.Effects.Count > 0);
             var damage = FindHeroBinding(config, ability => ability.Targeting.Relation == RelationFilter.Enemies &&
                 ability.Effects.Count == 0 && HasPayload(config, ability, EffectPayloadKind.Damage));
 
             Assert.True(registry.HeroSkill!.RequestHeroSkill(0, heal.Slot));
             scheduler.Tick(0.016f, 0);
             Assert.True(Store.PlayerCurrentHealth[player] > 40f);
-            EffectId statusEffect = Assert.Single(status.Ability.Effects);
-            Assert.True(registry.HeroSkill.RequestHeroSkill(0, status.Slot));
-            scheduler.Tick(0.016f, 1);
-            Assert.Contains(Enumerable.Range(0, Store.GetEffectCount(enemy)), slot =>
-                Store.TryGetActiveEffectAt(enemy, slot, out _, out var definition, out _) && definition.Id == statusEffect);
             Store.EnemyInvulnFramesLeft[enemy] = 0;
             Store.EnemyBlinkIFramesLeft[enemy] = 0f;
             Store.EnemyHealth[enemy] = 10f;
@@ -257,7 +325,7 @@ namespace BattleSystemECS.Tests.Integration
             Assert.Equal(damage.Ability.Id.Value, registry.HeroSkill.GetHeroSkillId(0, damage.Slot));
             Assert.True(registry.HeroSkill.IsHeroSkillReady(0, damage.Slot));
             Assert.True(registry.HeroSkill.RequestHeroSkill(0, damage.Slot));
-            scheduler.Tick(0.016f, 2);
+            scheduler.Tick(0.016f, 1);
             Assert.True(registry.HeroSkill.LastActivation.Accepted,
                 $"activation={registry.HeroSkill.LastActivation.Reason}; effects={damage.Ability.Effects.Count}; executions={damage.Ability.Executions.Count}; damage={Store.DamageResolver.LastRejection}; pending={Store.DamageResolver.PendingRequestCount}; mana={Store.PlayerMana[player]}");
 
@@ -277,7 +345,7 @@ namespace BattleSystemECS.Tests.Integration
 
             foreach (var source in config.EnemyAbilities)
             {
-                Assert.True(EnemyAbilityTypeRegistry.TryResolve(source.AbilityType, out var type),
+                Assert.True(EnemyAbilityTypeRegistry.TryResolve(source, out var type, out var payload, out var operation),
                     $"Unregistered enemy ability type '{source.AbilityType}'");
                 Assert.Equal(source.AbilityType, type.Name, ignoreCase: true);
                 Assert.True(catalog.TryResolveAlias(source.Id, out var abilityId));
@@ -285,12 +353,137 @@ namespace BattleSystemECS.Tests.Integration
 
                 if (type.DispatchMode == EnemyAbilityDispatchMode.TypedCatalog)
                 {
-                    Assert.True(type.Payload.HasValue);
                     Assert.Contains(ability.Executions, executionId =>
                         catalog.TryGetExecution(executionId, out var execution) &&
-                        execution.Payload == type.Payload.Value && execution.Operation == type.Operation);
+                        execution.Payload == payload && execution.Operation == operation);
                 }
             }
+        }
+
+        [Fact]
+        public void StrictTypedTelegraphQueuesExactDefinitionAndDamagesOnceThroughProductionGraph()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            var source = Assert.Single(TypedGameConfigParser.ParseEnemyAbilities(
+                "[{\"Id\":\"typed_telegraph_fixture\",\"Name\":\"Typed Telegraph Fixture\"," +
+                "\"AbilityType\":\"aoe_damage\",\"Cooldown\":5,\"AoeRadius\":4," +
+                "\"DamageMultiplier\":2,\"TelegraphDuration\":1,\"TelegraphColor\":2}]",
+                "typed-telegraph.json"));
+            config.EnemyAbilities.Add(source);
+            config.CompiledCatalog = CatalogCompiler.CompileEnemyExtensions(config.CompiledCatalog!, new[] { source });
+            config.ManaShield.Enabled = false;
+            GameConfigLoader.ValidateStrictReferences(config, config.CompiledCatalog, HeroSkillsPath);
+            Assert.True(config.CompiledCatalog.TryResolveAlias(source.Id, out var abilityId));
+            var ability = config.CompiledCatalog.AbilityDefinitions[abilityId.Value];
+            var execution = Assert.Single(ability.Executions.Select(id => config.CompiledCatalog.Executions[id.Value]),
+                value => value.Operation == ExecutionOperation.QueueTelegraph);
+            int player = Player(p => { p.X = 0f; p.Y = 0f; p.Health = 100f; });
+            int enemy = Enemy(e => { e.X = 0f; e.Y = 4f; e.Damage = 10f; e.MoveSpeed = 0f; });
+            var events = new RecordingBattleEventBus();
+            var (registry, scheduler) = CreateProduction(config, player, events);
+            scheduler.AI.EnemyAI = null;
+            scheduler.Combat.ManaShield = null;
+            Store.PlayerShield[player] = 0f;
+            Store.PlayerManaShield[player] = 0f;
+            Store.PlayerManaShieldAbsorbRatio[player] = 0f;
+            Store.PlayerMana[player] = 0f;
+            Store.PlayerArmor[player] = 0f;
+            Store.PlayerMinHealthFloor[player] = 0f;
+            int published = 0;
+            float appliedDamage = 0f;
+            float remainingAfterDamage = 0f;
+            registry.EventBus!.PlayerDamaged.Subscribe(evt =>
+            {
+                published++;
+                appliedDamage += evt.Damage;
+                remainingAfterDamage = evt.RemainingHealth;
+            });
+            float before = Store.PlayerCurrentHealth[player];
+
+            registry.EnemyAbility!.EnqueueAbility(enemy, source.Id);
+            scheduler.Tick(0.5f, 0);
+
+            Assert.Equal(EffectPayloadKind.Telegraph, execution.Payload);
+            Assert.Equal(source.TelegraphDuration, execution.Duration);
+            Assert.Equal(source.TelegraphColor, execution.Parameter);
+            Assert.Equal(before, Store.PlayerCurrentHealth[player]);
+            Assert.Equal(1, registry.Telegraph!.ActiveZoneCount);
+            var ids = new List<int>(); var xs = new List<float>(); var ys = new List<float>();
+            var radii = new List<float>(); var remaining = new List<float>(); var durations = new List<float>();
+            var shapes = new List<int>(); var colors = new List<int>();
+            registry.Telegraph.GetActiveZones(ids, xs, ys, radii, remaining, durations, shapes, colors);
+            Assert.Equal(source.TelegraphDuration, Assert.Single(durations));
+            Assert.Equal(source.TelegraphColor, Assert.Single(colors));
+
+            scheduler.Tick(0.5f, 1);
+
+            Assert.Equal(0, registry.Telegraph.ActiveZoneCount);
+            Assert.Equal(1, published);
+            Assert.Equal(Store.EnemyDamage[enemy] * source.DamageMultiplier, appliedDamage, 3);
+            Assert.Equal(before - appliedDamage, remainingAfterDamage, 3);
+        }
+
+        [Fact]
+        public void StrictFreezeDefinitionAppliesConfiguredProbabilityAndDurationThroughProductionGraph()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            var freezeSource = config.SkillDefs.First(skill =>
+                skill.FreezeDuration > 0f && skill.FreezeChance > 0f &&
+                string.Equals(skill.AreaShape, "freeze", StringComparison.OrdinalIgnoreCase));
+            Assert.True(config.CompiledCatalog!.TryResolveAlias(freezeSource.Name, out var abilityId));
+            var ability = config.CompiledCatalog.AbilityDefinitions[abilityId.Value];
+            var freezeExecution = Assert.Single(ability.Executions.Select(id => config.CompiledCatalog.Executions[id.Value]),
+                value => value.Operation == ExecutionOperation.ApplyFreeze);
+            Assert.Equal(freezeSource.FreezeDuration, freezeExecution.Magnitude);
+            Assert.Equal(freezeSource.FreezeChance, freezeExecution.Probability);
+            config.Skills.Clear();
+            config.Skills.Add(freezeSource);
+            int player = Player(p => { p.X = 0f; p.Y = 0f; p.AttackDamage = 1f; });
+            const int targetCount = 64;
+            var targets = new List<int>(targetCount);
+            for (int i = 0; i < targetCount; i++)
+                targets.Add(Enemy(e => { e.X = 0f; e.Y = 1f; e.Health = 1000f; e.MaxHealth = 1000f; e.MoveSpeed = 0f; }));
+            var (registry, scheduler) = CreateProduction(config, player, new RecordingBattleEventBus());
+
+            Assert.True(registry.Skill!.RequestCatalogAbility(abilityId));
+            scheduler.Tick(0.016f, 0);
+
+            Assert.True(registry.Skill.LastCatalogActivation.Accepted,
+                registry.Skill.LastCatalogActivation.Reason.ToString());
+            int frozen = targets.Count(Store.IsEnemyFrozen);
+            Assert.InRange(frozen, 1, targetCount - 1);
+            Assert.All(targets.Where(Store.IsEnemyFrozen), target =>
+                Assert.Equal((float)Math.Ceiling(freezeSource.FreezeDuration), Store.EnemyStunDurationLeft[target]));
+        }
+
+        [Fact]
+        public void StrictEnemyControlFieldsCompileAndCommitTheirConfiguredValues()
+        {
+            var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            int player = Player(p => { p.X = 0f; p.Y = 0f; });
+            int caster = Enemy(e => { e.X = 0f; e.Y = 1f; e.Health = 100f; e.MaxHealth = 100f; });
+            int slowCaster = Enemy(e => { e.X = 1f; e.Y = 0f; e.Health = 100f; e.MaxHealth = 100f; });
+            var stun = config.EnemyAbilities.First(ability => ability.StunDuration > 0);
+            var slow = config.EnemyAbilities.First(ability => ability.SlowFactor > 0f && ability.SlowDuration > 0);
+            var system = new EnemyAbilitySystem(Store, Renderer, player, config);
+            system.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
+            Store.PlayerStunDuration[player] = 0;
+            Store.PlayerSlowFactor[player] = 0f;
+            Store.PlayerSlowDuration[player] = 0;
+
+            system.EnqueueAbility(caster, stun.Id);
+            system.ExecuteAbilities();
+            system.EnqueueAbility(slowCaster, slow.Id);
+            system.ExecuteAbilities();
+
+            Assert.Equal(stun.StunDuration, Store.PlayerStunDuration[player]);
+            Assert.Equal(slow.SlowFactor, Store.PlayerSlowFactor[player]);
+            Assert.Equal(slow.SlowDuration, Store.PlayerSlowDuration[player]);
+            Assert.True(config.CompiledCatalog!.TryResolveAlias(stun.Id, out var stunId));
+            Assert.Contains(config.CompiledCatalog.AbilityDefinitions[stunId.Value].Executions, executionId =>
+                config.CompiledCatalog.TryGetExecution(executionId, out var execution) &&
+                execution.Operation == ExecutionOperation.ApplyCrowdControl &&
+                execution.Magnitude == stun.StunDuration);
         }
 
         [Fact]

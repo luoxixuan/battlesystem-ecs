@@ -1498,7 +1498,7 @@ namespace BattleSystemECS.Systems
             for (int slot = 0; slot < count; slot++)
             {
                 var inst = store.GetAbility(playerId, slot);
-                if (inst.CanActivate())
+                if (GameplayAbilityRuntime.TryActivate(store, playerId, slot, out _))
                 {
                     if (!IsAbilityAllowed(inst.Definition.AreaShape))
                     {

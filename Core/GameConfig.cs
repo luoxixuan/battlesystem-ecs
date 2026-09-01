@@ -856,6 +856,8 @@ namespace BattleSystemECS.Config
     public class LevelConfig
     {
         public int LevelNumber { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
         public int WaveCount { get; set; }
         public List<WaveConfig> Waves { get; set; } = new List<WaveConfig>();
         // Objective type for this level — defaults to KillAll if omitted.
@@ -1396,6 +1398,8 @@ namespace BattleSystemECS.Config
         public float FreezeChance { get; set; }
         /// <summary>Cone angle in degrees for AreaShape="cone". Controls fan spread. Default: 60.</summary>
         public float ConeAngleDegrees { get; set; } = 60.0f;
+        internal SkillSemanticField SemanticFields;
+        internal bool HasSemanticField(SkillSemanticField field) => (SemanticFields & field) != 0;
         // Slow fields (Slow Nova — move speed reduction AoE)
         public float SlowAmount { get; set; }
         public float SlowDuration { get; set; }
@@ -1435,6 +1439,7 @@ namespace BattleSystemECS.Config
     public class BehaviorTreeDef
     {
         public string MonsterType;
+        public string Description;
         public string RootId;
         public Dictionary<string, BTNodeDef> Nodes;
     }

@@ -1,4 +1,5 @@
 using System;
+using BattleSystemECS.Config;
 
 namespace BattleSystemECS.Core.GAS
 {
@@ -94,6 +95,27 @@ namespace BattleSystemECS.Core.GAS
                 descriptor = default;
                 return false;
             }
+            return true;
+        }
+
+        public static bool TryResolve(EnemyAbilityDef source, out EnemyAbilityTypeDescriptor descriptor,
+            out EffectPayloadKind payload, out ExecutionOperation operation)
+        {
+            descriptor = default(EnemyAbilityTypeDescriptor);
+            if (source == null || !TryResolve(source.AbilityType, out descriptor) || !descriptor.Payload.HasValue)
+            {
+                payload = default(EffectPayloadKind);
+                operation = default(ExecutionOperation);
+                return false;
+            }
+            if (descriptor.Kind == EnemyAbilityKind.AoeDamage && source.TelegraphDuration > 0f)
+            {
+                payload = EffectPayloadKind.Telegraph;
+                operation = ExecutionOperation.QueueTelegraph;
+                return true;
+            }
+            payload = descriptor.Payload.Value;
+            operation = descriptor.Operation;
             return true;
         }
 

@@ -15,10 +15,9 @@ namespace BattleSystemECS.Config
     internal static class TypedGameConfigParser
     {
         private static readonly JsonSerializerOptions Options = CreateOptions();
-        private static readonly HashSet<string> ExplicitEnemyLegacyFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        private static readonly HashSet<string> ExplicitInactiveEnemyCompatibilityFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "StunDuration", "SlowFactor", "SlowDuration", "MinionHealthMult", "MinionDamageMult",
-            "TelegraphDuration", "TelegraphColor", "CastTime", "Interruptible"
+            "CastTime", "Interruptible"
         };
 
         internal static GameConfig ParseProduction(string json, string sourcePath)
@@ -29,7 +28,12 @@ namespace BattleSystemECS.Config
             Require(source.Towers != null && source.Towers.Count > 0, sourcePath, "$.Towers", "at least one tower is required");
             Require(source.Skills != null && source.Skills.Count > 0, sourcePath, "$.Skills", "at least one player skill is required");
             Require(source.Levels != null && source.Levels.Count > 0, sourcePath, "$.Levels", "at least one level is required");
-            for (int i = 0; i < source.Skills.Count; i++) NormalizeLegacyPlayerSkill(source.Skills[i]);
+            using (var document = JsonDocument.Parse(json))
+            {
+                var skillNodes = document.RootElement.GetProperty("Skills");
+                for (int i = 0; i < source.Skills.Count; i++)
+                    NormalizeLegacyPlayerSkill(source.Skills[i], skillNodes[i]);
+            }
 
             var config = new GameConfig
             {
@@ -77,7 +81,8 @@ namespace BattleSystemECS.Config
                 var source = sources[i];
                 if (source.LegacyFields != null)
                     foreach (string field in source.LegacyFields.Keys)
-                        Require(ExplicitEnemyLegacyFields.Contains(field), sourcePath, "$[" + i + "]." + field, "unknown field");
+                        Require(ExplicitInactiveEnemyCompatibilityFields.Contains(field), sourcePath, "$[" + i + "]." + field,
+                            "unknown field (only CastTime and Interruptible are accepted as inactive compatibility data)");
                 var ability = new EnemyAbilityDef
                 {
                     Id = source.Id,
@@ -91,6 +96,13 @@ namespace BattleSystemECS.Config
                     DamageMultiplier = source.DamageMultiplier,
                     HealAmount = source.HealAmount,
                     BuffDuration = source.BuffDuration,
+                    StunDuration = source.StunDuration,
+                    SlowFactor = source.SlowFactor,
+                    SlowDuration = source.SlowDuration,
+                    MinionHealthMult = source.MinionHealthMult,
+                    MinionDamageMult = source.MinionDamageMult,
+                    TelegraphDuration = source.TelegraphDuration,
+                    TelegraphColor = source.TelegraphColor,
                     SilenceRadius = source.SilenceRadius,
                     SilenceDuration = source.SilenceDuration,
                     DispelRadius = source.DispelRadius,
@@ -103,6 +115,20 @@ namespace BattleSystemECS.Config
                 Require(!string.IsNullOrWhiteSpace(ability.AbilityType), sourcePath, path + ".AbilityType", "required string is missing");
                 Require(ids.Add(ability.Id), sourcePath, path + ".Id", "duplicate id '" + ability.Id + "'");
                 NonNegative(ability.Cooldown, sourcePath, path + ".Cooldown");
+                NonNegative(ability.StunDuration, sourcePath, path + ".StunDuration");
+                Require(ability.SlowFactor >= 0f && ability.SlowFactor <= 1f, sourcePath, path + ".SlowFactor", "must be between zero and one");
+                NonNegative(ability.SlowDuration, sourcePath, path + ".SlowDuration");
+                NonNegative(ability.MinionHealthMult, sourcePath, path + ".MinionHealthMult");
+                NonNegative(ability.MinionDamageMult, sourcePath, path + ".MinionDamageMult");
+                if (string.Equals(ability.AbilityType, "summon_minion", StringComparison.OrdinalIgnoreCase))
+                {
+                    Require(ability.MinionHealthMult > 0f, sourcePath, path + ".MinionHealthMult",
+                        "summon_minion requires a positive multiplier");
+                    Require(ability.MinionDamageMult > 0f, sourcePath, path + ".MinionDamageMult",
+                        "summon_minion requires a positive multiplier");
+                }
+                NonNegative(ability.TelegraphDuration, sourcePath, path + ".TelegraphDuration");
+                Require(ability.TelegraphColor >= 0, sourcePath, path + ".TelegraphColor", "must be non-negative");
                 AtLeast(ability.SilenceRadius, -1f, sourcePath, path + ".SilenceRadius");
                 NonNegative(ability.SilenceDuration, sourcePath, path + ".SilenceDuration");
                 AtLeast(ability.DispelRadius, -1f, sourcePath, path + ".DispelRadius");
@@ -242,20 +268,30 @@ namespace BattleSystemECS.Config
             skill.Modifiers = skill.Modifiers ?? new List<SkillModifierDef>();
         }
 
-        private static void NormalizeLegacyPlayerSkill(SkillConfig skill)
+        private static void NormalizeLegacyPlayerSkill(SkillConfig skill, JsonElement source)
         {
             if (skill == null) return;
             // These fields were not active in the legacy game_config parser. Keeping them
             // inert prevents a parser cutover from changing activation or effect behavior.
             skill.AutoCast = false;
-            skill.DotDuration = 0f;
-            skill.DotTickInterval = 0f;
             skill.DotDamagePerTick = 0f;
             skill.PolymorphDuration = 0f;
             skill.PolymorphDamageTakenMultiplier = 1f;
             skill.SummonDefId = null;
-            skill.ConeAngleDegrees = 0f;
-            skill.Modifiers = new List<SkillModifierDef>();
+            skill.SemanticFields = ReadSkillSemanticFields(source);
+            if (!skill.HasSemanticField(SkillSemanticField.ConeAngleDegrees)) skill.ConeAngleDegrees = 0f;
+            skill.Modifiers = skill.Modifiers ?? new List<SkillModifierDef>();
+        }
+
+        private static SkillSemanticField ReadSkillSemanticFields(JsonElement source)
+        {
+            SkillSemanticField fields = SkillSemanticField.None;
+            foreach (var property in source.EnumerateObject())
+            {
+                if (Enum.TryParse(property.Name, true, out SkillSemanticField field))
+                    fields |= field;
+            }
+            return fields;
         }
 
         private static bool IsKnownShape(string value)
@@ -307,7 +343,12 @@ namespace BattleSystemECS.Config
 
         private static JsonSerializerOptions CreateOptions()
         {
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true, IncludeFields = true };
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                IncludeFields = true,
+                UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
+            };
             options.Converters.Add(new TowerTypeConverter());
             return options;
         }
@@ -338,6 +379,13 @@ namespace BattleSystemECS.Config
             public float DamageMultiplier { get; set; }
             public float HealAmount { get; set; }
             public int BuffDuration { get; set; }
+            public int StunDuration { get; set; }
+            public float SlowFactor { get; set; }
+            public int SlowDuration { get; set; }
+            public float MinionHealthMult { get; set; }
+            public float MinionDamageMult { get; set; }
+            public float TelegraphDuration { get; set; }
+            public int TelegraphColor { get; set; }
             public float SilenceRadius { get; set; }
             public float SilenceDuration { get; set; }
             public float DispelRadius { get; set; }

@@ -32,24 +32,18 @@ namespace BattleSystemECS.Core.GAS
                 _store.GameplayEffectPool.FreeCount >= runtimeSlots &&
                 _modifierHandleCount <= ModifierCapacity - modifierCount && Events.CanPublish(eventCount, true);
         }
-        internal bool CanApplyDefinition(GameplayEffectDefinition definition, int targetId)
+        internal bool CanApplyPlan(IReadOnlyList<int> targetIds, int runtimeSlotsPerTarget,
+            int modifiersPerTarget, int eventCount)
         {
-            if (!ComponentStore.IsValidEntity(targetId) || !IsDurationContractValid(definition)) return false;
-            if (definition.Type == EffectType.Duration && definition.DurationPolicy == DurationPolicy.Duration &&
-                (definition.Duration <= 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration))) return false;
-            if (definition.Type == EffectType.Duration && definition.DurationPolicy == DurationPolicy.Infinite &&
-                (definition.Duration != 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration))) return false;
-            if (definition.Type == EffectType.Periodic)
-            {
-                if (definition.DurationPolicy != DurationPolicy.Duration || definition.Duration <= 0f ||
-                    float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration) ||
-                    !definition.Periodic.HasValue || !ValidatePeriodicPayload(definition.Periodic.Value, targetId)) return false;
-                float magnitude = definition.Periodic.Value.Magnitude;
-                if (definition.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent &&
-                    (magnitude <= 0f || float.IsNaN(magnitude) || float.IsInfinity(magnitude))) return false;
-            }
-            for (int i = 0; i < definition.Modifiers.Count; i++)
-                if (!AttributeSchema.Default.TryGet(definition.Modifiers[i].Attribute, out var attribute) || !attribute.AllowsModifiers)
+            if (targetIds == null || runtimeSlotsPerTarget < 0 || modifiersPerTarget < 0 || eventCount < 0 ||
+                !Events.CanPublish(eventCount, true)) return false;
+            long totalSlots = (long)runtimeSlotsPerTarget * targetIds.Count;
+            long totalModifiers = (long)modifiersPerTarget * targetIds.Count;
+            if (totalSlots > _store.GameplayEffectPool.FreeCount ||
+                totalModifiers > ModifierCapacity - _modifierHandleCount) return false;
+            for (int i = 0; i < targetIds.Count; i++)
+                if (!ComponentStore.IsValidEntity(targetIds[i]) ||
+                    _store.ActiveEffectCount[targetIds[i]] > ComponentStore.MAX_ACTIVE_EFFECTS_PER_ENTITY - runtimeSlotsPerTarget)
                     return false;
             return true;
         }

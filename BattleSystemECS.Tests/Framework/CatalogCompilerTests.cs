@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using BattleSystemECS.Core.GAS;
 using BattleSystemECS.Tests.Infrastructure;
 using Xunit;
@@ -35,10 +36,12 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(8f, merged.Executions[poisonEffect.Executions[0].Value].Magnitude);
             Assert.True(merged.TryResolveAlias("Cold Nova", out var coldId));
             Assert.True(merged.TryGetAbility(coldId, out var cold));
-            Assert.True(merged.TryGetEffect(cold.Effects[0], out var coldEffect));
-            Assert.Equal(2f, coldEffect.Duration);
-            Assert.Equal(EffectPayloadKind.CrowdControl, coldEffect.Payload);
-            Assert.Equal(new TagId(3), coldEffect.Tag);
+            Assert.Empty(cold.Effects);
+            var coldFreeze = Assert.Single(cold.Executions.Select(id => merged.Executions[id.Value]),
+                execution => execution.Operation == ExecutionOperation.ApplyFreeze);
+            Assert.Equal(EffectPayloadKind.Freeze, coldFreeze.Payload);
+            Assert.Equal(2f, coldFreeze.Duration);
+            Assert.Equal(0.3f, coldFreeze.Probability);
             Assert.True(merged.TryResolveAlias("Meteor Strike", out var meteorId));
             Assert.True(merged.TryGetAbility(meteorId, out var meteor));
             Assert.Single(meteor.Effects);

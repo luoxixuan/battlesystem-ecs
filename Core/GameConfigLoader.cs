@@ -10,6 +10,38 @@ namespace BattleSystemECS.Config
 {
     public class GameConfigLoader
     {
+        private interface IConfigurationParser
+        {
+            bool IsStrict { get; }
+            GameConfig ParseMain(string json, string sourcePath);
+            void ParseBehaviorTrees(GameConfig config, string json, string sourcePath);
+            void ParseEnemyAbilities(GameConfig config, string json, string sourcePath);
+            void ParsePhaseBehaviors(GameConfig config, string json, string sourcePath);
+            void ParseWeather(GameConfig config, string json, string sourcePath);
+        }
+
+        private sealed class StrictConfigurationParser : IConfigurationParser
+        {
+            internal static readonly StrictConfigurationParser Instance = new StrictConfigurationParser();
+            public bool IsStrict => true;
+            public GameConfig ParseMain(string json, string sourcePath) => TypedGameConfigParser.ParseProduction(json, sourcePath);
+            public void ParseBehaviorTrees(GameConfig config, string json, string sourcePath) => config.BehaviorTrees = TypedGameConfigParser.ParseBehaviorTrees(json, sourcePath);
+            public void ParseEnemyAbilities(GameConfig config, string json, string sourcePath) => config.EnemyAbilities = TypedGameConfigParser.ParseEnemyAbilities(json, sourcePath);
+            public void ParsePhaseBehaviors(GameConfig config, string json, string sourcePath) => config.PhaseBehaviors = TypedGameConfigParser.ParsePhaseBehaviors(json, sourcePath);
+            public void ParseWeather(GameConfig config, string json, string sourcePath) => config.Weather = TypedGameConfigParser.ParseWeather(json, sourcePath);
+        }
+
+        private sealed class LegacyConfigurationParser : IConfigurationParser
+        {
+            internal static readonly LegacyConfigurationParser Instance = new LegacyConfigurationParser();
+            public bool IsStrict => false;
+            public GameConfig ParseMain(string json, string sourcePath) => ParseLegacyGameConfig(json);
+            public void ParseBehaviorTrees(GameConfig config, string json, string sourcePath) => GameConfigLoader.ParseBehaviorTrees(config, json);
+            public void ParseEnemyAbilities(GameConfig config, string json, string sourcePath) => GameConfigLoader.ParseEnemyAbilities(config, json);
+            public void ParsePhaseBehaviors(GameConfig config, string json, string sourcePath) => GameConfigLoader.ParsePhaseBehaviors(config, json);
+            public void ParseWeather(GameConfig config, string json, string sourcePath) => ParseWeatherConfig(config, json);
+        }
+
         private const string CONFIG_FILE = "game_config.json";
 
         public static GameConfig LoadStrictCatalog(IRenderer renderer, string canonicalPath = null, string staticDirectory = null)
@@ -31,7 +63,7 @@ namespace BattleSystemECS.Config
 
         public static GameConfig LoadConfig(IRenderer renderer)
         {
-            return LoadConfigInternal(renderer, strict: false);
+            return LoadConfigInternal(renderer, LegacyConfigurationParser.Instance);
         }
 
         /// <summary>
@@ -39,11 +71,12 @@ namespace BattleSystemECS.Config
         /// </summary>
         public static GameConfig LoadConfigStrict(IRenderer renderer)
         {
-            return LoadConfigInternal(renderer, strict: true);
+            return LoadConfigInternal(renderer, StrictConfigurationParser.Instance);
         }
 
-        private static GameConfig LoadConfigInternal(IRenderer renderer, bool strict)
+        private static GameConfig LoadConfigInternal(IRenderer renderer, IConfigurationParser parser)
         {
+            bool strict = parser.IsStrict;
             try
             {
                 if (!File.Exists(CONFIG_FILE))
@@ -68,21 +101,19 @@ namespace BattleSystemECS.Config
                     RequireJsonKind(strict, CONFIG_FILE, document.RootElement,
                         System.Text.Json.JsonValueKind.Object, "a JSON object");
 
-                var gameConfig = strict
-                    ? TypedGameConfigParser.ParseProduction(jsonContent, CONFIG_FILE)
-                    : ParseLegacyGameConfig(jsonContent);
+                var gameConfig = parser.ParseMain(jsonContent, CONFIG_FILE);
 
                 // Load behavior trees
-                LoadBehaviorTrees(gameConfig, renderer, strict);
+                LoadBehaviorTrees(gameConfig, renderer, parser);
 
                 // Load enemy abilities
-                LoadEnemyAbilities(gameConfig, renderer, strict);
+                LoadEnemyAbilities(gameConfig, renderer, parser);
 
                 // Load phase behaviors
-                LoadPhaseBehaviors(gameConfig, renderer, strict);
+                LoadPhaseBehaviors(gameConfig, renderer, parser);
 
                 // Load weather config
-                LoadWeatherConfig(gameConfig, renderer, strict);
+                LoadWeatherConfig(gameConfig, renderer, parser);
 
                 // Load terrain config
                 LoadTerrainConfig(gameConfig, renderer, strict);
@@ -321,14 +352,21 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
 
         private static void ValidateEnemyExecution(GameplayCatalog catalog, AbilityId abilityId, EnemyAbilityDef source)
         {
-            if (!EnemyAbilityTypeRegistry.TryResolve(source.AbilityType, out var type))
+            if (!EnemyAbilityTypeRegistry.TryResolve(source, out _, out var payload, out var operation))
                 throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: unsupported AbilityType '{source.AbilityType}' for '{source.Id}'");
-            if (!type.Payload.HasValue) return;
             catalog.TryGetAbility(abilityId, out var ability);
             foreach (var executionId in ability.Executions)
-                if (catalog.TryGetExecution(executionId, out var execution) && execution.Payload == type.Payload.Value &&
-                    execution.Operation == type.Operation) return;
-            throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: '{source.Id}' requires typed {type.Payload.Value}/{type.Operation} execution");
+                if (catalog.TryGetExecution(executionId, out var execution) && execution.Payload == payload &&
+                    execution.Operation == operation)
+                {
+                    if (operation == ExecutionOperation.SummonEnemy &&
+                        (source.MinionHealthMult <= 0f || source.MinionDamageMult <= 0f ||
+                         Math.Abs(execution.Magnitude - source.MinionHealthMult) > 0.0001f ||
+                         Math.Abs(execution.Duration - source.MinionDamageMult) > 0.0001f))
+                        throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: '{source.Id}' has invalid summon multiplier contract");
+                    return;
+                }
+            throw new CatalogValidationException($"Data/Configs/enemy_abilities.json: '{source.Id}' requires typed {payload}/{operation} execution");
         }
 
         private static string NormalizeAlias(string value) => value.Replace('_', ' ').Replace('-', ' ');
@@ -386,8 +424,9 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             }
         }
 
-        private static void LoadBehaviorTrees(GameConfig gameConfig, IRenderer renderer, bool strict)
+        private static void LoadBehaviorTrees(GameConfig gameConfig, IRenderer renderer, IConfigurationParser parser)
         {
+            bool strict = parser.IsStrict;
             const string btFile = "Data/Configs/behavior_trees.json";
             try
             {
@@ -407,8 +446,7 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
                 using (var document = System.Text.Json.JsonDocument.Parse(json))
                     RequireJsonKind(strict, btFile, document.RootElement,
                         System.Text.Json.JsonValueKind.Array, "an array");
-                if (strict) gameConfig.BehaviorTrees = TypedGameConfigParser.ParseBehaviorTrees(json, btFile);
-                else ParseBehaviorTrees(gameConfig, json);
+                parser.ParseBehaviorTrees(gameConfig, json, btFile);
                 renderer.Log("[BT] Loaded " + gameConfig.BehaviorTrees.Count + " behavior trees from " + btFile);
             }
             catch (Exception ex)
@@ -418,8 +456,9 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             }
         }
 
-        private static void LoadEnemyAbilities(GameConfig gameConfig, IRenderer renderer, bool strict)
+        private static void LoadEnemyAbilities(GameConfig gameConfig, IRenderer renderer, IConfigurationParser parser)
         {
+            bool strict = parser.IsStrict;
             const string abFile = "Data/Configs/enemy_abilities.json";
             try
             {
@@ -439,8 +478,7 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
                 using (var document = System.Text.Json.JsonDocument.Parse(json))
                     RequireJsonKind(strict, abFile, document.RootElement,
                         System.Text.Json.JsonValueKind.Array, "an array");
-                if (strict) gameConfig.EnemyAbilities = TypedGameConfigParser.ParseEnemyAbilities(json, abFile);
-                else ParseEnemyAbilities(gameConfig, json);
+                parser.ParseEnemyAbilities(gameConfig, json, abFile);
                 if (strict && gameConfig.EnemyAbilities.Count == 0)
                     throw ConfigLoadFailure(abFile, "no enemy abilities declared");
                 renderer.Log("[ABILITY] Loaded " + gameConfig.EnemyAbilities.Count + " enemy abilities from " + abFile);
@@ -452,8 +490,9 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             }
         }
 
-        private static void LoadPhaseBehaviors(GameConfig gameConfig, IRenderer renderer, bool strict)
+        private static void LoadPhaseBehaviors(GameConfig gameConfig, IRenderer renderer, IConfigurationParser parser)
         {
+            bool strict = parser.IsStrict;
             const string phaseFile = "Data/Configs/phase_behavior.json";
             try
             {
@@ -473,8 +512,7 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
                 using (var document = System.Text.Json.JsonDocument.Parse(json))
                     RequireJsonKind(strict, phaseFile, document.RootElement,
                         System.Text.Json.JsonValueKind.Object, "an object");
-                if (strict) gameConfig.PhaseBehaviors = TypedGameConfigParser.ParsePhaseBehaviors(json, phaseFile);
-                else ParsePhaseBehaviors(gameConfig, json);
+                parser.ParsePhaseBehaviors(gameConfig, json, phaseFile);
                 renderer.Log("[PHASE] Loaded " + gameConfig.PhaseBehaviors.Count + " phase behaviors from " + phaseFile);
             }
             catch (Exception ex)
@@ -1733,8 +1771,9 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             return skill;
         }
 
-        private static void LoadWeatherConfig(GameConfig gameConfig, IRenderer renderer, bool strict)
+        private static void LoadWeatherConfig(GameConfig gameConfig, IRenderer renderer, IConfigurationParser parser)
         {
+            bool strict = parser.IsStrict;
             const string weatherFile = "Data/Configs/weather.json";
             try
             {
@@ -1753,8 +1792,7 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
                 using (var document = System.Text.Json.JsonDocument.Parse(json))
                     RequireJsonKind(strict, weatherFile, document.RootElement,
                         System.Text.Json.JsonValueKind.Object, "an object");
-                if (strict) gameConfig.Weather = TypedGameConfigParser.ParseWeather(json, weatherFile);
-                else ParseWeatherConfig(gameConfig, json);
+                parser.ParseWeather(gameConfig, json, weatherFile);
                 renderer.Log("[WEATHER] Loaded weather config from " + weatherFile);
             }
             catch (Exception ex)

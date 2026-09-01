@@ -3,6 +3,8 @@ using Xunit;
 using System;
 using System.IO;
 using System.Reflection;
+using System.Linq;
+using System.Text.Json;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
@@ -270,14 +272,17 @@ namespace BattleSystemECS.Tests.Features.Skills
         [Fact]
         public void Trigger_SucceedsAndFlipsCooldownWhenReady()
         {
-            ConfigureDefaultSkills();
-            var sys = new HeroSkillSystem(Store, 0, "/nope.json", Config);
+            var strictConfig = GameConfigLoader.LoadStrictCatalog(Renderer);
+            var binding = FindStrictBinding(strictConfig, ability =>
+                HasExecution(strictConfig, ability, ExecutionOperation.ApplyHeal));
+            int playerId = Player(p => p.EntityId = 0);
+            var sys = new HeroSkillSystem(Store, playerId, "Data/Configs/hero_skills.json", strictConfig);
             sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
-            ConfigureSkillSlot(sys, 0, 0, skillId: 0, maxCooldown: 5f, cooldown: 0f); // ready
+            sys.Initialize();
             Store.HeroIsDeployed[0] = true;
-            bool ok = sys.TriggerHeroSkill(0, 0);
-            Assert.True(ok);
-            Assert.Equal(5f, sys.GetHeroSkillCooldown(0, 0), 3);
+            Assert.Equal(binding.Ability.Id.Value, sys.GetHeroSkillId(0, binding.Slot));
+            Assert.True(sys.TriggerHeroSkill(0, binding.Slot));
+            Assert.Equal(binding.Ability.Cooldown, sys.GetHeroSkillCooldown(0, binding.Slot), 3);
         }
 
         [Fact]
@@ -300,31 +305,42 @@ namespace BattleSystemECS.Tests.Features.Skills
         /// 接线前 SkillDefs 不存在，hero_skills.json 引用的精选技能名永远解析失败。
         /// </summary>
         [Fact]
-        public void Initialize_SkillDefsTakePriority_SameNameInBothTables()
+        public void Initialize_StrictCatalogTakesPriorityOverMutableLegacyTables()
         {
-            Config.SkillDefs.Add(new SkillConfig { Name = "Cross Slash", Cooldown = 7f });
-            Config.SkillDefs.Add(new SkillConfig { Name = "Guardian Heal", Cooldown = 9f });
-            Config.Skills.Add(new SkillConfig { Name = "Cross Slash", Cooldown = 3f }); // 玩家栏同名条目，不得被优先命中
+            var strictConfig = GameConfigLoader.LoadStrictCatalog(Renderer);
+            var damage = FindStrictBinding(strictConfig, ability => ability.Targeting.Relation == RelationFilter.Enemies &&
+                HasExecution(strictConfig, ability, ExecutionOperation.ApplyDamage));
+            var heal = FindStrictBinding(strictConfig, ability =>
+                HasExecution(strictConfig, ability, ExecutionOperation.ApplyHeal));
+            strictConfig.SkillDefs.Add(new SkillConfig { Name = damage.Ability.Name, Cooldown = damage.Ability.Cooldown + 2f });
+            strictConfig.SkillDefs.Add(new SkillConfig { Name = heal.Ability.Name, Cooldown = heal.Ability.Cooldown + 2f });
+            strictConfig.Skills.Add(new SkillConfig { Name = damage.Ability.Name, Cooldown = damage.Ability.Cooldown + 3f });
 
             string tmp = Path.Combine(Path.GetTempPath(), "hero_skills_test_" + Guid.NewGuid().ToString("N") + ".json");
             try
             {
-                File.WriteAllText(tmp,
-                    "{\"Skills\":[{\"SlotIndex\":0,\"SkillName\":\"Cross Slash\"},{\"SlotIndex\":1,\"SkillName\":\"Guardian Heal\"}]}");
-                var sys = new HeroSkillSystem(Store, 0, heroSkillsPath: tmp, config: Config);
+                File.WriteAllText(tmp, JsonSerializer.Serialize(new
+                {
+                    Skills = new[]
+                    {
+                        new { SlotIndex = damage.Slot, SkillName = damage.Ability.Name },
+                        new { SlotIndex = heal.Slot, SkillName = heal.Ability.Name }
+                    }
+                }));
+                var sys = new HeroSkillSystem(Store, 0, heroSkillsPath: tmp, config: strictConfig);
                 sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
                 sys.Initialize();
 
                 Assert.True(sys.HasAnyConfiguredSkill());
                 Store.HeroIsDeployed[0] = true;
-                Assert.True(sys.IsHeroSkillReady(0, 0));
-                Assert.True(sys.IsHeroSkillReady(0, 1));
-                // 冷却上限来自 SkillDefs 条目（7s），不是玩家栏同名条目（3s）
-                Assert.Equal(7f, sys.GetHeroSkillCooldownMax(0, 0), 3);
-                Assert.Equal(9f, sys.GetHeroSkillCooldownMax(0, 1), 3);
-                // 触发成功并把冷却翻转到 SkillDefs 的 max
-                Assert.True(sys.TriggerHeroSkill(0, 0));
-                Assert.Equal(7f, sys.GetHeroSkillCooldown(0, 0), 3);
+                Assert.True(sys.IsHeroSkillReady(0, damage.Slot));
+                Assert.True(sys.IsHeroSkillReady(0, heal.Slot));
+                // Strict Catalog 是权威来源，测试期修改的 legacy 表不能改变运行时冷却。
+                Assert.Equal(damage.Ability.Cooldown, sys.GetHeroSkillCooldownMax(0, damage.Slot), 3);
+                Assert.Equal(heal.Ability.Cooldown, sys.GetHeroSkillCooldownMax(0, heal.Slot), 3);
+                // 伤害能力在该 fixture 中没有目标，不得提交冷却。
+                Assert.False(sys.TriggerHeroSkill(0, damage.Slot));
+                Assert.Equal(0f, sys.GetHeroSkillCooldown(0, damage.Slot), 3);
             }
             finally
             {
@@ -335,19 +351,24 @@ namespace BattleSystemECS.Tests.Features.Skills
         [Fact]
         public void Initialize_FallsBackToPlayerSkillBar_WhenNameNotInSkillDefs()
         {
-            Config.Skills.Add(new SkillConfig { Name = "Railgun Shot #3", Cooldown = 4f });
+            const string fixtureName = "Fixture Player Skill";
+            const float fixtureCooldown = 4f;
+            Config.Skills.Add(new SkillConfig { Name = fixtureName, Cooldown = fixtureCooldown });
 
             string tmp = Path.Combine(Path.GetTempPath(), "hero_skills_test_" + Guid.NewGuid().ToString("N") + ".json");
             try
             {
-                File.WriteAllText(tmp, "{\"Skills\":[{\"SlotIndex\":2,\"SkillName\":\"Railgun Shot #3\"}]}");
+                File.WriteAllText(tmp, JsonSerializer.Serialize(new
+                {
+                    Skills = new[] { new { SlotIndex = 2, SkillName = fixtureName } }
+                }));
                 var sys = new HeroSkillSystem(Store, 0, heroSkillsPath: tmp, config: Config);
                 sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
                 sys.Initialize();
 
                 Store.HeroIsDeployed[0] = true;
                 Assert.True(sys.IsHeroSkillReady(0, 2));
-                Assert.Equal(4f, sys.GetHeroSkillCooldownMax(0, 2), 3);
+                Assert.Equal(fixtureCooldown, sys.GetHeroSkillCooldownMax(0, 2), 3);
             }
             finally
             {
@@ -359,41 +380,41 @@ namespace BattleSystemECS.Tests.Features.Skills
         public void StrictCatalog_CanonicalHealUsesRealPlayerSourceTargetAndCooldown()
         {
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            var binding = FindStrictBinding(config, ability =>
+                HasExecution(config, ability, ExecutionOperation.ApplyHeal));
             int playerId = Player(p => { p.EntityId = 0; p.X = 0f; p.Y = 0f; p.Health = 100f; });
             var sys = new HeroSkillSystem(Store, playerId, "Data/Configs/hero_skills.json", config);
             sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.Initialize();
             Store.HeroIsDeployed[0] = true;
 
-            const int slot = 2;
-            int skillId = sys.GetHeroSkillId(0, slot);
-            Assert.True(config.CompiledCatalog!.TryResolveAlias("Guardian Heal", out var abilityId));
-            Assert.Equal(abilityId.Value, skillId);
+            int skillId = sys.GetHeroSkillId(0, binding.Slot);
+            Assert.Equal(binding.Ability.Id.Value, skillId);
             Assert.Equal(playerId, Store.PlayerEntityId);
             Assert.True(Store.PositionActive[playerId]);
             Assert.True(Store.GetEntityHandle(playerId).IsValid);
 
-            Assert.True(sys.TriggerHeroSkill(0, slot));
-            Assert.Equal(config.CompiledCatalog.AbilityDefinitions[abilityId.Value].Cooldown,
-                sys.GetHeroSkillCooldown(0, slot));
-            Assert.True(sys.GetHeroSkillCooldown(0, slot) > 0f);
-            Assert.False(sys.TriggerHeroSkill(0, slot));
+            Assert.True(sys.TriggerHeroSkill(0, binding.Slot));
+            Assert.Equal(binding.Ability.Cooldown, sys.GetHeroSkillCooldown(0, binding.Slot));
+            Assert.True(sys.GetHeroSkillCooldown(0, binding.Slot) > 0f);
+            Assert.False(sys.TriggerHeroSkill(0, binding.Slot));
         }
 
         [Fact]
         public void StrictCatalog_DamageSkillWithoutActiveTargetRejectsWithoutCooldown()
         {
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            var binding = FindStrictBinding(config, ability => ability.Targeting.Relation == RelationFilter.Enemies &&
+                HasExecution(config, ability, ExecutionOperation.ApplyDamage));
             int playerId = Player(p => { p.EntityId = 0; p.Health = 100f; });
             var sys = new HeroSkillSystem(Store, playerId, "Data/Configs/hero_skills.json", config);
             sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.Initialize();
             Store.HeroIsDeployed[0] = true;
 
-            Assert.True(config.CompiledCatalog!.TryResolveAlias("Cross Slash", out var abilityId));
-            Assert.Equal(abilityId.Value, sys.GetHeroSkillId(0, 0));
-            Assert.False(sys.TriggerHeroSkill(0, 0));
-            Assert.Equal(0f, sys.GetHeroSkillCooldown(0, 0));
+            Assert.Equal(binding.Ability.Id.Value, sys.GetHeroSkillId(0, binding.Slot));
+            Assert.False(sys.TriggerHeroSkill(0, binding.Slot));
+            Assert.Equal(0f, sys.GetHeroSkillCooldown(0, binding.Slot));
             Assert.Equal(0, Store.DamageResolver.PendingRequestCount);
         }
 
@@ -401,22 +422,36 @@ namespace BattleSystemECS.Tests.Features.Skills
         public void StrictCatalog_HeroesUsingSameSlotKeepIndependentCooldowns()
         {
             var config = GameConfigLoader.LoadStrictCatalog(Renderer);
+            var binding = FindStrictBinding(config, ability =>
+                HasExecution(config, ability, ExecutionOperation.ApplyHeal));
             int playerId = Player(p => { p.EntityId = 0; p.Health = 100f; });
             var sys = new HeroSkillSystem(Store, playerId, "Data/Configs/hero_skills.json", config);
             sys.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             sys.Initialize();
             Store.HeroIsDeployed[0] = true;
             Store.HeroIsDeployed[1] = true;
-            const int slot = 2;
-            Assert.True(config.CompiledCatalog!.TryResolveAlias("Guardian Heal", out var abilityId));
-            Assert.True(config.CompiledCatalog.TryGetAbility(abilityId, out var ability));
-
-            Assert.True(sys.TriggerHeroSkill(1, slot));
-            Assert.Equal(0f, sys.GetHeroSkillCooldown(0, slot));
-            Assert.Equal(ability.Cooldown, sys.GetHeroSkillCooldown(1, slot));
-            Assert.False(sys.TriggerHeroSkill(1, slot));
-            Assert.True(sys.TriggerHeroSkill(0, slot));
-            Assert.Equal(ability.Cooldown, sys.GetHeroSkillCooldown(0, slot));
+            Assert.True(sys.TriggerHeroSkill(1, binding.Slot));
+            Assert.Equal(0f, sys.GetHeroSkillCooldown(0, binding.Slot));
+            Assert.Equal(binding.Ability.Cooldown, sys.GetHeroSkillCooldown(1, binding.Slot));
+            Assert.False(sys.TriggerHeroSkill(1, binding.Slot));
+            Assert.True(sys.TriggerHeroSkill(0, binding.Slot));
+            Assert.Equal(binding.Ability.Cooldown, sys.GetHeroSkillCooldown(0, binding.Slot));
         }
+
+        private static (int Slot, AbilityDefinition Ability) FindStrictBinding(GameConfig config,
+            Func<AbilityDefinition, bool> predicate)
+        {
+            const string path = "Data/Configs/hero_skills.json";
+            var bindings = HeroSkillSystem.HeroSkillsConfigLoader.Parse(File.ReadAllText(path), path);
+            foreach (var binding in bindings.Skills ?? Enumerable.Empty<HeroSkillSystem.HeroSkillSlotEntry>())
+                if (binding.SkillName != null && config.CompiledCatalog!.TryResolveAlias(binding.SkillName, out var id) &&
+                    config.CompiledCatalog.TryGetAbility(id, out var ability) && predicate(ability))
+                    return (binding.SlotIndex, ability);
+            throw new Xunit.Sdk.XunitException("strict hero binding with requested typed behavior was not found");
+        }
+
+        private static bool HasExecution(GameConfig config, AbilityDefinition ability, ExecutionOperation operation) =>
+            ability.Executions.Any(id => config.CompiledCatalog!.TryGetExecution(id, out var execution) &&
+                execution.Operation == operation);
     }
 }

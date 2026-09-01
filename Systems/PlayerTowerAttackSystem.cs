@@ -188,8 +188,8 @@ public void SetWaveNumber(int waveNumber)
             baseDamage *= _metaDamageMult;       // meta-progression: persistent cross-run bonus
             baseDamage *= _waveDifficultyMult;  // wave scaling, always applied (1.0f when wave=1)
 
-            // 应用连击击杀伤害倍率（min(1 + ComboCount * bonus, maxMult)）。
-            baseDamage *= store.PlayerComboDamageMult[playerId];
+            // 连击伤害由编译后的 GameplayEffect 投影到 AttackDamage；旧字段只保留兼容和展示用途，
+            // 此处不再重复贡献。
 
             // Round 207 Direction 2 — Adrenaline Rush window. While the player is in
             // the one-shot Rush state (PlayerAdrenalineRushActiveFrames > 0), the player's

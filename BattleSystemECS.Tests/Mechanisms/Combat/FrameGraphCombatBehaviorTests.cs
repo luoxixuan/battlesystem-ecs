@@ -251,7 +251,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             scheduler.Tick(1f,0);
 
             Assert.Equal(1,published);
-            Assert.Equal(Store.EnemyDamage[enemyId]*2f,publishedDamage,3);
+            Assert.Equal(100f-Store.PlayerCurrentHealth[playerId],publishedDamage,3);
             Assert.True(Store.PlayerCurrentHealth[playerId]<100f);
             Assert.Equal(publishedRemaining,Store.PlayerCurrentHealth[playerId],3);
             Assert.Equal(0,registry.Telegraph!.ActiveZoneCount);

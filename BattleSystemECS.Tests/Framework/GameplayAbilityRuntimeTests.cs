@@ -517,7 +517,8 @@ namespace BattleSystemECS.Tests.Framework
 
             var result = GameplayAbilityRuntime.Activate(store, Catalog(executions), cooldowns, Request(enemy));
 
-            Assert.True(result.Accepted);
+            Assert.True(result.Accepted,
+                $"activation={result.Reason}, damage={store.DamageResolver.LastRejection}");
             Assert.Equal(0f, store.EnemyHealth[enemy]);
             Assert.True(store.IsEnemyPendingDeath(enemy));
             Assert.Equal(2f, cooldowns[0]);

@@ -9,28 +9,33 @@ namespace BattleSystemECS.Core.GAS
 
     public readonly struct AbilityActivationRequest
     {
-        public readonly int OwnerId;
+        public readonly int SourceEntityId;
+        public int OwnerId => SourceEntityId;
         public readonly int Slot;
         public readonly float Cooldown;
         public readonly int TargetId;
         public readonly AbilityId Ability;
-        public readonly EffectId Effect;
-        public readonly TriggerId Trigger;
+        public readonly EffectId? Effect;
+        public readonly TriggerId? Trigger;
         public readonly float Cost;
         public readonly float MagnitudeOverride;
+        public readonly float MagnitudeScale;
         public readonly int OwnerPlayerId;
         public AbilityActivationRequest(int ownerId, int slot, float cooldown, int targetId = -1,
-            AbilityId ability = default(AbilityId), EffectId effect = default(EffectId), TriggerId trigger = default(TriggerId), float cost = 0f)
-            : this(ownerId, slot, cooldown, targetId, ability, effect, trigger, cost, float.NaN, ownerId) { }
+            AbilityId ability = default(AbilityId), EffectId? effect = null, TriggerId? trigger = null,
+            float cost = 0f, int ownerPlayerId = -1)
+            : this(ownerId, slot, cooldown, targetId, ability, effect, trigger, cost, float.NaN, ownerPlayerId, 1f) { }
         public AbilityActivationRequest(int ownerId, int slot, float cooldown, int targetId,
-            AbilityId ability, EffectId effect, TriggerId trigger, float cost, float magnitudeOverride, int ownerPlayerId = -1)
-        { OwnerId = ownerId; Slot = slot; Cooldown = cooldown; TargetId = targetId; Ability = ability; Effect = effect; Trigger = trigger; Cost = cost; MagnitudeOverride = magnitudeOverride; OwnerPlayerId = ownerPlayerId < 0 ? ownerId : ownerPlayerId; }
+            AbilityId ability, EffectId? effect, TriggerId? trigger, float cost, float magnitudeOverride,
+            int ownerPlayerId = -1, float magnitudeScale = 1f)
+        { SourceEntityId = ownerId; Slot = slot; Cooldown = cooldown; TargetId = targetId; Ability = ability; Effect = effect; Trigger = trigger; Cost = cost; MagnitudeOverride = magnitudeOverride; MagnitudeScale = magnitudeScale; OwnerPlayerId = ownerPlayerId < 0 ? ownerId : ownerPlayerId; }
         public AbilityActivationRequest(int ownerId, int slot, float cooldown, int targetId,
-            AbilityId ability, float magnitudeOverride)
-            : this(ownerId, slot, cooldown, targetId, ability, default(EffectId), default(TriggerId), 0f, magnitudeOverride, ownerId) { }
-        public AbilityActivationRequest(int ownerId, int slot, float cooldown, int targetId,
-            AbilityId ability, float magnitudeOverride, int ownerPlayerId)
-            : this(ownerId, slot, cooldown, targetId, ability, default(EffectId), default(TriggerId), 0f, magnitudeOverride, ownerPlayerId) { }
+            AbilityId ability, float magnitudeOverride, int ownerPlayerId = -1)
+            : this(ownerId, slot, cooldown, targetId, ability, null, null, 0f, magnitudeOverride, ownerPlayerId) { }
+
+        internal AbilityActivationRequest ForTarget(int targetId, float magnitudeScale) =>
+            new AbilityActivationRequest(OwnerId, Slot, Cooldown, targetId, Ability, Effect, Trigger,
+                Cost, MagnitudeOverride, OwnerPlayerId, magnitudeScale);
     }
 
     public readonly struct AbilityActivationResult
@@ -300,13 +305,13 @@ namespace BattleSystemECS.Core.GAS
                 return AbilityActivationRejectReason.TagRequirementsNotMet;
             for (int i = 0; i < ability.Effects.Count; i++)
                 if (!catalog.TryGetEffect(ability.Effects[i], out var effect) ||
-                    !store.GameplayEffectsRuntime.CanApplyDefinition(effect, target.Index))
+                    !GameplayEffectRuntime.IsDurationContractValid(effect))
                     return AbilityActivationRejectReason.InvalidRequest;
             for (int i = 0; i < ability.Executions.Count; i++)
             {
                 if (!catalog.TryGetExecution(ability.Executions[i], out var execution))
                     return AbilityActivationRejectReason.UnsupportedDefinition;
-                float magnitude = ResolveMagnitude(store, execution, request.MagnitudeOverride, source.Index);
+                float magnitude = ResolveMagnitude(store, execution, request, source.Index);
                 var context = new AbilityPayloadContext(store, ability, execution, request, source, target, magnitude);
                 if (payloadHandler != null && payloadHandler.Supports(execution))
                 {
@@ -320,7 +325,7 @@ namespace BattleSystemECS.Core.GAS
             return AbilityActivationRejectReason.None;
         }
 
-        private enum BuiltInPayloadKind { Damage, Heal, Shield, Slow, CrowdControl, GameplayEvent }
+        private enum BuiltInPayloadKind { Damage, Heal, Shield, Slow, CrowdControl, Freeze, GameplayEvent }
 
         private readonly struct BuiltInPayloadPlan
         {
@@ -399,7 +404,7 @@ namespace BattleSystemECS.Core.GAS
             for (int i = 0; i < ability.Executions.Count; i++)
             {
                 catalog.TryGetExecution(ability.Executions[i], out var execution);
-                float magnitude = ResolveMagnitude(store, execution, request.MagnitudeOverride, source.Index);
+                float magnitude = ResolveMagnitude(store, execution, request, source.Index);
                 var context = new AbilityPayloadContext(store, ability, execution, request, source, target, magnitude);
                 if (payloadHandler != null && payloadHandler.Supports(execution))
                     applied += Math.Max(0, payloadHandler.Commit(context));
@@ -441,6 +446,9 @@ namespace BattleSystemECS.Core.GAS
                 case EffectPayloadKind.CrowdControl:
                     if (!Matches(execution.Operation, ExecutionOperation.ApplyCrowdControl)) { supported = false; return false; }
                     kind = BuiltInPayloadKind.CrowdControl; break;
+                case EffectPayloadKind.Freeze:
+                    if (!Matches(execution.Operation, ExecutionOperation.ApplyFreeze)) { supported = false; return false; }
+                    kind = BuiltInPayloadKind.Freeze; break;
                 case EffectPayloadKind.GameplayEvent:
                     if (execution.Operation != ExecutionOperation.Default) { supported = false; return false; }
                     kind = BuiltInPayloadKind.GameplayEvent; break;
@@ -467,6 +475,8 @@ namespace BattleSystemECS.Core.GAS
                     return magnitude > 0f && magnitude < 1f &&
                         execution.Duration > 0f && (player || enemy);
                 case BuiltInPayloadKind.CrowdControl: return magnitude > 0f && (player || enemy);
+                case BuiltInPayloadKind.Freeze:
+                    return magnitude > 0f && execution.Probability >= 0f && execution.Probability <= 1f && enemy;
                 case BuiltInPayloadKind.GameplayEvent: return true;
                 default:
                     return false;
@@ -510,9 +520,13 @@ namespace BattleSystemECS.Core.GAS
                     }
                     else store.ApplyPlayerStun(targetId, duration);
                     return true;
+                case BuiltInPayloadKind.Freeze:
+                    if (ShouldApplyProbability(context))
+                        store.ApplyEnemyFreeze(targetId, Math.Max(1, (int)Math.Ceiling(context.Magnitude)));
+                    return true;
                 case BuiltInPayloadKind.GameplayEvent:
                     return store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.EffectApplied,
-                        context.Source, context.Target, sequence, ownerPlayerId: context.Request.OwnerPlayerId), true);
+                        context.Source, context.Target, sequence, ownerPlayerId: context.Request.OwnerPlayerId));
                 default:
                     return false;
             }
@@ -570,10 +584,31 @@ namespace BattleSystemECS.Core.GAS
         private static bool Matches(ExecutionOperation actual, ExecutionOperation expected) =>
             actual == ExecutionOperation.Default || actual == expected;
 
+        private static bool ShouldApplyProbability(AbilityPayloadContext context)
+        {
+            float probability = context.Execution.Probability;
+            if (probability <= 0f) return false;
+            if (probability >= 1f) return true;
+            uint value;
+            unchecked
+            {
+                value = (uint)context.Store.CurrentFrame * 2246822519u;
+                value ^= (uint)context.Ability.Id.Value * 3266489917u;
+                value ^= (uint)context.Source.Index * 668265263u;
+                value ^= (uint)context.Source.Generation * 374761393u;
+                value ^= (uint)context.Target.Index * 1274126177u;
+                value ^= (uint)context.Target.Generation * 1431374977u;
+                value ^= value >> 15;
+                value *= 2246822519u;
+                value ^= value >> 13;
+            }
+            return (value & 0x00FFFFFFu) < probability * 16777216f;
+        }
+
         private static void PublishActivation(ComponentStore store, AbilityActivationRequest request,
             EntityHandle source, EntityHandle target, int targetId) =>
             store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.AbilityActivated, source, target,
-                store.AllocateGameplaySequence(targetId), ownerPlayerId: request.OwnerPlayerId), true);
+                store.AllocateGameplaySequence(targetId), ownerPlayerId: request.OwnerPlayerId));
         public static AbilityActivationResult ActivateHealTargets(ComponentStore store, GameplayCatalog catalog,
             float[] cooldowns, AbilityActivationRequest request, IReadOnlyList<int> targetIds,
             IReadOnlyList<float> magnitudes)

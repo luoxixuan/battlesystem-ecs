@@ -383,15 +383,15 @@ namespace BattleSystemECS.Systems
 
         private bool CanDispatchStrict(EnemyAbilityDef ability)
         {
-            if (!EnemyAbilityTypeRegistry.TryResolve(ability.AbilityType, out var type)) return false;
+            if (!EnemyAbilityTypeRegistry.TryResolve(ability, out var type, out var payload,
+                out var operation)) return false;
             if (type.DispatchMode == EnemyAbilityDispatchMode.CompatibilityOnly) return false;
             var catalog = gameConfig.CompiledCatalog;
             if (catalog == null || !catalog.TryResolveAlias(ability.Id, out var id) ||
                 !catalog.TryGetAbility(id, out var typed)) return false;
-            if (!type.Payload.HasValue) return false;
             for (int i = 0; i < typed.Executions.Count; i++)
                 if (catalog.TryGetExecution(typed.Executions[i], out var execution) &&
-                    execution.Payload == type.Payload.Value && execution.Operation == type.Operation)
+                    execution.Payload == payload && execution.Operation == operation)
                     return true;
             return false;
         }
@@ -424,7 +424,9 @@ namespace BattleSystemECS.Systems
             execution.Payload == EffectPayloadKind.Status &&
                 (execution.Operation == ExecutionOperation.ApplyEnemyBuff || execution.Operation == ExecutionOperation.ApplyTowerSilence) ||
             execution.Payload == EffectPayloadKind.Dispel &&
-                execution.Operation == ExecutionOperation.RemoveDispellableEffects;
+                execution.Operation == ExecutionOperation.RemoveDispellableEffects ||
+            execution.Payload == EffectPayloadKind.Telegraph &&
+                execution.Operation == ExecutionOperation.QueueTelegraph;
 
         bool IAbilityPayloadHandler.CanCommit(AbilityPayloadContext context)
         {
@@ -444,9 +446,14 @@ namespace BattleSystemECS.Systems
             if (context.Execution.Operation == ExecutionOperation.RemoveDispellableEffects)
                 return context.Execution.Payload == EffectPayloadKind.Dispel && IsActiveTower(context.Target.Index) &&
                        _dispelCapacityReserved && CountDispellableEffects(context.Target.Index) > 0;
+            if (context.Execution.Operation == ExecutionOperation.QueueTelegraph)
+                return context.Execution.Payload == EffectPayloadKind.Telegraph && _telegraphSystem != null &&
+                       (uint)context.Target.Index < ComponentStore.MAX_PLAYERS &&
+                       context.Execution.Parameter >= 0 && context.Execution.Parameter <= 2 &&
+                       context.Magnitude > 0f && _telegraphSystem.CanQueueTelegraphZone(context.Execution.Duration);
             if (context.Execution.Payload != EffectPayloadKind.WorldAction) return false;
             if (context.Execution.Operation == ExecutionOperation.SummonEnemy)
-                return store.HasEntityCapacity;
+                return store.HasEntityCapacity && HasValidSummonContract(ability, context.Execution);
             return context.Execution.Operation == ExecutionOperation.PrepareStealth &&
                    ability.DamageMultiplier > 0f;
         }
@@ -477,8 +484,25 @@ namespace BattleSystemECS.Systems
             }
             if (context.Execution.Operation == ExecutionOperation.RemoveDispellableEffects)
                 return RemoveDispellableEffects(context.Target.Index);
+            if (context.Execution.Operation == ExecutionOperation.QueueTelegraph)
+            {
+                float radius = context.Ability.Targeting.Radius > 0f
+                    ? context.Ability.Targeting.Radius : context.Ability.Targeting.Range;
+                bool queued = _telegraphSystem.TryQueueTelegraphZone(context.Source, context.Target,
+                    store.PositionX[context.Target.Index], store.PositionY[context.Target.Index], radius,
+                    context.Execution.Duration, context.Magnitude, context.Ability.Id,
+                    context.Request.OwnerPlayerId, TelegraphSystem.SHAPE_CIRCLE,
+                    colorHint: context.Execution.Parameter);
+                if (!queued) throw new InvalidOperationException("prevalidated telegraph capacity was unavailable during commit");
+                return 1;
+            }
             if (context.Execution.Operation == ExecutionOperation.SummonEnemy)
-                return EnemyWorldActionAdapter.Summon(store, logger, context.Source.Index, ability);
+            {
+                if (!HasValidSummonContract(ability, context.Execution))
+                    throw new InvalidOperationException("summon multipliers must be validated before commit");
+                return EnemyWorldActionAdapter.Summon(store, logger, context.Source.Index, ability,
+                    context.Execution.Magnitude, context.Execution.Duration);
+            }
             if (context.Execution.Operation == ExecutionOperation.PrepareStealth)
                 return EnemyWorldActionAdapter.PrepareStealth(store, logger, context.Source.Index, ability);
             return 0;
@@ -489,6 +513,12 @@ namespace BattleSystemECS.Systems
             if (sharedHandler == null) throw new ArgumentNullException(nameof(sharedHandler));
             _payloadHandler = new AbilityPayloadHandlerChain(this, sharedHandler);
         }
+
+        private static bool HasValidSummonContract(EnemyAbilityDef ability, ExecutionDefinition execution) =>
+            ability.MinionHealthMult > 0f && ability.MinionDamageMult > 0f &&
+            execution.Magnitude > 0f && execution.Duration > 0f &&
+            Math.Abs(ability.MinionHealthMult - execution.Magnitude) <= 0.0001f &&
+            Math.Abs(ability.MinionDamageMult - execution.Duration) <= 0.0001f;
 
         private bool IsActiveTower(int towerId)
         {
@@ -531,11 +561,11 @@ namespace BattleSystemECS.Systems
 
         private AbilityActivationResult TryExecuteTypedBasicAbility(int enemyId, EnemyAbilityDef ability)
         {
-            if (!EnemyAbilityTypeRegistry.TryResolve(ability.AbilityType, out var type) ||
-                type.DispatchMode != EnemyAbilityDispatchMode.TypedCatalog || !type.Payload.HasValue)
+            if (!EnemyAbilityTypeRegistry.TryResolve(ability, out var type, out var payload,
+                out var operation) || type.DispatchMode != EnemyAbilityDispatchMode.TypedCatalog)
                 return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.UnsupportedDefinition);
-            bool heal = type.Payload.Value == EffectPayloadKind.Heal;
-            bool damage = type.Payload.Value == EffectPayloadKind.Damage;
+            bool heal = payload == EffectPayloadKind.Heal;
+            bool damage = payload == EffectPayloadKind.Damage || payload == EffectPayloadKind.Telegraph;
             var catalog = gameConfig.CompiledCatalog;
             if (catalog == null) return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.UnsupportedDefinition);
             string alias = ability.Id;
@@ -551,7 +581,7 @@ namespace BattleSystemECS.Systems
             {
                 if (!catalog.TryGetExecution(typed.Executions[i], out var execution))
                     return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.UnsupportedDefinition);
-                if (execution.Payload == type.Payload.Value && execution.Operation == type.Operation) payloadMatches = true;
+                if (execution.Payload == payload && execution.Operation == operation) payloadMatches = true;
             }
             if (!payloadMatches) return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.UnsupportedDefinition);
             if (groupHeal)
@@ -698,6 +728,27 @@ namespace BattleSystemECS.Systems
             }
         }
 
+        private void ExecuteBuffAllies(int enemyId, EnemyAbilityDef ability)
+        {
+            if (ability.AoeRadius <= 0) return;
+            float enemyX = store.PositionX[enemyId];
+            float enemyY = store.PositionY[enemyId];
+            var activeEnemyIds = store.GetCachedActiveEnemyIds();
+            int buffedCount = 0;
+            foreach (var allyId in activeEnemyIds)
+            {
+                if (!store.EnemyActive[allyId] || allyId == enemyId) continue;
+                float dist = Math.Abs(enemyX - store.PositionX[allyId]) +
+                             Math.Abs(enemyY - store.PositionY[allyId]);
+                if (dist > ability.AoeRadius) continue;
+                store.EnemyBuffDamageBonus[allyId] = store.EnemyDamage[allyId] * ability.DamageMultiplier;
+                store.EnemyBuffDurationLeft[allyId] = ability.BuffDuration;
+                buffedCount++;
+            }
+            if (buffedCount > 0)
+                logger.Log($"[ABILITY] Enemy {enemyId} buffs {buffedCount} allies with {ability.BuffStat} for {ability.BuffDuration} turns");
+        }
+
         private void ExecuteStunAoe(int enemyId, EnemyAbilityDef ability)
         {
             if (ability.AoeRadius <= 0 || ability.StunDuration <= 0) return;
@@ -771,7 +822,8 @@ namespace BattleSystemECS.Systems
 
         private void ExecuteSummonMinion(int enemyId, EnemyAbilityDef ability)
         {
-            EnemyWorldActionAdapter.Summon(store, logger, enemyId, ability);
+            EnemyWorldActionAdapter.Summon(store, logger, enemyId, ability,
+                ability.MinionHealthMult, ability.MinionDamageMult);
         }
 
         private static class EnemyWorldActionAdapter
@@ -787,13 +839,13 @@ namespace BattleSystemECS.Systems
             }
 
             internal static int Summon(ComponentStore store, IRenderer logger, int enemyId,
-                EnemyAbilityDef ability)
+                EnemyAbilityDef ability, float healthMult, float damageMult)
             {
+                if (healthMult <= 0f || damageMult <= 0f)
+                    throw new InvalidOperationException("summon multipliers must be validated before commit");
                 int minionId = store.CreateEntity();
                 if (minionId < 0)
                     throw new InvalidOperationException("prevalidated summon capacity was unavailable during commit");
-                float healthMult = ability.MinionHealthMult > 0 ? ability.MinionHealthMult : 0.3f;
-                float damageMult = ability.MinionDamageMult > 0 ? ability.MinionDamageMult : 0.3f;
                 float baseHealth = store.EnemyMaxHealth[enemyId];
                 float baseDamage = store.EnemyDamage[enemyId];
                 store.EnemyHealth[minionId] = baseHealth * healthMult;
@@ -811,6 +863,43 @@ namespace BattleSystemECS.Systems
                 store.AddActiveEnemyId(minionId);
                 logger.Log($"[ABILITY] Enemy {enemyId} summons minion {minionId} (HP: {baseHealth * healthMult:F0}, DMG: {baseDamage * damageMult:F0}) ({ability.Name})");
                 return 1;
+            }
+        }
+
+        private void ExecuteSilenceTower(int enemyId, EnemyAbilityDef ability)
+        {
+            if (ability.SilenceRadius <= 0 || ability.SilenceDuration <= 0) return;
+            float enemyX = store.PositionX[enemyId];
+            float enemyY = store.PositionY[enemyId];
+            var activeTowerIds = store.ActiveTowerIds;
+            for (int i = 0; i < activeTowerIds.Count; i++)
+            {
+                int towerId = activeTowerIds[i];
+                float dx = store.PositionX[towerId] - enemyX;
+                float dy = store.PositionY[towerId] - enemyY;
+                if ((float)Math.Sqrt(dx * dx + dy * dy) > ability.SilenceRadius) continue;
+                store.TowerIsSilenced[towerId] = true;
+                store.TowerSilenceTimer[towerId] = ability.SilenceDuration;
+                store.TowerSilenceSourceId[towerId] = enemyId;
+            }
+        }
+
+        private void ExecuteDispelTower(int enemyId, EnemyAbilityDef ability)
+        {
+            if (ability.DispelRadius <= 0f || ability.DispelDuration <= 0f) return;
+            float enemyX = store.PositionX[enemyId];
+            float enemyY = store.PositionY[enemyId];
+            var activeTowerIds = store.ActiveTowerIds;
+            for (int i = 0; i < activeTowerIds.Count; i++)
+            {
+                int towerId = activeTowerIds[i];
+                if (store.TowerDispelImmunityTimer[towerId] > 0f) continue;
+                float dx = store.PositionX[towerId] - enemyX;
+                float dy = store.PositionY[towerId] - enemyY;
+                if ((float)Math.Sqrt(dx * dx + dy * dy) > ability.DispelRadius) continue;
+                store.TowerIsDispelled[towerId] = true;
+                store.TowerDispelTimer[towerId] = ability.DispelDuration;
+                store.TowerDispelImmunityTimer[towerId] = 0f;
             }
         }
 

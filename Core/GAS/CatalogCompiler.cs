@@ -72,6 +72,27 @@ namespace BattleSystemECS.Core.GAS
     /// <summary>Strict bootstrap for canonical skills.json. Legacy game_config skills remain an explicit caller choice.</summary>
     public static class CatalogCompiler
     {
+        private static readonly HashSet<string> CuratedSkillProperties = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Name", "Description", "DamageMultiplier", "AreaWidth", "AreaHeight", "AttackRange", "Cooldown",
+            "AutoCast", "Hotkey", "AreaShape", "AreaRadius", "DotDuration", "DotTickInterval", "DotDamagePerTick",
+            "HealPercent", "ShieldAmount", "ShieldDuration", "FreezeDuration", "FreezeChance", "ConeAngleDegrees",
+            "SlowAmount", "SlowDuration", "PolymorphDuration", "PolymorphDamageTakenMultiplier", "ManaCost",
+            "SummonDefId", "AoeStunDuration", "AoeRootDuration", "AoeKnockbackForce", "Modifiers", "AllowedPhases",
+            "RequiredTags", "BlockedTags", "TargetRequiredTags", "TargetBlockedTags"
+        };
+        private static readonly HashSet<string> ModifierProperties = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Name", "Type", "Duration", "StackingType", "StackLimitCount", "Value", "EffectTag",
+            "GrantedTags", "BlockedTags"
+        };
+        private static readonly HashSet<string> StaticSkillProperties = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Name", "Description", "Hotkey", "AttackRange", "Cooldown", "AutoCast", "AreaWidth", "AreaHeight",
+            "DamageMultiplier", "ManaCost", "AllowedPhases", "RequiredTags", "BlockedTags",
+            "TargetRequiredTags", "TargetBlockedTags"
+        };
+
         public static GameplayCatalog CreateEmpty()
         {
             return new GameplayCatalog(Array.Empty<AbilityDefinition>(), Array.Empty<TargetingDefinition>(),
@@ -126,25 +147,26 @@ namespace BattleSystemECS.Core.GAS
                 var source = enemyAbilities[i];
                 if (source == null || string.IsNullOrWhiteSpace(source.Id) || string.IsNullOrWhiteSpace(source.Name))
                     throw new CatalogValidationException($"enemy abilities: missing id/name at index {i}");
-                if (!EnemyAbilityTypeRegistry.TryResolve(source.AbilityType, out var type))
+                if (!EnemyAbilityTypeRegistry.TryResolve(source, out var type, out var requiredPayload,
+                    out var requiredOperation))
                     throw new CatalogValidationException($"enemy abilities: unsupported AbilityType '{source.AbilityType}' for '{source.Id}'");
 
                 bool hasNameAlias = aliases.TryGetValue(source.Name, out var abilityId);
-                bool needsTypedDefinition = type.Payload.HasValue;
-                EffectPayloadKind requiredPayload = type.Payload.GetValueOrDefault();
-                bool nameIsCompatible = hasNameAlias && (!needsTypedDefinition ||
-                    AbilityContainsPayload(abilities, executions, abilityId, requiredPayload,
-                        type.Operation));
+                bool nameIsCompatible = hasNameAlias &&
+                    AbilityContainsPayload(abilities, executions, abilityId, requiredPayload, requiredOperation);
                 if (!nameIsCompatible)
                 {
                     abilityId = new AbilityId(abilities.Count);
                     var executionIds = new List<ExecutionId>();
                     var effectIds = new List<EffectId>();
                     TargetingShape shape = type.Targeting;
-                    EffectPayloadKind payload = type.Payload ?? EffectPayloadKind.GameplayEvent;
-                    ExecutionOperation operation = type.Operation;
+                    EffectPayloadKind payload = requiredPayload;
+                    ExecutionOperation operation = requiredOperation;
+                    MagnitudeSource magnitudeSource = MagnitudeSource.Constant;
+                    DamageAmountStage amountStage = DamageAmountStage.Raw;
                     float magnitude = 0f;
                     float duration = 0f;
+                    int parameter = 0;
 
                     switch (type.Kind)
                     {
@@ -154,6 +176,13 @@ namespace BattleSystemECS.Core.GAS
                             break;
                         case EnemyAbilityKind.AoeDamage:
                             magnitude = source.DamageMultiplier;
+                            magnitudeSource = MagnitudeSource.Multiplier;
+                            amountStage = DamageAmountStage.LegacyMultiplier;
+                            if (source.TelegraphDuration > 0f)
+                            {
+                                duration = source.TelegraphDuration;
+                                parameter = source.TelegraphColor;
+                            }
                             break;
                         case EnemyAbilityKind.StunAoe:
                             magnitude = source.StunDuration;
@@ -164,6 +193,11 @@ namespace BattleSystemECS.Core.GAS
                             duration = source.SlowDuration;
                             break;
                         case EnemyAbilityKind.SummonMinion:
+                            if (source.MinionHealthMult <= 0f || source.MinionDamageMult <= 0f)
+                                throw new CatalogValidationException($"enemy abilities: '{source.Id}' requires positive summon health and damage multipliers");
+                            magnitude = source.MinionHealthMult;
+                            duration = source.MinionDamageMult;
+                            break;
                         case EnemyAbilityKind.StealthAttack:
                             magnitude = 1f;
                             break;
@@ -204,8 +238,8 @@ namespace BattleSystemECS.Core.GAS
                     {
                         var executionId = new ExecutionId(executions.Count);
                         executions.Add(new ExecutionDefinition(executionId, payload, Math.Max(0f, magnitude),
-                            CatalogRegistries.SkillTag, MagnitudeSource.Multiplier, DamageAmountStage.LegacyMultiplier,
-                            Math.Max(0f, duration), operation));
+                            CatalogRegistries.SkillTag, magnitudeSource, amountStage,
+                            Math.Max(0f, duration), operation, parameter: parameter));
                         executionIds.Add(executionId);
                     }
 
@@ -326,27 +360,178 @@ namespace BattleSystemECS.Core.GAS
                 if (!catalog.TryResolveAlias(source.Name, out var id) || !catalog.TryGetAbility(id, out var ability))
                     throw new CatalogValidationException(path + ".Name: alias '" + source.Name + "' is not declared by canonical or static skills");
 
-                AssertCompatible(source.Cooldown, ability.Cooldown, path + ".Cooldown");
-                AssertCompatible(source.AttackRange, ability.Targeting.Range, path + ".AttackRange");
-                AssertCompatible(source.AreaWidth, ability.Targeting.Width, path + ".AreaWidth");
-                AssertCompatible(source.AreaHeight, ability.Targeting.Height, path + ".AreaHeight");
-                AssertCompatible(source.AreaRadius, ability.Targeting.Radius, path + ".AreaRadius");
-                if (!string.IsNullOrWhiteSpace(source.AreaShape))
+                AssertCompatible(IsSpecified(source, SkillSemanticField.Cooldown, source.Cooldown), source.Cooldown, ability.Cooldown, path + ".Cooldown", ability);
+                AssertCompatible(IsSpecified(source, SkillSemanticField.AttackRange, source.AttackRange), source.AttackRange, ability.Targeting.Range, path + ".AttackRange", ability);
+                AssertCompatible(IsSpecified(source, SkillSemanticField.AreaWidth, source.AreaWidth), source.AreaWidth, ability.Targeting.Width, path + ".AreaWidth", ability);
+                AssertCompatible(IsSpecified(source, SkillSemanticField.AreaHeight, source.AreaHeight), source.AreaHeight, ability.Targeting.Height, path + ".AreaHeight", ability);
+                AssertCompatible(IsSpecified(source, SkillSemanticField.AreaRadius, source.AreaRadius), source.AreaRadius, ability.Targeting.Radius, path + ".AreaRadius", ability);
+                AssertCompatible(IsSpecified(source, SkillSemanticField.ConeAngleDegrees, source.ConeAngleDegrees, 60f),
+                    source.ConeAngleDegrees, ability.Targeting.Angle, path + ".ConeAngleDegrees", ability);
+                AssertCompatible(IsSpecified(source, SkillSemanticField.ManaCost, source.ManaCost), source.ManaCost, ability.ManaCost, path + ".ManaCost", ability);
+                AssertExecutionCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.DamageMultiplier, source.DamageMultiplier), source.DamageMultiplier, ExecutionOperation.ApplyDamage,
+                    path + ".DamageMultiplier", ability, MagnitudeSource.Multiplier);
+                AssertExecutionCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.HealPercent, source.HealPercent), source.HealPercent, ExecutionOperation.ApplyHeal,
+                    path + ".HealPercent", ability);
+                AssertExecutionCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.ShieldAmount, source.ShieldAmount), source.ShieldAmount, ExecutionOperation.ApplyShield,
+                    path + ".ShieldAmount", ability);
+                AssertExecutionDurationCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.ShieldDuration, source.ShieldDuration), source.ShieldDuration, ExecutionOperation.ApplyShield,
+                    path + ".ShieldDuration", ability);
+                AssertExecutionCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.SlowAmount, source.SlowAmount), source.SlowAmount, ExecutionOperation.ApplySlow,
+                    path + ".SlowAmount", ability);
+                AssertExecutionDurationCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.SlowDuration, source.SlowDuration), source.SlowDuration, ExecutionOperation.ApplySlow,
+                    path + ".SlowDuration", ability);
+                AssertExecutionCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.AoeStunDuration, source.AoeStunDuration), source.AoeStunDuration, ExecutionOperation.ApplyCrowdControl,
+                    path + ".AoeStunDuration", ability);
+                AssertExecutionCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.AoeRootDuration, source.AoeRootDuration), source.AoeRootDuration, ExecutionOperation.ApplyCrowdControl,
+                    path + ".AoeRootDuration", ability);
+                AssertExecutionCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.AoeKnockbackForce, source.AoeKnockbackForce), source.AoeKnockbackForce, ExecutionOperation.ApplyCrowdControl,
+                    path + ".AoeKnockbackForce", ability);
+                AssertExecutionCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.FreezeDuration, source.FreezeDuration), source.FreezeDuration, ExecutionOperation.ApplyFreeze,
+                    path + ".FreezeDuration", ability);
+                AssertExecutionProbabilityCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.FreezeChance, source.FreezeChance), source.FreezeChance,
+                    ExecutionOperation.ApplyFreeze, path + ".FreezeChance", ability);
+                AssertEffectCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.DotDuration, source.DotDuration), source.DotDuration, path + ".DotDuration", ability,
+                    effect => effect.Duration);
+                AssertEffectCompatible(catalog, ability, IsSpecified(source, SkillSemanticField.DotTickInterval, source.DotTickInterval), source.DotTickInterval, path + ".DotTickInterval", ability,
+                    effect => effect.Period);
+                AssertModifiersCompatible(catalog, ability,
+                    source.HasSemanticField(SkillSemanticField.Modifiers) || source.Modifiers != null && source.Modifiers.Count > 0,
+                    source, path + ".Modifiers");
+                if (source.HasSemanticField(SkillSemanticField.AreaShape) || !string.IsNullOrWhiteSpace(source.AreaShape))
                 {
                     TargetingShape shape = ParseShapeName(source.AreaShape, path + ".AreaShape");
                     if (shape != ability.Targeting.Shape)
-                        throw new CatalogValidationException(path + ".AreaShape: conflicts with higher-precedence definition");
+                        throw new CatalogValidationException(path + ".AreaShape: conflicts with " + WinnerSource(ability));
                 }
             }
         }
 
-        private static void AssertCompatible(float lowerPriorityValue, float winningValue, string path)
+        private static bool IsSpecified(SkillConfig source, SkillSemanticField field, float value, float implicitDefault = 0f) =>
+            source.HasSemanticField(field) || Math.Abs(value - implicitDefault) > 0.0001f;
+
+        private static void AssertCompatible(bool specified, float lowerPriorityValue, float winningValue, string path, AbilityDefinition winner)
         {
-            if (lowerPriorityValue == 0f) return;
+            if (!specified) return;
             if (float.IsNaN(lowerPriorityValue) || float.IsInfinity(lowerPriorityValue) ||
                 Math.Abs(lowerPriorityValue - winningValue) > 0.0001f)
-                throw new CatalogValidationException(path + ": conflicts with higher-precedence definition");
+                throw new CatalogValidationException(path + ": conflicts with " + WinnerSource(winner));
         }
+
+        private static void AssertExecutionCompatible(GameplayCatalog catalog, AbilityDefinition ability, bool specified, float lowerPriorityValue,
+            ExecutionOperation operation, string path, AbilityDefinition winner, MagnitudeSource? source = null)
+        {
+            if (!specified) return;
+            bool found = TryFindExecution(catalog, ability, operation, source, out var execution);
+            float winningValue = found ? execution.Magnitude : 0f;
+            if (float.IsNaN(lowerPriorityValue) || float.IsInfinity(lowerPriorityValue) ||
+                !found && Math.Abs(lowerPriorityValue) > 0.0001f ||
+                Math.Abs(lowerPriorityValue - winningValue) > 0.0001f)
+                throw new CatalogValidationException(path + ": conflicts with " + WinnerSource(winner));
+        }
+
+        private static void AssertExecutionDurationCompatible(GameplayCatalog catalog, AbilityDefinition ability,
+            bool specified, float lowerPriorityValue, ExecutionOperation operation, string path, AbilityDefinition winner)
+        {
+            if (!specified) return;
+            bool found = TryFindExecution(catalog, ability, operation, null, out var execution);
+            float winningValue = found ? execution.Duration : 0f;
+            if (float.IsNaN(lowerPriorityValue) || float.IsInfinity(lowerPriorityValue) ||
+                !found && Math.Abs(lowerPriorityValue) > 0.0001f ||
+                Math.Abs(lowerPriorityValue - winningValue) > 0.0001f)
+                throw new CatalogValidationException(path + ": conflicts with " + WinnerSource(winner));
+        }
+
+        private static void AssertExecutionProbabilityCompatible(GameplayCatalog catalog, AbilityDefinition ability,
+            bool specified, float lowerPriorityValue, ExecutionOperation operation, string path, AbilityDefinition winner)
+        {
+            if (!specified) return;
+            bool found = TryFindExecution(catalog, ability, operation, null, out var execution);
+            float winningValue = found ? execution.Probability : 0f;
+            if (float.IsNaN(lowerPriorityValue) || float.IsInfinity(lowerPriorityValue) ||
+                !found && Math.Abs(lowerPriorityValue) > 0.0001f ||
+                Math.Abs(lowerPriorityValue - winningValue) > 0.0001f)
+                throw new CatalogValidationException(path + ": conflicts with " + WinnerSource(winner));
+        }
+
+        private static bool TryFindExecution(GameplayCatalog catalog, AbilityDefinition ability,
+            ExecutionOperation operation, MagnitudeSource? source, out ExecutionDefinition execution)
+        {
+            for (int i = 0; i < ability.Executions.Count; i++)
+            {
+                if (!catalog.TryGetExecution(ability.Executions[i], out var candidate)) continue;
+                if (candidate.Operation != operation || (source.HasValue && candidate.MagnitudeSource != source.Value)) continue;
+                execution = candidate;
+                return true;
+            }
+            execution = default(ExecutionDefinition);
+            return false;
+        }
+
+        private static void AssertEffectCompatible(GameplayCatalog catalog, AbilityDefinition ability,
+            bool specified, float lowerPriorityValue, string path, AbilityDefinition winner,
+            Func<GameplayEffectDefinition, float> selector)
+        {
+            if (!specified) return;
+            if (ability.Effects.Count == 0 && Math.Abs(lowerPriorityValue) <= 0.0001f) return;
+            for (int i = 0; i < ability.Effects.Count; i++)
+                if (catalog.TryGetEffect(ability.Effects[i], out var effect) &&
+                    Math.Abs(lowerPriorityValue - selector(effect)) <= 0.0001f) return;
+            throw new CatalogValidationException(path + ": conflicts with " + WinnerSource(winner));
+        }
+
+        private static void AssertModifiersCompatible(GameplayCatalog catalog, AbilityDefinition ability,
+            bool specified, SkillConfig source, string path)
+        {
+            if (!specified) return;
+            var modifiers = source.Modifiers;
+            if (modifiers == null || modifiers.Count == 0)
+            {
+                if (ability.SourceModifierCount > 0)
+                    throw new CatalogValidationException(path + ": conflicts with " + WinnerSource(ability));
+                return;
+            }
+            if (ability.SourceModifierCount != modifiers.Count)
+                throw new CatalogValidationException(path + "[0]: conflicts with " + WinnerSource(ability));
+            for (int i = 0; i < modifiers.Count; i++)
+            {
+                var modifier = modifiers[i];
+                string modifierPath = path + "[" + i + "]";
+                if (modifier == null || string.IsNullOrWhiteSpace(modifier.Type) ||
+                    !CatalogRegistries.TryTag(modifier.EffectTag, out var tag) ||
+                    !HasCompatibleModifier(ability.SourceModifiers[i], source, ability.Targeting.Shape, modifier, tag))
+                    throw new CatalogValidationException(modifierPath + ": conflicts with " + WinnerSource(ability));
+            }
+        }
+
+        private static bool HasCompatibleModifier(SkillModifierSemantic expected, SkillConfig source,
+            TargetingShape targeting, SkillModifierDef modifier, TagId tag)
+        {
+            bool crowdControl = string.Equals(modifier.Type, "CrowdControl", StringComparison.OrdinalIgnoreCase);
+            bool debuff = string.Equals(modifier.Type, "Debuff", StringComparison.OrdinalIgnoreCase);
+            bool damage = string.Equals(modifier.Type, "Damage", StringComparison.OrdinalIgnoreCase);
+            if (!crowdControl && !debuff && !damage) return false;
+            bool freeze = crowdControl && targeting == TargetingShape.Freeze;
+            EffectPayloadKind payload = freeze ? EffectPayloadKind.Freeze :
+                crowdControl ? EffectPayloadKind.CrowdControl : EffectPayloadKind.Damage;
+            ExecutionOperation operation = freeze ? ExecutionOperation.ApplyFreeze :
+                crowdControl ? ExecutionOperation.ApplyCrowdControl : ExecutionOperation.ApplyDamage;
+            float normalizedMagnitude = freeze ? source.FreezeDuration : modifier.Value;
+            float probability = freeze ? source.FreezeChance : 1f;
+            StackingBehavior stacking = ParseStacking(modifier.StackingType,
+                "player alias modifier", 0);
+            return string.Equals(expected.Name, modifier.Name, StringComparison.Ordinal) &&
+                   string.Equals(expected.Type, modifier.Type, StringComparison.OrdinalIgnoreCase) &&
+                   Math.Abs(expected.Value - modifier.Value) <= 0.0001f &&
+                   Math.Abs(expected.Duration - modifier.Duration) <= 0.0001f &&
+                   expected.Stacking == stacking && expected.MaxStacks == Math.Max(1, modifier.StackLimitCount) &&
+                   expected.Tag.Equals(tag) && expected.Payload == payload && expected.Operation == operation &&
+                   Math.Abs(expected.NormalizedMagnitude - normalizedMagnitude) <= 0.0001f &&
+                   Math.Abs(expected.Probability - probability) <= 0.0001f && expected.Targeting == targeting;
+        }
+
+        private static string WinnerSource(AbilityDefinition winner) => winner.Name == null
+            ? "higher-precedence definition"
+            : "higher-precedence compiled Catalog ability '" + winner.Name + "' (id " + winner.Id.Value + ")";
 
         private static TargetingShape ParseShapeName(string value, string path)
         {
@@ -409,6 +594,7 @@ namespace BattleSystemECS.Core.GAS
                 int id = 0;
                 foreach (var node in doc.RootElement.EnumerateArray())
                 {
+                    ValidateProperties(node, CuratedSkillProperties, canonicalSkillsPath, "$[" + id + "]");
                     string name = RequiredString(node, "Name", canonicalSkillsPath, id);
                     float duration = Number(node, "DotDuration", 0f, canonicalSkillsPath, id);
                     float period = Number(node, "DotTickInterval", 0f, canonicalSkillsPath, id);
@@ -419,6 +605,7 @@ namespace BattleSystemECS.Core.GAS
                     var effectIds = new List<EffectId>();
                     var abilityModifiers = new List<ModifierDefinition>();
                     var abilityExecutions = new List<ExecutionId>();
+                    var sourceModifierSemantics = new List<SkillModifierSemantic>();
                     float damageMultiplier = Number(node, "DamageMultiplier", 0f, canonicalSkillsPath, id);
                     if (damageMultiplier > 0f)
                     {
@@ -426,15 +613,73 @@ namespace BattleSystemECS.Core.GAS
                         executions.Add(new ExecutionDefinition(multiplierId, EffectPayloadKind.Damage, damageMultiplier, CatalogRegistries.SkillTag, MagnitudeSource.Multiplier, DamageAmountStage.LegacyMultiplier, 0f, ExecutionOperation.ApplyDamage));
                         abilityExecutions.Add(multiplierId);
                     }
+                    if (targeting.Shape == TargetingShape.Freeze)
+                    {
+                        float freezeDuration = Number(node, "FreezeDuration", 0f, canonicalSkillsPath, id);
+                        float freezeChance = Number(node, "FreezeChance", 0f, canonicalSkillsPath, id);
+                        if (freezeDuration <= 0f || freezeChance <= 0f || freezeChance > 1f)
+                            throw new CatalogValidationException($"{canonicalSkillsPath}: freeze ability {id} requires positive duration and probability in (0,1]");
+                        StackingBehavior freezeStacking = StackingBehavior.None;
+                        int freezeMaxStacks = 0;
+                        if (node.TryGetProperty("Modifiers", out var freezeModifiers) && freezeModifiers.ValueKind == JsonValueKind.Array)
+                            foreach (var modifier in freezeModifiers.EnumerateArray())
+                                if (modifier.TryGetProperty("Type", out var modifierType) &&
+                                    string.Equals(modifierType.GetString(), "CrowdControl", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    freezeStacking = ParseStacking(modifier.TryGetProperty("StackingType", out var stackingNode) &&
+                                        stackingNode.ValueKind == JsonValueKind.String ? stackingNode.GetString() : "None",
+                                        canonicalSkillsPath, id);
+                                    freezeMaxStacks = Int(modifier, "StackLimitCount", canonicalSkillsPath, id);
+                                    if (freezeMaxStacks < 1) freezeMaxStacks = 1;
+                                    break;
+                                }
+                        var freezeId = new ExecutionId(executions.Count);
+                        executions.Add(new ExecutionDefinition(freezeId, EffectPayloadKind.Freeze, freezeDuration,
+                            CatalogRegistries.SkillTag, MagnitudeSource.Constant, DamageAmountStage.Raw,
+                            freezeDuration, ExecutionOperation.ApplyFreeze, probability: freezeChance,
+                            semanticStacking: freezeStacking, semanticMaxStacks: freezeMaxStacks));
+                        abilityExecutions.Add(freezeId);
+                    }
                     if (node.TryGetProperty("Modifiers", out var modArray))
                     {
                         if (modArray.ValueKind != JsonValueKind.Array) throw new CatalogValidationException($"{canonicalSkillsPath}: Modifiers must be an array for id {id}");
                         foreach (var mod in modArray.EnumerateArray())
                         {
+                            ValidateProperties(mod, ModifierProperties, canonicalSkillsPath,
+                                "$[" + id + "].Modifiers");
                             string modName = RequiredString(mod, "Name", canonicalSkillsPath, id);
                             string modType = RequiredString(mod, "Type", canonicalSkillsPath, id);
                             float magnitude = Number(mod, "Value", 0f, canonicalSkillsPath, id);
+                            float modifierDuration = Number(mod, "Duration", duration, canonicalSkillsPath, id);
                             TagId tag = ParseTag(RequiredString(mod, "EffectTag", canonicalSkillsPath, id), canonicalSkillsPath, id);
+                            StackingBehavior sourceStacking = ParseStacking(
+                                mod.TryGetProperty("StackingType", out var stackingNode) && stackingNode.ValueKind == JsonValueKind.String
+                                    ? stackingNode.GetString() : "None", canonicalSkillsPath, id);
+                            int sourceMaxStacks = Int(mod, "StackLimitCount", canonicalSkillsPath, id);
+                            if (sourceMaxStacks < 1) sourceMaxStacks = 1;
+                            bool normalizedFreeze = targeting.Shape == TargetingShape.Freeze &&
+                                string.Equals(modType, "CrowdControl", StringComparison.OrdinalIgnoreCase);
+                            EffectPayloadKind normalizedPayload = normalizedFreeze ? EffectPayloadKind.Freeze :
+                                string.Equals(modType, "CrowdControl", StringComparison.OrdinalIgnoreCase)
+                                    ? EffectPayloadKind.CrowdControl : EffectPayloadKind.Damage;
+                            ExecutionOperation normalizedOperation = normalizedFreeze ? ExecutionOperation.ApplyFreeze :
+                                string.Equals(modType, "CrowdControl", StringComparison.OrdinalIgnoreCase)
+                                    ? ExecutionOperation.ApplyCrowdControl : ExecutionOperation.ApplyDamage;
+                            float normalizedMagnitude = normalizedFreeze
+                                ? Number(node, "FreezeDuration", 0f, canonicalSkillsPath, id) : magnitude;
+                            float normalizedProbability = normalizedFreeze
+                                ? Number(node, "FreezeChance", 0f, canonicalSkillsPath, id) : 1f;
+                            bool directDamage = string.Equals(modType, "Damage", StringComparison.OrdinalIgnoreCase);
+                            sourceModifierSemantics.Add(new SkillModifierSemantic(modName, modType, magnitude,
+                                modifierDuration, directDamage ? StackingBehavior.None : sourceStacking,
+                                directDamage ? 0 : sourceMaxStacks, tag, normalizedPayload,
+                                normalizedOperation, normalizedMagnitude, normalizedProbability, targeting.Shape));
+                            if (targeting.Shape == TargetingShape.Freeze &&
+                                string.Equals(modType, "CrowdControl", StringComparison.OrdinalIgnoreCase))
+                            {
+                                AddAlias(aliases, modName, new AbilityId(id), canonicalSkillsPath);
+                                continue;
+                            }
                             if (string.Equals(modType, "Damage", StringComparison.OrdinalIgnoreCase))
                             {
                                 // Damage is an execution payload, not an attribute modifier.
@@ -498,7 +743,7 @@ namespace BattleSystemECS.Core.GAS
                     var requiredTags = ParseTags(node, "RequiredTags", canonicalSkillsPath, id);
                     var blockedTags = ParseTags(node, "BlockedTags", canonicalSkillsPath, id);
                     EnsureNoTagConflict(requiredTags, blockedTags, canonicalSkillsPath, id, "ability");
-                    typedAbilities.Add(new AbilityDefinition(new AbilityId(id), name, targeting, ClockId.Combat, Number(node, "Cooldown", 0f, canonicalSkillsPath, id), ParseAllowedPhases(node, targeting.Shape, canonicalSkillsPath, id), effectIds.ToArray(), abilityModifiers.ToArray(), CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, ActivationPolicy.Instant, manaCost, abilityExecutions.ToArray(), manaCost > 0 ? new[] { new CostDefinition(CatalogRegistries.Mana, manaCost) } : Array.Empty<CostDefinition>(), requiredTags, blockedTags));
+                    typedAbilities.Add(new AbilityDefinition(new AbilityId(id), name, targeting, ClockId.Combat, Number(node, "Cooldown", 0f, canonicalSkillsPath, id), ParseAllowedPhases(node, targeting.Shape, canonicalSkillsPath, id), effectIds.ToArray(), abilityModifiers.ToArray(), CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, ActivationPolicy.Instant, manaCost, abilityExecutions.ToArray(), manaCost > 0 ? new[] { new CostDefinition(CatalogRegistries.Mana, manaCost) } : Array.Empty<CostDefinition>(), requiredTags, blockedTags, semanticFields: ReadSkillSemanticFields(node), sourceModifiers: sourceModifierSemantics.ToArray()));
                     abilities.Add(entry);
                     AddAlias(aliases, name, entry.Id, canonicalSkillsPath);
                     id++;
@@ -517,6 +762,7 @@ namespace BattleSystemECS.Core.GAS
                         JsonElement node = doc.RootElement;
                         if (node.ValueKind != JsonValueKind.Object)
                             throw new CatalogValidationException($"{skillPath}: expected object");
+                        ValidateProperties(node, StaticSkillProperties, skillPath, "$");
                         var staticRecord = StaticSkillSchemaAdapter.Read(node, skillPath, abilities.Count);
                         string name = staticRecord.Name;
                         if (staticNames.Contains(name)) throw new CatalogValidationException($"{skillPath}: static skill alias conflict '{name}'");
@@ -526,7 +772,9 @@ namespace BattleSystemECS.Core.GAS
                             ? TargetingShape.Box : TargetingShape.Single;
                         var entry = new AbilityCatalogEntry(new AbilityId(abilities.Count), name, (int)staticShape, 0f);
                         var staticExecution = new ExecutionId(executions.Count);
-                        executions.Add(new ExecutionDefinition(staticExecution, EffectPayloadKind.Damage, staticRecord.DamageMultiplier, CatalogRegistries.SkillTag, MagnitudeSource.Multiplier, DamageAmountStage.LegacyMultiplier));
+                        executions.Add(new ExecutionDefinition(staticExecution, EffectPayloadKind.Damage,
+                            staticRecord.DamageMultiplier, CatalogRegistries.SkillTag, MagnitudeSource.Multiplier,
+                            DamageAmountStage.LegacyMultiplier, 0f, ExecutionOperation.ApplyDamage));
                         var staticTargeting = new TargetingDefinition(new TargetingId(entry.Id.Value), staticShape, staticRecord.Range,
                                 staticRecord.Width, staticRecord.Height, staticShape == TargetingShape.Single ? 1 : 0,
                                 requiredTags: ParseTags(node, "TargetRequiredTags", skillPath, entry.Id.Value),
@@ -540,7 +788,8 @@ namespace BattleSystemECS.Core.GAS
                             ClockId.Combat, staticRecord.Cooldown, ParseAllowedPhases(node, staticShape, skillPath, entry.Id.Value), Array.Empty<EffectId>(),
                             Array.Empty<ModifierDefinition>(), CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
                             ActivationPolicy.Instant, staticRecord.ManaCost, new[] { staticExecution },
-                            staticRecord.ManaCost > 0 ? new[] { new CostDefinition(CatalogRegistries.Mana, staticRecord.ManaCost) } : Array.Empty<CostDefinition>(), staticRequired, staticBlocked));
+                            staticRecord.ManaCost > 0 ? new[] { new CostDefinition(CatalogRegistries.Mana, staticRecord.ManaCost) } : Array.Empty<CostDefinition>(), staticRequired, staticBlocked,
+                            semanticFields: ReadSkillSemanticFields(node)));
                         targetings.Add(typedAbilities[typedAbilities.Count - 1].Targeting);
                         abilities.Add(entry);
                         AddAlias(aliases, name, entry.Id, skillPath);
@@ -557,6 +806,23 @@ namespace BattleSystemECS.Core.GAS
             if (!node.TryGetProperty(property, out var value) || value.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(value.GetString()))
                 throw new CatalogValidationException($"{path}: missing {property} for id {id}");
             return value.GetString();
+        }
+
+        private static SkillSemanticField ReadSkillSemanticFields(JsonElement node)
+        {
+            SkillSemanticField fields = SkillSemanticField.None;
+            foreach (var property in node.EnumerateObject())
+                if (Enum.TryParse(property.Name, true, out SkillSemanticField field)) fields |= field;
+            return fields;
+        }
+
+        private static void ValidateProperties(JsonElement node, HashSet<string> allowed, string sourcePath, string nodePath)
+        {
+            if (node.ValueKind != JsonValueKind.Object)
+                throw new CatalogValidationException(sourcePath + ":" + nodePath + ": expected object");
+            foreach (var property in node.EnumerateObject())
+                if (!allowed.Contains(property.Name))
+                    throw new CatalogValidationException(sourcePath + ":" + nodePath + "." + property.Name + ": unknown field");
         }
         private static float Number(JsonElement node, string property, float fallback, string path, int id)
         {

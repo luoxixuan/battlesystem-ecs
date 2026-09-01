@@ -15,6 +15,15 @@ namespace BattleSystemECS.Core.GAS
                 case EffectPayloadKind.Slow: return Matches(execution.Operation, ExecutionOperation.ApplySlow);
                 case EffectPayloadKind.CrowdControl: return Matches(execution.Operation, ExecutionOperation.ApplyCrowdControl);
                 case EffectPayloadKind.GameplayEvent: return execution.Operation == ExecutionOperation.Default;
+                case EffectPayloadKind.Status:
+                    return execution.Operation == ExecutionOperation.ApplyEnemyBuff ||
+                           execution.Operation == ExecutionOperation.ApplyTowerSilence;
+                case EffectPayloadKind.Dispel:
+                    return execution.Operation == ExecutionOperation.RemoveDispellableEffects;
+                case EffectPayloadKind.Freeze:
+                    return execution.Operation == ExecutionOperation.ApplyFreeze;
+                case EffectPayloadKind.Telegraph:
+                    return execution.Operation == ExecutionOperation.QueueTelegraph;
                 case EffectPayloadKind.Resurrect: return execution.Operation == ExecutionOperation.Resurrect;
                 case EffectPayloadKind.Resource: return execution.Operation == ExecutionOperation.RestoreSnapshot;
                 case EffectPayloadKind.WorldAction:

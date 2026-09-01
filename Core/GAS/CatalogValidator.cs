@@ -30,6 +30,7 @@ namespace BattleSystemECS.Core.GAS
                 foreach (var execution in ability.Executions) if ((uint)execution.Value >= (uint)catalog.Executions.Count) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} references missing execution {execution.Value}");
                 foreach (var effect in ability.Effects) if ((uint)effect.Value >= (uint)catalog.Effects.Count) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} references missing effect {effect.Value}");
                 foreach (var trigger in ability.TriggerRefs) if ((uint)trigger.Value >= (uint)catalog.Triggers.Count) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} ({ability.Name}) references missing trigger {trigger.Value}");
+                ValidateModifierProvenance(catalog, ability, path);
             }
             if (catalog.AbilityDefinitions == null || catalog.AbilityDefinitions.Count != catalog.Abilities.Count)
                 throw new CatalogValidationException($"{path}: ability definition/reference count mismatch");
@@ -81,6 +82,18 @@ namespace BattleSystemECS.Core.GAS
                 if (execution.Id.Value != i) throw new CatalogValidationException($"{path}: execution id {execution.Id.Value} is not contiguous");
                 if (float.IsNaN(execution.Magnitude) || float.IsInfinity(execution.Magnitude) || execution.Magnitude < 0f || float.IsNaN(execution.Duration) || float.IsInfinity(execution.Duration) || execution.Duration < 0f)
                     throw new CatalogValidationException($"{path}: invalid execution magnitude/duration for id {execution.Id.Value}");
+                if (float.IsNaN(execution.Probability) || float.IsInfinity(execution.Probability) ||
+                    execution.Probability < 0f || execution.Probability > 1f)
+                    throw new CatalogValidationException($"{path}: invalid execution probability for id {execution.Id.Value}");
+                if (execution.Payload == EffectPayloadKind.Telegraph &&
+                    (execution.Duration <= 0f || execution.Parameter < 0 || execution.Parameter > 2))
+                    throw new CatalogValidationException($"{path}: invalid telegraph duration/color for execution {execution.Id.Value}");
+                if (execution.Operation == ExecutionOperation.SummonEnemy &&
+                    (execution.Payload != EffectPayloadKind.WorldAction || execution.Magnitude <= 0f || execution.Duration <= 0f))
+                    throw new CatalogValidationException($"{path}: summon execution {execution.Id.Value} requires positive health and damage multipliers");
+                if (execution.Payload == EffectPayloadKind.Damage && execution.Operation == ExecutionOperation.ApplyDamage &&
+                    (execution.SemanticStacking != StackingBehavior.None || execution.SemanticMaxStacks != 0))
+                    throw new CatalogValidationException($"{path}: direct damage execution {execution.Id.Value} has an invalid stack contract");
                 if (!ProductionAbilityPayloadRegistry.Supports(execution))
                     throw new CatalogValidationException($"{path}: execution {execution.Id.Value} has no production handler for {execution.Payload}/{execution.Operation}");
             }
@@ -97,6 +110,61 @@ namespace BattleSystemECS.Core.GAS
         {
             if (catalog.Abilities.Count > MaxCatalogEntries || catalog.AbilityDefinitions.Count > MaxCatalogEntries || catalog.Targetings.Count > MaxCatalogEntries || catalog.Effects.Count > MaxCatalogEntries || catalog.Executions.Count > MaxCatalogEntries || catalog.Triggers.Count > MaxCatalogEntries || catalog.Modifiers.Count > MaxCatalogEntries)
                 throw new CatalogValidationException($"{path}: catalog exceeds capacity {MaxCatalogEntries}");
+        }
+
+        private static void ValidateModifierProvenance(GameplayCatalog catalog, AbilityDefinition ability, string path)
+        {
+            for (int i = 0; i < ability.SourceModifiers.Count; i++)
+            {
+                var semantic = ability.SourceModifiers[i];
+                bool matched = false;
+                CatalogRegistries.TryTag("Freeze", out var freezeTag);
+                if (semantic.Targeting == ability.Targeting.Shape)
+                {
+                    bool directDamageAbsentStack = semantic.Operation == ExecutionOperation.ApplyDamage &&
+                        semantic.Payload == EffectPayloadKind.Damage &&
+                        string.Equals(semantic.Type, "Damage", StringComparison.OrdinalIgnoreCase) &&
+                        semantic.Stacking == StackingBehavior.None && semantic.MaxStacks == 0;
+                    if (semantic.Operation == ExecutionOperation.ApplyDamage &&
+                        semantic.Payload == EffectPayloadKind.Damage &&
+                        string.Equals(semantic.Type, "Damage", StringComparison.OrdinalIgnoreCase) && !directDamageAbsentStack)
+                        throw new CatalogValidationException($"{path}: ability {ability.Id.Value} modifier provenance {i} is not closed");
+                    for (int j = 0; j < ability.Executions.Count && !matched; j++)
+                    {
+                        var execution = catalog.Executions[ability.Executions[j].Value];
+                        matched = execution.Payload == semantic.Payload && execution.Operation == semantic.Operation &&
+                                  (semantic.Operation == ExecutionOperation.ApplyFreeze
+                                      ? execution.Tag.Equals(CatalogRegistries.SkillTag) && semantic.Tag.Equals(freezeTag)
+                                      : execution.Tag.Equals(semantic.Tag)) &&
+                                  Math.Abs(execution.Magnitude - semantic.NormalizedMagnitude) <= 0.0001f &&
+                                  Math.Abs(execution.Probability - semantic.Probability) <= 0.0001f &&
+                                  (semantic.Operation == ExecutionOperation.ApplyFreeze
+                                      ? Math.Abs(execution.Duration - semantic.Duration) <= 0.0001f &&
+                                        execution.SemanticStacking == semantic.Stacking &&
+                                        execution.SemanticMaxStacks == semantic.MaxStacks &&
+                                        semantic.Stacking != StackingBehavior.None && semantic.MaxStacks > 0
+                                      : execution.SemanticStacking == StackingBehavior.None &&
+                                        execution.SemanticMaxStacks == 0);
+                    }
+                    for (int j = 0; j < ability.Effects.Count && !matched; j++)
+                    {
+                        var effect = catalog.Effects[ability.Effects[j].Value];
+                        if (effect.Payload != semantic.Payload || !effect.Tag.Equals(semantic.Tag) ||
+                            Math.Abs(effect.Duration - semantic.Duration) > 0.0001f ||
+                            effect.Stacking != semantic.Stacking || effect.MaxStacks != semantic.MaxStacks) continue;
+                        for (int k = 0; k < effect.Executions.Count && !matched; k++)
+                        {
+                            var execution = catalog.Executions[effect.Executions[k].Value];
+                            matched = execution.Payload == semantic.Payload && execution.Operation == semantic.Operation &&
+                                      execution.Tag.Equals(semantic.Tag) &&
+                                      Math.Abs(execution.Magnitude - semantic.NormalizedMagnitude) <= 0.0001f &&
+                                      Math.Abs(execution.Probability - semantic.Probability) <= 0.0001f;
+                        }
+                    }
+                }
+                if (!matched)
+                    throw new CatalogValidationException($"{path}: ability {ability.Id.Value} modifier provenance {i} is not closed");
+            }
         }
     }
 }
