@@ -1,12 +1,20 @@
 namespace BattleSystemECS.Core.GAS
 {
+    public enum AbilityActivationRejectReason { None, InvalidRequest, Cooldown, NoTarget, PhaseNotAllowed, Cost }
+
     public readonly struct AbilityActivationRequest
     {
         public readonly int OwnerId;
         public readonly int Slot;
         public readonly float Cooldown;
-        public AbilityActivationRequest(int ownerId, int slot, float cooldown)
-        { OwnerId = ownerId; Slot = slot; Cooldown = cooldown; }
+        public readonly int TargetId;
+        public readonly AbilityId Ability;
+        public readonly EffectId Effect;
+        public readonly TriggerId Trigger;
+        public readonly float Cost;
+        public AbilityActivationRequest(int ownerId, int slot, float cooldown, int targetId = -1,
+            AbilityId ability = default(AbilityId), EffectId effect = default(EffectId), TriggerId trigger = default(TriggerId), float cost = 0f)
+        { OwnerId = ownerId; Slot = slot; Cooldown = cooldown; TargetId = targetId; Ability = ability; Effect = effect; Trigger = trigger; Cost = cost; }
     }
 
     public readonly struct AbilityActivationResult
@@ -14,8 +22,9 @@ namespace BattleSystemECS.Core.GAS
         public readonly bool Accepted;
         public readonly int OwnerId;
         public readonly int Slot;
-        public AbilityActivationResult(bool accepted, int ownerId, int slot)
-        { Accepted = accepted; OwnerId = ownerId; Slot = slot; }
+        public readonly AbilityActivationRejectReason Reason;
+        public AbilityActivationResult(bool accepted, int ownerId, int slot, AbilityActivationRejectReason reason = AbilityActivationRejectReason.None)
+        { Accepted = accepted; OwnerId = ownerId; Slot = slot; Reason = reason; }
     }
 
     /// <summary>
@@ -27,14 +36,19 @@ namespace BattleSystemECS.Core.GAS
     {
         public static AbilityActivationResult TryActivate(float[] cooldowns, AbilityActivationRequest request)
         {
-            bool accepted = TryActivate(cooldowns, request.Slot);
-            return new AbilityActivationResult(accepted, request.OwnerId, request.Slot);
+            var reason = cooldowns == null || request.Slot < 0 || request.Slot >= (cooldowns?.Length ?? 0)
+                ? AbilityActivationRejectReason.InvalidRequest
+                : cooldowns[request.Slot] > 0f ? AbilityActivationRejectReason.Cooldown : AbilityActivationRejectReason.None;
+            return new AbilityActivationResult(reason == AbilityActivationRejectReason.None, request.OwnerId, request.Slot, reason);
         }
 
         public static AbilityActivationResult AbilityCommit(float[] cooldowns, AbilityActivationRequest request)
         {
+            var ready = TryActivate(cooldowns, request);
+            if (!ready.Accepted) return ready;
             bool accepted = AbilityCommit(cooldowns, request.Slot, request.Cooldown);
-            return new AbilityActivationResult(accepted, request.OwnerId, request.Slot);
+            return new AbilityActivationResult(accepted, request.OwnerId, request.Slot,
+                accepted ? AbilityActivationRejectReason.None : AbilityActivationRejectReason.Cooldown);
         }
 
         public static bool TryActivate(float[] cooldowns, int index)

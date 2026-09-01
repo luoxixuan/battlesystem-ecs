@@ -2,6 +2,8 @@
 using System;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Components;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -12,8 +14,8 @@ namespace BattleSystemECS.Systems
     /// powerful AOE attached to that specific tower). This system handles:
     ///   • per-frame cooldown tick (so the gate resolves in seconds, not frames)
     ///   • the public TriggerTowerActive(towerId) API the player/HUD calls on input
-    ///   • a soft-coupling dispatch into the shared SkillDef table — any player skill
-    ///     can be repurposed as a tower active (designer just references its id)
+    ///   • a typed activation request into the shared ability runtime, followed by a
+    ///     resolver-owned damage request against the selected enemy
     ///
     /// Design notes:
     ///   • Inert by default: ActiveSkillId == -1 → no field writes, no per-tick work
@@ -32,6 +34,7 @@ namespace BattleSystemECS.Systems
         private GameConfig? _config;
         private PhaseContext _phaseContext = PhaseContext.Unbound;
         public PhaseContextKind CurrentPhaseContext => _phaseContext.Kind;
+        public AbilityActivationResult LastActivation { get; private set; }
 
         public TowerActiveSkillSystem(ComponentStore store, GameConfig? config = null)
         {
@@ -62,7 +65,7 @@ namespace BattleSystemECS.Systems
                 if (!store.TowerActive[towerId]) continue;
                 // Fast skip: no active skill → cooldown is 0, no work to do
                 if (store.TowerActiveSkillId[towerId] < 0) continue;
-                store.TickTowerActiveCooldown(towerId, deltaTime);
+                GameplayAbilityRuntime.TickCooldown(store.TowerActiveCooldown, towerId, deltaTime);
             }
         }
 
@@ -71,27 +74,62 @@ namespace BattleSystemECS.Systems
         /// bound to a tower's active skill. Returns true if the cast succeeded
         /// (i.e. the tower was ready and the cooldown gate was passed).
         ///
-        /// Note: the actual effect dispatch (AOE damage, debuff, heal) is left as
-        /// a follow-up hook — Round 138 establishes the gate + cooldown contract
-        /// and emits a log line so the design intent is observable. The skill-id
-        /// resolution into a real cast path is the next round's job (the relevant
-        /// SkillSystem.CastXxx methods are player-targeted, so they need a
-        /// "cast by tower" variant — that's a bigger refactor than fits in one round).
+        /// The bool-returning method is retained as the public compatibility adapter;
+        /// callers needing rejection diagnostics should use ActivateTower.
         /// </summary>
         public bool TriggerTowerActive(int towerId)
         {
-            if (!_phaseContext.AllowsCombat) return false;
-            if (!ComponentStore.IsValidEntity(towerId)) return false;
-            if (!store.TowerActive[towerId]) return false;
+            LastActivation = ActivateTower(towerId);
+            return LastActivation.Accepted;
+        }
+
+        public AbilityActivationResult ActivateTower(int towerId)
+        {
+            if (!_phaseContext.AllowsCombat) return Reject(towerId, AbilityActivationRejectReason.PhaseNotAllowed);
+            if (!ComponentStore.IsValidEntity(towerId) || !store.TowerActive[towerId]) return Reject(towerId, AbilityActivationRejectReason.InvalidRequest);
             int skillId = store.TowerActiveSkillId[towerId];
-            if (skillId < 0) return false;
-            if (store.TowerActiveCooldown[towerId] > 0f) return false;
-            // Gate passed — flip the cooldown to its max and emit the log.
-            store.SetTowerActiveOnCooldown(towerId);
-            string towerName = store.TowerType[towerId].ToString();
-            string skillName = ResolveSkillName(skillId);
-            Console.WriteLine($"[TOWER_ACTIVE] tower={towerId} ({towerName}) cast skillId={skillId} ({skillName}) cd={store.TowerActiveCooldownMax[towerId]:F1}s");
-            return true;
+            if (skillId < 0) return Reject(towerId, AbilityActivationRejectReason.InvalidRequest);
+            int targetId = FindTarget(towerId);
+            var request = new AbilityActivationRequest(towerId, towerId, store.TowerActiveCooldownMax[towerId], targetId,
+                new AbilityId(skillId), new EffectId(skillId), new TriggerId(skillId));
+            var ready = GameplayAbilityRuntime.TryActivate(store.TowerActiveCooldown, request);
+            if (!ready.Accepted) return ready;
+            // A tower may be activated before enemies spawn; retain the legacy
+            // cooldown-only acknowledgement while the effect path remains inert.
+            if (targetId < 0) return GameplayAbilityRuntime.AbilityCommit(store.TowerActiveCooldown, request);
+            var skill = _config?.TryGetSkillById(skillId);
+            float multiplier = skill != null && skill.DamageMultiplier > 0f ? skill.DamageMultiplier : 1f;
+            float damage = store.TowerAttackDamage[towerId] * multiplier;
+            if (damage <= 0f) return Reject(towerId, AbilityActivationRejectReason.InvalidRequest);
+            var damageRequest = new DamageRequest(store.GetEntityHandle(towerId), store.GetEntityHandle(targetId), damage,
+                DamageType.True, ElementType.None, DamageFlags.None, DamageAmountStage.Raw,
+                DamageCommitBoundary.GameplayResolve, store.AllocateGameplaySequence(targetId),
+                ability: request.Ability, effect: request.Effect, ownerPlayerId: 0);
+            var applied = store.DamageResolver.TryApply(damageRequest);
+            if (!applied.Accepted) return Reject(towerId, AbilityActivationRejectReason.InvalidRequest);
+            var committed = GameplayAbilityRuntime.AbilityCommit(store.TowerActiveCooldown, request);
+            if (committed.Accepted)
+                Console.WriteLine($"[TOWER_ACTIVE] tower={towerId} target={targetId} skill={ResolveSkillName(skillId)} damage={damage:F1}");
+            return committed;
+        }
+
+        private AbilityActivationResult Reject(int towerId, AbilityActivationRejectReason reason) =>
+            new AbilityActivationResult(false, towerId, towerId, reason);
+
+        private int FindTarget(int towerId)
+        {
+            int best = -1; float bestDistance = float.MaxValue;
+            var enemies = store.ActiveEnemyIds;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                int enemy = enemies[i];
+                if (!store.EnemyActive[enemy] || store.EnemyHealth[enemy] <= 0f) continue;
+                float dx = store.PositionX[enemy] - store.PositionX[towerId];
+                float dy = store.PositionY[enemy] - store.PositionY[towerId];
+                float distance = dx * dx + dy * dy;
+                if (distance < bestDistance) { bestDistance = distance; best = enemy; }
+            }
+            return best;
         }
 
         internal void SetPhaseContext(PhaseContext context) => _phaseContext = context;
