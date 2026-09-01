@@ -7,6 +7,25 @@ namespace BattleSystemECS.Core.GAS
     /// </summary>
     public static class GameplayAbilityRuntime
     {
+        public static bool TryActivate(float[] cooldowns, int index)
+        {
+            return cooldowns != null && index >= 0 && index < cooldowns.Length && cooldowns[index] <= 0f;
+        }
+
+        public static bool AbilityCommit(float[] cooldowns, int index, float cooldown)
+        {
+            if (!TryActivate(cooldowns, index)) return false;
+            cooldowns[index] = System.Math.Max(0f, cooldown);
+            return true;
+        }
+
+        public static bool TickCooldown(float[] cooldowns, int index, float deltaSeconds)
+        {
+            if (cooldowns == null || deltaSeconds <= 0f || index < 0 || index >= cooldowns.Length) return false;
+            cooldowns[index] = System.Math.Max(0f, cooldowns[index] - deltaSeconds);
+            return true;
+        }
+
         public static bool TryActivate(ComponentStore store, int entityId, int slot, out AbilityInstance ability)
         {
             ability = default(AbilityInstance);

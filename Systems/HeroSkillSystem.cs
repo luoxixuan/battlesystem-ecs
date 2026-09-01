@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -150,9 +151,7 @@ namespace BattleSystemECS.Systems
                     if (_heroSkillIds[flatIdx] < 0) continue;
                     float cd = _heroSkillCooldowns[flatIdx];
                     if (cd <= 0f) continue;
-                    cd -= deltaTime;
-                    if (cd < 0f) cd = 0f;
-                    _heroSkillCooldowns[flatIdx] = cd;
+                    GameplayAbilityRuntime.TickCooldown(_heroSkillCooldowns, flatIdx, deltaTime);
                 }
             }
         }
@@ -174,10 +173,10 @@ namespace BattleSystemECS.Systems
             int flatIdx = heroId * MAX_HERO_SKILLS + slot;
             int skillId = _heroSkillIds[flatIdx];
             if (skillId < 0) return false;
-            if (_heroSkillCooldowns[flatIdx] > 0f) return false;
+            if (!GameplayAbilityRuntime.TryActivate(_heroSkillCooldowns, flatIdx)) return false;
 
             // Gate passed — flip the cooldown to its max and emit the log.
-            _heroSkillCooldowns[flatIdx] = _heroSkillCooldownMax[flatIdx];
+            GameplayAbilityRuntime.AbilityCommit(_heroSkillCooldowns, flatIdx, _heroSkillCooldownMax[flatIdx]);
             string skillName = ResolveSkillNameById(skillId);
             Console.WriteLine($"[HERO_SKILL] hero={heroId} slot={slot} cast skillId={skillId} ({skillName}) cd={_heroSkillCooldownMax[flatIdx]:F1}s");
             return true;

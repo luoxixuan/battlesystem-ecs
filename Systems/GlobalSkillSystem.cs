@@ -95,7 +95,7 @@ namespace BattleSystemECS.Systems
                     // effectiveRate = 1 + cdr, capped at 60% (1.6x speed)
                     float cdr = store.PlayerCooldownReduction[playerId];
                     float cdrClamped = Math.Min(cdr, 0.6f);
-                    store.PlayerGlobalSkillCooldown[idx] = Math.Max(0f, cd - deltaTime * (1f + cdrClamped));
+                    GameplayAbilityRuntime.TickCooldown(store.PlayerGlobalSkillCooldown, idx, deltaTime * (1f + cdrClamped));
                 }
             }
 
@@ -149,7 +149,7 @@ namespace BattleSystemECS.Systems
 
             int idx = playerId * MAX_GLOBAL_SKILLS + skillIdx;
             if (!store.PlayerGlobalSkillUnlocked[idx]) return false;
-            if (store.PlayerGlobalSkillCooldown[idx] > 0f) return false;
+            if (!GameplayAbilityRuntime.TryActivate(store.PlayerGlobalSkillCooldown, idx)) return false;
 
             // Get skill definition
             var def = GetSkillDef(skillIdx);
@@ -179,7 +179,7 @@ namespace BattleSystemECS.Systems
             ExecuteSkillEffect(def);
 
             // Start cooldown
-            store.PlayerGlobalSkillCooldown[idx] = def.Cooldown;
+            GameplayAbilityRuntime.AbilityCommit(store.PlayerGlobalSkillCooldown, idx, def.Cooldown);
 
             renderer.Log($"[GlobalSkill] Activated: {def.Name}");
             _successfulActivationCount++;
