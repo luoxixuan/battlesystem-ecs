@@ -173,22 +173,26 @@ namespace BattleSystemECS.Systems
             int flatIdx = heroId * MAX_HERO_SKILLS + slot;
             int skillId = _heroSkillIds[flatIdx];
             if (skillId < 0) return false;
-            var activation = new AbilityActivationRequest(heroId, slot, _heroSkillCooldownMax[flatIdx]);
             var catalog = _config?.CompiledCatalog;
-            if (catalog != null && TryResolveCatalogAbility(catalog, skillId, out var abilityId))
-            {
-                activation = new AbilityActivationRequest(heroId, slot, _heroSkillCooldownMax[flatIdx], heroId, abilityId);
-                var result = GameplayAbilityRuntime.Activate(store, catalog, _heroSkillCooldowns, activation);
-                if (!result.Accepted) return false;
-                Console.WriteLine($"[HERO_SKILL] hero={heroId} slot={slot} ability={abilityId.Value} effects={result.AppliedEffects}");
-                return true;
-            }
-            if (!GameplayAbilityRuntime.TryActivate(_heroSkillCooldowns, activation).Accepted) return false;
+            if (catalog == null || !TryResolveCatalogAbility(catalog, skillId, out var abilityId) ||
+                !catalog.TryGetAbility(abilityId, out var ability)) return false;
 
-            // Gate passed — flip the cooldown to its max and emit the log.
-            GameplayAbilityRuntime.AbilityCommit(_heroSkillCooldowns, activation);
-            string skillName = ResolveSkillNameById(skillId);
-            Console.WriteLine($"[HERO_SKILL] hero={heroId} slot={slot} cast skillId={skillId} ({skillName}) cd={_heroSkillCooldownMax[flatIdx]:F1}s");
+            int targetId = store.PlayerEntityId;
+            for (int i = 0; i < ability.Executions.Count; i++)
+            {
+                if (!catalog.TryGetExecution(ability.Executions[i], out var execution)) return false;
+                if (execution.Payload == EffectPayloadKind.Damage)
+                {
+                    targetId = FindFirstActiveEnemy();
+                    if (targetId < 0) return false;
+                    break;
+                }
+            }
+            var activation = new AbilityActivationRequest(store.PlayerEntityId, slot,
+                _heroSkillCooldownMax[flatIdx], targetId, abilityId);
+            var result = GameplayAbilityRuntime.Activate(store, catalog, _heroSkillCooldowns, activation);
+            if (!result.Accepted) return false;
+            Console.WriteLine($"[HERO_SKILL] hero={heroId} slot={slot} ability={abilityId.Value} effects={result.AppliedEffects}");
             return true;
         }
 
@@ -249,9 +253,17 @@ namespace BattleSystemECS.Systems
         private static bool TryResolveCatalogAbility(GameplayCatalog catalog, int skillId, out AbilityId ability)
         {
             ability = default(AbilityId);
-            if (skillId < 0 || skillId >= catalog.Abilities.Count) return false;
-            ability = catalog.Abilities[skillId].Id;
-            return catalog.TryGetAbility(ability, out _);
+            if (skillId < 0) return false;
+            string name = catalog.AbilityDefinitions.Count > skillId ? catalog.AbilityDefinitions[skillId].Name : string.Empty;
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            return catalog.Aliases != null && catalog.Aliases.TryGetValue(name, out ability) && catalog.TryGetAbility(ability, out _);
+        }
+
+        private int FindFirstActiveEnemy()
+        {
+            var ids = store.ActiveEnemyIds;
+            for (int i = 0; i < ids.Count; i++) if (store.EnemyActive[ids[i]]) return ids[i];
+            return -1;
         }
 
         private float ResolveCooldownForSkill(int skillId)

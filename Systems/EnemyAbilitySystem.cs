@@ -52,9 +52,10 @@ namespace BattleSystemECS.Systems
             {
                 foreach (var ab in gameConfig.EnemyAbilities)
                 {
-                    if (!string.IsNullOrEmpty(ab.Id))
+                    string id = ab.Id;
+                    if (!string.IsNullOrEmpty(id))
                     {
-                        _abilityLookup[ab.Id] = ab;
+                        _abilityLookup[id] = ab;
                     }
                 }
             }
@@ -285,6 +286,11 @@ namespace BattleSystemECS.Systems
 
         private void ExecuteAbility(int enemyId, EnemyAbilityDef ability)
         {
+            // Basic resource/combat payloads are executed through the typed GAS
+            // runtime. Legacy handlers remain adapters for special world actions
+            // (crowd control, summons, silence and dispel) until their schemas land.
+            if (TryExecuteTypedBasicAbility(enemyId, ability)) return;
+
             switch (ability.AbilityType)
             {
                 case "self_heal":
@@ -326,6 +332,42 @@ namespace BattleSystemECS.Systems
             int timerIdx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY;
             GameplayAbilityRuntime.AbilityCommit(_abilityCooldownTimers,
                 new AbilityActivationRequest(enemyId, 0, ability.Cooldown));
+        }
+
+        private bool TryExecuteTypedBasicAbility(int enemyId, EnemyAbilityDef ability)
+        {
+            bool heal = string.Equals(ability.AbilityType, "self_heal", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(ability.AbilityType, "heal_allies", StringComparison.OrdinalIgnoreCase);
+            bool damage = string.Equals(ability.AbilityType, "aoe_damage", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(ability.AbilityType, "stealth_attack", StringComparison.OrdinalIgnoreCase);
+            if (!heal && !damage) return false;
+            int targetId = heal ? enemyId : playerId;
+            if (targetId < 0 || !store.GetEntityHandle(targetId).IsValid) return false;
+            float magnitude = heal
+                ? store.EnemyMaxHealth[enemyId] * Math.Max(0f, ability.HealAmount)
+                : store.EnemyDamage[enemyId] * Math.Max(0f, ability.DamageMultiplier);
+            var execution = new ExecutionDefinition(new ExecutionId(0),
+                heal ? EffectPayloadKind.Heal : EffectPayloadKind.Damage, magnitude,
+                CatalogRegistries.SkillTag, MagnitudeSource.Constant,
+                DamageAmountStage.Raw, 0f,
+                heal ? ExecutionOperation.ApplyHeal : ExecutionOperation.ApplyDamage);
+            var targeting = new TargetingDefinition(new TargetingId(0),
+                heal ? TargetingShape.Heal : TargetingShape.Single, ability.AoeRadius, 1, 1, 1,
+                ability.AoeRadius);
+            var typed = new AbilityDefinition(new AbilityId(0), ability.Id ?? ability.Name ?? "enemy",
+                targeting, ClockId.Combat, ability.Cooldown, GameplayPhaseMask.Wave,
+                Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
+                executions: new[] { execution.Id });
+            var catalog = new GameplayCatalog(new[] { typed }, new[] { targeting },
+                Array.Empty<GameplayEffectDefinition>(), new[] { execution },
+                Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
+                new Dictionary<string, AbilityId>(StringComparer.OrdinalIgnoreCase) { [typed.Name] = typed.Id });
+            var request = new AbilityActivationRequest(enemyId, 0, ability.Cooldown, targetId, typed.Id);
+            var result = GameplayAbilityRuntime.Activate(store, catalog, _abilityCooldownTimers, request);
+            if (!result.Accepted) return false;
+            logger.Log($"[ABILITY] Enemy {enemyId} typed '{ability.Name}' applied {result.AppliedEffects} effect(s)");
+            return true;
         }
 
         private void ExecuteSelfHeal(int enemyId, EnemyAbilityDef ability)
