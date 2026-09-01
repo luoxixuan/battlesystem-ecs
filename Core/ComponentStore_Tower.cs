@@ -536,6 +536,14 @@ namespace BattleSystemECS.Core
         // TowerSilenceSourceId: enemy entity ID that applied this silence (-1 = none/unknown)
         public int[] TowerSilenceSourceId = new int[MAX_ENTITIES];
 
+        public void ApplyTowerSilence(int towerId, float duration, int sourceEnemyId)
+        {
+            if (!IsValidEntity(towerId) || duration <= 0f) return;
+            TowerIsSilenced[towerId] = true;
+            TowerSilenceTimer[towerId] = duration;
+            TowerSilenceSourceId[towerId] = sourceEnemyId;
+        }
+
         // ==================== 敌人驱散/净化塔增益 (Tower Dispel) ====================
         // TowerIsDispelled: true if this tower's aura/synergy buffs are currently removed by enemy dispel
         public bool[] TowerIsDispelled = new bool[MAX_ENTITIES];

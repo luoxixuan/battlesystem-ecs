@@ -21,7 +21,7 @@ namespace BattleSystemECS.Systems
         private readonly GameConfig gameConfig;
         private readonly EventBus _eventBus;
         private readonly Dictionary<string, EnemyAbilityDef> _abilityLookup;
-        private readonly Dictionary<int, EnemyAbilityDef> _specialDefinitions = new Dictionary<int, EnemyAbilityDef>();
+        private readonly Dictionary<int, EnemyAbilityDef> _payloadDefinitions = new Dictionary<int, EnemyAbilityDef>();
         private TelegraphSystem _telegraphSystem;
 
         // Ping-pong double-buffer for ability events — collected parallel, applied serial.
@@ -41,6 +41,9 @@ namespace BattleSystemECS.Systems
         private readonly List<int> _healTargets = new List<int>(256);
         private readonly List<float> _healMagnitudes = new List<float>(256);
         private IAbilityPayloadHandler _payloadHandler;
+        private readonly List<int> _typedTargets = new List<int>(256);
+        private readonly List<float> _typedMagnitudes = new List<float>(256);
+        private bool _dispelCapacityReserved;
 
         public EnemyAbilitySystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EventBus eventBus = null)
         {
@@ -69,10 +72,8 @@ namespace BattleSystemECS.Systems
             if (catalog != null)
             {
                 foreach (var ability in _abilityLookup.Values)
-                    if (EnemyAbilityTypeRegistry.TryResolve(ability.AbilityType, out var type) &&
-                        type.DispatchMode == EnemyAbilityDispatchMode.RuntimeAdapter &&
-                        catalog.TryResolveAlias(ability.Id, out var abilityId))
-                        _specialDefinitions[abilityId.Value] = ability;
+                    if (catalog.TryResolveAlias(ability.Id, out var abilityId))
+                        _payloadDefinitions[abilityId.Value] = ability;
             }
 
         }
@@ -388,10 +389,10 @@ namespace BattleSystemECS.Systems
             var catalog = gameConfig.CompiledCatalog;
             if (catalog == null || !catalog.TryResolveAlias(ability.Id, out var id) ||
                 !catalog.TryGetAbility(id, out var typed)) return false;
-            if (type.DispatchMode != EnemyAbilityDispatchMode.RuntimeAdapter) return true;
+            if (!type.Payload.HasValue) return false;
             for (int i = 0; i < typed.Executions.Count; i++)
                 if (catalog.TryGetExecution(typed.Executions[i], out var execution) &&
-                    execution.Payload == EffectPayloadKind.WorldAction && execution.Operation == type.Operation)
+                    execution.Payload == type.Payload.Value && execution.Operation == type.Operation)
                     return true;
             return false;
         }
@@ -420,7 +421,11 @@ namespace BattleSystemECS.Systems
             execution.Payload == EffectPayloadKind.Damage &&
                 (execution.Operation == ExecutionOperation.Default || execution.Operation == ExecutionOperation.ApplyDamage) ||
             execution.Payload == EffectPayloadKind.WorldAction &&
-                (execution.Operation == ExecutionOperation.SummonEnemy || execution.Operation == ExecutionOperation.PrepareStealth);
+                (execution.Operation == ExecutionOperation.SummonEnemy || execution.Operation == ExecutionOperation.PrepareStealth) ||
+            execution.Payload == EffectPayloadKind.Status &&
+                (execution.Operation == ExecutionOperation.ApplyEnemyBuff || execution.Operation == ExecutionOperation.ApplyTowerSilence) ||
+            execution.Payload == EffectPayloadKind.Dispel &&
+                execution.Operation == ExecutionOperation.RemoveDispellableEffects;
 
         bool IAbilityPayloadHandler.CanCommit(AbilityPayloadContext context)
         {
@@ -429,9 +434,18 @@ namespace BattleSystemECS.Systems
                 return store.ResourceResolver.CanApplyPlayerDamage(new PlayerDamageRequest(context.Source,
                     context.Target, context.Magnitude, 0L,
                     context.Ability.Id, context.Target.Index));
-            if (context.Execution.Payload != EffectPayloadKind.WorldAction ||
-                !_specialDefinitions.TryGetValue(context.Ability.Id.Value, out var ability) ||
+            if (!_payloadDefinitions.TryGetValue(context.Ability.Id.Value, out var ability) ||
                 !store.EnemyActive[context.Source.Index]) return false;
+            if (context.Execution.Operation == ExecutionOperation.ApplyEnemyBuff)
+                return context.Execution.Payload == EffectPayloadKind.Status &&
+                       store.EnemyActive[context.Target.Index] && ability.DamageMultiplier > 0f && ability.BuffDuration > 0f;
+            if (context.Execution.Operation == ExecutionOperation.ApplyTowerSilence)
+                return context.Execution.Payload == EffectPayloadKind.Status && IsActiveTower(context.Target.Index) &&
+                       ability.SilenceDuration > 0f;
+            if (context.Execution.Operation == ExecutionOperation.RemoveDispellableEffects)
+                return context.Execution.Payload == EffectPayloadKind.Dispel && IsActiveTower(context.Target.Index) &&
+                       _dispelCapacityReserved && CountDispellableEffects(context.Target.Index) > 0;
+            if (context.Execution.Payload != EffectPayloadKind.WorldAction) return false;
             if (context.Execution.Operation == ExecutionOperation.SummonEnemy)
                 return store.HasEntityCapacity;
             return context.Execution.Operation == ExecutionOperation.PrepareStealth &&
@@ -455,7 +469,15 @@ namespace BattleSystemECS.Systems
                 });
                 return 1;
             }
-            if (!_specialDefinitions.TryGetValue(context.Ability.Id.Value, out var ability)) return 0;
+            if (!_payloadDefinitions.TryGetValue(context.Ability.Id.Value, out var ability)) return 0;
+            if (context.Execution.Operation == ExecutionOperation.ApplyEnemyBuff) return 1;
+            if (context.Execution.Operation == ExecutionOperation.ApplyTowerSilence)
+            {
+                store.ApplyTowerSilence(context.Target.Index, ability.SilenceDuration, context.Source.Index);
+                return 1;
+            }
+            if (context.Execution.Operation == ExecutionOperation.RemoveDispellableEffects)
+                return RemoveDispellableEffects(context.Target.Index);
             if (context.Execution.Operation == ExecutionOperation.SummonEnemy)
                 return EnemyWorldActionAdapter.Summon(store, logger, context.Source.Index, ability);
             if (context.Execution.Operation == ExecutionOperation.PrepareStealth)
@@ -467,6 +489,45 @@ namespace BattleSystemECS.Systems
         {
             if (sharedHandler == null) throw new ArgumentNullException(nameof(sharedHandler));
             _payloadHandler = new AbilityPayloadHandlerChain(this, sharedHandler);
+        }
+
+        private bool IsActiveTower(int towerId)
+        {
+            if (!store.GetEntityHandle(towerId).IsValid || !store.PositionActive[towerId]) return false;
+            var towers = store.ActiveTowerIds;
+            for (int i = 0; i < towers.Count; i++) if (towers[i] == towerId) return true;
+            return false;
+        }
+
+        private int CountDispellableEffects(int towerId)
+        {
+            int result = 0;
+            for (int slot = 0; slot < store.GetEffectCount(towerId); slot++)
+                if (store.TryGetActiveEffectAt(towerId, slot, out _, out var definition, out _) &&
+                    GrantsTag(definition, CatalogRegistries.DispellableTag)) result++;
+            return result;
+        }
+
+        private int RemoveDispellableEffects(int towerId)
+        {
+            int removed = 0;
+            var target = store.GetEntityHandle(towerId);
+            for (int slot = store.GetEffectCount(towerId) - 1; slot >= 0; slot--)
+            {
+                if (!store.TryGetActiveEffectAt(towerId, slot, out var runtime, out var definition, out _) ||
+                    !GrantsTag(definition, CatalogRegistries.DispellableTag)) continue;
+                if (!store.GameplayEffectsRuntime.Remove(target, runtime.Handle))
+                    throw new InvalidOperationException("prevalidated dispel removal failed during commit");
+                removed++;
+            }
+            return removed;
+        }
+
+        private static bool GrantsTag(GameplayEffectDefinition definition, TagId tag)
+        {
+            for (int i = 0; i < definition.GrantedTags.Count; i++)
+                if (definition.GrantedTags[i].Equals(tag)) return true;
+            return false;
         }
 
         private AbilityActivationResult TryExecuteTypedBasicAbility(int enemyId, EnemyAbilityDef ability)
@@ -491,7 +552,7 @@ namespace BattleSystemECS.Systems
             {
                 if (!catalog.TryGetExecution(typed.Executions[i], out var execution))
                     return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.UnsupportedDefinition);
-                if (execution.Payload == type.Payload.Value) payloadMatches = true;
+                if (execution.Payload == type.Payload.Value && execution.Operation == type.Operation) payloadMatches = true;
             }
             if (!payloadMatches) return new AbilityActivationResult(false, enemyId, 0, AbilityActivationRejectReason.UnsupportedDefinition);
             if (groupHeal)
@@ -506,6 +567,43 @@ namespace BattleSystemECS.Systems
                 if (groupResult.Accepted)
                     logger.Log($"[ABILITY] Enemy {enemyId} typed '{ability.Name}' healed {groupResult.AppliedEffects} allies");
                 return groupResult;
+            }
+            if (type.Kind == EnemyAbilityKind.BuffAllies || type.Kind == EnemyAbilityKind.SilenceTower ||
+                type.Kind == EnemyAbilityKind.DispelTower)
+            {
+                _typedTargets.Clear();
+                _typedMagnitudes.Clear();
+                bool collected = type.Kind == EnemyAbilityKind.BuffAllies
+                    ? TargetingRuntime.TryCollectEnemyAllies(store, enemyId, typed.Targeting, _typedTargets, _typedMagnitudes)
+                    : TargetingRuntime.TryCollectTowerTargets(store, enemyId, typed.Targeting, _typedTargets, _typedMagnitudes);
+                if (!collected)
+                    return new AbilityActivationResult(false, enemyId, CooldownSlot(enemyId), AbilityActivationRejectReason.UnsupportedDefinition);
+                if (type.Kind == EnemyAbilityKind.DispelTower)
+                {
+                    int requiredEvents = 0;
+                    for (int i = _typedTargets.Count - 1; i >= 0; i--)
+                    {
+                        int count = CountDispellableEffects(_typedTargets[i]);
+                        if (count == 0) { _typedTargets.RemoveAt(i); _typedMagnitudes.RemoveAt(i); }
+                        else requiredEvents += count;
+                    }
+                    _dispelCapacityReserved = requiredEvents > 0 &&
+                        store.GameplayEffectsRuntime.Events.CanPublish(requiredEvents, true);
+                    if (!_dispelCapacityReserved)
+                        return new AbilityActivationResult(false, enemyId, CooldownSlot(enemyId),
+                            _typedTargets.Count == 0 ? AbilityActivationRejectReason.NoTarget : AbilityActivationRejectReason.InvalidRequest);
+                }
+                var groupRequest = new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown,
+                    -1, typedId, ownerPlayerId: playerId);
+                try
+                {
+                    var groupResult = GameplayAbilityRuntime.ActivateTargets(store, catalog, _abilityCooldownTimers,
+                        groupRequest, _typedTargets, _typedMagnitudes, _payloadHandler);
+                    if (groupResult.Accepted)
+                        logger.Log($"[ABILITY] Enemy {enemyId} typed '{ability.Name}' affected {groupResult.AppliedEffects} target payload(s)");
+                    return groupResult;
+                }
+                finally { _dispelCapacityReserved = false; }
             }
             float magnitude = heal
                 ? store.EnemyMaxHealth[targetId] * Math.Max(0f, ability.HealAmount)
@@ -598,45 +696,6 @@ namespace BattleSystemECS.Systems
             else
             {
                 logger.Log($"[ABILITY] Enemy {enemyId} AOE missed (player out of range, dist={dist:F1})");
-            }
-        }
-
-        private void ExecuteBuffAllies(int enemyId, EnemyAbilityDef ability)
-        {
-            if (ability.AoeRadius <= 0) return;
-
-            float enemyX = store.PositionX[enemyId];
-            float enemyY = store.PositionY[enemyId];
-
-            var activeEnemyIds = store.GetCachedActiveEnemyIds();
-            int buffedCount = 0;
-
-            foreach (var allyId in activeEnemyIds)
-            {
-                if (!store.EnemyActive[allyId]) continue;
-                if (allyId == enemyId) continue;
-
-                float allyX = store.PositionX[allyId];
-                float allyY = store.PositionY[allyId];
-                float dist = Math.Abs(enemyX - allyX) + Math.Abs(enemyY - allyY);
-
-                if (dist <= ability.AoeRadius)
-                {
-                    float currentBuff = store.EnemyBuffDamageBonus[allyId];
-                    float buffDamageBonus = store.EnemyDamage[allyId] * ability.DamageMultiplier;
-
-                    if (currentBuff >= 0)
-                    {
-                        store.EnemyBuffDamageBonus[allyId] = buffDamageBonus;
-                        store.EnemyBuffDurationLeft[allyId] = ability.BuffDuration;
-                        buffedCount++;
-                    }
-                }
-            }
-
-            if (buffedCount > 0)
-            {
-                logger.Log($"[ABILITY] Enemy {enemyId} buffs {buffedCount} allies with {ability.BuffStat} for {ability.BuffDuration} turns");
             }
         }
 
@@ -756,93 +815,37 @@ namespace BattleSystemECS.Systems
             }
         }
 
-        private void ExecuteSilenceTower(int enemyId, EnemyAbilityDef ability)
-        {
-            if (ability.SilenceRadius <= 0 || ability.SilenceDuration <= 0) return;
-
-            float enemyX = store.PositionX[enemyId];
-            float enemyY = store.PositionY[enemyId];
-
-            // Silence all towers within the specified radius
-            var activeTowerIds = store.ActiveTowerIds;
-            int silencedCount = 0;
-            for (int i = 0; i < activeTowerIds.Count; i++)
-            {
-                int towerId = activeTowerIds[i];
-                float tx = store.PositionX[towerId];
-                float ty = store.PositionY[towerId];
-                float dx = tx - enemyX;
-                float dy = ty - enemyY;
-                float dist = (float)Math.Sqrt(dx * dx + dy * dy);
-                if (dist <= ability.SilenceRadius)
-                {
-                    // Apply silence to this tower
-                    store.TowerIsSilenced[towerId] = true;
-                    store.TowerSilenceTimer[towerId] = ability.SilenceDuration;
-                    store.TowerSilenceSourceId[towerId] = enemyId;
-                    silencedCount++;
-                }
-            }
-
-            logger.Log($"[ABILITY] Enemy {enemyId} silences {silencedCount} towers for {ability.SilenceDuration:F0} turns (radius={ability.SilenceRadius:F1}) ({ability.Name})");
-        }
-
-        private void ExecuteDispelTower(int enemyId, EnemyAbilityDef ability)
-        {
-            if (ability.DispelRadius <= 0f || ability.DispelDuration <= 0f) return;
-
-            float enemyX = store.PositionX[enemyId];
-            float enemyY = store.PositionY[enemyId];
-
-            // Dispel all towers within the specified radius
-            var activeTowerIds = store.ActiveTowerIds;
-            int dispelledCount = 0;
-            for (int i = 0; i < activeTowerIds.Count; i++)
-            {
-                int towerId = activeTowerIds[i];
-                // Skip towers that are immune (in immunity period after dispel expired)
-                if (store.TowerDispelImmunityTimer[towerId] > 0f) continue;
-
-                float tx = store.PositionX[towerId];
-                float ty = store.PositionY[towerId];
-                float dx = tx - enemyX;
-                float dy = ty - enemyY;
-                float dist = (float)Math.Sqrt(dx * dx + dy * dy);
-                if (dist <= ability.DispelRadius)
-                {
-                    // Apply dispel to this tower
-                    store.TowerIsDispelled[towerId] = true;
-                    store.TowerDispelTimer[towerId] = ability.DispelDuration;
-                    // Clear immunity timer when dispel is applied (immunity starts after dispel expires)
-                    store.TowerDispelImmunityTimer[towerId] = 0f;
-                    dispelledCount++;
-                }
-            }
-
-            logger.Log($"[ABILITY] Enemy {enemyId} dispels {dispelledCount} tower buffs for {ability.DispelDuration:F0} turns (radius={ability.DispelRadius:F1}) ({ability.Name})");
-        }
-
         /// <summary>
-        /// Called once per turn from GameManager.Run(). Decrements buff_allies durations and clears expired buffs.
-        /// Does NOT touch EnemySlowDurationLeft — that is managed by ComponentStore.DecrementEnemySlowDurations().
+        /// Synchronizes the legacy tower attack gate from the canonical silence tag.
         /// </summary>
         public void Update()
         {
-            var activeEnemyIds = store.GetCachedActiveEnemyIds();
-            foreach (var enemyId in activeEnemyIds)
+            var towers = store.ActiveTowerIds;
+            for (int i = 0; i < towers.Count; i++)
             {
-                if (!store.EnemyActive[enemyId]) continue;
-                float remaining = store.EnemyBuffDurationLeft[enemyId];
-                if (remaining <= 0f) continue;
-
-                store.EnemyBuffDurationLeft[enemyId] = remaining - 1f;
-                if (store.EnemyBuffDurationLeft[enemyId] <= 0f)
+                int towerId = towers[i];
+                bool silenced = TryGetTagRemaining(towerId, CatalogRegistries.TowerSilencedTag, out float remaining);
+                store.TowerIsSilenced[towerId] = silenced;
+                if (silenced) store.TowerSilenceTimer[towerId] = remaining;
+                else
                 {
-                    store.EnemyBuffDamageBonus[enemyId] = 0f;
-                    store.EnemyBuffDurationLeft[enemyId] = 0f;
-                    // NOTE: do NOT clear slow here — EnemySlowDurationLeft is tracked separately
+                    store.TowerSilenceTimer[towerId] = 0f;
+                    store.TowerSilenceSourceId[towerId] = -1;
                 }
             }
+        }
+
+        private bool TryGetTagRemaining(int entityId, TagId tag, out float remaining)
+        {
+            remaining = 0f;
+            for (int slot = 0; slot < store.GetEffectCount(entityId); slot++)
+            {
+                if (!store.TryGetActiveEffectAt(entityId, slot, out var runtime, out var definition, out _) ||
+                    !GrantsTag(definition, tag)) continue;
+                remaining = runtime.RemainingTime;
+                return true;
+            }
+            return false;
         }
 
         private struct AbilityEvent

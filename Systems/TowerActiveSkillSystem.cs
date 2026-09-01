@@ -105,6 +105,9 @@ namespace BattleSystemECS.Systems
         {
             if (!_phaseContext.AllowsCombat) return Reject(towerId, AbilityActivationRejectReason.PhaseNotAllowed);
             if (!ComponentStore.IsValidEntity(towerId) || !store.TowerActive[towerId]) return Reject(towerId, AbilityActivationRejectReason.InvalidRequest);
+            if (store.TowerIsSilenced[towerId] ||
+                GameplayTagRuntime.HasTag(store, towerId, CatalogRegistries.TowerSilencedTag))
+                return Reject(towerId, AbilityActivationRejectReason.TagRequirementsNotMet);
             int skillId = store.TowerActiveSkillId[towerId];
             if (skillId < 0) return Reject(towerId, AbilityActivationRejectReason.InvalidRequest);
             var catalog = _config?.CompiledCatalog;

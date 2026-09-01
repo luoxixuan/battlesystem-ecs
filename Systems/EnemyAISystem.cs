@@ -39,6 +39,7 @@ namespace BattleSystemECS.Systems
         private float _currentDeltaTime;
 
         private readonly List<AttackEvent> _attackEvents = new List<AttackEvent>();
+        private readonly List<AttackEvent> _abilityActionEvents = new List<AttackEvent>();
         private readonly List<LifestealEvent> _lifestealEvents = new List<LifestealEvent>();
         private readonly List<DeathEvent> _deathEvents = new List<DeathEvent>();
         private EnemyAiCollectBuffer[] _collectBuffers = Array.Empty<EnemyAiCollectBuffer>();
@@ -135,6 +136,7 @@ namespace BattleSystemECS.Systems
             int numBatches=Math.Max(1,(count+batchSize-1)/batchSize);
             PrepareCollectBuffers(numBatches);
             _attackEvents.Clear();
+            _abilityActionEvents.Clear();
             _lifestealEvents.Clear();
             _deathEvents.Clear();
             _phaseAbilityEvents.Clear();
@@ -336,6 +338,8 @@ namespace BattleSystemECS.Systems
                         _enemyStunDurationCache[enemyId] == stunDuration)
                     {
                         store.SetEnemyActionEnum(enemyId, _lastActionCache[enemyId]);
+                        if (IsAbilityAction(_lastActionCache[enemyId]))
+                            collect.AbilityActions.Add(new AttackEvent { EnemyId = enemyId, ActionType = _lastActionCache[enemyId] });
                         continue;
                     }
 
@@ -427,6 +431,10 @@ namespace BattleSystemECS.Systems
                             ActionType = actionEnum,
                             Param = param
                         });
+                    }
+                    else if (IsAbilityAction(actionEnum))
+                    {
+                        collect.AbilityActions.Add(new AttackEvent { EnemyId = enemyId, ActionType = actionEnum });
                     }
                 }
             }
@@ -623,6 +631,8 @@ namespace BattleSystemECS.Systems
                             _enemyStunDurationCache[enemyId] == stunDuration)
                         {
                             store.SetEnemyActionEnum(enemyId, _lastActionCache[enemyId]);
+                            if (IsAbilityAction(_lastActionCache[enemyId]))
+                                collect.AbilityActions.Add(new AttackEvent { EnemyId = enemyId, ActionType = _lastActionCache[enemyId] });
                             continue;
                         }
 
@@ -713,11 +723,21 @@ namespace BattleSystemECS.Systems
                                 Param = param
                             });
                         }
+                        else if (IsAbilityAction(actionEnum))
+                        {
+                            collect.AbilityActions.Add(new AttackEvent { EnemyId = enemyId, ActionType = actionEnum });
+                        }
                     }
                 });
             }
 
             MergeCollectBuffers(numBatches);
+
+            for (int i = 0; i < _abilityActionEvents.Count; i++)
+            {
+                AttackEvent evt = _abilityActionEvents[i];
+                InvokeExecuteActionEnum(evt.EnemyId, evt.ActionType);
+            }
 
             for(int i=0;i<_deathEvents.Count;i++)
             {
@@ -1028,8 +1048,7 @@ namespace BattleSystemECS.Systems
 
         private void ExecuteMeleeAttack(int enemyId)
         {
-            float damage = store.EnemyDamage[enemyId];
-            damage += store.EnemyBuffDamageBonus[enemyId];
+            float damage = store.GetEnemyAttackDamageProjection(enemyId);
             // Apply stealth multiplier and reset to 1.0f for next attack
             float stealthMult = store.EnemyStealthMultiplier[enemyId];
             damage *= stealthMult;
@@ -1067,8 +1086,7 @@ namespace BattleSystemECS.Systems
 
         private void ExecuteRangedAttack(int enemyId)
         {
-            float damage = store.EnemyDamage[enemyId];
-            damage += store.EnemyBuffDamageBonus[enemyId];
+            float damage = store.GetEnemyAttackDamageProjection(enemyId);
             // Apply stealth multiplier and reset to 1.0f for next attack
             float stealthMult = store.EnemyStealthMultiplier[enemyId];
             damage *= stealthMult;
@@ -1129,8 +1147,7 @@ namespace BattleSystemECS.Systems
             }
             else
             {
-                float baseDamage = store.EnemyDamage[enemyId];
-                baseDamage += store.EnemyBuffDamageBonus[enemyId];
+                float baseDamage = store.GetEnemyAttackDamageProjection(enemyId);
                 // Apply stealth multiplier and reset to 1.0f for next attack
                 float stealthMult = store.EnemyStealthMultiplier[enemyId];
                 baseDamage *= stealthMult;
@@ -1352,12 +1369,19 @@ namespace BattleSystemECS.Systems
             {
                 EnemyAiCollectBuffer collect=_collectBuffers[i];
                 _attackEvents.AddRange(collect.Attacks);
+                _abilityActionEvents.AddRange(collect.AbilityActions);
                 _phaseAbilityEvents.AddRange(collect.PhaseAbilities);
                 _phaseMinionEvents.AddRange(collect.PhaseMinions);
                 _phaseChangeEvents.AddRange(collect.PhaseChanges);
                 _deathEvents.AddRange(collect.Deaths);
             }
         }
+
+        private static bool IsAbilityAction(EnemyActionType action) =>
+            action == EnemyActionType.SelfHeal || action == EnemyActionType.AoeDamage ||
+            action == EnemyActionType.BuffAllies || action == EnemyActionType.StunAoe ||
+            action == EnemyActionType.SlowAoe || action == EnemyActionType.HealAllies ||
+            action == EnemyActionType.StealthAttack;
 
         private bool TryCollectExpiredDecoy(int enemyId,EnemyAiCollectBuffer collect)
         {
@@ -1409,12 +1433,13 @@ namespace BattleSystemECS.Systems
         private sealed class EnemyAiCollectBuffer
         {
             public readonly List<AttackEvent> Attacks=new List<AttackEvent>();
+            public readonly List<AttackEvent> AbilityActions=new List<AttackEvent>();
             public readonly List<(int enemyId,string abilityId)> PhaseAbilities=new List<(int,string)>();
             public readonly List<(int bossId,int typeId,int count,float x,float y,int elementAffinity)> PhaseMinions=
                 new List<(int,int,int,float,float,int)>();
             public readonly List<BossPhaseChangedEvent> PhaseChanges=new List<BossPhaseChangedEvent>();
             public readonly List<DeathEvent> Deaths=new List<DeathEvent>();
-            public void Clear(){Attacks.Clear();PhaseAbilities.Clear();PhaseMinions.Clear();PhaseChanges.Clear();Deaths.Clear();}
+            public void Clear(){Attacks.Clear();AbilityActions.Clear();PhaseAbilities.Clear();PhaseMinions.Clear();PhaseChanges.Clear();Deaths.Clear();}
         }
     }
 }

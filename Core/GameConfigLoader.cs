@@ -607,6 +607,11 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             ability.DamageMultiplier = ExtractFloat(json, "DamageMultiplier");
             ability.HealAmount = ExtractFloat(json, "HealAmount");
             ability.BuffDuration = ExtractInt(json, "BuffDuration");
+            ability.SilenceRadius = ExtractFloat(json, "SilenceRadius");
+            ability.SilenceDuration = ExtractFloat(json, "SilenceDuration");
+            ability.DispelRadius = ExtractFloat(json, "DispelRadius");
+            ability.DispelDuration = ExtractFloat(json, "DispelDuration");
+            ability.DispelImmunityDuration = ExtractFloat(json, "DispelImmunityDuration");
             return ability;
         }
 

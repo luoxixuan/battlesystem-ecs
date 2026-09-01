@@ -118,6 +118,7 @@ namespace BattleSystemECS.Core.GAS
 
             var abilities = new List<AbilityDefinition>(catalog.AbilityDefinitions);
             var targetings = new List<TargetingDefinition>(catalog.Targetings);
+            var effects = new List<GameplayEffectDefinition>(catalog.Effects);
             var executions = new List<ExecutionDefinition>(catalog.Executions);
             var aliases = new Dictionary<string, AbilityId>(catalog.Aliases, StringComparer.OrdinalIgnoreCase);
 
@@ -139,6 +140,7 @@ namespace BattleSystemECS.Core.GAS
                 {
                     abilityId = new AbilityId(abilities.Count);
                     var executionIds = new List<ExecutionId>();
+                    var effectIds = new List<EffectId>();
                     TargetingShape shape = type.Targeting;
                     EffectPayloadKind payload = type.Payload ?? EffectPayloadKind.GameplayEvent;
                     ExecutionOperation operation = type.Operation;
@@ -166,6 +168,36 @@ namespace BattleSystemECS.Core.GAS
                         case EnemyAbilityKind.StealthAttack:
                             magnitude = 1f;
                             break;
+                        case EnemyAbilityKind.BuffAllies:
+                            magnitude = source.DamageMultiplier;
+                            duration = source.BuffDuration;
+                            if (magnitude <= 0f || duration <= 0f)
+                                throw new CatalogValidationException($"enemy abilities: '{source.Id}' requires positive buff magnitude and duration");
+                            var buffEffect = new EffectId(effects.Count);
+                            effects.Add(new GameplayEffectDefinition(buffEffect, EffectType.Duration,
+                                new[] { new ModifierDefinition(CatalogRegistries.AttackDamage, AttributeModifierOp.Multiply, 1f + magnitude) },
+                                duration, 0f, ClockId.Enemy, StackingBehavior.DurationRefresh, 1, RefreshPolicy.Duration,
+                                SourceDeathPolicy.Persist, EffectPayloadKind.Status, CatalogRegistries.EnemyBuffTag,
+                                Array.Empty<ExecutionId>(), grantedTags: new[] { CatalogRegistries.EnemyBuffTag },
+                                stackKey: CatalogRegistries.EnemyBuffTag));
+                            effectIds.Add(buffEffect);
+                            break;
+                        case EnemyAbilityKind.SilenceTower:
+                            duration = source.SilenceDuration;
+                            if (duration <= 0f)
+                                throw new CatalogValidationException($"enemy abilities: '{source.Id}' requires positive silence duration");
+                            var silenceEffect = new EffectId(effects.Count);
+                            effects.Add(new GameplayEffectDefinition(silenceEffect, EffectType.Duration,
+                                Array.Empty<ModifierDefinition>(), duration, 0f, ClockId.Enemy,
+                                StackingBehavior.DurationRefresh, 1, RefreshPolicy.Duration, SourceDeathPolicy.Persist,
+                                EffectPayloadKind.Status, CatalogRegistries.TowerSilencedTag, Array.Empty<ExecutionId>(),
+                                grantedTags: new[] { CatalogRegistries.TowerSilencedTag },
+                                stackKey: CatalogRegistries.TowerSilencedTag));
+                            effectIds.Add(silenceEffect);
+                            break;
+                        case EnemyAbilityKind.DispelTower:
+                            magnitude = 1f;
+                            break;
                     }
 
                     // Zero-execution definitions are explicit world-action or unsupported
@@ -182,18 +214,24 @@ namespace BattleSystemECS.Core.GAS
                     bool group = string.Equals(source.AbilityType, "heal_allies", StringComparison.OrdinalIgnoreCase) ||
                                  string.Equals(source.AbilityType, "aoe_damage", StringComparison.OrdinalIgnoreCase) ||
                                  string.Equals(source.AbilityType, "stun_aoe", StringComparison.OrdinalIgnoreCase) ||
-                                 string.Equals(source.AbilityType, "slow_aoe", StringComparison.OrdinalIgnoreCase);
+                                 string.Equals(source.AbilityType, "slow_aoe", StringComparison.OrdinalIgnoreCase) ||
+                                 type.Kind == EnemyAbilityKind.BuffAllies || type.Kind == EnemyAbilityKind.SilenceTower ||
+                                 type.Kind == EnemyAbilityKind.DispelTower;
                     bool self = string.Equals(source.AbilityType, "self_heal", StringComparison.OrdinalIgnoreCase) ||
-                                payload == EffectPayloadKind.WorldAction;
+                                 payload == EffectPayloadKind.WorldAction;
+                    float configuredRadius = type.Kind == EnemyAbilityKind.SilenceTower && source.SilenceRadius > 0f
+                        ? source.SilenceRadius : type.Kind == EnemyAbilityKind.DispelTower && source.DispelRadius > 0f
+                            ? source.DispelRadius : source.AoeRadius;
+                    RelationFilter relation = type.Kind == EnemyAbilityKind.BuffAllies
+                        ? RelationFilter.Allies : self ? RelationFilter.Self : RelationFilter.Enemies;
                     var targeting = new TargetingDefinition(new TargetingId(abilityId.Value), shape,
-                        (int)Math.Max(0f, source.AoeRadius), 1, 1, group ? 0 : 1,
-                        radius: Math.Max(0f, source.AoeRadius),
-                        relation: self ? RelationFilter.Self : shape == TargetingShape.Heal ? RelationFilter.Allies : RelationFilter.Enemies,
+                        (int)Math.Max(0f, configuredRadius), 1, 1, group ? 0 : 1,
+                        radius: Math.Max(0f, configuredRadius), relation: relation,
                         maxTargetsMode: group ? MaxTargetsPolicy.Unlimited : MaxTargetsPolicy.Fixed);
                     targetings.Add(targeting);
                     string compiledName = hasNameAlias ? source.Name + " [" + source.Id + "]" : source.Name;
                     abilities.Add(new AbilityDefinition(abilityId, compiledName, targeting, ClockId.Combat,
-                        Math.Max(0f, source.Cooldown), GameplayPhaseMask.Wave, Array.Empty<EffectId>(),
+                        Math.Max(0f, source.Cooldown), GameplayPhaseMask.Wave, effectIds.ToArray(),
                         Array.Empty<ModifierDefinition>(), CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
                         executions: executionIds.ToArray()));
                     if (!hasNameAlias) aliases.Add(source.Name, abilityId);
@@ -204,7 +242,7 @@ namespace BattleSystemECS.Core.GAS
                 aliases[source.Id] = abilityId;
             }
 
-            var extended = new GameplayCatalog(abilities, targetings, catalog.Effects, executions,
+            var extended = new GameplayCatalog(abilities, targetings, effects, executions,
                 catalog.Triggers, catalog.Modifiers, aliases, catalog.HasRuntimeExtensions);
             CatalogValidator.Validate(extended, "enemy ability catalog extensions");
             return extended;

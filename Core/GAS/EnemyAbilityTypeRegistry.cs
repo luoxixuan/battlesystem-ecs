@@ -67,12 +67,15 @@ namespace BattleSystemECS.Core.GAS
             EnemyAbilityKind.SummonMinion, "summon_minion", ExecutionOperation.SummonEnemy);
         private static readonly EnemyAbilityTypeDescriptor StealthAttack = Adapter(
             EnemyAbilityKind.StealthAttack, "stealth_attack", ExecutionOperation.PrepareStealth);
-        private static readonly EnemyAbilityTypeDescriptor BuffAllies = Compatibility(
-            EnemyAbilityKind.BuffAllies, "buff_allies");
-        private static readonly EnemyAbilityTypeDescriptor SilenceTower = Compatibility(
-            EnemyAbilityKind.SilenceTower, "silence_tower");
-        private static readonly EnemyAbilityTypeDescriptor DispelTower = Compatibility(
-            EnemyAbilityKind.DispelTower, "dispel_tower");
+        private static readonly EnemyAbilityTypeDescriptor BuffAllies = Typed(
+            EnemyAbilityKind.BuffAllies, "buff_allies", TargetingShape.Circle,
+            ExecutionOperation.ApplyEnemyBuff, EffectPayloadKind.Status);
+        private static readonly EnemyAbilityTypeDescriptor SilenceTower = Typed(
+            EnemyAbilityKind.SilenceTower, "silence_tower", TargetingShape.Circle,
+            ExecutionOperation.ApplyTowerSilence, EffectPayloadKind.Status);
+        private static readonly EnemyAbilityTypeDescriptor DispelTower = Typed(
+            EnemyAbilityKind.DispelTower, "dispel_tower", TargetingShape.Circle,
+            ExecutionOperation.RemoveDispellableEffects, EffectPayloadKind.Dispel);
 
         public static bool TryResolve(string abilityType, out EnemyAbilityTypeDescriptor descriptor)
         {
@@ -104,8 +107,5 @@ namespace BattleSystemECS.Core.GAS
             => new EnemyAbilityTypeDescriptor(kind, name, EnemyAbilityDispatchMode.RuntimeAdapter,
                 TargetingShape.Single, operation, EffectPayloadKind.WorldAction);
 
-        private static EnemyAbilityTypeDescriptor Compatibility(EnemyAbilityKind kind, string name)
-            => new EnemyAbilityTypeDescriptor(kind, name, EnemyAbilityDispatchMode.CompatibilityOnly,
-                TargetingShape.Single, ExecutionOperation.Default);
     }
 }

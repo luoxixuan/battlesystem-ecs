@@ -68,12 +68,18 @@ namespace BattleSystemECS.Core
                 int towerId = ActiveTowerIds[i];
                 AttributeAggregator.SetBase(towerId, new AttributeKey(8), TowerAttackDamage[towerId]);
             }
-            for (int i = 0; i < MAX_PLAYERS; i++)
+            for (int i = 0; i < ActiveEnemyIds.Count; i++)
             {
-                AttributeAggregator.SetBase(i, new AttributeKey(0), GetPlayerAttackDamage(i));
-                AttributeAggregator.SetBase(i, new AttributeKey(1), PlayerAttackRange[i]);
-                AttributeAggregator.SetBase(i, new AttributeKey(5), PlayerPreFightCritBonus[i]);
-                AttributeAggregator.SetBase(i, new AttributeKey(10), PlayerArmor[i]);
+                int enemyId = ActiveEnemyIds[i];
+                AttributeAggregator.SetBase(enemyId, CatalogRegistries.AttackDamage, EnemyDamage[enemyId]);
+            }
+            int playerId = PlayerEntityId;
+            if ((uint)playerId < MAX_PLAYERS && PositionActive[playerId] && !EnemyActive[playerId])
+            {
+                AttributeAggregator.SetBase(playerId, new AttributeKey(0), GetPlayerAttackDamage(playerId));
+                AttributeAggregator.SetBase(playerId, new AttributeKey(1), PlayerAttackRange[playerId]);
+                AttributeAggregator.SetBase(playerId, new AttributeKey(5), PlayerPreFightCritBonus[playerId]);
+                AttributeAggregator.SetBase(playerId, new AttributeKey(10), PlayerArmor[playerId]);
             }
         }
         internal void ClearComputedAttributes(int entityId) => AttributeAggregator.ClearEntity(entityId);
@@ -87,6 +93,12 @@ namespace BattleSystemECS.Core
         {
             var baseValue = GetPlayerAttackDamage(playerId);
             return !_useComputedAttributes ? baseValue : AttributeAggregator.GetComputed(playerId, new AttributeKey(0), baseValue);
+        }
+        public float GetEnemyAttackDamageProjection(int enemyId)
+        {
+            var baseValue = EnemyDamage[enemyId];
+            return !_useComputedAttributes ? baseValue : AttributeAggregator.GetComputed(enemyId,
+                CatalogRegistries.AttackDamage, baseValue);
         }
         public float GetPlayerCritRateProjection(int playerId, float legacyBase)
         {

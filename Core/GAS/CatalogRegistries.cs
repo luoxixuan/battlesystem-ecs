@@ -11,7 +11,7 @@ namespace BattleSystemECS.Core.GAS
         public const int MaxTriggers = 4096;
         public const int MaxExecutions = 8192;
         private static readonly Dictionary<string, TagId> _tags = new Dictionary<string, TagId>(StringComparer.OrdinalIgnoreCase)
-        { ["Normal"] = new TagId(0), ["Burn"] = new TagId(1), ["Fire"] = new TagId(2), ["Freeze"] = new TagId(3), ["Lightning"] = new TagId(4), ["Explosion"] = new TagId(5), ["Plasma"] = new TagId(6), ["Poison"] = new TagId(7) };
+        { ["Normal"] = new TagId(0), ["Burn"] = new TagId(1), ["Fire"] = new TagId(2), ["Freeze"] = new TagId(3), ["Lightning"] = new TagId(4), ["Explosion"] = new TagId(5), ["Plasma"] = new TagId(6), ["Poison"] = new TagId(7), ["EnemyBuff"] = new TagId(8), ["TowerSilenced"] = new TagId(9), ["Dispellable"] = new TagId(10) };
         private static readonly Dictionary<string, AttributeKey> _attributes = new Dictionary<string, AttributeKey>(StringComparer.OrdinalIgnoreCase)
         { ["AttackDamage"] = new AttributeKey(0), ["AttackRange"] = new AttributeKey(1), ["MaxHealth"] = new AttributeKey(2), ["CurrentHealth"] = new AttributeKey(3), ["Gold"] = new AttributeKey(4), ["CritRate"] = new AttributeKey(5), ["BuffStrength"] = new AttributeKey(6), ["Mana"] = new AttributeKey(7), ["DamageOutputMultiplier"] = new AttributeKey(8), ["Shield"] = new AttributeKey(9), ["Armor"] = new AttributeKey(10) };
         private static readonly Dictionary<string, ExecutorId> _executors = new Dictionary<string, ExecutorId>(StringComparer.OrdinalIgnoreCase) { ["Skill"] = new ExecutorId(0) };
@@ -27,5 +27,8 @@ namespace BattleSystemECS.Core.GAS
         public static TagId SkillTag => _tags["Normal"];
         public static AttributeKey Mana => _attributes["Mana"];
         public static AttributeKey AttackDamage => _attributes["AttackDamage"];
+        public static TagId EnemyBuffTag => _tags["EnemyBuff"];
+        public static TagId TowerSilencedTag => _tags["TowerSilenced"];
+        public static TagId DispellableTag => _tags["Dispellable"];
     }
 }

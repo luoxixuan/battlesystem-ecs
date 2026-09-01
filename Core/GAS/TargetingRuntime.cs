@@ -103,6 +103,57 @@ namespace BattleSystemECS.Core.GAS
             return true;
         }
 
+        public static bool TryCollectEnemyAllies(ComponentStore store, int sourceEntityId,
+            TargetingDefinition definition, List<int> targetIds, List<float> magnitudeScales)
+        {
+            if (store == null || targetIds == null || magnitudeScales == null ||
+                definition.Relation != RelationFilter.Allies || !store.GetEntityHandle(sourceEntityId).IsValid)
+                return false;
+            targetIds.Clear();
+            magnitudeScales.Clear();
+            float radius = Range(definition);
+            float radiusSquared = radius * radius;
+            int limit = ResolveLimit(definition);
+            var enemies = store.ActiveEnemyIds;
+            for (int i = 0; i < enemies.Count && targetIds.Count < limit; i++)
+            {
+                int target = enemies[i];
+                if (target == sourceEntityId || !IsCandidate(store, target, definition)) continue;
+                float dx = store.PositionX[target] - store.PositionX[sourceEntityId];
+                float dy = store.PositionY[target] - store.PositionY[sourceEntityId];
+                if (dx * dx + dy * dy > radiusSquared) continue;
+                targetIds.Add(target);
+                magnitudeScales.Add(1f);
+            }
+            return true;
+        }
+
+        public static bool TryCollectTowerTargets(ComponentStore store, int sourceEntityId,
+            TargetingDefinition definition, List<int> targetIds, List<float> magnitudeScales)
+        {
+            if (store == null || targetIds == null || magnitudeScales == null ||
+                definition.Relation != RelationFilter.Enemies || !store.GetEntityHandle(sourceEntityId).IsValid)
+                return false;
+            targetIds.Clear();
+            magnitudeScales.Clear();
+            float radius = Range(definition);
+            float radiusSquared = radius * radius;
+            int limit = ResolveLimit(definition);
+            var towers = store.ActiveTowerIds;
+            for (int i = 0; i < towers.Count && targetIds.Count < limit; i++)
+            {
+                int target = towers[i];
+                if (!store.GetEntityHandle(target).IsValid || !store.PositionActive[target] ||
+                    !GameplayTagRuntime.Matches(store, target, definition.RequiredTags, definition.BlockedTags)) continue;
+                float dx = store.PositionX[target] - store.PositionX[sourceEntityId];
+                float dy = store.PositionY[target] - store.PositionY[sourceEntityId];
+                if (dx * dx + dy * dy > radiusSquared) continue;
+                targetIds.Add(target);
+                magnitudeScales.Add(1f);
+            }
+            return true;
+        }
+
         private static bool CollectChain(ComponentStore store, float sourceX, float sourceY,
             TargetingDefinition definition, int limit, List<int> targetIds, List<float> magnitudeScales)
         {
