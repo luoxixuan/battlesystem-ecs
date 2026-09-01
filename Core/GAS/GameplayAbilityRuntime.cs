@@ -40,6 +40,30 @@ namespace BattleSystemECS.Core.GAS
         { Accepted = accepted; OwnerId = ownerId; Slot = slot; Reason = reason; AppliedEffects = appliedEffects; }
     }
 
+    public readonly struct AbilityPayloadContext
+    {
+        public readonly ComponentStore Store;
+        public readonly AbilityDefinition Ability;
+        public readonly ExecutionDefinition Execution;
+        public readonly AbilityActivationRequest Request;
+        public readonly EntityHandle Source;
+        public readonly EntityHandle Target;
+        public readonly float Magnitude;
+        public AbilityPayloadContext(ComponentStore store, AbilityDefinition ability, ExecutionDefinition execution,
+            AbilityActivationRequest request, EntityHandle source, EntityHandle target, float magnitude)
+        { Store = store; Ability = ability; Execution = execution; Request = request; Source = source; Target = target; Magnitude = magnitude; }
+    }
+
+    /// <summary>
+    /// Domain extension for payloads that need services outside the GAS store.
+    /// CanCommit is a read-only planning pass; once it returns true, Commit must not reject.
+    /// </summary>
+    public interface IAbilityPayloadHandler
+    {
+        bool CanCommit(AbilityPayloadContext context);
+        int Commit(AbilityPayloadContext context);
+    }
+
     /// <summary>
     /// Single writer for ability-slot activation state. Legacy systems may inspect
     /// definitions, but cooldown ownership stays in the ECS ability store through
@@ -48,7 +72,8 @@ namespace BattleSystemECS.Core.GAS
     public static class GameplayAbilityRuntime
     {
         /// <summary>Catalog-backed activation boundary used by domain adapters.</summary>
-        public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, float[] cooldowns, AbilityActivationRequest request)
+        public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, float[] cooldowns,
+            AbilityActivationRequest request, IAbilityPayloadHandler payloadHandler = null)
         {
             if (store == null || catalog == null || cooldowns == null || request.Slot < 0 || request.Slot >= cooldowns.Length)
                 return Reject(request, AbilityActivationRejectReason.InvalidRequest);
@@ -62,42 +87,18 @@ namespace BattleSystemECS.Core.GAS
             if (!target.IsValid) return Reject(request, AbilityActivationRejectReason.NoTarget);
             var ready = TryActivate(cooldowns, request);
             if (!ready.Accepted) return ready;
-            int applied = 0;
-            for (int i = 0; i < ability.Effects.Count; i++)
-            {
-                if (!catalog.TryGetEffect(ability.Effects[i], out var effect) ||
-                    !store.GameplayEffectsRuntime.TryApply(effect.Id, effect, source, target, out _, ownerPlayerId: request.OwnerId))
-                    return Reject(request, AbilityActivationRejectReason.InvalidRequest);
-                applied++;
-            }
-            for (int i = 0; i < ability.Executions.Count; i++)
-            {
-                if (!catalog.TryGetExecution(ability.Executions[i], out var execution)) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
-                float magnitude = float.IsNaN(request.MagnitudeOverride) ? execution.Magnitude : request.MagnitudeOverride;
-                long sequence = store.AllocateGameplaySequence(targetId);
-                if (execution.Payload == EffectPayloadKind.Damage)
-                {
-                    var result = store.DamageResolver.TryApply(new DamageRequest(source, target, magnitude,
-                        DamageType.True, ElementType.None, DamageFlags.None, execution.Stage, DamageCommitBoundary.GameplayResolve,
-                        sequence, ability: ability.Id, effect: request.Effect, ownerPlayerId: request.OwnerId));
-                    if (!result.Accepted) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
-                    applied++;
-                }
-                else if (execution.Payload == EffectPayloadKind.Heal)
-                {
-                    if (!store.ResourceResolver.TryApply(new HealRequest(source, target, magnitude, sequence, request.OwnerId)).Accepted)
-                        return Reject(request, AbilityActivationRejectReason.InvalidRequest);
-                    applied++;
-                }
-            }
-            if (!AbilityCommit(cooldowns, request.Slot, ability.Cooldown)) return Reject(request, AbilityActivationRejectReason.Cooldown);
-            store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.AbilityActivated, source, target,
-                store.AllocateGameplaySequence(targetId), ownerPlayerId: request.OwnerId));
+            var validation = ValidatePlan(store, catalog, ability, request, source, target, payloadHandler);
+            if (validation != AbilityActivationRejectReason.None) return Reject(request, validation);
+            int applied = CommitPlan(store, catalog, ability, request, source, target, payloadHandler);
+            if (applied < 0) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            cooldowns[request.Slot] = Math.Max(0f, ability.Cooldown);
+            PublishActivation(store, request, source, target, targetId);
             return new AbilityActivationResult(true, request.OwnerId, request.Slot, appliedEffects: applied);
         }
 
         /// <summary>Catalog-backed activation for ECS ability slots.</summary>
-        public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, int entityId, int slot, AbilityActivationRequest request)
+        public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, int entityId, int slot,
+            AbilityActivationRequest request, IAbilityPayloadHandler payloadHandler = null)
         {
             if (store == null || catalog == null || entityId < 0 || entityId >= ComponentStore.MAX_ENTITIES ||
                 slot < 0 || slot >= store.AbilityCount[entityId])
@@ -111,40 +112,183 @@ namespace BattleSystemECS.Core.GAS
             if (!target.IsValid) return Reject(request, AbilityActivationRejectReason.NoTarget);
             if (!TryActivate(store, entityId, slot, out _))
                 return new AbilityActivationResult(false, request.OwnerId, slot, AbilityActivationRejectReason.Cooldown);
+            var validation = ValidatePlan(store, catalog, ability, request, source, target, payloadHandler);
+            if (validation != AbilityActivationRejectReason.None) return Reject(request, validation);
+            int applied = CommitPlan(store, catalog, ability, request, source, target, payloadHandler);
+            if (applied < 0) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            var instance = store.GetAbility(entityId, slot);
+            instance.Activate();
+            store.SetAbility(entityId, slot, instance);
+            PublishActivation(store, request, source, target, targetId);
+            return new AbilityActivationResult(true, request.OwnerId, slot, appliedEffects: applied);
+        }
+
+        private static AbilityActivationRejectReason ValidatePlan(ComponentStore store, GameplayCatalog catalog,
+            AbilityDefinition ability, AbilityActivationRequest request, EntityHandle source, EntityHandle target,
+            IAbilityPayloadHandler payloadHandler)
+        {
+            if (!ValidateCosts(store, ability, request, source)) return AbilityActivationRejectReason.Cost;
+            for (int i = 0; i < ability.Effects.Count; i++)
+                if (!catalog.TryGetEffect(ability.Effects[i], out var effect) ||
+                    !GameplayEffectRuntime.IsDurationContractValid(effect))
+                    return AbilityActivationRejectReason.InvalidRequest;
+            for (int i = 0; i < ability.Executions.Count; i++)
+            {
+                if (!catalog.TryGetExecution(ability.Executions[i], out var execution))
+                    return AbilityActivationRejectReason.UnsupportedDefinition;
+                float magnitude = float.IsNaN(request.MagnitudeOverride) ? execution.Magnitude : request.MagnitudeOverride;
+                var context = new AbilityPayloadContext(store, ability, execution, request, source, target, magnitude);
+                if (payloadHandler != null && payloadHandler.CanCommit(context)) continue;
+                if (!CanCommitBuiltIn(context)) return AbilityActivationRejectReason.UnsupportedDefinition;
+            }
+            return AbilityActivationRejectReason.None;
+        }
+
+        private static int CommitPlan(ComponentStore store, GameplayCatalog catalog, AbilityDefinition ability,
+            AbilityActivationRequest request, EntityHandle source, EntityHandle target, IAbilityPayloadHandler payloadHandler)
+        {
             int applied = 0;
             for (int i = 0; i < ability.Effects.Count; i++)
             {
-                if (!catalog.TryGetEffect(ability.Effects[i], out var effect) ||
-                    !store.GameplayEffectsRuntime.TryApply(effect.Id, effect, source, target, out _, ownerPlayerId: request.OwnerId))
-                    return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                catalog.TryGetEffect(ability.Effects[i], out var effect);
+                if (!store.GameplayEffectsRuntime.TryApply(effect.Id, effect, source, target, out _, ownerPlayerId: request.OwnerId))
+                    return -1;
                 applied++;
             }
             for (int i = 0; i < ability.Executions.Count; i++)
             {
-                if (!catalog.TryGetExecution(ability.Executions[i], out var execution)) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
-                long sequence = store.AllocateGameplaySequence(targetId);
-                if (execution.Payload == EffectPayloadKind.Damage)
-                {
-                    if (!store.DamageResolver.TryApply(new DamageRequest(source, target, execution.Magnitude,
-                        DamageType.True, ElementType.None, DamageFlags.None, execution.Stage, DamageCommitBoundary.GameplayResolve,
-                        sequence, ability: ability.Id, effect: request.Effect, ownerPlayerId: request.OwnerId)).Accepted)
-                        return Reject(request, AbilityActivationRejectReason.InvalidRequest);
-                    applied++;
-                }
-                else if (execution.Payload == EffectPayloadKind.Heal)
-                {
-                    if (!store.ResourceResolver.TryApply(new HealRequest(source, target, execution.Magnitude, sequence, request.OwnerId)).Accepted)
-                        return Reject(request, AbilityActivationRejectReason.InvalidRequest);
-                    applied++;
-                }
+                catalog.TryGetExecution(ability.Executions[i], out var execution);
+                float magnitude = float.IsNaN(request.MagnitudeOverride) ? execution.Magnitude : request.MagnitudeOverride;
+                var context = new AbilityPayloadContext(store, ability, execution, request, source, target, magnitude);
+                if (payloadHandler != null && payloadHandler.CanCommit(context)) applied += Math.Max(0, payloadHandler.Commit(context));
+                else if (!CommitBuiltIn(context)) return -1;
+                else applied++;
             }
-            var instance = store.GetAbility(entityId, slot);
-            instance.Activate();
-            store.SetAbility(entityId, slot, instance);
+            if (!CommitCosts(store, ability, request, source)) return -1;
+            return applied;
+        }
+
+        private static bool CanCommitBuiltIn(AbilityPayloadContext context)
+        {
+            var execution = context.Execution;
+            float magnitude = context.Magnitude;
+            if (float.IsNaN(magnitude) || float.IsInfinity(magnitude)) return false;
+            switch (execution.Payload)
+            {
+                case EffectPayloadKind.Damage:
+                    return Matches(execution.Operation, ExecutionOperation.ApplyDamage) && magnitude > 0f;
+                case EffectPayloadKind.Heal:
+                    return Matches(execution.Operation, ExecutionOperation.ApplyHeal) && magnitude > 0f;
+                case EffectPayloadKind.Shield:
+                    return Matches(execution.Operation, ExecutionOperation.ApplyShield) && magnitude > 0f;
+                case EffectPayloadKind.Slow:
+                    return Matches(execution.Operation, ExecutionOperation.ApplySlow) && magnitude > 0f && magnitude < 1f && execution.Duration > 0f;
+                case EffectPayloadKind.CrowdControl:
+                    return Matches(execution.Operation, ExecutionOperation.ApplyCrowdControl) && magnitude > 0f;
+                case EffectPayloadKind.GameplayEvent:
+                    return execution.Operation == ExecutionOperation.Default;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool CommitBuiltIn(AbilityPayloadContext context)
+        {
+            var store = context.Store;
+            int targetId = context.Target.Index;
+            long sequence = store.AllocateGameplaySequence(targetId);
+            switch (context.Execution.Payload)
+            {
+                case EffectPayloadKind.Damage:
+                    return store.DamageResolver.TryApply(new DamageRequest(context.Source, context.Target, context.Magnitude,
+                        DamageType.True, ElementType.None, DamageFlags.None, context.Execution.Stage,
+                        DamageCommitBoundary.GameplayResolve, sequence, ability: context.Ability.Id,
+                        effect: context.Request.Effect, ownerPlayerId: context.Request.OwnerId)).Accepted;
+                case EffectPayloadKind.Heal:
+                    return store.ResourceResolver.TryApply(new HealRequest(context.Source, context.Target,
+                        context.Magnitude, sequence, context.Request.OwnerId)).Accepted;
+                case EffectPayloadKind.Shield:
+                    return store.ResourceResolver.TryApply(new ResourceRequest(context.Source, context.Target,
+                        new AttributeKey(9), context.Magnitude, sequence, context.Request.OwnerId)).Accepted;
+                case EffectPayloadKind.Slow:
+                    int slowDuration = Math.Max(1, (int)Math.Ceiling(context.Execution.Duration));
+                    if (store.EnemyActive[targetId]) store.ApplyEnemySlow(targetId, context.Magnitude, slowDuration);
+                    else store.ApplyPlayerSlow(targetId, context.Magnitude, slowDuration);
+                    return true;
+                case EffectPayloadKind.CrowdControl:
+                    int duration = Math.Max(1, (int)Math.Ceiling(context.Magnitude));
+                    if (store.EnemyActive[targetId])
+                    {
+                        if (context.Ability.Targeting.Shape == TargetingShape.AoeRoot) store.ApplyEnemyRoot(targetId, duration);
+                        else if (context.Ability.Targeting.Shape == TargetingShape.AoeKnockback) store.ApplyEnemyKnockback(targetId, context.Magnitude);
+                        else store.ApplyEnemyStun(targetId, duration);
+                    }
+                    else store.ApplyPlayerStun(targetId, duration);
+                    return true;
+                case EffectPayloadKind.GameplayEvent:
+                    return store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.EffectApplied,
+                        context.Source, context.Target, sequence, ownerPlayerId: context.Request.OwnerId));
+                default:
+                    return false;
+            }
+        }
+
+        private static bool ValidateCosts(ComponentStore store, AbilityDefinition ability,
+            AbilityActivationRequest request, EntityHandle source)
+        {
+            for (int i = 0; i < ability.Costs.Count; i++)
+            {
+                float amount = EffectiveCost(ability, request, i);
+                if (amount < 0f || float.IsNaN(amount) || float.IsInfinity(amount) ||
+                    !TryGetResource(store, source.Index, ability.Costs[i].Resource, out float available)) return false;
+                float sameResource = 0f;
+                for (int j = 0; j <= i; j++)
+                    if (ability.Costs[j].Resource.Equals(ability.Costs[i].Resource)) sameResource += EffectiveCost(ability, request, j);
+                if (available < sameResource) return false;
+            }
+            return true;
+        }
+
+        private static bool CommitCosts(ComponentStore store, AbilityDefinition ability,
+            AbilityActivationRequest request, EntityHandle source)
+        {
+            for (int i = 0; i < ability.Costs.Count; i++)
+            {
+                float amount = EffectiveCost(ability, request, i);
+                if (amount == 0f) continue;
+                if (!store.ResourceResolver.TryApply(new ResourceRequest(source, source, ability.Costs[i].Resource,
+                    -amount, store.AllocateGameplaySequence(source.Index), request.OwnerId)).Accepted) return false;
+            }
+            return true;
+        }
+
+        private static float EffectiveCost(AbilityDefinition ability, AbilityActivationRequest request, int index) =>
+            request.Cost > 0f && ability.Costs.Count == 1 && index == 0 ? request.Cost : ability.Costs[index].Amount;
+
+        private static bool TryGetResource(ComponentStore store, int entityId, AttributeKey key, out float value)
+        {
+            value = 0f;
+            bool player = (uint)entityId < ComponentStore.MAX_PLAYERS && store.PositionActive[entityId];
+            bool enemy = ComponentStore.IsValidEntity(entityId) && store.EnemyActive[entityId];
+            if (!player && !enemy) return false;
+            switch (key.Value)
+            {
+                case 2: value = player ? store.PlayerMaxHealth[entityId] : store.EnemyMaxHealth[entityId]; return true;
+                case 3: value = player ? store.PlayerCurrentHealth[entityId] : store.EnemyHealth[entityId]; return true;
+                case 4: if (!player) return false; value = store.PlayerGold[entityId]; return true;
+                case 7: value = player ? store.PlayerMana[entityId] : store.EnemyCurrentMana[entityId]; return true;
+                case 9: value = player ? store.PlayerShield[entityId] : store.EnemyShield[entityId]; return true;
+                default: return false;
+            }
+        }
+
+        private static bool Matches(ExecutionOperation actual, ExecutionOperation expected) =>
+            actual == ExecutionOperation.Default || actual == expected;
+
+        private static void PublishActivation(ComponentStore store, AbilityActivationRequest request,
+            EntityHandle source, EntityHandle target, int targetId) =>
             store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.AbilityActivated, source, target,
                 store.AllocateGameplaySequence(targetId), ownerPlayerId: request.OwnerId));
-            return new AbilityActivationResult(true, request.OwnerId, slot, appliedEffects: applied);
-        }
         private static bool Contains(IReadOnlyList<EffectId> ids, EffectId id) { for (int i = 0; i < ids.Count; i++) if (ids[i].Value == id.Value) return true; return false; }
         private static bool Contains(IReadOnlyList<TriggerId> ids, TriggerId id) { for (int i = 0; i < ids.Count; i++) if (ids[i].Value == id.Value) return true; return false; }
         private static AbilityActivationResult Reject(AbilityActivationRequest request, AbilityActivationRejectReason reason) => new AbilityActivationResult(false, request.OwnerId, request.Slot, reason);

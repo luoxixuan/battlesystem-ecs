@@ -22,7 +22,7 @@ namespace BattleSystemECS.Systems
     /// Casting is driven by the GameplayAbilityDef data (area shape, radius, etc.)
     /// instead of hard-coded string branching.
     /// </summary>
-    public class SkillSystem
+    public class SkillSystem : IAbilityPayloadHandler
     {
         private ComponentStore store;
         private IRenderer renderer;
@@ -109,7 +109,69 @@ namespace BattleSystemECS.Systems
             var request = new AbilityActivationRequest(playerId, slot, definition.Cooldown, targetId, abilityId,
                 definition.Effects.Count > 0 ? definition.Effects[0] : default(EffectId),
                 definition.TriggerRefs.Count > 0 ? definition.TriggerRefs[0] : default(TriggerId));
-            return GameplayAbilityRuntime.Activate(store, catalog, playerId, slot, request);
+            return GameplayAbilityRuntime.Activate(store, catalog, playerId, slot, request, this);
+        }
+
+        bool IAbilityPayloadHandler.CanCommit(AbilityPayloadContext context)
+        {
+            switch (context.Execution.Payload)
+            {
+                case EffectPayloadKind.Slow:
+                    return (context.Execution.Operation == ExecutionOperation.Default ||
+                            context.Execution.Operation == ExecutionOperation.ApplySlow) &&
+                           context.Ability.Targeting.Shape == TargetingShape.Slow &&
+                           context.Magnitude > 0f && context.Magnitude < 1f && context.Execution.Duration > 0f;
+                case EffectPayloadKind.CrowdControl:
+                    return (context.Execution.Operation == ExecutionOperation.Default ||
+                            context.Execution.Operation == ExecutionOperation.ApplyCrowdControl) &&
+                           context.Magnitude > 0f &&
+                           (context.Ability.Targeting.Shape == TargetingShape.AoeStun ||
+                            context.Ability.Targeting.Shape == TargetingShape.AoeRoot ||
+                            context.Ability.Targeting.Shape == TargetingShape.AoeKnockback);
+                case EffectPayloadKind.Resurrect:
+                    return context.Execution.Operation == ExecutionOperation.Resurrect && necromancerSystem != null;
+                case EffectPayloadKind.Resource:
+                    return context.Execution.Operation == ExecutionOperation.RestoreSnapshot && timeRewindSystem != null &&
+                           timeRewindSystem.GetSampleCount(playerId) > 0;
+                default:
+                    return false;
+            }
+        }
+
+        int IAbilityPayloadHandler.Commit(AbilityPayloadContext context)
+        {
+            if (context.Execution.Payload == EffectPayloadKind.Resurrect)
+                return necromancerSystem.MassResurrect(playerId, store.PositionX[playerId], store.PositionY[playerId],
+                    context.Ability.Targeting.Radius > 0f ? context.Ability.Targeting.Radius : context.Ability.Targeting.Range,
+                    context.Magnitude > 0f ? context.Magnitude : 0.3f);
+            if (context.Execution.Payload == EffectPayloadKind.Resource)
+                return timeRewindSystem.RestoreFromSnapshot(playerId, context.Magnitude) >= 0f ? 1 : 0;
+
+            float radius = context.Ability.Targeting.Radius > 0f
+                ? context.Ability.Targeting.Radius : context.Ability.Targeting.Range;
+            float radiusSquared = radius * radius;
+            float x = store.PositionX[playerId];
+            float y = store.PositionY[playerId];
+            int applied = 0;
+            var enemies = store.ActiveEnemyIds;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                int enemyId = enemies[i];
+                if (!store.EnemyActive[enemyId] || store.EnemyHealth[enemyId] <= 0f) continue;
+                float dx = store.PositionX[enemyId] - x;
+                float dy = store.PositionY[enemyId] - y;
+                if (dx * dx + dy * dy > radiusSquared) continue;
+                if (context.Execution.Payload == EffectPayloadKind.Slow)
+                    store.ApplyEnemySlow(enemyId, context.Magnitude, Math.Max(1, (int)Math.Ceiling(context.Execution.Duration)));
+                else if (context.Ability.Targeting.Shape == TargetingShape.AoeRoot)
+                    store.ApplyEnemyRoot(enemyId, Math.Max(1, (int)Math.Ceiling(context.Magnitude)));
+                else if (context.Ability.Targeting.Shape == TargetingShape.AoeKnockback)
+                    store.ApplyEnemyKnockback(enemyId, context.Magnitude);
+                else
+                    store.ApplyEnemyStun(enemyId, Math.Max(1, (int)Math.Ceiling(context.Magnitude)));
+                applied++;
+            }
+            return applied;
         }
 
         private int FindSlot(string name)

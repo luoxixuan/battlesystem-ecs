@@ -163,37 +163,40 @@ namespace BattleSystemECS.Systems
                 return false;
             }
 
-            // Check mana cost (apply cost multiplier from tech tree)
+            // Cost multiplier is projected into the typed activation request.
             float costMult = store.PlayerManaCost[playerId];
             float manaCost = def.ManaCost * costMult;
-            if (store.PlayerMana[playerId] < manaCost)
-            {
-                renderer.Log($"[GlobalSkill] Not enough mana for {def.Name} ({manaCost} required)");
-                return false;
-            }
 
             // Catalog is authoritative when the global definition is present in
             // the compiled content table. The switch remains a compatibility
             // projection for legacy fixtures that intentionally do not load the
             // global content catalog.
-            bool catalogActivated = TryActivateCatalogGlobal(def);
-            if (!catalogActivated)
+            if (TryActivateCatalogGlobal(def, manaCost, out var catalogResult))
             {
+                if (!catalogResult.Accepted) return false;
+            }
+            else
+            {
+                if (store.PlayerMana[playerId] < manaCost)
+                {
+                    renderer.Log($"[GlobalSkill] Not enough mana for {def.Name} ({manaCost} required)");
+                    return false;
+                }
                 ExecuteSkillEffect(def);
                 if (!GameplayAbilityRuntime.AbilityCommit(store.PlayerGlobalSkillCooldown, activation).Accepted)
                     return false;
+                // Compatibility-only definitions have no typed cost to commit.
+                store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), -manaCost);
             }
-
-            // Resource mutation is committed only after the ability path succeeds.
-            store.ApplyPlayerResourceAuthority(playerId, playerId, new Core.GAS.AttributeKey(7), -manaCost);
 
             renderer.Log($"[GlobalSkill] Activated: {def.Name}");
             _successfulActivationCount++;
             return true;
         }
 
-        private bool TryActivateCatalogGlobal(GlobalSkillDef def)
+        private bool TryActivateCatalogGlobal(GlobalSkillDef def, float manaCost, out AbilityActivationResult result)
         {
+            result = default(AbilityActivationResult);
             var catalog = gameConfig.CompiledCatalog;
             if (catalog == null || !catalog.TryResolveAlias(def.Name, out var abilityId)) return false;
             if (!catalog.TryGetAbility(abilityId, out var ability)) return false;
@@ -203,9 +206,8 @@ namespace BattleSystemECS.Systems
             if (slot < 0 || slot >= MAX_GLOBAL_SKILLS) return false;
             var request = new AbilityActivationRequest(playerId, slot, def.Cooldown,
                 playerId, abilityId, ability.Effects.Count > 0 ? ability.Effects[0] : default(EffectId),
-                ability.TriggerRefs.Count > 0 ? ability.TriggerRefs[0] : default(TriggerId));
-            var result = GameplayAbilityRuntime.Activate(store, catalog, store.PlayerGlobalSkillCooldown, request);
-            if (!result.Accepted) return false;
+                ability.TriggerRefs.Count > 0 ? ability.TriggerRefs[0] : default(TriggerId), manaCost);
+            result = GameplayAbilityRuntime.Activate(store, catalog, store.PlayerGlobalSkillCooldown, request);
             return true;
         }
 
