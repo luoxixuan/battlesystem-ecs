@@ -19,7 +19,7 @@ namespace BattleSystemECS.Systems
     ///   if (_hitShieldSystem != null && _hitShieldSystem.ConsumeHitShield(enemyId))
     ///       continue; // damage was blocked, don't apply damage
     /// </summary>
-    public class HitShieldSystem
+    public class HitShieldSystem : global::BattleSystemECS.Content.Contracts.IHitShieldResolver
     {
         private readonly ComponentStore store;
         private readonly IRenderer renderer;

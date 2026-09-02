@@ -10,17 +10,17 @@ namespace BattleSystemECS.Systems
     /// 金币奖励逻辑已迁移到 PlayerTowerAttackSystem 和 TowerAttackSystem
     /// 科技树击杀金币倍率通过 GoldKillMultiplier 同步到 ComponentStore
     /// </summary>
-    public class GoldSystem
+    public class GoldSystem : global::BattleSystemECS.Content.Contracts.IGoldRewardPort
     {
         private ComponentStore store;
         private IRenderer renderer;
-        private TechTreeSystem techTreeSystem;
+        private global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem;
         private readonly bool hasTechTreeSystem;
 
         /// <summary>
-        /// Full constructor with TechTreeSystem — enables gold-on-kill multiplier sync.
+        /// 完整构造函数接收 ICombatTuningView，用于同步击杀金币倍率。
         /// </summary>
-        public GoldSystem(ComponentStore store, IRenderer renderer, TechTreeSystem techTreeSystem)
+        public GoldSystem(ComponentStore store, IRenderer renderer, global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem)
         {
             this.store = store;
             this.renderer = renderer;
@@ -29,7 +29,7 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Backwards-compatible constructor without TechTreeSystem.
+        /// 另提供不接收 ICombatTuningView 的兼容构造函数。
         /// Defaults multiplier to 1.0 (no bonus).
         /// </summary>
         public GoldSystem(ComponentStore store, IRenderer renderer)
@@ -47,28 +47,16 @@ namespace BattleSystemECS.Systems
         ///   3) Cooldown reduction by PlayerCooldownReduceOnBreather[playerId] seconds on every global skill
         /// Call this AFTER both GoldSystem and WaveSpawningSystem are constructed.
         /// </summary>
-        public void SubscribeToBreatherWave(WaveSpawningSystem waveSpawning)
-        {
-            if (waveSpawning == null) return;
-            waveSpawning.OnBreatherWaveComplete += HandleBreatherWaveComplete;
-        }
-
         /// <summary>
         /// Wire Decaying-Wave-Bounty: subscribe to WaveSpawningSystem.OnWaveStart.
         /// When a new wave begins, reset PlayerWaveKillCount[pid] = 0 for all players so the decay
         /// multiplier restarts at 1.0. Idempotent — safe to call more than once.
         /// </summary>
-        public void SubscribeToWaveStart(WaveSpawningSystem waveSpawning)
-        {
-            if (waveSpawning == null) return;
-            waveSpawning.OnWaveStart += HandleWaveStart;
-        }
-
         /// <summary>
         /// OnWaveStart handler — zero out the per-player wave kill counter.
         /// Uses array length (not a hardcoded constant) so this stays in sync if MAX_PLAYERS ever changes.
         /// </summary>
-        private void HandleWaveStart()
+        public void HandleWaveStart()
         {
             if (store == null) return;
             int maxPlayers = store.PlayerWaveKillCount.Length;
@@ -85,7 +73,7 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Apply the three Breather-wave bonuses. Idempotent against missing arrays.
         /// </summary>
-        private void HandleBreatherWaveComplete(int waveNumber)
+        public void HandleBreatherWaveComplete(int waveNumber)
         {
             if (store == null) return;
             // Use array length (not a hardcoded constant) so this stays in sync if MAX_PLAYERS ever changes.
@@ -205,17 +193,13 @@ namespace BattleSystemECS.Systems
         /// Per-frame cost: zero. The event is fired only when a culling kill actually
         /// lands, which is rare (HP-threshold + damage-gate gated).
         /// </summary>
-        public void SubscribeToCulling(CullingSystem cullingSystem)
+        public void HandleCullingKilled(int enemyId, int towerId, int playerId, float bonusGold)
         {
-            if (cullingSystem == null) return;
-            cullingSystem.OnCullingKilled += (enemyId, towerId, playerId, bonusGold) =>
-            {
-                if (bonusGold <= 0f) return;
-                if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) return;
-                float currentGold = store.GetPlayerGold(playerId);
-                store.SetPlayerGold(playerId, currentGold + bonusGold);
-                renderer.Log($"[CULL] Tower {towerId} executed Enemy {enemyId} (Player {playerId}): +{bonusGold:F0} gold");
-            };
+            if (bonusGold <= 0f) return;
+            if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) return;
+            float currentGold = store.GetPlayerGold(playerId);
+            store.SetPlayerGold(playerId, currentGold + bonusGold);
+            renderer.Log($"[CULL] Tower {towerId} executed Enemy {enemyId} (Player {playerId}): +{bonusGold:F0} gold");
         }
     }
 }

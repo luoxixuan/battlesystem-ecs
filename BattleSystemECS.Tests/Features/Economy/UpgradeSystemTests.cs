@@ -55,7 +55,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             // 确保 config 有可用的 buff
             Assert.True(config.UpgradeBuffs.Count > 0);
 
-            var sys = new UpgradeSystem(Store, Renderer, pid, config);
+            var sys = new UpgradeSystem(Store, Renderer, pid, config, new TowerUpgradeSystem(Store, Renderer, config));
 
             // 给足够的金币触发升级（threshold 是 100）
             Store.PlayerGold[pid] = 200f;
@@ -69,7 +69,7 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact] public void Update_DoesNotGrantSameBuffTwice()
         {
             var (config, pid) = CreateEnv();
-            var sys = new UpgradeSystem(Store, Renderer, pid, config);
+            var sys = new UpgradeSystem(Store, Renderer, pid, config, new TowerUpgradeSystem(Store, Renderer, config));
 
             // 足够的金币 + 足够的 threshold 差，确保两次 Upgrade 都触发
             Store.PlayerGold[pid] = 1000f;
@@ -94,7 +94,7 @@ namespace BattleSystemECS.Tests.Features.Economy
         [Fact] public void Update_FailsWhenGoldBelowThreshold()
         {
             var (config, pid) = CreateEnv();
-            var sys = new UpgradeSystem(Store, Renderer, pid, config);
+            var sys = new UpgradeSystem(Store, Renderer, pid, config, new TowerUpgradeSystem(Store, Renderer, config));
 
             Store.PlayerGold[pid] = 10f; // 远低于 threshold 100
 

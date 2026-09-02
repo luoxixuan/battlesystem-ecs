@@ -23,8 +23,8 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore store;
         private readonly int playerId;
-        private readonly ReflectTowerSystem? _reflectTowerSystem;
-        private readonly TowerStealthSystem? _towerStealthSystem;
+        private readonly global::BattleSystemECS.Content.Contracts.IReflectionCommandPort? _reflectTowerSystem;
+        private readonly global::BattleSystemECS.Content.Contracts.ITowerTargetingView? _towerStealthSystem;
         private SuicideExplosionEvent[] _explosionEvents=Array.Empty<SuicideExplosionEvent>();
         private bool[] _hasExplosionEvent=Array.Empty<bool>();
         private int _explosionCollectCount;
@@ -33,7 +33,7 @@ namespace BattleSystemECS.Systems
         // Cached active enemy list per turn
         private System.Collections.Generic.List<int> _activeEnemyList = null!;
 
-        public SuicideBombSystem(ComponentStore store, int playerId, ReflectTowerSystem? reflectTowerSystem = null, TowerStealthSystem? towerStealthSystem = null)
+        public SuicideBombSystem(ComponentStore store, int playerId, global::BattleSystemECS.Content.Contracts.IReflectionCommandPort? reflectTowerSystem = null, global::BattleSystemECS.Content.Contracts.ITowerTargetingView? towerStealthSystem = null)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this.playerId = playerId;

@@ -2,7 +2,7 @@
 namespace BattleSystemECS.Core
 {
     /// <summary>Main combat phase: attacks, synergy, auras, curses, projectiles, mana, skills.</summary>
-    public class CombatGroup : ISystemGroup
+    internal sealed class CombatGroup : ISystemGroup
     {
         public Systems.PlayerTowerAttackSystem? PlayerTowerAttack { get; set; }
         public Systems.TowerOverchargeSystem? TowerOvercharge { get; set; }
@@ -110,6 +110,49 @@ namespace BattleSystemECS.Core
         // injected CullingSystem reference). Exposed in CombatGroup so the
         // scheduler can call it uniformly. OnWaveStart resets per-player stacks.
         public Systems.CullingSystem? Culling { get; set; }
+
+        internal void RegisterFrameBindings(FrameScheduler s)
+        {
+            if(PlayerTowerAttack!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.player-attack.update"),c=>PlayerTowerAttack?.Update());
+            if(TowerOvercharge!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.overcharge.update"),c=>TowerOvercharge?.Update(c.Delta));
+            if(Heat!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.heat.update"),c=>Heat?.Update(c.Delta));
+            if(Energy!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.energy.update"),c=>Energy?.Update(c.Delta));
+            if(Demolish!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.demolish.update"),c=>Demolish?.Update());
+            if(HitShield!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.hit-shield.update"),c=>HitShield?.Update(c.Delta));
+            if(TowerSabotage!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.sabotage.update"),c=>TowerSabotage?.Update(c.Delta));
+            if(TowerStealth!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.stealth.update"),c=>TowerStealth?.Update(c.Delta));
+            if(TowerSynergy!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("combat.synergy.resolve-buff-shares"),c=>TowerSynergy?.ResolveBuffShares());s.RegisterFrameBinding(FrameBindingFacts.Get("combat.synergy.update"),c=>TowerSynergy?.Update());}
+            if(TowerAttack!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.tower-attack.update"),c=>TowerAttack?.Update(c.Delta));
+            if(TowerLink!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.link.update"),c=>TowerLink?.Update());
+            if(AuraTower!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.aura.resolve"),c=>AuraTower?.ResolveAuraBuffs());
+            if(TowerShrine!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("combat.shrine.prepare"),c=>TowerShrine?.SetTurn());s.RegisterFrameBinding(FrameBindingFacts.Get("combat.shrine.resolve"),c=>TowerShrine?.ResolveShrineBuffs());}
+            if(TowerBeacon!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("combat.beacon.prepare"),c=>TowerBeacon?.SetTurn());s.RegisterFrameBinding(FrameBindingFacts.Get("combat.beacon.resolve"),c=>TowerBeacon?.ResolveBeaconBuffs());}
+            if(Curse!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.curse.resolve"),c=>Curse?.ResolveCurseDebuffs());
+            if(PullTower!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.pull-tower.update"),c=>PullTower?.Update(c.Delta));
+            if(TowerSilence!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.silence.update"),c=>TowerSilence?.Update(c.Delta));
+            if(Dispel!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.dispel.update"),c=>Dispel?.Update(c.Delta));
+            if(Projectile!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.projectile.update"),c=>Projectile?.Update(c.Delta));
+            if(EnemyProjectile!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.enemy-projectile.update"),c=>EnemyProjectile?.Update(c.Delta));
+            if(Pickup!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.pickup.update"),c=>Pickup?.Update(c.Delta));
+            if(Mana!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.mana.update"),c=>Mana?.Update(c.Delta,false));
+            if(ManaShield!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.mana-shield.update"),c=>ManaShield?.Update(c.Delta));
+            if(GlobalSkill!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.global-skill.update"),c=>GlobalSkill?.Update(c.Delta,false));
+            if(BeamTower!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.beam.update"),c=>BeamTower?.Update(c.Delta));
+            if(Hero!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.hero.update"),c=>Hero?.Update(c.Delta));
+            if(SuicideBomb!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.suicide-bomb.update"),c=>SuicideBomb?.Update());
+            if(ReflectTower!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("combat.reflect.resolve"),c=>ReflectTower?.ResolveReflect());s.RegisterFrameBinding(FrameBindingFacts.Get("combat.reflect.apply"),c=>ReflectTower?.ApplyReflectDamage());}
+            if(TowerMorph!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.tower-morph.update"),c=>TowerMorph?.Update(c.Delta));
+            if(Taunt!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.taunt.resolve"),c=>Taunt?.ResolveTauntAssignments());
+            if(TowerActiveSkill!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.tower-active-skill.update"),c=>TowerActiveSkill?.Update(c.Delta));
+            if(Aggro!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.aggro.update"),c=>Aggro?.Update(c.Delta));
+            if(HeroSkill!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.hero-skill.update"),c=>HeroSkill?.Update(c.Delta));
+            if(EchoClone!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.echo-clone.update"),c=>EchoClone?.Update(c.Delta));
+            if(Bloodlust!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.bloodlust.update"),c=>Bloodlust?.Update(c.Turn));
+            if(Momentum!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.momentum.update"),c=>Momentum?.Update(c.Delta));
+            if(Adrenaline!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.adrenaline.update"),c=>Adrenaline?.Update(c.Delta));
+            if(Crest!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.crest.update"),c=>Crest?.Update(c.Delta));
+            if(Culling!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.culling.update"),c=>Culling?.Update(c.Delta));
+        }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {

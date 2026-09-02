@@ -18,7 +18,7 @@ namespace BattleSystemECS.Systems
     /// 触发检测位于 EnemyMovementSystem 的并行段，每个活跃敌人索引独占一个事件槽。
     /// 并行屏障后由 Resolve 串行按活跃索引顺序提交。
     /// </summary>
-    public class BossTrailAoeSystem
+    public class BossTrailAoeSystem : global::BattleSystemECS.Content.Contracts.IBossTrailCollector
     {
         private readonly ComponentStore store;
         private readonly int playerId;

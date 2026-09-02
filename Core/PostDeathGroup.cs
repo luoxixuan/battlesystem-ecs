@@ -3,7 +3,7 @@ using System;
 namespace BattleSystemECS.Core
 {
     /// <summary>Post-death resolution: fission, life link penalties, objective, resources, income, corpses, combo.</summary>
-    public class PostDeathGroup : ISystemGroup
+    internal sealed class PostDeathGroup : ISystemGroup
     {
         public Systems.EnemyFissionSystem? EnemyFission { get; set; }
         public Systems.EnemyLifeLinkSystem? LifeLink { get; set; }
@@ -26,6 +26,19 @@ namespace BattleSystemECS.Core
         // event-driven (synchronous in ResolveEnemiesKilledThisFrame) so kills
         // are visible to the next Update's regen check.
         public Systems.SoulHarvestSystem? SoulHarvest { get; set; }
+
+        internal void RegisterFrameBindings(FrameScheduler s)
+        {
+            if(EnemyFission!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.fission.update"),c=>EnemyFission?.Update());
+            if(LifeLink!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.life-link.resolve"),c=>LifeLink?.ResolveBreakPenalties());
+            if(Objective!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.objective.update"),c=>Objective?.Update(c.Delta,GameState.WavePhase));
+            if(ResourceNode!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.resource-node.update"),c=>ResourceNode?.Update(c.Delta,GameState.WavePhase));
+            if(TowerIncome!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.tower-income.update"),c=>TowerIncome?.Update(c.Delta));
+            if(CorpseEffect!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.corpse.update"),c=>CorpseEffect?.Update(c.Delta));
+            if(Combo!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.combo.update"),c=>Combo?.Update(c.Delta));
+            if(DoomClock!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.doom-clock.update"),c=>DoomClock?.Update(c.Delta,GameState.WavePhase));
+            if(SoulHarvest!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.soul-harvest.update"),c=>SoulHarvest?.Update(c.Delta));
+        }
 
         internal void ExecuteLegacy(ComponentStore store, TimeContext time, int turn)
         {

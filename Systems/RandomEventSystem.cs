@@ -17,10 +17,10 @@ namespace BattleSystemECS.Systems
     ///
     /// Integration:
     ///   - FrameScheduler.Tick() calls RandomEvent.Update(deltaTime, currentWave)
-    ///   - Ambient events (Ambush, BossRush) spawn via WaveSpawningSystem.InjectEnemies()
-    ///   - Supply drops spawn via PickupSystem.QueuePickup()
+    ///   - 环境事件通过 IWaveSpawningPort 追加敌人
+    ///   - 补给事件通过 IPickupCommandPort 生成掉落
     ///   - Earthquake applies damage via BuffSystem / direct ComponentStore
-    ///   - Merchant applies gold discount via InterestSystem
+    ///   - 商人事件通过 IMerchantModifierPort 应用折扣
     ///   - OnEventTriggered event for UI notification
     /// </summary>
     public class RandomEventSystem
@@ -42,11 +42,10 @@ namespace BattleSystemECS.Systems
         private int _pendingCallbackCount;
 
         // Reference to other systems (set by GameManager)
-        private WaveSpawningSystem waveSpawning;
-        private PickupSystem pickup;
-        private BuffSystem buff;
-        private InterestSystem interest;
-        private GoldSystem gold;
+        private global::BattleSystemECS.Content.Contracts.IWaveSpawningPort waveSpawning;
+        private global::BattleSystemECS.Content.Contracts.IPickupCommandPort pickup;
+        private global::BattleSystemECS.Content.Contracts.IMerchantModifierPort interest;
+        private global::BattleSystemECS.Content.Contracts.IGoldRewardPort gold;
 
         public RandomEventSystem(ComponentStore store, GameConfig gameConfig)
         {
@@ -54,11 +53,10 @@ namespace BattleSystemECS.Systems
             this.gameConfig = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));
         }
 
-        public void SetWaveSpawning(WaveSpawningSystem ws) => waveSpawning = ws;
-        public void SetPickupSystem(PickupSystem ps) => pickup = ps;
-        public void SetBuffSystem(BuffSystem bs) => buff = bs;
-        public void SetInterestSystem(InterestSystem iss) => interest = iss;
-        public void SetGoldSystem(GoldSystem gs) => gold = gs;
+        public void SetWaveSpawning(global::BattleSystemECS.Content.Contracts.IWaveSpawningPort ws) => waveSpawning = ws;
+        public void SetPickupSystem(global::BattleSystemECS.Content.Contracts.IPickupCommandPort ps) => pickup = ps;
+        public void SetInterestSystem(global::BattleSystemECS.Content.Contracts.IMerchantModifierPort iss) => interest = iss;
+        public void SetGoldSystem(global::BattleSystemECS.Content.Contracts.IGoldRewardPort gs) => gold = gs;
 
         /// <summary>
         /// Called each frame from FrameScheduler (WavePhase).
@@ -196,7 +194,7 @@ namespace BattleSystemECS.Systems
                         float current = store.GetPlayerGold(playerId);
                         store.SetPlayerGold(playerId, current + goldAmount);
                     }
-                    // Also optionally spawn a mana pickup via PickupSystem
+                    // 可选地通过 IPickupCommandPort 生成法力掉落。
                     if (pickup != null && param2 > 0f)
                     {
                         float manaAmount = param2; // param2 = mana amount if provided

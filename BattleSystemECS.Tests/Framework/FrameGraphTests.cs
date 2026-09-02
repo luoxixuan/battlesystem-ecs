@@ -12,6 +12,18 @@ namespace BattleSystemECS.Tests.Framework
     public sealed class FrameGraphTests : BattleTestBase
     {
         [Fact]
+        public void ExplicitCompatibilityDamageEntryCountsOnceAndUsesTypedResolver()
+        {
+            Player();
+            int enemyId=Enemy(e=>{e.Health=20f;e.MaxHealth=20f;});
+            long acceptedBefore=Store.DamageResolver.AcceptedCount;
+            Store.ApplyEnemyDamage(enemyId,5f);
+            Assert.Equal(1,Store.DamageResolver.LegacyApplyCount);
+            Assert.Equal(acceptedBefore+1,Store.DamageResolver.AcceptedCount);
+            Assert.Equal(15f,Store.EnemyHealth[enemyId]);
+        }
+
+        [Fact]
         public void StableNodeIdTopologyAndHashIgnoreRegistrationOrder()
         {
             // Bug 回归：相同节点集合不得因注册顺序改变拓扑或 hash。
@@ -70,7 +82,8 @@ namespace BattleSystemECS.Tests.Framework
             missing.SealGraphComposition();
             var presentStore=new ComponentStore();
             var present=new FrameScheduler(presentStore,Config);
-            present.SetPathfindingSystem(new Systems.PathfindingSystem(presentStore));
+            var pathfinding = new Systems.PathfindingSystem(presentStore);
+            present.RegisterPathWaypointCountQuery(pathfinding.GetPathWaypointCount);
             present.SealGraphComposition();
             Assert.NotEqual(missing.FrameGraphTopologyHash,present.FrameGraphTopologyHash);
         }
@@ -414,7 +427,7 @@ namespace BattleSystemECS.Tests.Framework
             // Bug 回归：删除或绕过任一真实生产节点时，composition 快照必须失败。
             Assert.Equal(FrameAccessReviewCatalog.ReviewedNodeCount-scheduler.FrameGraphDiagnostics.Count,
                 scheduler.FrameGraphPlan.Count);
-            Assert.Equal("0673aea3dfd0e07b3937a058ee1baa4ce30f4a37655e9fa72fc097a683a553b2",scheduler.FrameGraphTopologyHash);
+            Assert.Equal("8077e0885152522ba2c9297151d9c175dccdbf926d90a4a8235583201d27f45c",scheduler.FrameGraphTopologyHash);
             Assert.Contains(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="frame.input.publish");
             FrameNodeAdapter publisher=Assert.Single(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="frame.input.publish");
             Assert.Contains(FrameResource.EnemyHealth,publisher.Metadata.Reads);
@@ -457,6 +470,8 @@ namespace BattleSystemECS.Tests.Framework
                 Assert.False(string.IsNullOrWhiteSpace(n.Metadata.AccessProfile.ReviewId.Value));
                 Assert.False(string.IsNullOrWhiteSpace(n.Metadata.AccessProfile.BindingId.Value));
                 Assert.False(string.IsNullOrWhiteSpace(n.Metadata.AccessProfile.Owner.Value));
+                Assert.DoesNotContain("Systems.",n.Metadata.AccessProfile.Owner.Value,StringComparison.Ordinal);
+                Assert.DoesNotContain("Systems.",n.Metadata.AccessProfile.BindingId.Value,StringComparison.Ordinal);
                 Assert.DoesNotContain("WorldState",n.Metadata.Id.Value,StringComparison.Ordinal);
                 Assert.DoesNotContain(n.Metadata.Reads,r=>!Enum.IsDefined(typeof(FrameResource),r));
                 Assert.DoesNotContain(n.Metadata.Writes,r=>!Enum.IsDefined(typeof(FrameResource),r));
@@ -470,9 +485,9 @@ namespace BattleSystemECS.Tests.Framework
                     Assert.True(n.Metadata.AccessProfile.RequiresSystemBinding,$"{n.Metadata.Id} must fail when its Registry binding is removed.");
                     Assert.Contains(n.Metadata.AccessProfile.Owner.Value,n.Metadata.RequiredDependencies);
                 });
-            Assert.Equal("BattleSystemECS.Systems.SkillSystem.Update(delta)/ability.commit",
+            Assert.Equal("registration.Skill.Update(delta)/ability.commit",
                 Assert.Single(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="ability.commit").Metadata.AccessProfile.BindingId.Value);
-            Assert.Equal("BattleSystemECS.Systems.PathfindingSystem.SetTurn(turn)/movement.pathfinding.prepare",
+            Assert.Equal("registration.Pathfinding.SetTurn(turn)/movement.pathfinding.prepare",
                 Assert.Single(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="movement.pathfinding.prepare").Metadata.AccessProfile.BindingId.Value);
             Assert.Equal("BattleSystemECS.Core.FrameScheduler.GraphBeginFrame/frame.begin",
                 Assert.Single(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="frame.begin").Metadata.AccessProfile.BindingId.Value);
@@ -488,6 +503,8 @@ namespace BattleSystemECS.Tests.Framework
                 Assert.False(string.IsNullOrWhiteSpace(d.ReviewId.Value));
                 Assert.False(string.IsNullOrWhiteSpace(d.BindingId.Value));
                 Assert.False(string.IsNullOrWhiteSpace(d.Owner.Value));
+                Assert.DoesNotContain("Systems.",d.Owner.Value,StringComparison.Ordinal);
+                Assert.DoesNotContain("Systems.",d.BindingId.Value,StringComparison.Ordinal);
             });
             var reviewScopes=scheduler.FrameGraphPlan.Select(n=>n.Metadata.AccessProfile.Review!)
                 .Concat(scheduler.FrameGraphDiagnostics.Select(d=>d.Review!))
@@ -548,6 +565,7 @@ namespace BattleSystemECS.Tests.Framework
                 var scheduler=new FrameScheduler(world.Store,world.Config);
                 registry.AssignToGroupsForValidation(scheduler);
                 item.enable(scheduler,registry);
+                scheduler.RegisterFrameBinding(item.nodeId,_=>{ });
                 FrameGraphValidationException error=Assert.Throws<FrameGraphValidationException>(
                     ()=>scheduler.SealGraphComposition());
                 Assert.Contains(item.nodeId,error.Message,StringComparison.Ordinal);
@@ -596,15 +614,15 @@ namespace BattleSystemECS.Tests.Framework
         public void RemovingActiveRegistryBindingsAcrossGroupsFailsAtSeal()
         {
             // Bug 回归：删除任一 active Registry binding 必须在 Seal 时失败。
-            var removals=new (Action<FrameScheduler> remove,string expectedNode)[]
+            var removals=new[]
             {
-                (s=>s.Build.Gold=null,"build.gold.update"),
-                (s=>s.AI.EnemyAI=null,"ai.enemy.prepare"),
-                (s=>s.Movement.EnemyMovement=null,"movement.enemy.prepare"),
-                (s=>s.Combat.TowerAttack=null,"combat.tower-attack.update"),
-                (s=>s.PostDeath.Combo=null,"post-death.combo.update")
+                "build.gold.update",
+                "ai.enemy.prepare",
+                "movement.enemy.prepare",
+                "combat.tower-attack.update",
+                "post-death.combo.update"
             };
-            foreach(var removal in removals)
+            foreach(string nodeId in removals)
             {
                 using var world=new TestWorld();
                 int playerId=world.Player();
@@ -613,9 +631,9 @@ namespace BattleSystemECS.Tests.Framework
                 registry.WireDependencies(world.Store,playerId);
                 var scheduler=new FrameScheduler(world.Store,world.Config);
                 registry.AssignToGroupsForValidation(scheduler);
-                removal.remove(scheduler);
+                Assert.True(scheduler.RemoveFrameBinding(nodeId));
                 var error=Assert.Throws<FrameGraphValidationException>(()=>scheduler.SealGraphComposition());
-                Assert.Contains(removal.expectedNode,error.Message,StringComparison.Ordinal);
+                Assert.Contains(nodeId,error.Message,StringComparison.Ordinal);
             }
         }
 
@@ -778,7 +796,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(1,mode4.StateEntryCount(GameState.WavePhase));
             Assert.Contains(";Scenario=FixedPopulationBenchmark;WaveSpawning=Suppressed;Population=64;WaveStart=Suppressed",
                 mode4.CompositionFingerprint,StringComparison.Ordinal);
-            Assert.StartsWith("ProductionRegistry:f4d99c36cf616eb2d4310b85f6ce227cf8e7e807fc195d88a806c226af9e6715",
+            Assert.StartsWith("ProductionRegistry:3ad80041065ca9efb7d8011aec314b8a01baf2008c463732d4466d02fe5e0d31",
                 mode4.CompositionFingerprint,StringComparison.Ordinal);
             Assert.Equal(Systems.BenchmarkCompositionContract.ProductionRegistryGraph,mode5.Composition);
             Assert.Equal(4,mode5.FramesExecuted);
@@ -815,9 +833,9 @@ namespace BattleSystemECS.Tests.Framework
             var fixedPopulation=Systems.BenchmarkCompositionFactory.Create(fixedWorld.Store,fixedWorld.Config,
                 fixedWorld.Renderer,fixedPlayer,scenarioKind:FrameScenarioKind.FixedPopulationBenchmark);
             Assert.NotEqual(gameplay.Scheduler.FrameGraphTopologyHash,fixedPopulation.Scheduler.FrameGraphTopologyHash);
-            Assert.Equal("0673aea3dfd0e07b3937a058ee1baa4ce30f4a37655e9fa72fc097a683a553b2",
+            Assert.Equal("8077e0885152522ba2c9297151d9c175dccdbf926d90a4a8235583201d27f45c",
                 gameplay.Scheduler.FrameGraphTopologyHash);
-            Assert.Equal("f4d99c36cf616eb2d4310b85f6ce227cf8e7e807fc195d88a806c226af9e6715",
+            Assert.Equal("3ad80041065ca9efb7d8011aec314b8a01baf2008c463732d4466d02fe5e0d31",
                 fixedPopulation.Scheduler.FrameGraphTopologyHash);
             Assert.NotEqual(gameplay.Scheduler.FrameGraphReviewRoot,fixedPopulation.Scheduler.FrameGraphReviewRoot);
             Assert.Equal(FrameAccessReviewCatalog.ApprovedFingerprintRootGameplay,gameplay.Scheduler.FrameGraphReviewRoot);

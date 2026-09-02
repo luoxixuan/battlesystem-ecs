@@ -21,7 +21,7 @@ namespace BattleSystemECS.Systems
     ///
     /// Frame schedule: WavePhase, after EnemyAI.SetTurn/Update (Phase 2), before EnemyMovement.
     /// </summary>
-    public class EnemyLifeLinkSystem
+    public class EnemyLifeLinkSystem : global::BattleSystemECS.Content.Contracts.ILinkDamageResolver
     {
         private readonly ComponentStore store;
         private readonly GameConfig gameConfig;

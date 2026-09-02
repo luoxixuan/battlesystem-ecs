@@ -12,7 +12,7 @@ namespace BattleSystemECS.Systems
     /// 
     /// Cached bonuses are read by TowerAttackSystem each frame — zero per-tower query overhead.
     /// </summary>
-    public class DesperationSystem
+    public class DesperationSystem : global::BattleSystemECS.Content.Contracts.IDesperationView
     {
         private readonly ComponentStore store;
 

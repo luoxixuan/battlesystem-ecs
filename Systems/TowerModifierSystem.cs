@@ -33,7 +33,7 @@ namespace BattleSystemECS.Systems
     /// Reroll). The read helpers (GetTowerModifierId / GetModifierStat / etc.) are
     /// pure array reads and may be called from any frame phase.
     /// </summary>
-    public class TowerModifierSystem
+    public class TowerModifierSystem : global::BattleSystemECS.Content.Contracts.ITowerModifierRoller
     {
         private readonly ComponentStore store;
         private readonly Random rng;

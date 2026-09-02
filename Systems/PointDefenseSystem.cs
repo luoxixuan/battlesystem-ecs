@@ -10,10 +10,10 @@ namespace BattleSystemECS.Systems
     /// 
     /// 工作原理：
     /// - 在 TowerAttackSystem 之前运行（Phase 5.5）
-    /// - 扫描范围内所有敌方弹道（EnemyProjectileSystem）
+    /// - 通过 IEnemyProjectilePort 扫描范围内所有敌方弹道
     /// - 对每个敌方弹道，检测是否有 PointDefense 塔在射程内
     /// - 如果有，概率性击落（基于 PointDefense 塔的拦截率）
-    /// - 被击落的弹道从 EnemyProjectileSystem 中移除
+    /// - 通过 IEnemyProjectilePort 移除被击落的弹道
     /// 
     /// PointDefense 塔索敌模式 = Intercept，专门用于反制弹道而非攻击敌人。
     /// </summary>
@@ -21,9 +21,9 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore store;
         private readonly IRenderer logger;
-        private EnemyProjectileSystem enemyProjectileSystem;
+        private global::BattleSystemECS.Content.Contracts.IEnemyProjectilePort enemyProjectileSystem;
 
-        // Ping-pong queue for intercepted projectiles (intercept events → deactivate in EnemyProjectileSystem)
+        // 复用双缓冲队列收集拦截事件，串行通知 IEnemyProjectilePort 停用弹道。
         private List<int>[] _interceptQueue = new List<int>[2];
         private int _interceptQueueIdx = 0;
 
@@ -35,7 +35,7 @@ namespace BattleSystemECS.Systems
             _interceptQueue[1] = new List<int>(64);
         }
 
-        public void SetEnemyProjectileSystem(EnemyProjectileSystem enemyProjectileSystem)
+        public void SetEnemyProjectileSystem(global::BattleSystemECS.Content.Contracts.IEnemyProjectilePort enemyProjectileSystem)
         {
             this.enemyProjectileSystem = enemyProjectileSystem;
         }
@@ -71,14 +71,14 @@ namespace BattleSystemECS.Systems
                 if (interceptRate <= 0f) interceptRate = 0.5f; // default 50%
 
                 // Query spatial grid for enemy projectiles in range
-                // Note: EnemyProjectileSystem stores projectiles in world coordinates
+                // IEnemyProjectilePort 返回世界坐标中的弹道位置。
                 // We need to scan all active enemy projectiles in range
                 // Since spatial grid tracks enemies not projectiles, we do a simple loop
                 // for now (enemy projectiles are typically few — max 4096)
                 ScanAndIntercept(towerId, tx, ty, rangeSq, interceptRate);
             }
 
-            // Resolve intercepts: tell EnemyProjectileSystem to destroy intercepted projectiles
+            // 串行提交拦截结果，避免并行扫描阶段修改弹道状态。
             ResolveIntercepts();
         }
 
@@ -89,19 +89,18 @@ namespace BattleSystemECS.Systems
             // For future optimization: maintain a list of active enemy projectile IDs.
             var rng = Rng.Shared;
 
-            // TODO: We need access to _eprojActive[] from EnemyProjectileSystem.
-            // Since EnemyProjectileSystem is a sibling system, we expose GetProjectilesInRange.
+            // 通过窄接口查询弹道，不读取 EnemyProjectileSystem 的内部数组。
             // For now we use a simplified approach: iterate all slots and check distance.
             // This will be optimized once we have the cross-system query API.
             // 
-            // Instead, we'll use an event/broadcast: EnemyProjectileSystem exposes
+            // IEnemyProjectilePort 暴露受控的范围查询与停用操作。
             // GetActiveProjectileIds() and we check each one's distance from tower.
             // For this implementation, we'll add a public getter method.
             // 
-            // Since EnemyProjectileSystem lives in the same process, we can directly
+            // 同进程实现仍必须遵守该接口边界。
             // read its arrays via a public accessor — but that breaks encapsulation.
             // 
-            // Best approach: add a public "GetProjectilesInRange" method to EnemyProjectileSystem.
+            // 查询结果写入调用方提供的复用缓冲区。
             // Let's call it via the exposed system reference.
             var nearbyProjIds = new List<int>(64);
             enemyProjectileSystem.GetProjectilesInRange(tx, ty, rangeSq, nearbyProjIds);

@@ -1,0 +1,4758 @@
+﻿{
+  "schemaVersion": 3,
+  "bootstrap": {
+    "prepare": "PrepareInstallation",
+    "finalize": "FinalizeBindings"
+  },
+  "installationStages": {
+    "factory": "Construction",
+    "wire": "Wiring",
+    "bind": "Binding"
+  },
+  "registrations": [
+    {
+      "id": "Map",
+      "property": "Map",
+      "serviceType": "MapSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Map",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.Map"
+      ],
+      "recipe": {
+        "factory": "CreateMap",
+        "wire": "WireMap",
+        "bind": "BindMap"
+      }
+    },
+    {
+      "id": "WaveSpawning",
+      "property": "WaveSpawning",
+      "serviceType": "WaveSpawningSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.WaveSpawning",
+      "frameBindings": [
+        {
+          "nodeId": "pregame.wave.read-current-wave",
+          "registrationId": "WaveSpawning",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.WaveSpawning"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "pregame.wave.read-current-level",
+          "registrationId": "WaveSpawning",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.WaveSpawning"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "spawning.wave.update",
+          "registrationId": "WaveSpawning",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.WaveSpawning"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "spawning.wave.callback-dispatch",
+          "registrationId": "WaveSpawning",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.WaveSpawning"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.WaveSpawning"
+      ],
+      "recipe": {
+        "factory": "CreateWaveSpawning",
+        "wire": "WireWaveSpawning",
+        "bind": "BindWaveSpawning"
+      }
+    },
+    {
+      "id": "Nest",
+      "property": "Nest",
+      "serviceType": "NestSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Nest",
+      "frameBindings": [
+        {
+          "nodeId": "spawning.nest.prepare",
+          "registrationId": "Nest",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Nest"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "spawning.nest.update",
+          "registrationId": "Nest",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Nest"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Nest"
+      ],
+      "recipe": {
+        "factory": "CreateNest",
+        "wire": "WireNest",
+        "bind": "BindNest"
+      }
+    },
+    {
+      "id": "Gold",
+      "property": "Gold",
+      "serviceType": "GoldSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "TechTree"
+      ],
+      "ownerToken": "registration.Gold",
+      "frameBindings": [
+        {
+          "nodeId": "build.gold.update",
+          "registrationId": "Gold",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Gold"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Gold"
+      ],
+      "recipe": {
+        "factory": "CreateGold",
+        "wire": "WireGold",
+        "bind": "BindGold"
+      }
+    },
+    {
+      "id": "Upgrade",
+      "property": "Upgrade",
+      "serviceType": "UpgradeSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "TowerUpgrade"
+      ],
+      "ownerToken": "registration.Upgrade",
+      "frameBindings": [
+        {
+          "nodeId": "build.upgrade.update",
+          "registrationId": "Upgrade",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Upgrade"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Upgrade"
+      ],
+      "recipe": {
+        "factory": "CreateUpgrade",
+        "wire": "WireUpgrade",
+        "bind": "BindUpgrade"
+      }
+    },
+    {
+      "id": "Interest",
+      "property": "Interest",
+      "serviceType": "InterestSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Interest",
+      "frameBindings": [
+        {
+          "nodeId": "build.interest.update",
+          "registrationId": "Interest",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Interest"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Interest"
+      ],
+      "recipe": {
+        "factory": "CreateInterest",
+        "wire": "WireInterest",
+        "bind": "BindInterest"
+      }
+    },
+    {
+      "id": "Skill",
+      "property": "Skill",
+      "serviceType": "SkillSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "Buff",
+        "HealingZone",
+        "Mana",
+        "Necromancer",
+        "TechTree",
+        "TimeRewind"
+      ],
+      "ownerToken": "registration.Skill",
+      "frameBindings": [
+        {
+          "nodeId": "build.skill.update",
+          "registrationId": "Skill",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Skill"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "build.skill.reject-pending",
+          "registrationId": "Skill",
+          "phase": "Build",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Skill"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat-setup.skill.prepare",
+          "registrationId": "Skill",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Skill"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "skill-buff.skill.resolve-damage",
+          "registrationId": "Skill",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Skill"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ability.commit",
+          "registrationId": "Skill",
+          "phase": "Wave",
+          "executionPolicy": "InternalParallelCollectSerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Skill"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Skill"
+      ],
+      "recipe": {
+        "factory": "CreateSkill",
+        "wire": "WireSkill",
+        "bind": "BindSkill"
+      }
+    },
+    {
+      "id": "Buff",
+      "property": "Buff",
+      "serviceType": "BuffSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Buff",
+      "frameBindings": [
+        {
+          "nodeId": "skill-buff.buff.update",
+          "registrationId": "Buff",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Buff"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "skill-buff.buff.resolve-dot",
+          "registrationId": "Buff",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Buff"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Buff"
+      ],
+      "recipe": {
+        "factory": "CreateBuff",
+        "wire": "WireBuff",
+        "bind": "BindBuff"
+      }
+    },
+    {
+      "id": "ElementalReaction",
+      "property": "ElementalReaction",
+      "serviceType": "ElementalReactionSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.ElementalReaction",
+      "frameBindings": [
+        {
+          "nodeId": "skill-buff.elemental.update",
+          "registrationId": "ElementalReaction",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ElementalReaction"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "skill-buff.elemental.resolve",
+          "registrationId": "ElementalReaction",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ElementalReaction"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.ElementalReaction"
+      ],
+      "recipe": {
+        "factory": "CreateElementalReaction",
+        "wire": "WireElementalReaction",
+        "bind": "BindElementalReaction"
+      }
+    },
+    {
+      "id": "Combo",
+      "property": "Combo",
+      "serviceType": "ComboSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Combo",
+      "frameBindings": [
+        {
+          "nodeId": "post-death.combo.update",
+          "registrationId": "Combo",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Combo"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Combo"
+      ],
+      "recipe": {
+        "factory": "CreateCombo",
+        "wire": "WireCombo",
+        "bind": "BindCombo"
+      }
+    },
+    {
+      "id": "AutoSkill",
+      "property": "AutoSkill",
+      "serviceType": "AutoSkillSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "Skill"
+      ],
+      "ownerToken": "registration.AutoSkill",
+      "frameBindings": [
+        {
+          "nodeId": "build.auto-skill.update",
+          "registrationId": "AutoSkill",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.AutoSkill"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.AutoSkill"
+      ],
+      "recipe": {
+        "factory": "CreateAutoSkill",
+        "wire": "WireAutoSkill",
+        "bind": "BindAutoSkill"
+      }
+    },
+    {
+      "id": "Mana",
+      "property": "Mana",
+      "serviceType": "ManaSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "TechTree"
+      ],
+      "ownerToken": "registration.Mana",
+      "frameBindings": [
+        {
+          "nodeId": "build.mana.update",
+          "registrationId": "Mana",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Mana"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat-setup.mana.prepare",
+          "registrationId": "Mana",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Mana"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.mana.update",
+          "registrationId": "Mana",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Mana"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Mana"
+      ],
+      "recipe": {
+        "factory": "CreateMana",
+        "wire": "WireMana",
+        "bind": "BindMana"
+      }
+    },
+    {
+      "id": "ManaShield",
+      "property": "ManaShield",
+      "serviceType": "ManaShieldSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.ManaShield",
+      "frameBindings": [
+        {
+          "nodeId": "build.mana-shield.update",
+          "registrationId": "ManaShield",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ManaShield"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.mana-shield.update",
+          "registrationId": "ManaShield",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ManaShield"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.ManaShield"
+      ],
+      "recipe": {
+        "factory": "CreateManaShield",
+        "wire": "WireManaShield",
+        "bind": "BindManaShield"
+      }
+    },
+    {
+      "id": "GlobalSkill",
+      "property": "GlobalSkill",
+      "serviceType": "GlobalSkillSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.GlobalSkill",
+      "frameBindings": [
+        {
+          "nodeId": "build.global-skill.update",
+          "registrationId": "GlobalSkill",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.GlobalSkill"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat-setup.global-skill.prepare",
+          "registrationId": "GlobalSkill",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.GlobalSkill"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.global-skill.update",
+          "registrationId": "GlobalSkill",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.GlobalSkill"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.GlobalSkill"
+      ],
+      "recipe": {
+        "factory": "CreateGlobalSkill",
+        "wire": "WireGlobalSkill",
+        "bind": "BindGlobalSkill"
+      }
+    },
+    {
+      "id": "AbilityPayloads",
+      "property": "AbilityPayloads",
+      "serviceType": "ProductionAbilityPayloadHandler",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [
+        "EnemyAbility",
+        "GlobalSkill",
+        "HeroSkill",
+        "Necromancer",
+        "Skill",
+        "TimeRewind",
+        "TowerActiveSkill"
+      ],
+      "ownerToken": "registration.AbilityPayloads",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.AbilityPayloads"
+      ],
+      "recipe": {
+        "factory": "CreateAbilityPayloads",
+        "wire": "WireAbilityPayloads",
+        "bind": "BindAbilityPayloads"
+      }
+    },
+    {
+      "id": "Mark",
+      "property": "Mark",
+      "serviceType": "MarkSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Mark",
+      "frameBindings": [
+        {
+          "nodeId": "skill-buff.mark.update",
+          "registrationId": "Mark",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Mark"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Mark"
+      ],
+      "recipe": {
+        "factory": "CreateMark",
+        "wire": "WireMark",
+        "bind": "BindMark"
+      }
+    },
+    {
+      "id": "DeathMark",
+      "property": "DeathMark",
+      "serviceType": "DeathMarkSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.DeathMark",
+      "frameBindings": [
+        {
+          "nodeId": "skill-buff.death-mark.update",
+          "registrationId": "DeathMark",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.DeathMark"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.DeathMark"
+      ],
+      "recipe": {
+        "factory": "CreateDeathMark",
+        "wire": "WireDeathMark",
+        "bind": "BindDeathMark"
+      }
+    },
+    {
+      "id": "Culling",
+      "property": "Culling",
+      "serviceType": "CullingSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Culling",
+      "frameBindings": [
+        {
+          "nodeId": "combat.culling.update",
+          "registrationId": "Culling",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Culling"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Culling"
+      ],
+      "recipe": {
+        "factory": "CreateCulling",
+        "wire": "WireCulling",
+        "bind": "BindCulling"
+      }
+    },
+    {
+      "id": "TimeRewind",
+      "property": "TimeRewind",
+      "serviceType": "TimeRewindSnapshotSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TimeRewind",
+      "frameBindings": [
+        {
+          "nodeId": "pregame.time-rewind.update",
+          "registrationId": "TimeRewind",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TimeRewind"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.TimeRewind"
+      ],
+      "recipe": {
+        "factory": "CreateTimeRewind",
+        "wire": "WireTimeRewind",
+        "bind": "BindTimeRewind"
+      }
+    },
+    {
+      "id": "TowerPlacement",
+      "property": "TowerPlacement",
+      "serviceType": "TowerPlacementSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [
+        "TowerModifier"
+      ],
+      "ownerToken": "registration.TowerPlacement",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.TowerPlacement"
+      ],
+      "recipe": {
+        "factory": "CreateTowerPlacement",
+        "wire": "WireTowerPlacement",
+        "bind": "BindTowerPlacement"
+      }
+    },
+    {
+      "id": "TowerAttack",
+      "property": "TowerAttack",
+      "serviceType": "TowerAttackSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "Bleed",
+        "Buff",
+        "Culling",
+        "Desperation",
+        "EventBus",
+        "FireTrail",
+        "HitShield",
+        "LifeLink",
+        "Projectile",
+        "TechTree"
+      ],
+      "ownerToken": "registration.TowerAttack",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.tower-attack.prepare",
+          "registrationId": "TowerAttack",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerAttack"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.tower-attack.update",
+          "registrationId": "TowerAttack",
+          "phase": "Wave",
+          "executionPolicy": "InternalParallelCollectSerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerAttack"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.TowerAttack"
+      ],
+      "recipe": {
+        "factory": "CreateTowerAttack",
+        "wire": "WireTowerAttack",
+        "bind": "BindTowerAttack"
+      }
+    },
+    {
+      "id": "TowerUpgrade",
+      "property": "TowerUpgrade",
+      "serviceType": "TowerUpgradeSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TowerUpgrade",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.TowerUpgrade"
+      ],
+      "recipe": {
+        "factory": "CreateTowerUpgrade",
+        "wire": "WireTowerUpgrade",
+        "bind": "BindTowerUpgrade"
+      }
+    },
+    {
+      "id": "TowerExperience",
+      "property": "TowerExperience",
+      "serviceType": "TowerExperienceSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TowerExperience",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.TowerExperience"
+      ],
+      "recipe": {
+        "factory": "CreateTowerExperience",
+        "wire": "WireTowerExperience",
+        "bind": "BindTowerExperience"
+      }
+    },
+    {
+      "id": "TowerSynergy",
+      "property": "TowerSynergy",
+      "serviceType": "TowerSynergySystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TowerSynergy",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.synergy.prepare",
+          "registrationId": "TowerSynergy",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerSynergy"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.synergy.resolve-buff-shares",
+          "registrationId": "TowerSynergy",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerSynergy"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.synergy.update",
+          "registrationId": "TowerSynergy",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerSynergy"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.TowerSynergy"
+      ],
+      "recipe": {
+        "factory": "CreateTowerSynergy",
+        "wire": "WireTowerSynergy",
+        "bind": "BindTowerSynergy"
+      }
+    },
+    {
+      "id": "TowerFortress",
+      "property": "TowerFortress",
+      "serviceType": "TowerFortressSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TowerFortress",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.fortress.prepare",
+          "registrationId": "TowerFortress",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerFortress"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.TowerFortress"
+      ],
+      "recipe": {
+        "factory": "CreateTowerFortress",
+        "wire": "WireTowerFortress",
+        "bind": "BindTowerFortress"
+      }
+    },
+    {
+      "id": "KillCooldownReset",
+      "property": "KillCooldownReset",
+      "serviceType": "KillCooldownResetSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.KillCooldownReset",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.KillCooldownReset"
+      ],
+      "recipe": {
+        "factory": "CreateKillCooldownReset",
+        "wire": "WireKillCooldownReset",
+        "bind": "BindKillCooldownReset"
+      }
+    },
+    {
+      "id": "HealOnKill",
+      "property": "HealOnKill",
+      "serviceType": "HealOnKillSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.HealOnKill",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.HealOnKill"
+      ],
+      "recipe": {
+        "factory": "CreateHealOnKill",
+        "wire": "WireHealOnKill",
+        "bind": "BindHealOnKill"
+      }
+    },
+    {
+      "id": "Bloodlust",
+      "property": "Bloodlust",
+      "serviceType": "BloodlustSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Bloodlust",
+      "frameBindings": [
+        {
+          "nodeId": "combat.bloodlust.update",
+          "registrationId": "Bloodlust",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Bloodlust"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Bloodlust"
+      ],
+      "recipe": {
+        "factory": "CreateBloodlust",
+        "wire": "WireBloodlust",
+        "bind": "BindBloodlust"
+      }
+    },
+    {
+      "id": "PreFightBuff",
+      "property": "PreFightBuff",
+      "serviceType": "PreFightBuffSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.PreFightBuff",
+      "frameBindings": [
+        {
+          "nodeId": "build.pre-fight-buff.update",
+          "registrationId": "PreFightBuff",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.PreFightBuff"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.PreFightBuff"
+      ],
+      "recipe": {
+        "factory": "CreatePreFightBuff",
+        "wire": "WirePreFightBuff",
+        "bind": "BindPreFightBuff"
+      }
+    },
+    {
+      "id": "Momentum",
+      "property": "Momentum",
+      "serviceType": "MomentumSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Momentum",
+      "frameBindings": [
+        {
+          "nodeId": "combat.momentum.update",
+          "registrationId": "Momentum",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Momentum"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Momentum"
+      ],
+      "recipe": {
+        "factory": "CreateMomentum",
+        "wire": "WireMomentum",
+        "bind": "BindMomentum"
+      }
+    },
+    {
+      "id": "Adrenaline",
+      "property": "Adrenaline",
+      "serviceType": "AdrenalineSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Adrenaline",
+      "frameBindings": [
+        {
+          "nodeId": "combat.adrenaline.update",
+          "registrationId": "Adrenaline",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Adrenaline"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Adrenaline"
+      ],
+      "recipe": {
+        "factory": "CreateAdrenaline",
+        "wire": "WireAdrenaline",
+        "bind": "BindAdrenaline"
+      }
+    },
+    {
+      "id": "Crest",
+      "property": "Crest",
+      "serviceType": "CrestSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Crest",
+      "frameBindings": [
+        {
+          "nodeId": "combat.crest.update",
+          "registrationId": "Crest",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Crest"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Crest"
+      ],
+      "recipe": {
+        "factory": "CreateCrest",
+        "wire": "WireCrest",
+        "bind": "BindCrest"
+      }
+    },
+    {
+      "id": "TowerMorph",
+      "property": "TowerMorph",
+      "serviceType": "TowerMorphSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TowerMorph",
+      "frameBindings": [
+        {
+          "nodeId": "combat.tower-morph.update",
+          "registrationId": "TowerMorph",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerMorph"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.TowerMorph"
+      ],
+      "recipe": {
+        "factory": "CreateTowerMorph",
+        "wire": "WireTowerMorph",
+        "bind": "BindTowerMorph"
+      }
+    },
+    {
+      "id": "AuraTower",
+      "property": "AuraTower",
+      "serviceType": "AuraTowerSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.AuraTower",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.aura.prepare",
+          "registrationId": "AuraTower",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.AuraTower"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.aura.resolve",
+          "registrationId": "AuraTower",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.AuraTower"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.AuraTower"
+      ],
+      "recipe": {
+        "factory": "CreateAuraTower",
+        "wire": "WireAuraTower",
+        "bind": "BindAuraTower"
+      }
+    },
+    {
+      "id": "Curse",
+      "property": "Curse",
+      "serviceType": "CurseAuraSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Curse",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.curse.prepare",
+          "registrationId": "Curse",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Curse"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.curse.resolve",
+          "registrationId": "Curse",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Curse"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Curse"
+      ],
+      "recipe": {
+        "factory": "CreateCurse",
+        "wire": "WireCurse",
+        "bind": "BindCurse"
+      }
+    },
+    {
+      "id": "PullTower",
+      "property": "PullTower",
+      "serviceType": "PullTowerSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.PullTower",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.pull-tower.prepare",
+          "registrationId": "PullTower",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.PullTower"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.pull-tower.update",
+          "registrationId": "PullTower",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.PullTower"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.PullTower"
+      ],
+      "recipe": {
+        "factory": "CreatePullTower",
+        "wire": "WirePullTower",
+        "bind": "BindPullTower"
+      }
+    },
+    {
+      "id": "Taunt",
+      "property": "Taunt",
+      "serviceType": "TauntSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Taunt",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.taunt.prepare",
+          "registrationId": "Taunt",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Taunt"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.taunt.resolve",
+          "registrationId": "Taunt",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Taunt"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Taunt"
+      ],
+      "recipe": {
+        "factory": "CreateTaunt",
+        "wire": "WireTaunt",
+        "bind": "BindTaunt"
+      }
+    },
+    {
+      "id": "Bleed",
+      "property": "Bleed",
+      "serviceType": "BleedSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Bleed",
+      "frameBindings": [
+        {
+          "nodeId": "skill-buff.bleed.update",
+          "registrationId": "Bleed",
+          "phase": "Wave",
+          "executionPolicy": "ParallelDisjointWrite",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Bleed"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "skill-buff.bleed.resolve",
+          "registrationId": "Bleed",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Bleed"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Bleed"
+      ],
+      "recipe": {
+        "factory": "CreateBleed",
+        "wire": "WireBleed",
+        "bind": "BindBleed"
+      }
+    },
+    {
+      "id": "Frostbite",
+      "property": "Frostbite",
+      "serviceType": "FrostbiteSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Frostbite",
+      "frameBindings": [
+        {
+          "nodeId": "skill-buff.frostbite.update",
+          "registrationId": "Frostbite",
+          "phase": "Wave",
+          "executionPolicy": "ParallelDisjointWrite",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Frostbite"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "skill-buff.frostbite.resolve",
+          "registrationId": "Frostbite",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Frostbite"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Frostbite"
+      ],
+      "recipe": {
+        "factory": "CreateFrostbite",
+        "wire": "WireFrostbite",
+        "bind": "BindFrostbite"
+      }
+    },
+    {
+      "id": "HealAura",
+      "property": "HealAura",
+      "serviceType": "HealAuraSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.HealAura",
+      "frameBindings": [
+        {
+          "nodeId": "skill-buff.heal-aura.prepare",
+          "registrationId": "HealAura",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.HealAura"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "skill-buff.heal-aura.update",
+          "registrationId": "HealAura",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.HealAura"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.HealAura"
+      ],
+      "recipe": {
+        "factory": "CreateHealAura",
+        "wire": "WireHealAura",
+        "bind": "BindHealAura"
+      }
+    },
+    {
+      "id": "ThornsAura",
+      "property": "ThornsAura",
+      "serviceType": "ThornsAuraSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.ThornsAura",
+      "frameBindings": [
+        {
+          "nodeId": "skill-buff.thorns-aura.prepare",
+          "registrationId": "ThornsAura",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ThornsAura"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "skill-buff.thorns-aura.update",
+          "registrationId": "ThornsAura",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ThornsAura"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.ThornsAura"
+      ],
+      "recipe": {
+        "factory": "CreateThornsAura",
+        "wire": "WireThornsAura",
+        "bind": "BindThornsAura"
+      }
+    },
+    {
+      "id": "Rally",
+      "property": "Rally",
+      "serviceType": "RallySystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "EventBus"
+      ],
+      "ownerToken": "registration.Rally",
+      "frameBindings": [
+        {
+          "nodeId": "skill-buff.rally.update",
+          "registrationId": "Rally",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Rally"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Rally"
+      ],
+      "recipe": {
+        "factory": "CreateRally",
+        "wire": "WireRally",
+        "bind": "BindRally"
+      }
+    },
+    {
+      "id": "TowerActiveSkill",
+      "property": "TowerActiveSkill",
+      "serviceType": "TowerActiveSkillSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TowerActiveSkill",
+      "frameBindings": [
+        {
+          "nodeId": "combat.tower-active-skill.update",
+          "registrationId": "TowerActiveSkill",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerActiveSkill"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.TowerActiveSkill"
+      ],
+      "recipe": {
+        "factory": "CreateTowerActiveSkill",
+        "wire": "WireTowerActiveSkill",
+        "bind": "BindTowerActiveSkill"
+      }
+    },
+    {
+      "id": "Aggro",
+      "property": "Aggro",
+      "serviceType": "AggroSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Aggro",
+      "frameBindings": [
+        {
+          "nodeId": "combat.aggro.update",
+          "registrationId": "Aggro",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Aggro"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Aggro"
+      ],
+      "recipe": {
+        "factory": "CreateAggro",
+        "wire": "WireAggro",
+        "bind": "BindAggro"
+      }
+    },
+    {
+      "id": "EchoClone",
+      "property": "EchoClone",
+      "serviceType": "EchoCloneSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.EchoClone",
+      "frameBindings": [
+        {
+          "nodeId": "combat.echo-clone.update",
+          "registrationId": "EchoClone",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EchoClone"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.EchoClone"
+      ],
+      "recipe": {
+        "factory": "CreateEchoClone",
+        "wire": "WireEchoClone",
+        "bind": "BindEchoClone"
+      }
+    },
+    {
+      "id": "TowerModifier",
+      "property": "TowerModifier",
+      "serviceType": "TowerModifierSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TowerModifier",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.TowerModifier"
+      ],
+      "recipe": {
+        "factory": "CreateTowerModifier",
+        "wire": "WireTowerModifier",
+        "bind": "BindTowerModifier"
+      }
+    },
+    {
+      "id": "FireTrail",
+      "property": "FireTrail",
+      "serviceType": "FireTrailSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.FireTrail",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.FireTrail"
+      ],
+      "recipe": {
+        "factory": "CreateFireTrail",
+        "wire": "WireFireTrail",
+        "bind": "BindFireTrail"
+      }
+    },
+    {
+      "id": "Projectile",
+      "property": "Projectile",
+      "serviceType": "ProjectileSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Projectile",
+      "frameBindings": [
+        {
+          "nodeId": "combat.projectile.update",
+          "registrationId": "Projectile",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Projectile"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Projectile"
+      ],
+      "recipe": {
+        "factory": "CreateProjectile",
+        "wire": "WireProjectile",
+        "bind": "BindProjectile"
+      }
+    },
+    {
+      "id": "ChronoTower",
+      "property": "ChronoTower",
+      "serviceType": "ChronoTowerSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.ChronoTower",
+      "frameBindings": [
+        {
+          "nodeId": "spatial.chrono.prepare",
+          "registrationId": "ChronoTower",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ChronoTower"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "spatial.chrono.update",
+          "registrationId": "ChronoTower",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ChronoTower"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.ChronoTower"
+      ],
+      "recipe": {
+        "factory": "CreateChronoTower",
+        "wire": "WireChronoTower",
+        "bind": "BindChronoTower"
+      }
+    },
+    {
+      "id": "Mine",
+      "property": "Mine",
+      "serviceType": "MineSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Mine",
+      "frameBindings": [
+        {
+          "nodeId": "spatial.mine.prepare",
+          "registrationId": "Mine",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Mine"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "spatial.mine.update",
+          "registrationId": "Mine",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Mine"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Mine"
+      ],
+      "recipe": {
+        "factory": "CreateMine",
+        "wire": "WireMine",
+        "bind": "BindMine"
+      }
+    },
+    {
+      "id": "TowerShrine",
+      "property": "TowerShrine",
+      "serviceType": "TowerShrineSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TowerShrine",
+      "frameBindings": [
+        {
+          "nodeId": "combat.shrine.prepare",
+          "registrationId": "TowerShrine",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerShrine"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.shrine.resolve",
+          "registrationId": "TowerShrine",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerShrine"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.TowerShrine"
+      ],
+      "recipe": {
+        "factory": "CreateTowerShrine",
+        "wire": "WireTowerShrine",
+        "bind": "BindTowerShrine"
+      }
+    },
+    {
+      "id": "TowerBeacon",
+      "property": "TowerBeacon",
+      "serviceType": "TowerBeaconSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TowerBeacon",
+      "frameBindings": [
+        {
+          "nodeId": "combat.beacon.prepare",
+          "registrationId": "TowerBeacon",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerBeacon"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.beacon.resolve",
+          "registrationId": "TowerBeacon",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerBeacon"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.TowerBeacon"
+      ],
+      "recipe": {
+        "factory": "CreateTowerBeacon",
+        "wire": "WireTowerBeacon",
+        "bind": "BindTowerBeacon"
+      }
+    },
+    {
+      "id": "PlayerTowerAttack",
+      "property": "PlayerTowerAttack",
+      "serviceType": "PlayerTowerAttackSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "EventBus",
+        "HitShield",
+        "LifeLink",
+        "TechTree"
+      ],
+      "ownerToken": "registration.PlayerTowerAttack",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.player-attack.prepare",
+          "registrationId": "PlayerTowerAttack",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.PlayerTowerAttack"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.player-attack.update",
+          "registrationId": "PlayerTowerAttack",
+          "phase": "Wave",
+          "executionPolicy": "InternalParallelCollectSerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.PlayerTowerAttack"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.PlayerTowerAttack"
+      ],
+      "recipe": {
+        "factory": "CreatePlayerTowerAttack",
+        "wire": "WirePlayerTowerAttack",
+        "bind": "BindPlayerTowerAttack"
+      }
+    },
+    {
+      "id": "Hero",
+      "property": "Hero",
+      "serviceType": "HeroSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Hero",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.hero.prepare",
+          "registrationId": "Hero",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Hero"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.hero.update",
+          "registrationId": "Hero",
+          "phase": "Wave",
+          "executionPolicy": "InternalParallelCollectSerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Hero"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Hero"
+      ],
+      "recipe": {
+        "factory": "CreateHero",
+        "wire": "WireHero",
+        "bind": "BindHero"
+      }
+    },
+    {
+      "id": "HeroSkill",
+      "property": "HeroSkill",
+      "serviceType": "HeroSkillSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.HeroSkill",
+      "frameBindings": [
+        {
+          "nodeId": "combat.hero-skill.update",
+          "registrationId": "HeroSkill",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.HeroSkill"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.HeroSkill"
+      ],
+      "recipe": {
+        "factory": "CreateHeroSkill",
+        "wire": "WireHeroSkill",
+        "bind": "BindHeroSkill"
+      }
+    },
+    {
+      "id": "EnemyMovement",
+      "property": "EnemyMovement",
+      "serviceType": "EnemyMovementSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "BossTrailAoe",
+        "DayNight",
+        "Pathfinding",
+        "Weather"
+      ],
+      "ownerToken": "registration.EnemyMovement",
+      "frameBindings": [
+        {
+          "nodeId": "movement.enemy.prepare",
+          "registrationId": "EnemyMovement",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyMovement"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "movement.enemy.update",
+          "registrationId": "EnemyMovement",
+          "phase": "Wave",
+          "executionPolicy": "InternalParallelCollectSerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyMovement"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.EnemyMovement"
+      ],
+      "recipe": {
+        "factory": "CreateEnemyMovement",
+        "wire": "WireEnemyMovement",
+        "bind": "BindEnemyMovement"
+      }
+    },
+    {
+      "id": "EnemyAI",
+      "property": "EnemyAI",
+      "serviceType": "EnemyAISystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "EnemyAbility",
+        "EventBus",
+        "TechTree",
+        "WaveSpawning"
+      ],
+      "ownerToken": "registration.EnemyAI",
+      "frameBindings": [
+        {
+          "nodeId": "ai.enemy.prepare",
+          "registrationId": "EnemyAI",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyAI"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.enemy.update",
+          "registrationId": "EnemyAI",
+          "phase": "Wave",
+          "executionPolicy": "InternalParallelCollectSerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyAI"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.EnemyAI"
+      ],
+      "recipe": {
+        "factory": "CreateEnemyAI",
+        "wire": "WireEnemyAI",
+        "bind": "BindEnemyAI"
+      }
+    },
+    {
+      "id": "EnemyAbility",
+      "property": "EnemyAbility",
+      "serviceType": "EnemyAbilitySystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "EventBus",
+        "Telegraph"
+      ],
+      "ownerToken": "registration.EnemyAbility",
+      "frameBindings": [
+        {
+          "nodeId": "ai.enemy-ability.prepare",
+          "registrationId": "EnemyAbility",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyAbility"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.enemy-ability.cooldowns",
+          "registrationId": "EnemyAbility",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyAbility"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.enemy-ability.execute",
+          "registrationId": "EnemyAbility",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyAbility"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.enemy-ability.cast-timers",
+          "registrationId": "EnemyAbility",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyAbility"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.enemy-ability.update",
+          "registrationId": "EnemyAbility",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyAbility"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.EnemyAbility"
+      ],
+      "recipe": {
+        "factory": "CreateEnemyAbility",
+        "wire": "WireEnemyAbility",
+        "bind": "BindEnemyAbility"
+      }
+    },
+    {
+      "id": "EnemyFission",
+      "property": "EnemyFission",
+      "serviceType": "EnemyFissionSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.EnemyFission",
+      "frameBindings": [
+        {
+          "nodeId": "post-death.fission.update",
+          "registrationId": "EnemyFission",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyFission"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.EnemyFission"
+      ],
+      "recipe": {
+        "factory": "CreateEnemyFission",
+        "wire": "WireEnemyFission",
+        "bind": "BindEnemyFission"
+      }
+    },
+    {
+      "id": "EnemyMorph",
+      "property": "EnemyMorph",
+      "serviceType": "EnemyMorphSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.EnemyMorph",
+      "frameBindings": [
+        {
+          "nodeId": "terrain.enemy-morph.update",
+          "registrationId": "EnemyMorph",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyMorph"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.EnemyMorph"
+      ],
+      "recipe": {
+        "factory": "CreateEnemyMorph",
+        "wire": "WireEnemyMorph",
+        "bind": "BindEnemyMorph"
+      }
+    },
+    {
+      "id": "EnemyBurrow",
+      "property": "EnemyBurrow",
+      "serviceType": "EnemyBurrowSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.EnemyBurrow",
+      "frameBindings": [
+        {
+          "nodeId": "ai.burrow.prepare",
+          "registrationId": "EnemyBurrow",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyBurrow"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.burrow.update",
+          "registrationId": "EnemyBurrow",
+          "phase": "Wave",
+          "executionPolicy": "InternalParallelCollectSerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyBurrow"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.burrow.apply",
+          "registrationId": "EnemyBurrow",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyBurrow"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.EnemyBurrow"
+      ],
+      "recipe": {
+        "factory": "CreateEnemyBurrow",
+        "wire": "WireEnemyBurrow",
+        "bind": "BindEnemyBurrow"
+      }
+    },
+    {
+      "id": "Necromancer",
+      "property": "Necromancer",
+      "serviceType": "NecromancerSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Necromancer",
+      "frameBindings": [
+        {
+          "nodeId": "ai.necromancer.prepare",
+          "registrationId": "Necromancer",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Necromancer"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.necromancer.update",
+          "registrationId": "Necromancer",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Necromancer"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Necromancer"
+      ],
+      "recipe": {
+        "factory": "CreateNecromancer",
+        "wire": "WireNecromancer",
+        "bind": "BindNecromancer"
+      }
+    },
+    {
+      "id": "LifeLink",
+      "property": "LifeLink",
+      "serviceType": "EnemyLifeLinkSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.LifeLink",
+      "frameBindings": [
+        {
+          "nodeId": "ai.life-link.prepare",
+          "registrationId": "LifeLink",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.LifeLink"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.life-link.update",
+          "registrationId": "LifeLink",
+          "phase": "Wave",
+          "executionPolicy": "InternalParallelCollectSerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.LifeLink"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.life-link.cooldowns",
+          "registrationId": "LifeLink",
+          "phase": "Wave",
+          "executionPolicy": "ParallelDisjointWrite",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.LifeLink"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.LifeLink"
+      ],
+      "recipe": {
+        "factory": "CreateLifeLink",
+        "wire": "WireLifeLink",
+        "bind": "BindLifeLink"
+      }
+    },
+    {
+      "id": "HitShield",
+      "property": "HitShield",
+      "serviceType": "HitShieldSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.HitShield",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.hit-shield.prepare",
+          "registrationId": "HitShield",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.HitShield"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.hit-shield.update",
+          "registrationId": "HitShield",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.HitShield"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.HitShield"
+      ],
+      "recipe": {
+        "factory": "CreateHitShield",
+        "wire": "WireHitShield",
+        "bind": "BindHitShield"
+      }
+    },
+    {
+      "id": "TowerSabotage",
+      "property": "TowerSabotage",
+      "serviceType": "TowerSabotageSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TowerSabotage",
+      "frameBindings": [
+        {
+          "nodeId": "combat.sabotage.update",
+          "registrationId": "TowerSabotage",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerSabotage"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.TowerSabotage"
+      ],
+      "recipe": {
+        "factory": "CreateTowerSabotage",
+        "wire": "WireTowerSabotage",
+        "bind": "BindTowerSabotage"
+      }
+    },
+    {
+      "id": "ManaBurn",
+      "property": "ManaBurn",
+      "serviceType": "ManaBurnSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.ManaBurn",
+      "frameBindings": [
+        {
+          "nodeId": "ai.mana-burn.prepare",
+          "registrationId": "ManaBurn",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ManaBurn"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.mana-burn.update",
+          "registrationId": "ManaBurn",
+          "phase": "Wave",
+          "executionPolicy": "InternalParallelCollectSerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ManaBurn"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.ManaBurn"
+      ],
+      "recipe": {
+        "factory": "CreateManaBurn",
+        "wire": "WireManaBurn",
+        "bind": "BindManaBurn"
+      }
+    },
+    {
+      "id": "Phase",
+      "property": "Phase",
+      "serviceType": "PhaseSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Phase",
+      "frameBindings": [
+        {
+          "nodeId": "ai.phase.prepare",
+          "registrationId": "Phase",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Phase"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.phase.update",
+          "registrationId": "Phase",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Phase"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Phase"
+      ],
+      "recipe": {
+        "factory": "CreatePhase",
+        "wire": "WirePhase",
+        "bind": "BindPhase"
+      }
+    },
+    {
+      "id": "Fear",
+      "property": "Fear",
+      "serviceType": "FearSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Fear",
+      "frameBindings": [
+        {
+          "nodeId": "ai.fear.prepare",
+          "registrationId": "Fear",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Fear"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.fear.update",
+          "registrationId": "Fear",
+          "phase": "Wave",
+          "executionPolicy": "ParallelDisjointWrite",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Fear"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Fear"
+      ],
+      "recipe": {
+        "factory": "CreateFear",
+        "wire": "WireFear",
+        "bind": "BindFear"
+      }
+    },
+    {
+      "id": "EnemyStrafe",
+      "property": "EnemyStrafe",
+      "serviceType": "EnemyStrafeSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "TowerAttack"
+      ],
+      "ownerToken": "registration.EnemyStrafe",
+      "frameBindings": [
+        {
+          "nodeId": "ai.enemy-strafe.prepare",
+          "registrationId": "EnemyStrafe",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyStrafe"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.enemy-strafe.update",
+          "registrationId": "EnemyStrafe",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.EnemyStrafe"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.EnemyStrafe"
+      ],
+      "recipe": {
+        "factory": "CreateEnemyStrafe",
+        "wire": "WireEnemyStrafe",
+        "bind": "BindEnemyStrafe"
+      }
+    },
+    {
+      "id": "SuicideBomb",
+      "property": "SuicideBomb",
+      "serviceType": "SuicideBombSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "ReflectTower",
+        "TowerStealth"
+      ],
+      "ownerToken": "registration.SuicideBomb",
+      "frameBindings": [
+        {
+          "nodeId": "combat.suicide-bomb.update",
+          "registrationId": "SuicideBomb",
+          "phase": "Wave",
+          "executionPolicy": "InternalParallelCollectSerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.SuicideBomb"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.SuicideBomb"
+      ],
+      "recipe": {
+        "factory": "CreateSuicideBomb",
+        "wire": "WireSuicideBomb",
+        "bind": "BindSuicideBomb"
+      }
+    },
+    {
+      "id": "ReflectTower",
+      "property": "ReflectTower",
+      "serviceType": "ReflectTowerSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.ReflectTower",
+      "frameBindings": [
+        {
+          "nodeId": "combat.reflect.resolve",
+          "registrationId": "ReflectTower",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ReflectTower"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat.reflect.apply",
+          "registrationId": "ReflectTower",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ReflectTower"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.ReflectTower"
+      ],
+      "recipe": {
+        "factory": "CreateReflectTower",
+        "wire": "WireReflectTower",
+        "bind": "BindReflectTower"
+      }
+    },
+    {
+      "id": "TowerStealth",
+      "property": "TowerStealth",
+      "serviceType": "TowerStealthSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TowerStealth",
+      "frameBindings": [
+        {
+          "nodeId": "combat.stealth.update",
+          "registrationId": "TowerStealth",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TowerStealth"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.TowerStealth"
+      ],
+      "recipe": {
+        "factory": "CreateTowerStealth",
+        "wire": "WireTowerStealth",
+        "bind": "BindTowerStealth"
+      }
+    },
+    {
+      "id": "PathBlock",
+      "property": "PathBlock",
+      "serviceType": "PathBlockSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.PathBlock",
+      "frameBindings": [
+        {
+          "nodeId": "movement.path-block.update",
+          "registrationId": "PathBlock",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.PathBlock"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.PathBlock"
+      ],
+      "recipe": {
+        "factory": "CreatePathBlock",
+        "wire": "WirePathBlock",
+        "bind": "BindPathBlock"
+      }
+    },
+    {
+      "id": "Desperation",
+      "property": "Desperation",
+      "serviceType": "DesperationSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Desperation",
+      "frameBindings": [
+        {
+          "nodeId": "build.desperation.update",
+          "registrationId": "Desperation",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Desperation"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "pregame.desperation.update",
+          "registrationId": "Desperation",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Desperation"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Desperation"
+      ],
+      "recipe": {
+        "factory": "CreateDesperation",
+        "wire": "WireDesperation",
+        "bind": "BindDesperation"
+      }
+    },
+    {
+      "id": "ShopReroll",
+      "property": "ShopReroll",
+      "serviceType": "ShopRerollSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.ShopReroll",
+      "frameBindings": [
+        {
+          "nodeId": "build.shop-reroll.update",
+          "registrationId": "ShopReroll",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ShopReroll"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.ShopReroll"
+      ],
+      "recipe": {
+        "factory": "CreateShopReroll",
+        "wire": "WireShopReroll",
+        "bind": "BindShopReroll"
+      }
+    },
+    {
+      "id": "Terrain",
+      "property": "Terrain",
+      "serviceType": "TerrainSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "Buff"
+      ],
+      "ownerToken": "registration.Terrain",
+      "frameBindings": [
+        {
+          "nodeId": "terrain.prepare",
+          "registrationId": "Terrain",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Terrain"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "terrain.update",
+          "registrationId": "Terrain",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Terrain"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Terrain"
+      ],
+      "recipe": {
+        "factory": "CreateTerrain",
+        "wire": "WireTerrain",
+        "bind": "BindTerrain"
+      }
+    },
+    {
+      "id": "Pathfinding",
+      "property": "Pathfinding",
+      "serviceType": "PathfindingSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Pathfinding",
+      "frameBindings": [
+        {
+          "nodeId": "movement.pathfinding.prepare",
+          "registrationId": "Pathfinding",
+          "phase": "Wave",
+          "executionPolicy": "ParallelDisjointWrite",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Pathfinding"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Pathfinding"
+      ],
+      "recipe": {
+        "factory": "CreatePathfinding",
+        "wire": "WirePathfinding",
+        "bind": "BindPathfinding"
+      }
+    },
+    {
+      "id": "DeployableTrap",
+      "property": "DeployableTrap",
+      "serviceType": "DeployableTrapSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.DeployableTrap",
+      "frameBindings": [
+        {
+          "nodeId": "movement.deployable-trap.update",
+          "registrationId": "DeployableTrap",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.DeployableTrap"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.DeployableTrap"
+      ],
+      "recipe": {
+        "factory": "CreateDeployableTrap",
+        "wire": "WireDeployableTrap",
+        "bind": "BindDeployableTrap"
+      }
+    },
+    {
+      "id": "PathModifier",
+      "property": "PathModifier",
+      "serviceType": "PathModifierSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.PathModifier",
+      "frameBindings": [
+        {
+          "nodeId": "movement.path-modifier.prepare",
+          "registrationId": "PathModifier",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.PathModifier"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "movement.path-modifier.update",
+          "registrationId": "PathModifier",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.PathModifier"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.PathModifier"
+      ],
+      "recipe": {
+        "factory": "CreatePathModifier",
+        "wire": "WirePathModifier",
+        "bind": "BindPathModifier"
+      }
+    },
+    {
+      "id": "Pull",
+      "property": "Pull",
+      "serviceType": "PullSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Pull",
+      "frameBindings": [
+        {
+          "nodeId": "movement.pull.prepare",
+          "registrationId": "Pull",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Pull"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "movement.pull.update",
+          "registrationId": "Pull",
+          "phase": "Wave",
+          "executionPolicy": "ParallelDisjointWrite",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Pull"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Pull"
+      ],
+      "recipe": {
+        "factory": "CreatePull",
+        "wire": "WirePull",
+        "bind": "BindPull"
+      }
+    },
+    {
+      "id": "Weather",
+      "property": "Weather",
+      "serviceType": "WeatherSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "TowerAttack"
+      ],
+      "ownerToken": "registration.Weather",
+      "frameBindings": [
+        {
+          "nodeId": "pregame.weather.update",
+          "registrationId": "Weather",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Weather"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Weather"
+      ],
+      "recipe": {
+        "factory": "CreateWeather",
+        "wire": "WireWeather",
+        "bind": "BindWeather"
+      }
+    },
+    {
+      "id": "DayNight",
+      "property": "DayNight",
+      "serviceType": "DayNightSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "TowerAttack"
+      ],
+      "ownerToken": "registration.DayNight",
+      "frameBindings": [
+        {
+          "nodeId": "pregame.day-night.update",
+          "registrationId": "DayNight",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.DayNight"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.DayNight"
+      ],
+      "recipe": {
+        "factory": "CreateDayNight",
+        "wire": "WireDayNight",
+        "bind": "BindDayNight"
+      }
+    },
+    {
+      "id": "WaveMutator",
+      "property": "WaveMutator",
+      "serviceType": "WaveMutatorSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.WaveMutator",
+      "frameBindings": [
+        {
+          "nodeId": "terrain.wave-mutator.prepare",
+          "registrationId": "WaveMutator",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.WaveMutator"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "terrain.wave-mutator.update",
+          "registrationId": "WaveMutator",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.WaveMutator"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.WaveMutator"
+      ],
+      "recipe": {
+        "factory": "CreateWaveMutator",
+        "wire": "WireWaveMutator",
+        "bind": "BindWaveMutator"
+      }
+    },
+    {
+      "id": "RandomEvent",
+      "property": "RandomEvent",
+      "serviceType": "RandomEventSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.RandomEvent",
+      "frameBindings": [
+        {
+          "nodeId": "pregame.random-event.update",
+          "registrationId": "RandomEvent",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.RandomEvent"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "pregame.random-event.callback-dispatch",
+          "registrationId": "RandomEvent",
+          "phase": "Wave",
+          "executionPolicy": "PresentationCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.RandomEvent"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.RandomEvent"
+      ],
+      "recipe": {
+        "factory": "CreateRandomEvent",
+        "wire": "WireRandomEvent",
+        "bind": "BindRandomEvent"
+      }
+    },
+    {
+      "id": "Telegraph",
+      "property": "Telegraph",
+      "serviceType": "TelegraphSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "EventBus"
+      ],
+      "ownerToken": "registration.Telegraph",
+      "frameBindings": [
+        {
+          "nodeId": "spatial.telegraph.update",
+          "registrationId": "Telegraph",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Telegraph"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Telegraph"
+      ],
+      "recipe": {
+        "factory": "CreateTelegraph",
+        "wire": "WireTelegraph",
+        "bind": "BindTelegraph"
+      }
+    },
+    {
+      "id": "AdaptiveDifficulty",
+      "property": "AdaptiveDifficulty",
+      "serviceType": "AdaptiveDifficultySystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "WaveSpawning"
+      ],
+      "ownerToken": "registration.AdaptiveDifficulty",
+      "frameBindings": [
+        {
+          "nodeId": "pregame.adaptive-difficulty.update",
+          "registrationId": "AdaptiveDifficulty",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.AdaptiveDifficulty"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.AdaptiveDifficulty"
+      ],
+      "recipe": {
+        "factory": "CreateAdaptiveDifficulty",
+        "wire": "WireAdaptiveDifficulty",
+        "bind": "BindAdaptiveDifficulty"
+      }
+    },
+    {
+      "id": "CorpseEffect",
+      "property": "CorpseEffect",
+      "serviceType": "CorpseEffectSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "Buff"
+      ],
+      "ownerToken": "registration.CorpseEffect",
+      "frameBindings": [
+        {
+          "nodeId": "post-death.corpse.update",
+          "registrationId": "CorpseEffect",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.CorpseEffect"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.CorpseEffect"
+      ],
+      "recipe": {
+        "factory": "CreateCorpseEffect",
+        "wire": "WireCorpseEffect",
+        "bind": "BindCorpseEffect"
+      }
+    },
+    {
+      "id": "HealingZone",
+      "property": "HealingZone",
+      "serviceType": "HealingZoneSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.HealingZone",
+      "frameBindings": [
+        {
+          "nodeId": "skill-buff.healing-zone.update",
+          "registrationId": "HealingZone",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.HealingZone"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.HealingZone"
+      ],
+      "recipe": {
+        "factory": "CreateHealingZone",
+        "wire": "WireHealingZone",
+        "bind": "BindHealingZone"
+      }
+    },
+    {
+      "id": "ZoneControl",
+      "property": "ZoneControl",
+      "serviceType": "ZoneControlSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.ZoneControl",
+      "frameBindings": [
+        {
+          "nodeId": "ai.zone-control.update",
+          "registrationId": "ZoneControl",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ZoneControl"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.ZoneControl"
+      ],
+      "recipe": {
+        "factory": "CreateZoneControl",
+        "wire": "WireZoneControl",
+        "bind": "BindZoneControl"
+      }
+    },
+    {
+      "id": "Objective",
+      "property": "Objective",
+      "serviceType": "ObjectiveSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [
+        "EventBus"
+      ],
+      "ownerToken": "registration.Objective",
+      "frameBindings": [
+        {
+          "nodeId": "build.objective.update",
+          "registrationId": "Objective",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Objective"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "post-death.objective.update",
+          "registrationId": "Objective",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Objective"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Objective"
+      ],
+      "recipe": {
+        "factory": "CreateObjective",
+        "wire": "WireObjective",
+        "bind": "BindObjective"
+      }
+    },
+    {
+      "id": "WaveBranch",
+      "property": "WaveBranch",
+      "serviceType": "WaveBranchSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.WaveBranch",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.WaveBranch"
+      ],
+      "recipe": {
+        "factory": "CreateWaveBranch",
+        "wire": "WireWaveBranch",
+        "bind": "BindWaveBranch"
+      }
+    },
+    {
+      "id": "ResourceNode",
+      "property": "ResourceNode",
+      "serviceType": "ResourceNodeSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.ResourceNode",
+      "frameBindings": [
+        {
+          "nodeId": "build.resource-node.update",
+          "registrationId": "ResourceNode",
+          "phase": "Build",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ResourceNode"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "post-death.resource-node.update",
+          "registrationId": "ResourceNode",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.ResourceNode"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.ResourceNode"
+      ],
+      "recipe": {
+        "factory": "CreateResourceNode",
+        "wire": "WireResourceNode",
+        "bind": "BindResourceNode"
+      }
+    },
+    {
+      "id": "WavePreview",
+      "property": "WavePreview",
+      "serviceType": "WavePreviewSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.WavePreview",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.WavePreview"
+      ],
+      "recipe": {
+        "factory": "CreateWavePreview",
+        "wire": "WireWavePreview",
+        "bind": "BindWavePreview"
+      }
+    },
+    {
+      "id": "DoomClock",
+      "property": "DoomClock",
+      "serviceType": "DoomClockSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.DoomClock",
+      "frameBindings": [
+        {
+          "nodeId": "post-death.doom-clock.update",
+          "registrationId": "DoomClock",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.DoomClock"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.DoomClock"
+      ],
+      "recipe": {
+        "factory": "CreateDoomClock",
+        "wire": "WireDoomClock",
+        "bind": "BindDoomClock"
+      }
+    },
+    {
+      "id": "SoulHarvest",
+      "property": "SoulHarvest",
+      "serviceType": "SoulHarvestSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.SoulHarvest",
+      "frameBindings": [
+        {
+          "nodeId": "post-death.soul-harvest.update",
+          "registrationId": "SoulHarvest",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.SoulHarvest"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.SoulHarvest"
+      ],
+      "recipe": {
+        "factory": "CreateSoulHarvest",
+        "wire": "WireSoulHarvest",
+        "bind": "BindSoulHarvest"
+      }
+    },
+    {
+      "id": "Replay",
+      "property": "Replay",
+      "serviceType": "ReplaySystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Replay",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.Replay"
+      ],
+      "recipe": {
+        "factory": "CreateReplay",
+        "wire": "WireReplay",
+        "bind": "BindReplay"
+      }
+    },
+    {
+      "id": "HotZone",
+      "property": "HotZone",
+      "serviceType": "HotZoneSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.HotZone",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.hot-zone.prepare",
+          "registrationId": "HotZone",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.HotZone"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.HotZone"
+      ],
+      "recipe": {
+        "factory": "CreateHotZone",
+        "wire": "WireHotZone",
+        "bind": "BindHotZone"
+      }
+    },
+    {
+      "id": "TerrainZone",
+      "property": "TerrainZone",
+      "serviceType": "TerrainZoneSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TerrainZone",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.terrain-zone.prepare",
+          "registrationId": "TerrainZone",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TerrainZone"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat-setup.terrain-zone.update",
+          "registrationId": "TerrainZone",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.TerrainZone"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.TerrainZone"
+      ],
+      "recipe": {
+        "factory": "CreateTerrainZone",
+        "wire": "WireTerrainZone",
+        "bind": "BindTerrainZone"
+      }
+    },
+    {
+      "id": "FrostZone",
+      "property": "FrostZone",
+      "serviceType": "FrostZoneSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.FrostZone",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.frost-zone.prepare",
+          "registrationId": "FrostZone",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.FrostZone"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat-setup.frost-zone.update",
+          "registrationId": "FrostZone",
+          "phase": "Wave",
+          "executionPolicy": "ParallelDisjointWrite",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.FrostZone"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.FrostZone"
+      ],
+      "recipe": {
+        "factory": "CreateFrostZone",
+        "wire": "WireFrostZone",
+        "bind": "BindFrostZone"
+      }
+    },
+    {
+      "id": "WanderRoam",
+      "property": "WanderRoam",
+      "serviceType": "WanderRoamSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.WanderRoam",
+      "frameBindings": [
+        {
+          "nodeId": "combat-setup.wander.prepare",
+          "registrationId": "WanderRoam",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.WanderRoam"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "combat-setup.wander.update",
+          "registrationId": "WanderRoam",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.WanderRoam"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.WanderRoam"
+      ],
+      "recipe": {
+        "factory": "CreateWanderRoam",
+        "wire": "WireWanderRoam",
+        "bind": "BindWanderRoam"
+      }
+    },
+    {
+      "id": "Magnetize",
+      "property": "Magnetize",
+      "serviceType": "MagnetizeSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Magnetize",
+      "frameBindings": [
+        {
+          "nodeId": "ai.magnetize.update",
+          "registrationId": "Magnetize",
+          "phase": "Wave",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Magnetize"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Magnetize"
+      ],
+      "recipe": {
+        "factory": "CreateMagnetize",
+        "wire": "WireMagnetize",
+        "bind": "BindMagnetize"
+      }
+    },
+    {
+      "id": "Sapper",
+      "property": "Sapper",
+      "serviceType": "SapperSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Sapper",
+      "frameBindings": [
+        {
+          "nodeId": "ai.sapper.prepare",
+          "registrationId": "Sapper",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Sapper"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.sapper.update",
+          "registrationId": "Sapper",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Sapper"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "ai.sapper.recompute",
+          "registrationId": "Sapper",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Sapper"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Sapper"
+      ],
+      "recipe": {
+        "factory": "CreateSapper",
+        "wire": "WireSapper",
+        "bind": "BindSapper"
+      }
+    },
+    {
+      "id": "Wisp",
+      "property": "Wisp",
+      "serviceType": "WispSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Wisp",
+      "frameBindings": [
+        {
+          "nodeId": "skill-buff.wisp.update",
+          "registrationId": "Wisp",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Wisp"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Wisp"
+      ],
+      "recipe": {
+        "factory": "CreateWisp",
+        "wire": "WireWisp",
+        "bind": "BindWisp"
+      }
+    },
+    {
+      "id": "BossTrailAoe",
+      "property": "BossTrailAoe",
+      "serviceType": "BossTrailAoeSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.BossTrailAoe",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.BossTrailAoe"
+      ],
+      "recipe": {
+        "factory": "CreateBossTrailAoe",
+        "wire": "WireBossTrailAoe",
+        "bind": "BindBossTrailAoe"
+      }
+    },
+    {
+      "id": "TechTree",
+      "property": "TechTree",
+      "serviceType": "TechTreeSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.TechTree",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.TechTree"
+      ],
+      "recipe": {
+        "factory": "CreateTechTree",
+        "wire": "WireTechTree",
+        "bind": "BindTechTree"
+      }
+    },
+    {
+      "id": "Pickup",
+      "property": "Pickup",
+      "serviceType": "PickupSystem",
+      "enabled": true,
+      "featurePolicy": "production-frame-binding",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Pickup",
+      "frameBindings": [
+        {
+          "nodeId": "combat.pickup.update",
+          "registrationId": "Pickup",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "registration.Pickup"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "registration.Pickup"
+      ],
+      "recipe": {
+        "factory": "CreatePickup",
+        "wire": "WirePickup",
+        "bind": "BindPickup"
+      }
+    },
+    {
+      "id": "Inventory",
+      "property": "Inventory",
+      "serviceType": "InventorySystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Inventory",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.Inventory"
+      ],
+      "recipe": {
+        "factory": "CreateInventory",
+        "wire": "WireInventory",
+        "bind": "BindInventory"
+      }
+    },
+    {
+      "id": "Ascension",
+      "property": "Ascension",
+      "serviceType": "AscensionSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [
+        "WaveSpawning"
+      ],
+      "ownerToken": "registration.Ascension",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.Ascension"
+      ],
+      "recipe": {
+        "factory": "CreateAscension",
+        "wire": "WireAscension",
+        "bind": "BindAscension"
+      }
+    },
+    {
+      "id": "Save",
+      "property": "Save",
+      "serviceType": "SaveSystem",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.Save",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.Save"
+      ],
+      "recipe": {
+        "factory": "CreateSave",
+        "wire": "WireSave",
+        "bind": "BindSave"
+      }
+    },
+    {
+      "id": "EventBus",
+      "property": "EventBus",
+      "serviceType": "EventBus",
+      "enabled": true,
+      "featurePolicy": "production-service",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "registration.EventBus",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.EventBus"
+      ],
+      "recipe": {
+        "factory": "CreateEventBus",
+        "wire": "WireEventBus",
+        "bind": "BindEventBus"
+      }
+    },
+    {
+      "id": "ProductionEvents",
+      "property": "ProductionEvents",
+      "serviceType": "composition",
+      "enabled": true,
+      "featurePolicy": "production-event-wiring",
+      "reason": "",
+      "dependencies": [
+        "Combo",
+        "Crest",
+        "Culling",
+        "Gold",
+        "Interest",
+        "Momentum",
+        "PlayerTowerAttack",
+        "PreFightBuff",
+        "Save",
+        "Skill",
+        "TechTree",
+        "TowerAttack",
+        "WaveBranch",
+        "WaveMutator",
+        "WavePreview",
+        "WaveSpawning"
+      ],
+      "ownerToken": "registration.ProductionEvents",
+      "frameBindings": [],
+      "providedTokens": [
+        "registration.ProductionEvents"
+      ],
+      "recipe": {
+        "factory": "CreateProductionEvents",
+        "wire": "WireProductionEvents",
+        "bind": "BindProductionEvents"
+      }
+    },
+    {
+      "id": "FrameScheduler",
+      "property": "FrameScheduler",
+      "serviceType": "composition",
+      "enabled": true,
+      "featurePolicy": "production-frame-orchestration",
+      "reason": "",
+      "dependencies": [],
+      "ownerToken": "BattleSystemECS.Core.FrameScheduler",
+      "frameBindings": [
+        {
+          "nodeId": "frame.input.publish",
+          "registrationId": "FrameScheduler",
+          "phase": "All",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "frame.begin",
+          "registrationId": "FrameScheduler",
+          "phase": "All",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "frame.invulnerability.update",
+          "registrationId": "FrameScheduler",
+          "phase": "All",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "frame.phaser.update",
+          "registrationId": "FrameScheduler",
+          "phase": "All",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "frame.blinker.update",
+          "registrationId": "FrameScheduler",
+          "phase": "All",
+          "executionPolicy": "SerialUpdate",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "frame.time.freeze",
+          "registrationId": "FrameScheduler",
+          "phase": "All",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "attribute.aggregate",
+          "registrationId": "FrameScheduler",
+          "phase": "All",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "build.effect.tick.real",
+          "registrationId": "FrameScheduler",
+          "phase": "Build",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "build.effect.tick.global",
+          "registrationId": "FrameScheduler",
+          "phase": "Build",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "build.effect.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Build",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "build.damage.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Build",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "build.resource.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Build",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "build.gameplay-event.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Build",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "build.ability.reject",
+          "registrationId": "FrameScheduler",
+          "phase": "Build",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "build.frame.close",
+          "registrationId": "FrameScheduler",
+          "phase": "Build",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "non-wave.damage.reject",
+          "registrationId": "FrameScheduler",
+          "phase": "NonWave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "non-wave.ability.reject",
+          "registrationId": "FrameScheduler",
+          "phase": "NonWave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "non-wave.frame.close",
+          "registrationId": "FrameScheduler",
+          "phase": "NonWave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "movement.presentation.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "PresentationCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "threat.aggregate",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "wave.frame.close",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "early.damage.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "early.resource.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "spatial.index.rebuild",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "effect.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "effect.tick.combat",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "effect.tick.enemy",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "effect.tick.real",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "effect.tick.global",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "damage.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "resource.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "gameplay-event.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "primary-death.resolve",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "primary-death.callback-dispatch",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "cascade.damage.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "cascade.resource.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "cascade-death.resolve",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialPrepare",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "cascade-death.callback-dispatch",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "post-death.gameplay-event.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        }
+      ],
+      "providedTokens": [
+        "BattleSystemECS.Core.FrameScheduler"
+      ],
+      "recipe": {
+        "factory": "CreateFrameSchedulerContract",
+        "wire": "WireFrameSchedulerContract",
+        "bind": "BindFrameSchedulerContract"
+      }
+    },
+    {
+      "id": "TowerIncome",
+      "property": "TowerIncome",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "TowerRelocate",
+      "property": "TowerRelocate",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "Construction",
+      "property": "Construction",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "EnemyAffix",
+      "property": "EnemyAffix",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "Wound",
+      "property": "Wound",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "EnemyHealer",
+      "property": "EnemyHealer",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "StealGold",
+      "property": "StealGold",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "Summon",
+      "property": "Summon",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "TowerOvercharge",
+      "property": "TowerOvercharge",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "TowerLink",
+      "property": "TowerLink",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "PatrolTower",
+      "property": "PatrolTower",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "Fog",
+      "property": "Fog",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "PointDefense",
+      "property": "PointDefense",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "Heat",
+      "property": "Heat",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "Demolish",
+      "property": "Demolish",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "TowerSilence",
+      "property": "TowerSilence",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "Dispel",
+      "property": "Dispel",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    },
+    {
+      "id": "EnemyProjectile",
+      "property": "EnemyProjectile",
+      "serviceType": "disabled",
+      "enabled": false,
+      "featurePolicy": "feature-disabled",
+      "reason": "not enabled by production composition",
+      "dependencies": [],
+      "ownerToken": "",
+      "frameBindings": [],
+      "providedTokens": [],
+      "recipe": {
+        "factory": null,
+        "wire": null,
+        "bind": null
+      }
+    }
+  ]
+}

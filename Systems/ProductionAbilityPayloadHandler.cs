@@ -1,6 +1,7 @@
 using System;
 using BattleSystemECS.Core;
 using BattleSystemECS.Core.GAS;
+using BattleSystemECS.Content.Contracts;
 
 namespace BattleSystemECS.Systems
 {
@@ -8,15 +9,15 @@ namespace BattleSystemECS.Systems
     public sealed class ProductionAbilityPayloadHandler : IAbilityPayloadHandler
     {
         private readonly ComponentStore _store;
-        private readonly NecromancerSystem _necromancer;
-        private readonly TimeRewindSnapshotSystem _timeRewind;
+        private readonly IResurrectionPort _resurrection;
+        private readonly ISnapshotRestorePort _snapshotRestore;
 
-        public ProductionAbilityPayloadHandler(ComponentStore store, NecromancerSystem necromancer,
-            TimeRewindSnapshotSystem timeRewind)
+        public ProductionAbilityPayloadHandler(ComponentStore store, IResurrectionPort resurrection,
+            ISnapshotRestorePort snapshotRestore)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
-            _necromancer = necromancer ?? throw new ArgumentNullException(nameof(necromancer));
-            _timeRewind = timeRewind ?? throw new ArgumentNullException(nameof(timeRewind));
+            _resurrection = resurrection ?? throw new ArgumentNullException(nameof(resurrection));
+            _snapshotRestore = snapshotRestore ?? throw new ArgumentNullException(nameof(snapshotRestore));
         }
 
         public bool Supports(ExecutionDefinition execution) =>
@@ -30,13 +31,13 @@ namespace BattleSystemECS.Systems
             if ((uint)owner >= ComponentStore.MAX_PLAYERS || !_store.GetEntityHandle(owner).IsValid) return false;
             if (context.Execution.Payload == EffectPayloadKind.Resource)
                 return context.Magnitude >= 0f && !float.IsNaN(context.Magnitude) && !float.IsInfinity(context.Magnitude) &&
-                       _timeRewind.GetSampleCount(owner) > 0 && _store.ResourceResolver.CanAccept(3, 3);
+                       _snapshotRestore.GetSampleCount(owner) > 0 && _store.ResourceResolver.CanAccept(3, 3);
 
             float radius = context.Ability.Targeting.Radius > 0f
                 ? context.Ability.Targeting.Radius : context.Ability.Targeting.Range;
             float fraction = context.Magnitude > 0f ? context.Magnitude : 0.3f;
             return !float.IsNaN(fraction) && !float.IsInfinity(fraction) &&
-                   _necromancer.CanMassResurrect(_store.PositionX[context.Source.Index],
+                   _resurrection.CanMassResurrect(_store.PositionX[context.Source.Index],
                        _store.PositionY[context.Source.Index], radius);
         }
 
@@ -47,12 +48,12 @@ namespace BattleSystemECS.Systems
             {
                 float radius = context.Ability.Targeting.Radius > 0f
                     ? context.Ability.Targeting.Radius : context.Ability.Targeting.Range;
-                return _necromancer.MassResurrect(owner, _store.PositionX[context.Source.Index],
+                return _resurrection.MassResurrect(owner, _store.PositionX[context.Source.Index],
                     _store.PositionY[context.Source.Index], radius,
                     context.Magnitude > 0f ? context.Magnitude : 0.3f);
             }
 
-            float restored = _timeRewind.RestoreFromSnapshot(context.Source.Index, owner, context.Magnitude);
+            float restored = _snapshotRestore.RestoreFromSnapshot(context.Source.Index, owner, context.Magnitude);
             if (restored < 0f) throw new InvalidOperationException("prevalidated rewind snapshot was unavailable during commit");
             return 1;
         }

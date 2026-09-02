@@ -5,37 +5,30 @@ using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Core.GAS;
+using BattleSystemECS.Content.Contracts;
 
 namespace BattleSystemECS.Systems
 {
-    public enum SkillDamageRejectReason
-    {
-        None = 0,
-        PhaseNotAllowed = 1,
-        UnsupportedCommitBoundary = 2,
-        NoPending = 3
-    }
-
     /// <summary>
     /// Skill system refactored to use the GAS (Gameplay Ability System) architecture.
     /// Skills are stored as AbilityInstances in ComponentStore, one slot per ability.
     /// Casting is driven by the GameplayAbilityDef data (area shape, radius, etc.)
     /// instead of hard-coded string branching.
     /// </summary>
-    public class SkillSystem
+    public class SkillSystem : global::BattleSystemECS.Content.Contracts.IAbilityActivationPort
     {
         private ComponentStore store;
         private IRenderer renderer;
         private int playerId;
         private float deltaTime = 1f;
         private GameConfig gameConfig;
-        private TechTreeSystem techTreeSystem;
-        private BuffSystem dotSystem;
-        private ManaSystem manaSystem; // optional — null if mana system not yet initialized
-        private PlayerSummonSystem summonSystem; // optional — null if summon system not yet initialized
-        private HealingZoneSystem healingZoneSystem; // optional — null if healing zone system not yet initialized
-        private TimeRewindSnapshotSystem timeRewindSystem; // optional — null if snapshot system not yet initialized
-        private NecromancerSystem necromancerSystem; // optional — null if necromancer system not yet initialized (Round 133 — for MassResurrect)
+        private global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem;
+        private global::BattleSystemECS.Content.Contracts.IEffectCommandPort dotSystem;
+        private global::BattleSystemECS.Content.Contracts.IResourcePort manaSystem; // 可选，法力系统未初始化时为空。
+        private global::BattleSystemECS.Content.Contracts.ISummonCommandPort summonSystem; // 可选，召唤系统未初始化时为空。
+        private global::BattleSystemECS.Content.Contracts.IHealingZoneCommandPort healingZoneSystem; // 可选，治疗区域系统未初始化时为空。
+        private global::BattleSystemECS.Content.Contracts.ISnapshotRestorePort timeRewindSystem; // 可选，快照系统未初始化时为空。
+        private global::BattleSystemECS.Content.Contracts.IResurrectionPort necromancerSystem; // 可选，复活系统未初始化时为空（第 133 轮 MassResurrect）。
         // Cached turn counter from SetTurn (used for MassResurrect's corpse-age gating)
         private int _currentTurn;
         private List<int> _activeEnemyList;
@@ -47,7 +40,7 @@ namespace BattleSystemECS.Systems
         private bool _buildPhaseRejectReported;
         private IAbilityPayloadHandler _payloadHandler;
 
-        // Cached enemy CC resistance stats (updated each SetTurn — from TechTreeSystem getters)
+        // 缓存敌人控制抗性统计，每次 SetTurn 从 ICombatTuningView 获取。
         private float _enemyFreezeResistance = 0f;  // from techTreeSystem.GetFreezeResistance()
         private float _enemySlowResistance = 0f;    // from techTreeSystem.GetSlowResistance()
         // Ping-pong double-buffer: eliminates per-frame new ConcurrentBag<>() allocation
@@ -179,7 +172,7 @@ namespace BattleSystemECS.Systems
         private bool[] _chainHealHitBuffer = new bool[0];
         private int _chainHealHitBufferSize = 0;
 
-        public SkillSystem(ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem = null)
+        public SkillSystem(ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem = null)
         {
             this.store = store;
             this.renderer = renderer;
@@ -217,43 +210,42 @@ namespace BattleSystemECS.Systems
             _shapeHandlers[AreaShapeType.AoeRoot] = c => CastAoeRoot(c.X, c.Y, c.Definition.AreaRadius, c.Definition.AoeRootDuration, c.Definition.Name);
             _shapeHandlers[AreaShapeType.AoeKnockback] = c => CastAoeKnockback(c.X, c.Y, c.Definition.AreaRadius, c.Definition.AoeKnockbackForce, c.Definition.Name);
         }
-        public void InjectDotSystem(BuffSystem dotSystem)
+        public void InjectDotSystem(global::BattleSystemECS.Content.Contracts.IEffectCommandPort dotSystem)
         {
             this.dotSystem = dotSystem;
         }
 
         /// <summary>
-        /// Inject ManaSystem for mana cost checking. Called by GameManager after ManaSystem construction.
+        /// 注入法力资源端口；由 ProductionSystemInstaller 按 schema v3 的 Skill typed recipe 在 Wiring 阶段调用。
         /// </summary>
-        public void InjectManaSystem(ManaSystem manaSystem)
+        public void InjectManaSystem(global::BattleSystemECS.Content.Contracts.IResourcePort manaSystem)
         {
             this.manaSystem = manaSystem;
         }
 
         /// <summary>
-        /// Inject PlayerSummonSystem for summoning abilities. Called by GameManager after SummonSystem construction.
+        /// 注入召唤命令端口；由 ProductionSystemInstaller 的 Skill typed recipe 在 Wiring 阶段调用。
         /// </summary>
-        public void InjectSummonSystem(PlayerSummonSystem summonSystem)
+        public void InjectSummonSystem(global::BattleSystemECS.Content.Contracts.ISummonCommandPort summonSystem)
         {
             this.summonSystem = summonSystem;
         }
 
-        public void InjectHealingZoneSystem(HealingZoneSystem healingZoneSystem)
+        public void InjectHealingZoneSystem(global::BattleSystemECS.Content.Contracts.IHealingZoneCommandPort healingZoneSystem)
         {
             this.healingZoneSystem = healingZoneSystem;
         }
 
-        public void InjectTimeRewindSystem(TimeRewindSnapshotSystem timeRewindSystem)
+        public void InjectTimeRewindSystem(global::BattleSystemECS.Content.Contracts.ISnapshotRestorePort timeRewindSystem)
         {
             this.timeRewindSystem = timeRewindSystem;
         }
 
         /// <summary>
-        /// Inject NecromancerSystem for MassResurrect ability (Round 133).
-        /// Called by GameManager after NecromancerSystem construction. Without this,
+        /// 注入复活端口；由 ProductionSystemInstaller 的 Skill typed recipe 在 Wiring 阶段调用。若未注入，
         /// casting AreaShapeType.MassResurrect logs a warning and returns 0.
         /// </summary>
-        public void InjectNecromancerSystem(NecromancerSystem necromancerSystem)
+        public void InjectNecromancerSystem(global::BattleSystemECS.Content.Contracts.IResurrectionPort necromancerSystem)
         {
             this.necromancerSystem = necromancerSystem;
         }
@@ -489,14 +481,12 @@ namespace BattleSystemECS.Systems
                         return false;
                     }
                     float cost = inst.Definition.Cost;
-                    if (cost > 0f && manaSystem != null && !manaSystem.HasEnoughMana(cost))
+                    if (cost > 0f && manaSystem != null && !manaSystem.TryConsumeMana(cost))
                     {
                         renderer.Log($"[SKILL] Not enough mana for '{skillName}': need {cost:F0}, have {manaSystem.GetCurrentMana():F0}");
                         return false;
                     }
                     ExecuteAbility(inst.Definition, slot);
-                    if (cost > 0f && manaSystem != null)
-                        manaSystem.ConsumeMana(cost);
                     return true;
                 }
             }
@@ -524,8 +514,7 @@ namespace BattleSystemECS.Systems
 
         public static bool IsBuildAllowedAbility(int shape)
         {
-            return shape == AreaShapeType.Heal || shape == AreaShapeType.Shield ||
-                   shape == AreaShapeType.ChainHeal || shape == AreaShapeType.TimeRewind;
+            return AbilityPhaseRules.IsBuildAllowed(shape);
         }
 
         private bool IsAbilityAllowed(int shape) =>
@@ -675,7 +664,7 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// MassResurrect (AreaShape=18)：委托 NecromancerSystem.MassResurrect，其中
+        /// MassResurrect (AreaShape=18)：委托 global::BattleSystemECS.Content.Contracts.IResurrectionPort.MassResurrect，其中
         /// hpFraction = HealPercent（0.0-1.0，按尸体最大 HP 复活比例，30% 回退）。
         /// AreaRadius 为 AOE 半径（tiles，3 回退——尸体按世界坐标存放，但 MassResurrect
         /// 是战术 AOE，小半径 3-5 tiles 是合理量级）。
@@ -684,13 +673,13 @@ namespace BattleSystemECS.Systems
         {
             if (necromancerSystem == null)
             {
-                renderer.Log($"[SKILL] '{def.Name}' failed: NecromancerSystem not injected into SkillSystem");
+                renderer.Log($"[SKILL] '{def.Name}' failed: global::BattleSystemECS.Content.Contracts.IResurrectionPort not injected into SkillSystem");
                 return 0;
             }
             float massRadius = def.AreaRadius > 0 ? def.AreaRadius : 3f; // default 3 tiles
             float hpFraction = def.HealPercent > 0f ? def.HealPercent : 0.3f; // 30% HP fallback
             // Ensure the necromancer system has an up-to-date sim time for corpse age gating.
-            // NecromancerSystem.SetTurn signature is (int turn, float simTime); the AIGroup
+            // IResurrectionPort.SetTurn 签名为 (int turn, float simTime)；AIGroup
             // wires it before SkillSystem runs (Necromancer sits in AI group, Skill in SkillBuff
             // group — so the simTime is already current). We re-set it here as a defensive
             // measure in case the order ever changes, using the same turn-based time proxy
@@ -1288,7 +1277,7 @@ namespace BattleSystemECS.Systems
         {
             if (summonSystem == null)
             {
-                renderer.Log($"[SUMMON] PlayerSummonSystem not available — cannot cast '{def.Name}'");
+                renderer.Log($"[SUMMON] global::BattleSystemECS.Content.Contracts.ISummonCommandPort not available — cannot cast '{def.Name}'");
                 return;
             }
 
@@ -1318,13 +1307,13 @@ namespace BattleSystemECS.Systems
         /// HealingZone AreaShape: places a ground healing zone at the player's position.
         /// The zone heals allies (player + summoned units) within its radius over time.
         /// Duration and heal rate come from def.Cooldown (duration) and def.HealPercent (hps).
-        /// Uses HealingZoneSystem.AddHealingZone() which internally uses CorpseEffect type=4.
+        /// 使用 IHealingZoneCommandPort.AddHealingZone()；内部对应 CorpseEffect 类型 4。
         /// </summary>
         private int CastHealingZone(GameplayAbilityDef def)
         {
             if (healingZoneSystem == null)
             {
-                renderer.Log($"[HEALZONE] HealingZoneSystem not available — cannot cast '{def.Name}'");
+                renderer.Log($"[HEALZONE] global::BattleSystemECS.Content.Contracts.IHealingZoneCommandPort not available — cannot cast '{def.Name}'");
                 return 0;
             }
 
@@ -1516,7 +1505,7 @@ namespace BattleSystemECS.Systems
 
         /// <summary>
         /// TimeRewind AreaShape (16): restore player HP / Mana / Shield from a recent snapshot
-        /// captured by TimeRewindSnapshotSystem. How far back to rewind is encoded in
+        /// 由 ISnapshotRestorePort 捕获；回溯时长编码在
         /// <c>def.HealPercent</c> (treated as seconds, e.g. 3.0 = 3 seconds back).
         /// Falls back to the system default (3.0s) when HealPercent is unset.
         /// </summary>
@@ -1524,7 +1513,7 @@ namespace BattleSystemECS.Systems
         {
             if (timeRewindSystem == null)
             {
-                renderer.Log($"[TIMEREWIND] TimeRewindSnapshotSystem not available — cannot cast '{def.Name}'");
+                renderer.Log($"[TIMEREWIND] global::BattleSystemECS.Content.Contracts.ISnapshotRestorePort not available — cannot cast '{def.Name}'");
                 return;
             }
 

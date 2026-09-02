@@ -5,37 +5,37 @@ using BattleSystemECS.Core;
 namespace BattleSystemECS.Systems
 {
     /// <summary>
-    /// Adaptive Difficulty System — dynamically adjusts wave difficulty based on player performance.
+    /// 自适应难度系统：根据玩家表现动态调整波次难度。
     ///
-    /// Performance signals (per wave):
-    ///   - Enemies leaked: increases difficulty
-    ///   - Enemies killed (kills): decreases difficulty
-    ///   - Gold remaining: bonus for efficiency
-    ///   - Health remaining: bonus for not taking damage
+    /// 每波采集的表现信号：
+    ///   - 敌人漏过：提高难度
+    ///   - 击杀数量：降低难度
+    ///   - 剩余金币：效率奖励
+    ///   - 剩余生命：未受伤奖励
     ///
-    /// Metrics are collected during the wave, then computed when the wave completes.
-    /// The resulting AdaptiveDifficultyLevel is read by WaveSpawningSystem to scale enemy stats.
+    /// 表现指标在波次期间采集，并在波次完成时计算。
+    /// 生成端通过 IWaveSpawningPort 读取 AdaptiveDifficultyLevel，以缩放敌人属性。
     ///
-    /// Integration points:
-    ///   - FrameScheduler.Tick() calls AdaptiveDifficulty.Update() each turn (WavePhase)
-    ///   - WaveSpawningSystem reads AdaptiveDifficultyLevel when spawning enemies
-    ///   - OnWaveComplete: resets per-wave counters and computes new difficulty level
+    /// 集成点：
+    ///   - FrameScheduler.Tick() 在 WavePhase 每回合调用 Update()
+    ///   - 生成敌人时由 IWaveSpawningPort 读取难度等级
+    ///   - OnWaveComplete 重置本波计数并计算新的难度等级
     /// </summary>
-    public class AdaptiveDifficultySystem
+    public class AdaptiveDifficultySystem : global::BattleSystemECS.Content.Contracts.IWaveScalingState
     {
         private readonly ComponentStore _store;
         private readonly GameConfig _gameConfig;
 
-        // Wave-level kill tracking (reset each wave)
+        // 波次级击杀统计（每波重置）。
         private int[] _killsThisWave = new int[ComponentStore.MAX_PLAYERS];
         private float[] _damageTakenThisWave = new float[ComponentStore.MAX_PLAYERS];
 
-        // Difficulty config (loaded from game_config.json or defaults)
-        private float _difficultyGrowthPerLeak = 0.10f;   // +10% difficulty per leak
-        private float _difficultyShrinkPerKill = 0.005f;  // -0.5% difficulty per kill
-        private float _minDifficulty = 0.5f;              // floor: 50% easier than baseline
-        private float _maxDifficulty = 3.0f;              // ceiling: 3x harder than baseline
-        private float _initialDifficulty = 1.0f;           // baseline multiplier
+        // 难度配置（来自 game_config.json，缺失时使用默认值）。
+        private float _difficultyGrowthPerLeak = 0.10f;   // 每次漏怪难度增加 10%
+        private float _difficultyShrinkPerKill = 0.005f;  // 每次击杀难度降低 0.5%
+        private float _minDifficulty = 0.5f;              // 下限：基准难度的 50%
+        private float _maxDifficulty = 3.0f;              // 上限：基准难度的 3 倍
+        private float _initialDifficulty = 1.0f;           // 基准倍率
 
         public AdaptiveDifficultySystem(ComponentStore store, GameConfig gameConfig)
         {
@@ -47,7 +47,7 @@ namespace BattleSystemECS.Systems
         private void LoadConfig()
         {
             _difficultyGrowthPerLeak = _gameConfig.DifficultyGrowthPerWave > 0
-                ? _gameConfig.DifficultyGrowthPerWave * 2f  // more aggressive than static growth
+                ? _gameConfig.DifficultyGrowthPerWave * 2f  // 比静态增长更积极。
                 : 0.10f;
             _initialDifficulty = 1.0f;
             _minDifficulty = 0.5f;
@@ -55,7 +55,7 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Called each turn during WavePhase — tracks performance signals.
+        /// 波次阶段每回合调用，记录表现信号。
         /// </summary>
         public void Update(float deltaTime)
         {
@@ -63,16 +63,12 @@ namespace BattleSystemECS.Systems
             {
                 if (_store.PlayerCurrentHealth[playerId] <= 0) continue;
 
-                // Track leaks that happened this turn (DecrementPlayerBaseLives is called in BenchmarkSystem)
-                // We track leaks via EnemiesLeakedThisWave which is incremented when enemies reach bottom
-                // The actual leak tracking happens in BenchmarkSystem/GameManager
-                // Here we just track that the system is active
+                // 泄漏由 BenchmarkSystem/GameManager 更新，本方法只保留活跃状态检查。
             }
         }
 
         /// <summary>
-        /// Record a kill for the adaptive difficulty system.
-        /// Called from ComboSystem or wherever kills are counted.
+        /// 记录一次击杀，供自适应难度系统使用。
         /// </summary>
         public void RecordKill(int playerId)
         {
@@ -81,7 +77,7 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Record damage taken by a player this wave.
+        /// 记录玩家本波承受的伤害。
         /// </summary>
         public void RecordDamageTaken(int playerId, float damage)
         {
@@ -90,12 +86,11 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Called by WaveSpawningSystem.OnWaveComplete — computes new difficulty level.
-        /// Uses: leaks this wave, kills this wave, damage taken, gold remaining.
-        /// <paramref name="expectedKills"/> is the designer-set baseline for this wave
-        /// (from <c>WaveConfig.ExpectedKillCount</c>). When &lt;= 0, the rubber-band
-        /// spawn multiplier is left at 1.0 (backward-compatible default for waves
-        /// that don't opt in via JSON config).
+        /// 由 WaveSpawningSystem 的 OnWaveComplete 事件调用，计算新的难度等级。
+        /// 使用本波泄漏、击杀、承伤和剩余金币等信号。
+        /// <paramref name="expectedKills"/> 是设计器为本波设置的击杀基准值
+        ///（来自 <c>WaveConfig.ExpectedKillCount</c>）。当该值小于等于 0 时，
+        /// 橡皮筋生成倍率保持 1.0，兼容未在 JSON 中启用该功能的波次。
         /// </summary>
         public void OnWaveComplete(int playerId, int expectedKills = 0)
         {
@@ -104,30 +99,28 @@ namespace BattleSystemECS.Systems
             int leaks = _store.EnemiesLeakedThisWave[playerId];
             int kills = _killsThisWave[playerId];
 
-            // Compute performance score delta
-            // Good performance (few leaks, many kills) → decrease difficulty
-            // Poor performance (many leaks, few kills) → increase difficulty
+            // 计算表现分差值：漏怪少且击杀多时降低难度，反之提高难度。
             float currentLevel = _store.AdaptiveDifficultyLevel[playerId];
             float performanceScore = 0f;
 
-            // Leaks penalty: each leak adds difficulty
+            // 漏怪惩罚：每次漏怪都会提高难度。
             performanceScore += leaks * _difficultyGrowthPerLeak;
 
-            // Kill bonus: each kill reduces difficulty
+            // 击杀奖励：每次击杀都会降低难度。
             performanceScore -= kills * _difficultyShrinkPerKill;
 
-            // Compute new difficulty level (clamped)
+            // 计算并裁剪新的难度等级。
             float newLevel = currentLevel + performanceScore;
             newLevel = Math.Clamp(newLevel, _minDifficulty, _maxDifficulty);
 
             _store.AdaptiveDifficultyLevel[playerId] = newLevel;
 
-            // Update cumulative score for display/debug
+            // 更新用于显示和调试的累计分数。
             _store.AdaptiveDifficultyScore[playerId] += (kills > 0 || leaks > 0)
                 ? (kills * 0.5f) - (leaks * 1.0f)
                 : 0f;
 
-            // Reset per-wave counters
+            // 重置本波计数器。
             _killsThisWave[playerId] = 0;
             _damageTakenThisWave[playerId] = 0f;
             _store.EnemiesLeakedThisWave[playerId] = 0;
@@ -141,17 +134,15 @@ namespace BattleSystemECS.Systems
                 // rawDelta = (actual - expected) / expected; >0 means player over-killed.
                 float rawDelta = (kills - expectedKills) / (float)expectedKills;
                 float mult = 1.0f + rawDelta * AdaptiveSpawnConfig.DefaultSpawnSensitivity;
-                // Note: WaveSpawningSystem.SetPerformanceSpawnMultiplier does the final clamp
+            // 说明：IWaveSpawningPort.SetPerformanceSpawnMultiplier 负责最终裁剪。
                 // and the near-1 snap, so we write the unclamped value here for transparency.
                 _waveSpawningSystemRef?.SetPerformanceSpawnMultiplier(mult);
             }
         }
 
-        // Round 120 Dir 3 — back-reference to WaveSpawningSystem so OnWaveComplete can
-        // write the rubber-band multiplier. Set via SetWaveSpawningSystem() during
-        // GameManager's system wiring (same lifecycle as WaveSpawningSystem.SetAdaptiveDifficulty).
-        private WaveSpawningSystem _waveSpawningSystemRef;
-        public void SetWaveSpawningSystem(WaveSpawningSystem waveSpawningSystem)
+        // 第 120 轮方向 3：保存波次生成端口回引，以便完成波次时写入缩放倍率。
+        private global::BattleSystemECS.Content.Contracts.IWaveSpawningPort _waveSpawningSystemRef;
+        public void SetWaveSpawningSystem(global::BattleSystemECS.Content.Contracts.IWaveSpawningPort waveSpawningSystem)
         {
             _waveSpawningSystemRef = waveSpawningSystem;
         }
@@ -173,7 +164,7 @@ namespace BattleSystemECS.Systems
 
         /// <summary>
         /// Returns the current difficulty multiplier for a player.
-        /// Read by WaveSpawningSystem when spawning enemies.
+        /// 生成敌人时由 IWaveSpawningPort 读取。
         /// </summary>
         public float GetDifficultyMult(int playerId)
         {

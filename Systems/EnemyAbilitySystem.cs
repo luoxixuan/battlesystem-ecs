@@ -13,7 +13,7 @@ namespace BattleSystemECS.Systems
     /// Handles enemy-cast abilities: self_heal, aoe_damage, buff_allies.
     /// Two-phase pattern: parallel collection → serial apply.
     /// </summary>
-    public class EnemyAbilitySystem : IAbilityPayloadHandler
+    public class EnemyAbilitySystem : IAbilityPayloadHandler, global::BattleSystemECS.Content.Contracts.IEnemyAbilityCommandPort
     {
         private readonly ComponentStore store;
         private readonly IRenderer logger;
@@ -22,7 +22,7 @@ namespace BattleSystemECS.Systems
         private readonly EventBus _eventBus;
         private readonly Dictionary<string, EnemyAbilityDef> _abilityLookup;
         private readonly Dictionary<int, EnemyAbilityDef> _payloadDefinitions = new Dictionary<int, EnemyAbilityDef>();
-        private TelegraphSystem _telegraphSystem;
+        private global::BattleSystemECS.Content.Contracts.ITelegraphCommandPort _telegraphSystem;
 
         // Ping-pong double-buffer for ability events — collected parallel, applied serial.
         private readonly List<AbilityEvent>[] _abilityEvents = { new List<AbilityEvent>(64), new List<AbilityEvent>(64) };
@@ -78,9 +78,9 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Inject TelegraphSystem reference for warning zone queuing.
+        /// 注入 ITelegraphCommandPort，用于排队警示区域。
         /// </summary>
-        public void SetTelegraphSystem(TelegraphSystem telegraphSystem)
+        public void SetTelegraphSystem(global::BattleSystemECS.Content.Contracts.ITelegraphCommandPort telegraphSystem)
         {
             _telegraphSystem = telegraphSystem;
         }
@@ -491,7 +491,7 @@ namespace BattleSystemECS.Systems
                 bool queued = _telegraphSystem.TryQueueTelegraphZone(context.Source, context.Target,
                     store.PositionX[context.Target.Index], store.PositionY[context.Target.Index], radius,
                     context.Execution.Duration, context.Magnitude, context.Ability.Id,
-                    context.Request.OwnerPlayerId, TelegraphSystem.SHAPE_CIRCLE,
+                    context.Request.OwnerPlayerId, global::BattleSystemECS.Content.Contracts.TelegraphShape.Circle,
                     colorHint: context.Execution.Parameter);
                 if (!queued) throw new InvalidOperationException("prevalidated telegraph capacity was unavailable during commit");
                 return 1;
@@ -702,7 +702,7 @@ namespace BattleSystemECS.Systems
                         ability.TelegraphDuration,
                         aoeDamage,
                         playerId,
-                        TelegraphSystem.SHAPE_CIRCLE,
+                        global::BattleSystemECS.Content.Contracts.TelegraphShape.Circle,
                         60f, 0f,
                         ability.TelegraphColor);
                     logger.Log($"[ABILITY] Enemy {enemyId} AOE telegraph zone queued for {ability.TelegraphDuration:F0} turns, damage={aoeDamage:F1} ({ability.Name})");

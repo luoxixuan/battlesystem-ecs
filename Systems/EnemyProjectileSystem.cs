@@ -10,7 +10,7 @@ namespace BattleSystemECS.Systems
     /// 
     /// 两阶段模式：串行 Update 中移动→命中检测→玩家伤害，帧末统一 apply。
     /// </summary>
-    public class EnemyProjectileSystem
+    public class EnemyProjectileSystem : global::BattleSystemECS.Content.Contracts.IEnemyProjectilePort
     {
         private readonly ComponentStore store;
         private const int MAX_ENEMY_PROJ = 4096;

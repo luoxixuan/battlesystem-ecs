@@ -28,7 +28,7 @@ namespace BattleSystemECS.Systems
     /// 
     /// Execution: CombatGroup (after Combat/TowerAttack where towers are hit).
     /// </summary>
-    public class ReflectTowerSystem
+    public class ReflectTowerSystem : global::BattleSystemECS.Content.Contracts.IReflectionCommandPort
     {
         private readonly ComponentStore store;
         private readonly int playerId;

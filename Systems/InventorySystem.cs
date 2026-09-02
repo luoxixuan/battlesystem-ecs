@@ -2,60 +2,59 @@ using System;
 using BattleSystemECS.Components;
 using BattleSystemECS.Config;
 using BattleSystemECS.Core;
+using BattleSystemECS.Content.Contracts;
 
 namespace BattleSystemECS.Systems
 {
     /// <summary>
-    /// Round 130 — Inventory / Item system.
+    /// Round 130：背包和道具系统。
     ///
-    /// Per-player slot-based inventory of consumable items (potions / grenades / scrolls / sigils).
-    /// Items are defined in Data/Configs/items.json and dispatched by InventoryItemType.
+    /// 每名玩家拥有按槽位组织的消耗品背包（药水、手雷、卷轴和护符）。
+    /// 道具定义位于 Data/Configs/items.json，并按 InventoryItemType 分派。
     ///
-    /// Storage model:
-    ///   - ComponentStore.PlayerInventoryItemId/Count/Used SOA arrays (see ComponentStore_Player.cs).
-    ///   - Flat indexing: PlayerInventoryXxx[playerId * MAX_INVENTORY_SLOTS + slot].
-    ///   - Default 0-initialized arrays; ResetInventory(playerId) flips to -1/0.
+    /// 存储模型：
+    ///   - 使用 ComponentStore_Player.cs 中的 SOA 数组。
+    ///   - 线性索引为 playerId * MAX_INVENTORY_SLOTS + slot。
+    ///   - 数组默认初始化为 0，ResetInventory(playerId) 会重置为 -1/0。
     ///
-    /// Lifecycle:
-    ///   - ResetInventory(playerId) called by GameManager on player add.
-    ///   - AddItem(playerId, itemType) called by PickupSystem / drop handler / event system.
-    ///   - UseItem(playerId, slot) called by hotkey handler / auto-trigger.
-    ///   - RemoveItem(playerId, slot) called by craft/transfer or admin.
+    /// 生命周期：
+    ///   - GameManager 添加玩家时调用 ResetInventory(playerId)。
+    ///   - PickupSystem、掉落处理器或事件系统调用 AddItem。
+    ///   - 快捷键处理器或自动触发器调用 UseItem。
+    ///   - 制作、转移或管理操作调用 RemoveItem。
     ///
-    /// Stack semantics:
-    ///   - If existing slot has same itemId and count < MaxStack, increment.
-    ///   - Else, find first empty slot.
-    ///   - Else, return false (inventory full).
+    /// 堆叠规则：
+    ///   - 已有相同 itemId 且数量小于 MaxStack 时直接增加数量。
+    ///   - 否则查找第一个空槽位。
+    ///   - 没有空槽位时返回 false，表示背包已满。
     ///
-    /// UseItem dispatch (by InventoryItemType):
-    ///   Heal        — PlayerCurrentHealth += Value (clamped to MaxHealth)
-    ///   Mana        — PlayerMana += Value (clamped to MaxMana)
-    ///   Shield      — PlayerShield += Value, PlayerShieldDuration = BuffDuration
-    ///   SpeedBoost  — PlayerSlowFactor = 1.5, PlayerSlowDuration = (int)BuffDuration
-    ///   DamageBoost — PlayerBuffFlags |= BuffType.AttackBoost, PlayerSlowDuration = (int)BuffDuration
-    ///   AoEBurst    — apply Value damage to enemies within Radius of player (direct HP write, O(n_enemies) scan)
-    ///   Summon      — not yet implemented in Round 130 (returns false, marks "TODO future round")
-    ///   Cleanse     — PlayerCCFlags = 0 (clear all CC; BuffType bitfield)
+    /// UseItem 按 InventoryItemType 分派：
+    ///   Heal        — 增加生命并裁剪到 MaxHealth。
+    ///   Mana        — 增加法力并裁剪到 MaxMana。
+    ///   Shield      — 增加护盾并设置持续时间。
+    ///   SpeedBoost  — 设置减速倍率和持续时间。
+    ///   DamageBoost — 设置攻击增益标志和持续时间。
+    ///   AoEBurst    — 对玩家半径内的敌人造成 Value 伤害。
+    ///   Summon      — Round 130 尚未实现，返回 false。
+    ///   Cleanse     — 清除玩家的全部控制效果标志。
     ///
-    /// Performance:
-    ///   - Add/Use/Remove are O(MAX_INVENTORY_SLOTS=8) per call; zero allocation.
-    ///   - AoEBurst does an O(activeEnemies) scan, gated by Radius==0 → fast-path skip.
-    ///   - PlayerInventoryUsed[] cached counter is O(1) for "is inventory full" checks.
-    ///   - Not called per frame; only on pickup collection / hotkey press.
+    /// 性能：
+    ///   - Add/Use/Remove 每次调用为 O(MAX_INVENTORY_SLOTS=8)，不产生分配。
+    ///   - AoEBurst 扫描 O(activeEnemies)，Radius==0 时走快速跳过路径。
+    ///   - PlayerInventoryUsed[] 缓存计数器可 O(1) 判断背包是否已满。
+    ///   - 不在每帧调用，仅在拾取或快捷键操作时调用。
     /// </summary>
-    public class InventorySystem
+    public class InventorySystem : global::BattleSystemECS.Content.Contracts.IInventoryCommandPort
     {
         private readonly ComponentStore store;
         private readonly GameConfig gameConfig;
         private readonly IRenderer renderer;
 
-        // Round 199 Direction 6 — optional CraftingSystem dependency. When set,
-        // TryCraft() forwards to it. Lazy binding so InventorySystem can still be
-        // constructed without crafting support (back-compat with existing test
-        // scaffolding and GameManager wire-up).
-        private CraftingSystem craftingSystem;
+        // Round 199 方向 6：可选的 ICraftingService 依赖。设置后 TryCraft() 转发给它；
+        // 使用延迟绑定，使没有制作支持时仍可构造 InventorySystem，兼容现有测试基建和 GameManager 接线。
+        private global::BattleSystemECS.Content.Contracts.ICraftingService craftingSystem;
 
-        // O(1) telemetry counters
+        // O(1) 遥测计数器。
         public int TotalAddCalls = 0;
         public int TotalUseCalls = 0;
         public int TotalDroppedFullInv = 0;
@@ -69,11 +68,10 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Round 199 Direction 6 — bind a CraftingSystem so TryCraft() can forward to it.
-        /// Idempotent: a second call replaces the binding. Tests can leave this unset
-        /// and TryCraft() returns BadRecipe cleanly (no null-ref crash).
+        /// Round 199 方向 6：绑定 ICraftingService，供 TryCraft() 转发。
+        /// 绑定可重复执行，后一次调用会替换前一次；未绑定时 TryCraft() 返回 BadRecipe，不会空引用崩溃。
         /// </summary>
-        public void BindCraftingSystem(CraftingSystem crafting)
+        public void BindCraftingSystem(global::BattleSystemECS.Content.Contracts.ICraftingService crafting)
         {
             craftingSystem = crafting;
         }
@@ -208,15 +206,12 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Round 199 Direction 6 — Crafting entry point. Forwards to the bound CraftingSystem
-        /// when one is registered; returns BadRecipe cleanly when crafting is not wired
-        /// (e.g. tests that don't exercise the recipe system). Single indirection so the
-        /// crafting code path is reachable from UI / hotkey / quest handlers without
-        /// needing a direct CraftingSystem reference.
+        /// 第 199 轮方向 6：制作入口转发到已绑定的 ICraftingService；未接线时返回 BadRecipe。
+        /// 通过单层间接调用，使界面、快捷键和任务处理器无需持有具体制作系统引用。
         /// </summary>
-        public CraftingSystem.CraftingResult TryCraft(int playerId, int recipeId)
+        public CraftingResult TryCraft(int playerId, int recipeId)
         {
-            if (craftingSystem == null) return CraftingSystem.CraftingResult.BadRecipe;
+            if (craftingSystem == null) return CraftingResult.BadRecipe;
             return craftingSystem.TryCraft(playerId, recipeId);
         }
 

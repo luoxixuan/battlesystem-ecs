@@ -6,6 +6,7 @@ using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
+using BattleSystemECS.Content.Contracts;
 
 namespace BattleSystemECS.Tests.Features.Economy
 {
@@ -121,7 +122,7 @@ namespace BattleSystemECS.Tests.Features.Economy
         {
             var (system, _) = MakeSystem(recipes: Array.Empty<CraftingRecipeDef>());
             var result = system.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.BadRecipe, result);
+            Assert.Equal(CraftingResult.BadRecipe, result);
             Assert.Equal(0, system.TotalAttempts); // not even counted
         }
 
@@ -149,7 +150,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             Assert.Equal(3, CountItem(PlayerId, HealingPotionId));
 
             var result = system.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.Success, result);
+            Assert.Equal(CraftingResult.Success, result);
             // 3 - 2 inputs + 1 output = 2 left
             Assert.Equal(2, CountItem(PlayerId, HealingPotionId));
             Assert.Equal(1, system.TotalSuccesses);
@@ -167,7 +168,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             GiveItems(inv, PlayerId, HealingPotionId, 3);
 
             var result = system.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.MissingInputs, result);
+            Assert.Equal(CraftingResult.MissingInputs, result);
             Assert.Equal(3, CountItem(PlayerId, HealingPotionId)); // untouched
             Assert.Equal(1, system.TotalRejectedMissingInputs);
             Assert.Equal(0, system.TotalSuccesses);
@@ -192,7 +193,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             int manaBefore = CountItem(PlayerId, ManaPotionId);
 
             var result = system.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.Failure, result);
+            Assert.Equal(CraftingResult.Failure, result);
             Assert.Equal(2, CountItem(PlayerId, HealingPotionId)); // refunded
             Assert.Equal(manaBefore, CountItem(PlayerId, ManaPotionId)); // no output
             Assert.Equal(1, system.TotalFailures);
@@ -216,7 +217,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             GiveItems(inv, PlayerId, HealingPotionId, 2);
 
             var result = system.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.Failure, result);
+            Assert.Equal(CraftingResult.Failure, result);
             Assert.Equal(0, CountItem(PlayerId, HealingPotionId)); // lost
         }
 
@@ -239,7 +240,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             GiveItems(inv, PlayerId, HealingPotionId, 2);
 
             var result = system.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.SuccessRareBonus, result);
+            Assert.Equal(CraftingResult.SuccessRareBonus, result);
             // 2 heal - 2 input + 1 output = 1 heal
             Assert.Equal(1, CountItem(PlayerId, HealingPotionId));
             // +1 mana bonus
@@ -266,7 +267,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             GiveItems(inv, PlayerId, HealingPotionId, 2);
 
             var result = system.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.SuccessRareBonus, result);
+            Assert.Equal(CraftingResult.SuccessRareBonus, result);
             // 2 - 2 + 1 (base) + 1 (bonus duplicate) = 2
             Assert.Equal(2, CountItem(PlayerId, HealingPotionId));
         }
@@ -278,8 +279,8 @@ namespace BattleSystemECS.Tests.Features.Economy
             var (system, _) = MakeSystem(recipes: new[] {
                 MakeSuccessRecipe("a", new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } },
                                        new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } }) });
-            Assert.Equal(CraftingSystem.CraftingResult.BadRecipe, system.TryCraft(PlayerId, 999));
-            Assert.Equal(CraftingSystem.CraftingResult.BadRecipe, system.TryCraft(PlayerId, -1));
+            Assert.Equal(CraftingResult.BadRecipe, system.TryCraft(PlayerId, 999));
+            Assert.Equal(CraftingResult.BadRecipe, system.TryCraft(PlayerId, -1));
             // Two bad id calls → two rejected-bad-recipe entries
             Assert.Equal(2, system.TotalRejectedBadRecipe);
         }
@@ -291,8 +292,8 @@ namespace BattleSystemECS.Tests.Features.Economy
             var (system, _) = MakeSystem(recipes: new[] {
                 MakeSuccessRecipe("a", new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } },
                                        new[] { new CraftingItemStack { ItemId = HealingPotionId, Count = 1 } }) });
-            Assert.Equal(CraftingSystem.CraftingResult.BadRecipe, system.TryCraft(-1, 0));
-            Assert.Equal(CraftingSystem.CraftingResult.BadRecipe, system.TryCraft(MaxPlayers, 0));
+            Assert.Equal(CraftingResult.BadRecipe, system.TryCraft(-1, 0));
+            Assert.Equal(CraftingResult.BadRecipe, system.TryCraft(MaxPlayers, 0));
         }
 
         // ── 11. Full inventory on success: inputs consumed, output dropped ─
@@ -326,7 +327,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             for (int i = 0; i < 7; i++) inv.AddItem(PlayerId, ManaPotionId);
 
             var result = system.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.FullInventory, result);
+            Assert.Equal(CraftingResult.FullInventory, result);
             // Inputs were consumed (1 healing potion gone)
             Assert.Equal(0, CountItem(PlayerId, HealingPotionId));
             // Mana: was 7 (full minus the heal slot) + 1 from output (just barely
@@ -349,7 +350,7 @@ namespace BattleSystemECS.Tests.Features.Economy
 
             // Have tonic but no mana → missing inputs
             GiveItems(inv, PlayerId, SpeedTonicId, 1);
-            Assert.Equal(CraftingSystem.CraftingResult.MissingInputs, system.TryCraft(PlayerId, 0));
+            Assert.Equal(CraftingResult.MissingInputs, system.TryCraft(PlayerId, 0));
             Assert.Equal(1, CountItem(PlayerId, SpeedTonicId)); // untouched
         }
 
@@ -379,19 +380,19 @@ namespace BattleSystemECS.Tests.Features.Economy
             int successes = 0;
             foreach (var r in seqA)
             {
-                if (r == CraftingSystem.CraftingResult.Success) successes++;
+                if (r == CraftingResult.Success) successes++;
             }
             Assert.InRange(successes, 20, 80);
-            Assert.Contains(CraftingSystem.CraftingResult.Success, seqA);
-            Assert.Contains(CraftingSystem.CraftingResult.Failure, seqA);
+            Assert.Contains(CraftingResult.Success, seqA);
+            Assert.Contains(CraftingResult.Failure, seqA);
         }
 
         /// <summary>单个 CraftingSystem 实例连续尝试 N 次（每次补一个输入），返回完整结果序列。</summary>
-        private CraftingSystem.CraftingResult[] RunCraftSequence(
+        private CraftingResult[] RunCraftSequence(
             CraftingRecipeDef recipe, int seed, int attempts)
         {
             var (system, inv) = MakeSystem(recipes: new[] { recipe }, seed: seed);
-            var results = new CraftingSystem.CraftingResult[attempts];
+            var results = new CraftingResult[attempts];
             for (int i = 0; i < attempts; i++)
             {
                 inv.AddItem(PlayerId, HealingPotionId);
@@ -429,7 +430,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             GiveItems(inv, PlayerId, HealingPotionId, 1);
 
             var result = inv.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.Success, result);
+            Assert.Equal(CraftingResult.Success, result);
         }
 
         // ── 16. Unbound InventorySystem.TryCraft: returns BadRecipe ────
@@ -440,7 +441,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             var inv = new InventorySystem(Store, Config, null);
             // No BindCraftingSystem call → craftingSystem is null
             var result = inv.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.BadRecipe, result);
+            Assert.Equal(CraftingResult.BadRecipe, result);
         }
 
         // ── 17. RefundRate=0 → no refund attempt ───────────────────────
@@ -461,7 +462,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             GiveItems(inv, PlayerId, HealingPotionId, 3);
             int addsBefore = inv.TotalAddCalls;
             var result = system.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.Failure, result);
+            Assert.Equal(CraftingResult.Failure, result);
             // No AddItem calls during refund (RefundRate=0 means refundCount=0)
             Assert.Equal(addsBefore, inv.TotalAddCalls);
             Assert.Equal(0, CountItem(PlayerId, HealingPotionId));
@@ -484,7 +485,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             var (system, inv) = MakeSystem(recipes: new[] { recipe });
             GiveItems(inv, PlayerId, HealingPotionId, 3);
             var result = system.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.Failure, result);
+            Assert.Equal(CraftingResult.Failure, result);
             // 3 - 3 (consumed) + 3 (refund) = 3
             Assert.Equal(3, CountItem(PlayerId, HealingPotionId));
         }
@@ -516,7 +517,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             // must reject — old code would have passed and silently lost it.
             GiveItems(inv, PlayerId, GrenadeId, 1);
             var result = system.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.MissingInputs, result);
+            Assert.Equal(CraftingResult.MissingInputs, result);
             Assert.Equal(1, CountItem(PlayerId, GrenadeId)); // untouched
             Assert.Equal(1, system.TotalRejectedMissingInputs);
 
@@ -524,7 +525,7 @@ namespace BattleSystemECS.Tests.Features.Economy
             GiveItems(inv, PlayerId, GrenadeId, 1);
             Assert.Equal(2, CountItem(PlayerId, GrenadeId));
             var result2 = system.TryCraft(PlayerId, 0);
-            Assert.Equal(CraftingSystem.CraftingResult.Success, result2);
+            Assert.Equal(CraftingResult.Success, result2);
             // 2 - 2 inputs + 1 output = 1
             Assert.Equal(1, CountItem(PlayerId, GrenadeId));
         }

@@ -143,7 +143,7 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void Assembly_EnemyAI_ReceivesNonNullReflectTower()
+        public void Assembly_EnemyAI_DoesNotRetainDeadReflectTowerEdge()
         {
             GameConfig config = GameConfigLoader.LoadConfig(Renderer);
             var stateMachine = new StateMachine();
@@ -154,7 +154,9 @@ namespace BattleSystemECS.Tests.Framework
             registry.WireDependencies(Store, playerId);
 
             Assert.NotNull(registry.EnemyAI);
-            Assert.NotNull(ReadPrivateField(registry.EnemyAI!, "_reflectTowerSystem"));
+            Assert.NotNull(registry.ReflectTower);
+            Assert.Null(registry.EnemyAI!.GetType().GetField("_reflectTowerSystem",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance));
         }
 
         /// <summary>读取私有实例字段（生产未提供只读访问器；补测缝后可移除）。</summary>

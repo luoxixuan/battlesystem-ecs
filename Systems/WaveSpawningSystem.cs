@@ -60,7 +60,7 @@ namespace BattleSystemECS.Systems
     /// 支持多怪物类型（EnemyTypes[]）
     /// 支持精英/Boss 难度缩放（波次动态难度曲线）
     /// </summary>
-    public class WaveSpawningSystem
+    public class WaveSpawningSystem : global::BattleSystemECS.Content.Contracts.IWaveSpawningPort
     {
         private Core.ComponentStore store;
         private IRenderer renderer;
@@ -74,7 +74,7 @@ namespace BattleSystemECS.Systems
         private int totalEnemiesSpawned = 0;
         private Random _spawnRandom;
         private readonly object _spawnRandomLock = new object();
-        private readonly EnemyAffixSystem _enemyAffixSystem;
+        private readonly global::BattleSystemECS.Content.Contracts.IEnemyAffixDecorator _enemyAffixSystem;
 
         // Multi-type support
         private string[] _multiTypes = Array.Empty<string>();
@@ -104,7 +104,9 @@ namespace BattleSystemECS.Systems
         private int _pendingCompletedWaveNumber;
         private int _pendingExpectedKills;
 
-        public WaveSpawningSystem(Core.ComponentStore store, IRenderer renderer, GameConfig gameConfig, EnemyAffixSystem enemyAffixSystem = null, IBattleEventBus eventBus = null)
+        public WaveSpawningSystem(Core.ComponentStore store, IRenderer renderer, GameConfig gameConfig,
+            global::BattleSystemECS.Content.Contracts.IEnemyAffixDecorator enemyAffixSystem = null,
+            IBattleEventBus eventBus = null)
         {
             this.store = store;
             this.renderer = renderer;
@@ -112,9 +114,8 @@ namespace BattleSystemECS.Systems
             this.spawnConfig = LoadWaveSpawnConfig();
             this._enemyAffixSystem = enemyAffixSystem;
             _eventBus = eventBus ?? NullEventBus.Instance;
-            // Round 127 Dir 1 — lazy-load the global curve registry. Idempotent and
-            // thread-safe; a missing curves.json is logged but never throws, so the
-            // spawn loop falls back to the legacy linear formulas.
+            // 第 127 轮方向 1：延迟加载全局曲线注册表。该操作幂等且线程安全；
+            // curves.json 缺失时记录日志但不抛异常，生成循环回退到旧线性公式。
             Core.CurveTable.Load("Data/Configs/curves.json", renderer);
         }
 
@@ -157,34 +158,34 @@ namespace BattleSystemECS.Systems
             return 1.0f + (currentWave - 1) * spawnConfig.DifficultyConfig.SpeedGrowthPerWave;
         }
 
-        private AscensionSystem _ascensionSystem;
-        public void SetAscensionSystem(AscensionSystem ascensionSystem)
+        private global::BattleSystemECS.Content.Contracts.IAscensionDecorator _ascensionSystem;
+        public void SetAscensionSystem(global::BattleSystemECS.Content.Contracts.IAscensionDecorator ascensionSystem)
         {
             _ascensionSystem = ascensionSystem;
         }
 
-        private AdaptiveDifficultySystem _adaptiveDifficulty;
-        public void SetAdaptiveDifficulty(AdaptiveDifficultySystem adaptiveDifficulty)
+        private global::BattleSystemECS.Content.Contracts.IWaveScalingState _adaptiveDifficulty;
+        public void SetAdaptiveDifficulty(global::BattleSystemECS.Content.Contracts.IWaveScalingState adaptiveDifficulty)
         {
             _adaptiveDifficulty = adaptiveDifficulty;
         }
 
         // ── Round 120 Direction 3 — Adaptive Spawn Count (Rubber-band Spawn Pacing) ──
         // Multiplier applied to the per-type baseline enemy count at each spawn site.
-        // Written by AdaptiveDifficultySystem.OnWaveComplete (1.0 = no scaling, default).
+        // 由 IWaveScalingState.OnWaveComplete 写入（1.0 表示不缩放，为默认值）。
         // The first wave of a level always uses 1.0 (no performance data yet).
         // Clamped by AdaptiveSpawnConfig to [MinSpawnMultiplier, MaxSpawnMultiplier] when written.
         private float _performanceSpawnMultiplier = 1.0f;
 
         /// <summary>
         /// Read-only view of the current rubber-band spawn multiplier. Public so tests
-        /// (and AdaptiveDifficultySystem) can verify the value after OnWaveComplete.
+        /// 测试可在 OnWaveComplete 后通过 IWaveScalingState 校验该值。
         /// Defaults to 1.0 (no scaling) and resets to 1.0 at the start of every level.
         /// </summary>
         public float PerformanceSpawnMultiplier => _performanceSpawnMultiplier;
 
         /// <summary>
-        /// Sets the rubber-band spawn multiplier. Called by <c>AdaptiveDifficultySystem.OnWaveComplete</c>
+        /// 设置橡皮筋生成倍率，由 <c>IWaveScalingState.OnWaveComplete</c> 调用。
         /// after computing the raw kill-vs-expected delta. Clamped to
         /// <c>[AdaptiveSpawnConfig.MinSpawnMultiplier, MaxSpawnMultiplier]</c> on the way in
         /// so a misbehaving caller can't push the value out of range.
@@ -954,7 +955,7 @@ namespace BattleSystemECS.Systems
                         store.EnemyOwnerId[enemyId] = -1;
                     }
 
-                    // Assign per-enemy affixes (1-3 random affixes from EnemyAffixSystem)
+                    // 为每个敌人分配词缀（由 IEnemyAffixDecorator 提供）。
                     _enemyAffixSystem?.AssignAffixesAtSpawn(enemyId, scaledMaxHealth);
 
                     // Apply ascension/difficulty modifier scaling

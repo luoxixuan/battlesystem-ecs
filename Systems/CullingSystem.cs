@@ -29,7 +29,7 @@ namespace BattleSystemECS.Systems
     /// per-frame loop. Sentinel-gated: per-tower / per-enemy opt-out flags make
     /// the hot path branch-cheap when the subsystem is unused.
     /// </summary>
-    public class CullingSystem
+    public class CullingSystem : global::BattleSystemECS.Content.Contracts.ICullingPass
     {
         private readonly ComponentStore store;
         private readonly int playerId;
@@ -91,10 +91,9 @@ namespace BattleSystemECS.Systems
         /// exists, the inner loop is O(cullingTowers * enemies) worst case, but typically
         /// culling is rare (few towers, gated by threshold).
         /// </summary>
-        public void ScanAndCull(TowerAttackSystem towerAttackSystem)
+        public void ScanAndCull()
         {
             if (!config.Enabled) return;
-            if (towerAttackSystem == null) return;
 
             var activeTowers = store.ActiveTowerIds;
             int towerCount = activeTowers.Count;

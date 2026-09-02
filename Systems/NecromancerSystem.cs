@@ -30,7 +30,7 @@ namespace BattleSystemECS.Systems
     ///   - GameManager bootstrap creates and injects NecromancerSystem instance
     ///   - FrameScheduler registers via scheduler.Necromancer
     /// </summary>
-    public class NecromancerSystem
+    public class NecromancerSystem : global::BattleSystemECS.Content.Contracts.IResurrectionPort
     {
         private readonly ComponentStore _store;
         private readonly GameConfig _gameConfig;

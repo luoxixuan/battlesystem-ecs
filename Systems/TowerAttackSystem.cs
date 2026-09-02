@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using BattleSystemECS.Core;
 using BattleSystemECS.Components;
 using BattleSystemECS.Config;
+using BattleSystemECS.Content.Contracts;
 
 namespace BattleSystemECS.Systems
 {
@@ -16,20 +17,18 @@ namespace BattleSystemECS.Systems
     {
         private ComponentStore store;
         private IRenderer logger;
-        private TechTreeSystem techTreeSystem;
-        private BuffSystem buffSystem;
-        private BleedSystem bleedSystem;
-        private DeathMarkSystem deathMarkSystem; // injected for stack-based execute counter
-        private CullingSystem cullingSystem; // Round 206 Direction 1 — injected for HP-threshold instant execute
-        private TowerExperienceSystem towerExperienceSystem;
-        private ProjectileSystem projectileSystem;
-        private WeatherSystem _weatherSystem; // injected for weather effects
-        private DayNightSystem _dayNightSystem; // injected for day/night cycle effects
-        private HeatSystem _heatSystem; // injected for heat/overheat effects
-        private TowerEnergySystem _energySystem; // injected for energy system effects
-        private HitShieldSystem _hitShieldSystem; // injected for N-hit shield blocking
-        private EnemyStrafeSystem _enemyStrafeSystem; // injected for enemy dodge/strafe
-        private DesperationSystem _desperationSystem; // injected for last stand damage/speed bonuses
+        private global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem;
+        private global::BattleSystemECS.Content.Contracts.IEffectCommandPort buffSystem;
+        private global::BattleSystemECS.Content.Contracts.IBleedCommandPort bleedSystem;
+        private global::BattleSystemECS.Content.Contracts.ICullingPass cullingSystem; // 负责低血量处决判定
+        private global::BattleSystemECS.Content.Contracts.IProjectileCommandPort projectileSystem;
+        private global::BattleSystemECS.Content.Contracts.ITowerEnvironmentView _weatherSystem; // 天气修饰
+        private global::BattleSystemECS.Content.Contracts.ITowerRangeModifierView _dayNightSystem; // 昼夜射程修饰
+        private global::BattleSystemECS.Content.Contracts.ITowerHeatPort _heatSystem; // 热量命令端口
+        private global::BattleSystemECS.Content.Contracts.ITowerEnergyPort _energySystem; // 能量命令端口
+        private global::BattleSystemECS.Content.Contracts.IHitShieldResolver _hitShieldSystem; // 次数盾结算
+        private global::BattleSystemECS.Content.Contracts.IDodgeResolver _enemyStrafeSystem; // 闪避结算
+        private global::BattleSystemECS.Content.Contracts.IDesperationView _desperationSystem; // 背水加成视图
         // Round 143 Direction 1 — Tower-vs-Enemy type effectiveness matrix.
         // Optional injection; null disables the feature (multiplier = 1.0).
         // Lookups are O(1) Dictionary<string,float> with composite "<int>|<string>" key.
@@ -51,14 +50,14 @@ namespace BattleSystemECS.Systems
         private float _posFlankCos;      // cos((Backstab+Flank)/2)：dot 大于它且未达背刺阈值 → 侧袭带
         private float _posBackstabMult;
         private float _posFlankMult;
-        // Cached desperation bonuses (updated each SetTurn from DesperationSystem)
+        // 每次 SetTurn 从 IDesperationView 刷新背水加成缓存。
         private float _desperationDmgBonus = 0f;
         private float _desperationSpeedBonus = 0f;
         // Round 128 Direction 5 — Fire Trail System. Optional injection; null when
         // not wired (in which case Firewall hits just apply their normal DoT and
         // do not leave a burning patch). Calling SpawnTrail with a null reference
         // is a no-op, so the hot path stays branch-free on the null case.
-        private FireTrailSystem _fireTrailSystem;
+        private global::BattleSystemECS.Content.Contracts.IFireTrailCommandPort _fireTrailSystem;
         private List<int> _activeEnemyList;
 
         // GC elimination: per-tower reusable candidate arrays (zero-allocation — no List.Clear() version bump)
@@ -97,20 +96,20 @@ namespace BattleSystemECS.Systems
         private int _thornsQueueIdx = 0;
 
         // Cached player armor stats (updated each SetTurn)
-        private float _armorPenetration = 0f;  // from TechTreeSystem
-        private float _damageTakenMult = 1f;   // from TechTreeSystem
+        private float _armorPenetration = 0f;  // 来自 ICombatTuningView
+        private float _damageTakenMult = 1f;   // 来自 ICombatTuningView
 
-        // Cached enemy CC resistance stats (updated each SetTurn — from TechTreeSystem getters)
+        // 每次 SetTurn 从 ICombatTuningView 刷新敌人控制抗性缓存。
         private float _enemyStunResistance = 0f;  // from techTreeSystem.GetStunResistance()
         private float _enemySlowResistance = 0f;    // from techTreeSystem.GetSlowResistance()
 
         // Cached wave-based difficulty multiplier (updated each SetTurn)
         private float _waveDifficultyMult = 1f;
 
-        // Cached crit bonuses from TechTreeSystem (updated each SetTurn)
+        // 每次 SetTurn 从 ICombatTuningView 刷新暴击加成。
         private float _critRateBonus = 0f;      // from techTreeSystem.GetCritRateBonus()
         private float _critDamageBonus = 1f;     // from techTreeSystem.GetCritDamageMult()
-        // Cached armor shred per stack from TechTreeSystem (flat armor reduction per stack)
+        // ICombatTuningView 提供每层固定护甲削减值。
         private float _armorShredPerStack = 0f;
 
         // Map width minus one (used for knockback bound clamping)
@@ -126,11 +125,11 @@ namespace BattleSystemECS.Systems
         private List<(int chainId, int enemyId, float damage, int playerId, int towerId)>[] _chainDamageQueue = new List<(int, int, float, int, int)>[2];
         private int _chainDamageQueueIdx = 0;
 
-        // Cached weather multipliers (updated each SetTurn from WeatherSystem)
+        // 每次 SetTurn 从 ITowerEnvironmentView 刷新天气倍率。
         private float _weatherRangeMult = 1f;
         private float _weatherDamageMult = 1f;
 
-        // Cached day/night cycle multipliers (updated each SetTurn from DayNightSystem)
+        // 每次 SetTurn 从 ITowerRangeModifierView 刷新昼夜倍率。
         private float _dayNightRangeMult = 1f;
 
         // Ping-pong double-buffer for splash damage events (from upgrade special abilities)
@@ -144,7 +143,7 @@ namespace BattleSystemECS.Systems
         private List<(int bounceLevel, int enemyId, float damage, int playerId, int towerId)>[] _bounceDamageQueue = new List<(int, int, float, int, int)>[2];
         private int _bounceDamageQueueIdx = 0;
 
-        // Fragment projectile events: collected parallel, fired serial via ProjectileSystem
+        // 碎片弹道在并行段收集，随后通过 IProjectileCommandPort 串行发射。
         // Tuple: (enemyId, damage, playerId, towerId, fragCount, fragRange)
         private List<(int enemyId, float damage, int playerId, int towerId, int fragCount, float fragRange)>[] _fragmentQueue = new List<(int, float, int, int, int, float)>[2];
         private int _fragmentQueueIdx = 0;
@@ -152,7 +151,7 @@ namespace BattleSystemECS.Systems
         private sealed class TowerCollectBuffer
         {
             public readonly List<(int enemyId,float damage,int playerId,int towerId)> Damage = new List<(int,float,int,int)>(48);
-            public readonly List<EnemyStrafeSystem.DodgeFact> Dodge = new List<EnemyStrafeSystem.DodgeFact>(4);
+            public readonly List<DodgeFact> Dodge = new List<DodgeFact>(4);
             public readonly List<(int enemyId,int towerId)> Debuff = new List<(int,int)>(8);
             public readonly List<(int enemyId,int towerId,float armorShred,int invulnFrames)> OnHit = new List<(int,int,float,int)>(4);
             public readonly List<(int playerId,float healAmount)> Heal = new List<(int,float)>(2);
@@ -226,13 +225,13 @@ namespace BattleSystemECS.Systems
         private const float HEALING_REDUCTION_AMOUNT = 0.30f;
         private const float HEALING_REDUCTION_DURATION = 2f;
 
-        public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem = null, int mapWidth = 10)
+        public TowerAttackSystem(ComponentStore store, IRenderer logger, global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem = null, int mapWidth = 10)
             : this(store, logger, techTreeSystem, mapWidth, null)
         {
         }
 
         // Round 67: IBattleEventBus optional injection for On-Hit / On-Crit publication.
-        public TowerAttackSystem(ComponentStore store, IRenderer logger, TechTreeSystem techTreeSystem, int mapWidth, EventBus eventBus, IBattleEventBus battleEventBus = null)
+        public TowerAttackSystem(ComponentStore store, IRenderer logger, global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem, int mapWidth, EventBus eventBus, IBattleEventBus battleEventBus = null)
         {
             this.store = store;
             this.logger = logger;
@@ -261,44 +260,33 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Inject EnemyStrafeSystem for event-driven dodge checks.
+        /// 注入闪避结算端口。
         /// </summary>
-        public void SetEnemyStrafeSystem(EnemyStrafeSystem enemyStrafeSystem)
+        public void SetEnemyStrafeSystem(global::BattleSystemECS.Content.Contracts.IDodgeResolver enemyStrafeSystem)
         {
             _enemyStrafeSystem = enemyStrafeSystem;
         }
 
         /// <summary>
-        /// Inject BuffSystem reference for Leech lifesteal healing and Firewall DoT effects.
+        /// 注入吸血治疗与防火墙周期效果命令端口。
         /// </summary>
-        public void SetBuffSystem(BuffSystem buffSystem)
+        public void SetBuffSystem(global::BattleSystemECS.Content.Contracts.IEffectCommandPort buffSystem)
         {
             this.buffSystem = buffSystem;
         }
 
         /// <summary>
-        /// Inject BleedSystem reference for bleed application on tower hits.
+        /// 注入流血命令端口。
         /// </summary>
-        public void SetBleedSystem(BleedSystem bleedSystem)
+        public void SetBleedSystem(global::BattleSystemECS.Content.Contracts.IBleedCommandPort bleedSystem)
         {
             this.bleedSystem = bleedSystem;
         }
 
         /// <summary>
-        /// Round 200 Direction 5 — Inject DeathMarkSystem reference for stacking execute counter
-        /// on tower hits. Late-bound like BleedSystem (no-op when null, which is the default for
-        /// pre-existing test harnesses).
+        /// 注入低血量处决判定；未接线时跳过处决。
         /// </summary>
-        public void SetDeathMarkSystem(DeathMarkSystem deathMarkSystem)
-        {
-            this.deathMarkSystem = deathMarkSystem;
-        }
-
-        /// <summary>
-        /// Round 206 Direction 1 — Inject CullingSystem reference for HP-threshold instant
-        /// execute. Late-bound; null = culling subsystem not wired (TryCull is a no-op).
-        /// </summary>
-        public void SetCullingSystem(CullingSystem cullingSystem)
+        public void SetCullingSystem(global::BattleSystemECS.Content.Contracts.ICullingPass cullingSystem)
         {
             this.cullingSystem = cullingSystem;
         }
@@ -385,95 +373,75 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Inject TowerExperienceSystem reference for XP grant on kills.
+        /// 注入碎片弹道命令端口。
         /// </summary>
-        public void SetTowerExperienceSystem(TowerExperienceSystem system)
-        {
-            this.towerExperienceSystem = system;
-        }
-
-        /// <summary>
-        /// Inject ProjectileSystem reference for fragment (split) projectile spawning.
-        /// </summary>
-        public void SetProjectileSystem(ProjectileSystem projectileSystem)
+        public void SetProjectileSystem(global::BattleSystemECS.Content.Contracts.IProjectileCommandPort projectileSystem)
         {
             this.projectileSystem = projectileSystem;
         }
 
         /// <summary>
-        /// Inject WeatherSystem reference for dynamic weather effects on tower range and damage.
+        /// 注入天气对塔射程和伤害的修饰视图。
         /// </summary>
-        public void SetWeatherSystem(WeatherSystem weather)
+        public void SetWeatherSystem(global::BattleSystemECS.Content.Contracts.ITowerEnvironmentView weather)
         {
             _weatherSystem = weather;
         }
 
         /// <summary>
-        /// Inject DayNightSystem reference for day/night cycle effects on tower range.
+        /// 注入昼夜对塔射程的修饰视图。
         /// </summary>
-        public void SetDayNightSystem(DayNightSystem dayNight)
+        public void SetDayNightSystem(global::BattleSystemECS.Content.Contracts.ITowerRangeModifierView dayNight)
         {
             _dayNightSystem = dayNight;
         }
 
         /// <summary>
-        /// Inject HeatSystem reference for heat/overheat effects on tower attacks.
+        /// 注入塔热量命令端口。
         /// </summary>
-        public void SetHeatSystem(HeatSystem heatSystem)
+        public void SetHeatSystem(global::BattleSystemECS.Content.Contracts.ITowerHeatPort heatSystem)
         {
             _heatSystem = heatSystem;
         }
 
         /// <summary>
-        /// Inject DesperationSystem reference for last stand damage/speed bonuses.
+        /// 注入背水伤害与攻速加成视图。
         /// </summary>
-        public void SetDesperationSystem(DesperationSystem desperationSystem)
+        public void SetDesperationSystem(global::BattleSystemECS.Content.Contracts.IDesperationView desperationSystem)
         {
             _desperationSystem = desperationSystem;
         }
 
         /// <summary>
-        /// Round 128 Direction 5 — inject FireTrailSystem so the Firewall hit path
-        /// can leave a brief burning patch at the enemy position. May be null
-        /// (no-op in that case — the Firewall DoT still applies normally).
+        /// 注入火焰轨迹命令端口；未接线时仍保留防火墙周期伤害。
         /// </summary>
-        public void SetFireTrailSystem(FireTrailSystem fireTrailSystem)
+        public void SetFireTrailSystem(global::BattleSystemECS.Content.Contracts.IFireTrailCommandPort fireTrailSystem)
         {
             _fireTrailSystem = fireTrailSystem;
         }
 
         /// <summary>
-        /// Inject TowerEnergySystem reference for energy consumption effects on tower attacks.
+        /// 注入塔能量命令端口。
         /// </summary>
-        public void SetEnergySystem(TowerEnergySystem energySystem)
+        public void SetEnergySystem(global::BattleSystemECS.Content.Contracts.ITowerEnergyPort energySystem)
         {
             _energySystem = energySystem;
         }
 
         /// <summary>
-        /// Inject HitShieldSystem reference for N-hit shield blocking.
+        /// 注入次数盾结算端口。
         /// </summary>
-        public void SetHitShieldSystem(HitShieldSystem hitShieldSystem)
+        public void SetHitShieldSystem(global::BattleSystemECS.Content.Contracts.IHitShieldResolver hitShieldSystem)
         {
             _hitShieldSystem = hitShieldSystem;
         }
 
-        private TowerStealthSystem _towerStealthSystem;
+        private global::BattleSystemECS.Content.Contracts.ILinkDamageResolver _lifeLinkSystem;
 
         /// <summary>
-        /// Inject TowerStealthSystem reference for stealth targeting filters and decloak-on-fire.
+        /// 注入 ILinkDamageResolver，用于计算伤害分摊链接。
         /// </summary>
-        public void SetTowerStealthSystem(TowerStealthSystem towerStealthSystem)
-        {
-            _towerStealthSystem = towerStealthSystem;
-        }
-
-        private EnemyLifeLinkSystem _lifeLinkSystem;
-
-        /// <summary>
-        /// Inject EnemyLifeLinkSystem reference for damage-sharing link computation.
-        /// </summary>
-        public void SetLifeLinkSystem(EnemyLifeLinkSystem lifeLinkSystem)
+        public void SetLifeLinkSystem(global::BattleSystemECS.Content.Contracts.ILinkDamageResolver lifeLinkSystem)
         {
             _lifeLinkSystem = lifeLinkSystem;
         }
@@ -518,7 +486,7 @@ namespace BattleSystemECS.Systems
             // Cache wave-based difficulty multiplier (default wave 1)
             _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(1) : 1f;
 
-            // Cache desperation bonuses from DesperationSystem
+            // 从 IDesperationView 缓存背水加成。
             if (_desperationSystem != null)
             {
                 _desperationDmgBonus = _desperationSystem.DamageBonus;
@@ -726,9 +694,6 @@ namespace BattleSystemECS.Systems
 
                 // Overheat check: skip if tower is overheated (cannot fire)
                 if (_heatSystem != null && _heatSystem.IsOverheated(towerId)) return;
-
-                // Energy check: skip if tower doesn't have enough energy to fire
-                if (_energySystem != null && !_energySystem.HasEnergy(towerId)) return;
 
                 float tx = store.PositionX[towerId];
                 float ty = store.PositionY[towerId];
@@ -981,6 +946,9 @@ namespace BattleSystemECS.Systems
                         return;
                     }
 
+                    // 所有只读拒绝完成后，原子验证并消费本次射击能量。
+                    if (_energySystem != null && !_energySystem.TryConsumeEnergy(towerId)) return;
+
                     store.TowerLastAttackTime[towerId] = 0f;
 
                     // Burst fire: increment shot counter — resets to 0 in the burst cooldown check above
@@ -1005,12 +973,6 @@ namespace BattleSystemECS.Systems
                     if (_heatSystem != null)
                     {
                         _heatSystem.AccumulateHeat(towerId);
-                    }
-
-                    // Consume energy for towers that require energy to fire
-                    if (_energySystem != null)
-                    {
-                        _energySystem.ConsumeEnergy(towerId);
                     }
 
                     float baseDmg = store.GetTowerAttackDamage(towerId);
@@ -2125,7 +2087,7 @@ namespace BattleSystemECS.Systems
                 switch (towerType)
                 {
                     case TowerType.Firewall:
-                        // Firewall: apply burn DoT (continuous damage over time via BuffSystem)
+                        // 防火墙：通过 IEffectCommandPort 应用燃烧周期伤害。
                         if (buffSystem != null && slowAmount > 0f && slowDuration > 0f)
                         {
                             int actualDuration = (int)Math.Max(1, slowDuration * (1f - _enemySlowResistance));
@@ -2196,12 +2158,12 @@ namespace BattleSystemECS.Systems
 
             // Phase 3c.5 (serial): apply culling kills (Round 206 Direction 1)
             // After all damage has been applied this frame, walk each active enemy and check
-            // whether any TowerIsCullingTower can cull it. CullingSystem.TryCull handles the
+            // 是否存在可执行处决的塔；ICullingPass.TryCull 负责处理
             // threshold/damage gates and fires OnCullingKilled. Per-frame cost is O(active
             // enemies) and is sentinel-gated (no-op when no culling tower is on the field).
             if (cullingSystem != null)
             {
-                cullingSystem.ScanAndCull(this);
+                cullingSystem.ScanAndCull();
             }
 
             // Phase 3d (serial): resolve tower knockback — push enemies backward
@@ -2359,7 +2321,7 @@ namespace BattleSystemECS.Systems
         /// <summary>
         /// Apply life link shared damage to a linked enemy.
         /// The linked enemy takes full damage (no further splitting — links are not recursive).
-        /// Break penalties are handled by EnemyLifeLinkSystem.ResolveBreakPenalties() post death.
+        /// 断链惩罚在死亡后由 ILinkDamageResolver.ResolveBreakPenalties() 处理。
         /// </summary>
         private void ApplyLinkedDamage(int linkedEnemyId, float linkedDamage, int playerId)
         {

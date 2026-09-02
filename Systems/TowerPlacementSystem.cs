@@ -16,7 +16,7 @@ namespace BattleSystemECS.Systems
         private GameConfig gameConfig;
         // Round 145 Direction 3 — Per-Tower Modifier Pool reference. Optional injection;
         // when null, PlaceTower() skips the modifier roll and towers keep ModifierId=-1.
-        private TowerModifierSystem towerModifierSystem;
+        private global::BattleSystemECS.Content.Contracts.ITowerModifierRoller towerModifierSystem;
         private IBattleEventBus _eventBus;
 
         // Sell ratio: fraction of upgrade cost refunded (0.5 = 50%)
@@ -162,7 +162,7 @@ namespace BattleSystemECS.Systems
         /// before PlaceTower() is invoked by gameplay. Optional — if never called, towers spawn
         /// with TowerModifierId=-1 (the sentinel no-op default).
         /// </summary>
-        public void SetTowerModifierSystem(TowerModifierSystem modifierSystem) => towerModifierSystem = modifierSystem;
+        public void SetTowerModifierSystem(global::BattleSystemECS.Content.Contracts.ITowerModifierRoller modifierSystem) => towerModifierSystem = modifierSystem;
 
         /// <summary>
         /// Calculate the effective sell ratio for a given tower level.

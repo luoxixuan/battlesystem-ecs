@@ -15,7 +15,7 @@ namespace BattleSystemECS.Systems
     /// 
     /// Two-phase pattern: collect bleed damage in parallel, apply in serial.
     /// </summary>
-    public class BleedSystem
+    public class BleedSystem : global::BattleSystemECS.Content.Contracts.IBleedCommandPort
     {
         private ComponentStore store;
         private int playerId;

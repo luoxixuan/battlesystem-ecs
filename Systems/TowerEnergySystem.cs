@@ -18,7 +18,7 @@ namespace BattleSystemECS.Systems
     /// TowerAttackSystem reads the energy check directly in its hot path
     /// (zero additional per-attack overhead when energy is sufficient).
     /// </summary>
-    public class TowerEnergySystem
+    public class TowerEnergySystem : global::BattleSystemECS.Content.Contracts.ITowerEnergyPort
     {
         private ComponentStore store;
         private int _turn = 0;
@@ -39,6 +39,11 @@ namespace BattleSystemECS.Systems
         /// Returns true if energy was sufficient and consumption occurred.
         /// </summary>
         public bool ConsumeEnergy(int towerId)
+        {
+            return TryConsumeEnergy(towerId);
+        }
+
+        public bool TryConsumeEnergy(int towerId)
         {
             if (!store.TowerActive[towerId]) return false;
             

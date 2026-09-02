@@ -33,7 +33,7 @@ namespace BattleSystemECS.Systems
     ///   // During wave:
     ///   ascension.ApplyEnemyScaling(enemyId);          // apply per-enemy HP/speed scaling
     /// </summary>
-    public class AscensionSystem
+    public class AscensionSystem : global::BattleSystemECS.Content.Contracts.IAscensionDecorator
     {
         private readonly ComponentStore store;
         private readonly IRenderer renderer;

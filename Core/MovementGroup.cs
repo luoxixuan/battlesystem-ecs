@@ -187,7 +187,7 @@ namespace BattleSystemECS.Systems
 namespace BattleSystemECS.Core
 {
     /// <summary>Enemy movement, pathfinding, wound, path modifiers, healer, summons, steal gold, pull, path blocks, deployable traps.</summary>
-    public class MovementGroup : ISystemGroup
+    internal sealed class MovementGroup : ISystemGroup
     {
         public Systems.EnemyWoundSystem? Wound { get; set; }
         public Systems.PathfindingSystem? Pathfinding { get; set; }
@@ -200,6 +200,20 @@ namespace BattleSystemECS.Core
         public Systems.PathBlockSystem? PathBlock { get; set; }
         // 可部署陷阱由 composition 显式注册；缺失即按禁用处理。
         public Systems.DeployableTrapSystem? DeployableTrap { get; set; }
+
+        internal void RegisterFrameBindings(FrameScheduler scheduler)
+        {
+            if (Wound != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.wound.prepare"), c => Wound?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.wound.update"), c => Wound?.Update()); }
+            if (Pathfinding != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.pathfinding.prepare"), c => Pathfinding?.SetTurn(c.Turn));
+            if (EnemyMovement != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.enemy.prepare"), c => EnemyMovement?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.enemy.update"), c => EnemyMovement?.Update()); }
+            if (PathBlock != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.path-block.update"), c => PathBlock?.Update());
+            if (DeployableTrap != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.deployable-trap.update"), c => DeployableTrap?.Update());
+            if (PathModifier != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.path-modifier.prepare"), c => PathModifier?.SetTurn()); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.path-modifier.update"), c => PathModifier?.Update(c.Delta)); }
+            if (Pull != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.pull.prepare"), c => Pull?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.pull.update"), c => Pull?.Update(c.Delta)); }
+            if (EnemyHealer != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.enemy-healer.prepare"), c => EnemyHealer?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.enemy-healer.update"), c => EnemyHealer?.Update(c.Delta)); }
+            if (StealGold != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.steal-gold.update"), c => StealGold?.Update());
+            if (Summon != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.summon.prepare"), c => Summon?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.summon.update"), c => Summon?.Update(c.Delta)); }
+        }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {

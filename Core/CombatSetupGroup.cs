@@ -2,7 +2,7 @@
 namespace BattleSystemECS.Core
 {
     /// <summary>Pre-combat SetTurn calls for all combat systems.</summary>
-    public class CombatSetupGroup : ISystemGroup
+    internal sealed class CombatSetupGroup : ISystemGroup
     {
         public Systems.PlayerTowerAttackSystem? PlayerTowerAttack { get; set; }
         public Systems.HeroSystem? Hero { get; set; }
@@ -28,6 +28,30 @@ namespace BattleSystemECS.Core
         public Systems.TerrainZoneSystem? TerrainZone { get; set; }
         public Systems.WanderRoamSystem? WanderRoam { get; set; }
         public Systems.TauntSystem? Taunt { get; set; }
+
+        internal void RegisterFrameBindings(FrameScheduler scheduler)
+        {
+            if (PlayerTowerAttack != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.player-attack.prepare"), c => PlayerTowerAttack?.SetTurn(c.Turn));
+            if (Hero != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.hero.prepare"), c => Hero?.SetTurn(c.Turn));
+            if (TowerAttack != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.tower-attack.prepare"), c => TowerAttack?.SetTurn(c.Turn));
+            if (TowerOvercharge != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.overcharge.prepare"), c => TowerOvercharge?.SetTurn(c.Turn));
+            if (Heat != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.heat.prepare"), c => Heat?.SetTurn(c.Turn));
+            if (TowerSynergy != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.synergy.prepare"), c => TowerSynergy?.SetTurn());
+            if (TowerFortress != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.fortress.prepare"), c => TowerFortress?.SetTurn());
+            if (TowerLink != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.link.prepare"), c => TowerLink?.SetTurn());
+            if (Skill != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.skill.prepare"), c => Skill?.SetTurn(c.Turn));
+            if (AuraTower != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.aura.prepare"), c => AuraTower?.SetTurn());
+            if (Curse != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.curse.prepare"), c => Curse?.SetTurn());
+            if (PullTower != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.pull-tower.prepare"), c => PullTower?.SetTurn());
+            if (Mana != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.mana.prepare"), c => Mana?.SetTurn());
+            if (GlobalSkill != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.global-skill.prepare"), c => GlobalSkill?.SetTurn(c.Turn));
+            if (HitShield != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.hit-shield.prepare"), c => HitShield?.SetTurn(c.Turn));
+            if (HotZone != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.hot-zone.prepare"), c => HotZone?.SetTurn(c.Turn));
+            if (FrostZone != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.frost-zone.prepare"), c => FrostZone?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.frost-zone.update"), c => FrostZone?.Update()); }
+            if (TerrainZone != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.terrain-zone.prepare"), c => TerrainZone?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.terrain-zone.update"), c => TerrainZone?.Update(c.Delta)); }
+            if (WanderRoam != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.wander.prepare"), c => WanderRoam?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.wander.update"), c => WanderRoam?.Update()); }
+            if (Taunt != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.taunt.prepare"), c => Taunt?.SetTurn());
+        }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {

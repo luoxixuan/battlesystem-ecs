@@ -35,11 +35,6 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore store;
         private readonly GameConfig gameConfig;
-        private WaveSpawningSystem _waveSpawning;
-
-        // Idempotency guard against WireDependencies re-init / test reset
-        // paths stacking duplicate OnWaveStart/OnWaveComplete handlers.
-        private bool _waveSubscribed;
 
         public CrestSystem(ComponentStore store, GameConfig gameConfig)
         {
@@ -53,27 +48,6 @@ namespace BattleSystemECS.Systems
         /// ever fire (sentinel "no spawner wired yet"). Called from
         /// SystemRegistry.WireDependencies().
         /// </summary>
-        public void SetWaveSpawningSystem(WaveSpawningSystem waveSpawning)
-        {
-            _waveSpawning = waveSpawning;
-        }
-
-        /// <summary>
-        /// Subscribe to WaveSpawningSystem OnWaveStart / OnWaveComplete.
-        /// Called once by SystemRegistry.WireDependencies(). Idempotent:
-        /// re-call is a no-op so the reset-test path doesn't stack duplicate
-        /// handlers. Requires SetWaveSpawningSystem to have been called
-        /// first so we have a spawner reference.
-        /// </summary>
-        public void SubscribeToWaveEvents()
-        {
-            if (_waveSubscribed) return;
-            if (_waveSpawning == null) return;
-            _waveSubscribed = true;
-            _waveSpawning.OnWaveStart += HandleWaveStart;
-            _waveSpawning.OnWaveComplete += HandleWaveComplete;
-        }
-
         // ── Event handlers ────────────────────────────────────────────
 
         /// <summary>
@@ -92,13 +66,11 @@ namespace BattleSystemECS.Systems
         /// CrestOfFury + CrestOfBounty co-fire = +20% enemy damage AND
         /// +50% player gold).
         /// </summary>
-        private void HandleWaveStart()
+        public void HandleWaveStart(int wave)
         {
             var cfg = gameConfig.Crest;
             if (cfg == null || !cfg.Enabled) return;
             if (cfg.Crests == null || cfg.Crests.Length == 0) return;
-            if (_waveSpawning == null) return;
-            int wave = _waveSpawning.GetCurrentWave();
             if (wave <= 0) return;
 
             bool anyEnemyDmg = false;
@@ -189,7 +161,7 @@ namespace BattleSystemECS.Systems
         /// is the cleanup path that prevents a stale crest from leaking
         /// into the next wave.
         /// </summary>
-        private void HandleWaveComplete()
+        public void HandleWaveComplete()
         {
             // No "isEnabled" gate here: the cleanup is cheap (O(activeEnemies
             // + MAX_PLAYERS)) and runs even when the system is disabled

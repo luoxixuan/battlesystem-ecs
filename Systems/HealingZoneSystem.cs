@@ -24,7 +24,7 @@ namespace BattleSystemECS.Systems
     ///   - CorpseEffect type 4 is reused: existing CorpseEffectSystem skips it (not DoT)
     ///   - Max healing zones = MAX_CORPSE_EFFECTS (2000) — shared pool with corpse effects
     /// </summary>
-    public class HealingZoneSystem
+    public class HealingZoneSystem : global::BattleSystemECS.Content.Contracts.IHealingZoneCommandPort
     {
         private readonly ComponentStore _store;
         private readonly IRenderer? _logger;

@@ -23,7 +23,7 @@ namespace BattleSystemECS.Systems
     /// 
     /// Execution: CombatGroup, before TowerAttack. Also called after tower attacks for decloak-on-fire.
     /// </summary>
-    public class TowerStealthSystem
+    public class TowerStealthSystem : global::BattleSystemECS.Content.Contracts.ITowerTargetingView
     {
         private readonly ComponentStore store;
         private readonly int playerId;

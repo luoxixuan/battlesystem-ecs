@@ -4,6 +4,145 @@ using System.Collections.Generic;
 
 namespace BattleSystemECS.Core
 {
+    internal static class FrameRegistrationContractCatalog
+    {
+        internal const string DisabledOwnerToken = "registration.disabled-frame-slot";
+
+        internal static FrameBindingRegistration Require(string nodeId, FramePhaseMask phase,
+            FrameExecutionSemantics executionPolicy)
+        {
+            FrameBindingRegistration? found = null;
+            foreach (var entry in SystemRegistrationManifest.Entries)
+            {
+                foreach (var binding in entry.FrameBindings)
+                {
+                    if (!string.Equals(binding.NodeId, nodeId, StringComparison.Ordinal)) continue;
+                    if (found.HasValue)
+                        throw new FrameGraphValidationException("Duplicate manifest frame binding: " + nodeId);
+                    found = binding;
+                }
+            }
+            if (!found.HasValue)
+                throw new FrameGraphValidationException("Production frame node has no manifest binding: " + nodeId);
+            FrameBindingRegistration contract = found.Value;
+            if (contract.Phase != phase)
+                throw new FrameGraphValidationException($"Frame binding phase mismatch for '{nodeId}': manifest={contract.Phase}, graph={phase}.");
+            if (contract.ExecutionPolicy != executionPolicy)
+                throw new FrameGraphValidationException($"Frame binding execution policy mismatch for '{nodeId}': manifest={contract.ExecutionPolicy}, graph={executionPolicy}.");
+            return contract;
+        }
+
+        internal static string OwnerToken(FrameBindingRegistration contract)
+        {
+            foreach (var entry in SystemRegistrationManifest.Entries)
+                if (string.Equals(entry.Id, contract.RegistrationId, StringComparison.Ordinal))
+                {
+                    if (entry.IsDisabled)
+                        throw new FrameGraphValidationException("Frame binding owner is disabled: " + contract.RegistrationId);
+                    return entry.OwnerToken;
+                }
+            throw new FrameGraphValidationException("Frame binding has unknown owner: " + contract.RegistrationId);
+        }
+
+        internal static void ValidateProductionGraph(FrameGraph graph, FrameScheduler scheduler)
+            => ValidateContractSet(SystemRegistrationManifest.Entries, graph.Nodes,
+                graph.AvailableDependencies, scheduler.IsRegistrationBindingComplete, scheduler.RuntimeFrameDeclarations);
+
+        internal static void ValidateContractSet(IReadOnlyList<SystemRegistrationEntry> entries,
+            IReadOnlyList<FrameNodeAdapter> nodes, IReadOnlyList<string> availableDependencies,
+            Func<string, bool> isBindingComplete,
+            IReadOnlyDictionary<string, FrameNodeRuntimeDeclaration>? runtimeDeclarations = null)
+        {
+            var actual = new Dictionary<string, FrameNodeAdapter>(StringComparer.Ordinal);
+            foreach (var node in nodes)
+            {
+                if (!actual.TryAdd(node.Metadata.Id.Value, node))
+                    throw new FrameGraphValidationException("Duplicate production frame node: " + node.Metadata.Id.Value);
+            }
+
+            var expected = new Dictionary<string, FrameBindingRegistration>(StringComparer.Ordinal);
+            foreach (var entry in entries)
+            {
+                if (entry.IsDisabled && entry.FrameBindings.Length != 0)
+                    throw new FrameGraphValidationException("Disabled manifest owner declares frame bindings: " + entry.Id);
+                foreach (var binding in entry.FrameBindings)
+                {
+                    if (!entry.Enabled)
+                        throw new FrameGraphValidationException("Frame binding owner is disabled: " + entry.Id);
+                    if (!string.Equals(binding.RegistrationId, entry.Id, StringComparison.Ordinal))
+                        throw new FrameGraphValidationException($"Frame binding '{binding.NodeId}' owner mismatch: entry={entry.Id}, binding={binding.RegistrationId}.");
+                    if (!expected.TryAdd(binding.NodeId, binding))
+                        throw new FrameGraphValidationException("Duplicate manifest frame binding: " + binding.NodeId);
+                    if (!isBindingComplete(entry.Id))
+                        throw new FrameGraphValidationException($"Frame binding '{binding.NodeId}' owner binder did not execute: {entry.Id}.");
+                }
+            }
+
+            foreach (var pair in actual)
+            {
+                if (!expected.TryGetValue(pair.Key, out FrameBindingRegistration binding))
+                    throw new FrameGraphValidationException("Orphan production frame node: " + pair.Key);
+                FrameNodeMetadata metadata = pair.Value.Metadata;
+                if (runtimeDeclarations != null)
+                {
+                    if (!runtimeDeclarations.TryGetValue(pair.Key, out var declaration))
+                        throw new FrameGraphValidationException("Production frame node has no runtime declaration: " + pair.Key);
+                    if (!string.Equals(declaration.RegistrationId, binding.RegistrationId, StringComparison.Ordinal) ||
+                        declaration.Phase != binding.Phase || declaration.ExecutionPolicy != binding.ExecutionPolicy ||
+                        !SequenceEqual(declaration.RequiredTokens, binding.RequiredTokens))
+                        throw new FrameGraphValidationException("Runtime frame node declaration drift: " + pair.Key);
+                }
+                string owner = OwnerToken(entries, binding);
+                if (!string.Equals(metadata.AccessProfile.Owner.Value, owner, StringComparison.Ordinal))
+                    throw new FrameGraphValidationException($"Frame binding owner mismatch for '{pair.Key}': manifest={owner}, graph={metadata.AccessProfile.Owner.Value}.");
+                if (metadata.ActivePhases != binding.Phase)
+                    throw new FrameGraphValidationException($"Frame binding phase mismatch for '{pair.Key}': manifest={binding.Phase}, graph={metadata.ActivePhases}.");
+                if (metadata.ExecutionSemantics != binding.ExecutionPolicy)
+                    throw new FrameGraphValidationException($"Frame binding execution policy mismatch for '{pair.Key}': manifest={binding.ExecutionPolicy}, graph={metadata.ExecutionSemantics}.");
+                if (!SequenceEqual(metadata.RequiredDependencies, binding.RequiredTokens))
+                    throw new FrameGraphValidationException("Frame binding required-token mismatch: " + pair.Key);
+                foreach (string token in binding.ProvidedTokens)
+                    if (!Contains(availableDependencies, token))
+                        throw new FrameGraphValidationException($"Frame binding '{pair.Key}' did not provide token '{token}'.");
+            }
+            foreach (string nodeId in expected.Keys)
+                if (!actual.ContainsKey(nodeId))
+                    throw new FrameGraphValidationException("Manifest frame binding has no real production node: " + nodeId);
+            if (runtimeDeclarations != null)
+                foreach (string nodeId in runtimeDeclarations.Keys)
+                    if (!expected.ContainsKey(nodeId))
+                        throw new FrameGraphValidationException("Orphan runtime frame node declaration: " + nodeId);
+        }
+
+        private static string OwnerToken(IReadOnlyList<SystemRegistrationEntry> entries,
+            FrameBindingRegistration contract)
+        {
+            foreach (var entry in entries)
+                if (string.Equals(entry.Id, contract.RegistrationId, StringComparison.Ordinal))
+                {
+                    if (entry.IsDisabled)
+                        throw new FrameGraphValidationException("Frame binding owner is disabled: " + contract.RegistrationId);
+                    return entry.OwnerToken;
+                }
+            throw new FrameGraphValidationException("Frame binding has unknown owner: " + contract.RegistrationId);
+        }
+
+        private static bool SequenceEqual(IReadOnlyList<string> left, string[] right)
+        {
+            if (left.Count != right.Length) return false;
+            for (int i = 0; i < right.Length; i++)
+                if (!string.Equals(left[i], right[i], StringComparison.Ordinal)) return false;
+            return true;
+        }
+
+        private static bool Contains(IReadOnlyList<string> values, string expected)
+        {
+            for (int i = 0; i < values.Count; i++)
+                if (string.Equals(values[i], expected, StringComparison.Ordinal)) return true;
+            return false;
+        }
+    }
+
     internal static class FrameAdapterBindingCatalog
     {
         private static readonly Dictionary<string, string> Semantics =

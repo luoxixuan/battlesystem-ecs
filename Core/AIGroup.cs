@@ -2,7 +2,7 @@
 namespace BattleSystemECS.Core
 {
     /// <summary>Enemy AI, abilities, burrow, necromancer, life link, affixes, mana burn, fear, zone control.</summary>
-    public class AIGroup : ISystemGroup
+    internal sealed class AIGroup : ISystemGroup
     {
         public Systems.EnemyAISystem? EnemyAI { get; set; }
         public Systems.EnemyAbilitySystem? EnemyAbility { get; set; }
@@ -21,6 +21,31 @@ namespace BattleSystemECS.Core
         // Round 186 Direction 2 — Sapper (engineer) enemies that attack the nearest
         // tower and apply a stackable attack-speed slow. Optional, lazy-initialized.
         public Systems.SapperSystem? Sapper { get; set; }
+
+        internal void RegisterFrameBindings(FrameScheduler scheduler)
+        {
+            if (ZoneControl != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.zone-control.update"), c => ZoneControl?.Update(c.Delta));
+            if (Magnetize != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.magnetize.update"), c => Magnetize?.Update(c.Delta));
+            if (EnemyStrafe != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.enemy-strafe.prepare"), c => EnemyStrafe?.SetTurn()); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.enemy-strafe.update"), c => EnemyStrafe?.Update()); }
+            if (EnemyAI != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.enemy.prepare"), c => EnemyAI?.SetTurn(c.Turn, c.Delta)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.enemy.update"), c => EnemyAI?.Update()); }
+            if (EnemyAbility != null)
+            {
+                scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.enemy-ability.prepare"), c => EnemyAbility?.SetTurn(c.Turn));
+                scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.enemy-ability.cooldowns"), c => EnemyAbility?.UpdateCooldowns(c.Delta));
+                scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.enemy-ability.execute"), c => EnemyAbility?.ExecuteAbilities());
+                scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.enemy-ability.cast-timers"), c => EnemyAbility?.TickCastTimers(c.Delta));
+                scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.enemy-ability.update"), c => EnemyAbility?.Update());
+            }
+            if (Burrow != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.burrow.prepare"), c => Burrow?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.burrow.update"), c => Burrow?.Update(c.Delta)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.burrow.apply"), c => Burrow?.ApplyBurrowEffects()); }
+            if (Necromancer != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.necromancer.prepare"), c => Necromancer?.SetTurn(c.Turn, c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.necromancer.update"), c => Necromancer?.Update(c.Delta)); }
+            if (LifeLink != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.life-link.prepare"), c => LifeLink?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.life-link.update"), c => LifeLink?.Update()); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.life-link.cooldowns"), c => LifeLink?.DecrementCooldowns(c.Delta)); }
+            if (EnemyAffix != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.enemy-affix.update"), c => EnemyAffix?.Update(c.Delta));
+            if (ManaBurn != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.mana-burn.prepare"), c => ManaBurn?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.mana-burn.update"), c => ManaBurn?.Update()); }
+            if (Lifesteal != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.lifesteal.prepare"), c => Lifesteal?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.lifesteal.update"), c => Lifesteal?.Update()); }
+            if (Phase != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.phase.prepare"), c => Phase?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.phase.update"), c => Phase?.Update(c.Delta)); }
+            if (Fear != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.fear.prepare"), c => Fear?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.fear.update"), c => Fear?.Update(c.Delta)); }
+            if (Sapper != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.sapper.prepare"), c => Sapper?.SetTurn(c.Turn, c.Delta)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.sapper.update"), c => Sapper?.Update(c.Delta)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.sapper.recompute"), c => Sapper?.RecomputeTowerSlows()); }
+        }
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {

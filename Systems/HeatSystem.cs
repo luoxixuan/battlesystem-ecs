@@ -19,7 +19,7 @@ namespace BattleSystemECS.Systems
     /// TowerAttackSystem reads the cached overheat flags directly in its hot path
     /// (zero additional per-attack overhead when not overheated).
     /// </summary>
-    public class HeatSystem
+    public class HeatSystem : global::BattleSystemECS.Content.Contracts.ITowerHeatPort
     {
         private ComponentStore store;
         private int _turn = 0;

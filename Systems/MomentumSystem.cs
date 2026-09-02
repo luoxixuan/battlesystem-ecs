@@ -54,7 +54,6 @@ namespace BattleSystemECS.Systems
         private bool _waveRunning;
         // Idempotency guard against WireDependencies re-init / test reset
         // paths stacking duplicate handlers.
-        private bool _waveSubscribed;
 
         public MomentumSystem(ComponentStore store, GameConfig gameConfig)
         {
@@ -68,24 +67,15 @@ namespace BattleSystemECS.Systems
         /// a no-op so the WireDependencies reset-test path doesn't stack
         /// duplicate handlers.
         /// </summary>
-        public void SubscribeToWaveEvents(WaveSpawningSystem waveSpawning)
-        {
-            if (_waveSubscribed) return;
-            if (waveSpawning == null) return;
-            _waveSubscribed = true;
-            waveSpawning.OnWaveStart += HandleWaveStart;
-            waveSpawning.OnWaveComplete += HandleWaveComplete;
-        }
-
         /// <summary>
         /// Public setter for the wave-running latch. Useful for tests that
         /// don't want to spin up a full WaveSpawningSystem. Production code
-        /// drives this via <see cref="SubscribeToWaveEvents"/>.
+        /// 通过 <see cref="SubscribeToWaveEvents"/> 驱动该流程。
         /// </summary>
         public void SetWaveRunning(bool running) => _waveRunning = running;
 
         // ── Event handlers ────────────────────────────────────────────
-        private void HandleWaveStart()
+        public void HandleWaveStart()
         {
             _waveRunning = true;
             var cfg = gameConfig.Momentum;
@@ -105,7 +95,7 @@ namespace BattleSystemECS.Systems
             }
         }
 
-        private void HandleWaveComplete()
+        public void HandleWaveComplete()
         {
             _waveRunning = false;
             // On wave end, the timer stops accumulating. We do NOT clear

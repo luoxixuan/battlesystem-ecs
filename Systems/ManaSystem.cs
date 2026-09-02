@@ -14,16 +14,16 @@ namespace BattleSystemECS.Systems
     /// - Different regen rates for BuildPhase (higher, for preparation) and WavePhase (normal).
     /// - ManaSystem.Update() is called every frame during BuildPhase and WavePhase.
     /// </summary>
-    public class ManaSystem
+    public class ManaSystem : global::BattleSystemECS.Content.Contracts.IResourcePort
     {
         private ComponentStore store;
         private IRenderer renderer;
         private GameConfig gameConfig;
-        private TechTreeSystem techTreeSystem;
+        private global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem;
         private readonly bool hasTechTreeSystem;
         private readonly int playerId;
 
-        public ManaSystem(ComponentStore store, IRenderer renderer, GameConfig gameConfig, int playerId, TechTreeSystem techTreeSystem = null)
+        public ManaSystem(ComponentStore store, IRenderer renderer, GameConfig gameConfig, int playerId, global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem = null)
         {
             this.store = store;
             this.renderer = renderer;
@@ -113,6 +113,11 @@ namespace BattleSystemECS.Systems
         /// Consume mana for casting a skill. Returns true if mana was successfully consumed.
         /// </summary>
         public bool ConsumeMana(float baseCost)
+        {
+            return TryConsumeMana(baseCost);
+        }
+
+        public bool TryConsumeMana(float baseCost)
         {
             if (baseCost <= 0f) return true;
             float costMult = store.PlayerManaCost[playerId];

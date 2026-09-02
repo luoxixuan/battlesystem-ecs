@@ -26,13 +26,14 @@ namespace BattleSystemECS.Core.GAS
         public bool LastEventPublicationFailed { get { return Volatile.Read(ref _eventPublicationFailed) != 0; } }
         private int _lastCommittedBoundary = (int)DamageCommitBoundary.GameplayResolve;
         private int _lastLegacyRejection;
-        private long _requestsValidated, _requestsFastPath, _factsPublished, _acceptedCount;
+        private long _requestsValidated, _requestsFastPath, _factsPublished, _acceptedCount, _legacyApplyCount;
         public DamageCommitBoundary LastCommittedBoundary => (DamageCommitBoundary)Volatile.Read(ref _lastCommittedBoundary);
         public DamageRejectionReason LastLegacyRejection => (DamageRejectionReason)Volatile.Read(ref _lastLegacyRejection);
         public long RequestsValidated => Interlocked.Read(ref _requestsValidated);
         public long RequestsFastPath => Interlocked.Read(ref _requestsFastPath);
         public long FactsPublished => Interlocked.Read(ref _factsPublished);
         public long AcceptedCount => Interlocked.Read(ref _acceptedCount);
+        public long LegacyApplyCount => Interlocked.Read(ref _legacyApplyCount);
         private long _rejectedCount, _unconsumedRequestCount;
         private int _requestOverflowCount;
         private readonly object _diagnosticsLock = new object();
@@ -220,6 +221,7 @@ namespace BattleSystemECS.Core.GAS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void ApplyLegacy(int targetId, float amount, ElementType element, int ownerPlayerId)
         {
+            Interlocked.Increment(ref _legacyApplyCount);
             Volatile.Write(ref _lastLegacyRejection, (int)DamageRejectionReason.None);
             if (ownerPlayerId < 0 || ownerPlayerId >= ComponentStore.MAX_PLAYERS) { Volatile.Write(ref _lastLegacyRejection, (int)DamageRejectionReason.InvalidOwner); return; }
             if (!ComponentStore.IsValidEntity(targetId) || !_store.EnemyActive[targetId] || _store.EnemyHealth[targetId] <= 0f || amount <= 0f) { Volatile.Write(ref _lastLegacyRejection, (int)DamageRejectionReason.TargetAlreadyDead); return; }

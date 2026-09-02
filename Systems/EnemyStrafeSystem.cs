@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BattleSystemECS.Core;
+using BattleSystemECS.Content.Contracts;
 
 namespace BattleSystemECS.Systems
 {
@@ -27,7 +28,7 @@ namespace BattleSystemECS.Systems
     ///
     /// Direction: 方向十 · 敌人偏移移动 (Enemy Strafing / Dodge Movement)
     /// </summary>
-    public class EnemyStrafeSystem
+    public class EnemyStrafeSystem : global::BattleSystemECS.Content.Contracts.IDodgeResolver
     {
         private readonly ComponentStore _store;
         private readonly IRenderer? _logger;
@@ -178,13 +179,5 @@ namespace BattleSystemECS.Systems
             }
         }
 
-        public readonly struct DodgeFact
-        {
-            public int EnemyId { get; }
-            public float Distance { get; }
-            public int Direction { get; }
-            public DodgeFact(int enemyId, float distance, int direction)
-            { EnemyId = enemyId; Distance = distance; Direction = direction; }
-        }
     }
 }

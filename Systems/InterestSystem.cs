@@ -16,7 +16,7 @@ namespace BattleSystemECS.Systems
     /// - InterestSystem.Update() is called during BuildPhase to pay interest on the
     ///   banked gold from the previous wave.
     /// </summary>
-    public class InterestSystem
+    public class InterestSystem : global::BattleSystemECS.Content.Contracts.IMerchantModifierPort
     {
         private ComponentStore store;
         private IRenderer renderer;

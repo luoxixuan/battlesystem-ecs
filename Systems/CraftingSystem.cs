@@ -1,6 +1,7 @@
 using System;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Content.Contracts;
 
 namespace BattleSystemECS.Systems
 {
@@ -8,8 +9,7 @@ namespace BattleSystemECS.Systems
     /// Round 199 Direction 6 — Crafting System.
     ///
     /// Consumes inventory items per a recipe (CraftingRecipeDef) and produces new
-    /// inventory items. The system is a thin layer over InventorySystem — it reuses
-    /// InventorySystem.AddItem() for output delivery and its own input-removal logic
+    /// 道具系统是 IInventoryCommandPort 的薄层封装；输出复用 AddItem()，输入移除由本系统处理。
     /// (the inventory has no direct "remove count" API, so crafting iterates slots
     /// and decrements one at a time).
     ///
@@ -32,11 +32,11 @@ namespace BattleSystemECS.Systems
     /// a stranded "all inputs consumed, no outputs delivered" state where the player
     /// could spam TryCraft to lose items. Failed delivery is logged via IRenderer.
     /// </summary>
-    public class CraftingSystem
+    public class CraftingSystem : global::BattleSystemECS.Content.Contracts.ICraftingService
     {
         private readonly ComponentStore store;
         private readonly GameConfig gameConfig;
-        private readonly InventorySystem inventory;
+        private readonly global::BattleSystemECS.Content.Contracts.IInventoryCommandPort inventory;
         private readonly IRenderer renderer;
         private readonly Random rng;
 
@@ -51,7 +51,7 @@ namespace BattleSystemECS.Systems
         public CraftingSystem(
             ComponentStore store,
             GameConfig gameConfig,
-            InventorySystem inventory,
+            global::BattleSystemECS.Content.Contracts.IInventoryCommandPort inventory,
             IRenderer renderer,
             int seed = 0)
         {
@@ -69,16 +69,6 @@ namespace BattleSystemECS.Systems
         /// Outcome of a single TryCraft call. The reason codes let callers (UI,
         /// quest systems) distinguish between "lucky" and "unlucky" failures.
         /// </summary>
-        public enum CraftingResult
-        {
-            Success = 0,           // inputs consumed, outputs delivered (rare bonus optional)
-            SuccessRareBonus = 1,  // inputs consumed, base outputs + bonus outputs delivered
-            Failure = 2,           // inputs consumed, partial refund returned, no outputs
-            MissingInputs = 3,     // inputs were short — no mutation happened
-            BadRecipe = 4,         // recipe id out of range — no mutation happened
-            FullInventory = 5,     // success rolled but AddItem refused (inventory full) — inputs were still consumed
-        }
-
         /// <summary>
         /// Attempt to craft using the given recipe id. See class doc for full semantics.
         /// Returns a CraftingResult describing the outcome. Always safe to call —
@@ -116,7 +106,7 @@ namespace BattleSystemECS.Systems
             }
 
             // Consume inputs first. Inputs are decremented slot-by-slot using the
-            // same flat-indexing scheme InventorySystem uses. We use a per-input
+            // 与 IInventoryCommandPort 使用相同的线性索引；每个输入项单独处理。
             // counter rather than removing slots wholesale so partial stacks survive
             // (e.g. 5 healing potions in 2 slots → 4 potions in 2 slots after crafting).
             ConsumeInputs(playerId, recipe);

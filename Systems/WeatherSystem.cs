@@ -21,7 +21,7 @@ namespace BattleSystemECS.Systems
     ///   - EnemyMovementSystem reads WeatherIntensity for speed penalty
     ///   - TowerAttackSystem reads WeatherIntensity for range/damage modifiers
     /// </summary>
-    public class WeatherSystem
+    public class WeatherSystem : global::BattleSystemECS.Content.Contracts.IEnemySpeedModifierView, global::BattleSystemECS.Content.Contracts.ITowerEnvironmentView
     {
         private readonly ComponentStore _store;
         private readonly GameConfig _gameConfig;

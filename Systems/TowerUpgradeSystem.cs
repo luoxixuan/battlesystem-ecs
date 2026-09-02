@@ -9,7 +9,7 @@ namespace BattleSystemECS.Systems
     /// Upgrade curves driven by GameConfig.TowerUpgradePaths. Special abilities (armor pierce,
     /// splash damage, critical strike, chain lightning, freeze AOE) applied from upgrade config.
     /// </summary>
-    public class TowerUpgradeSystem
+    public class TowerUpgradeSystem : global::BattleSystemECS.Content.Contracts.ITowerUpgradeService
     {
         private readonly ComponentStore store;
         private readonly IRenderer logger;

@@ -52,7 +52,6 @@ namespace BattleSystemECS.Systems
  private bool _wavePending;
  // Idempotency guard against WireDependencies re-init / test reset
  // paths stacking duplicate OnWaveStart/OnWaveComplete handlers.
- private bool _waveSubscribed;
  // Re-usable Random instance. Seeded once per system so a test can
  // pass a deterministic seed by setting SystemRandomSeed (test hook).
  public int SystemRandomSeed = Environment.TickCount;
@@ -66,34 +65,20 @@ namespace BattleSystemECS.Systems
  }
 
  /// <summary>
- /// Subscribe to WaveSpawning OnWaveStart / OnWaveComplete. Called
- /// once by SystemRegistry.WireDependencies(). Idempotent: re-call
- /// is a no-op so reset-test paths don't stack duplicate handlers.
- /// </summary>
- public void SubscribeToWaveEvents(WaveSpawningSystem waveSpawning)
- {
- if (_waveSubscribed) return;
- if (waveSpawning == null) return;
- _waveSubscribed = true;
- waveSpawning.OnWaveStart += HandleWaveStart;
- waveSpawning.OnWaveComplete += HandleWaveComplete;
- }
-
- /// <summary>
  /// Public setter for the wave-pending latch. Useful for tests that
  /// don't want to spin up a full WaveSpawningSystem. Production code
- /// drives this via <see cref="SubscribeToWaveEvents"/>.
+ /// 由 ProductionEvents 组合配方驱动该流程。
  /// </summary>
  public void SetWavePending(bool pending) => _wavePending = pending;
 
  // ── Event handlers ────────────────────────────────────────────
- private void HandleWaveStart()
+ public void HandleWaveStart()
  {
  _wavePending = false;
  ApplyToAllActiveTowers();
  }
 
- private void HandleWaveComplete()
+ public void HandleWaveComplete()
  {
  _wavePending = true;
  ClearWaveScoped();

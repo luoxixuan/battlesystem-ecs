@@ -15,7 +15,7 @@ namespace BattleSystemECS.Systems
     /// - 攻击逻辑：索敌 → 移动 → 攻击，两阶段并行安全模式
     /// - 帧末统一结算：伤害队列在帧末统一 apply，避免 last-write-wins
     /// </summary>
-    public class PlayerSummonSystem
+    public class PlayerSummonSystem : global::BattleSystemECS.Content.Contracts.ISummonCommandPort
     {
         private ComponentStore store;
         private IRenderer renderer;

@@ -30,7 +30,7 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore _store;
         private readonly GameConfig _gameConfig;
-        private readonly BuffSystem _buffSystem;
+        private readonly global::BattleSystemECS.Content.Contracts.IEffectCommandPort _buffSystem;
         private readonly IRenderer _logger;
 
         // Monster type name → CorpseEffectDef lookup (built at startup)
@@ -39,7 +39,7 @@ namespace BattleSystemECS.Systems
         // CorpseEffectDef list (from config)
         private List<CorpseEffectDef> _corpseEffectDefs = new List<CorpseEffectDef>();
 
-        public CorpseEffectSystem(ComponentStore store, GameConfig gameConfig, BuffSystem buffSystem, IRenderer logger = null)
+        public CorpseEffectSystem(ComponentStore store, GameConfig gameConfig, global::BattleSystemECS.Content.Contracts.IEffectCommandPort buffSystem, IRenderer logger = null)
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _gameConfig = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));
@@ -187,12 +187,12 @@ namespace BattleSystemECS.Systems
                 float distSq = dx * dx + dy * dy;
                 if (distSq <= radius * radius)
                 {
-                    // Apply DoT via BuffSystem
+                    // 通过 IEffectCommandPort 应用周期伤害。
                     // effectType 0 = Poison, 3 = Fire, 6 = HallowedGround, 7 = ThornyBramble, 8 = BlightedGround
                     if (_buffSystem != null)
                     {
                         _ = effectType; // keep switch-like intent explicit
-                        // 通过 legacy snapshot 生成完整的周期规则，运行态计时由 BuffSystem 的 typed store 推进。
+                        // 通过 legacy snapshot 生成完整的周期规则，运行态计时由 global::BattleSystemECS.Content.Contracts.IEffectCommandPort 的 typed store 推进。
                         var dotDef = GameplayEffectDef.Periodic(
                             name: $"corpse_zone_tick_{effectType}",
                             attrIdx: AttributeSetDefinitions.ENEMY_HEALTH,

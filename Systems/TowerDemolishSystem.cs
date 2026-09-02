@@ -20,7 +20,7 @@ namespace BattleSystemECS.Systems
     public class TowerDemolishSystem
     {
         private ComponentStore store;
-        private BuffSystem buffSystem;
+        private global::BattleSystemECS.Content.Contracts.IEffectCommandPort buffSystem;
 
         // Reusable list for AoE queries — avoids per-call allocation
         private List<int> _aoeTargets = new List<int>(128);
@@ -33,7 +33,7 @@ namespace BattleSystemECS.Systems
         private const int EFFECT_TYPE_POISON = 4;
         private const int EFFECT_TYPE_ARCANE = 5;
 
-        public TowerDemolishSystem(ComponentStore store, BuffSystem buffSystem)
+        public TowerDemolishSystem(ComponentStore store, global::BattleSystemECS.Content.Contracts.IEffectCommandPort buffSystem)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this.buffSystem = buffSystem;
@@ -116,7 +116,7 @@ namespace BattleSystemECS.Systems
 
         /// <summary>
         /// Apply secondary effect (stun, slow, DoT) based on demolish effect type.
-        /// Fire/Poison: burning/poison DoT via damage queue (BuffSystem handles DoT)
+        /// 火焰/毒素：通过伤害队列施加燃烧或中毒周期效果（由 IEffectCommandPort 处理）。
         /// Ice: freeze stun (EnemyStunDurationLeft)
         /// Lightning: stun (EnemyStunDurationLeft)
         /// Arcane: no CC
@@ -127,8 +127,8 @@ namespace BattleSystemECS.Systems
             {
                 case EFFECT_TYPE_FIRE:
                 case EFFECT_TYPE_POISON:
-                    // DoT handled via BuffSystem's poison/burn mechanism
-                    // 通过 BuffSystem 创建类型化的燃烧/中毒周期效果。
+                    // 周期伤害由 IEffectCommandPort 的中毒/燃烧机制处理。
+                    // 通过 global::BattleSystemECS.Content.Contracts.IEffectCommandPort 创建类型化的燃烧/中毒周期效果。
                     if (buffSystem != null)
                     {
                         ApplyDotEffect(enemyId, effectType, towerId);
@@ -152,7 +152,7 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Apply a DoT effect from fire/poison demolish via BuffSystem.
+        /// 通过 IEffectCommandPort 为火焰/毒素拆除效果施加周期伤害。
         /// </summary>
         private void ApplyDotEffect(int enemyId, int effectType, int towerId)
         {

@@ -14,7 +14,7 @@ namespace BattleSystemECS.Systems
     /// 
     /// Uses two-phase pattern (parallel collect → serial apply) for enemy-targeted effects.
     /// </summary>
-    public class BuffSystem
+    public class BuffSystem : global::BattleSystemECS.Content.Contracts.IEffectCommandPort
     {
         private ComponentStore store;
         private int playerId;

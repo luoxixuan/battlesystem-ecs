@@ -53,8 +53,8 @@ namespace BattleSystemECS.Tests.Features.Buffs
             };
             var wave = new WaveSpawningSystem(Store, Renderer, Config);
             var sys = new CrestSystem(Store, Config);
-            sys.SetWaveSpawningSystem(wave);
-            sys.SubscribeToWaveEvents();
+            wave.OnWaveStart += () => sys.HandleWaveStart(wave.GetCurrentWave());
+            wave.OnWaveComplete += sys.HandleWaveComplete;
             return (sys, wave);
         }
 
@@ -347,14 +347,13 @@ namespace BattleSystemECS.Tests.Features.Buffs
         // ─── SubscribeToWaveEvents idempotency ─────────────────────────
 
         [Fact]
-        public void SubscribeToWaveEvents_Idempotent()
+        public void TestCompositionSubscribesEachHandlerExactlyOnce()
         {
             var (sys, wave) = MakeSystem(crests: Array.Empty<CrestDef>());
-            sys.SubscribeToWaveEvents();
-            sys.SubscribeToWaveEvents();
-            sys.SubscribeToWaveEvents();
-            // No exception, no duplicate-handler side effect.
-            // The cleanup path (OnWaveComplete) should still run exactly once.
+            var startHandlers = GetEventDelegate(wave, "OnWaveStart");
+            var completeHandlers = GetEventDelegate(wave, "OnWaveComplete");
+            Assert.Single(startHandlers!.GetInvocationList());
+            Assert.Single(completeHandlers!.GetInvocationList());
             int eid = Enemy();
             Store.EnemyCrestDamageMult[eid] = 5f;
             FireOnWaveComplete(wave);
@@ -362,7 +361,7 @@ namespace BattleSystemECS.Tests.Features.Buffs
         }
 
         [Fact]
-        public void SubscribeToWaveEvents_NullSpawner_NoOp()
+        public void HandlersRequireNoConcreteSpawnerReference()
         {
             Config.Crest = new CrestConfig
             {
@@ -370,18 +369,9 @@ namespace BattleSystemECS.Tests.Features.Buffs
                 Crests = Array.Empty<CrestDef>()
             };
             var sys = new CrestSystem(Store, Config);
-            // 不注入 spawner 时先订阅：生产实现里 _waveSubscribed 不会被置位，
-            // 所以之后补注入 spawner 再订阅仍必须能正常挂上事件。
-            sys.SubscribeToWaveEvents();
-
-            // 可观测证明：null 调用没有消费订阅机会——补注入真实 spawner 后
-            // 再订阅，触发 OnWaveComplete 时缓存必须被清回 1f。
             int eid = Enemy();
             Store.EnemyCrestDamageMult[eid] = 5f;
-            var wave = new WaveSpawningSystem(Store, Renderer, Config);
-            sys.SetWaveSpawningSystem(wave);
-            sys.SubscribeToWaveEvents();
-            FireOnWaveComplete(wave);
+            sys.HandleWaveComplete();
             Assert.Equal(1f, Store.EnemyCrestDamageMult[eid]);
         }
 

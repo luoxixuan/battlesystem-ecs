@@ -12,7 +12,7 @@ namespace BattleSystemECS.Systems
     /// 直接访问 ComponentStore 的数组，无字典查询，无 struct 复制
     /// 性能提升：10-100 倍
     /// Movement direction is driven by EnemyAISystem via EnemyActionEnum.
-    /// When EnemyPathId >= 0, movement follows waypoints from PathfindingSystem.
+    /// EnemyPathId 大于等于零时，通过 IPathNavigationView 沿航点移动。
     /// </summary>
     public class EnemyMovementSystem
     {
@@ -30,12 +30,12 @@ namespace BattleSystemECS.Systems
         // Tunable sine-wave frequency (radians per turn) for type=1 path deviation.
         private const float PATH_DEV_SINE_FREQ = 0.3f;
 
-        // PathfindingSystem reference for waypoint-based movement
-        private PathfindingSystem _pathfinding;
-        // WeatherSystem reference for dynamic weather effects
-        private WeatherSystem _weather;
-        // DayNightSystem reference for day/night cycle effects
-        private DayNightSystem _dayNight;
+        // 航点导航只依赖只读路径视图。
+        private global::BattleSystemECS.Content.Contracts.IPathNavigationView _pathfinding;
+        // 天气通过敌人移速修饰视图提供倍率。
+        private global::BattleSystemECS.Content.Contracts.IEnemySpeedModifierView _weather;
+        // 昼夜通过敌人移速修饰视图提供倍率。
+        private global::BattleSystemECS.Content.Contracts.IEnemySpeedModifierView _dayNight;
         // Optional GameConfig (injected for tile-stacking penalty). Null = stacking disabled.
         private readonly Config.GameConfig _gameConfig;
         // Reused dictionary for stack counting — allocated once, cleared per frame.
@@ -54,36 +54,33 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Inject PathfindingSystem for waypoint-based navigation.
+        /// 注入航点导航只读视图。
         /// </summary>
-        public void SetPathfindingSystem(PathfindingSystem pathfinding)
+        public void SetPathfindingSystem(global::BattleSystemECS.Content.Contracts.IPathNavigationView pathfinding)
         {
             _pathfinding = pathfinding;
         }
 
         /// <summary>
-        /// Inject WeatherSystem for dynamic weather effects on enemy movement.
+        /// 注入天气移速修饰视图。
         /// </summary>
-        public void SetWeatherSystem(WeatherSystem weather)
+        public void SetWeatherSystem(global::BattleSystemECS.Content.Contracts.IEnemySpeedModifierView weather)
         {
             _weather = weather;
         }
 
         /// <summary>
-        /// Inject DayNightSystem for day/night cycle effects on enemy movement.
+        /// 注入昼夜移速修饰视图。
         /// </summary>
-        public void SetDayNightSystem(DayNightSystem dayNight)
+        public void SetDayNightSystem(global::BattleSystemECS.Content.Contracts.IEnemySpeedModifierView dayNight)
         {
             _dayNight = dayNight;
         }
 
         /// <summary>
-        /// Inject BossTrailAoeSystem (Round 124 Dir 1). When injected, the per-enemy
-        /// movement loop will call TryQueueTrail on each enemy that has the trail flag
-        /// set. Trail events are drained via BossTrailAoeSystem.ResolveTrailEvents
-        /// at the end of Update().
+        /// 注入 Boss 轨迹收集端口；移动循环只收集轨迹事件，Update 末尾统一结算。
         /// </summary>
-        public void SetBossTrailSystem(BossTrailAoeSystem bossTrail)
+        public void SetBossTrailSystem(global::BattleSystemECS.Content.Contracts.IBossTrailCollector bossTrail)
         {
             _bossTrailSystem = bossTrail;
         }
@@ -125,7 +122,7 @@ namespace BattleSystemECS.Systems
         // Round 124 — Direction 1: Boss Path Trail AoE. Reference to the trail system
         // (injected via SetBossTrailSystem). When null, the per-enemy trail trigger check
         // is a single null-check and skipped entirely (zero overhead on the common case).
-        private BossTrailAoeSystem _bossTrailSystem;
+        private global::BattleSystemECS.Content.Contracts.IBossTrailCollector _bossTrailSystem;
 
         public void Update()
         {
@@ -193,7 +190,7 @@ namespace BattleSystemECS.Systems
                         {
                             int towerCount = CountTowersNearEnemy(ex, ey, junc.TowerDensityRadius);
                             bool isBoss = IsBossEnemy(enemyId);
-                            int newPath = PathfindingSystem.EvaluateJunction(
+                            int newPath = global::BattleSystemECS.Content.Contracts.PathNavigationRules.EvaluateJunction(
                                 junc,
                                 store.EnemyHealth[enemyId],
                                 store.EnemyMaxHealth[enemyId],
@@ -739,7 +736,7 @@ switch (actionEnum)
                 // After the enemy has finished moving, if it is a boss with trail configured
                 // and is on a path, queue a trail event when the path progress has advanced
                 // by ≥ BossTrailProgressInterval since the last trigger. The event is drained
-                // by BossTrailAoeSystem.ResolveTrailEvents() at the end of Update().
+                // 轨迹事件在 Update 末尾通过 IBossTrailCollector 统一结算。
                 // Per-enemy cost: 6-7 array reads + a few comparisons — no allocation.
                 if (_bossTrailSystem != null && store.EnemyIsBossTrail[enemyId])
                 {

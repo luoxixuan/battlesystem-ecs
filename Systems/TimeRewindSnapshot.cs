@@ -24,7 +24,7 @@ namespace BattleSystemECS.Systems
     /// the cost is two writes per 0.25s per player (negligible) and it keeps the
     /// system state-driven (any future "snapshot" skill works without code changes).
     /// </summary>
-    public class TimeRewindSnapshotSystem
+    public class TimeRewindSnapshotSystem : global::BattleSystemECS.Content.Contracts.ISnapshotRestorePort
     {
         private readonly ComponentStore store;
 

@@ -11,7 +11,7 @@ namespace BattleSystemECS.Systems
     /// Manages path tables and assigns each enemy a current waypoint index.
     /// Replaces the simple direction=-1 Y-axis movement with waypoint following.
     /// </summary>
-    public class PathfindingSystem
+    public class PathfindingSystem : global::BattleSystemECS.Content.Contracts.IPathNavigationView
     {
         private Core.ComponentStore store;
 
@@ -316,31 +316,8 @@ namespace BattleSystemECS.Systems
         /// <returns>Path ID to assign. If no decision can be made (null def or unknown policy), returns the current path as a safe fallback.</returns>
         public static int EvaluateJunction(JunctionDef def, float currentHp, float maxHp, bool isBossType, int towerCountInRadius)
         {
-            if (def == null) return -1; // no junction → caller keeps current path
-
-            switch (def.Policy)
-            {
-                case JunctionPolicy.HpBased:
-                {
-                    // High-HP enemies take the "long" branch; low-HP take "short".
-                    float ratio = maxHp > 0f ? currentHp / maxHp : 0f;
-                    return ratio > def.HpLongPathThreshold ? def.LongPathId : def.ShortPathId;
-                }
-                case JunctionPolicy.TowerDensityBased:
-                {
-                    // High tower count → take the "short" path (avoid heavy defenses).
-                    return towerCountInRadius > def.TowerDensityShortPathThreshold
-                        ? def.ShortPathId
-                        : def.LongPathId;
-                }
-                case JunctionPolicy.TypeBased:
-                {
-                    // Boss-typed enemies take the "long" branch (direct path, e.g. to player).
-                    return isBossType ? def.LongPathId : def.ShortPathId;
-                }
-                default:
-                    return def.ShortPathId; // safe fallback
-            }
+            return global::BattleSystemECS.Content.Contracts.PathNavigationRules.EvaluateJunction(
+                def, currentHp, maxHp, isBossType, towerCountInRadius);
         }
     }
 }

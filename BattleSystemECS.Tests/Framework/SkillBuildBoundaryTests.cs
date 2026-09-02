@@ -4,6 +4,7 @@ using BattleSystemECS.Components;
 using BattleSystemECS.Config;
 using BattleSystemECS.Core;
 using BattleSystemECS.Core.GAS;
+using BattleSystemECS.Content.Contracts;
 using BattleSystemECS.Systems;
 using BattleSystemECS.Tests.Infrastructure;
 using Xunit;

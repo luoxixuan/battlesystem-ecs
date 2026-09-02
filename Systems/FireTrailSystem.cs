@@ -26,7 +26,7 @@ namespace BattleSystemECS.Systems
     ///     per-hit is the intended cadence.
     ///   - The system holds zero per-frame allocations and no per-tower caches.
     /// </summary>
-    public class FireTrailSystem
+    public class FireTrailSystem : global::BattleSystemECS.Content.Contracts.IFireTrailCommandPort
     {
         private readonly ComponentStore _store;
 

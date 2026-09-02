@@ -550,13 +550,14 @@ namespace BattleSystemECS.Tests.Features.Buffs
  // ─── SubscribeToWaveEvents idempotency ───────────────────────────
 
  [Fact]
- public void SubscribeToWaveEvents_Idempotent()
+ public void WaveHandlersRequireNoConcreteSpawnerReference()
  {
  var (sys, towerId) = MakeSystem();
- // Pass null — should be a safe no-op.
- sys.SubscribeToWaveEvents(null);
- // No exception, no side effect.
- Assert.False(Store.PlayerPreFightOptionsRolled[PlayerId]);
+ Store.PlayerPreFightSelectedBuffId[PlayerId] = "selected";
+ Store.TowerPreFightDamageMult[towerId] = 3f;
+ sys.HandleWaveComplete();
+ Assert.Equal("", Store.PlayerPreFightSelectedBuffId[PlayerId]);
+ Assert.Equal(1f, Store.TowerPreFightDamageMult[towerId]);
  }
  }
 }

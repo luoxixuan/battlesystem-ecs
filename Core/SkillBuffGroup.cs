@@ -3,7 +3,7 @@ using System;
 namespace BattleSystemECS.Core
 {
     /// <summary>Skill resolution, buff DoT, bleed damage.</summary>
-    public class SkillBuffGroup : ISystemGroup
+    internal sealed class SkillBuffGroup : ISystemGroup
     {
         public Systems.BuffSystem? Buff { get; set; }
         public Systems.SkillSystem? Skill { get; set; }
@@ -46,6 +46,21 @@ namespace BattleSystemECS.Core
         // the live PlayerRallyActive set. Subscribes to PlayerDamaged in its constructor
         // (via SystemRegistry) to activate the rally on player damage.
         public Systems.RallySystem? Rally { get; set; }
+        internal void RegisterFrameBindings(FrameScheduler s)
+        {
+            if(Buff!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.buff.update"),c=>Buff?.Update(c.Delta));s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.buff.resolve-dot"),c=>Buff?.ResolveDotDamage());}
+            if(Skill!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.skill.resolve-damage"),c=>Skill?.ResolveSkillDamage());s.RegisterFrameBinding(FrameBindingFacts.Get("ability.commit"),c=>Skill?.Update(c.Delta));}
+            if(ElementalReaction!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.elemental.update"),c=>ElementalReaction?.Update(c.Delta));s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.elemental.resolve"),c=>ElementalReaction?.ResolveReactionDamage());}
+            if(Bleed!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.bleed.update"),c=>Bleed?.Update(c.Delta));s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.bleed.resolve"),c=>Bleed?.ResolveBleedDamage());}
+            if(Frostbite!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.frostbite.update"),c=>Frostbite?.Update(c.Delta));s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.frostbite.resolve"),c=>Frostbite?.ResolveFrostbiteDamage());}
+            if(HealingZone!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.healing-zone.update"),c=>HealingZone?.Update(c.Delta));
+            if(Mark!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.mark.update"),c=>Mark?.Update(c.Delta));
+            if(DeathMark!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.death-mark.update"),c=>DeathMark?.Update(c.Delta));
+            if(HealAura!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.heal-aura.prepare"),c=>HealAura?.SetTurn());s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.heal-aura.update"),c=>HealAura?.Update(c.Delta));}
+            if(ThornsAura!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.thorns-aura.prepare"),c=>ThornsAura?.SetTurn());s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.thorns-aura.update"),c=>ThornsAura?.Update(c.Delta,ThornsAuraPlayerId));}
+            if(Wisp!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.wisp.update"),c=>Wisp?.Update(c.Delta));
+            if(Rally!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.rally.update"),c=>Rally?.Update(c.Delta));
+        }
         internal void ExecuteLegacy(ComponentStore store, TimeContext time, int turn)
         {
             store.GameplayEffectsRuntime.Tick(time.EffectDelta, time.EffectClock);

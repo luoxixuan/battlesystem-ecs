@@ -23,7 +23,7 @@ namespace BattleSystemECS.Systems
     ///   - FrameScheduler.Phase 8 (before Death Resolve) calls TelegraphSystem.Resolve()
     ///   - ConsoleLogger renders telegraph zones as pulsing circles (ASCII art)
     /// </summary>
-    public class TelegraphSystem
+    public class TelegraphSystem : global::BattleSystemECS.Content.Contracts.ITelegraphCommandPort
     {
         private readonly ComponentStore _store;
         private readonly IRenderer _logger;

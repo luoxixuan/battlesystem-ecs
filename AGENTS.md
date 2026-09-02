@@ -7,13 +7,15 @@
 ## 1. 项目概述
 
 **BattleSystem-ECS** 是一个基于 **SOA (Struct of Arrays) ECS 架构**的塔防战斗系统性能基准项目。
-- **语言**: C#，**双项目结构**：
-  - `BattleSystemECS.Core` — 战斗逻辑核心库（netstandard2.1，LangVersion=9.0，Unity 兼容）
-  - `BattleSystemECS` — 控制台 EXE（net6.0，引用 Core 库）
+- **语言**: C#，**四项目结构**：
+  - `BattleSystemECS.Engine` — 帧执行与内容值合同（netstandard2.1，不引用 Core/Systems）
+  - `BattleSystemECS.Core` — 战斗逻辑核心库（netstandard2.1，LangVersion=9.0，引用 Engine，Unity 兼容）
+  - `BattleSystemECS` — 控制台 EXE（net6.0，引用 Core）
+  - `BattleSystemECS.Tests` — xUnit 测试（net9.0，仅项目引用 Core；Engine 合同通过 Core 暴露，不添加直接引用）
 - **架构**: SOA ECS（逻辑与渲染完全分离），事件总线（`IBattleEventBus`）驱动渲染
 - **运行时**: 控制台应用（含交互式游戏 + 非交互式压测）+ Unity 2D 渲染端
 - **核心特征**: 全系统并行化 (`Parallel.For`)、零分配热路径、配置驱动、帧末统一结算
-- **代码规模**: Core 库 ~52k 行（Core + Systems）、Tests ~22k 行；1325 项 xUnit 测试（框架层 / 机制层 / 业务层 / 集成层四分层）
+- **代码规模**: Core 库与 Tests 按当前工作树构建；xUnit 测试数量以最新门禁日志为准（框架层 / 机制层 / 业务层 / 集成层四分层）
 - **Unity 工程**: `F:\AI\BattleSystem-ECS-Unity`（2022.3.62f2c1 LTS），通过 `BattleDriver` 消费 DLL
 
 ---
@@ -24,9 +26,10 @@
 
 | 文件 | 作用 |
 |------|------|
-| `BattleSystemECS.Core/BattleSystemECS.Core.csproj` | **核心库** — netstandard2.1，LangVersion=9.0，编译 Core/ + Systems/ 全部代码。含 polyfill（IsExternalInit、Rng、PolyfillExtensions）、事件总线（IBattleEventBus/ConsoleEventBus + EventBus/GameEvents） |
+| `BattleSystemECS.Engine/BattleSystemECS.Engine.csproj` | **引擎合同库** — netstandard2.1，仅编译 `Contracts.cs`；定义 `IFrameContext` / `IFrameNode` / `IFrameExecutionPlan` 等帧执行和值合同，不引用 Core/Systems |
+| `BattleSystemECS.Core/BattleSystemECS.Core.csproj` | **核心库** — netstandard2.1，LangVersion=9.0，引用 Engine，编译 Core/ + Systems/ 全部代码。含 polyfill（IsExternalInit、Rng、PolyfillExtensions）、事件总线（IBattleEventBus/ConsoleEventBus + EventBus/GameEvents） |
 | `BattleSystemECS.csproj` | 主 EXE — net6.0，引用 Core 库，仅含 Program.cs |
-| `BattleSystemECS.Tests/BattleSystemECS.Tests.csproj` | 测试项目 — net9.0，引用 Core 库（不含 EXE） |
+| `BattleSystemECS.Tests/BattleSystemECS.Tests.csproj` | 测试项目 — net9.0，仅项目引用 Core（不含 EXE；Core 内部消费 Engine） |
 | `game_config.json` | 运行时游戏主配置（怪物类型、关卡、波次、玩家属性、连击/TowerOvercharge/PositionalDamage 参数），`CopyToOutputDirectory=PreserveNewest` |
 | `Data/Configs/*.json` | 子配置：行为树、技能（skills.json = 精选技能表，加载进 `GameConfig.SkillDefs`）、科技树、塔位规则、波次生成、阶段行为、自动技能 |
 | `Data/Monsters/*.json` | 200 种怪物静态定义 |
@@ -39,7 +42,10 @@
 ### 2.2 构建与运行命令
 
 ```bash
-# 构建核心库（netstandard2.1，必须 0 warnings 0 errors）
+# 构建 Engine 合同库（netstandard2.1，必须 0 warnings 0 errors）
+dotnet build BattleSystemECS.Engine
+
+# 构建核心库（会引用 Engine，必须 0 warnings 0 errors）
 dotnet build BattleSystemECS.Core
 
 # 构建主程序（net6.0，引用 Core）
@@ -66,9 +72,10 @@ dotnet test BattleSystemECS.Tests
 
 ```
 BattleSystem-ECS/
+├── BattleSystemECS.Engine/          # 独立帧执行/内容值合同；Core → Engine，Engine 不反向引用 Core/Systems
 ├── BattleSystemECS.Core/            # 核心库项目（仅 csproj；源码经 Linked Files 链接编译，不复制）
 ├── BattleSystemECS.csproj           # 控制台 EXE（net6.0，仅 Program.cs）
-├── BattleSystemECS.Tests/           # 单元测试（xUnit，net9.0，引用 Core 库；四分层见 §6）
+├── BattleSystemECS.Tests/           # 单元测试（xUnit，net9.0，仅引用 Core；四分层见 §6）
 │   ├── Infrastructure/              # 测试基建（TestWorld / Specs / MockRenderer，无 [Fact]）
 │   ├── Framework/                   # 框架层测试
 │   ├── Mechanisms/                  # 机制层测试（Combat / Control / Perception / Movement / Spawning / World / TowerCore）
@@ -109,12 +116,12 @@ BattleSystem-ECS/
 
 - 11 个 `*Group.cs` 位于 `Core/`（`BuildGroup` / `PreGameGroup` / `SpawningGroup` / `AIGroup` / `MovementGroup` / `TerrainGroup` / `CombatSetupGroup` / `SpatialGroup` / `CombatGroup` / `SkillBuffGroup` / `PostDeathGroup`），另加 `ISystemGroup.cs` 接口。
 - 每个 group 是一组相关 system + 固定执行顺序（对应 §4.2 的帧调度各阶段）。
-- `Core/SystemRegistry.cs` 集中负责所有 system 的 `CreateAll` / `WireDependencies` / `AssignToGroups`。
+- `ProductionSystemInstaller` 是生产组装唯一入口；`SystemRegistry` 的 `CreateAll` / `WireDependencies` / `AssignToGroups` 仅保留为受 session guard 约束的兼容 facade。
 - 添加新 system 的标准流程：
-  1. `SystemRegistry` 加 `public XxxSystem? Xxx { get; private set; }`
-  2. `CreateAll()` 中 `new`（传入 `battleEventBus` 参数）
-  3. `WireDependencies()` 中调 `SetXxx(...)` 注入依赖
-  4. `AssignToGroups()` 中分配到正确的 `scheduler.Group.Xxx = Xxx`
+  1. `SystemRegistry` 加 `public XxxSystem? Xxx { get; private set; }`，在 `Core/SystemRegistrationRecipes.cs` 实现 typed Factory/Wire/Bind 方法
+  2. 在 schema v3 `tools/system-registration-spec.json` 仅用受控方法标识选择 recipe，并显式声明 owner token、依赖、feature policy 与 frame bindings；禁止嵌入 C# 语句
+  3. 运行 `tools/generate-system-registry-ledger.ps1`，同步生成 manifest 与 nullable ledger
+  4. 由 `ProductionSystemInstaller` 执行稳定依赖顺序并在 Seal 时验证 graph↔manifest 双向合同
 
 新增 system 必须通过 `SystemRegistry` 注入，不要直接改 `FrameScheduler`。
 
@@ -125,7 +132,7 @@ BattleSystem-ECS/
 1. **`IBattleEventBus`（逻辑 → 渲染）** — 战斗逻辑向视图层（Unity）推送展示事件。
    - **接口**：`Core/IBattleEventBus.cs` — 定义 EntityCreated/TowerCreated/EntityDestroyed/PositionChanged(s)/DamageDealt/EntityKilled/ProjectileFired/WaveStarted/GameOver
    - **实现**：`Core/ConsoleEventBus.cs` 的 `NullEventBus`（空操作，压测/无渲染用）+ Unity 侧 `UnityEventBus.cs`（消费事件创建/更新 GameObject）
-   - **注入路径**：`GameManager` → `SystemRegistry.CreateAll(battleEventBus)` → 各 system + `FrameScheduler`（Movement/Death 事件）
+- **注入路径**：`GameManager` → `ProductionSystemInstaller`（唯一生产组装入口）→ `SystemRegistry` 与 `FrameScheduler`；旧 facade 仅供受 guard 约束的兼容/测试路径。
 
 2. **`EventBus` / `EventChannel<T>`（系统 → 系统）** — 系统间类型化事件（`PlayerDamaged` / `EnemyHit` / `EnemyCrit` / `EnemyCharging` / `EnemyChargeReleased` / `BossPhaseChanged` / `SideQuestCompleted`），定义在 `Core/EventBus.cs` + `Core/GameEvents.cs`。零分配（多播委托单次调用），在 `SystemRegistry` 中构造并注入。
 
@@ -239,7 +246,9 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 ### 5.3 项目引用规则
 
-- **Main EXE 和 Tests 都只引用 Core 库**（不直接引用 Core/ 或 Systems/ 源码）。
+- 引用方向固定为 **Engine ← Core ← EXE**；Tests 仅引用 Core，由 Core 间接消费 Engine。Engine 禁止引用 Core/Systems，Core/Systems 禁止反向把具体 content 类型暴露进 Engine。
+- `BattleSystemECS.Content.Contracts` namespace 当前由 Core 的 `Core/ContentContracts.cs` 编译并拥有业务 port/interface；Engine 只拥有 `BattleSystemECS.Engine` 的帧执行和值合同，禁止引入具体 `BattleSystemECS.Systems.*` 类型。
+- Main EXE 不直接引用 Core/ 或 Systems/ 源码；Tests 通过项目引用消费 Core/Engine。
 - Core 库通过 Linked Files（`<Compile Include="..\Core\*.cs" Link="..." />`）编译源码，不复制。
 - 修改 Core/ 或 Systems/ 下的文件后，两个项目（Core 库 + 引用方）都需重新编译验证。
 - Polyfill 文件（`IsExternalInit.cs`、`Rng.cs`、`PolyfillExtensions.cs`）位于顶层 `Core/` 目录，通过 csproj 的 `<Compile Include="..\Core\*.cs">` Linked Files 编译进 Core 库（不在 `BattleSystemECS.Core/` 项目目录内）。
@@ -252,7 +261,7 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 - **xUnit**（`Xunit`），测试项目 `BattleSystemECS.Tests`（TargetFramework=`net9.0`，引用 Core 库）。
 - 测试运行器：`xunit.runner.visualstudio`，覆盖率收集：`coverlet.collector`。
-- 当前测试数量：**1325 项**（全部通过为门禁要求）。
+- 当前测试数量以最新完整门禁日志为准；全部通过是门禁要求，文档不维护易腐的手工计数。
 - **测试范围分层**（目录即分层，详见 `BattleSystemECS.Tests/README.md`）：
   - **Infrastructure**：`TestWorld` / `Specs` / `MockRenderer` / `BattleTestBase` 共享基建，不含测试。
   - **Framework 框架层**：ECS 存储生命周期、帧调度与死亡结算、状态机、配置加载、GAS 冷却、曲线表、技能核心、时光快照。
@@ -272,20 +281,16 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 > **门禁是硬要求，任何代码改动后必须验证，否则禁止提交。**
 
-### 7.1 基准（2026-08-27，并行热路径优化后）
+### 7.1 性能门禁
 
-| 压测模式 | 说明 | 当前 FPS | 硬门禁 |
-|----------|------|----------|---------|
-| mode 2 | 合并热路径（10K 敌 ×500 帧） | 8,333 | ≥ 7,000 |
-| mode 4 | 真实系统链路（10K 敌 ×500 帧） | 5,212 | ≥ 3,000 |
-| mode 5 | 完整一局（5 关全通） | 4,874 | ≥ 2,500 |
+性能压测结果、相对门禁和延期状态以最新 fresh evidence 为准；当前迁移轮次暂不运行
+mode2/mode4/mode5，未运行项不得标记为通过。
 
-### 7.2 相对门禁
+M7 fresh evidence 的 `dirty-inventory.txt` 必须包含 `STATUS_BEGIN`/`STATUS_END` 标记，
+并在标记之间保存 `git status --short` 原文；`dirty-inventory-schema` capture gate 负责
+验证标记顺序和内容一致性。
 
-- 与上一轮相比，mode 2 / mode 4 / mode 5 任何一项 FPS **不得下降超过 ±5%**。
-- 三个模式全部测一遍；不能只跑一个模式就提交。
-
-### 7.3 运行方式
+### 7.2 运行方式
 
 ```bash
 echo 2 | dotnet run   # mode 2：stdin 菜单路径（Program.cs 读取 "2"）
@@ -299,17 +304,18 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 
 > 严格按顺序执行，**全部通过后才能 `git commit`**。
 
-1. **`dotnet build BattleSystemECS.Core`** — Core 库 0 warnings, 0 errors
-2. **`dotnet build`** — EXE 0 warnings, 0 errors
-3. **`dotnet test BattleSystemECS.Tests`** — 全部通过（当前 1325/1325）
-4. **`pwsh -File tools\check-test-rules.ps1`** — 测试静态规则 0 违规（零断言测试 + 恒真/恒假断言）
-5. **`git diff --check`** — 无空白/行尾错误（CRLF、trailing whitespace）
-6. **`echo 2 | dotnet run`** — mode 2 压测
-7. **`echo 4 | dotnet run`** — mode 4 压测
-8. **`dotnet run -- 5`** — mode 5 压测（注意：参数模式，不能用 `echo 5 | dotnet run`）
-9. **同步文档** — 更新 `AGENTS.md` / `README.md` / `docs/` / `CHANGELOG.md`
-10. **`git add -A && git commit -m "描述"`** — 原子性最小改动
-11. **`git push github master`** — commit 完成后立即推送
+1. **`dotnet build BattleSystemECS.Engine`** — Engine 0 warnings, 0 errors
+2. **`dotnet build BattleSystemECS.Core`** — Core 库 0 warnings, 0 errors
+3. **`dotnet build`** — EXE 0 warnings, 0 errors
+4. **`dotnet test BattleSystemECS.Tests`** — 当前发现的全部测试通过
+5. **`pwsh -File tools\check-test-rules.ps1`** — 测试静态规则 0 违规（零断言测试 + 恒真/恒假断言）
+6. **`git diff --check`** — 无空白/行尾错误（CRLF、trailing whitespace）
+7. **`echo 2 | dotnet run`** — mode 2 压测
+8. **`echo 4 | dotnet run`** — mode 4 压测
+9. **`dotnet run -- 5`** — mode 5 压测（注意：参数模式，不能用 `echo 5 | dotnet run`）
+10. **同步文档** — 更新 `AGENTS.md` / `README.md` / `docs/` / `CHANGELOG.md`
+11. **`git add -A && git commit -m "描述"`** — 原子性最小改动
+12. **`git push github master`** — commit 完成后立即推送
 
 ### Git 提交风格
 
@@ -346,7 +352,7 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 | 需求 | 文件 |
 |------|------|
 | 添加新组件字段 | 对应领域的 `Core/ComponentStore_Xxx.cs` |
-| 添加新系统 | `Systems/XxxSystem.cs` + 在 `Core/SystemRegistry.cs` 注册（4 步：属性 / `CreateAll` / `WireDependencies` / `AssignToGroups`） |
+| 添加新系统 | `Systems/XxxSystem.cs` + `Core/SystemRegistry.cs` 属性 + `Core/SystemRegistrationRecipes.cs` typed recipe + schema v3 `tools/system-registration-spec.json`；运行生成器同步 manifest/ledger，并由 installer/Seal 校验 |
 | 修改帧顺序 | `Core/FrameScheduler.cs` 的 `RunWavePhase()` 方法 |
 | 添加事件发射 | 逻辑→渲染走 `Core/IBattleEventBus.cs`；系统间走 `Core/EventBus.cs` + `Core/GameEvents.cs`（DTO） |
 | 修改并行策略 | 对应系统的 `Update()`，注意两阶段模式审查 |
@@ -363,4 +369,4 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 
 ---
 
-> **最后更新**：2026-08-29（第三批：技能/战斗系统可维护性重构 —— 技能 id 归一化约定集中 `GameConfig.GetSkillIdByName/TryGetSkillById`、SkillSystem 9 处圆形 AoE 谓词收敛 `CollectCircleHits`、ExecuteAbility switch 命名常量化、TowerAttackSystem 朝向 dot 提取 `TryComputeRearDot` 共用；净 -177 行，1298 测试全过。同日第二批：死配置接线 SkillDefs/TowerOvercharge/PositionalDamage + hero 技能槽修复 + game_config.json 修复为合法 JSON，测试 1281→1298）
+> **最后更新**：2026-09-02。当前构建、测试与审计结果以本轮仓外 final evidence 目录及其原始日志为准；文档不维护易腐的手工测试计数。

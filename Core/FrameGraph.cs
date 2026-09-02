@@ -75,11 +75,11 @@ namespace BattleSystemECS.Core
         internal void FreezeTime(TimeContext time) { if(_timeFrozen)throw new InvalidOperationException("TimeContext may only be frozen once per frame.");_time=time;_timeFrozen=true; }
     }
 
-    public readonly struct NodeExecutionContext
+    public readonly struct NodeExecutionContext : BattleSystemECS.Engine.IFrameContext
     {
         private readonly FrameExecutionContext _frame; private readonly FrameTimeDomain _domain;
         internal NodeExecutionContext(FrameExecutionContext frame,FrameTimeDomain domain){_frame=frame;_domain=domain;}
-        public float Delta=>_frame.Time.DeltaFor(_domain); public int Turn=>_frame.Turn; public int Frame=>_frame.Frame; public PhaseContext Phase=>_frame.Time.Phase; internal ClockId EffectClock=>_frame.Time.EffectClock;
+        public float Delta=>_frame.Time.DeltaFor(_domain); public float DeltaTime=>Delta; public int Turn=>_frame.Turn; public int Frame=>_frame.Frame; public PhaseContext Phase=>_frame.Time.Phase; internal ComponentStore Store=>_frame.Store; internal ClockId EffectClock=>_frame.Time.EffectClock;
         internal TimeContext Time=>_frame.Time; internal void FreezeTime(TimeContext time)=>_frame.FreezeTime(time);
     }
     public interface ISystem { void Execute(NodeExecutionContext context); }
@@ -99,15 +99,51 @@ namespace BattleSystemECS.Core
         {Id=id;ActivePhases=activePhases;TimeDomain=timeDomain;ExecutionSemantics=executionSemantics;var readCopy=Copy(reads);var writeCopy=Copy(writes);AccessProfile=new FrameAccessProfile(bindingId,owner,evidence,reviewId,review,readCopy,writeCopy,requiresSystemBinding);Before=Copy(before);After=Copy(after);RequiredDependencies=Copy(requiredDependencies);OptionalDependencies=Copy(optionalDependencies);}
         private static IReadOnlyList<T> Copy<T>(IReadOnlyList<T>? source){if(source==null||source.Count==0)return Array.Empty<T>();var copy=new T[source.Count];for(int i=0;i<source.Count;i++)copy[i]=source[i];return Array.AsReadOnly(copy);}
     }
-    public sealed class FrameNodeAdapter { public FrameNodeMetadata Metadata{get;} public ISystem System{get;} public FrameNodeAdapter(FrameNodeMetadata metadata,ISystem system){Metadata=metadata??throw new ArgumentNullException(nameof(metadata));System=system??throw new ArgumentNullException(nameof(system));} }
+
+    /// <summary>绑定事实产生的运行时帧节点声明，不从 manifest 派生。</summary>
+    internal sealed class FrameNodeRuntimeDeclaration : IEquatable<FrameNodeRuntimeDeclaration>
+    {
+        internal string NodeId { get; }
+        internal string RegistrationId { get; }
+        internal FramePhaseMask Phase { get; }
+        internal FrameExecutionSemantics ExecutionPolicy { get; }
+        internal string[] RequiredTokens { get; }
+
+        internal FrameNodeRuntimeDeclaration(string nodeId, string registrationId, FramePhaseMask phase,
+            FrameExecutionSemantics executionPolicy, IReadOnlyList<string> requiredTokens)
+        {
+            NodeId = nodeId;
+            RegistrationId = registrationId;
+            Phase = phase;
+            ExecutionPolicy = executionPolicy;
+            RequiredTokens = new string[requiredTokens.Count];
+            for (int i = 0; i < requiredTokens.Count; i++) RequiredTokens[i] = requiredTokens[i];
+        }
+
+        public bool Equals(FrameNodeRuntimeDeclaration? other)
+        {
+            if (other == null || !string.Equals(NodeId, other.NodeId, StringComparison.Ordinal) ||
+                !string.Equals(RegistrationId, other.RegistrationId, StringComparison.Ordinal) ||
+                Phase != other.Phase || ExecutionPolicy != other.ExecutionPolicy ||
+                RequiredTokens.Length != other.RequiredTokens.Length) return false;
+            for (int i = 0; i < RequiredTokens.Length; i++)
+                if (!string.Equals(RequiredTokens[i], other.RequiredTokens[i], StringComparison.Ordinal)) return false;
+            return true;
+        }
+
+        public override bool Equals(object? obj) => Equals(obj as FrameNodeRuntimeDeclaration);
+        public override int GetHashCode() => NodeId.GetHashCode(StringComparison.Ordinal);
+    }
+    public sealed class FrameNodeAdapter : BattleSystemECS.Engine.IFrameNode { public FrameNodeMetadata Metadata{get;} public ISystem System{get;} public string Id=>Metadata.Id.Value; public FrameNodeAdapter(FrameNodeMetadata metadata,ISystem system){Metadata=metadata??throw new ArgumentNullException(nameof(metadata));System=system??throw new ArgumentNullException(nameof(system));} public void Execute(BattleSystemECS.Engine.IFrameContext context){if(!(context is NodeExecutionContext typed))throw new ArgumentException("Frame node requires the engine frame context.",nameof(context));System.Execute(typed);} }
     public sealed class FrameCompositionDiagnostic { public FrameNodeMetadata Metadata{get;} public FrameNodeId NodeId=>Metadata.Id; public OptionalDependencyPolicy Policy{get;} public string Reason{get;} public FrameBindingId BindingId=>Metadata.AccessProfile.BindingId; public FrameAccessOwner Owner=>Metadata.AccessProfile.Owner; public FrameAccessEvidence Evidence=>Metadata.AccessProfile.Evidence; public FrameAccessReviewId ReviewId=>Metadata.AccessProfile.ReviewId; public FrameAccessReviewRecord? Review=>Metadata.AccessProfile.Review; public FrameCompositionDiagnostic(FrameNodeMetadata metadata,OptionalDependencyPolicy policy,string reason){Metadata=metadata??throw new ArgumentNullException(nameof(metadata));Policy=policy;Reason=reason;} }
     public sealed class FrameGraphValidationException:InvalidOperationException { public FrameGraphValidationException(string message):base(message){} }
 
-    public sealed class FrameGraph
+    public sealed class FrameGraph : BattleSystemECS.Engine.IFrameExecutionPlan
     {
-        private readonly FrameNodeAdapter[] _nodes; private readonly IReadOnlyList<FrameNodeAdapter> _readOnlyNodes; private readonly IReadOnlyList<FrameCompositionDiagnostic> _diagnostics; private readonly IReadOnlyList<string> _availableDependencies;
-        internal FrameGraph(FrameNodeAdapter[] nodes,FrameCompositionDiagnostic[] diagnostics,string[] availableDependencies,string topologyHash,string reviewRoot,FrameGraphCompositionKind compositionKind){_nodes=nodes;_readOnlyNodes=Array.AsReadOnly(nodes);_diagnostics=Array.AsReadOnly(diagnostics);_availableDependencies=Array.AsReadOnly(availableDependencies);TopologyHash=topologyHash;ReviewRoot=reviewRoot;CompositionKind=compositionKind;}
+        private readonly FrameNodeAdapter[] _nodes; private readonly IReadOnlyList<FrameNodeAdapter> _readOnlyNodes; private readonly IReadOnlyList<BattleSystemECS.Engine.IFrameNode> _engineNodes; private readonly IReadOnlyList<FrameCompositionDiagnostic> _diagnostics; private readonly IReadOnlyList<string> _availableDependencies;
+        internal FrameGraph(FrameNodeAdapter[] nodes,FrameCompositionDiagnostic[] diagnostics,string[] availableDependencies,string topologyHash,string reviewRoot,FrameGraphCompositionKind compositionKind){_nodes=nodes;_readOnlyNodes=Array.AsReadOnly(nodes);var engineNodes=new BattleSystemECS.Engine.IFrameNode[nodes.Length];for(int i=0;i<nodes.Length;i++)engineNodes[i]=nodes[i];_engineNodes=Array.AsReadOnly(engineNodes);_diagnostics=Array.AsReadOnly(diagnostics);_availableDependencies=Array.AsReadOnly(availableDependencies);TopologyHash=topologyHash;ReviewRoot=reviewRoot;CompositionKind=compositionKind;}
         public IReadOnlyList<FrameNodeAdapter> Nodes=>_readOnlyNodes; public IReadOnlyList<FrameCompositionDiagnostic> Diagnostics=>_diagnostics; public IReadOnlyList<string> AvailableDependencies=>_availableDependencies; public string TopologyHash{get;} public string ReviewRoot{get;} public FrameGraphCompositionKind CompositionKind{get;}
+        IReadOnlyList<BattleSystemECS.Engine.IFrameNode> BattleSystemECS.Engine.IFrameExecutionPlan.Nodes=>_engineNodes;
         public void Execute(FrameExecutionContext context){FramePhaseMask current=FrameGraphValidator.ToMask(context.Time.Phase.Kind);for(int i=0;i<_nodes.Length;i++){FrameNodeAdapter node=_nodes[i];if((node.Metadata.ActivePhases&current)==0)continue;node.System.Execute(new NodeExecutionContext(context,node.Metadata.TimeDomain));}}
     }
     public sealed class FrameGraphBuilder

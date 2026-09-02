@@ -11,14 +11,28 @@ namespace BattleSystemECS.Core
     /// Central registry for all game systems — creates, wires dependencies, and assigns to FrameScheduler groups.
     /// Extracted from GameManager.Initialize() to eliminate the ~300-line "spaghetti" init method.
     ///
-    /// Adding a new system:
-    ///   1. Add a public property below
-    ///   2. Create it in CreateAll()
-    ///   3. Wire its SetXxx() dependencies in WireDependencies()
-    ///   4. Assign it to the correct scheduler group in AssignToGroups()
+    /// 新系统必须在 schema v3 中声明 owner、依赖、策略和 frame binding，
+    /// 由生成器发出 typed recipe，再经 ProductionSystemInstaller 按 Construction、
+    /// Wiring、Binding 三阶段执行并封存图；CreateAll/WireDependencies/AssignToGroups
+    /// 仅是受 session guard 约束的兼容 facade。
     /// </summary>
-    public class SystemRegistry
+    public sealed partial class SystemRegistry
     {
+        private enum InstallationState
+        {
+            New,
+            Creating,
+            Created,
+            Wiring,
+            Wired,
+            Binding,
+            Bound,
+            Failed
+        }
+
+        private InstallationState _installationState;
+        internal string? LastRegistrationFailureId { get; private set; }
+        internal RegistrationStage? LastRegistrationFailureStage { get; private set; }
         private readonly List<Core.GAS.TriggerDefinition> _runtimeTriggers = new List<Core.GAS.TriggerDefinition>();
         private Core.GAS.GameplayEffectDefinition _runtimeComboEffect;
         // ── Map ──
@@ -267,17 +281,17 @@ namespace BattleSystemECS.Core
         // ── EventBus ──
         public EventBus? EventBus { get; private set; }
 
-        // ═══════════════════════════════════════════════════════════════════
+        // 系统注册边界分隔线。
         //  Creation — one system per block, in dependency order
-        // ═══════════════════════════════════════════════════════════════════
+        // 系统注册阶段分隔线。
 
-        public void CreateAll(ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus = null)
+        internal void PrepareInstallation(ComponentStore store, GameConfig config)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
-            // 计算属性投影属于生产合同，在首个帧边界应用，避免暴露部分聚合状态。
             store.UseComputedAttributes = true;
             var combo = config.Combo ?? new ComboConfig();
-            if (combo.TriggerThreshold < 1) throw new Core.GAS.CatalogValidationException("Combo.triggerThreshold must be positive");
+            if (combo.TriggerThreshold < 1)
+                throw new Core.GAS.CatalogValidationException("Combo.triggerThreshold must be positive");
             if (combo.ComboDamageBonusPerKill < 0f || combo.ComboMaxMultiplier < 1f)
                 throw new Core.GAS.CatalogValidationException("Combo damage bonus/max multiplier is invalid");
             config.CompiledCatalog = Core.GAS.CatalogCompiler.CompileRuntimeExtensions(config.CompiledCatalog,
@@ -285,789 +299,207 @@ namespace BattleSystemECS.Core
             _runtimeComboEffect = config.CompiledCatalog.Effects[config.CompiledCatalog.Effects.Count - 1];
             _runtimeTriggers.Clear();
             _runtimeTriggers.Add(config.CompiledCatalog.Triggers[config.CompiledCatalog.Triggers.Count - 1]);
-            var battleEb = battleEventBus ?? NullEventBus.Instance;
-
-            // ── EventBus (needed early by several systems) ──
-            var eventBus = new EventBus();
-
-            // ── Map ──
-            Map = new MapSystem(logger, store);
-
-            // ── Tech Tree (needed by most systems) ──
-            var techConfig = TechTreeSystem.LoadConfig(logger);
-            TechTree = new TechTreeSystem(store, logger, playerId, techConfig, config);
-
-            // ── Pathfinding & Movement ──
-            Pathfinding = new PathfindingSystem(store);
-            DeployableTrap = new DeployableTrapSystem(store);
-            EnemyMovement = new EnemyMovementSystem(store, playerId, config.MapWidth, config);
-            EnemyMovement.SetPathfindingSystem(Pathfinding);
-            // Round 124 — Direction 1: Boss Path Trail AoE. Create the system and inject it
-            // into EnemyMovementSystem so the parallel pass can queue trail events. The actual
-            // drain runs in EnemyMovementSystem.Update()'s serial pass.
-            BossTrailAoe = new BossTrailAoeSystem(store, playerId);
-            EnemyMovement.SetBossTrailSystem(BossTrailAoe);
-
-            // ── Tower core systems ──
-            TowerPlacement = new TowerPlacementSystem(store, logger, config, battleEb);
-            TowerAttack = new TowerAttackSystem(store, logger, TechTree, 10, eventBus, battleEb);
-            // Round 143 Direction 1 — inject the effectiveness matrix for tower-vs-enemy damage
-            TowerAttack.SetGameConfig(config);
-            TowerUpgrade = new TowerUpgradeSystem(store, logger, config);
-            TowerExperience = new TowerExperienceSystem(store, config);
-            TowerSynergy = new TowerSynergySystem(store, logger);
-            TowerSynergy.LoadSynergyConfig();
-            // Round 180 Direction 5 — Fortress Aura (no JSON config, all thresholds in FortressConfig).
-            TowerFortress = new TowerFortressSystem(store, logger);
-            // Kill-triggered cooldown reset (ARPG/Roguelike mechanic)
-            KillCooldownReset = new KillCooldownResetSystem(store, config, playerId);
-            // Kill-triggered player sustain (heal / mana on tower kill)
-            HealOnKill = new HealOnKillSystem(store);
-            // Round176 Direction2 — Bloodlust: per-tower kill-stacking buff
-            Bloodlust = new BloodlustSystem(store, config);
-            // Round178 Direction6 — Pre-fight Buff: BuildPhase末「3-选-1」出战 buff.
-            // No external dependencies (reads GameConfig.PreFight + ComponentStore).
-            // WaveSpawningSystem is passed in via SubscribeToWaveEvents below in
-            // WireDependencies (after WaveSpawning is constructed).
-            PreFightBuff = new PreFightBuffSystem(store, config);
-            // Round174+ Direction3 — Momentum: per-(wave-time) ramping global buff.
-            // No construction-time external dependencies (reads GameConfig.Momentum
-            // + ComponentStore). WaveSpawningSystem is passed in via
-            // SubscribeToWaveEvents below in WireDependencies.
-            Momentum = new MomentumSystem(store, config);
-            // Round 207 Direction 2 — Adrenaline: low-HP / critical-HP player-side
-            // buff + one-shot Rush. No construction-time external dependencies
-            // (reads GameConfig.Adrenaline + ComponentStore). WaveSpawningSystem
-            // is NOT required (Adrenaline is purely per-frame; no wave-event
-            // hooks). Per-frame tick walks MAX_PLAYERS slots in O(MAX_PLAYERS).
-            Adrenaline = new AdrenalineSystem(store, config);
-            // Round 178+ Direction 5 — Crest / Tide System. No
-            // construction-time external dependencies (reads GameConfig.Crest
-            // + ComponentStore). WaveSpawningSystem is passed in via
-            // SetWaveSpawningSystem below in WireDependencies.
-            Crest = new CrestSystem(store, config);
-            TowerMorph = new TowerMorphSystem(store);
-
-            // ── Player attack ──
-            PlayerTowerAttack = new PlayerTowerAttackSystem(store, logger, playerId, config, TechTree, eventBus, battleEb);
-            Hero = new HeroSystem(store, playerId);
-            // Round 144 方向4 — Hero Active Skill Set. Constructed alongside Hero
-            //   and Skill (it needs config to resolve SkillName → SkillDef id).
-            //   Initialize() loads slot bindings from Data/Configs/hero_skills.json
-            //   and is idempotent (safe to call again on hot-reload).
-            HeroSkill = new HeroSkillSystem(store, playerId, config: config);
-            HeroSkill.SetConfig(config);
-            HeroSkill.Initialize();
-
-            // ── Spawning ──
-            WaveSpawning = new WaveSpawningSystem(store, logger, config, eventBus: battleEb);
-            Nest = new NestSystem(store, config, logger, playerId);
-            Nest.Initialize();
-
-            // ── Economy ──
-            Gold = new GoldSystem(store, logger, TechTree);
-            Upgrade = new UpgradeSystem(store, logger, playerId, config);
-            Interest = new InterestSystem(store, logger, config, playerId);
-
-            // ── Skills & Buffs & Mana ──
-            Skill = new SkillSystem(store, logger, playerId, config, TechTree);
-            Skill.InitializePlayerSkills();
-            Buff = new BuffSystem(store, playerId);
-            // Elemental reactions. This system existed for two feature rounds but was NEVER
-            // constructed (no `new ElementalReactionSystem(` anywhere, no registry field, no
-            // group slot), so three things it exclusively owns were dead:
-            //   1. element timer decay — EnemyElementStatus/EnemyElementTimer, written by
-            //      ApplyEnemyDamage's shield-break path and TowerAttackSystem's enchant path,
-            //      were never cleared, so element bits were effectively permanent;
-            //   2. PendingShieldBreaks consumption — the queue grew for the whole session;
-            //   3. EnemyExposureMask / EnemyExposureTimer writes — so the +30% off-element
-            //      vulnerability read by TowerAttackSystem and PlayerTowerAttackSystem could
-            //      never fire.
-            // Wiring it activates (3), which is a real combat-damage change, not a no-op.
-            ElementalReaction = new ElementalReactionSystem(store, playerId, logger);
-            Combo = new ComboSystem(store, config.Combo);
-            Mana = new ManaSystem(store, logger, config, playerId, TechTree);
-            Mana.Initialize();
-            // Round 175 Direction 1 — Mana Shield (mana → damage-absorption shield).
-            //   One per player slot; reads PlayerManaShieldCap / AbsorbRatio from
-            //   the store so the damage hot-path stays branch-cheap.
-            ManaShield = new ManaShieldSystem(store, config, playerId);
-            ManaShield.Initialize();
-            AutoSkill = new AutoSkillSystem(store, logger, playerId, Skill, config.AutoSkill);
-            GlobalSkill = new GlobalSkillSystem(store, config, logger, playerId, TechTree);
-
-            // ── Mana ↔ Skill wiring ──
-            Skill.InjectManaSystem(Mana);
-
-            // ── Reflect Tower / Tower Stealth ──
-            // Constructed HERE, before their first consumers (EnemyAI below and SuicideBomb
-            // further down), not after them. Both take only (store, playerId), so they have
-            // no ordering constraints of their own. Previously they were created after the
-            // systems that receive them as constructor arguments, so those systems captured
-            // null into readonly fields with no later setter — silently disabling reflect
-            // damage and stealth targeting for the suicide-bomber path.
-            ReflectTower = new ReflectTowerSystem(store, playerId);
-            TowerStealth = new TowerStealthSystem(store, playerId);
-
-            // ── Enemy AI & Abilities ──
-            EnemyAbility = new EnemyAbilitySystem(store, logger, playerId, config, eventBus);
-            EnemyAI = new EnemyAISystem(store, logger, playerId, config, EnemyAbility, TechTree, eventBus, ReflectTower);
-            // Round 119 Dir 3 — wire WaveSpawningSystem into EnemyAISystem so phase-triggered
-            // minion summons can be drained into SpawnMinionNearPosition() at end of Update.
-            EnemyAI.SetWaveSpawningSystem(WaveSpawning);
-
-            // ── Hit Shield ──
-            var hitShield = new HitShieldSystem(store, logger);
-            HitShield = hitShield;
-
-            // ── Tower Sabotage ──
-            TowerSabotage = new TowerSabotageSystem(store);
-
-            // ── Mana Burn ──
-            ManaBurn = new ManaBurnSystem(store, playerId);
-
-            // ── Phase ──
-            Phase = new PhaseSystem(store, playerId);
-
-            // ── Fear ──
-            Fear = new FearSystem(store, playerId);
-
-            // ── Enemy Strafe/Dodge ──
-            EnemyStrafe = new EnemyStrafeSystem(store, logger);
-
-            // ── Suicide Bomb ──
-            // ReflectTower / TowerStealth are constructed earlier (see the Enemy AI section)
-            // so both arrive non-null here.
-            SuicideBomb = new SuicideBombSystem(store, playerId, ReflectTower, TowerStealth);
-
-            // ── Desperation / Last Stand ──
-            Desperation = new DesperationSystem(store);
-
-            // ── Shop Reroll (BuildPhase offer pool) ──
-            ShopReroll = new ShopRerollSystem(store, logger, config, playerId);
-
-            // ── Burrow, Necromancer, LifeLink ──
-            EnemyBurrow = new EnemyBurrowSystem(store, playerId);
-            Necromancer = new NecromancerSystem(store, config, logger);
-            LifeLink = new EnemyLifeLinkSystem(store, config, logger);
-
-            // ── Fission, Morph ──
-            EnemyFission = new EnemyFissionSystem(store, config, logger);
-            EnemyMorph = new EnemyMorphSystem(store, config, logger);
-
-            // ── Environment ──
-            Terrain = new TerrainSystem(store, playerId, config);
-            Terrain.SetBuffSystem(Buff);
-            WaveMutator = new WaveMutatorSystem(store, playerId, logger);
-            WaveMutator.LoadMutators(config.WaveMutatorDefs);
-            Weather = new WeatherSystem(store, config);
-            DayNight = new DayNightSystem(store, config);
-            DayNight.Initialize(playerId);
-            EnemyMovement.SetWeatherSystem(Weather);
-            TowerAttack.SetWeatherSystem(Weather);
-            EnemyMovement.SetDayNightSystem(DayNight);
-            TowerAttack.SetDayNightSystem(DayNight);
-
-            // ── Enemy Strafe ──
-            TowerAttack.SetEnemyStrafeSystem(EnemyStrafe);
-
-            // ── Telegraph ──
-            Telegraph = new TelegraphSystem(store, logger, config, eventBus);
-            EnemyAbility.SetTelegraphSystem(Telegraph);
-
-            // ── Aura / Curse / Pull / Bleed ──
-            AuraTower = new AuraTowerSystem(store);
-            Curse = new CurseAuraSystem(store);
-            PullTower = new PullTowerSystem(store);
-            Bleed = new BleedSystem(store, playerId);
-            // Round 170 Direction 6 — Frostbite (non-stacking %-of-maxHP DoT)
-            Frostbite = new FrostbiteSystem(store, playerId);
-            // ── Taunt tower (force-enemy-target-this-tower aura) ──
-            Taunt = new TauntSystem(store);
-
-            // Round 122 Direction 2 — Heal Aura System. Created alongside the other
-            // aura-flavor systems (Taunt, Curse, AuraTower) since it shares the same
-            // tower-only effect semantics: opt-in via tower-config fields, zero-overhead
-            // when no heal-aura tower is on the field (radius==0 fast path).
-            HealAura = new HealAuraSystem(store);
-            // Round 126 Direction 4 — Thorns Aura System. Mirrors the HealAura wiring:
-            // opt-in via tower-config fields, zero-overhead when no thorns tower is on
-            // the field (IsThornsTower==false fast path). Runs in SkillBuffGroup like
-            // HealAura, but deals damage to enemies instead of healing friendly towers.
-            ThornsAura = new ThornsAuraSystem(store);
-
-            // Round 187 Direction 4 — Rally Buff. Subscribes to PlayerDamaged event
-            // in its constructor; the event bus is shared with EnemyAbility / EnemyAI
-            // (created at the top of CreateAll). Runs in SkillBuffGroup; per-frame
-            // cost is O(active_towers) only when at least one PlayerRallyActive is true.
-            Rally = new RallySystem(store, logger, eventBus);
-
-            // Round 138 — Per-Tower Active Skill System. Pure state machine that ticks
-            //   per-tower cooldowns and exposes TriggerTowerActive(towerId) for the
-            //   player/HUD. No effect dispatch yet (SkillSystem refactor is a future
-            //   round) — this round establishes the gate + cooldown contract.
-            TowerActiveSkill = new TowerActiveSkillSystem(store, config);
-
-            // Round 142 方向5 — Aggro / Focus Fire System. Player-driven mark-focus
-            //   command. Constructed after the tower-side systems (no per-tower
-            //   dependency; operates on enemy-side state) and before FireTrail
-            //   (which is also a passive system). Wired into CombatGroup.Update()
-            //   last in the combat phase, after TowerActiveSkill.
-            Aggro = new AggroSystem(store);
-
-            // Round 201 Direction 8 — Echo Clone System. Sentinel-gated per-frame
-            //   tick (O(1) when no parent opts in). Wired last in Combat. Stateless
-            //   beyond the store, so no BuildPhase wiring needed.
-            EchoClone = new EchoCloneSystem(store);
-
-            // Round 145 Direction 3 — Per-Tower Modifier Pool. Constructed early so
-            //   TowerPlacementSystem can call RollAtPlacement() right after AddTower.
-            //   BuildPhase-only system — no per-frame work; the modifier is rolled
-            //   once and consumed lazily by combat systems.
-            TowerModifier = new TowerModifierSystem(store, config);
-
-            // Round 128 Direction 5 — Fire Trail System. Passive wrapper, no
-            // dependencies on Buff/Skill systems. Constructed early so it can be
-            // injected into TowerAttackSystem via WireDependencies below.
-            FireTrail = new FireTrailSystem(store);
-
-            // ── Projectile ──
-            Projectile = new ProjectileSystem(store, logger, battleEb);
-
-            // ── Objective / Branch / Resource ──
-            Objective = new ObjectiveSystem(store, playerId, eventBus);
-            WaveBranch = new WaveBranchSystem(store, logger, config, stateMachine);
-            ResourceNode = new ResourceNodeSystem(store, logger, playerId);
-            WavePreview = new WavePreviewSystem(store, config, playerId);
-            // Round 110 Direction 10 — DoomClock countdown + final score helper.
-            // Created here so it shares the same ComponentStore as the other
-            // objective / post-death systems. The countdown itself is ticked
-            // by PostDeathGroup.DoomClock.Update(...) each WavePhase frame.
-            DoomClock = new DoomClockSystem(store, playerId);
-
-            // Round 196 Direction 3 — Soul Harvest System. Per-kill harvesting wires
-            // via store.OnEnemyKilled in WireDependencies below; per-frame regen
-            // tick is invoked by PostDeathGroup. Stateless beyond ComponentStore
-            // reads (no per-frame state) — zero cost when no enemies are killed
-            // and no regen is configured.
-            SoulHarvest = new SoulHarvestSystem(store, config.SoulHarvest, logger);
-
-            // ── Replay / Recording (per-frame telemetry, opt-in via GameConfig.Replay.Enabled) ──
-            Replay = new ReplaySystem(store, config, playerId);
-
-            // ── Hot Zone ──
-            HotZone = new HotZoneSystem(store, config, playerId);
-
-            // ── Round 200 Direction 2 — Elemental Terrain Zone ──
-            // Distinct from HotZone (placement bonus) and HazardZone (single-effect DoT):
-            // player-spawned per-element ground effects with stacks + slow + DoT.
-            TerrainZone = new TerrainZoneSystem(store, config, playerId, Buff);
-
-            // ── Frost Zone (Round 82 Direction 1) — instantiates per registry
-            FrostZone = new FrostZoneSystem(store);
-
-            // ── Wander Roam (Round 84 Direction 6) — instantiates per registry
-            WanderRoam = new WanderRoamSystem(store);
-
-            // ── Magnetize (displacement fields) ──
-            Magnetize = new MagnetizeSystem(store, logger);
-            Sapper = new SapperSystem(store, logger);
-
-            // ── Wisp aura pets (Heal / Slow / Curse) ──
-            Wisp = new WispSystem(store, logger);
-
-            // ── Adaptive Difficulty ──
-            AdaptiveDifficulty = new AdaptiveDifficultySystem(store, config);
-            WaveSpawning.SetAdaptiveDifficulty(AdaptiveDifficulty);
-            // Round 120 Dir 3 — wire WaveSpawning back to AdaptiveDifficulty so OnWaveComplete
-            // can write the rubber-band spawn multiplier for the next wave.
-            AdaptiveDifficulty.SetWaveSpawningSystem(WaveSpawning);
-
-            // ── Misc ──
-            Pickup = new PickupSystem(store, config, logger);
-            Inventory = new InventorySystem(store, config, logger);
-            Ascension = new AscensionSystem(store, logger, config);
-            Ascension.SelectModifier("tough_enemies");
-            WaveSpawning.SetAscensionSystem(Ascension);
-            Save = new SaveSystem(store, playerId);
-
-            // ── Corpse effects ──
-            CorpseEffect = new CorpseEffectSystem(store, config, Buff, logger);
-            CorpseEffect.LoadCorpseEffects();
-
-            // ── Healing zones ──
-            HealingZone = new HealingZoneSystem(store, logger);
-
-            // ── Zone control (CC zones: Slow/Stun/Freeze/Root) ──
-            ZoneControl = new ZoneControlSystem(store, logger);
-
-            // ── Path modifier ──
-            PathModifier = new PathModifierSystem(store);
-            Pull = new PullSystem(store, playerId);
-
-            // ── Path block system (dynamic path blocking) ──
-            PathBlock = new PathBlockSystem(store);
-
-            // ── Random events ──
-            RandomEvent = new RandomEventSystem(store, config);
-
-            // ── Chrono tower ──
-            ChronoTower = new ChronoTowerSystem(store);
-
-            // ── Round 106 Direction 2 — Mine / Trap tower ──
-            Mine = new MineSystem(store, logger, config, playerId);
-
-            // ── Round 173 Direction 1 — Shrine Tower (persistent pure-buff aura) ──
-            // Created alongside Mine because both are "non-attack" tower-flavor systems
-            // with their own TowerType enum value. Sentinel-gated fast path when no
-            // shrine is on the field.
-            TowerShrine = new TowerShrineSystem(store);
-
-            // ── Round 177 Direction 2 — Beacon Tower (active command-post broadcast buff) ──
-            //   Created alongside Shrine (both are non-attack "support" tower-flavor systems
-            //   with their own TowerType enum value and per-frame additive cache arrays).
-            //   Sentinel-gated fast path when no beacon is on the field. Always broadcasts
-            //   BOTH damage and attack-speed bonuses together to every friendly tower in range.
-            TowerBeacon = new TowerBeaconSystem(store);
-
-            // ── Round 107 Direction 6 — Target Mark subsystem ──
-            Mark = new MarkSystem(store, playerId);
-
-            // ── Round 200 Direction 5 — Death Mark subsystem (stack + execute + damage bonus) ──
-            DeathMark = new DeathMarkSystem(store, playerId);
-
-            // ── Round 206 Direction 1 — Culling subsystem (HP-threshold instant execute) ──
-            // Event-driven system. Per-hit TryCull is called from TowerAttackSystem after
-            // each successful hit. Per-frame Update is a no-op. OnWaveStart resets the
-            // per-player culling stacks (combo reset). Sentinel-gated via CullingConfig.
-            Culling = new CullingSystem(store, playerId);
-
-            // ── Round 109 Direction 5 — Time Rewind snapshot ring ──
-            TimeRewind = new TimeRewindSnapshotSystem(store);
-
-            // ── Store EventBus ──
-            EventBus = eventBus;
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        //  Dependency wiring — SetXxx() injections & event subscriptions
-        // ═══════════════════════════════════════════════════════════════════
+        public void CreateAll(ComponentStore store, GameConfig config, IRenderer logger, int playerId,
+            StateMachine stateMachine, IBattleEventBus? battleEventBus = null)
+        {
+            if (store == null) throw new ArgumentNullException(nameof(store));
+            if (config == null) throw new ArgumentNullException(nameof(config));
+            if (logger == null) throw new ArgumentNullException(nameof(logger));
+            if (stateMachine == null) throw new ArgumentNullException(nameof(stateMachine));
+            var plan = SystemRegistrationGraphValidator.GetStableOrder(SystemRegistrationManifest.Entries);
+            RequireInstallationState(InstallationState.New, nameof(CreateAll));
+            _installationState = InstallationState.Creating;
+            LastRegistrationFailureId = null;
+            LastRegistrationFailureStage = null;
+            try
+            {
+                try
+                {
+                    PrepareInstallation(store, config);
+                }
+                catch
+                {
+                    LastRegistrationFailureId = "bootstrap";
+                    LastRegistrationFailureStage = RegistrationStage.Construction;
+                    throw;
+                }
+                foreach (var entry in plan)
+                    if (!entry.IsDisabled)
+                    {
+                        try
+                        {
+                            entry.Factory!(this, store, config, logger, playerId, stateMachine, battleEventBus);
+                        }
+                        catch
+                        {
+                            LastRegistrationFailureId = entry.Id;
+                            LastRegistrationFailureStage = RegistrationStage.Construction;
+                            throw;
+                        }
+                    }
+                _installationState = InstallationState.Created;
+            }
+            catch
+            {
+                _installationState = InstallationState.Failed;
+                throw;
+            }
+        }
+
+        // 系统接线阶段分隔线。
 
         public void WireDependencies(ComponentStore store, int playerId)
         {
-            // ── TowerAttack dependency wiring ──
-            TowerAttack?.SetBuffSystem(Buff);
-            TowerAttack?.SetBleedSystem(Bleed);
-            TowerAttack?.SetTowerExperienceSystem(TowerExperience);
-            TowerAttack?.SetProjectileSystem(Projectile);
-            TowerAttack?.SetLifeLinkSystem(LifeLink);
-            TowerAttack?.SetHitShieldSystem(HitShield);
-            TowerAttack?.SetTowerStealthSystem(TowerStealth);
-            TowerAttack?.SetDesperationSystem(Desperation);
-            // Round 128 Direction 5 — Fire Trail System. Inject after Desperation
-            // (last-situation system) to keep the wiring list ordered by
-            // injection-time-of-arrival. Optional dependency; null-safe at call
-            // site.
-            TowerAttack?.SetFireTrailSystem(FireTrail);
-
-            // Round 145 Direction 3 — Per-Tower Modifier Pool: inject into TowerPlacementSystem
-            //   so PlaceTower() can roll the modifier at placement time. Optional dependency;
-            //   null-safe (the placement path branches on null before calling).
-            TowerPlacement?.SetTowerModifierSystem(TowerModifier);
-
-            // ── PlayerTowerAttack wiring ──
-            PlayerTowerAttack?.SetLifeLinkSystem(LifeLink);
-            PlayerTowerAttack?.SetHitShieldSystem(HitShield);
-
-            // ── Skill wiring ──
-            Skill?.InjectDotSystem(Buff);
-            Skill?.InjectHealingZoneSystem(HealingZone);
-            Skill?.InjectTimeRewindSystem(TimeRewind);
-            // Round 133 Direction 5 — wire NecromancerSystem into SkillSystem so the
-            // MassResurrect (AreaShapeType.MassResurrect = 18) ability can delegate to
-            // NecromancerSystem.MassResurrect for the actual AOE corpse revive. Optional
-            // dependency: null-safe at the call site (ExecuteAbility case 18 logs a
-            // warning and returns 0 if not injected).
-            Skill?.InjectNecromancerSystem(Necromancer);
-            if (Necromancer == null || TimeRewind == null)
-                throw new InvalidOperationException("production ability payload dependencies are not constructed");
-            AbilityPayloads = new ProductionAbilityPayloadHandler(store, Necromancer, TimeRewind);
-            Skill?.SetPayloadHandler(AbilityPayloads);
-            HeroSkill?.SetPayloadHandler(AbilityPayloads);
-            TowerActiveSkill?.SetPayloadHandler(AbilityPayloads);
-            GlobalSkill?.SetPayloadHandler(AbilityPayloads);
-            EnemyAbility?.SetPayloadHandler(AbilityPayloads);
-
-            // ── Mark wiring: subscribe to OnEnemyKilled to free the per-entity
-            //    threshold-fired latch on enemy destroy (avoids ID-reuse leakage). ──
-            store.OnEnemyKilled += (enemyId, pid) => Mark?.OnEnemyDestroyed(enemyId);
-
-            // ── Round 200 Direction 5 — Death Mark wiring: same OnEnemyKilled latch reset. ──
-            store.OnEnemyKilled += (enemyId, pid) => DeathMark?.OnEnemyDestroyed(enemyId);
-
-            // ── Round 206 Direction 1 — Culling wiring: inject the CullingSystem into
-            //   TowerAttackSystem so it can call TryCull on every successful hit. Also
-            //   subscribe to OnWaveStart (latch-driven via WaveSpawningSystem) so the
-            //   per-player stacks reset to 0 on every new wave (combo reset). ──
-            TowerAttack?.SetCullingSystem(Culling);
-            if (WaveSpawning != null)
+            if (store == null) throw new ArgumentNullException(nameof(store));
+            var plan = SystemRegistrationGraphValidator.GetStableOrder(
+                SystemRegistrationManifest.Entries);
+            RequireInstallationState(InstallationState.Created, nameof(WireDependencies));
+            _installationState = InstallationState.Wiring;
+            LastRegistrationFailureId = null;
+            LastRegistrationFailureStage = null;
+            try
             {
-                WaveSpawning.OnWaveStart += () => Culling?.OnWaveStart();
+                foreach (var entry in plan)
+                    if (!entry.IsDisabled)
+                    {
+                        try
+                        {
+                            entry.Wire!(this, store, playerId);
+                        }
+                        catch
+                        {
+                            LastRegistrationFailureId = entry.Id;
+                            LastRegistrationFailureStage = RegistrationStage.Wiring;
+                            throw;
+                        }
+                    }
+                _installationState = InstallationState.Wired;
             }
-            // ── Round 206 Direction 1 — Wire GoldSystem → CullingSystem event for the
-            //   per-kill bonus gold payout (BaseBonusGold * (1 + stacks * pct)). ──
-            Gold?.SubscribeToCulling(Culling);
-
-            // ── OnEnemyKilled → Combo + Necromancer ──
-            store.OnEnemyKilled += (enemyId, pid) => Combo?.HandleComboIncrement(pid);
-            store.OnEnemyKilled += (enemyId, pid) => Necromancer?.OnEnemyKilled(enemyId, pid);
-
-            // Round 196 Direction 3 — Soul Harvest subscribes to OnEnemyKilled to
-            // credit per-kill soul reward. The regen tick is invoked from
-            // PostDeathGroup. Update() — per-frame cost is O(MAX_PLAYERS) when at
-            // least one player has PlayerSoulRegen > 0, zero otherwise (sentinel).
-            SoulHarvest?.SubscribeToEvents();
-
-            // ── OnTowerKill → TowerExperience ──
-            store.OnTowerKill += (enemyId, pid, towerId) => TowerExperience?.HandleEnemyKilled(enemyId, pid, towerId);
-
-            // ── OnTowerKill + OnEnemyKilled → KillCooldownReset (cooldown reset on kill) ──
-            KillCooldownReset?.SubscribeToEvents();
-
-            // ── OnTowerKill → HealOnKill (player heal / mana restore on tower kill) ──
-            HealOnKill?.SubscribeToEvents();
-
-            // ── OnTowerKill → Bloodlust (per-tower kill-stacking attack-speed / damage buff) ──
-            Bloodlust?.SubscribeToEvents();
-
-            // ── Round178 Direction6 — Pre-fight Buff: subscribe to OnWaveStart /
-            // OnWaveComplete so the system flips its wave-pending latch and
-            // applies / clears the per-tower cache automatically. ──
-            PreFightBuff?.SubscribeToWaveEvents(WaveSpawning);
-
-            // ── Round174+ Direction3 — Momentum: subscribe to OnWaveStart /
-            // OnWaveComplete so the system flips its wave-running latch and
-            // (optionally) resets the per-player timer at wave start. ──
-            Momentum?.SubscribeToWaveEvents(WaveSpawning);
-
-            // Round 178+ Direction 5 — Crest / Tide System. Inject the
-            // WaveSpawningSystem so HandleWaveStart can read the current
-            // wave index, then subscribe to OnWaveStart / OnWaveComplete
-            // to stamp + clear the per-enemy / per-player crest caches.
-            Crest?.SetWaveSpawningSystem(WaveSpawning);
-            Crest?.SubscribeToWaveEvents();
-
-            // ── CorpseEffect subscribes to OnEnemyKilled ──
-            CorpseEffect?.SubscribeToOnEnemyKilled();
-
-            // ── OnWaveComplete hooks ──
-            if (WaveSpawning != null)
+            catch
             {
-                WaveSpawning.OnWaveComplete += () => TechTree?.OnWaveComplete();
-                WaveSpawning.OnWaveComplete += () => Interest?.OnWaveComplete();
-                WaveSpawning.OnWaveComplete += () => Save?.SaveCheckpoint();
-                WaveSpawning.OnWaveComplete += () =>
-                {
-                    if (WaveBranch != null && WaveSpawning != null)
-                        WaveBranch.CheckAndActivateBranch(
-                            WaveSpawning.GetCurrentWave() - 1,
-                            WaveSpawning.GetCurrentLevel()
-                        );
-                };
-                // Breather-wave reward hook: GoldSystem applies heal + CDR + gold x2 when a Breather wave ends.
-                Gold?.SubscribeToBreatherWave(WaveSpawning);
-                // Decaying-Wave-Bounty hook: GoldSystem resets PlayerWaveKillCount when each new wave starts.
-                Gold?.SubscribeToWaveStart(WaveSpawning);
+                _installationState = InstallationState.Failed;
+                throw;
             }
-
-            // ── OnWaveStart hooks ──
-            if (WaveSpawning != null)
-            {
-                WaveSpawning.OnWaveStart += () =>
-                {
-                    int wave = WaveSpawning.GetCurrentWave();
-                    PlayerTowerAttack?.SetWaveNumber(wave);
-                    TowerAttack?.SetWaveNumber(wave);
-                    Skill?.SetWaveNumber(wave);
-                    Combo?.ResetCombo(playerId);
-                    WaveMutator?.OnWaveStart(wave);
-                };
-                // WavePreview handles its own wave-start recompute inside HandleWaveStart
-                // (queries GetCurrentLevel/GetCurrentWave directly from the spawner).
-                WavePreview?.Subscribe(WaveSpawning);
-            }
-            // Round 126 Direction 4 — stashed so AssignToGroups can plumb playerId into
-            // the SkillBuffGroup. ThornsAuraSystem.Update needs the killing-player id
-            // to attribute QueueEnemyDeath calls (matches BleedSystem / TowerAttackSystem
-            // behavior). SystemRegistry itself has no SkillBuff field — the property
-            // lives on FrameScheduler.
-            _thornsAuraPlayerId = playerId;
         }
 
         private int _thornsAuraPlayerId = 0;
 
-        // ═══════════════════════════════════════════════════════════════════
+        // 帧组分配阶段分隔线。
         //  Assign to FrameScheduler groups — one block per group
         // ═══════════════════════════════════════════════════════════════════
 
+        internal void FinalizeBindings(FrameScheduler scheduler, bool seal)
+        {
+            scheduler.Build.ClearBindings();
+            scheduler.Build.Register("build.gold.update", () => scheduler.Build.Gold, (st, dt) => Gold!.Update());
+            scheduler.Build.Register("build.upgrade.update", () => scheduler.Build.Upgrade, (st, dt) => Upgrade!.Update());
+            scheduler.Build.Register("build.skill.update", () => scheduler.Build.Skill, (st, dt) => Skill!.Update(dt, allowCombat: false));
+            scheduler.Build.Register("build.auto-skill.update", () => scheduler.Build.AutoSkill, (st, dt) => AutoSkill!.Update(allowCombat: false));
+            scheduler.Build.Register("build.interest.update", () => scheduler.Build.Interest, (st, dt) => Interest!.Update());
+            scheduler.Build.Register("build.mana.update", () => scheduler.Build.Mana, (st, dt) => Mana!.Update(dt, isBuildPhase: true));
+            scheduler.Build.Register("build.mana-shield.update", () => scheduler.Build.ManaShield, (st, dt) => ManaShield!.Update(dt));
+            scheduler.Build.Register("build.pre-fight-buff.update", () => scheduler.Build.PreFightBuff, (st, dt) => PreFightBuff!.Update(dt));
+            scheduler.Build.Register("build.resource-node.update", () => scheduler.Build.ResourceNode, (st, dt) => ResourceNode!.Update(dt, GameState.BuildPhase));
+            scheduler.Build.Register("build.objective.update", () => scheduler.Build.Objective, (st, dt) => Objective!.Update(dt, GameState.BuildPhase));
+            scheduler.Build.Register("build.global-skill.update", () => scheduler.Build.GlobalSkill, (st, dt) => GlobalSkill!.Update(dt, isBuildPhase: true));
+            scheduler.Build.Register("build.desperation.update", () => scheduler.Build.Desperation, (st, dt) => Desperation!.Update());
+            scheduler.Build.Register("build.shop-reroll.update", () => scheduler.Build.ShopReroll, (st, dt) => ShopReroll!.Update());
+            scheduler.Build.Register("build.skill.reject-pending", () => scheduler.Build.Skill, (st, dt) => Skill!.RejectPendingSkillDamage());
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.gold.update"));
+            if (FrameBindingFacts.TryGet("build.tower-income.update", out var towerIncomeFact))
+                scheduler.RegisterBuildFrameBinding(towerIncomeFact);
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.upgrade.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.skill.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.auto-skill.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.tower-relocate.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.interest.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.mana.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.mana-shield.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.pre-fight-buff.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.resource-node.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.objective.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.global-skill.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.desperation.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.shop-reroll.update"));
+            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.skill.reject-pending"));
+            scheduler.PreGame.RegisterBoundFrameAdapters(scheduler);
+            scheduler.Spawning.RegisterBoundFrameAdapters(scheduler);
+            scheduler.AI.RegisterFrameBindings(scheduler);
+            scheduler.Movement.RegisterFrameBindings(scheduler);
+            scheduler.Terrain.RegisterFrameBindings(scheduler);
+            scheduler.CombatSetup.RegisterFrameBindings(scheduler);
+            scheduler.Spatial.RegisterFrameBindings(scheduler);
+            scheduler.Combat.RegisterFrameBindings(scheduler);
+            scheduler.SkillBuff.RegisterFrameBindings(scheduler);
+            scheduler.PostDeath.RegisterFrameBindings(scheduler);
+            scheduler.ConfigureGraphComposition(FrameGraphCompositionKind.ProductionRegistry);
+            if (seal) scheduler.SealGraphComposition();
+        }
+
         public void AssignToGroups(FrameScheduler scheduler)
         {
-            AssignToGroupsCore(scheduler, true);
+            AssignToGroupsCore(scheduler, true, nameof(AssignToGroups));
         }
 
         internal void AssignToGroupsForValidation(FrameScheduler scheduler)
         {
-            AssignToGroupsCore(scheduler, false);
+            AssignToGroupsCore(scheduler, false, nameof(AssignToGroupsForValidation));
         }
 
-        private void AssignToGroupsCore(FrameScheduler scheduler, bool seal)
+        private void AssignToGroupsCore(FrameScheduler scheduler, bool seal, string operation)
         {
-            scheduler.SetSkillSystem(Skill);
-            scheduler.SetGlobalSkillSystem(GlobalSkill);
-            scheduler.SetHeroSkillSystem(HeroSkill);
-            scheduler.SetTowerActiveSkillSystem(TowerActiveSkill);
-            scheduler.ConfigureGameplayRuntime(_runtimeTriggers);
-            scheduler.Store.GameplayTriggersRuntime.RegisterEffect(_runtimeComboEffect);
-            // ── BuildPhase ──
-            scheduler.Build.Gold = Gold;
-            scheduler.Build.TowerIncome = null;
-            scheduler.Build.Upgrade = Upgrade;
-            scheduler.Build.Skill = Skill;
-            scheduler.Build.AutoSkill = AutoSkill;
-            scheduler.Build.TowerRelocate = null;
-            scheduler.Build.Interest = Interest;
-            scheduler.Build.Mana = Mana;
-            // Round 175 Direction 1 — Mana Shield ticks in both Build and Combat phases
-            scheduler.Build.ManaShield = ManaShield;
- // Round178 Direction6 — Pre-fight Buff: BuildPhase tick rolls options at
- // the WaveRunning→WavePending transition (wave just ended, BuildPhase
- // just began). O(MAX_PLAYERS) per tick when _wavePending==true,
- // otherwise sentinel-gated no-op.
- scheduler.Build.PreFightBuff = PreFightBuff;
-            scheduler.Build.Objective = Objective;
-            scheduler.Build.ResourceNode = ResourceNode;
-            scheduler.Build.GlobalSkill = GlobalSkill;
-            scheduler.Build.Desperation = Desperation;
-            scheduler.Build.ShopReroll = ShopReroll;
-
-            // ── PreGame ──
-            scheduler.PreGame.WaveSpawning = WaveSpawning;
-            scheduler.PreGame.Weather = Weather;
-            scheduler.PreGame.DayNight = DayNight;
-            scheduler.PreGame.AdaptiveDifficulty = AdaptiveDifficulty;
-            scheduler.PreGame.Construction = null;
-            scheduler.PreGame.RandomEvent = RandomEvent;
-            scheduler.PreGame.Desperation = Desperation;
-            scheduler.PreGame.TimeRewind = TimeRewind;
-
-            // ── Spawning ──
-            scheduler.Spawning.WaveSpawning = WaveSpawning;
-            scheduler.Spawning.Nest = Nest;
-
-            // ── AI ──
-            scheduler.AI.EnemyAI = EnemyAI;
-            scheduler.AI.EnemyAbility = EnemyAbility;
-            EnemyAbility?.SetPhaseContext(PhaseContext.FromGameState(scheduler.Phase));
-            scheduler.AI.Burrow = EnemyBurrow;
-            scheduler.AI.Necromancer = Necromancer;
-            scheduler.AI.LifeLink = LifeLink;
-            scheduler.AI.EnemyAffix = null;
-            scheduler.AI.ManaBurn = ManaBurn;
-            scheduler.AI.Phase = Phase;
-            scheduler.AI.Fear = Fear;
-            scheduler.AI.ZoneControl = ZoneControl;
-            scheduler.AI.EnemyStrafe = EnemyStrafe;
-            scheduler.AI.ReflectTower = ReflectTower;
-            scheduler.AI.Magnetize = Magnetize;
-            scheduler.AI.Sapper = Sapper;
-
-            // ── Movement ──
-            scheduler.Movement.Wound = null;
-            scheduler.Movement.Pathfinding = Pathfinding;
-            scheduler.Movement.EnemyMovement = EnemyMovement;
-            scheduler.Movement.PathModifier = PathModifier;
-            scheduler.Movement.Pull = Pull;
-            scheduler.Movement.EnemyHealer = null;
-            scheduler.Movement.StealGold = null;
-            scheduler.Movement.Summon = null;
-            scheduler.Movement.PathBlock = PathBlock;
-            scheduler.Movement.DeployableTrap = DeployableTrap;
-
-            // ── Terrain + Mutators + Morph ──
-            scheduler.Terrain.Terrain = Terrain;
-            scheduler.Terrain.WaveMutator = WaveMutator;
-            scheduler.Terrain.EnemyMorph = EnemyMorph;
-
-            // ── Combat Setup ──
-            scheduler.CombatSetup.PlayerTowerAttack = PlayerTowerAttack;
-            scheduler.CombatSetup.Hero = Hero;
-            scheduler.CombatSetup.TowerAttack = TowerAttack;
-            scheduler.CombatSetup.TowerOvercharge = null;
-            scheduler.CombatSetup.TowerSynergy = TowerSynergy;
-            // Round 180 Direction 5 — Fortress cluster scan lives in CombatSetup (frame cache).
-            scheduler.CombatSetup.TowerFortress = TowerFortress;
-            scheduler.CombatSetup.TowerLink = null;
-            scheduler.CombatSetup.Skill = Skill;
-            scheduler.CombatSetup.AuraTower = AuraTower;
-            scheduler.CombatSetup.Curse = Curse;
-            scheduler.CombatSetup.PullTower = PullTower;
-            scheduler.CombatSetup.Mana = Mana;
-            scheduler.CombatSetup.GlobalSkill = GlobalSkill;
-            scheduler.CombatSetup.HitShield = HitShield;
-            scheduler.CombatSetup.HotZone = HotZone;
-            scheduler.CombatSetup.FrostZone = FrostZone;
-            scheduler.CombatSetup.TerrainZone = TerrainZone;
-            scheduler.CombatSetup.WanderRoam = WanderRoam;
-            scheduler.CombatSetup.Taunt = Taunt;
-
-            // ── Spatial ──
-            scheduler.Spatial.PatrolTower = null;
-            scheduler.Spatial.ChronoTower = ChronoTower;
-            scheduler.Spatial.Fog = null;
-            scheduler.Spatial.PointDefense = null;
-            scheduler.Spatial.Telegraph = Telegraph;
-            scheduler.Spatial.Mine = Mine;
-
-            // ── Combat ──
-            scheduler.Combat.PlayerTowerAttack = PlayerTowerAttack;
-            scheduler.Combat.TowerOvercharge = null;
-            scheduler.Combat.Heat = null; // HeatSystem — heat accumulation + overheat state
-            scheduler.Combat.Demolish = null;
-            scheduler.Combat.HitShield = HitShield;
-            scheduler.Combat.TowerSabotage = TowerSabotage;
-            scheduler.Combat.Hero = Hero;
-            scheduler.Combat.SuicideBomb = SuicideBomb;
-            scheduler.Combat.ReflectTower = ReflectTower;
-            scheduler.Combat.TowerAttack = TowerAttack;
-            scheduler.Combat.TowerMorph = TowerMorph;
-            scheduler.Combat.TowerStealth = TowerStealth;
-            scheduler.Combat.TowerSynergy = TowerSynergy;
-            // Round 180 Direction 5 — Fortress reference exposed in Combat group for
-            //   future per-frame hooks (currently Update is a no-op; SetTurn does the work).
-            scheduler.Combat.TowerFortress = TowerFortress;
-            scheduler.Combat.TowerLink = null;
-            scheduler.Combat.AuraTower = AuraTower;
-            scheduler.Combat.Curse = Curse;
-            scheduler.Combat.PullTower = PullTower;
-            scheduler.Combat.TowerSilence = null;
-            scheduler.Combat.Dispel = null;
-            scheduler.Combat.Projectile = Projectile;
-            scheduler.Combat.EnemyProjectile = null;
-            scheduler.Combat.Pickup = Pickup;
-            scheduler.Combat.Mana = Mana;
-            // Round 175 Direction 1 — Mana Shield runs in the combat phase right
-            //   after Mana so it sees the freshly-regenerated mana pool.
-            scheduler.Combat.ManaShield = ManaShield;
-            scheduler.Combat.GlobalSkill = GlobalSkill;
-            scheduler.Combat.Taunt = Taunt;
-            // Round 138 — Per-tower active skill (cooldown tick).
-            scheduler.Combat.TowerActiveSkill = TowerActiveSkill;
-            // Round 142 方向5 — Aggro / Focus Fire (per-frame duration tick). Wired
-            //   last in the combat phase, after TowerActiveSkill. O(1) when no
-            //   focus is active; O(n_enemies) when at least one enemy has an
-            //   active focus assignment.
-            scheduler.Combat.Aggro = Aggro;
-            // Round 201 Direction 8 — Echo Clone per-frame tick. Wired last in
-            // the combat phase, after HeroSkill. O(1) when no opt-in parent
-            // is on the field (sentinel _hasAnyEchoCapableParent in the system).
-            scheduler.Combat.EchoClone = EchoClone;
-            // Round 176 Direction 2 — Bloodlust per-frame tick. Wired last in
-            // the combat phase, after EchoClone. O(activeTowers) per frame so
-            // cost is bounded by the deployed tower count (typically <20).
-            scheduler.Combat.Bloodlust = Bloodlust;
-            // Round174+ Direction3 — Momentum per-frame tick. Wired last in
-            // the combat phase, after Bloodlust. O(MAX_PLAYERS + activeTowers)
-            // per frame so cost is bounded by the deployed tower count and
-            // the player count (typically 1, capped at MAX_PLAYERS).
-            scheduler.Combat.Momentum = Momentum;
-            // Round 207 Direction 2 — Adrenaline per-frame tick. Wired last in
-            // the combat phase (after Momentum, before Culling) so the freshly-
-            // computed tier-derived attack-speed bonus and rush-frame count are
-            // visible to PlayerTowerAttackSystem on the *next* frame. O(MAX_PLAYERS)
-            // per tick. Sentinel fast path: disabled or degenerate thresholds →
-            // single O(MAX_PLAYERS) clear-pass.
-            scheduler.Combat.Adrenaline = Adrenaline;
-            // Round 178+ Direction 5 — Crest System. Wired last in the
-            // combat phase, after Momentum. Per-frame Update() is a no-op
-            // (event-driven system); the work happens in
-            // OnWaveStart / OnWaveComplete handlers.
-            scheduler.Combat.Crest = Crest;
-            // Round 206 Direction 1 — Culling system. Wired in the combat phase after
-            //   Crest (sentinel-gated, no per-frame work; the per-hit hot path is
-            //   invoked from TowerAttackSystem via the injected CullingSystem reference).
-            scheduler.Combat.Culling = Culling;
-            // Round 144 方向4 — Hero Active Skill Set per-frame cooldown tick. Wired
-            //   last in the combat phase, after Aggro. O(1) when no skill is
-            //   configured (sentinel _anySkillConfigured in the system).
-            scheduler.Combat.HeroSkill = HeroSkill;
-            // Round 173 Direction 1 — Shrine Tower: resolve persistent aura buffs.
-            //   Runs after AuraTower.ResolveAuraBuffs (both are serial aura-phase
-            //   passes) and before the projectile/buff downstream consumers, so
-            //   any v2 wiring that consumes the cached bonuses sees fresh values.
-            scheduler.Combat.TowerShrine = TowerShrine;
-            // Round 177 Direction 2 — Beacon Tower: resolve active broadcast buffs.
-            //   Runs immediately after Shrine.ResolveShrineBuffs (both are serial
-            //   aura-phase passes) and before the projectile/buff downstream consumers.
-            //   Both beacon damage and atk-spd cache arrays are written to per-tower
-            //   additive slots and consumed by TowerAttackSystem in v2.
-            scheduler.Combat.TowerBeacon = TowerBeacon;
-
-            // ── Skill / Buff / Bleed ──
-            scheduler.SkillBuff.Buff = Buff;
-            scheduler.SkillBuff.Skill = Skill;
-            // Elemental reactions run in SkillBuff (Phase 9) because that phase is the only
-            // window satisfying both ordering constraints: Update() must observe the shield
-            // breaks that Combat (Phase 8) appended to PendingShieldBreaks this frame, and
-            // ResolveReactionDamage() must precede the Phase 10 death resolve so reaction
-            // kills are settled at the frame boundary like every other damage source.
-            scheduler.SkillBuff.ElementalReaction = ElementalReaction;
-            scheduler.SkillBuff.Bleed = Bleed;
-            scheduler.SkillBuff.Frostbite = Frostbite;
-            scheduler.SkillBuff.HealingZone = HealingZone;
-            scheduler.SkillBuff.Wisp = Wisp;
-            // Round 107 Direction 6 — Target Mark decay tick (between HealingZone and Skill cd)
-            scheduler.SkillBuff.Mark = Mark;
-            // Round 200 Direction 5 — Death Mark decay tick (after Mark so event ordering matches)
-            scheduler.SkillBuff.DeathMark = DeathMark;
-            // Round 122 Direction 2 — Heal Aura System wiring (passive tower-to-tower healing)
-            scheduler.SkillBuff.HealAura = HealAura;
-            // Round 126 Direction 4 — Thorns Aura System wiring (passive tower-centered damage on enemies).
-            //   The system reference is wired in AssignToGroups; the playerId is set below in
-            //   WireDependencies where the parameter is in scope. (Moved from AssignToGroups
-            //   because that method does not take a playerId parameter.)
-            scheduler.SkillBuff.ThornsAura = ThornsAura;
-            // Round 126 Direction 4 — playerId stashed in WireDependencies (which is
-            // the only place the id is in scope) is now propagated to the SkillBuffGroup
-            // so ThornsAuraSystem.Update can attribute QueueEnemyDeath to the killing player.
-            scheduler.SkillBuff.ThornsAuraPlayerId = _thornsAuraPlayerId;
-            // Round 187 Direction 4 — Rally Buff wiring. Per-frame tick lives at the
-            // tail of SkillBuffGroup.Execute so the recomputed TowerRallyAtkSpdBonus
-            // is observable to TowerAttackSystem on the next combat-phase read.
-            scheduler.SkillBuff.Rally = Rally;
-
-            // ── Post-death ──
-            scheduler.PostDeath.EnemyFission = EnemyFission;
-            scheduler.PostDeath.LifeLink = null;
-            LifeLink?.SetBreakPenaltyDispatchEnabled(false);
-            scheduler.PostDeath.Objective = Objective;
-            scheduler.PostDeath.ResourceNode = ResourceNode;
-            scheduler.PostDeath.TowerIncome = null;
-            scheduler.PostDeath.CorpseEffect = CorpseEffect;
-            scheduler.PostDeath.WaveBranch = WaveBranch;
-            scheduler.PostDeath.Combo = Combo;
-            // Round 110 Direction 10 — wire DoomClock into PostDeath so the
-            // countdown ticks alongside objective bookkeeping each WavePhase.
-            // Zero overhead when not active (Update() short-circuits on
-            // DoomClockActive[playerId] == false).
-            scheduler.PostDeath.DoomClock = DoomClock;
-            // Round 196 Direction 3 — Soul Harvest per-frame regen tick. Lives
-            // alongside DoomClock in PostDeath (zero-overhead when no player
-            // has PlayerSoulRegen > 0). OnEnemyKilled credit is event-driven
-            // (synchronous in ResolveEnemiesKilledThisFrame, no frame delay).
-            scheduler.PostDeath.SoulHarvest = SoulHarvest;
-            if (Pathfinding != null) scheduler.SetPathfindingSystem(Pathfinding);
-            scheduler.ConfigureGraphComposition(FrameGraphCompositionKind.ProductionRegistry);
-            if (seal) scheduler.SealGraphComposition();
+            if (scheduler == null) throw new ArgumentNullException(nameof(scheduler));
+            var plan = SystemRegistrationGraphValidator.GetStableOrder(SystemRegistrationManifest.Entries);
+            RequireInstallationState(InstallationState.Wired, operation);
+            if (scheduler.IsCompositionSealed)
+                throw new InvalidOperationException(operation + " cannot mutate a sealed scheduler composition.");
+            _installationState = InstallationState.Binding;
+            LastRegistrationFailureId = null;
+            LastRegistrationFailureStage = null;
+            try
+            {
+                foreach (var entry in plan)
+                    if (!entry.IsDisabled)
+                    {
+                        try
+                        {
+                            entry.Bind!(this, scheduler);
+                            scheduler.CompleteRegistrationBinding(entry);
+                        }
+                        catch
+                        {
+                            LastRegistrationFailureId = entry.Id;
+                            LastRegistrationFailureStage = RegistrationStage.Binding;
+                            throw;
+                        }
+                    }
+                try
+                {
+                    FinalizeBindings(scheduler, seal);
+                }
+                catch
+                {
+                    LastRegistrationFailureId = "graph.seal";
+                    LastRegistrationFailureStage = RegistrationStage.Binding;
+                    throw;
+                }
+                _installationState = InstallationState.Bound;
+            }
+            catch
+            {
+                _installationState = InstallationState.Failed;
+                throw;
+            }
         }
+
+        private void RequireInstallationState(InstallationState expected, string operation)
+        {
+            if (_installationState != expected)
+                throw new InvalidOperationException(operation + " requires installation state " + expected +
+                    ", but registry is " + _installationState + ".");
+        }
+
     }
 }

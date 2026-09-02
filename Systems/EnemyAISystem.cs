@@ -21,15 +21,14 @@ namespace BattleSystemECS.Systems
         private readonly int playerId;
 
         private readonly GameConfig gameConfig;
-        private readonly EnemyAbilitySystem enemyAbilitySystem;
-        private readonly TechTreeSystem techTreeSystem;
+        private readonly global::BattleSystemECS.Content.Contracts.IEnemyAbilityCommandPort enemyAbilitySystem;
+        private readonly global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem;
         private readonly EventBus _eventBus;
-        private readonly ReflectTowerSystem _reflectTowerSystem;
-        // Round 119 Dir 3 — optional WaveSpawningSystem ref. Set via SetWaveSpawningSystem() after
+        // 第 119 轮方向 3：可选的 IWaveSpawningPort 引用，构造后通过 SetWaveSpawningSystem() 设置。
         // construction. When null (e.g. in unit tests that construct EnemyAISystem without the
         // full GameManager), the minion-summon bag is drained but no spawn happens (drained
         // count is still tracked for diagnostics).
-        private WaveSpawningSystem _waveSpawningSystem;
+        private global::BattleSystemECS.Content.Contracts.IWaveSpawningPort _waveSpawningSystem;
 
         private int currentTurn;
         // Per-turn cached fields for cache locality
@@ -46,7 +45,7 @@ namespace BattleSystemECS.Systems
 
         // 首领阶段能力批次：小规模顺序路径与大规模并行批次都写各自独占缓冲，
         // 阶段 AbilityId 触发后在 Update 末尾稳定合并并串行提交。
-        // Update() into EnemyAbilitySystem.EnqueueAbility (which is NOT thread-safe — it
+        // 在 Update() 末尾提交到 IEnemyAbilityCommandPort.EnqueueAbility（该接口不是线程安全的，
         // mutates EnemyIsChanneling / _activeChannelers). One-shot guard is the FiredMask
         // bit already set inside each path before the push, so even if two threads see the
         // same transition in the same frame, only the first wins (CAS on FiredMask).
@@ -54,7 +53,7 @@ namespace BattleSystemECS.Systems
 
         // 首领阶段召唤批次：与能力事件共用同一 Parallel.For 的批次独占缓冲，
         // path as _phaseAbilityEvents whenever a phase's (MinionTypeId, MinionCount) trigger
-        // fires. Drained serially at end of Update() into WaveSpawningSystem.SpawnMinionNearPosition
+        // 触发后在 Update() 末尾串行提交到 IWaveSpawningPort.SpawnMinionNearPosition。
         // (which calls AddEnemy — NOT thread-safe). Each event carries the boss id, typeId,
         // count, and current position so the spawn site can ring-place the new minions. One-shot
         // guard is the same EnemyPhaseFiredMask bit that guards the ability + speed/damage
@@ -86,7 +85,9 @@ namespace BattleSystemECS.Systems
         private readonly EnemyActionType[] _lastActionCache = new EnemyActionType[ComponentStore.MAX_ENTITIES];
         private readonly string[] _lastActionStringCache = new string[ComponentStore.MAX_ENTITIES];
 
-        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig, EnemyAbilitySystem enemyAbilitySystem, TechTreeSystem techTreeSystem = null, EventBus eventBus = null, ReflectTowerSystem reflectTowerSystem = null)
+        public EnemyAISystem(ComponentStore store, IRenderer logger, int playerId, GameConfig gameConfig,
+            global::BattleSystemECS.Content.Contracts.IEnemyAbilityCommandPort enemyAbilitySystem, global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem = null,
+            EventBus eventBus = null)
         {
             this.store = store;
             this.logger = logger;
@@ -95,15 +96,14 @@ namespace BattleSystemECS.Systems
             this.enemyAbilitySystem = enemyAbilitySystem;
             this.techTreeSystem = techTreeSystem;
             this._eventBus = eventBus ?? new EventBus();
-            this._reflectTowerSystem = reflectTowerSystem;
         }
 
         /// <summary>
-        /// Round 119 Dir 3 — wire the WaveSpawningSystem into EnemyAISystem so that phase-triggered
+        /// 第 119 轮方向 3：接入 IWaveSpawningPort，使阶段触发的
         /// minion summons can be drained into SpawnMinionNearPosition(). Called from GameManager
         /// after both systems are constructed. Safe to call multiple times (idempotent).
         /// </summary>
-        public void SetWaveSpawningSystem(WaveSpawningSystem waveSpawningSystem)
+        public void SetWaveSpawningSystem(global::BattleSystemECS.Content.Contracts.IWaveSpawningPort waveSpawningSystem)
         {
             _waveSpawningSystem = waveSpawningSystem;
         }
@@ -230,8 +230,8 @@ namespace BattleSystemECS.Systems
                     // SpeedMult / DamageMult and the phase's AbilityId. Uses the new
                     // EnemyPhaseCount + EnemyPhaseThresholdsFlat arrays (Round 111), the
                     // EnemyPhaseFiredMask bitmask to ensure each phase triggers exactly once
-                    // even if HP later recovers, and EnemyAbilitySystem.EnqueueAbility for the
-                    // ability trigger. Capped at BOSS_PHASE_MAX (4) to match WaveSpawningSystem.
+                    // 即使生命值随后恢复也只触发一次，并将能力提交给 IEnemyAbilityCommandPort.EnqueueAbility；
+                    // 阶段数量上限为 BOSS_PHASE_MAX（4），与生成端约定一致。
                     int phaseCount = store.EnemyPhaseCount[enemyId];
                     if (phaseCount > 0)
                     {
@@ -280,7 +280,7 @@ namespace BattleSystemECS.Systems
                                     store.EnemyDamage[enemyId] = store.EnemyDamage[enemyId] * dmgMult;
                                 }
                                 // Trigger phase ability — push to bag for end-of-Update serial drain.
-                                // Avoids calling non-thread-safe EnemyAbilitySystem.EnqueueAbility
+                                // 避免在 Parallel.For 中调用非线程安全的 IEnemyAbilityCommandPort.EnqueueAbility。
                                 // from within a Parallel.For batch (race on EnemyIsChanneling /
                                 // _activeChannelers / cooldown timers). Direct 2D array read — no
                                 // per-frame string.Split (perf fix for 26% bench regression).
@@ -779,7 +779,7 @@ namespace BattleSystemECS.Systems
 
             // Faction / Infighting (Round 90): pairwise check on same-faction enemies.
             // Opt-in via EnemyFactionId > 0; pairs in close proximity deal 5% maxHp each + 0.5s cooldown.
-            // Gated by FactionInfightEnabled (set by WaveSpawningSystem) so the O(N) early-out scan
+            // 由 IWaveSpawningPort 设置 FactionInfightEnabled；未启用时 O(N) 扫描直接快速退出，
             // and O(N) cooldown-decrement loop only run when at least one enemy has a faction. This
             // is the lazy-disable optimization: when no monster config opts in, the gate stays 0
             // and the entire infight pass is a single int comparison, restoring pre-feature perf.
@@ -929,7 +929,7 @@ namespace BattleSystemECS.Systems
                 {
                     // Reveal! Sticky flag; the ambush bonus is consumed by the FIRST
                     // attack post-reveal (see TowerAttackSystem / PlayerTowerAttackSystem
-                    // / EnemyAbilitySystem — EnemyStalkConsumed becomes true after the
+                    // / IEnemyAbilityCommandPort；首次造成伤害后 EnemyStalkConsumed 置为 true，
                     // first damage application).
                     store.EnemyStalkRevealed[enemyId] = true;
                     return;
@@ -994,7 +994,7 @@ namespace BattleSystemECS.Systems
                 case EnemyActionType.SlowAoe:
                 case EnemyActionType.HealAllies:
                 case EnemyActionType.StealthAttack:
-                    // Ability actions are dispatched to EnemyAbilitySystem
+                    // 能力动作统一分派到 IEnemyAbilityCommandPort。
                     string abilityId = store.EnemyCastAbilityId[enemyId];
                     if (!string.IsNullOrEmpty(abilityId))
                         enemyAbilitySystem.EnqueueAbility(enemyId, abilityId);
@@ -1192,14 +1192,14 @@ namespace BattleSystemECS.Systems
                 }
             }
 
-            // Round 111 Direction 1 — drain phase-ability bag into EnemyAbilitySystem.
+            // 第 111 轮方向 1：将阶段能力批次提交给 IEnemyAbilityCommandPort。
             // Both sequential + parallel paths above push (enemyId, abilityId) tuples into
             // _phaseAbilityEvents whenever a phase transition fires. We now serially hand
-            // them off to EnemyAbilitySystem.EnqueueAbility (which mutates cooldown
+            // 将其提交给 IEnemyAbilityCommandPort.EnqueueAbility（会修改冷却计时器，
             // timers and _activeChannelers — NOT thread-safe). Drained at end of Update so
             // the rest of the frame can still see the new ability channeling state.
             DrainPhaseAbilityEvents();
-            // Round 119 Dir 3 — drain phase-minion bag into WaveSpawningSystem.SpawnMinionNearPosition.
+            // 第 119 轮方向 3：将阶段召唤批次提交给 IWaveSpawningPort.SpawnMinionNearPosition。
             // Same pattern as ability drain: serial, end-of-Update, thread-safe. Bag is always
             // drained (count tracked) so diagnostics work even when _waveSpawningSystem is null.
             DrainPhaseMinionEvents();
@@ -1271,7 +1271,7 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// 将阶段能力批次串行提交给 EnemyAbilitySystem。
+        /// 将阶段能力批次串行提交给 global::BattleSystemECS.Content.Contracts.IEnemyAbilityCommandPort。
         /// Called at the end of Update() (after both sequential and parallel paths complete).
         /// 按稳定 batch 合并顺序遍历复用列表，不产生逐项分配。
         /// Drained count is exposed for tests / diagnostics.
@@ -1293,7 +1293,7 @@ namespace BattleSystemECS.Systems
             PhaseAbilityDrainCount = count;
         }
 
-        // 将阶段召唤批次串行提交给 WaveSpawningSystem.SpawnMinionNearPosition。
+        // 将阶段召唤批次串行提交给 global::BattleSystemECS.Content.Contracts.IWaveSpawningPort.SpawnMinionNearPosition。
         // Called at the end of Update() (after both sequential and parallel paths complete). Like
         // DrainPhaseAbilityEvents, this is serial and thread-safe. When _waveSpawningSystem is null
         // (e.g. unit tests without a full GameManager) the batch is drained but no spawn happens —

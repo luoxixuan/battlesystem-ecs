@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Content.Contracts;
 
 namespace BattleSystemECS.Systems
 {
@@ -24,7 +25,7 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore store;
         private readonly IRenderer renderer;
         private readonly int playerId;
-        private readonly SkillSystem skillSystem;
+        private readonly global::BattleSystemECS.Content.Contracts.IAbilityActivationPort skillSystem;
         private readonly AutoSkillConfig config;
         private bool _buildPhaseRejectReported;
         private int _rejectedCandidateCount;
@@ -41,7 +42,7 @@ namespace BattleSystemECS.Systems
             ComponentStore store,
             IRenderer renderer,
             int playerId,
-            SkillSystem skillSystem,
+            global::BattleSystemECS.Content.Contracts.IAbilityActivationPort skillSystem,
             AutoSkillConfig config)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
@@ -74,7 +75,7 @@ namespace BattleSystemECS.Systems
                 int write = 0;
                 for (int read = 0; read < candidates.Count; read++)
                 {
-                    if (SkillSystem.IsBuildAllowedAbility(candidates[read].AreaShape))
+                    if (AbilityPhaseRules.IsBuildAllowed(candidates[read].AreaShape))
                         candidates[write++] = candidates[read];
                     else if (!_buildPhaseRejectReported)
                     {

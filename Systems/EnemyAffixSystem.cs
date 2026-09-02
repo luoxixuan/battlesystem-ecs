@@ -18,7 +18,7 @@ namespace BattleSystemECS.Systems
     ///   AffixRegen      — regen maxHealth×0.02/second
     ///   AffixExplosive  — on death: all enemies take maxHealth×0.2 explosion
     /// </summary>
-    public class EnemyAffixSystem
+    public class EnemyAffixSystem : global::BattleSystemECS.Content.Contracts.IEnemyAffixDecorator
     {
         private readonly ComponentStore store;
         private readonly IRenderer renderer;

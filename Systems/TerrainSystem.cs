@@ -15,7 +15,7 @@ namespace BattleSystemECS.Systems
         private ComponentStore store;
         private int playerId;
         private GameConfig gameConfig;
-        private BuffSystem buffSystem;
+        private global::BattleSystemECS.Content.Contracts.IEffectCommandPort buffSystem;
 
         private Dictionary<int, int> _lavaDotApplied = new Dictionary<int, int>();
 
@@ -26,7 +26,7 @@ namespace BattleSystemECS.Systems
             this.gameConfig = gameConfig;
         }
 
-        public void SetBuffSystem(BuffSystem buffSystem)
+        public void SetBuffSystem(global::BattleSystemECS.Content.Contracts.IEffectCommandPort buffSystem)
         {
             this.buffSystem = buffSystem;
         }

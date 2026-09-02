@@ -10,7 +10,7 @@ namespace BattleSystemECS.Systems
     /// 弹道/飞行道具系统 — 管理 projectile 生命周期（生成、移动、命中结算）。
     /// 两阶段模式：串行 Update 中移动→命中检测→入 damage queue，帧末统一 apply。
     /// </summary>
-    public class ProjectileSystem
+    public class ProjectileSystem : global::BattleSystemECS.Content.Contracts.IProjectileCommandPort
     {
         private readonly ComponentStore store;
         private readonly IRenderer logger;

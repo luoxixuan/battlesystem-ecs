@@ -12,6 +12,46 @@ namespace BattleSystemECS.Tests.Integration
     public sealed class FrameGraphProductionFlowTests : BattleTestBase
     {
         [Fact]
+        public void BindingFactRegistersIndependentRuntimeDeclarationAndRejectsDrift()
+        {
+            var scheduler = new FrameScheduler(new ComponentStore(), GameConfigLoader.LoadConfigStrict(new MockRenderer()));
+            scheduler.RegisterFrameBinding("pregame.weather.update", _ => { });
+
+            Assert.True(scheduler.TryGetFrameNodeContract("pregame.weather.update", out var declaration));
+            Assert.NotNull(declaration);
+            Assert.Equal("Weather", declaration!.RegistrationId);
+            Assert.Equal(FramePhaseMask.Wave, declaration.Phase);
+            Assert.Throws<FrameGraphValidationException>(() => scheduler.RegisterFrameNodeContract(
+                declaration.NodeId, declaration.RegistrationId, declaration.Phase,
+                FrameExecutionSemantics.SerialCommit, declaration.RequiredTokens));
+        }
+
+        [Fact]
+        public void UnknownStringFrameBindingIsRejectedBeforeMutation()
+        {
+            var scheduler = new FrameScheduler(new ComponentStore(), GameConfigLoader.LoadConfigStrict(new MockRenderer()));
+
+            var error = Assert.Throws<FrameGraphValidationException>(() =>
+                scheduler.RegisterFrameBinding("binding.unknown", _ => { }));
+
+            Assert.Contains("Unknown frame binding id: binding.unknown", error.Message, StringComparison.Ordinal);
+            Assert.False(scheduler.TryGetFrameBinding("binding.unknown", out _));
+            Assert.False(scheduler.TryGetFrameNodeContract("binding.unknown", out _));
+        }
+
+        [Fact]
+        public void UnknownBuildFrameBindingIsRejectedBeforeMutation()
+        {
+            var scheduler = new FrameScheduler(new ComponentStore(), GameConfigLoader.LoadConfigStrict(new MockRenderer()));
+
+            var error = Assert.Throws<FrameGraphValidationException>(() =>
+                scheduler.RegisterBuildFrameBinding("binding.unknown"));
+
+            Assert.Contains("Unknown frame binding id: binding.unknown", error.Message, StringComparison.Ordinal);
+            Assert.False(scheduler.TryGetFrameNodeContract("binding.unknown", out _));
+        }
+
+        [Fact]
         public void ReflectRequestRunsThroughProductionDeathCallbacksRewardAndEventsOnce()
         {
             // Bug 回归：原始反伤必须经生产 graph 的提交与拆分死亡回调精确结算一次。
@@ -36,6 +76,7 @@ namespace BattleSystemECS.Tests.Integration
             Assert.Equal(7f,Store.GetPlayerGold(playerId));
             Assert.Equal(comboBefore+1f,Store.PlayerComboCount[playerId]);
             Assert.Equal(new[]{"killed","destroyed"},events.KillEvents);
+            Assert.Equal(0,Store.DamageResolver.LegacyApplyCount);
             string[] ordered={"combat.reflect.resolve","combat.reflect.apply","damage.commit",
                 "primary-death.resolve","primary-death.callback-dispatch"};
             int[] indices=ordered.Select(id=>scheduler.FrameGraphPlan.ToList()
@@ -133,6 +174,7 @@ namespace BattleSystemECS.Tests.Integration
             {
                 runtime.Scheduler.Tick(0.016f,frame);
                 Assert.Equal(10000,Store.GetActiveEnemyCount());
+                Assert.Equal(0,Store.DamageResolver.LegacyApplyCount);
             }
 
             Assert.True(runtime.Scheduler.IsCompositionSealed);

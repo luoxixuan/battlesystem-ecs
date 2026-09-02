@@ -8,9 +8,10 @@
 
 ```
 BattleSystem-ECS/
-├── BattleSystemECS.Core/     # 战斗逻辑核心库（netstandard2.1，Unity 兼容）
+├── BattleSystemECS.Engine/   # 独立帧执行与内容值合同库（netstandard2.1）
+├── BattleSystemECS.Core/     # 战斗逻辑核心库（netstandard2.1，引用 Engine）
 ├── BattleSystemECS.csproj    # 控制台 EXE（net6.0，引用 Core）
-├── BattleSystemECS.Tests/    # xUnit 单元测试（net9.0，1325 项，四分层：Infrastructure/Framework/Mechanisms/Features/Integration）
+├── BattleSystemECS.Tests/    # xUnit 单元测试（net9.0，四分层；数量以最新门禁日志为准）
 ├── Systems/                  # 游戏系统（144 个，全部编译到 Core）
 ├── Core/                     # ECS 核心（ComponentStore×5、FrameScheduler、GAS、EventBus）
 ├── Data/                     # 静态数据（Monsters×200、Towers×150、Skills×150、Levels×5）
@@ -21,16 +22,11 @@ BattleSystem-ECS/
 
 ---
 
-## 性能基准（2026-08-27，并行热路径优化后）
+## 性能验证
 
-| 模式 | 指标 |
-|------|------|
-| **mode5**（完整一局） | **4874 FPS**，410 帧（历史 manual baseline） |
-| **mode2**（合并热路径，10K 敌 ×500 帧） | **8333 FPS**（历史 manual baseline） |
-| **mode4**（真实系统链路，10K 敌 ×500 帧） | **5212 FPS**（历史 manual baseline；当前 ProductionGraph deferred 记录见 [orchestration](docs/ecs-gas-migration-orchestration.md)） |
-| **mode3**（微基准测试） | 单系统操作级性能剖析 |
+性能门禁和压测结果以最新一次完整门禁证据为准；易变化的性能指标、帧数和数据规模不在 README 中固化。当前迁移轮次暂不运行 mode2/mode4/mode5，详见 [迁移编排](docs/ecs-gas-migration-orchestration.md)。
 
-> mode5 最接近真实游戏：5 关全通、真实波次生成。mode4 是主要参考指标。完整变更历史见 [CHANGELOG.md](CHANGELOG.md)。
+当前 M7 fresh evidence：`C:\WorkSpace\AI\battlesystem-ecs-gate-logs\m7-installer-registration-final-20260902T231500Z`。
 
 ---
 

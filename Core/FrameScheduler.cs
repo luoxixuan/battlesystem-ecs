@@ -27,10 +27,105 @@ namespace BattleSystemECS.Core
         private readonly Core.GAS.ClockId _effectClock;
         private readonly FrameScenarioKind _scenarioKind;
         private FrameGraphCompositionKind _compositionKind = FrameGraphCompositionKind.Direct;
+        private readonly Dictionary<string, Action<NodeExecutionContext>> _frameBindings = new Dictionary<string, Action<NodeExecutionContext>>(StringComparer.Ordinal);
+        private readonly Dictionary<string, FrameNodeRuntimeDeclaration> _runtimeFrameDeclarations = new Dictionary<string, FrameNodeRuntimeDeclaration>(StringComparer.Ordinal);
+        private readonly HashSet<string> _completedRegistrationBindings = new HashSet<string>(StringComparer.Ordinal);
+        private readonly List<Action<PhaseContext>> _abilityPhaseConsumers = new List<Action<PhaseContext>>();
+        private readonly List<Action> _abilityRejectConsumers = new List<Action>();
+        private Func<int, int>? _pathWaypointCountQuery;
 
         public FrameGraphCompositionKind CompositionKind => _compositionKind;
         public FrameSchedulerExecutionMode ExecutionMode => _executionMode;
         public bool IsCompositionSealed => _frameGraph != null;
+        internal void ClearFrameBindings() => _frameBindings.Clear();
+        internal bool RemoveFrameBinding(string id) => _frameBindings.Remove(id) || Build.RemoveBinding(id);
+        internal void RegisterFrameBinding(string id, Action<NodeExecutionContext> execute)
+        {
+            if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("Frame binding id is required.", nameof(id));
+            if (!FrameBindingFacts.TryGet(id, out var contract))
+                throw new FrameGraphValidationException("Unknown frame binding id: " + id);
+            RegisterFrameNodeContract(id, contract.RegistrationId, contract.Phase, contract.ExecutionPolicy, contract.RequiredTokens);
+            _frameBindings[id] = execute ?? throw new ArgumentNullException(nameof(execute));
+        }
+        internal void RegisterFrameBinding(FrameBindingRegistration registration, Action<NodeExecutionContext> execute)
+        {
+            if (string.IsNullOrEmpty(registration.NodeId)) return;
+            if (registration.RegistrationId.StartsWith("disabled.", StringComparison.Ordinal) &&
+                !(_compositionKind == FrameGraphCompositionKind.Direct && registration.NodeId.StartsWith("movement.wound.", StringComparison.Ordinal))) return;
+            RegisterFrameNodeContract(registration.NodeId, registration.RegistrationId, registration.Phase,
+                registration.ExecutionPolicy, registration.RequiredTokens);
+            _frameBindings[registration.NodeId] = execute ?? throw new ArgumentNullException(nameof(execute));
+        }
+        internal void RegisterBuildFrameBinding(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new ArgumentException("Frame binding id is required.", nameof(id));
+            if (!FrameBindingFacts.TryGet(id, out var contract))
+                throw new FrameGraphValidationException("Unknown frame binding id: " + id);
+            RegisterFrameNodeContract(id, contract.RegistrationId, contract.Phase, contract.ExecutionPolicy, contract.RequiredTokens);
+        }
+        internal void RegisterBuildFrameBinding(FrameBindingRegistration registration)
+        {
+            if (string.IsNullOrEmpty(registration.NodeId)) return;
+            if (registration.RegistrationId.StartsWith("disabled.", StringComparison.Ordinal)) return;
+            RegisterFrameNodeContract(registration.NodeId, registration.RegistrationId, registration.Phase,
+                registration.ExecutionPolicy, registration.RequiredTokens);
+        }
+        internal bool TryGetFrameBinding(string id, out Action<NodeExecutionContext>? execute) => _frameBindings.TryGetValue(id, out execute);
+        internal IReadOnlyDictionary<string, FrameNodeRuntimeDeclaration> RuntimeFrameDeclarations => _runtimeFrameDeclarations;
+        internal bool TryGetFrameNodeContract(string nodeId, out FrameNodeRuntimeDeclaration? declaration)
+            => _runtimeFrameDeclarations.TryGetValue(nodeId, out declaration);
+        /// <summary>记录绑定路径实际声明的帧节点合同；声明独立于 manifest，重复或漂移立即失败。</summary>
+        internal void RegisterFrameNodeContract(string nodeId, string registrationId, FramePhaseMask phase,
+            FrameExecutionSemantics executionPolicy, IReadOnlyList<string> requiredTokens)
+        {
+            if (_frameGraph != null) throw new InvalidOperationException("Frame node contract cannot change after frame graph seal.");
+            if (string.IsNullOrWhiteSpace(nodeId) || string.IsNullOrWhiteSpace(registrationId))
+                throw new ArgumentException("Frame node and registration identifiers are required.");
+            var declaration = new FrameNodeRuntimeDeclaration(nodeId, registrationId, phase, executionPolicy, requiredTokens);
+            if (_runtimeFrameDeclarations.TryGetValue(nodeId, out var existing))
+            {
+                if (!existing.Equals(declaration))
+                    throw new FrameGraphValidationException("Runtime frame node declaration drift: " + nodeId);
+                throw new FrameGraphValidationException("Duplicate runtime frame node declaration: " + nodeId);
+            }
+            _runtimeFrameDeclarations.Add(nodeId, declaration);
+        }
+        /// <summary>登记实际绑定事实；已有声明必须与独立事实逐字段一致。</summary>
+        internal void RegisterOrValidateFrameBindingFact(FrameBindingRegistration fact)
+        {
+            if (_runtimeFrameDeclarations.TryGetValue(fact.NodeId, out var existing))
+            {
+                if (!string.Equals(existing.RegistrationId, fact.RegistrationId, StringComparison.Ordinal) ||
+                    existing.Phase != fact.Phase || existing.ExecutionPolicy != fact.ExecutionPolicy ||
+                    existing.RequiredTokens.Length != fact.RequiredTokens.Length)
+                    throw new FrameGraphValidationException("Runtime frame node declaration drift: " + fact.NodeId);
+                for (int i = 0; i < fact.RequiredTokens.Length; i++)
+                    if (!string.Equals(existing.RequiredTokens[i], fact.RequiredTokens[i], StringComparison.Ordinal))
+                        throw new FrameGraphValidationException("Runtime frame node declaration drift: " + fact.NodeId);
+                return;
+            }
+            RegisterFrameNodeContract(fact.NodeId, fact.RegistrationId, fact.Phase,
+                fact.ExecutionPolicy, fact.RequiredTokens);
+        }
+        internal void CompleteRegistrationBinding(SystemRegistrationEntry entry)
+        {
+            if (_frameGraph != null) throw new InvalidOperationException("Registration binding cannot complete after frame graph seal.");
+            if (entry.IsDisabled) throw new InvalidOperationException("Disabled registration cannot complete binding: " + entry.Id);
+            if (!_completedRegistrationBindings.Add(entry.Id))
+                throw new InvalidOperationException("Registration binder executed more than once: " + entry.Id);
+        }
+        internal bool IsRegistrationBindingComplete(string registrationId) => _completedRegistrationBindings.Contains(registrationId);
+
+        internal void AddCompletedRegistrationDependencies(FrameGraphBuilder builder)
+        {
+            foreach (var entry in SystemRegistrationManifest.Entries)
+            {
+                if (!entry.IsDisabled && _completedRegistrationBindings.Contains(entry.Id))
+                    for (int i = 0; i < entry.ProvidedTokens.Length; i++)
+                        builder.AddAvailableDependency(entry.ProvidedTokens[i]);
+            }
+        }
         public IReadOnlyList<FrameNodeAdapter> FrameGraphPlan => RequireFrameGraph().Nodes;
         public IReadOnlyList<FrameCompositionDiagnostic> FrameGraphDiagnostics => RequireFrameGraph().Diagnostics;
         public IReadOnlyList<string> FrameGraphAvailableDependencies => RequireFrameGraph().AvailableDependencies;
@@ -39,7 +134,7 @@ namespace BattleSystemECS.Core
         public TimeContext LastTimeContext { get; private set; }
         public Core.GAS.ClockId EffectClock => _effectClock;
         public FrameScenarioKind ScenarioKind => _scenarioKind;
-        internal bool HasPathfindingDependency => _pathfinding != null;
+        internal bool HasPathfindingDependency => _pathWaypointCountQuery != null;
         internal int GraphCurrentWave { get; set; } = 1;
         internal int GraphCurrentLevel { get; set; } = 1;
         internal int LastPublishedPersistentFrame { get; private set; } = -1;
@@ -53,10 +148,6 @@ namespace BattleSystemECS.Core
         internal void ResolveCurrentFrameDeaths()
             => store.ResolveEnemiesKilledThisFrame();
 
-        private Systems.SkillSystem? _skillSystem;
-        private Systems.GlobalSkillSystem? _globalSkillSystem;
-        private Systems.HeroSkillSystem? _heroSkillSystem;
-        private Systems.TowerActiveSkillSystem? _towerActiveSkillSystem;
         private GameState _phase = GameState.WavePhase;
         public GameState Phase
         {
@@ -68,30 +159,22 @@ namespace BattleSystemECS.Core
                 _phase = value;
                 var context = PhaseContext.FromGameState(value);
                 store.GameplayPhaseContext = context;
-                _skillSystem?.SetPhaseContext(context);
-                _globalSkillSystem?.SetPhaseContext(context);
-                _heroSkillSystem?.SetPhaseContext(context);
-                _towerActiveSkillSystem?.SetPhaseContext(context);
-                AI.EnemyAbility?.SetPhaseContext(context);
+                for (int i = 0; i < _abilityPhaseConsumers.Count; i++)
+                    _abilityPhaseConsumers[i](context);
             }
         }
         // ── System groups — one per logical phase ──
-        public BuildGroup          Build          { get; } = new();
-        public PreGameGroup        PreGame        { get; } = new();
-        public SpawningGroup       Spawning       { get; } = new();
-        public AIGroup             AI             { get; } = new();
-        public MovementGroup       Movement       { get; } = new();
-        public TerrainGroup        Terrain        { get; } = new();
-        public CombatSetupGroup    CombatSetup    { get; } = new();
-        public SpatialGroup        Spatial        { get; } = new();
-        public CombatGroup         Combat         { get; } = new();
-        public SkillBuffGroup      SkillBuff      { get; } = new();
-        public PostDeathGroup      PostDeath      { get; } = new();
-
-        // Round 182 Direction 6 — PathfindingSystem reference (optional). Set via property;
-        // required by TickBlinkerCycle to validate path waypoint count before advancing
-        // the node index. Injected lazily so construction order doesn't matter.
-        private Systems.PathfindingSystem? _pathfinding;
+        internal BuildGroup       Build       { get; } = new();
+        internal PreGameGroup     PreGame     { get; } = new();
+        internal SpawningGroup    Spawning    { get; } = new();
+        internal AIGroup          AI          { get; } = new();
+        internal MovementGroup    Movement    { get; } = new();
+        internal TerrainGroup     Terrain     { get; } = new();
+        internal CombatSetupGroup CombatSetup { get; } = new();
+        internal SpatialGroup     Spatial     { get; } = new();
+        internal CombatGroup      Combat      { get; } = new();
+        internal SkillBuffGroup   SkillBuff   { get; } = new();
+        internal PostDeathGroup   PostDeath   { get; } = new();
 
         public FrameScheduler(ComponentStore store, GameConfig gameConfig, IBattleEventBus? eventBus = null,
             FrameSchedulerExecutionMode executionMode = FrameSchedulerExecutionMode.Graph,
@@ -120,15 +203,12 @@ namespace BattleSystemECS.Core
         }
 
         /// <summary>
-        /// Round 182 Direction 6 — Inject the PathfindingSystem so the Blink-Dash cycle
-        /// ticker can look up waypoint counts before advancing node indices. Optional:
-        /// TickBlinkerCycle falls back to a no-advance behavior when pathfinding is null
-        /// (the timer still ticks and i-frames still decrement, but no teleport happens).
+        /// 注册可选的路径节点数量查询。缺失时 Blinker 保持 no-op 路径策略。
         /// </summary>
-        public void SetPathfindingSystem(Systems.PathfindingSystem pathfinding)
+        internal void RegisterPathWaypointCountQuery(Func<int, int> query)
         {
             if (_frameGraph != null) throw new InvalidOperationException("Pathfinding dependency cannot change after frame graph seal.");
-            _pathfinding = pathfinding;
+            _pathWaypointCountQuery = query ?? throw new ArgumentNullException(nameof(query));
         }
 
         internal void ConfigureGraphComposition(FrameGraphCompositionKind compositionKind)
@@ -145,31 +225,21 @@ namespace BattleSystemECS.Core
             _frameGraph = FrameSystemGraph.Build(this, _compositionKind);
         }
 
-        internal void GraphUpdateWaveSpawning(Systems.WaveSpawningSystem system)
-        {
-            if (_scenarioKind == FrameScenarioKind.Gameplay)
-                system.Update();
-        }
+        internal bool RunsGameplayScenario => _scenarioKind == FrameScenarioKind.Gameplay;
 
         public void ConfigureGameplayRuntime(IReadOnlyList<Core.GAS.TriggerDefinition> triggers)
         {
             _gameplayTriggers = triggers ?? Array.Empty<Core.GAS.TriggerDefinition>();
         }
 
-        public void SetSkillSystem(Systems.SkillSystem? skillSystem)
+        internal void RegisterAbilityPhaseConsumer(Action<PhaseContext> phaseChanged, Action? rejectPending = null)
         {
-            _skillSystem = skillSystem;
-            _skillSystem?.SetPhaseContext(PhaseContext.FromGameState(_phase));
+            if (_frameGraph != null) throw new InvalidOperationException("Ability phase consumers cannot change after frame graph seal.");
+            if (phaseChanged == null) throw new ArgumentNullException(nameof(phaseChanged));
+            _abilityPhaseConsumers.Add(phaseChanged);
+            if (rejectPending != null) _abilityRejectConsumers.Add(rejectPending);
+            phaseChanged(PhaseContext.FromGameState(_phase));
         }
-
-        public void SetGlobalSkillSystem(Systems.GlobalSkillSystem? globalSkillSystem)
-        {
-            _globalSkillSystem = globalSkillSystem;
-            _globalSkillSystem?.SetPhaseContext(PhaseContext.FromGameState(_phase));
-        }
-
-        public void SetHeroSkillSystem(Systems.HeroSkillSystem? system) { _heroSkillSystem = system; _heroSkillSystem?.SetPhaseContext(PhaseContext.FromGameState(_phase)); }
-        public void SetTowerActiveSkillSystem(Systems.TowerActiveSkillSystem? system) { _towerActiveSkillSystem = system; _towerActiveSkillSystem?.SetPhaseContext(PhaseContext.FromGameState(_phase)); }
 
         public void BindStateMachine(StateMachine stateMachine)
         {
@@ -280,14 +350,14 @@ namespace BattleSystemECS.Core
 
         private void RejectNonWaveAbilityWork()
         {
-            _skillSystem?.RejectPendingSkillDamage(Systems.SkillDamageRejectReason.PhaseNotAllowed);
-            _globalSkillSystem?.RejectPendingActivation();
+            for (int i = 0; i < _abilityRejectConsumers.Count; i++)
+                _abilityRejectConsumers[i]();
         }
 
         private void RejectPhaseTransitionWork()
         {
-            _skillSystem?.RejectPendingSkillDamage(Systems.SkillDamageRejectReason.PhaseNotAllowed);
-            _globalSkillSystem?.RejectPendingActivation();
+            for (int i = 0; i < _abilityRejectConsumers.Count; i++)
+                _abilityRejectConsumers[i]();
             store.DamageResolver.RejectAllPending();
             store.ResourceResolver.RejectAllPending();
             store.DamageResolver.EnableDeferred(false);
@@ -382,6 +452,11 @@ namespace BattleSystemECS.Core
             if (clock != context.EffectClock)
                 store.GameplayEffectsRuntime.Tick(context.Delta, clock);
         }
+        internal void GraphTickEffectBuild(NodeExecutionContext context) => GraphTickEffects(context, Core.GAS.ClockId.Build);
+        internal void GraphTickEffectCombat(NodeExecutionContext context) => GraphTickSupplementalEffect(context, Core.GAS.ClockId.Combat);
+        internal void GraphTickEffectEnemy(NodeExecutionContext context) => GraphTickSupplementalEffect(context, Core.GAS.ClockId.Enemy);
+        internal void GraphTickEffectReal(NodeExecutionContext context) => GraphTickSupplementalEffect(context, Core.GAS.ClockId.RealTime);
+        internal void GraphTickEffectGlobal(NodeExecutionContext context) => GraphTickSupplementalEffect(context, Core.GAS.ClockId.Global);
 
         internal void GraphCommitBuildDamage(NodeExecutionContext context)
         {
@@ -739,10 +814,10 @@ namespace BattleSystemECS.Core
                     // (rounded up so even a 0.5-tile blink actually moves the enemy
                     // one node forward). Clamp to last waypoint so we don't overshoot
                     // the end of the path (which would leak the enemy through).
-                    if (_pathfinding != null)
+                    if (_pathWaypointCountQuery != null)
                     {
                         int pathId = store.EnemyPathId[eid];
-                        int totalNodes = _pathfinding.GetPathWaypointCount(pathId);
+                        int totalNodes = _pathWaypointCountQuery(pathId);
                         if (totalNodes > 0)
                         {
                             int curNode = store.EnemyPathNodeIndex[eid];

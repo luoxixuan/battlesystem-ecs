@@ -11,7 +11,7 @@ namespace BattleSystemECS.Systems
     /// 科技树系统 — 解锁分支研究节点，应用效果到玩家属性。
     /// 节点解锁消耗研究点数（每波结算产出），有前置依赖。
     /// </summary>
-    public class TechTreeSystem
+    public class TechTreeSystem : global::BattleSystemECS.Content.Contracts.ICombatTuningView
     {
         private readonly ComponentStore store;
         private readonly IRenderer renderer;
@@ -249,6 +249,15 @@ namespace BattleSystemECS.Systems
                     case "tower_slot_bonus":
                         _towerSlotBonus += (int)eff.value;
                         store.PlayerMaxTowers[playerId] = 20 + _towerSlotBonus;
+                        break;
+                    case "max_mana_add":
+                        _maxManaBonus += eff.value;
+                        break;
+                    case "mana_regen_add":
+                        _manaRegenBonus += eff.value;
+                        break;
+                    case "mana_cost_mult":
+                        _manaCostMultiplier *= eff.value;
                         break;
                     case "min_health_floor":
                         // One-shot protection: HP will not drop below this value.

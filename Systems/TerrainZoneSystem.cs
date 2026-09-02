@@ -34,14 +34,11 @@ namespace BattleSystemECS.Systems
  private readonly ComponentStore _store;
  private readonly GameConfig _config;
  private readonly int _playerId;
- private readonly BuffSystem _buffSystem;
-
- public TerrainZoneSystem(ComponentStore store, GameConfig config, int playerId, BuffSystem buffSystem = null)
+ public TerrainZoneSystem(ComponentStore store, GameConfig config, int playerId)
  {
  _store = store ?? throw new ArgumentNullException(nameof(store));
  _config = config ?? throw new ArgumentNullException(nameof(config));
  _playerId = playerId;
- _buffSystem = buffSystem;
  }
 
  /// <summary>

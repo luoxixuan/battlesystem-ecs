@@ -22,7 +22,7 @@ namespace BattleSystemECS.Systems
     ///   - Update() expires pickups and resolves collection
     ///   - FrameScheduler calls Pickup.Update() each wave turn
     /// </summary>
-    public class PickupSystem
+    public class PickupSystem : global::BattleSystemECS.Content.Contracts.IPickupCommandPort
     {
         private readonly ComponentStore store;
         private readonly GameConfig gameConfig;

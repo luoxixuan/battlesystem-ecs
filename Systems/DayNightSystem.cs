@@ -17,7 +17,7 @@ namespace BattleSystemECS.Systems
     ///   - TowerAttackSystem reads DayNight phase for range modifier
     ///   - EnemyAbilitySystem reads DayNight phase for damage modifier (enemy projectiles)
     /// </summary>
-    public class DayNightSystem
+    public class DayNightSystem : global::BattleSystemECS.Content.Contracts.IEnemySpeedModifierView, global::BattleSystemECS.Content.Contracts.ITowerRangeModifierView
     {
         private readonly ComponentStore _store;
         private readonly GameConfig _gameConfig;

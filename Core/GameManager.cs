@@ -132,11 +132,10 @@ namespace BattleSystemECS.Core
             //  将所有系统创建/依赖注入/分组赋值委托给 SystemRegistry
             // ══════════════════════════════════════════════════════════
             registry = new SystemRegistry();
-            registry.CreateAll(store, gameConfig, logger, playerId, stateMachine, _eventBus);
-            registry.WireDependencies(store, playerId);
 
             scheduler = new FrameScheduler(store, gameConfig, _eventBus, _schedulerExecutionMode, _effectClock);
-            registry.AssignToGroups(scheduler);
+            new ProductionSystemInstaller().Install(registry, store, gameConfig, logger,
+                playerId, stateMachine, scheduler, _eventBus);
             // 初始化地形网格
             if (gameConfig.MapTerrainGrid != null && gameConfig.MapTerrainGrid.Length > 0)
             {

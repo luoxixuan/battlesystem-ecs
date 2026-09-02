@@ -194,7 +194,8 @@ namespace BattleSystemECS.Systems
             var towerShrine  = new TowerShrineSystem(store);
             var projectile   = new ProjectileSystem(store, logger);
             var gold         = new GoldSystem(store, logger);
-            var upgrade      = new UpgradeSystem(store, logger, playerId, gameConfig);
+            var towerUpgrade = new TowerUpgradeSystem(store, logger, gameConfig);
+            var upgrade      = new UpgradeSystem(store, logger, playerId, gameConfig, towerUpgrade);
             var skill        = new SkillSystem(store, logger, playerId, gameConfig);
             skill.SetPhaseContext(new PhaseContext(PhaseContextKind.Wave));
             var buffSystem   = new BuffSystem(store, playerId);

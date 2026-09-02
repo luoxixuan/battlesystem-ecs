@@ -5,6 +5,7 @@ using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core.GAS;
+using BattleSystemECS.Content.Contracts;
 
 namespace BattleSystemECS.Systems
 {
@@ -28,8 +29,6 @@ namespace BattleSystemECS.Systems
         private ComponentStore store;
         private GameConfig gameConfig;
         private IRenderer renderer;
-        private TechTreeSystem? techTreeSystem;
-        private readonly bool hasTechTreeSystem;
         private readonly int playerId;
         private int _turn = 0;
         // 未绑定阶段时默认拒绝，调用方必须显式同步阶段上下文。
@@ -50,14 +49,13 @@ namespace BattleSystemECS.Systems
         // Global skill definitions (from gameConfig.GlobalSkills)
         private const int MAX_GLOBAL_SKILLS = 8;
 
-        public GlobalSkillSystem(ComponentStore store, GameConfig gameConfig, IRenderer renderer, int playerId, TechTreeSystem? techTreeSystem = null)
+        public GlobalSkillSystem(ComponentStore store, GameConfig gameConfig, IRenderer renderer,
+            int playerId)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this.gameConfig = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));
             this.renderer = renderer;
             this.playerId = playerId;
-            this.techTreeSystem = techTreeSystem;
-            this.hasTechTreeSystem = techTreeSystem != null;
         }
 
         public void SetTurn(int turn)

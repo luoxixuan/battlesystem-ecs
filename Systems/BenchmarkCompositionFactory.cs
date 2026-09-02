@@ -42,12 +42,11 @@ namespace BattleSystemECS.Systems
 
             var stateMachine=new StateMachine();
             var registry=new SystemRegistry();
-            registry.CreateAll(store,config,logger,playerId,stateMachine,eventBus);
-            registry.WireDependencies(store,playerId);
 
             var scheduler=new FrameScheduler(store,config,eventBus,
                 scenarioKind:scenarioKind);
-            registry.AssignToGroups(scheduler);
+            new ProductionSystemInstaller().Install(registry, store, config, logger,
+                playerId, stateMachine, scheduler, eventBus);
             scheduler.BindStateMachine(stateMachine);
 
             string wavePolicy=scenarioKind==FrameScenarioKind.FixedPopulationBenchmark?"Suppressed":"Enabled";

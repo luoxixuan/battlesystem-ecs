@@ -49,24 +49,11 @@ namespace BattleSystemECS.Systems
         /// Wire to WaveSpawningSystem.OnWaveStart. Idempotent (guards against double-subscribe).
         /// On each wave start, pre-computes the preview of the *next* wave.
         /// </summary>
-        public void Subscribe(WaveSpawningSystem waveSpawning)
-        {
-            if (waveSpawning == null) return;
-            // Idempotent: don't double-subscribe if WireDependencies runs twice
-            if (_subscribedWaveSpawning == waveSpawning) return;
-            _subscribedWaveSpawning = waveSpawning;
-            waveSpawning.OnWaveStart += HandleWaveStart;
-        }
-
-        private WaveSpawningSystem _subscribedWaveSpawning;
-
-        private void HandleWaveStart()
+        public void HandleWaveStart(int level, int wave)
         {
             // On each wave start, pre-compute the preview of the wave AFTER this one
             // using the current level/wave from the wave spawner. This avoids redundant
             // double-computation and stale cache from a separate inline Update() call.
-            int level = _subscribedWaveSpawning.GetCurrentLevel();
-            int wave = _subscribedWaveSpawning.GetCurrentWave();
             if (level <= 0) level = 1;
             if (wave <= 0) return;
             RecomputePreview(level, wave + 1);

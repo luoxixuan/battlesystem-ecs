@@ -18,7 +18,7 @@ namespace BattleSystemECS.Systems
         private Core.ComponentStore store;
         private IRenderer renderer;
         private int playerId;
-        private TechTreeSystem techTreeSystem;
+        private global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem;
         private GameConfig gameConfig;
         // Round 67: EventBus for On-Hit / On-Crit trigger event publication.
         // Always non-null after construction (ctor falls back to a fresh EventBus instance).
@@ -88,21 +88,21 @@ namespace BattleSystemECS.Systems
         private List<float>[] _thornsQueue = new List<float>[2];
         private int _thornsQueueIdx = 0;
 
-        private HitShieldSystem _hitShieldSystem;
+        private global::BattleSystemECS.Content.Contracts.IHitShieldResolver _hitShieldSystem;
 
         public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
             : this(store, renderer, playerId, gameConfig, null, null)
         {
         }
 
-        public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem)
+        public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem)
             : this(store, renderer, playerId, gameConfig, techTreeSystem, null)
         {
         }
 
         // Round 67: EventBus injection for On-Hit / On-Crit trigger event publication.
         // Optional parameter keeps existing call-sites (tests, partial ctor) compiling.
-        public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, TechTreeSystem techTreeSystem, EventBus eventBus, IBattleEventBus battleEventBus = null)
+        public PlayerTowerAttackSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig, global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem, EventBus eventBus, IBattleEventBus battleEventBus = null)
         {
             this.store = store;
             this.renderer = renderer;
@@ -156,20 +156,20 @@ public void SetWaveNumber(int waveNumber)
             _waveDifficultyMult = techTreeSystem != null ? techTreeSystem.GetWaveDifficultyMultiplier(waveNumber) : 1f;
         }
 
-        private EnemyLifeLinkSystem _lifeLinkSystem;
+        private global::BattleSystemECS.Content.Contracts.ILinkDamageResolver _lifeLinkSystem;
 
         /// <summary>
-        /// Inject EnemyLifeLinkSystem reference for damage-sharing link computation.
+        /// 注入 ILinkDamageResolver，用于计算伤害分摊链接。
         /// </summary>
-        public void SetLifeLinkSystem(EnemyLifeLinkSystem lifeLinkSystem)
+        public void SetLifeLinkSystem(global::BattleSystemECS.Content.Contracts.ILinkDamageResolver lifeLinkSystem)
         {
             _lifeLinkSystem = lifeLinkSystem;
         }
 
         /// <summary>
-        /// Inject HitShieldSystem reference for N-hit shield blocking.
+        /// 注入 IHitShieldResolver，用于结算次数护盾。
         /// </summary>
-        public void SetHitShieldSystem(HitShieldSystem hitShieldSystem)
+        public void SetHitShieldSystem(global::BattleSystemECS.Content.Contracts.IHitShieldResolver hitShieldSystem)
         {
             _hitShieldSystem = hitShieldSystem;
         }

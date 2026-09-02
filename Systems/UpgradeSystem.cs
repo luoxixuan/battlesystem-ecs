@@ -2,6 +2,7 @@ using System;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Content.Contracts;
 
 namespace BattleSystemECS.Systems
 {
@@ -18,15 +19,16 @@ namespace BattleSystemECS.Systems
         private IRenderer renderer;
         private int playerId;
         private GameConfig gameConfig;
-        private TowerUpgradeSystem towerUpgradeSystem;
+        private readonly ITowerUpgradeService towerUpgradeService;
 
-        public UpgradeSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig)
+        public UpgradeSystem(Core.ComponentStore store, IRenderer renderer, int playerId, GameConfig gameConfig,
+            ITowerUpgradeService towerUpgradeService)
         {
             this.store = store;
             this.renderer = renderer;
             this.playerId = playerId;
             this.gameConfig = gameConfig;
-            this.towerUpgradeSystem = new TowerUpgradeSystem(store, renderer, gameConfig);
+            this.towerUpgradeService = towerUpgradeService ?? throw new ArgumentNullException(nameof(towerUpgradeService));
         }
 
         public void Update()
@@ -94,7 +96,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public bool UpgradeTower(int towerId)
         {
-            return towerUpgradeSystem.UpgradeTower(towerId);
+            return towerUpgradeService.UpgradeTower(towerId);
         }
     }
 }
