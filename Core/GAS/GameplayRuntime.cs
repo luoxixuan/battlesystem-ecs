@@ -169,9 +169,12 @@ namespace BattleSystemECS.Core.GAS
             int count = _store.GetEffectCount(targetId);
             for (int i = 0; i < count; i++)
             {
-                if (!_store.TryGetActiveEffectAt(targetId, i, out var existing, out var existingDef, out _)) continue;
+                if (!_store.TryGetActiveEffectAt(targetId, i, out var existing, out var existingDef, out var existingSnapshot)) continue;
                 TagId existingKey = existingDef.StackKey.Equals(default(TagId)) ? new TagId(existingDef.Id.Value) : existingDef.StackKey;
                 if (!existingKey.Equals(key) || existingDef.Type != EffectType.Periodic) continue;
+                string incomingName = application.LegacySnapshot.Name;
+                if (!string.IsNullOrEmpty(incomingName) && !string.IsNullOrEmpty(existingSnapshot.Name) &&
+                    !string.Equals(incomingName, existingSnapshot.Name, StringComparison.Ordinal)) continue;
                 if (!existing.RuntimeOwned)
                 {
                     existing.RuntimeOwned = true;

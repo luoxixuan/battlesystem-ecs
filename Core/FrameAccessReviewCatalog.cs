@@ -14,7 +14,7 @@ namespace BattleSystemECS.Core
         internal const string SupplementalArtifactSha256 = "EA9FA8D9563DD0AEE189B6873573659C8C9CB3EE6E057873EDBD0932754A11FE";
         internal static int ReviewedNodeCount => Reviews.Count;
         internal const int ReportedEarlyNodeCount = 91;
-        internal const int ReportedCombatNodeCount = 83;
+        internal const int ReportedCombatNodeCount = 84;
         internal const int ReportedPostDeathNodeCount = 49;
         internal const int ReportedEarlyCombatOverlap = 0;
         internal const int ReportedEarlyPostDeathOverlap = 12;
@@ -148,6 +148,7 @@ namespace BattleSystemECS.Core
                 { "combat.player-attack.update", "FG-ACCESS-20260901/combat.player-attack.update" },
                 { "combat.projectile.update", "FG-ACCESS-20260901/combat.projectile.update" },
                 { "combat.pull-tower.update", "FG-ACCESS-20260901/combat.pull-tower.update" },
+                { "combat.rally.consume", "FG-ACCESS-20260903/combat.rally.consume" },
                 { "combat.reflect.apply", "FG-ACCESS-20260901/combat.reflect.apply" },
                 { "combat.reflect.resolve", "FG-ACCESS-20260901/combat.reflect.resolve" },
                 { "combat.sabotage.update", "FG-ACCESS-20260901/combat.sabotage.update" },
@@ -264,8 +265,8 @@ namespace BattleSystemECS.Core
             };
 
         // 生产 profile 按 NodeId 排序后的完整根指纹；任何节点或元数据变化都必须重新审阅。
-        internal const string ApprovedFingerprintRootGameplay = "4f272cd944370b44dcbf7b479c71f3096b8b6b54b06258c09d9bb543e2488d38";
-        internal const string ApprovedFingerprintRootFixedPopulation = "d944e9a09a4c187fb0e0c6af14fac46267f2ac5cf220a66b9db3032e3d2cd2f5";
+        internal const string ApprovedFingerprintRootGameplay = "df4d2c4ad3f01d04392a8c85eceb0fc25199846373c00ab717cb6399c0d09be1";
+        internal const string ApprovedFingerprintRootFixedPopulation = "70cc12c38566f2b5ce377cdeef5d2dff9cdabe6ee7a60ea746ae226f36ea6e0b";
 
         public static bool TryGet(string nodeId, out FrameAccessReviewId reviewId) =>
             Reviews.TryGetValue(nodeId, out reviewId);

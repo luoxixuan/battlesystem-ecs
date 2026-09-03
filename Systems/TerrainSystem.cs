@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -80,7 +81,8 @@ namespace BattleSystemECS.Systems
                 {
                     if (!_lavaDotApplied.ContainsKey(enemyId))
                         _lavaDotApplied[enemyId] = 1;
-                    buffSystem.ApplyDot(enemyId, terrain.DotDamagePerTick, terrain.DotDuration);
+                    buffSystem.ApplyDot(enemyId, GameplayEffectDef.Periodic("prod.dot.lava", -1,
+                        terrain.DotDamagePerTick, terrain.DotDuration, 1f));
                 }
             }
         }

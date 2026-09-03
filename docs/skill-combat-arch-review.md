@@ -5,7 +5,7 @@
 > 方法:6 个维度并行深挖 + 逐条 file:line 证据核验(grep/读码复核),每条头部结论均已独立验证
 > 结论定性:CONFIRMED = 已读码/grep 核实;下文所有 A–H 主结论均为 CONFIRMED
 
-> **当前快照说明（2026-08-30 复核，HEAD `c17a984`）**：本文保留审查当时的证据和判断，不等同于当前待修清单。`f3596db` 已修复 Weather 沙暴 DoT 与 GlobalSkill Meteor 的死亡入队，并补上实体回收清理；`e0c3e7c` 已接线 `ElementalReactionSystem`。当前它们仍属于“绕过统一 Resolver 的迁移来源”，不应重复列为同一个已知死亡入队 bug。数量也必须注明口径：严格匹配生产 `EnemyHealth[...] -=` 为 29 行/19 个文件；所有赋值候选为 59 行/37 个文件；`ApplyEnemyDamage` 生产调用点为 5 个。`SystemRegistry` 是 21 次 `= null` group-slot 赋值、18 个独立槽位名（跨 group 有重复），TowerAttack 是 8 类双缓冲队列。可重复生成候选台账：`tools/inventory-ecs-gas-migration.ps1`。迁移执行以 [ecs-gas-migration-plan.md](ecs-gas-migration-plan.md) 及其阶段文档为准。
+> **当前快照说明（2026-08-30 复核，HEAD `c17a984`）**：本文保留审查当时的证据和判断，不等同于当前待修清单。`f3596db` 已修复 Weather 沙暴 DoT 与 GlobalSkill Meteor 的死亡入队，并补上实体回收清理；`e0c3e7c` 已接线 `ElementalReactionSystem`。当前它们仍属于“绕过统一 Resolver 的迁移来源”，不应重复列为同一个已知死亡入队 bug。数量也必须注明口径：严格匹配生产 `EnemyHealth[...] -=` 为 29 行/19 个文件；所有赋值候选为 59 行/37 个文件；`ApplyEnemyDamage` 生产调用点为 5 个。`SystemRegistry` 是 21 次 `= null` group-slot 赋值、18 个独立槽位名（跨 group 有重复），TowerAttack 是 8 类双缓冲队列。可重复生成候选台账：`tools/inventory-ecs-gas-migration.ps1`。迁移执行以 [ecs-gas-migration-plan.md](plan/ecs-gas-migration-plan.md) 及其阶段文档为准。
 
 ---
 

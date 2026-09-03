@@ -458,6 +458,8 @@ namespace BattleSystemECS.Core
         internal void GraphTickEffectReal(NodeExecutionContext context) => GraphTickSupplementalEffect(context, Core.GAS.ClockId.RealTime);
         internal void GraphTickEffectGlobal(NodeExecutionContext context) => GraphTickSupplementalEffect(context, Core.GAS.ClockId.Global);
 
+        internal void GraphConsumeRally(NodeExecutionContext context) => SkillBuff.ConsumeRally();
+
         internal void GraphCommitBuildDamage(NodeExecutionContext context)
         {
             store.DamageResolver.RejectPending(Core.GAS.DamageCommitBoundary.GameplayResolve);

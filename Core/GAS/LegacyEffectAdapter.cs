@@ -35,7 +35,8 @@ namespace BattleSystemECS.Core.GAS
                 : definition.StackingBehavior == StackingBehavior.MaxStacksRefresh
                     ? RefreshPolicy.StacksAndDuration
                     : RefreshPolicy.None;
-            var modifiers = definition.AttributeIndex >= 0
+            // Periodic 伤害走 payload tick，禁止再挂 ENEMY_HEALTH 这类 modifier（TryApply 会立刻改血）。
+            var modifiers = definition.Type != EffectType.Periodic && definition.AttributeIndex >= 0
                 ? new[] { new ModifierDefinition(new AttributeKey(definition.AttributeIndex), definition.ModifierOp, definition.Magnitude, snapshot: SnapshotPolicy.CaptureOnApply) }
                 : System.Array.Empty<ModifierDefinition>();
             GameplayEffectDefinition immutable;

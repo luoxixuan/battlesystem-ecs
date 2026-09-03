@@ -4,7 +4,7 @@
 >
 > 前置阶段：[ecs-gas-migration-foundation.md](ecs-gas-migration-foundation.md)
 >
-> 终态约束：[ecs-gas-final-architecture.md](ecs-gas-final-architecture.md)
+> 终态约束：[ecs-gas-final-architecture.md](../ecs-gas-final-architecture.md)
 
 本文覆盖统一伤害/资源/死亡管线，以及 Gameplay Effect 和 Trigger runtime。它是行为风险最高的阶段，必须建立在 M1 的请求/句柄合同和 M2 的属性语义之上。
 
@@ -120,6 +120,9 @@ FrameGraph：`effect.tick` / `build.effect.tick` / `skill-buff.skill.update` 已
 `BuffSystem.ApplyDot` 的 None 走 `TryAdopt`，叠层刷新走 `TryRestack`；该路径 timer 只由
 `GameplayEffectRuntime` 写。`TryAdopt` 已校验 BlockedTags 与 Periodic payload。尚未 catalog 化。
 死亡回调不再声明 `AbilityRequests`。不是 F4–F9 终态收口。
+2026-09-03 再续：生产 DoT 经 `ProductionDotCatalog` 物化后 `TryApply`（Periodic 空 modifier）；
+Rally 改消费 `DamageApplied`，新增 `combat.rally.consume`（`tower-attack` 前）；
+`AbilityRequests` 成为真实 command buffer。`EffectRequests` 仍是死 token。仍不是终态收口。
 
 M3 就要建立事件迁移表，逐项标记旧 `EventBus` 的 `LegacyOnly`/`Bridge`/`GameplayOnly` 状态；M4 才允许 Trigger 消费 `GameplayOnly`。Bridge 期间由新事实单向转发旧事件，按 sequence 去重，不能让旧 publisher 和新 publisher 各发一份。
 
@@ -332,7 +335,7 @@ mode 5 不得伪造为通过，也不因该债务删除或改写历史日志；�
 
 ### 4.4 本机门禁执行记录（2026-08-31）
 
-文档引用的旧 `artifacts/benchmark-final-20260831.log` 在本工作树不可定位，不能用来复现上节历史数值。相对计算统一采用 [ecs-gas-m0-baseline.md](ecs-gas-m0-baseline.md) 的最新 M0 复跑基线（mode2 `14953`、mode4 `7699`、mode5 `7342`）。先按门禁顺序执行 `dotnet build BattleSystemECS.Core`，再执行 `dotnet build BattleSystemECS.csproj`，随后使用同一 Debug 构建产物和默认 `game_config.json` 配置运行：
+文档引用的旧 `artifacts/benchmark-final-20260831.log` 在本工作树不可定位，不能用来复现上节历史数值。相对计算统一采用 [ecs-gas-m0-baseline.md](../ecs-gas-m0-baseline.md) 的最新 M0 复跑基线（mode2 `14953`、mode4 `7699`、mode5 `7342`）。先按门禁顺序执行 `dotnet build BattleSystemECS.Core`，再执行 `dotnet build BattleSystemECS.csproj`，随后使用同一 Debug 构建产物和默认 `game_config.json` 配置运行：
 
 ```text
 cmd /c "echo 2|dotnet run --no-build --project BattleSystemECS.csproj"  -> mode 2: 39946 / 41585 / 41801 FPS (median 41585)
@@ -354,4 +357,4 @@ cmd /c "echo 4|dotnet run --no-build --project BattleSystemECS.csproj"  # warmup
 dotnet run --no-build --project BattleSystemECS.csproj -- 5              # measured 6299 FPS, 5/5 Victory
 ```
 
-统计规则：丢弃每个模式的预热值，五次测量取中位数；spread 为 `(max-min)/median`。相对 [M0 基线](ecs-gas-m0-baseline.md)（mode2 `14953`、mode4 `7699`、mode5 `7342`）分别为：mode2 median `42000`，`+180.88%`，spread `21.74%`；mode4 median `9488`，`+23.24%`，spread `14.51%`；mode5 `6299`，`-14.21%`，按用户豁免保留为观察债务，不等于规范通过。按 plan/AGENTS 已定义的硬门禁，mode2/mode4 的相对基线中位数及逐轮结果均未出现超过 5% 的回退；spread 本身没有被定义为硬失败阈值，现作为可审计性/稳定性观察债务记录。mode4 的运行环境波动仍需后续稳定观察，不能仅凭单次结果或 spread 宣称性能改善。
+统计规则：丢弃每个模式的预热值，五次测量取中位数；spread 为 `(max-min)/median`。相对 [M0 基线](../ecs-gas-m0-baseline.md)（mode2 `14953`、mode4 `7699`、mode5 `7342`）分别为：mode2 median `42000`，`+180.88%`，spread `21.74%`；mode4 median `9488`，`+23.24%`，spread `14.51%`；mode5 `6299`，`-14.21%`，按用户豁免保留为观察债务，不等于规范通过。按 plan/AGENTS 已定义的硬门禁，mode2/mode4 的相对基线中位数及逐轮结果均未出现超过 5% 的回退；spread 本身没有被定义为硬失败阈值，现作为可审计性/稳定性观察债务记录。mode4 的运行环境波动仍需后续稳定观察，不能仅凭单次结果或 spread 宣称性能改善。

@@ -3,6 +3,7 @@
 > 状态：目标架构决策（本文定义终态，不代表当前代码已经全部实现）
 > 更新日期：2026-09-03
 > 相关审查：[skill-combat-arch-review.md](skill-combat-arch-review.md)
+> 迁移计划：[ecs-gas-migration-plan.md](plan/ecs-gas-migration-plan.md)
 
 ## 1. 决策摘要
 

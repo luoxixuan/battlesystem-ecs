@@ -41,10 +41,8 @@ namespace BattleSystemECS.Core
         // to the killing player.
         public Systems.ThornsAuraSystem? ThornsAura { get; set; }
         public int ThornsAuraPlayerId { get; set; } = 0;
-        // Round 187 Direction 4 — Rally Buff. Per-frame tick: decrement PlayerRallyCooldown
-        // and PlayerRallyDurationLeft, recompute per-tower TowerRallyAtkSpdBonus from
-        // the live PlayerRallyActive set. Subscribes to PlayerDamaged in its constructor
-        // (via SystemRegistry) to activate the rally on player damage.
+        // Round 187 Direction 4 — Rally Buff. combat.rally.consume 在 tower-attack 前
+        // 消费 DamageApplied；本节点 tick 时长/CD，并再消费一次战斗段伤害。
         public Systems.RallySystem? Rally { get; set; }
         internal void RegisterFrameBindings(FrameScheduler s)
         {
@@ -60,6 +58,11 @@ namespace BattleSystemECS.Core
             if(ThornsAura!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.thorns-aura.prepare"),c=>ThornsAura?.SetTurn());s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.thorns-aura.update"),c=>ThornsAura?.Update(c.Delta,ThornsAuraPlayerId));}
             if(Wisp!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.wisp.update"),c=>Wisp?.Update(c.Delta));
             if(Rally!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.rally.update"),c=>Rally?.Update(c.Delta));
+        }
+        internal void ConsumeRally()
+        {
+            Rally?.ConsumePlayerDamageFacts();
+            Rally?.ApplyActiveBonuses();
         }
         internal void ExecuteLegacy(ComponentStore store, TimeContext time, int turn)
         {
@@ -115,10 +118,8 @@ namespace BattleSystemECS.Core
             ThornsAura?.Update(deltaTime, ThornsAuraPlayerId);
             Skill?.Update(deltaTime);
             Wisp?.Update(deltaTime);
-            // Round 187 Direction 4 — Rally Buff. Runs at the end of SkillBuffGroup
-            // (after all other time-based buffs have ticked this frame) so the
-            // recomputed TowerRallyAtkSpdBonus is observable to TowerAttackSystem
-            // on the next frame's hot-path read. (Same gate order as Bleed/Frostbite.)
+            // Rally：combat.rally.consume 已在 tower-attack 前写过加成；这里 tick 时长/CD，
+            // 并再消费战斗段 DamageApplied，供下一帧 consume 使用。
             Rally?.Update(deltaTime);
         }
         public void Execute(ComponentStore store, float deltaTime, int turn)

@@ -4274,6 +4274,17 @@
           "providedTokens": []
         },
         {
+          "nodeId": "combat.rally.consume",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
           "nodeId": "effect.tick",
           "registrationId": "FrameScheduler",
           "phase": "Wave",

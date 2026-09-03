@@ -118,6 +118,37 @@ namespace BattleSystemECS.Tests.Framework
             for (int i = 0; i < store.DamageResolver.Events.Count; i++)
                 if (store.DamageResolver.Events.Get(i).Type == GameplayEventType.AbilityActivated) published = true;
             Assert.True(published);
+            Assert.Equal(1, store.AbilityRequests.Count);
+            Assert.True(store.AbilityRequests.PeakCount >= 1);
+        }
+
+        [Fact]
+        public void AbilityRequest_IsPrimaryEntryAndEnqueuesCommandBuffer()
+        {
+            var store = WaveStore();
+            store.AddPlayer(0, 20f, 1f, 1f, 1);
+            int enemy = store.AddEnemy(0, 0, 1, 10f, 10f, 1, 1, 1);
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 10, 1, 1, 1);
+            var execution = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage, 3f, new TagId(0));
+            var ability = new AbilityDefinition(new AbilityId(0), "typed", targeting, ClockId.Combat, 2f,
+                GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, executions: new[] { execution.Id });
+            var catalog = new GameplayCatalog(new[] { ability }, new[] { targeting }, Array.Empty<GameplayEffectDefinition>(),
+                new[] { execution }, Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
+                new System.Collections.Generic.Dictionary<string, AbilityId> { ["typed"] = ability.Id });
+            Assert.True(store.TryAddAbility(0, new GameplayAbilityDef("typed", "", 2f, 0f, -1, 1f,
+                AbilityActivation.Instant, AreaShapeType.Single, 1)));
+            var inst = store.GetAbility(0, 0);
+            inst.State.Id = ability.Id;
+            inst.State.Owner = store.GetEntityHandle(0);
+            store.SetAbility(0, 0, inst);
+            var request = new AbilityRequest(store.GetEntityHandle(0), ability.Id, store.GetEntityHandle(enemy),
+                store.AllocateGameplaySequence(0));
+            var result = GameplayAbilityRuntime.Activate(store, catalog, request);
+            Assert.True(result.Accepted, result.Reason.ToString());
+            Assert.Equal(1, store.AbilityRequests.Count);
+            Assert.Equal(ability.Id, store.AbilityRequests.Get(0).Ability);
+            Assert.Equal(0, store.AbilityRequests.Get(0).Source.Index);
         }
 
         [Fact]
@@ -788,7 +819,7 @@ namespace BattleSystemECS.Tests.Framework
             string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
             string source = File.ReadAllText(Path.Combine(root, "Core", "GAS", "GameplayAbilityRuntime.cs"));
 
-            Assert.Equal(5, source.Split(new[] { "=> ActivateCore(" }, StringSplitOptions.None).Length - 1);
+            Assert.Equal(9, source.Split(new[] { "=> ActivateCore(" }, StringSplitOptions.None).Length - 1);
             Assert.Equal(1, source.Split(new[] { "private static AbilityActivationRejectReason BuildActivationPlan(" },
                 StringSplitOptions.None).Length - 1);
             Assert.DoesNotContain("ValidateSingleCapacity", source, StringComparison.Ordinal);

@@ -177,7 +177,7 @@ namespace BattleSystemECS.Systems
 
             if (buffSystem != null)
             {
-                var dotDef = GameplayEffectDef.Periodic(effectName, AttributeSetDefinitions.ENEMY_HEALTH,
+                var dotDef = GameplayEffectDef.Periodic(effectName, -1,
                     dotDamage, dotDuration, dotInterval);
                 buffSystem.ApplyDot(enemyId, dotDef);
             }

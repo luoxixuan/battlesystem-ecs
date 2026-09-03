@@ -97,6 +97,23 @@ namespace BattleSystemECS.Core.GAS
             public void Commit(float cooldown) => _cooldowns[_slot] = Math.Max(0f, cooldown);
         }
 
+        private readonly struct AbilityStateArrayActivationState : IAbilityActivationState
+        {
+            private readonly AbilityState[] _states;
+            private readonly int _slot;
+            public AbilityStateArrayActivationState(AbilityState[] states, int slot)
+            { _states = states; _slot = slot; }
+            public bool IsValid => _states != null && _slot >= 0 && _slot < _states.Length;
+            public bool IsReady => IsValid && _states[_slot].CanActivate();
+            public void Commit(float cooldown)
+            {
+                var state = _states[_slot];
+                state.Cooldown = Math.Max(0f, cooldown);
+                if (state.MaxCharges > 1 && state.Charges > 0) state.Charges--;
+                _states[_slot] = state;
+            }
+        }
+
         private readonly struct StoredAbilityActivationState : IAbilityActivationState
         {
             private readonly ComponentStore _store;
@@ -110,7 +127,13 @@ namespace BattleSystemECS.Core.GAS
             public void Commit(float cooldown)
             {
                 var instance = _store.GetAbility(_entityId, _slot);
-                instance.Activate();
+                instance.CurrentCooldown = Math.Max(0f, cooldown);
+                if (instance.State.MaxCharges > 1 && instance.State.Charges > 0)
+                {
+                    var state = instance.State;
+                    state.Charges--;
+                    instance.State = state;
+                }
                 _store.SetAbility(_entityId, _slot, instance);
             }
         }
@@ -201,6 +224,32 @@ namespace BattleSystemECS.Core.GAS
             => ActivateCore(store, catalog, new CooldownArrayActivationState(cooldowns, request.Slot),
                 request, ActivationTargetSet.Single(request.TargetId >= 0 ? request.TargetId : request.OwnerId), payloadHandler);
 
+        public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, AbilityState[] cooldowns,
+            AbilityActivationRequest request, IAbilityPayloadHandler payloadHandler = null)
+            => ActivateCore(store, catalog, new AbilityStateArrayActivationState(cooldowns, request.Slot),
+                request, ActivationTargetSet.Single(request.TargetId >= 0 ? request.TargetId : request.OwnerId), payloadHandler);
+
+        public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, AbilityCooldownColumn cooldowns,
+            AbilityActivationRequest request, IAbilityPayloadHandler payloadHandler = null)
+            => Activate(store, catalog, cooldowns.States, request, payloadHandler);
+
+        /// <summary>AbilityRequest 主入口：按 Source 句柄与 AbilityId 解析槽位后入 command buffer 再提交。</summary>
+        public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, AbilityRequest request,
+            IAbilityPayloadHandler payloadHandler = null)
+        {
+            if (store == null || catalog == null || !request.Source.IsValid)
+                return new AbilityActivationResult(false, request.Source.Index, -1, AbilityActivationRejectReason.InvalidRequest);
+            if (!catalog.TryGetAbility(request.Ability, out var resolved))
+                return new AbilityActivationResult(false, request.Source.Index, -1, AbilityActivationRejectReason.InvalidRequest);
+            int slot = FindStoredSlot(store, request.Source.Index, request.Ability, resolved.Name);
+            if (slot < 0)
+                return new AbilityActivationResult(false, request.Source.Index, -1, AbilityActivationRejectReason.InvalidRequest);
+            var activation = new AbilityActivationRequest(request.Source.Index, slot, resolved.Cooldown,
+                request.Target.IsValid ? request.Target.Index : request.Source.Index, request.Ability,
+                ownerPlayerId: request.Source.Index);
+            return Activate(store, catalog, request.Source.Index, slot, activation, payloadHandler);
+        }
+
         /// <summary>ECS 能力槽的目录激活入口。</summary>
         public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, int entityId, int slot,
             AbilityActivationRequest request, IAbilityPayloadHandler payloadHandler = null)
@@ -216,6 +265,17 @@ namespace BattleSystemECS.Core.GAS
             IReadOnlyList<float> magnitudeOverrides = null, IAbilityPayloadHandler payloadHandler = null)
             => ActivateCore(store, catalog, new CooldownArrayActivationState(cooldowns, request.Slot),
                 request, ActivationTargetSet.Scaled(targetIds, magnitudeOverrides), payloadHandler);
+
+        public static AbilityActivationResult ActivateTargets(ComponentStore store, GameplayCatalog catalog,
+            AbilityState[] cooldowns, AbilityActivationRequest request, IReadOnlyList<int> targetIds,
+            IReadOnlyList<float> magnitudeOverrides = null, IAbilityPayloadHandler payloadHandler = null)
+            => ActivateCore(store, catalog, new AbilityStateArrayActivationState(cooldowns, request.Slot),
+                request, ActivationTargetSet.Scaled(targetIds, magnitudeOverrides), payloadHandler);
+
+        public static AbilityActivationResult ActivateTargets(ComponentStore store, GameplayCatalog catalog,
+            AbilityCooldownColumn cooldowns, AbilityActivationRequest request, IReadOnlyList<int> targetIds,
+            IReadOnlyList<float> magnitudeOverrides = null, IAbilityPayloadHandler payloadHandler = null)
+            => ActivateTargets(store, catalog, cooldowns.States, request, targetIds, magnitudeOverrides, payloadHandler);
 
         public static AbilityActivationResult ActivateTargets(ComponentStore store, GameplayCatalog catalog,
             int entityId, int slot, AbilityActivationRequest request, IReadOnlyList<int> targetIds,
@@ -248,6 +308,8 @@ namespace BattleSystemECS.Core.GAS
             var abilityRequest = new AbilityRequest(source, request.Ability, primaryTarget,
                 store.AllocateGameplaySequence(request.OwnerId));
             if (!abilityRequest.Source.IsValid || abilityRequest.Ability.Value != ability.Id.Value)
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (!store.AbilityRequests.TryAdd(abilityRequest))
                 return Reject(request, AbilityActivationRejectReason.InvalidRequest);
             if (!activationState.IsReady)
                 return Reject(request, AbilityActivationRejectReason.Cooldown);
@@ -620,6 +682,45 @@ namespace BattleSystemECS.Core.GAS
             => ActivateCore(store, catalog, new CooldownArrayActivationState(cooldowns, request.Slot),
                 request, ActivationTargetSet.Heals(targetIds, magnitudes), null);
 
+        public static AbilityActivationResult ActivateHealTargets(ComponentStore store, GameplayCatalog catalog,
+            AbilityState[] cooldowns, AbilityActivationRequest request, IReadOnlyList<int> targetIds,
+            IReadOnlyList<float> magnitudes)
+            => ActivateCore(store, catalog, new AbilityStateArrayActivationState(cooldowns, request.Slot),
+                request, ActivationTargetSet.Heals(targetIds, magnitudes), null);
+
+        public static AbilityActivationResult ActivateHealTargets(ComponentStore store, GameplayCatalog catalog,
+            AbilityCooldownColumn cooldowns, AbilityActivationRequest request, IReadOnlyList<int> targetIds,
+            IReadOnlyList<float> magnitudes)
+            => ActivateHealTargets(store, catalog, cooldowns.States, request, targetIds, magnitudes);
+
+        public static AbilityActivationResult ActivateHealTargets(ComponentStore store, GameplayCatalog catalog,
+            int entityId, int slot, AbilityActivationRequest request, IReadOnlyList<int> targetIds,
+            IReadOnlyList<float> magnitudes)
+            => ActivateCore(store, catalog, new StoredAbilityActivationState(store, entityId, slot),
+                request, ActivationTargetSet.Heals(targetIds, magnitudes), null);
+
+        public static int FindStoredSlot(ComponentStore store, int entityId, AbilityId abilityId, string name = null)
+        {
+            if (store == null || entityId < 0 || entityId >= ComponentStore.MAX_ENTITIES) return -1;
+            int count = store.AbilityCount[entityId];
+            int nameMatch = -1;
+            for (int slot = 0; slot < count; slot++)
+            {
+                var inst = store.GetAbility(entityId, slot);
+                // Owner.IsValid 表示已盖过 catalog Id（含 AbilityId(0)，不能用 Value!=0 当哨兵）
+                if (inst.State.Owner.IsValid && inst.State.Id.Value == abilityId.Value) return slot;
+                if (nameMatch < 0 && !string.IsNullOrEmpty(name) &&
+                    string.Equals(inst.Definition.Name, name, StringComparison.OrdinalIgnoreCase))
+                    nameMatch = slot;
+            }
+            if (nameMatch < 0) return -1;
+            var stamped = store.GetAbility(entityId, nameMatch);
+            stamped.State.Id = abilityId;
+            stamped.State.Owner = store.GetEntityHandle(entityId);
+            store.SetAbility(entityId, nameMatch, stamped);
+            return nameMatch;
+        }
+
         private static bool Contains(IReadOnlyList<EffectId> ids, EffectId id) { for (int i = 0; i < ids.Count; i++) if (ids[i].Value == id.Value) return true; return false; }
         private static bool Contains(IReadOnlyList<TriggerId> ids, TriggerId id) { for (int i = 0; i < ids.Count; i++) if (ids[i].Value == id.Value) return true; return false; }
         private static bool HasDuplicateTargets(IReadOnlyList<int> targetIds)
@@ -716,6 +817,43 @@ namespace BattleSystemECS.Core.GAS
             store.SetAbility(entityId, slot, ability);
             return true;
         }
+
+        public static bool TickCooldown(AbilityState[] states, int index, float deltaSeconds)
+        {
+            if (states == null || deltaSeconds <= 0f || index < 0 || index >= states.Length) return false;
+            var state = states[index];
+            if (state.Cooldown <= 0f) return true;
+            state.Cooldown = Math.Max(0f, state.Cooldown - deltaSeconds);
+            states[index] = state;
+            return true;
+        }
+
+        public static AbilityActivationResult TryActivate(AbilityState[] states, AbilityActivationRequest request)
+        {
+            var reason = states == null || request.Slot < 0 || request.Slot >= (states?.Length ?? 0)
+                ? AbilityActivationRejectReason.InvalidRequest
+                : !states[request.Slot].CanActivate() ? AbilityActivationRejectReason.Cooldown : AbilityActivationRejectReason.None;
+            return new AbilityActivationResult(reason == AbilityActivationRejectReason.None, request.OwnerId, request.Slot, reason);
+        }
+
+        public static AbilityActivationResult TryActivate(AbilityCooldownColumn cooldowns, AbilityActivationRequest request)
+            => TryActivate(cooldowns.States, request);
+
+        public static AbilityActivationResult AbilityCommit(AbilityState[] states, AbilityActivationRequest request)
+        {
+            var ready = TryActivate(states, request);
+            if (!ready.Accepted) return ready;
+            var state = states[request.Slot];
+            state.Cooldown = Math.Max(0f, request.Cooldown);
+            states[request.Slot] = state;
+            return new AbilityActivationResult(true, request.OwnerId, request.Slot);
+        }
+
+        public static AbilityActivationResult AbilityCommit(AbilityCooldownColumn cooldowns, AbilityActivationRequest request)
+            => AbilityCommit(cooldowns.States, request);
+
+        public static bool TickCooldown(AbilityCooldownColumn cooldowns, int index, float deltaSeconds)
+            => TickCooldown(cooldowns.States, index, deltaSeconds);
 
         public static bool TickCooldown(ComponentStore store, int entityId, int slot, float deltaSeconds)
         {

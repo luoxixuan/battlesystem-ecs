@@ -105,7 +105,7 @@ BattleSystem-ECS/
 │   ├── Monsters/                    # 200 种怪物
 │   ├── Skills/                      # 150 种技能
 │   └── Towers/                      # 150 种塔
-├── docs/ / Research/                # 架构文档、研究日志
+├── docs/ / Research/                # 架构文档、研究日志；迁移计划在 docs/plan/
 ├── Program.cs                       # 入口（游戏 / 压测 / 微基准）
 └── game_config.json                 # 运行时主配置
 ```
@@ -194,14 +194,14 @@ EmitPositionEvents()      # 移动后发射 OnPositionsChanged（逻辑→渲染
 Terrain.Execute()         # 地形/变异/变形（enemyDt）
 CombatSetup.Execute()     # 战斗系统 SetTurn 缓存（enemyDt）
 Spatial.Execute()         # 空间网格重建 + 巡逻/时光/迷雾/预警（enemyDt）
-Combat.Execute()          # 攻击/协同/光环/投射物（combatDt，全速）
-SkillBuff.Execute()       # 技能结算 + DoT + 流血（combatDt）；节点为 effect.tick / skill-buff.skill.update
+Combat.Execute()          # 攻击/协同/光环/投射物（combatDt，全速）；含 combat.rally.consume（tower-attack 前）
+SkillBuff.Execute()       # 技能结算 + DoT + 流血（combatDt）；节点为 effect.tick / skill-buff.skill.update / skill-buff.rally.update
 ResolveEnemiesKilledThisFrame()  # 帧末统一死亡结算（dt-free）
 PostDeath.Execute()       # 分裂/生命链接/目标/资源/尸体/连击（combatDt）
 Threat Score EMA 更新      # 玩家 DPS 威胁分指数滑动平均
 ```
 
-> 说明：bullet-time（子弹时间）开启时，`enemyDt`（敌人侧 7 个 group）按比例减速，`combatDt`（玩家/塔攻击侧）保持全速——战术暂停效果。BuildPhase 只运行 `BuildGroup`，不运行任何战斗系统。SkillBuff 真实节点是 `effect.tick`（Periodic）与 `skill-buff.skill.update`（SkillSystem.Update）；旧 id `effect.commit` / `ability.commit` 已删除。`build.skill/auto-skill/global-skill.update` 与 `post-death.corpse.update` 不再声明不存在的 AbilityRequests/EffectRequests。
+> 说明：bullet-time（子弹时间）开启时，`enemyDt`（敌人侧 7 个 group）按比例减速，`combatDt`（玩家/塔攻击侧）保持全速——战术暂停效果。BuildPhase 只运行 `BuildGroup`，不运行任何战斗系统。SkillBuff 真实节点是 `effect.tick`（Periodic）与 `skill-buff.skill.update`（SkillSystem.Update）；旧 id `effect.commit` / `ability.commit` 已删除。`build.skill/auto-skill/global-skill.update` 不再声明不存在的 AbilityRequests；`post-death.corpse.update` 不再声明 EffectRequests。`AbilityRequests` 现为真实 command buffer（`frame.begin` 清空，能力执行节点写入）；`EffectRequests` 仍是死 token，保留以免 `FrameResource` 枚举移位。Rally 激活走 `combat.rally.consume` + `skill-buff.rally.update` 消费 `DamageApplied`，不再订 `PlayerDamaged`。
 
 ### 4.3 两阶段并行安全模式
 
@@ -369,6 +369,7 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 | CI 测试静态规则 | `tools/check-test-rules.ps1`（0 违规门禁：零断言测试 + 恒真/恒假断言） |
 | 查看 Bug 历史 | `docs/design-and-bugs.md` |
 | 查看架构决策 | `docs/architecture.md` |
+| 查看 ECS+GAS 迁移计划 | `docs/plan/ecs-gas-migration-plan.md` |
 | 查看 CodeReview 改进 | `Research/CodeReview_Improvements.md` |
 
 ---

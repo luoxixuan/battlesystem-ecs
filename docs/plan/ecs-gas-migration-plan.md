@@ -4,9 +4,9 @@
 >
 > 更新日期：2026-08-30
 >
-> 终态约束：[ecs-gas-final-architecture.md](ecs-gas-final-architecture.md)
+> 终态约束：[ecs-gas-final-architecture.md](../ecs-gas-final-architecture.md)
 >
-> 审查依据：[skill-combat-arch-review.md](skill-combat-arch-review.md)
+> 审查依据：[skill-combat-arch-review.md](../skill-combat-arch-review.md)
 
 ## 1. 文档职责
 
@@ -179,7 +179,7 @@ Archetype 不属于 M1-M7 的迁移必需步骤。M8 只在 profile 证明稳定
 当前 M8 有界 profile 没有触发该闸门：production soak 的 Trigger/pool 利用率远低于 cap，
 active-list 已避免 full `MAX_ENTITIES` 扫描，且 mode 4/5 与 cache-miss 证据按现行约束不可用。
 本轮仅把 Effect handle 元数据改为 interface 内按需分页；继续采用 dense 高频核心列 +
-sparse/paged GAS pool + active lists。详见 [M8 evidence](ecs-gas-m8-evidence.md)。
+sparse/paged GAS pool + active lists。详见 [M8 evidence](../ecs-gas-m8-evidence.md)。
 
 ## 10. 下一步
 

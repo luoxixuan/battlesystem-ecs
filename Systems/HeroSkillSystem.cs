@@ -44,8 +44,8 @@ namespace BattleSystemECS.Systems
 
         // Flattened [heroId * MAX_HERO_SKILLS + slot]; -1 = empty.
         private int[] _heroSkillIds = new int[ComponentStore.MAX_HEROES * MAX_HERO_SKILLS];
-        // Cooldowns in seconds, flat-indexed the same way.
-        private float[] _heroSkillCooldowns = new float[ComponentStore.MAX_HEROES * MAX_HERO_SKILLS];
+        // Cooldowns：英雄不是 ECS 实体，冷却并进 AbilityState 列而不是造 dummy entity。
+        private AbilityState[] _heroSkillCooldowns = new AbilityState[ComponentStore.MAX_HEROES * MAX_HERO_SKILLS];
         // Cooldown max mirror (so HUD can show "ready in Xs" without re-parsing).
         private float[] _heroSkillCooldownMax = new float[ComponentStore.MAX_HEROES * MAX_HERO_SKILLS];
         // Track which slots have ever been configured — so we don't accidentally
@@ -153,8 +153,7 @@ namespace BattleSystemECS.Systems
                 {
                     int flatIdx = baseIdx + slot;
                     if (_heroSkillIds[flatIdx] < 0) continue;
-                    float cd = _heroSkillCooldowns[flatIdx];
-                    if (cd <= 0f) continue;
+                    if (_heroSkillCooldowns[flatIdx].Cooldown <= 0f) continue;
                     GameplayAbilityRuntime.TickCooldown(_heroSkillCooldowns, flatIdx, deltaTime);
                 }
             }
@@ -201,7 +200,9 @@ namespace BattleSystemECS.Systems
                 if (!GameplayAbilityRuntime.TryActivate(_heroSkillCooldowns,
                         new AbilityActivationRequest(store.PlayerEntityId, flatIdx, _heroSkillCooldownMax[flatIdx],
                             ownerPlayerId: store.PlayerEntityId)).Accepted) return false;
-                _heroSkillCooldowns[flatIdx] = _heroSkillCooldownMax[flatIdx];
+                var committed = _heroSkillCooldowns[flatIdx];
+                committed.Cooldown = _heroSkillCooldownMax[flatIdx];
+                _heroSkillCooldowns[flatIdx] = committed;
                 return true;
             }
             if (!TryResolveCatalogAbility(catalog, ResolveSkillNameById(skillId), out var abilityId) ||
@@ -247,7 +248,7 @@ namespace BattleSystemECS.Systems
             if (heroId < 0 || heroId >= ComponentStore.MAX_HEROES) return false;
             if (slot < 0 || slot >= MAX_HERO_SKILLS) return false;
             int flatIdx = heroId * MAX_HERO_SKILLS + slot;
-            return _heroSkillIds[flatIdx] >= 0 && _heroSkillCooldowns[flatIdx] <= 0f;
+            return _heroSkillIds[flatIdx] >= 0 && _heroSkillCooldowns[flatIdx].Cooldown <= 0f;
         }
 
         /// <summary>Returns the configured skill id for a slot, or -1 if none.</summary>
@@ -265,7 +266,7 @@ namespace BattleSystemECS.Systems
             if (heroId < 0 || heroId >= ComponentStore.MAX_HEROES) return 0f;
             if (slot < 0 || slot >= MAX_HERO_SKILLS) return 0f;
             int flatIdx = heroId * MAX_HERO_SKILLS + slot;
-            return _heroSkillCooldowns[flatIdx];
+            return _heroSkillCooldowns[flatIdx].Cooldown;
         }
 
         /// <summary>Returns the max cooldown for a slot (0 if no skill).</summary>

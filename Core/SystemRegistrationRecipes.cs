@@ -75,6 +75,7 @@ scheduler.RegisterAbilityPhaseConsumer(skill.SetPhaseContext,
 }
 internal static void CreateBuff(SystemRegistry registry, ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus) {
  registry.Buff = new BuffSystem(store, playerId);
+ registry.Buff.SetCatalog(config.CompiledCatalog);
 }
 internal static void WireBuff(SystemRegistry registry, ComponentStore store, int playerId) {
 }

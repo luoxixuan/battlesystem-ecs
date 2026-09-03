@@ -858,6 +858,30 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
+        public void TryRestack_SameStackKeyDifferentName_DoesNotMerge()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 20f, 20f, 1f, 1, 1);
+            var definition = new GameplayEffectDefinition(new EffectId(218), EffectType.Periodic,
+                Array.Empty<ModifierDefinition>(), 4f, 1f, ClockId.Combat, StackingBehavior.MaxStacks, 3,
+                RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.Damage, default(TagId),
+                Array.Empty<ExecutionId>(), stackKey: new TagId(218), periodicMagnitude: 1f);
+            Assert.True(store.GameplayEffectsRuntime.TryAdopt(PeriodicApp(definition, store, 0, target, "BurnA"), 0, out _));
+            Assert.Equal(1, store.GetEffectCount(target));
+            Assert.True(store.TryGetActiveEffectAt(target, 0, out var first, out _, out _));
+            Assert.Equal(1, first.StackCount);
+            Assert.True(store.GameplayEffectsRuntime.TryRestack(PeriodicApp(definition, store, 0, target, "BurnB"), 0, out _));
+            Assert.Equal(2, store.GetEffectCount(target));
+            Assert.True(store.TryGetActiveEffectAt(target, 0, out first, out _, out _));
+            Assert.Equal(1, first.StackCount);
+            Assert.True(store.GameplayEffectsRuntime.TryRestack(PeriodicApp(definition, store, 0, target, "BurnA"), 0, out _));
+            Assert.Equal(2, store.GetEffectCount(target));
+            Assert.True(store.TryGetActiveEffectAt(target, 0, out first, out _, out _));
+            Assert.Equal(2, first.StackCount);
+        }
+
+        [Fact]
         public void PeriodicAttributeMagnitude_UsesSourceAttackProjection()
         {
             var store = new ComponentStore();
@@ -891,13 +915,14 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         private static GameplayEffectApplication PeriodicApp(GameplayEffectDefinition definition, ComponentStore store,
-            int sourceId, int targetId)
+            int sourceId, int targetId, string name = "")
         {
             var runtime = new ActiveGameplayEffect(default(EffectHandle), definition.Id,
                 store.GetEntityHandle(sourceId), store.GetEntityHandle(targetId), definition.Duration,
                 2, definition.Periodic.HasValue ? definition.Periodic.Value.Magnitude : 0f, ClockId.Combat,
                 FirstTickPolicy.NextInterval, CatchUpPolicy.CatchUpAll, SourceDeathPolicy.Persist);
-            return new GameplayEffectApplication(definition, default(LegacyEffectSnapshot), runtime);
+            return new GameplayEffectApplication(definition,
+                new LegacyEffectSnapshot(name, -1, AttributeModifierOp.Add, 1f), runtime);
         }
     }
 }

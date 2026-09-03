@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Core
 {
@@ -1172,8 +1173,9 @@ namespace BattleSystemECS.Core
         //   gating + a public TriggerTowerActive(towerId) API). Hot path: ActiveSkillId==-1
         //   branches are skipped; per active tower the cooldown tick is O(1).
         public int[] TowerActiveSkillId = new int[MAX_ENTITIES];
-        // TowerActiveCooldown: current remaining cooldown in seconds (0 = ready to fire)
-        public float[] TowerActiveCooldown = new float[MAX_ENTITIES];
+        // TowerActiveCooldown: AbilityState 冷却列投影（塔主动技不占实体能力槽）
+        public AbilityCooldownColumn TowerActiveCooldown =
+            new AbilityCooldownColumn(new AbilityState[MAX_ENTITIES]);
         // TowerActiveCooldownMax: configured maximum cooldown in seconds (0 = no active skill,
         //   or copy of Cooldown from TowerConfig at AddTower time). Used for tests/UI display.
         public float[] TowerActiveCooldownMax = new float[MAX_ENTITIES];

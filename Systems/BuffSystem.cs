@@ -19,6 +19,7 @@ namespace BattleSystemECS.Systems
         private ComponentStore store;
         private int playerId;
         private IRenderer renderer;
+        private GameplayCatalog _catalog;
 
         // Ping-pong double-buffer for enemy DoT damage queue
         private List<(int enemyId, float damage, EntityHandle source, EffectId effect, long sequence)>[] _dotDamageQueue = new List<(int, float, EntityHandle, EffectId, long)>[2];
@@ -33,6 +34,8 @@ namespace BattleSystemECS.Systems
             _dotDamageQueue[0] = new List<(int, float, EntityHandle, EffectId, long)>(128);
             _dotDamageQueue[1] = new List<(int, float, EntityHandle, EffectId, long)>(128);
         }
+
+        public void SetCatalog(GameplayCatalog catalog) => _catalog = catalog;
 
         /// <summary>
         /// Main update: tick all active Periodic/Duration effects.
@@ -204,8 +207,8 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// 把 Periodic DoT 交给 GameplayEffectRuntime：None 走 TryAdopt（可并存多份），
-        /// 其余叠层走 TryRestack（同一 owner 内改 RemainingTime / stacks）。
+        /// Periodic DoT 走 catalog 形状的 TryApply：空 modifier + Periodic Damage payload。
+        /// 叠层由 TryApply 解释；None 不再每次新开槽。
         /// </summary>
         public void ApplyDot(int targetId, GameplayEffectDef dotDef)
         {
@@ -214,11 +217,23 @@ namespace BattleSystemECS.Systems
             // Minimal unit worlds may not materialize a player entity; production worlds do.
             // Preserve a valid self-source only as a compatibility fallback for those worlds.
             if (!source.IsValid) return;
-            var application = LegacyEffectAdapter.CreateApplication(dotDef, source, target);
-            if (dotDef.StackingBehavior == StackingBehavior.None)
-                store.GameplayEffectsRuntime.TryAdopt(application, playerId, out _);
-            else
+            if (dotDef.Type == EffectType.Periodic)
+                dotDef.AttributeIndex = -1;
+            GameplayEffectDefinition typed;
+            if (!ProductionDotCatalog.TryMaterialize(_catalog, dotDef.Name, dotDef.Duration, dotDef.TickInterval,
+                    dotDef.Magnitude, dotDef.StackingBehavior, dotDef.MaxStacks, out typed))
+            {
+                typed = LegacyEffectAdapter.CreateApplication(dotDef, source, target).Definition;
+                if (typed.Type == EffectType.Periodic && typed.Modifiers.Count != 0) return;
+            }
+            if (typed.Type == EffectType.Periodic && typed.Stacking != StackingBehavior.None)
+            {
+                var application = LegacyEffectAdapter.CreateApplication(dotDef, source, target);
                 store.GameplayEffectsRuntime.TryRestack(application, playerId, out _);
+                return;
+            }
+            store.GameplayEffectsRuntime.TryApply(typed.Id, typed, source, target, out _,
+                snapshot: dotDef.Magnitude, ownerPlayerId: playerId);
         }
 
         /// <summary>

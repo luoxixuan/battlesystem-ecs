@@ -1,3 +1,4 @@
+using System;
 using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Core.GAS
@@ -181,6 +182,30 @@ namespace BattleSystemECS.Core.GAS
         }
 
         public bool CanActivate() => Cooldown <= 0.0001f && (MaxCharges <= 1 || Charges > 0);
+    }
+
+    /// <summary>
+    /// AbilityState[] 的剩余冷却投影，保留既有 <c>column[i]</c> 读写，避免测试/系统继续碰裸 float[]。
+    /// </summary>
+    public readonly struct AbilityCooldownColumn
+    {
+        public readonly AbilityState[] States;
+        public AbilityCooldownColumn(AbilityState[] states)
+        {
+            States = states ?? throw new ArgumentNullException(nameof(states));
+        }
+        public int Length => States.Length;
+        public float this[int index]
+        {
+            get => (uint)index < (uint)States.Length ? States[index].Cooldown : 0f;
+            set
+            {
+                if ((uint)index >= (uint)States.Length) return;
+                var state = States[index];
+                state.Cooldown = value < 0f ? 0f : value;
+                States[index] = state;
+            }
+        }
     }
 
     /// <summary>

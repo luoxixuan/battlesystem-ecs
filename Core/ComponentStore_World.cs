@@ -359,6 +359,7 @@ namespace BattleSystemECS.Core
 
         // Per-entity ability instances (SOA: first dimension = entity, second = slot)
         public AbilityInstance[] AbilityInstances = new AbilityInstance[MAX_ENTITIES * MAX_ABILITIES_PER_ENTITY];
+        public readonly CommandBuffer<AbilityRequest> AbilityRequests = new CommandBuffer<AbilityRequest>(256);
         public int AbilityPoolRejections;
         public int EffectPoolRejections;
         public event Action<int, bool> OnGasPoolRejected;

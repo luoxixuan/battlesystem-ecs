@@ -245,8 +245,10 @@ namespace BattleSystemECS.Tests.Framework
             int target = store.AddEnemy(0, 0, 1f, 20f, 20f, 1f, 1, 1);
             var buff = new BuffSystem(store, 0);
             buff.ApplyDot(target, 4f, 2);
-            Assert.True(store.TryGetActiveEffectAt(target, 0, out var active, out _, out _));
+            Assert.True(store.TryGetActiveEffectAt(target, 0, out var active, out var definition, out _));
             Assert.True(active.RuntimeOwned);
+            Assert.Empty(definition.Modifiers);
+            Assert.Equal(EffectType.Periodic, definition.Type);
 
             buff.Update(1f);
             buff.ResolveDotDamage();

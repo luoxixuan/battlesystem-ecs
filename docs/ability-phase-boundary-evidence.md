@@ -36,7 +36,7 @@
 - `Systems/HeroSkillSystem.cs`
 - `Systems/SkillSystem.cs`
 - `Systems/TowerActiveSkillSystem.cs`
-- `docs/ecs-gas-migration-foundation.md`
+- `docs/plan/ecs-gas-migration-foundation.md`
 
 新增且未跟踪，以下三个文件均列入后续提交清单：
 

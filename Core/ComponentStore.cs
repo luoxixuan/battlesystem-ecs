@@ -368,6 +368,7 @@ namespace BattleSystemECS.Core
             _deathQueueResolved = false;
             DamageResolver.Events.Clear();
             ResourceResolver.Events.Clear();
+            AbilityRequests.Clear();
             DamageResolver.BeginFrame();
             DamageResolver.ResetDiagnostics();
             ResourceResolver.BeginFrame();
@@ -1555,7 +1556,7 @@ namespace BattleSystemECS.Core
             PlayerCurrentLevel = null!; PlayerDamageType = null!;
             PlayerGold = null!; PlayerUpgradeThreshold = null!;
             PlayerMana = null!; PlayerMaxMana = null!; PlayerManaRegen = null!; PlayerManaCost = null!;
-            PlayerGlobalSkillUnlocked = null!; PlayerGlobalSkillCooldown = null!;
+            PlayerGlobalSkillUnlocked = null!; PlayerGlobalSkillCooldown = default;
             PlayerGlobalSkillPressed = null!; PlayerGlobalSkillHotkey = null!;
             PlayerSkillResetOnKill = null!; PlayerSkillResetAmount = null!;
             PlayerBuffFlags = null!; PlayerStunDuration = null!;

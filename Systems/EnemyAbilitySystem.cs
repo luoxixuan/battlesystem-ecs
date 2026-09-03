@@ -28,8 +28,8 @@ namespace BattleSystemECS.Systems
         private readonly List<AbilityEvent>[] _abilityEvents = { new List<AbilityEvent>(64), new List<AbilityEvent>(64) };
         private int _abilityEventsIdx = 0;
 
-        // EnemyAbilityCooldownOwner：敌人能力使用领域自有计时器，激活仍经过共享类型化运行时边界。
-        private readonly float[] _abilityCooldownTimers = new float[ComponentStore.MAX_ENTITIES * ComponentStore.MAX_ABILITIES_PER_ENTITY];
+        // 敌人能力冷却写进该实体 AbilityInstance.State，不再另持 float[]。
+        private const int EnemyAbilitySlot = 0;
 
         // Sparse list of currently-channeling enemy ids. Avoids iterating all active enemies
         // per frame in TickCastTimers (10K enemies × 500 frames would be wasted work when
@@ -117,9 +117,9 @@ namespace BattleSystemECS.Systems
                 return;
             }
 
-            int timerIdx = CooldownSlot(enemyId);
-            var activation = new AbilityActivationRequest(enemyId, timerIdx, ability.Cooldown);
-            if (!GameplayAbilityRuntime.TryActivate(_abilityCooldownTimers, activation).Accepted) return;
+            EnsureAbilitySlot(enemyId);
+            var activation = new AbilityActivationRequest(enemyId, EnemyAbilitySlot, ability.Cooldown);
+            if (!GameplayAbilityRuntime.TryActivate(store, enemyId, EnemyAbilitySlot, out _)) return;
 
             // If enemy is already channeling, ignore new ability requests (channel is locked).
             if (store.EnemyIsChanneling[enemyId]) return;
@@ -157,18 +157,34 @@ namespace BattleSystemECS.Systems
             });
         }
 
+        private void EnsureAbilitySlot(int enemyId)
+        {
+            if (store.AbilityCount[enemyId] > EnemyAbilitySlot) return;
+            store.TryAddAbility(enemyId, new GameplayAbilityDef("enemy-ability", "", 0f, 0f, -1, 0f,
+                AbilityActivation.Instant, AreaShapeType.Single, 1));
+        }
+
+        private void StampEnemyAbilityCooldown(int enemyId, float cooldown)
+        {
+            EnsureAbilitySlot(enemyId);
+            var inst = store.GetAbility(enemyId, EnemyAbilitySlot);
+            var def = inst.Definition;
+            def.Cooldown = cooldown;
+            inst.Definition = def;
+            store.SetAbility(enemyId, EnemyAbilitySlot, inst);
+        }
+
         /// <summary>
         /// Decrement cooldown timers for active enemies with abilities. Called once per turn from GameManager.
-        /// Each enemy uses slot 0 of _abilityCooldownTimers.
+        /// Each enemy uses AbilityInstance slot 0.
         /// </summary>
         public void UpdateCooldowns(float deltaTime)
         {
             var activeEnemyIds = store.GetCachedActiveEnemyIds();
             foreach (var enemyId in activeEnemyIds)
             {
-                int idx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY; // slot 0
-                if (_abilityCooldownTimers[idx] > 0f)
-                    GameplayAbilityRuntime.TickCooldown(_abilityCooldownTimers, idx, deltaTime);
+                EnsureAbilitySlot(enemyId);
+                GameplayAbilityRuntime.TickCooldown(store, enemyId, EnemyAbilitySlot, deltaTime);
 
                 // Round 124: tick down per-enemy disarm duration (independent of ability cooldowns)
                 float disarmLeft = store.EnemyDisarmDurationLeft[enemyId];
@@ -286,10 +302,12 @@ namespace BattleSystemECS.Systems
             }
 
             // Refund half cooldown so the enemy can try again later
-            int timerIdx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY;
+            EnsureAbilitySlot(enemyId);
             if (halfCooldown > 0f)
             {
-                _abilityCooldownTimers[timerIdx] = halfCooldown;
+                var inst = store.GetAbility(enemyId, EnemyAbilitySlot);
+                inst.CurrentCooldown = halfCooldown;
+                store.SetAbility(enemyId, EnemyAbilitySlot, inst);
             }
 
             logger.Log($"[ABILITY] Enemy {enemyId} channel INTERRUPTED: '{abilityName ?? "<unknown>"}' (refund {halfCooldown:F1} turn CD)");
@@ -376,9 +394,9 @@ namespace BattleSystemECS.Systems
                     break;
             }
 
-            int timerIdx = enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY;
-            GameplayAbilityRuntime.AbilityCommit(_abilityCooldownTimers,
-                new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown));
+            EnsureAbilitySlot(enemyId);
+            StampEnemyAbilityCooldown(enemyId, ability.Cooldown);
+            GameplayAbilityRuntime.AbilityCommit(store, enemyId, EnemyAbilitySlot);
         }
 
         private bool CanDispatchStrict(EnemyAbilityDef ability)
@@ -402,18 +420,20 @@ namespace BattleSystemECS.Systems
             var catalog = gameConfig.CompiledCatalog;
             if (catalog == null || !catalog.TryResolveAlias(ability.Id, out var abilityId) ||
                 !catalog.TryGetAbility(abilityId, out var typed))
-                return new AbilityActivationResult(false, enemyId, CooldownSlot(enemyId),
+                return new AbilityActivationResult(false, enemyId, EnemyAbilitySlot,
                     AbilityActivationRejectReason.UnsupportedDefinition);
             bool matched = false;
             for (int i = 0; i < typed.Executions.Count; i++)
                 if (catalog.TryGetExecution(typed.Executions[i], out var execution) &&
                     execution.Payload == EffectPayloadKind.WorldAction && execution.Operation == type.Operation)
                     matched = true;
-            if (!matched) return new AbilityActivationResult(false, enemyId, CooldownSlot(enemyId),
+            if (!matched) return new AbilityActivationResult(false, enemyId, EnemyAbilitySlot,
                 AbilityActivationRejectReason.UnsupportedDefinition);
-            var request = new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown,
+            EnsureAbilitySlot(enemyId);
+            StampEnemyAbilityCooldown(enemyId, ability.Cooldown);
+            var request = new AbilityActivationRequest(enemyId, EnemyAbilitySlot, ability.Cooldown,
                 enemyId, abilityId, ownerPlayerId: playerId);
-            return GameplayAbilityRuntime.Activate(store, catalog, _abilityCooldownTimers, request, _payloadHandler);
+            return GameplayAbilityRuntime.Activate(store, catalog, enemyId, EnemyAbilitySlot, request, _payloadHandler);
         }
 
         bool IAbilityPayloadHandler.Supports(ExecutionDefinition execution) =>
@@ -589,9 +609,11 @@ namespace BattleSystemECS.Systems
                 _healTargets.Clear();
                 _healMagnitudes.Clear();
                 CollectHealTargets(enemyId, ability, _healTargets, _healMagnitudes);
-                var groupRequest = new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown, -1, typedId,
+                EnsureAbilitySlot(enemyId);
+                StampEnemyAbilityCooldown(enemyId, ability.Cooldown);
+                var groupRequest = new AbilityActivationRequest(enemyId, EnemyAbilitySlot, ability.Cooldown, -1, typedId,
                     null, null, 0f, float.NaN, playerId);
-                var groupResult = GameplayAbilityRuntime.ActivateHealTargets(store, catalog, _abilityCooldownTimers,
+                var groupResult = GameplayAbilityRuntime.ActivateHealTargets(store, catalog, enemyId, EnemyAbilitySlot,
                     groupRequest, _healTargets, _healMagnitudes);
                 if (groupResult.Accepted)
                     logger.Log($"[ABILITY] Enemy {enemyId} typed '{ability.Name}' healed {groupResult.AppliedEffects} allies");
@@ -606,7 +628,7 @@ namespace BattleSystemECS.Systems
                     ? TargetingRuntime.TryCollectEnemyAllies(store, enemyId, typed.Targeting, _typedTargets, _typedMagnitudes)
                     : TargetingRuntime.TryCollectTowerTargets(store, enemyId, typed.Targeting, _typedTargets, _typedMagnitudes);
                 if (!collected)
-                    return new AbilityActivationResult(false, enemyId, CooldownSlot(enemyId), AbilityActivationRejectReason.UnsupportedDefinition);
+                    return new AbilityActivationResult(false, enemyId, EnemyAbilitySlot, AbilityActivationRejectReason.UnsupportedDefinition);
                 if (type.Kind == EnemyAbilityKind.DispelTower)
                 {
                     int requiredEvents = 0;
@@ -619,14 +641,16 @@ namespace BattleSystemECS.Systems
                     _dispelCapacityReserved = requiredEvents > 0 &&
                         store.GameplayEffectsRuntime.Events.CanPublish(requiredEvents, true);
                     if (!_dispelCapacityReserved)
-                        return new AbilityActivationResult(false, enemyId, CooldownSlot(enemyId),
+                        return new AbilityActivationResult(false, enemyId, EnemyAbilitySlot,
                             _typedTargets.Count == 0 ? AbilityActivationRejectReason.NoTarget : AbilityActivationRejectReason.InvalidRequest);
                 }
-                var groupRequest = new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown,
+                EnsureAbilitySlot(enemyId);
+                StampEnemyAbilityCooldown(enemyId, ability.Cooldown);
+                var groupRequest = new AbilityActivationRequest(enemyId, EnemyAbilitySlot, ability.Cooldown,
                     -1, typedId, ownerPlayerId: playerId);
                 try
                 {
-                    var groupResult = GameplayAbilityRuntime.ActivateTargets(store, catalog, _abilityCooldownTimers,
+                    var groupResult = GameplayAbilityRuntime.ActivateTargets(store, catalog, enemyId, EnemyAbilitySlot,
                         groupRequest, _typedTargets, _typedMagnitudes, _payloadHandler);
                     if (groupResult.Accepted)
                         logger.Log($"[ABILITY] Enemy {enemyId} typed '{ability.Name}' affected {groupResult.AppliedEffects} target payload(s)");
@@ -638,9 +662,11 @@ namespace BattleSystemECS.Systems
                 ? store.EnemyMaxHealth[targetId] * Math.Max(0f, ability.HealAmount)
                 : damage ? store.EnemyDamage[enemyId] * Math.Max(0f, ability.DamageMultiplier)
                 : float.NaN;
-             var request = new AbilityActivationRequest(enemyId, CooldownSlot(enemyId), ability.Cooldown, targetId, typedId,
+            EnsureAbilitySlot(enemyId);
+            StampEnemyAbilityCooldown(enemyId, ability.Cooldown);
+             var request = new AbilityActivationRequest(enemyId, EnemyAbilitySlot, ability.Cooldown, targetId, typedId,
                  magnitudeOverride: magnitude, ownerPlayerId: playerId);
-            var result = GameplayAbilityRuntime.Activate(store, catalog, _abilityCooldownTimers, request, _payloadHandler);
+            var result = GameplayAbilityRuntime.Activate(store, catalog, enemyId, EnemyAbilitySlot, request, _payloadHandler);
             if (result.Accepted)
                 logger.Log($"[ABILITY] Enemy {enemyId} typed '{ability.Name}' applied {result.AppliedEffects} effect(s)");
             return result;
@@ -663,8 +689,6 @@ namespace BattleSystemECS.Systems
                 magnitudes.Add(magnitude);
             }
         }
-
-        private static int CooldownSlot(int enemyId) => enemyId * ComponentStore.MAX_ABILITIES_PER_ENTITY;
 
         private void ExecuteSelfHeal(int enemyId, EnemyAbilityDef ability)
         {

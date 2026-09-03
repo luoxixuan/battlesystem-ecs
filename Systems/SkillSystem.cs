@@ -89,17 +89,22 @@ namespace BattleSystemECS.Systems
                 if (!catalog.TryGetExecution(definition.Executions[i], out _))
                     return CatalogReject(abilityId, AbilityActivationRejectReason.UnsupportedDefinition);
 
-            int slot = FindSlot(abilityId, definition.Name);
+            int slot = GameplayAbilityRuntime.FindStoredSlot(store, playerId, abilityId, definition.Name);
             if (slot < 0) return CatalogReject(abilityId, AbilityActivationRejectReason.InvalidRequest);
             if (!IsAbilityAllowed((int)definition.Targeting.Shape))
                 return CatalogReject(abilityId, AbilityActivationRejectReason.PhaseNotAllowed, slot);
             bool selfTarget = definition.Targeting.Relation == RelationFilter.Self;
+            var source = store.GetEntityHandle(playerId);
+            if (selfTarget)
+            {
+                var abilityRequest = new AbilityRequest(source, abilityId, source,
+                    store.AllocateGameplaySequence(playerId));
+                return GameplayAbilityRuntime.Activate(store, catalog, abilityRequest, _payloadHandler);
+            }
             var request = new AbilityActivationRequest(playerId, slot, definition.Cooldown, playerId, abilityId,
                 definition.Effects.Count > 0 ? definition.Effects[0] : (EffectId?)null,
                 definition.TriggerRefs.Count > 0 ? definition.TriggerRefs[0] : (TriggerId?)null,
                 ownerPlayerId: playerId);
-            if (selfTarget)
-                return GameplayAbilityRuntime.Activate(store, catalog, playerId, slot, request, _payloadHandler);
             bool collected = definition.Targeting.Relation == RelationFilter.Allies
                 ? TargetingRuntime.TryCollectAllyTargets(store, playerId, definition.Targeting,
                     _catalogTargets, _catalogMagnitudeScales)
@@ -111,27 +116,6 @@ namespace BattleSystemECS.Systems
                 return CatalogReject(abilityId, AbilityActivationRejectReason.NoTarget, slot);
             return GameplayAbilityRuntime.ActivateTargets(store, catalog, playerId, slot, request,
                 _catalogTargets, _catalogMagnitudeScales, _payloadHandler);
-        }
-
-        private int FindSlot(AbilityId abilityId, string name)
-        {
-            int count = store.AbilityCount[playerId];
-            int nameMatch = -1;
-            for (int slot = 0; slot < count; slot++)
-            {
-                var inst = store.GetAbility(playerId, slot);
-                if (abilityId.Value != 0 && inst.State.Id.Value == abilityId.Value) return slot;
-                if (nameMatch < 0 && string.Equals(inst.Definition.Name, name, System.StringComparison.OrdinalIgnoreCase))
-                    nameMatch = slot;
-            }
-            if (nameMatch >= 0 && abilityId.Value != 0)
-            {
-                var inst = store.GetAbility(playerId, nameMatch);
-                inst.State.Id = abilityId;
-                inst.State.Owner = store.GetEntityHandle(playerId);
-                store.SetAbility(playerId, nameMatch, inst);
-            }
-            return nameMatch;
         }
 
         private static AbilityActivationResult CatalogReject(AbilityId abilityId, AbilityActivationRejectReason reason, int slot = -1) =>
@@ -904,22 +888,25 @@ namespace BattleSystemECS.Systems
             {
                 if (dotSystem != null && def.HasDot)
                 {
-                    var dotDef = def.DotStackingBehavior != StackingBehavior.None
-                        ? GameplayEffectDef.Periodic(
-                            $"DoT:{def.Name}",
-                            AttributeSetDefinitions.ENEMY_HEALTH,
-                            def.DotDamagePerTick,
-                            def.DotDuration,
-                            def.DotTickInterval,
-                            def.DotStackingBehavior,
-                            def.DotMaxStacks)
-                        : GameplayEffectDef.Periodic(
-                            $"DoT:{def.Name}",
-                            AttributeSetDefinitions.ENEMY_HEALTH,
-                            def.DotDamagePerTick,
-                            def.DotDuration,
-                            def.DotTickInterval);
-                    dotSystem.ApplyDot(enemyId, dotDef);
+                    if (!TryApplyCatalogPeriodicDot(enemyId, def))
+                    {
+                        var dotDef = def.DotStackingBehavior != StackingBehavior.None
+                            ? GameplayEffectDef.Periodic(
+                                $"DoT:{def.Name}",
+                                -1,
+                                def.DotDamagePerTick,
+                                def.DotDuration,
+                                def.DotTickInterval,
+                                def.DotStackingBehavior,
+                                def.DotMaxStacks)
+                            : GameplayEffectDef.Periodic(
+                                $"DoT:{def.Name}",
+                                -1,
+                                def.DotDamagePerTick,
+                                def.DotDuration,
+                                def.DotTickInterval);
+                        dotSystem.ApplyDot(enemyId, dotDef);
+                    }
                 }
                 else
                 {
@@ -929,6 +916,28 @@ namespace BattleSystemECS.Systems
                 hitCount++;
             }
             return hitCount;
+        }
+
+        private bool TryApplyCatalogPeriodicDot(int enemyId, GameplayAbilityDef def)
+        {
+            var catalog = gameConfig?.CompiledCatalog;
+            if (catalog == null || !catalog.TryResolveAlias(def.Name, out var abilityId) ||
+                !catalog.TryGetAbility(abilityId, out var ability))
+                return false;
+            var source = store.GetEntityHandle(playerId);
+            var target = store.GetEntityHandle(enemyId);
+            if (!source.IsValid || !target.IsValid) return false;
+            bool applied = false;
+            for (int i = 0; i < ability.Effects.Count; i++)
+            {
+                if (!catalog.TryGetEffect(ability.Effects[i], out var effect) ||
+                    effect.Type != EffectType.Periodic || effect.Modifiers.Count != 0)
+                    continue;
+                store.GameplayEffectsRuntime.TryApply(effect.Id, effect, source, target, out _,
+                    snapshot: def.DotDamagePerTick, ownerPlayerId: playerId);
+                applied = true;
+            }
+            return applied;
         }
 
         /// <summary>

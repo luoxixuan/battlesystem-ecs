@@ -136,12 +136,14 @@ namespace BattleSystemECS.Tests.Features.Skills
             var anyField = typeof(HeroSkillSystem).GetField("_anySkillConfigured", Flags);
 
             var ids = (int[])idField!.GetValue(sys)!;
-            var cds = (float[])cdField!.GetValue(sys)!;
+            var cds = (AbilityState[])cdField!.GetValue(sys)!;
             var maxs = (float[])maxField!.GetValue(sys)!;
             int flat = hero * HeroSkillSystem.MAX_HERO_SKILLS + slot;
             ids[flat] = skillId;
             maxs[flat] = maxCooldown;
-            cds[flat] = cooldown;
+            var state = cds[flat];
+            state.Cooldown = cooldown;
+            cds[flat] = state;
             if (markConfigured) anyField!.SetValue(sys, true);
         }
 

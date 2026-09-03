@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Core
 {
@@ -204,8 +205,9 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // ====================玩家全局技能/终极技能 (Global Skills / Ultimates) ====================
  // PlayerGlobalSkillUnlocked: bit-flag of which global skills are unlocked per player (indexed by playerId * MAX_GLOBAL_SKILLS + skillIdx)
  public bool[] PlayerGlobalSkillUnlocked = new bool[MAX_PLAYERS *8];
-        // PlayerGlobalSkillCooldown: remaining cooldown in seconds per global skill
-        public float[] PlayerGlobalSkillCooldown = new float[MAX_PLAYERS * 8];
+        // PlayerGlobalSkillCooldown: AbilityState 冷却列投影（全局技能不占实体槽）
+        public AbilityCooldownColumn PlayerGlobalSkillCooldown =
+            new AbilityCooldownColumn(new AbilityState[MAX_PLAYERS * 8]);
         // PlayerGlobalSkillPressed: hotkey pressed signal this frame (consumed by GlobalSkillSystem)
         public bool[] PlayerGlobalSkillPressed = new bool[MAX_PLAYERS];
         // PlayerGlobalSkillHotkey: hotkey string per skill for UI display

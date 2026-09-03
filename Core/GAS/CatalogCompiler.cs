@@ -821,6 +821,7 @@ namespace BattleSystemECS.Core.GAS
                     }
                 }
             }
+            ProductionDotCatalog.AppendTo(effects);
             var catalog = new GameplayCatalog(typedAbilities, targetings, effects, executions, triggers, modifiers, aliases);
             CatalogValidator.Validate(catalog, canonicalSkillsPath);
             return catalog;

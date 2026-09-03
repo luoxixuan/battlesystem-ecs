@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using BattleSystemECS.Config;
 using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Systems
 {
@@ -14,31 +15,16 @@ namespace BattleSystemECS.Systems
     /// <c>RallyAtkSpdBonus</c> (+attack speed) for <c>RallyDuration</c> seconds.
     /// Cooldown <c>RallyCooldown</c> prevents stacking on every hit.
     ///
-    /// Wires up via the existing <see cref="EventBus.PlayerDamaged"/> channel —
-    /// published in 3 places (EnemyAISystem, EnemyAbilitySystem, TelegraphSystem),
-    /// all of which are the canonical "player lost HP" signal. No new event hooks
-    /// needed.
-    ///
-    /// Hot-path design:
-    ///   - <c>PlayerRallyCooldown</c> / <c>PlayerRallyDurationLeft</c> default 0
-    ///     (zero-overhead fast path; Update returns early when no player has an
-    ///     active rally).
-    ///   - When a player takes damage, OnPlayerDamagedHandler does an O(active_towers)
-    ///     radius scan to mark nearby towers' <c>TowerRallyAtkSpdBonus</c>.
-    ///   - BeginFrame() in ComponentStore resets TowerRallyAtkSpdBonus to 0 every
-    ///     frame (RallySystem re-derives it from the active-player set every frame).
-    ///   - The hot-path in TowerAttackSystem reads TowerRallyAtkSpdBonus as an
-    ///     additive bonus on top of Fortress/HotZone/Desperation — same model.
-    ///
-    /// Lazy-init: SystemRegistry wires the EventBus at construction time; if no
-    /// bus is supplied the system degrades to a "no-op" (Update is gated by the
-    /// presence of any active rally).
+    /// 激活通道是 <see cref="ResourceResolver.Events"/> 上的 <c>DamageApplied</c>
+    /// （<c>ApplyPlayerDamageAuthority</c> 的事实），不再订阅 <c>EventBus.PlayerDamaged</c>。
+    /// <c>combat.rally.consume</c> 在 tower-attack 之前消费本帧已有事实并重写塔加成；
+    /// <c>skill-buff.rally.update</c> 再消费一次以覆盖 thorns / projectile 等战斗段伤害。
     /// </summary>
     public class RallySystem
     {
         private readonly ComponentStore _store;
         private readonly IRenderer _logger;
-        private readonly EventBus? _eventBus;
+        private int _resourceEventCursor;
 
         // Cached list of active rally towers per player — used by the expiry
         // pass to find which towers to clear when a rally ends. Reused frame-to-frame
@@ -49,20 +35,48 @@ namespace BattleSystemECS.Systems
         {
             _store = store ?? throw new ArgumentNullException(nameof(store));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _eventBus = eventBus;
-
-            if (_eventBus != null)
-            {
-                _eventBus.PlayerDamaged.Subscribe(OnPlayerDamagedHandler);
-            }
+            _ = eventBus;
         }
 
         /// <summary>Round 187 — per-turn setup hook. Currently no-op (Rally is event-driven).</summary>
         public void SetTurn(int turn, float deltaTime)
         {
-            // No-op: the rally activation is fully event-driven via the PlayerDamaged
-            // subscription in the constructor. Per-turn setup is reserved for future
-            // effects (e.g. "rally morale" on the first enemy of a wave).
+            // No-op: 激活由 DamageApplied 消费驱动。Per-turn setup 留给后续效果。
+        }
+
+        /// <summary>
+        /// 只读消费 ResourceResolver 上的玩家 DamageApplied，不移除事件
+        /// （gameplay-event.commit 的 ConsumeOnly 还要读同一队列）。
+        /// </summary>
+        public void ConsumePlayerDamageFacts()
+        {
+            var events = _store.ResourceResolver.Events;
+            int count = events.Count;
+            if (count < _resourceEventCursor) _resourceEventCursor = 0;
+            for (int i = _resourceEventCursor; i < count; i++)
+            {
+                var ev = events.Get(i);
+                if (ev.Type != GameplayEventType.DamageApplied) continue;
+                int pid = ev.OwnerPlayerId;
+                if (pid < 0) pid = ev.Target.IsValid ? ev.Target.Index : -1;
+                if ((uint)pid >= ComponentStore.MAX_PLAYERS) continue;
+                if (!ev.Target.IsValid || ev.Target.Index != pid) continue;
+                TryActivateRally(pid);
+            }
+            _resourceEventCursor = count;
+        }
+
+        /// <summary>
+        /// 对当前仍激活的 Rally 重写 TowerRallyAtkSpdBonus。BeginFrame 每帧清零该列，
+        /// 必须在 tower-attack 之前再写一次，持续帧塔攻才能吃到加成。
+        /// </summary>
+        public void ApplyActiveBonuses()
+        {
+            for (int pid = 0; pid < ComponentStore.MAX_PLAYERS; pid++)
+            {
+                if (!_store.PlayerRallyActive[pid]) continue;
+                ApplyRallyBonusesForPlayer(pid);
+            }
         }
 
         /// <summary>
@@ -75,7 +89,12 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void Update(float deltaTime)
         {
-            if (deltaTime <= 0f) return;
+            ConsumePlayerDamageFacts();
+            if (deltaTime <= 0f)
+            {
+                ApplyActiveBonuses();
+                return;
+            }
 
             // Step 1: per-frame rewrite of TowerRallyAtkSpdBonus from the active-player
             // set. The reset already happened in BeginFrame(), so we just need to
@@ -126,38 +145,17 @@ namespace BattleSystemECS.Systems
                 _store.PlayerRallyCooldown[pid] = cd > deltaTime ? cd - deltaTime : 0f;
             }
 
-            // Step 3: for each active-rally player, scan towers in radius and write
-            // TowerRallyAtkSpdBonus. We re-scan every frame (not just at activation)
-            // because towers can be built / destroyed between activation and expiry.
-            for (int pid = 0; pid < ComponentStore.MAX_PLAYERS; pid++)
-            {
-                if (!_store.PlayerRallyActive[pid]) continue;
-                ApplyRallyBonusesForPlayer(pid);
-            }
+            ApplyActiveBonuses();
         }
 
-        /// <summary>
-        /// Event handler: PlayerDamaged → if cooldown == 0, activate rally for that
-        /// player and write the rally zones into the per-player tower list.
-        /// </summary>
-        private void OnPlayerDamagedHandler(PlayerDamagedEvent ev)
+        private void TryActivateRally(int pid)
         {
-            int pid = ResolvePlayerIdFromEvent(ev);
-            if (pid < 0) return;
-
-            // Cooldown gate.
             if (_store.PlayerRallyCooldown[pid] > 0f) return;
 
-            // Activate. Reset cooldown and stamp duration. Clear any stale list.
             _store.PlayerRallyActive[pid] = true;
             _store.PlayerRallyCooldown[pid] = RallyConfig.RallyCooldown;
             _store.PlayerRallyDurationLeft[pid] = RallyConfig.RallyDuration;
-
-            // Re-derive the affected tower list immediately so the rest of this
-            // frame's TowerAttackSystem reads see the buff. (The Update() pass
-            // would also do this, but applying it here closes the gap.)
             ApplyRallyBonusesForPlayer(pid);
-
             _logger.Log($"[RALLY] Player {pid} triggered rally (radius={RallyConfig.RallyRadius}, +{RallyConfig.RallyAtkSpdBonus:P0} atk spd for {RallyConfig.RallyDuration}s, cd={RallyConfig.RallyCooldown}s)");
         }
 
@@ -209,36 +207,6 @@ namespace BattleSystemECS.Systems
                 _store.TowerRallyAtkSpdBonus[tid] = bonus;
                 affected.Add(tid);
             }
-        }
-
-        /// <summary>
-        /// Best-effort player-id resolution from the PlayerDamagedEvent. The event
-        /// does not currently carry a playerId field; we use the player who has
-        /// the lowest current health as a proxy (matches the "the player who got
-        /// hit" semantic — there's only one such player per game in single-player
-        /// and in multi-player the EventBus is delivered synchronously so the
-        /// most-recently-damaged player is the right one).
-        ///
-        /// In single-player (the common case) playerId is always 0.
-        /// </summary>
-        private int ResolvePlayerIdFromEvent(PlayerDamagedEvent ev)
-        {
-            // Multi-player heuristic: pick the player whose current health matches
-            // the event's RemainingHealth, within a small tolerance.
-            float target = ev.RemainingHealth;
-            float bestDelta = float.MaxValue;
-            int best = -1;
-            for (int pid = 0; pid < ComponentStore.MAX_PLAYERS; pid++)
-            {
-                if (_store.PlayerCurrentHealth[pid] <= 0f) continue;  // dead
-                float delta = Math.Abs(_store.PlayerCurrentHealth[pid] - target);
-                if (delta < bestDelta)
-                {
-                    bestDelta = delta;
-                    best = pid;
-                }
-            }
-            return best;
         }
     }
 }

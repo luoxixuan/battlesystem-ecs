@@ -195,7 +195,7 @@ namespace BattleSystemECS.Systems
                         // 通过 legacy snapshot 生成完整的周期规则，运行态计时由 global::BattleSystemECS.Content.Contracts.IEffectCommandPort 的 typed store 推进。
                         var dotDef = GameplayEffectDef.Periodic(
                             name: $"corpse_zone_tick_{effectType}",
-                            attrIdx: AttributeSetDefinitions.ENEMY_HEALTH,
+                            attrIdx: -1,
                             damagePerTick: damage,
                             totalDuration: 1f,             // 1s — one tick per zone pulse
                             tickInterval: 1f

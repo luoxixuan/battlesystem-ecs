@@ -8,7 +8,7 @@
 >
 > 终态约束：[ecs-gas-final-architecture.md](../ecs-gas-final-architecture.md)
 >
-> 迁移总览：[ecs-gas-migration-plan.md](../ecs-gas-migration-plan.md)
+> 迁移总览：[ecs-gas-migration-plan.md](ecs-gas-migration-plan.md)
 
 ## 1. 背景与本文职责
 
@@ -62,7 +62,7 @@
 
 1. `CatalogCompiler.cs:701`：补**命名实参** `periodicMagnitude: magnitude`。必须用命名实参，避免与 `grantedTags` / `blockedTags` / `stackKey` 的位置参数混淆。
 2. `CatalogValidator.cs`：新增一条与运行期 reason 4 对齐的规则——`Type == Periodic && Periodic.Value.Payload != EffectPayloadKind.GameplayEvent` 时 `Magnitude` 必须有限且 `> 0`，否则抛 `CatalogValidationException`，消息中带 `effectId` 以便定位配置。
-3. 顺带修正 [`Systems/HitTriggerSystem.cs:34`](../../Systems/HitTriggerSystem.cs) 的失效注释（声称 scheduler 每帧调用 `ResetCounters()`，实际该类在生产从未实例化，且已被 [ecs-gas-migration-combat.md](../ecs-gas-migration-combat.md) 明确记为 disabled）。**仅改注释，不动行为。**
+3. 顺带修正 [`Systems/HitTriggerSystem.cs:34`](../../Systems/HitTriggerSystem.cs) 的失效注释（声称 scheduler 每帧调用 `ResetCounters()`，实际该类在生产从未实例化，且已被 [ecs-gas-migration-combat.md](ecs-gas-migration-combat.md) 明确记为 disabled）。**仅改注释，不动行为。**
 
 ### 3.4 测试
 
@@ -244,6 +244,8 @@
 
 2026-09-03 后续进度（登记快照之后，未宣称 F4–F9 终态收口）：ApplyDot 的 None 走 `TryAdopt`、叠层走 `TryRestack`；`TryAdopt`/`TryRestack` 已跑 BlockedTags 与 Periodic payload 校验。`HasTag` 只走 `TagState`。死亡回调节点已去掉假 `AbilityRequests`。5 个创建点尚未 catalog 化。`AbilityRequest` 仍无 command buffer；主入口仍是 `AbilityActivationRequest`。`PlayerDamaged` / Rally 未拆通道。
 
+2026-09-03 再续（仍未宣称终态收口）：lava / firewall / corpse / demolish 经 `ProductionDotCatalog` 物化后 `TryApply`（空 modifier）；Skill 有 catalog Periodic 时直接 `TryApply`，否则 fallback adapter。`AbilityRequest` 已入 command buffer，`Activate(AbilityRequest)` 为主入口（多目标仍 `AbilityActivationRequest`，经 `ActivateCore` 入队）。敌方/英雄/全局/塔主动技能冷却并进 `AbilityState`/`AbilityCooldownColumn`；burrow/leap/totem 等机制 SOA 未并。Rally 不再订 `PlayerDamaged`，改消费 `DamageApplied`，新增 `combat.rally.consume`。`TryRestack` 同 StackKey 还要比 Name。`EffectRequests` 仍是死 token。`AbilityState` 仍嵌在 `AbilityInstance`。`TryAdopt` 仍不 `ApplyModifiers`。
+
 ---
 
 ## 8. 门禁
@@ -266,7 +268,7 @@ git diff --check
 - **Phase 2**：确认 `SealGraphComposition` 通过（两个根 fingerprint 已重算）；运行 `tools/generate-system-registry-ledger.ps1` 同步 manifest 与 nullable ledger。
 - **Phase 3 Tier C 之前**：用测试 harness 取得 `ResourceResolver.Events.PeakCount` 证据。
 - mode 2/4/5 与 Unity smoke 保持 `DEFERRED` / `UNAVAILABLE`，单独记录，不并入 PASS command manifest。
-- 文档同步：`CHANGELOG.md`（Phase 1 的数值变化单列）、[ecs-gas-migration-combat.md](../ecs-gas-migration-combat.md)、[ecs-gas-migration-orchestration.md](../ecs-gas-migration-orchestration.md)、`AGENTS.md`（若节点 id 更名影响关键文件速查表）。
+- 文档同步：`CHANGELOG.md`（Phase 1 的数值变化单列）、[ecs-gas-migration-combat.md](ecs-gas-migration-combat.md)、[ecs-gas-migration-orchestration.md](ecs-gas-migration-orchestration.md)、`AGENTS.md`（若节点 id 更名影响关键文件速查表）。
 
 ---
 

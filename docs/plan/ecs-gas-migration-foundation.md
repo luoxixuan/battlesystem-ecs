@@ -2,7 +2,7 @@
 
 > 上级总览：[ecs-gas-migration-plan.md](ecs-gas-migration-plan.md)
 >
-> 终态约束：[ecs-gas-final-architecture.md](ecs-gas-final-architecture.md)
+> 终态约束：[ecs-gas-final-architecture.md](../ecs-gas-final-architecture.md)
 >
 > 本文范围：基线、语义冻结、Catalog/ID/Handle/Request/Event 合同、属性和资源基座。
 

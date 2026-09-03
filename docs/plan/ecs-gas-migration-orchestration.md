@@ -29,7 +29,11 @@ benchmark 入口不直接组装三段 registry facade。
 - 2026-09-03 F4–F9 进度：`ApplyDot` None→`TryAdopt`、叠层→`TryRestack`；Transfer / BlockedTags /
   Attribute magnitude / Explicit 计数器合同 / 嵌套 `AbilityState` 已落地。随后 `TryAdopt` 补上
   BlockedTags 与 Periodic 校验，`HasTag` 去掉槽位回退，死亡回调去掉假 `AbilityRequests`。
-  仍未做：`AbilityRequest` command buffer；cooldown 列未合并；Rally 拆通道；DoT catalog 化。
+  再续：`AbilityRequest` command buffer + `Activate(AbilityRequest)` 主入口；敌方/英雄/全局/塔
+  主动技能冷却并进 `AbilityState`；Rally 拆出 `combat.rally.consume` 消费 `DamageApplied`；
+  lava/firewall/corpse/demolish/skill 走 catalog Periodic + 空 modifier `TryApply`。
+  仍不是终态：`AbilityState` 非稀疏池；机制 SOA 冷却未并；`EffectRequests` 死 token 保留；
+  `TryAdopt` 不 `ApplyModifiers`；Skill 无 catalog Periodic 时仍 fallback。
 
 ## M7 复核
 
@@ -52,7 +56,7 @@ smoke 在当前主机不可用；二者不能冒充通过。
 ## M8 有界工作包
 
 M8 当前只完成稳定观察、profile 支持的 Effect handle 分页，以及历史 evidence 缺口回收；
-完整证据与决策见 [ecs-gas-m8-evidence.md](ecs-gas-m8-evidence.md)。
+完整证据与决策见 [ecs-gas-m8-evidence.md](../ecs-gas-m8-evidence.md)。
 
 - 生产 FixedPopulation graph 以 10K 敌运行 500 帧并记录 Resolver、Effect、Trigger 和 pool
   high-water；另有 128 轮 Periodic death/entity recycle soak。

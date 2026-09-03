@@ -1,5 +1,17 @@
 # 更新记录 (Changelog)
 
+### 2026-09-03（ECS+GAS 缺口续：Rally 拆通道 / AbilityRequest buffer / cooldown 合并 / catalog DoT，⚠️ 有数值变化）
+- **Rally**：不再订阅 `EventBus.PlayerDamaged`，只读消费 `ResourceResolver.Events` 的 `DamageApplied`。新增 `combat.rally.consume`（`tower-attack` 之前）重写塔加成；`skill-buff.rally.update` 再消费一次以覆盖战斗段伤害。四站点仍可发 `PlayerDamaged`（渲染），但不再激活 Rally。
+- **数值：原静默站点也会 Rally**。thorns / trample / leap / projectile（及一切 `ApplyPlayerDamageAuthority`）现在会触发 Rally。战斗段伤害同帧要等到 `skill-buff.rally.update` 才激活，该帧塔攻已结束；下一帧 `combat.rally.consume` 才让塔吃到加成。近战等战斗前伤害可在同帧 `tower-attack` 前生效。持续帧因 consume 在清零之后、塔攻之前重写，塔攻速加成不再只活在触发当帧的 SkillBuff 段。
+- **F4 进度**：`ProductionDotCatalog` 在 Compile 末尾登记 `Firewall_Burn` / `prod.dot.lava` / `DemolishBurn` / `DemolishPoison` / `corpse_zone_tick_*`。`ApplyDot` 优先物化后 `TryApply`（Periodic **空 modifier**，不带 `ENEMY_HEALTH`）；非 None 仍 `TryRestack`。Skill 有 catalog Periodic 时直接 `TryApply`，否则仍 adapter + 空 modifier `TryApply`。
+- **数值：None 叠层**。同 catalog key 的 None 不再走 `TryAdopt` 每次新开槽；`TryApply` 遇已有 key 且 Refresh=None 时不新开槽、不刷新 timer。
+- **F9 进度**：`ComponentStore.AbilityRequests` 为 `CommandBuffer<AbilityRequest>`；`ActivateCore` 校验后入队；`Activate(AbilityRequest)` 按句柄/AbilityId 解析槽位（含 AbilityId(0)）。多目标仍构造 `AbilityActivationRequest`，但同样经 `ActivateCore` 入队。敌方 / 英雄 / 全局技能 / 塔主动技能冷却并进 `AbilityState` 或 `AbilityCooldownColumn`。
+- `TryRestack` 在 StackKey 命中后还要比 `LegacySnapshot.Name`，不同名不合并。
+- 仍未宣称 F4–F9 终态收口：`AbilityState` 仍嵌在 `AbilityInstance`（不是稀疏池）；burrow / leap / totem 等机制 SOA 冷却列未并；`FrameResource.EffectRequests` 仍是死 token（保留以免枚举移位）；`TryAdopt` 仍不 `ApplyModifiers`。
+
+### 2026-09-03（文档：ECS+GAS 计划收进 docs/plan）
+- 将 `ecs-gas-migration-plan.md` / `foundation` / `combat` / `orchestration` 从 `docs/` 根目录移入 `docs/plan/`，与缺口修正计划同目录。证据与终态架构仍留在 `docs/`。
+
 ### 2026-09-03（ECS+GAS 缺口收口续：Adopt 校验 / TagState / 死亡回调声明）
 - `TryAdopt` / `TryRestack` 与 `TryApply` 共用 BlockedTags（reason 8）和 Periodic payload / 非正 magnitude（reason 2/4）校验。
 - `HasTag` 只读 `TagState` 贡献计数，不再在未命中时扫槽。
