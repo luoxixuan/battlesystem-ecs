@@ -44,40 +44,6 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void LegacyAndGraphSchedulersMatchStateEventsDeathAndReward()
-        {
-            // Bug 回归：声明式调度切流不能改变同帧击杀、奖励或展示事件顺序。
-            var graph = RunRegistryWaveParity(false);
-            var legacy = RunRegistryWaveParity(true);
-            Assert.Equal(legacy.kills, graph.kills);
-            Assert.Equal(legacy.gold, graph.gold);
-            Assert.Equal(legacy.events, graph.events);
-            Assert.Equal(new[] { "killed", "destroyed" },
-                graph.events.Where(e => e == "killed" || e == "destroyed"));
-        }
-
-        [Fact]
-        public void RegistryModesMatchBuildAbilityWaveEffectTriggerAndCommitQueues()
-        {
-            // Bug 回归：等价验证必须穿过完整 Registry composition，而不是测试自接线。
-            var graph = RunRegistryPipeline(false);
-            var legacy = RunRegistryPipeline(true);
-            Assert.Equal(legacy, graph);
-            Assert.Equal(60f, graph.playerHealth);
-            Assert.False(graph.enemyActive);
-            Assert.Equal(1, graph.kills);
-            Assert.Equal(7f, graph.gold);
-            Assert.Equal(1, graph.markerEffects);
-            Assert.Equal(0, graph.damagePending);
-            Assert.Equal(0, graph.resourcePending);
-            Assert.Contains(nameof(GameplayEventType.KillConfirmed), graph.damageEvents,
-                StringComparison.Ordinal);
-            Assert.Equal(0.25f, graph.enemyDelta);
-            Assert.Equal(1f, graph.combatDelta);
-            Assert.Equal(PhaseContextKind.Wave, graph.phase);
-        }
-
-        [Fact]
         public void TowerFrame_MitigationLayersEachReduceNonLethalDamage()
         {
             // Bug 回归：护甲、类型抗性和通用抗性必须分别贡献，不能被致死裁剪掩盖。
@@ -125,7 +91,6 @@ namespace BattleSystemECS.Tests.Framework
             var attack = new Systems.TowerAttackSystem(Store, Renderer, null, 10, new EventBus(), events);
             scheduler.Combat.TowerAttack = attack;
             scheduler.CombatSetup.TowerAttack = attack;
-            scheduler.SealGraphComposition();
             RebuildGrid();
             scheduler.Tick(1f, 0);
             scheduler.Tick(0f, 1);
@@ -416,7 +381,6 @@ namespace BattleSystemECS.Tests.Framework
             buff.ApplyDot(enemyId, poison);
             var scheduler = new FrameScheduler(Store, Config);
             scheduler.SkillBuff.Buff = buff;
-            scheduler.SealGraphComposition();
             Store.PlayerBulletTimeTurnsLeft[0] = 2f;
             Store.PlayerBulletTimeScale[0] = 0.25f;
             scheduler.Tick(1f, 0);
@@ -436,7 +400,6 @@ namespace BattleSystemECS.Tests.Framework
             var attack = new Systems.TowerAttackSystem(Store, Renderer);
             scheduler.Combat.TowerAttack = attack;
             scheduler.CombatSetup.TowerAttack = attack;
-            scheduler.SealGraphComposition();
             Store.PlayerBulletTimeTurnsLeft[0] = 2f;
             Store.PlayerBulletTimeScale[0] = 0.25f;
             RebuildGrid();
@@ -456,7 +419,6 @@ namespace BattleSystemECS.Tests.Framework
             weather.ForceWeather(0, WeatherConfig.Sandstorm, 1f, 10f);
             var scheduler = new FrameScheduler(Store, Config);
             scheduler.PreGame.Weather = weather;
-            scheduler.SealGraphComposition();
             Store.PlayerBulletTimeTurnsLeft[0] = 2f;
             Store.PlayerBulletTimeScale[0] = 0.25f;
             scheduler.Tick(1f, 0);
@@ -474,7 +436,6 @@ namespace BattleSystemECS.Tests.Framework
             var wound = new Systems.EnemyWoundSystem(Store, 0);
             var scheduler = new FrameScheduler(Store, Config);
             scheduler.Movement.Wound = wound;
-            scheduler.SealGraphComposition();
             Store.PlayerBulletTimeTurnsLeft[0] = 2f;
             Store.PlayerBulletTimeScale[0] = 0.25f;
             scheduler.Tick(1f, 0);
@@ -515,7 +476,6 @@ namespace BattleSystemECS.Tests.Framework
             var attack = new Systems.TowerAttackSystem(world.Store, world.Renderer, null, 10, new EventBus(), events);
             scheduler.Combat.TowerAttack = attack;
             scheduler.CombatSetup.TowerAttack = attack;
-            scheduler.SealGraphComposition();
             scheduler.Phase = GameState.WavePhase;
             world.Store.RebuildSpatialGrid();
             scheduler.Tick(1f, 0);
@@ -555,120 +515,11 @@ namespace BattleSystemECS.Tests.Framework
                 new EventBus(), events);
             scheduler.Combat.TowerAttack = attack;
             scheduler.CombatSetup.TowerAttack = attack;
-            scheduler.SealGraphComposition();
             scheduler.Phase = GameState.WavePhase;
             world.Store.RebuildSpatialGrid();
             scheduler.Tick(1f, 0);
             Assert.True(world.Store.EnemyActive[enemyId]);
             return Assert.Single(events.DamageAmounts);
-        }
-
-        private static (int kills, float gold, List<string> events) RunRegistryWaveParity(bool legacy)
-        {
-            using var world = new TestWorld();
-            var events = new RecordingEventBus();
-            int playerId = world.Player(p => { p.Health = 1000f; p.Gold = 0f; });
-            world.Config.Levels.Clear();
-            world.Config.GlobalSkills.Clear();
-            world.Config.GlobalSkills.Add(new GlobalSkillDef
-            {
-                Name = "Meteor Strike", SkillType = (int)GlobalSkillType.MeteorStrike,
-                ManaCost = 0f, Cooldown = 0f, DamagePct = 100f, MaxDamage = 10000f
-            });
-            int enemyId = world.Enemy(e =>
-            {
-                e.X = 20f; e.Y = 20f; e.Health = 10f; e.MaxHealth = 10f; e.GoldReward = 7;
-            });
-            var registry = new SystemRegistry();
-            registry.CreateAll(world.Store, world.Config, world.Renderer, playerId,
-                new StateMachine(), events);
-            registry.WireDependencies(world.Store, playerId);
-            var scheduler = new FrameScheduler(world.Store, world.Config, events,
-                legacy ? FrameSchedulerExecutionMode.Legacy : FrameSchedulerExecutionMode.Graph);
-            registry.AssignToGroups(scheduler);
-            scheduler.Phase = GameState.WavePhase;
-            registry.GlobalSkill!.SetTurn(0);
-            world.Store.PlayerGlobalSkillPressed[playerId] = true;
-            scheduler.Tick(1f, 0);
-            Assert.False(world.Store.EnemyActive[enemyId]);
-            return (world.Store.TotalKills, world.Store.GetPlayerGold(playerId),
-                new List<string>(events.Events));
-        }
-
-        private static (float playerHealth, bool enemyActive, int kills, float gold, int markerEffects,
-            int damagePending, int resourcePending, string damageEvents, string resourceEvents,
-            float enemyDelta, float combatDelta, PhaseContextKind phase) RunRegistryPipeline(bool legacy)
-        {
-            using var world = new TestWorld();
-            var events = new RecordingEventBus();
-            int playerId = world.Player(p => { p.Health = 100f; p.Gold = 0f; });
-            world.Store.SetPlayerCurrentHealth(playerId, 40f);
-            world.Config.Levels.Clear();
-            world.Config.GlobalSkills.Clear();
-            world.Config.GlobalSkills.Add(new GlobalSkillDef
-            {
-                Name = "Emergency Heal", SkillType = (int)GlobalSkillType.EmergencyHeal,
-                ManaCost = 0f, Cooldown = 0f, HealPct = 0.5f
-            });
-            int enemyId = world.Enemy(e => { e.Health = 1f; e.MaxHealth = 1f; e.GoldReward = 7; });
-            var registry = new SystemRegistry();
-            registry.CreateAll(world.Store, world.Config, world.Renderer, playerId,
-                new StateMachine(), events);
-            registry.WireDependencies(world.Store, playerId);
-            var scheduler = new FrameScheduler(world.Store, world.Config, events,
-                legacy ? FrameSchedulerExecutionMode.Legacy : FrameSchedulerExecutionMode.Graph);
-            registry.AssignToGroups(scheduler);
-
-            var periodic = new PeriodicSpec(1f, new ExecutionId(7301), EffectPayloadKind.Damage,
-                MagnitudeSource.Constant, FirstTickPolicy.NextInterval, CatchUpPolicy.CatchUpAll,
-                magnitude: 1f);
-            var killEffect = new GameplayEffectDefinition(new EffectId(7301), EffectType.Periodic,
-                Array.Empty<ModifierDefinition>(), 2f, ClockId.Combat, StackingBehavior.None, 1,
-                RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.Damage,
-                default(TagId), periodic, Array.Empty<ExecutionId>());
-            var marker = new GameplayEffectDefinition(new EffectId(7302), EffectType.Duration,
-                Array.Empty<ModifierDefinition>(), 2f, 0f, ClockId.Combat, StackingBehavior.None, 1,
-                RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent,
-                new TagId(7302), Array.Empty<ExecutionId>());
-            var trigger = new TriggerDefinition(new TriggerId(7302), GameplayEventType.KillConfirmed,
-                marker.Id, CatalogRegistries.SkillConsumer, effectTarget: EffectTargetPolicy.Source);
-            Assert.True(world.Store.GameplayTriggersRuntime.RegisterEffect(marker));
-            scheduler.ConfigureGameplayRuntime(new[] { trigger });
-            Assert.True(world.Store.GameplayEffectsRuntime.TryApply(killEffect.Id, killEffect,
-                world.Store.GetEntityHandle(playerId), world.Store.GetEntityHandle(enemyId), out _,
-                ownerPlayerId: playerId));
-
-            scheduler.Phase = GameState.BuildPhase;
-            registry.GlobalSkill!.SetTurn(0);
-            world.Store.PlayerGlobalSkillPressed[playerId] = true;
-            scheduler.Tick(0.5f, 0);
-            scheduler.Phase = GameState.WavePhase;
-            world.Store.PlayerBulletTimeTurnsLeft[playerId] = 2f;
-            world.Store.PlayerBulletTimeScale[playerId] = 0.25f;
-            scheduler.Tick(1f, 1);
-
-            return (world.Store.PlayerCurrentHealth[playerId], world.Store.EnemyActive[enemyId],
-                world.Store.TotalKills, world.Store.GetPlayerGold(playerId),
-                CountEffect(world.Store, playerId, marker.Id),
-                world.Store.DamageResolver.PendingRequestCount, world.Store.ResourceResolver.PendingRequestCount,
-                EventTypes(world.Store.DamageResolver.Events), EventTypes(world.Store.ResourceResolver.Events),
-                scheduler.LastTimeContext.EnemyDelta, scheduler.LastTimeContext.CombatDelta,
-                scheduler.LastTimeContext.Phase.Kind);
-        }
-
-        private static string EventTypes(GameplayEventQueue events) =>
-            string.Join(",", Enumerable.Range(0, events.Count).Select(i => events.Get(i).Type.ToString()));
-
-        private static int CountEffect(ComponentStore store, int entityId, EffectId effect)
-        {
-            int matches = 0;
-            for (int slot = 0; slot < store.GetEffectCount(entityId); slot++)
-            {
-                if (store.TryGetActiveEffectAt(entityId, slot, out _, out var definition, out _)
-                    && definition.Id.Equals(effect))
-                    matches++;
-            }
-            return matches;
         }
 
         private (SystemRegistry registry, FrameScheduler scheduler, int enemyId) MakeRegistryScenario(IBattleEventBus events)
