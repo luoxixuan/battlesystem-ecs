@@ -5,13 +5,21 @@ namespace BattleSystemECS.Core.GAS
     public enum EffectPoolFailure { None, Capacity, InvalidIndex, StaleGeneration, Inactive }
     public sealed class EffectPool
     {
-        private readonly int[] _generations;
-        private readonly bool[] _active;
-        private readonly int[] _nextFree;
-        private int _freeHead;
-        private int _freeCount;
-        public int Capacity => _active.Length;
-        public int FreeCount => _freeCount;
+        private const int PageSize = 256;
+        private readonly int _capacity;
+        private readonly int[][] _generationPages;
+        private readonly bool[][] _activePages;
+        private readonly int[][] _nextFreePages;
+        private int _freeHead = -1;
+        private int _nextUnallocated;
+        private int _activeCount;
+        private int _allocatedPageCount;
+        public int Capacity => _capacity;
+        public int FreeCount => Capacity - _activeCount;
+        public int ActiveCount => _activeCount;
+        public int PeakActiveCount { get; private set; }
+        public int AllocatedPageCount => _allocatedPageCount;
+        public int AllocatedSlotCapacity => Math.Min(Capacity, _allocatedPageCount * PageSize);
         public int AllocationFailures { get; private set; }
         public int InvalidResolveCount { get; private set; }
         public int StaleResolveCount { get; private set; }
@@ -21,17 +29,28 @@ namespace BattleSystemECS.Core.GAS
         public EffectPool(int capacity)
         {
             if (capacity < 1) throw new ArgumentOutOfRangeException(nameof(capacity));
-            _generations = new int[capacity];
-            _active = new bool[capacity];
-            _nextFree = new int[capacity];
-            for (int i = 0; i < capacity - 1; i++) _nextFree[i] = i + 1;
-            _nextFree[capacity - 1] = -1;
-            _freeHead = 0;
-            _freeCount = capacity;
+            _capacity = capacity;
+            int pageCount = (capacity + PageSize - 1) / PageSize;
+            _generationPages = new int[pageCount][];
+            _activePages = new bool[pageCount][];
+            _nextFreePages = new int[pageCount][];
         }
         public bool TryAllocate(out EffectHandle handle)
         {
-            if (_freeHead < 0)
+            int index;
+            if (_freeHead >= 0)
+            {
+                index = _freeHead;
+                int page = index / PageSize;
+                int offset = index % PageSize;
+                _freeHead = _nextFreePages[page][offset];
+            }
+            else if (_nextUnallocated < Capacity)
+            {
+                index = _nextUnallocated++;
+                EnsurePage(index);
+            }
+            else
             {
                 AllocationFailures++;
                 handle = default(EffectHandle);
@@ -39,23 +58,38 @@ namespace BattleSystemECS.Core.GAS
                 LastPoolFailure = EffectPoolFailure.Capacity;
                 return false;
             }
-            int index = _freeHead;
-            _freeHead = _nextFree[index];
-            _generations[index] = _generations[index] == int.MaxValue ? 1 : _generations[index] + 1;
-            _active[index] = true;
-            _freeCount--;
-            handle = new EffectHandle(index, _generations[index]);
+            int generationPage = index / PageSize;
+            int generationOffset = index % PageSize;
+            int generation = _generationPages[generationPage][generationOffset];
+            generation = generation == int.MaxValue ? 1 : generation + 1;
+            _generationPages[generationPage][generationOffset] = generation;
+            _activePages[generationPage][generationOffset] = true;
+            _activeCount++;
+            if (ActiveCount > PeakActiveCount) PeakActiveCount = ActiveCount;
+            handle = new EffectHandle(index, generation);
             LastFailure = HandleResolveFailure.None;
             LastPoolFailure = EffectPoolFailure.None;
             return true;
+        }
+        public void ResetDiagnostics()
+        {
+            PeakActiveCount = ActiveCount;
+            AllocationFailures = 0;
+            InvalidResolveCount = 0;
+            StaleResolveCount = 0;
+            InactiveResolveCount = 0;
+            LastFailure = HandleResolveFailure.None;
+            LastPoolFailure = EffectPoolFailure.None;
         }
         public bool Release(EffectHandle handle) { return Release(handle, out _); }
         public bool Release(EffectHandle handle, out HandleResolveFailure failure)
         {
             if (!TryResolve(handle, out _, out failure)) return false;
-            _active[handle.Index] = false;
-            _freeCount++;
-            _nextFree[handle.Index] = _freeHead;
+            int page = handle.Index / PageSize;
+            int offset = handle.Index % PageSize;
+            _activePages[page][offset] = false;
+            _activeCount--;
+            _nextFreePages[page][offset] = _freeHead;
             _freeHead = handle.Index;
             LastFailure = HandleResolveFailure.None;
             LastPoolFailure = EffectPoolFailure.None;
@@ -74,11 +108,25 @@ namespace BattleSystemECS.Core.GAS
         internal bool TryResolveReadOnly(EffectHandle handle, out int index, out HandleResolveFailure failure)
         {
             index = handle.Index;
-            if (index < 0 || index >= _active.Length || !handle.IsValid) { failure = HandleResolveFailure.InvalidIndex; return false; }
-            if (_generations[index] != handle.Generation) { failure = HandleResolveFailure.StaleGeneration; return false; }
-            if (!_active[index]) { failure = HandleResolveFailure.Inactive; return false; }
+            if (index < 0 || index >= Capacity || !handle.IsValid) { failure = HandleResolveFailure.InvalidIndex; return false; }
+            if (index >= _nextUnallocated) { failure = HandleResolveFailure.StaleGeneration; return false; }
+            int page = index / PageSize;
+            int offset = index % PageSize;
+            if (_generationPages[page][offset] != handle.Generation) { failure = HandleResolveFailure.StaleGeneration; return false; }
+            if (!_activePages[page][offset]) { failure = HandleResolveFailure.Inactive; return false; }
             failure = HandleResolveFailure.None;
             return true;
+        }
+
+        private void EnsurePage(int index)
+        {
+            int page = index / PageSize;
+            if (_generationPages[page] != null) return;
+            _generationPages[page] = new int[PageSize];
+            _activePages[page] = new bool[PageSize];
+            _nextFreePages[page] = new int[PageSize];
+            for (int i = 0; i < PageSize; i++) _nextFreePages[page][i] = -1;
+            _allocatedPageCount++;
         }
     }
 }

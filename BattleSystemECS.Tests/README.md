@@ -64,6 +64,11 @@ BattleSystemECS.Tests/
 8. 修复过的 bug，测试中保留 `// Bug 回归：...` 注释说明回归意图。
 9. CI 静态检查门禁：`pwsh -File tools\check-test-rules.ps1` 必须 0 违规
    （零断言测试 + 恒真/恒假断言）。
+10. Profile/soak 测试默认不得写仓内 artifact；只有 capture 脚本显式设置
+    `BATTLESYSTEM_*_REPORT` 环境变量时，才通过 `Infrastructure/EvidenceWriter` 写入仓外路径。
+    wall-clock 只记录为原始 profile，不作为跨机器的脆弱断言。
+11. 生产和测试源码使用永久领域命名，不出现 `M0`/`M8` 等迁移阶段标签；阶段信息只写在
+    `docs/` 与 `tools/` 的 evidence 编排中。
 
 ## 4. 从 git 历史恢复旧测试的规则
 

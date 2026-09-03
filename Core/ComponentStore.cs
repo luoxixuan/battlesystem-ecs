@@ -18,6 +18,8 @@ namespace BattleSystemECS.Core
     public partial class ComponentStore : IDisposable
     {
         internal PhaseContext GameplayPhaseContext { get; set; } = PhaseContext.Unbound;
+        // 同一 store 上的伤害与资源提交必须串行，避免跨 resolver 回滚已提交状态。
+        internal object GameplayCommitLock { get; } = new object();
         #region Constants & Helpers
         public const int MAX_ENTITIES = 100000;
 
@@ -276,6 +278,7 @@ namespace BattleSystemECS.Core
         private int _towerKillQueueIdx = 0;
 
         private bool _deathQueueResolved = false;
+        private bool _deathResolveBlocked;
         private readonly int[] _enemyDeathPending = new int[MAX_ENTITIES];
         private long _deathEnqueueCount;
         private int _frameSequence;
@@ -284,13 +287,70 @@ namespace BattleSystemECS.Core
 
         // Combo kill callback — fired once per killed enemy during ResolveEnemiesKilledThisFrame.
         // Safe for serial use only (called from the resolve loop inside a foreach).
-        public event Action<int, int> OnEnemyKilled;
+        private readonly object _enemyKilledSubscriberSync = new object();
+        private Action<int, int> _onEnemyKilled;
+        private Action<int, int>[] _enemyKilledSubscribers = Array.Empty<Action<int, int>>();
+        public event Action<int, int> OnEnemyKilled
+        {
+            add { lock (_enemyKilledSubscriberSync) { _onEnemyKilled += value; RebuildEnemyKilledSubscribers(); } }
+            remove { lock (_enemyKilledSubscriberSync) { _onEnemyKilled -= value; RebuildEnemyKilledSubscribers(); } }
+        }
+        internal int EnemyKilledSubscriberCount => _enemyKilledSubscribers.Length;
         // Tower kill callback — fired when a tower scores the killing blow.
         // Parameters: (enemyId, playerId, towerId). Thread-safe, serial context.
-        public event Action<int, int, int> OnTowerKill;
+        private readonly object _towerKillSubscriberSync = new object();
+        private Action<int, int, int> _onTowerKill;
+        private Action<int, int, int>[] _towerKillSubscribers = Array.Empty<Action<int, int, int>>();
+        public event Action<int, int, int> OnTowerKill
+        {
+            add { lock (_towerKillSubscriberSync) { _onTowerKill += value; RebuildTowerKillSubscribers(); } }
+            remove { lock (_towerKillSubscriberSync) { _onTowerKill -= value; RebuildTowerKillSubscribers(); } }
+        }
+        internal int TowerKillSubscriberCount => _towerKillSubscribers.Length;
+
+        private void RebuildEnemyKilledSubscribers()
+        {
+            if (_onEnemyKilled == null) { Volatile.Write(ref _enemyKilledSubscribers, Array.Empty<Action<int, int>>()); return; }
+            Delegate[] invocation = _onEnemyKilled.GetInvocationList();
+            var subscribers = new Action<int, int>[invocation.Length];
+            for (int i = 0; i < invocation.Length; i++) subscribers[i] = (Action<int, int>)invocation[i];
+            Volatile.Write(ref _enemyKilledSubscribers, subscribers);
+        }
+
+        private void RebuildTowerKillSubscribers()
+        {
+            if (_onTowerKill == null) { Volatile.Write(ref _towerKillSubscribers, Array.Empty<Action<int, int, int>>()); return; }
+            Delegate[] invocation = _onTowerKill.GetInvocationList();
+            var subscribers = new Action<int, int, int>[invocation.Length];
+            for (int i = 0; i < invocation.Length; i++) subscribers[i] = (Action<int, int, int>)invocation[i];
+            Volatile.Write(ref _towerKillSubscribers, subscribers);
+        }
+
+        internal void NotifyTowerKillSubscribers(int enemyId, int playerId, int towerId)
+        {
+            Exception callbackFailure = null;
+            Action<int, int, int>[] subscribers = Volatile.Read(ref _towerKillSubscribers);
+            for (int i = 0; i < subscribers.Length; i++)
+            {
+                try { subscribers[i](enemyId, playerId, towerId); }
+                catch (Exception ex) { if (callbackFailure == null) callbackFailure = ex; }
+            }
+            if (callbackFailure != null) throw callbackFailure;
+        }
 
         public void BeginFrame()
         {
+            if (_deathResolveBlocked)
+            {
+                // Keep the blocked death batch in place; only clear transient facts
+                // before retrying its required KillConfirmed publication.
+                _deathResolveBlocked = false;
+                DamageResolver.Events.Clear();
+                ResourceResolver.Events.Clear();
+                DamageResolver.BeginFrame();
+                ResourceResolver.BeginFrame();
+                return;
+            }
             // 检测帧生命周期错误：上一帧未完成死亡结算就再次 BeginFrame。
             if (!_deathQueue[_deathQueueIdx].IsEmpty && !_deathQueueResolved)
             {
@@ -298,9 +358,13 @@ namespace BattleSystemECS.Core
                     "BeginFrame() called but ResolveEnemiesKilledThisFrame() was not called " +
                     "for the previous frame. Deaths may have been discarded.");
             }
-            // Ping-pong: switch to alternate bag, clear it for new frame
-            _deathQueueIdx = 1 - _deathQueueIdx;
-            _deathQueue[_deathQueueIdx].Clear();
+            // A callback may have queued a cascade into the current write bag after the
+            // prior batch committed. Preserve that bag across BeginFrame for retry.
+            if (_deathQueue[_deathQueueIdx].IsEmpty)
+            {
+                _deathQueueIdx = 1 - _deathQueueIdx;
+                _deathQueue[_deathQueueIdx].Clear();
+            }
             _deathQueueResolved = false;
             DamageResolver.Events.Clear();
             ResourceResolver.Events.Clear();
@@ -429,11 +493,14 @@ namespace BattleSystemECS.Core
             int readIdx = _towerKillQueueIdx;
             int writeIdx = 1 - _towerKillQueueIdx;
             _towerKillQueueIdx = writeIdx;
+            Exception callbackFailure = null;
             foreach (var (enemyId, playerId, towerId) in _towerKillQueue[readIdx])
             {
-                OnTowerKill?.Invoke(enemyId, playerId, towerId);
+                try { NotifyTowerKillSubscribers(enemyId, playerId, towerId); }
+                catch (Exception ex) { if (callbackFailure == null) callbackFailure = ex; }
             }
-            _towerKillQueue[writeIdx].Clear();
+            _towerKillQueue[readIdx].Clear();
+            if (callbackFailure != null) throw callbackFailure;
         }
 
         /// <summary>
@@ -446,20 +513,70 @@ namespace BattleSystemECS.Core
             DispatchPreparedEnemyDeaths();
         }
 
+        private int CountPendingDeathResourceFacts()
+        {
+            int count = 0;
+            foreach (var entry in _deathQueue[_deathQueueIdx])
+            {
+                int enemyId = entry.EnemyId;
+                if (!IsValidEntity(enemyId) || !EnemyActive[enemyId] || GetEntityHandle(enemyId).Generation != entry.Generation) continue;
+                int playerId = entry.PlayerId;
+                float gold = (EnemyHasStolenGold[enemyId] ? EnemyGoldOnReturn[enemyId] : EnemyGoldReward[enemyId]) * _goldKillMultiplier * _allIncomeMultKill * PlayerComboGoldMult[playerId];
+                if (EnemyIsBounty[enemyId]) gold *= EnemyBountyGoldMult[enemyId];
+                int kills = PlayerWaveKillCount[playerId];
+                gold *= Math.Max(_waveGoldDecayFloor, 1f - kills * _waveGoldDecayRate);
+                if (gold != 0f) count++;
+                if (_goldOnEliteKill > 0f && EnemyIsElite[enemyId]) count++;
+                if (EnemyMarked[enemyId] && gold * EnemyMarkedDamageBonus[enemyId] != 0f) count++;
+                if (!EnemyExecuted[enemyId] && EnemyExecuteThreshold[enemyId] > 0f)
+                {
+                    if (EnemyExecuteBonusGold[enemyId] > 0f) count++;
+                    if (EnemyExecuteBonusMana[enemyId] > 0f) count++;
+                }
+            }
+            return count;
+        }
+
         private int _preparedDeathReadIdx=-1;
         private int _preparedDeathWriteIdx=-1;
+        private GameplayEventQueue.GameplayEventReservation _deathReservation;
 
         internal void PrepareEnemiesKilledThisFrame()
         {
             if(_preparedDeathReadIdx>=0)throw new InvalidOperationException("Prepared death callbacks must be dispatched before preparing another batch.");
+            int pendingDeaths = CountPendingDeathKillFacts();
+            if (pendingDeaths > 0)
+            {
+                _deathReservation = GameplayEventQueue.TryReserveAtomic(DamageResolver.Events, pendingDeaths,
+                    ResourceResolver.Events, CountPendingDeathResourceFacts());
+                if (_deathReservation == null)
+                {
+                    DamageResolver.MarkEventPublicationFailure(true);
+                    _deathResolveBlocked = true;
+                    return;
+                }
+            }
             _preparedDeathReadIdx=_deathQueueIdx;
             _preparedDeathWriteIdx=1-_deathQueueIdx;
             _deathQueueIdx=_preparedDeathWriteIdx;
         }
 
+        private int CountPendingDeathKillFacts()
+        {
+            int count = 0;
+            foreach (var entry in _deathQueue[_deathQueueIdx])
+                if (IsValidEntity(entry.EnemyId) && EnemyActive[entry.EnemyId] &&
+                    GetEntityHandle(entry.EnemyId).Generation == entry.Generation) count++;
+            return count;
+        }
+
         internal void DispatchPreparedEnemyDeaths()
         {
-            if(_preparedDeathReadIdx<0)throw new InvalidOperationException("Death callbacks require a prepared death batch.");
+            if(_preparedDeathReadIdx<0)
+            {
+                if (_deathResolveBlocked) return;
+                throw new InvalidOperationException("Death callbacks require a prepared death batch.");
+            }
             int readIdx=_preparedDeathReadIdx;
             int writeIdx=_preparedDeathWriteIdx;
             foreach (var entry in _deathQueue[readIdx])
@@ -481,7 +598,7 @@ namespace BattleSystemECS.Core
                 long killSequence = entry.Sequence == 0L ? ((long)CurrentFrame << 32) | (uint)enemyId : entry.Sequence;
                 void AddLifecycleGold(float amount)
                 {
-                    if (amount != 0f) ResourceResolver.ApplyLifecycleGold(playerId, amount, oldSource, killSequence, playerId);
+                    if (amount != 0f) ResourceResolver.StageLifecycleGold(playerId, amount, oldSource, killSequence, playerId, _deathReservation);
                 }
                 if (EnemyHasStolenGold[enemyId])
                 {
@@ -545,24 +662,41 @@ namespace BattleSystemECS.Core
                         // pattern used everywhere else for safe mana writes. Note that when
                         // PlayerMaxMana is 0 (uninitialized player), SetPlayerMana clamps to 0;
                         // this is the established convention across the codebase.
-                        ResourceResolver.ApplyLifecycleMana(playerId, execMana, oldSource, killSequence, playerId);
+                        ResourceResolver.StageLifecycleMana(playerId, execMana, oldSource, killSequence, playerId, _deathReservation);
                     }
                     EnemyExecuted[enemyId] = true;
                 }
-                OnEnemyKilled?.Invoke(enemyId, playerId);
-                // Fire tower kill event (for TowerExperienceSystem XP grant) — serial, safe
-                ResolveTowerKillsThisFrame();
-                DestroyEntity(enemyId);
-                // KillConfirmed 仅在奖励、生命周期回调、塔击杀经验和销毁完成后发布；保留致死命中的旧代句柄。
-                bool killPublished = DamageResolver.Events.TryPublish(new GameplayEvent(
+                // Stage required facts in the reservation. They remain invisible until
+                // callbacks and entity destruction complete for the entire batch.
+                _deathReservation.StageFirst(new GameplayEvent(
                     GameplayEventType.KillConfirmed, oldSource, oldTarget,
-                    killSequence, ownerPlayerId: playerId), true);
-                DamageResolver.MarkEventPublicationFailure(!killPublished);
+                    killSequence, ownerPlayerId: playerId));
             }
-            _deathQueue[writeIdx].Clear();
+            // All required facts for the batch now exist. Public callbacks may re-enter
+            // producers, but cannot starve a later death in this same commit.
+            Exception callbackFailure = null;
+            foreach (var entry in _deathQueue[readIdx])
+            {
+                int enemyId = entry.EnemyId;
+                if (GetEntityHandle(enemyId).Generation != entry.Generation || !EnemyActive[enemyId]) continue;
+                Action<int, int>[] subscribers = Volatile.Read(ref _enemyKilledSubscribers);
+                for (int i = 0; i < subscribers.Length; i++)
+                {
+                    try { subscribers[i](enemyId, entry.PlayerId); }
+                    catch (Exception ex) { if (callbackFailure == null) callbackFailure = ex; }
+                }
+                try { ResolveTowerKillsThisFrame(); }
+                catch (Exception ex) { if (callbackFailure == null) callbackFailure = ex; }
+                DestroyEntity(enemyId);
+            }
+            _deathReservation?.Commit();
+            _deathReservation?.Dispose();
+            _deathReservation = null;
+            _deathQueue[readIdx].Clear();
             _deathQueueResolved = true;
             _preparedDeathReadIdx=-1;
             _preparedDeathWriteIdx=-1;
+            if (callbackFailure != null) throw callbackFailure;
         }
 
         public ComponentStore()

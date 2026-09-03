@@ -26,6 +26,9 @@ namespace BattleSystemECS.Tests.Features.Enemies
                 for(int i=0;i<sources.Length;i++)system.TriggerBurrow(sources[i],0.01f,1f,2f,0f);
                 system.Update(0.02f);
                 system.ApplyBurrowEffects();
+                // Standalone system test must consume committed gameplay facts between rounds;
+                // production FrameScheduler performs this boundary each frame.
+                Store.DamageResolver.Events.Clear();
                 Assert.Equal(10000f-(round+1)*sourceCount,Store.EnemyHealth[target]);
                 for(int i=0;i<sources.Length;i++)
                     Assert.Equal(10000f-(round+1)*(sourceCount-1),Store.EnemyHealth[sources[i]]);

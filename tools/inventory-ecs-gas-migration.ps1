@@ -24,6 +24,11 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $scanDirectories = @('Core', 'Systems')
 $productionFiles = @()
+$registrationSpecPath = Join-Path $repoRoot 'tools/system-registration-spec.json'
+$registrationSpec = $null
+if (Test-Path -LiteralPath $registrationSpecPath -PathType Leaf) {
+    $registrationSpec = Get-Content -Raw -LiteralPath $registrationSpecPath -Encoding UTF8 | ConvertFrom-Json
+}
 
 function Get-RelativePath {
     param([string]$FullPath)
@@ -149,6 +154,10 @@ $nullableGroupSlots = @()
 $registryInjectors = @()
 $gameplayEffectUsages = @()
 $newTypeCounts = @{}
+$registrationEntries = @()
+$registrationBindings = @()
+$registrationDependencyEdges = @()
+$registrationWiring = @()
 
 $knownDefinitions = @(
     'MarkSystem',
@@ -340,6 +349,54 @@ foreach ($file in $productionFiles) {
     }
 }
 
+$registrationSchemaVersion = 0
+if ($null -ne $registrationSpec) {
+    $registrationSchemaVersion = [int]$registrationSpec.schemaVersion
+    foreach ($entry in @($registrationSpec.registrations)) {
+        $recipe = $entry.recipe
+        $registrationEntries += [ordered]@{
+            id = [string]$entry.id
+            property = [string]$entry.property
+            serviceType = [string]$entry.serviceType
+            enabled = [bool]$entry.enabled
+            featurePolicy = [string]$entry.featurePolicy
+            ownerToken = [string]$entry.ownerToken
+            dependencyCount = @($entry.dependencies).Count
+            frameBindingCount = @($entry.frameBindings).Count
+            factory = if ($null -ne $recipe) { [string]$recipe.factory } else { $null }
+            wire = if ($null -ne $recipe) { [string]$recipe.wire } else { $null }
+            bind = if ($null -ne $recipe) { [string]$recipe.bind } else { $null }
+            reason = [string]$entry.reason
+        }
+        foreach ($dependency in @($entry.dependencies)) {
+            $registrationDependencyEdges += [ordered]@{
+                registration = [string]$entry.id
+                dependency = [string]$dependency
+            }
+        }
+        foreach ($binding in @($entry.frameBindings)) {
+            if ($null -eq $binding) { continue }
+            $registrationBindings += [ordered]@{
+                registration = [string]$entry.id
+                property = [string]$entry.property
+                nodeId = [string]$binding.nodeId
+                phase = [string]$binding.phase
+                executionPolicy = [string]$binding.executionPolicy
+                requiredTokens = @($binding.requiredTokens)
+                providedTokens = @($binding.providedTokens)
+            }
+        }
+        if ([bool]$entry.enabled -and $null -ne $recipe) {
+            $registrationWiring += [ordered]@{
+                registration = [string]$entry.id
+                factory = [string]$recipe.factory
+                wire = [string]$recipe.wire
+                bind = [string]$recipe.bind
+            }
+        }
+    }
+}
+
 $directWriteFiles = @($directWrites | ForEach-Object { $_.file } | Sort-Object -Unique)
 $enemyHealthAccessFiles = @($enemyHealthAccesses | ForEach-Object { $_.file } | Sort-Object -Unique)
 $enemyHealthAccessOccurrenceCount = 0
@@ -361,11 +418,15 @@ foreach ($typeName in $knownDefinitions) {
     if ($newTypeCounts.ContainsKey($typeName)) {
         $constructed = [int]$newTypeCounts[$typeName]
     }
+    $registrationId = $typeName -replace 'System$', ''
+    $manifestEntry = @($registrationEntries | Where-Object { $_.id -eq $registrationId } | Select-Object -First 1)
+    $manifestStatus = if ($manifestEntry.Count -eq 0) { 'not-in-registration-spec' } elseif ($manifestEntry[0].enabled) { 'enabled' } else { 'disabled' }
     $disabledDefinitions += [ordered]@{
         name = $typeName
         definitionFile = if ($definitionExists) { Get-RelativePath -FullPath $definitionFile } else { $null }
         constructedCount = $constructed
-        status = if ($constructed -eq 0) { 'disabled-or-unregistered' } else { 'constructed' }
+        registrationStatus = $manifestStatus
+        status = if ($manifestStatus -eq 'enabled') { 'registered-enabled' } elseif ($constructed -eq 0) { 'disabled-or-unregistered' } else { 'constructed-compatibility-only' }
     }
 }
 
@@ -412,7 +473,22 @@ $ledger = [ordered]@{
         systemPropertyCount = @($registryProperties | Where-Object { $_.type -match 'System$' }).Count
         items = $registryProperties
     }
+    registrationModel = [ordered]@{
+        source = if ($null -ne $registrationSpec) { 'tools/system-registration-spec.json' } else { 'unavailable' }
+        schemaVersion = $registrationSchemaVersion
+        registrationCount = $registrationEntries.Count
+        enabledCount = @($registrationEntries | Where-Object enabled).Count
+        disabledCount = @($registrationEntries | Where-Object { -not $_.enabled }).Count
+        dependencyEdgeCount = $registrationDependencyEdges.Count
+        frameBindingCount = $registrationBindings.Count
+        typedRecipeCount = $registrationWiring.Count
+        registrations = $registrationEntries
+        dependencyEdges = $registrationDependencyEdges
+        frameBindings = $registrationBindings
+        typedRecipes = $registrationWiring
+    }
     groupAssignments = [ordered]@{
+        source = 'legacy Core/SystemRegistry.cs text scan; schema-v3 frame bindings are in registrationModel'
         count = $groupAssignments.Count
         items = $groupAssignments
     }
@@ -425,8 +501,11 @@ $ledger = [ordered]@{
         uniqueSlotNameCount = $uniqueNullSlotNames.Count
     }
     registryInjectors = [ordered]@{
-        callCount = $registryInjectors.Count
-        calls = $registryInjectors
+        source = 'legacy Core/SystemRegistry.cs text scan; schema-v3 typed recipes are in registrationModel'
+        legacyTextCallCount = $registryInjectors.Count
+        legacyTextCalls = $registryInjectors
+        typedRecipeCount = $registrationWiring.Count
+        typedRecipes = $registrationWiring
     }
     gameplayEffectUsages = $gameplayEffectUsages
     compatibilityFacade = [ordered]@{
@@ -434,7 +513,7 @@ $ledger = [ordered]@{
         runtimeFieldsOnDefinition = @('RemainingTime', 'TicksRemaining')
         derivedPolicyFieldsOnDefinition = @('RefreshDuration')
         runtimeOwner = 'Systems/BuffSystem.cs + Core/ComponentStore_World.cs'
-        migrationStatus = 'legacy-facade-required; M1a inventory only'
+        migrationStatus = 'legacy facade retained; typed runtime ownership migrated; removal requires public compatibility evidence'
     }
     disabledDefinitions = $disabledDefinitions
 }
@@ -448,8 +527,11 @@ Write-Output ("EnemyHealth executable write candidates: {0} occurrences in {1} f
 Write-Output ("ApplyEnemyDamage production callers: {0}" -f $productionApplyCalls.Count)
 Write-Output ("Queue declarations: {0} total ({1} in TowerAttackSystem); nullable group assignments: {2} ({3} unique group slots / {4} unique slot names)" -f `
     $ledger.damageLoops.uniqueQueueCount, $ledger.damageLoops.towerAttackQueueCount, $ledger.nullableGroupSlots.assignmentCount, $ledger.nullableGroupSlots.uniqueGroupSlotCount, $ledger.nullableGroupSlots.uniqueSlotNameCount)
-Write-Output ("Registry nullable properties: {0} ({1} system properties); group assignments: {2}; wiring calls: {3}" -f `
-    $ledger.registryProperties.count, $ledger.registryProperties.systemPropertyCount, $ledger.groupAssignments.count, $ledger.registryInjectors.callCount)
+Write-Output ("Registration schema v{0}: {1} registrations ({2} enabled / {3} disabled), {4} dependency edges, {5} frame bindings, {6} typed recipes" -f `
+    $ledger.registrationModel.schemaVersion, $ledger.registrationModel.registrationCount, $ledger.registrationModel.enabledCount, $ledger.registrationModel.disabledCount, `
+    $ledger.registrationModel.dependencyEdgeCount, $ledger.registrationModel.frameBindingCount, $ledger.registrationModel.typedRecipeCount)
+Write-Output ("Legacy registry text scan retained for compatibility: {0} nullable properties, {1} assignments, {2} wiring calls" -f `
+    $ledger.registryProperties.count, $ledger.groupAssignments.count, $ledger.registryInjectors.legacyTextCallCount)
 Write-Output ("Ability entrypoint candidates: {0}; effect timer owner candidates: {1}" -f `
     $ledger.abilityEntrypoints.Count, $ledger.effectTimerOwners.Count)
 

@@ -23,7 +23,9 @@ namespace BattleSystemECS.Core.GAS
         public int EventOverflowCount => Events.OverflowCount;
         public CommandRejection LastEventRejection => Events.LastRejection;
         private int _eventPublicationFailed;
+        private int _eventPublicationFailureCount;
         public bool LastEventPublicationFailed { get { return Volatile.Read(ref _eventPublicationFailed) != 0; } }
+        public int EventPublicationFailures => Volatile.Read(ref _eventPublicationFailureCount);
         private int _lastCommittedBoundary = (int)DamageCommitBoundary.GameplayResolve;
         private int _lastLegacyRejection;
         private long _requestsValidated, _requestsFastPath, _factsPublished, _acceptedCount, _legacyApplyCount;
@@ -34,34 +36,77 @@ namespace BattleSystemECS.Core.GAS
         public long FactsPublished => Interlocked.Read(ref _factsPublished);
         public long AcceptedCount => Interlocked.Read(ref _acceptedCount);
         public long LegacyApplyCount => Interlocked.Read(ref _legacyApplyCount);
-        private long _rejectedCount, _unconsumedRequestCount;
-        private int _requestOverflowCount;
+        private long _rejectedCount, _unconsumedRequestCount, _staleHandleRejectedCount;
+        private readonly long[] _rejectionsByReason = new long[Enum.GetValues(typeof(DamageRejectionReason)).Length];
+        private int _requestOverflowCount, _peakPendingRequestCount;
         private readonly object _diagnosticsLock = new object();
         public long RejectedCount => Interlocked.Read(ref _rejectedCount);
+        public long StaleHandleRejectedCount => Interlocked.Read(ref _staleHandleRejectedCount);
+        public long GetRejectionCount(DamageRejectionReason reason)
+        {
+            int index = (int)reason;
+            return (uint)index < (uint)_rejectionsByReason.Length
+                ? Interlocked.Read(ref _rejectionsByReason[index])
+                : 0L;
+        }
         private DamageRejectionReason _lastRejection;
         public DamageRejectionReason LastRejection { get { lock (_diagnosticsLock) return _lastRejection; } }
         public bool DiagnosticsEnabled { get; set; }
         // 测试/诊断观察点：事实进入队列后立即调用。
+        /// <summary>
+        /// HitConfirmed, DamageApplied and (for lethal hits) DeathQueued are
+        /// published and state-committed before this synchronous observer is
+        /// called exactly once with the HitConfirmed fact.
+        /// </summary>
         public Action<GameplayEvent> EventObserver { get; set; }
+        internal Action<long, bool> BeforeStateCommit { get; set; }
         public int PendingRequestCount { get { lock (_pendingLock) return _pending.Count; } }
+        public int PeakPendingRequestCount => Volatile.Read(ref _peakPendingRequestCount);
         public int RequestOverflowCount => Volatile.Read(ref _requestOverflowCount);
         public int UnconsumedRequestCount => (int)Interlocked.Read(ref _unconsumedRequestCount);
         private int _earlyBoundaryClosed;
         private bool _deferred;
         private bool _isCommitting;
         private readonly object _pendingLock = new object();
+        // 与 ResourceResolver 共用 store 级提交锁；提交区内保持状态与关键事实原子一致。
+        private readonly object _eventCommitLock;
         private readonly List<DamageRequest> _pending = new List<DamageRequest>(256);
         internal void ResetDiagnostics() { Interlocked.Exchange(ref _requestsValidated, 0); Interlocked.Exchange(ref _requestsFastPath, 0); Interlocked.Exchange(ref _factsPublished, 0); }
-        internal void MarkEventPublicationFailure(bool failed) { if (failed) Volatile.Write(ref _eventPublicationFailed, 1); }
-        public DamageResolver(ComponentStore store) { _store = store ?? throw new ArgumentNullException(nameof(store)); }
+        internal void MarkEventPublicationFailure(bool failed)
+        {
+            if (!failed) return;
+            Interlocked.Increment(ref _eventPublicationFailureCount);
+            Volatile.Write(ref _eventPublicationFailed, 1);
+        }
+        public DamageResolver(ComponentStore store)
+        {
+            _store = store ?? throw new ArgumentNullException(nameof(store));
+            _eventCommitLock = store.GameplayCommitLock;
+        }
         internal bool CanAccept(int requestCount, int criticalEventCount)
         {
             if (requestCount < 0 || criticalEventCount < 0 || !Events.CanPublish(criticalEventCount, true)) return false;
             if (!_deferred) return true;
             lock (_pendingLock) return _pending.Count <= MaxPendingRequests - requestCount;
         }
-        internal void BeginFrame() { Volatile.Write(ref _eventPublicationFailed, 0); Volatile.Write(ref _lastCommittedBoundary, (int)DamageCommitBoundary.EarlyResolve); Volatile.Write(ref _earlyBoundaryClosed, 0); lock (_pendingLock) { if (_pending.Count != 0) { Interlocked.Add(ref _unconsumedRequestCount, _pending.Count); Interlocked.Add(ref _rejectedCount, _pending.Count); SetRejection(DamageRejectionReason.UnconsumedRequests); _pending.Clear(); } } }
+        internal void BeginFrame() { Volatile.Write(ref _eventPublicationFailed, 0); Volatile.Write(ref _lastCommittedBoundary, (int)DamageCommitBoundary.EarlyResolve); Volatile.Write(ref _earlyBoundaryClosed, 0); lock (_pendingLock) { if (_pending.Count != 0) { Interlocked.Add(ref _unconsumedRequestCount, _pending.Count); RecordRejection(DamageRejectionReason.UnconsumedRequests, _pending.Count); _pending.Clear(); } } }
         private void SetRejection(DamageRejectionReason reason) { lock (_diagnosticsLock) _lastRejection = reason; }
+        private void RecordRejection(DamageRejectionReason reason, int count = 1,
+            HandleResolveFailure handleFailure = HandleResolveFailure.None)
+        {
+            if (count <= 0 || reason == DamageRejectionReason.None) return;
+            Interlocked.Add(ref _rejectedCount, count);
+            Interlocked.Add(ref _rejectionsByReason[(int)reason], count);
+            if (handleFailure == HandleResolveFailure.StaleGeneration)
+                Interlocked.Add(ref _staleHandleRejectedCount, count);
+            SetRejection(reason);
+        }
+        private DamageApplyResult Reject(DamageRejectionReason reason,
+            HandleResolveFailure handleFailure = HandleResolveFailure.None)
+        {
+            RecordRejection(reason, 1, handleFailure);
+            return new DamageApplyResult(false, 0f, 0f, false, reason);
+        }
         internal void EnableDeferred(bool value) { _deferred = value; }
         internal void MarkBoundary(DamageCommitBoundary boundary) { Volatile.Write(ref _lastCommittedBoundary, (int)boundary); }
         internal void RejectPending(DamageCommitBoundary boundary)
@@ -71,7 +116,7 @@ namespace BattleSystemECS.Core.GAS
                 int write = 0;
                 for (int i = 0; i < _pending.Count; i++)
                 {
-                    if (_pending[i].CommitBoundary == boundary) { Interlocked.Increment(ref _unconsumedRequestCount); Interlocked.Increment(ref _rejectedCount); SetRejection(DamageRejectionReason.UnsupportedCommitBoundary); }
+                    if (_pending[i].CommitBoundary == boundary) { Interlocked.Increment(ref _unconsumedRequestCount); RecordRejection(DamageRejectionReason.UnsupportedCommitBoundary); }
                     else _pending[write++] = _pending[i];
                 }
                 if (write < _pending.Count) _pending.RemoveRange(write, _pending.Count - write);
@@ -87,7 +132,7 @@ namespace BattleSystemECS.Core.GAS
                 {
                     var request = _pending[i];
                     bool enemy = _store.TryResolve(request.Target, out int target, out _) && _store.EnemyActive[target];
-                    if (enemy) { Interlocked.Increment(ref _unconsumedRequestCount); Interlocked.Increment(ref _rejectedCount); SetRejection(DamageRejectionReason.UnsupportedCommitBoundary); }
+                    if (enemy) { Interlocked.Increment(ref _unconsumedRequestCount); RecordRejection(DamageRejectionReason.UnsupportedCommitBoundary); }
                     else _pending[write++] = request;
                 }
                 if (write < _pending.Count) _pending.RemoveRange(write, _pending.Count - write);
@@ -100,8 +145,7 @@ namespace BattleSystemECS.Core.GAS
                 int count = _pending.Count;
                 if (count == 0) return;
                 Interlocked.Add(ref _unconsumedRequestCount, count);
-                Interlocked.Add(ref _rejectedCount, count);
-                SetRejection(DamageRejectionReason.UnsupportedCommitBoundary);
+                RecordRejection(DamageRejectionReason.UnsupportedCommitBoundary, count);
                 _pending.Clear();
             }
         }
@@ -141,74 +185,125 @@ namespace BattleSystemECS.Core.GAS
         private DamageApplyResult TryApplyInternal(DamageRequest request, bool validated, bool bypassDeferred)
         {
             if (DiagnosticsEnabled) { if (validated) Interlocked.Increment(ref _requestsFastPath); else Interlocked.Increment(ref _requestsValidated); }
-            int target;
-            if (!request.AllowMissingSource && !validated && !_store.TryResolve(request.Source, out _, out _)) { Interlocked.Increment(ref _rejectedCount); SetRejection(DamageRejectionReason.InvalidSource); return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.InvalidSource); }
-            int source;
-            // validated 适配器同样解析完整句柄；调用方不能只提供索引绕过代数和 active 校验。
-            if (!_store.TryResolve(request.Source, out source, out _) && !request.AllowMissingSource) { Interlocked.Increment(ref _rejectedCount); SetRejection(DamageRejectionReason.InvalidSource); return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.InvalidSource); }
-            if (!_store.TryResolve(request.Target, out target, out _)) { Interlocked.Increment(ref _rejectedCount); SetRejection(DamageRejectionReason.InvalidTarget); return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.InvalidTarget); }
-            if (request.AllowMissingSource) source = target;
-            if (float.IsNaN(request.RawAmount) || float.IsInfinity(request.RawAmount)) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.NonFiniteAmount);
-            if (request.RawAmount <= 0f) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.NonPositiveAmount);
-            if (!IsSupportedDamageType(request.DamageType)) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.UnsupportedDamageType);
-            if (request.AmountStage != DamageAmountStage.Raw && request.AmountStage != DamageAmountStage.PostCrit && request.AmountStage != DamageAmountStage.PostMitigation) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.UnsupportedAmountStage);
-            if ((request.Flags & ~(DamageFlags.IgnoreInvulnerability | DamageFlags.IgnoreShield | DamageFlags.IgnoreArmor | DamageFlags.IgnoreResistance | DamageFlags.Execute | DamageFlags.Reflect | DamageFlags.Transfer)) != DamageFlags.None) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.UnsupportedFlags);
+            if (float.IsNaN(request.RawAmount) || float.IsInfinity(request.RawAmount)) return Reject(DamageRejectionReason.NonFiniteAmount);
+            if (request.RawAmount <= 0f) return Reject(DamageRejectionReason.NonPositiveAmount);
+            if (!IsSupportedDamageType(request.DamageType)) return Reject(DamageRejectionReason.UnsupportedDamageType);
+            if (request.AmountStage != DamageAmountStage.Raw && request.AmountStage != DamageAmountStage.PostCrit && request.AmountStage != DamageAmountStage.PostMitigation) return Reject(DamageRejectionReason.UnsupportedAmountStage);
+            if ((request.Flags & ~(DamageFlags.IgnoreInvulnerability | DamageFlags.IgnoreShield | DamageFlags.IgnoreArmor | DamageFlags.IgnoreResistance | DamageFlags.Execute | DamageFlags.Reflect | DamageFlags.Transfer)) != DamageFlags.None) return Reject(DamageRejectionReason.UnsupportedFlags);
             if ((request.Flags & (DamageFlags.Reflect | DamageFlags.Transfer)) != DamageFlags.None && request.ParentSequence == request.Sequence)
-                return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.UnsupportedFlags);
+                return Reject(DamageRejectionReason.UnsupportedFlags);
             if ((request.Flags & (DamageFlags.Reflect | DamageFlags.Transfer)) != DamageFlags.None && request.ProvenanceDepth > MaxProvenanceDepth)
-                return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.UnsupportedFlags);
-            if (request.CommitBoundary != DamageCommitBoundary.GameplayResolve && request.CommitBoundary != DamageCommitBoundary.EarlyResolve) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.UnsupportedCommitBoundary);
-            if (request.CommitBoundary == DamageCommitBoundary.EarlyResolve && Volatile.Read(ref _earlyBoundaryClosed) != 0) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.UnsupportedCommitBoundary);
-            Volatile.Write(ref _lastCommittedBoundary, (int)request.CommitBoundary);
-            if (request.OwnerPlayerId < 0 || request.OwnerPlayerId >= ComponentStore.MAX_PLAYERS) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.InvalidOwner);
-            if (!_store.EnemyActive[target] || _store.EnemyHealth[target] <= 0f || _store.IsEnemyPendingDeath(target)) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.TargetAlreadyDead);
-            if (_store.EnemyIsInvulnerable[target] && (request.Flags & DamageFlags.IgnoreInvulnerability) == 0) return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.Invulnerable);
-            if (request.DamageType != DamageType.True && (_store.EnemyDamageImmunityMask[target] & (int)request.DamageType) != 0)
-                return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.Invulnerable);
+                return Reject(DamageRejectionReason.UnsupportedFlags);
+            if (request.CommitBoundary != DamageCommitBoundary.GameplayResolve && request.CommitBoundary != DamageCommitBoundary.EarlyResolve) return Reject(DamageRejectionReason.UnsupportedCommitBoundary);
+            if (request.OwnerPlayerId < 0 || request.OwnerPlayerId >= ComponentStore.MAX_PLAYERS) return Reject(DamageRejectionReason.InvalidOwner);
             if (_deferred && !bypassDeferred)
             {
+                lock (_eventCommitLock)
+                {
+                    DamageApplyResult validation = ValidateLiveRequest(request, out _);
+                    if (!validation.Accepted) return validation;
+                }
                 lock (_pendingLock)
                 {
-                    if (_pending.Count >= MaxPendingRequests) { Interlocked.Increment(ref _requestOverflowCount); Interlocked.Increment(ref _rejectedCount); SetRejection(DamageRejectionReason.RequestQueueOverflow); return new DamageApplyResult(false, 0f, 0f, false, DamageRejectionReason.RequestQueueOverflow); }
+                    if (_pending.Count >= MaxPendingRequests) { Interlocked.Increment(ref _requestOverflowCount); return Reject(DamageRejectionReason.RequestQueueOverflow); }
                     _pending.Add(request);
+                    if (_pending.Count > _peakPendingRequestCount)
+                        Volatile.Write(ref _peakPendingRequestCount, _pending.Count);
                 }
                 return new DamageApplyResult(true, 0f, 0f, false, DamageRejectionReason.None, deferred: true);
             }
             var hitFact = new GameplayEvent(GameplayEventType.HitConfirmed, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId);
-            bool hitPublished = Events.TryPublish(hitFact, true);
-            EventObserver?.Invoke(hitFact);
-            if (!hitPublished) Volatile.Write(ref _eventPublicationFailed, 1);
-            if (DiagnosticsEnabled && hitPublished) Interlocked.Increment(ref _factsPublished);
-
-            float beforeHealth = _store.EnemyHealth[target];
-            float beforeShield = _store.EnemyShield[target];
-            float damage = request.RawAmount;
-            if (request.AmountStage != DamageAmountStage.PostMitigation && request.DamageType != DamageType.True)
+            DamageApplyResult result;
+            lock (_eventCommitLock)
             {
-                if (request.DamageType == DamageType.Physical && (request.Flags & DamageFlags.IgnoreArmor) == 0 && _store.EnemyArmor[target] > 0f)
-                    damage *= 100f / (100f + _store.EnemyArmor[target]);
-                if ((request.Flags & DamageFlags.IgnoreResistance) == 0)
+                DamageApplyResult validation = ValidateLiveRequest(request, out int target);
+                if (!validation.Accepted) return validation;
+                float beforeHealth = _store.EnemyHealth[target];
+                float beforeShield = _store.EnemyShield[target];
+                float beforeMaxHealth = _store.EnemyMaxHealth[target];
+                float beforeMana = _store.EnemyCurrentMana[target];
+                ElementType beforeElementStatus = _store.EnemyElementStatus[target];
+                int elementBase = target * 4;
+                float beforeElement0 = _store.EnemyElementTimer[elementBase];
+                float beforeElement1 = _store.EnemyElementTimer[elementBase + 1];
+                float beforeElement2 = _store.EnemyElementTimer[elementBase + 2];
+                float beforeElement3 = _store.EnemyElementTimer[elementBase + 3];
+                int beforePendingShieldBreaks = _store.PendingShieldBreaks.Count;
+                BeforeStateCommit?.Invoke(request.Sequence, Monitor.IsEntered(_eventCommitLock));
+                float damage = request.RawAmount;
+                if (request.AmountStage != DamageAmountStage.PostMitigation && request.DamageType != DamageType.True)
                 {
-                    if (request.DamageType == DamageType.Magic) damage *= 1f - Clamp01(_store.EnemyMagicResist[target]);
-                    else if (request.DamageType == DamageType.Fire) damage *= 1f - Clamp01(_store.EnemyFireResist[target]);
-                    else if (request.DamageType == DamageType.Ice) damage *= 1f - Clamp01(_store.EnemyIceResist[target]);
-                    else if (request.DamageType == DamageType.Lightning) damage *= 1f - Clamp01(_store.EnemyLightningResist[target]);
-                    else if (request.DamageType == DamageType.Holy) damage *= 1f - Clamp01(_store.EnemyHolyResist[target]);
-                    damage *= 1f - Clamp01(_store.EnemyDamageResistance[target]);
+                    if (request.DamageType == DamageType.Physical && (request.Flags & DamageFlags.IgnoreArmor) == 0 && _store.EnemyArmor[target] > 0f)
+                        damage *= 100f / (100f + _store.EnemyArmor[target]);
+                    if ((request.Flags & DamageFlags.IgnoreResistance) == 0)
+                    {
+                        if (request.DamageType == DamageType.Magic) damage *= 1f - Clamp01(_store.EnemyMagicResist[target]);
+                        else if (request.DamageType == DamageType.Fire) damage *= 1f - Clamp01(_store.EnemyFireResist[target]);
+                        else if (request.DamageType == DamageType.Ice) damage *= 1f - Clamp01(_store.EnemyIceResist[target]);
+                        else if (request.DamageType == DamageType.Lightning) damage *= 1f - Clamp01(_store.EnemyLightningResist[target]);
+                        else if (request.DamageType == DamageType.Holy) damage *= 1f - Clamp01(_store.EnemyHolyResist[target]);
+                        damage *= 1f - Clamp01(_store.EnemyDamageResistance[target]);
+                    }
                 }
+                _store.ResourceResolver.ApplyEnemyDamageResources(target, damage, request.ElementType, (request.Flags & DamageFlags.IgnoreShield) != 0, (request.Flags & DamageFlags.Execute) != 0);
+                float applied = Math.Max(0f, beforeHealth - _store.EnemyHealth[target]);
+                float absorbed = Math.Max(0f, beforeShield - _store.EnemyShield[target]);
+                bool death = _store.EnemyHealth[target] <= 0f;
+                if (death) _store.ResourceResolver.ClampEnemyHealthAtZero(target);
+                var damageFact = new GameplayEvent(GameplayEventType.DamageApplied, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId);
+                var deathFact = new GameplayEvent(GameplayEventType.DeathQueued, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId);
+                bool published = death
+                    ? Events.TryPublishBatch(hitFact, damageFact, deathFact, true)
+                    : Events.TryPublishBatch(hitFact, damageFact, true);
+                if (!published)
+                {
+                    _store.EnemyHealth[target] = beforeHealth;
+                    _store.EnemyShield[target] = beforeShield;
+                    _store.EnemyMaxHealth[target] = beforeMaxHealth;
+                    _store.EnemyCurrentMana[target] = beforeMana;
+                    _store.EnemyElementStatus[target] = beforeElementStatus;
+                    _store.EnemyElementTimer[elementBase] = beforeElement0;
+                    _store.EnemyElementTimer[elementBase + 1] = beforeElement1;
+                    _store.EnemyElementTimer[elementBase + 2] = beforeElement2;
+                    _store.EnemyElementTimer[elementBase + 3] = beforeElement3;
+                    if (_store.PendingShieldBreaks.Count > beforePendingShieldBreaks)
+                        _store.PendingShieldBreaks.RemoveRange(beforePendingShieldBreaks, _store.PendingShieldBreaks.Count - beforePendingShieldBreaks);
+                    return Reject(DamageRejectionReason.RequestQueueOverflow);
+                }
+                if (death) _store.QueueEnemyDeath(target, request.OwnerPlayerId, request.Sequence, request.Source);
+                if (DiagnosticsEnabled) Interlocked.Add(ref _factsPublished, death ? 3 : 2);
+                Interlocked.Increment(ref _acceptedCount);
+                result = new DamageApplyResult(true, applied, absorbed, death, DamageRejectionReason.None);
             }
-            _store.ResourceResolver.ApplyEnemyDamageResources(target, damage, request.ElementType, (request.Flags & DamageFlags.IgnoreShield) != 0, (request.Flags & DamageFlags.Execute) != 0);
-            float applied = Math.Max(0f, beforeHealth - _store.EnemyHealth[target]);
-            float absorbed = Math.Max(0f, beforeShield - _store.EnemyShield[target]);
-            bool death = _store.EnemyHealth[target] <= 0f;
-            if (death) _store.ResourceResolver.ClampEnemyHealthAtZero(target);
-            if (death) _store.QueueEnemyDeath(target, request.OwnerPlayerId, request.Sequence, request.Source);
-            if (!Events.TryPublish(new GameplayEvent(GameplayEventType.DamageApplied, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId), true)) Volatile.Write(ref _eventPublicationFailed, 1);
-            if (DiagnosticsEnabled && !LastEventPublicationFailed) Interlocked.Increment(ref _factsPublished);
-            if (death && !Events.TryPublish(new GameplayEvent(GameplayEventType.DeathQueued, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId), true)) Volatile.Write(ref _eventPublicationFailed, 1);
-            if (DiagnosticsEnabled && death && !LastEventPublicationFailed) Interlocked.Increment(ref _factsPublished);
-            Interlocked.Increment(ref _acceptedCount);
-            return new DamageApplyResult(true, applied, absorbed, death, DamageRejectionReason.None);
+            // 公开回调必须位于提交锁外；状态与事实均已提交，重入不会阻塞同一提交单元。
+            EventObserver?.Invoke(hitFact);
+            return result;
+        }
+
+        private DamageApplyResult ValidateLiveRequest(DamageRequest request, out int target)
+        {
+            target = -1;
+            if (!_store.TryResolve(request.Source, out _, out HandleResolveFailure sourceFailure) && !request.AllowMissingSource)
+                return Reject(DamageRejectionReason.InvalidSource, sourceFailure);
+            if (!_store.TryResolve(request.Target, out target, out HandleResolveFailure targetFailure))
+            {
+                if (ComponentStore.IsValidEntity(request.Target.Index) &&
+                    _store.GetEntityHandle(request.Target.Index).Equals(request.Target) &&
+                    _store.EnemyActive[request.Target.Index] &&
+                    (_store.EnemyHealth[request.Target.Index] <= 0f || _store.IsEnemyPendingDeath(request.Target.Index)))
+                    return Reject(DamageRejectionReason.TargetAlreadyDead);
+                return Reject(DamageRejectionReason.InvalidTarget, targetFailure);
+            }
+            if (request.CommitBoundary == DamageCommitBoundary.EarlyResolve && Volatile.Read(ref _earlyBoundaryClosed) != 0)
+                return Reject(DamageRejectionReason.UnsupportedCommitBoundary);
+            Volatile.Write(ref _lastCommittedBoundary, (int)request.CommitBoundary);
+            if (!_store.EnemyActive[target] || _store.EnemyHealth[target] <= 0f || _store.IsEnemyPendingDeath(target))
+                return Reject(DamageRejectionReason.TargetAlreadyDead);
+            if (_store.EnemyIsInvulnerable[target] && (request.Flags & DamageFlags.IgnoreInvulnerability) == 0)
+                return Reject(DamageRejectionReason.Invulnerable);
+            if (request.DamageType != DamageType.True && (_store.EnemyDamageImmunityMask[target] & (int)request.DamageType) != 0)
+                return Reject(DamageRejectionReason.Invulnerable);
+            return new DamageApplyResult(true, 0f, 0f, false, DamageRejectionReason.None);
         }
 
         private static bool IsSupportedDamageType(DamageType type)

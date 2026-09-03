@@ -35,11 +35,14 @@ namespace BattleSystemECS.Tests.Framework
                     Assert.Equal(0, killer);
                     Assert.True(store.EnemyActive[id]);
                     Assert.Equal(7f, store.GetPlayerGold(killer));
-                    Assert.Contains(GameplayEventType.ResourceChanged,
+                    Assert.DoesNotContain(GameplayEventType.ResourceChanged,
                         Enumerable.Range(0, store.ResourceResolver.Events.Count).Select(i => store.ResourceResolver.Events.Get(i).Type));
                 };
 
                 scheduler.Tick(1f, 0);
+
+                Assert.Contains(GameplayEventType.ResourceChanged,
+                    Enumerable.Range(0, store.ResourceResolver.Events.Count).Select(i => store.ResourceResolver.Events.Get(i).Type));
 
                 Assert.True(store.DamageResolver.Events.Count >= 3);
                 var first = store.DamageResolver.Events.Get(0);
@@ -395,21 +398,90 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void HitConfirmedObserverRunsBeforeResourceWrite()
+        public void HitConfirmedObserverRunsAfterAtomicCommit()
         {
             using (var store = new ComponentStore())
             {
                 store.AddPlayer(0, 3f, 1f, 1f, 1);
                 int enemy = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
-                float healthAtHit = -1f;
+                float healthAtObservation = -1f;
+                int observedEvents = 0;
+                int observerCalls = 0;
                 store.DamageResolver.EventObserver = e =>
                 {
-                    if (e.Type == GameplayEventType.HitConfirmed) healthAtHit = store.EnemyHealth[enemy];
+                    if (e.Type == GameplayEventType.HitConfirmed)
+                    {
+                        observerCalls++;
+                        healthAtObservation = store.EnemyHealth[enemy];
+                        observedEvents = store.DamageResolver.Events.Count;
+                    }
                 };
                 var result = store.DamageResolver.TryApply(new DamageRequest(store.GetEntityHandle(0), store.GetEntityHandle(enemy), 2f, DamageType.True, 42L, ownerPlayerId: 0));
                 Assert.True(result.Accepted);
-                Assert.Equal(10f, healthAtHit);
+                Assert.Equal(8f, healthAtObservation);
+                Assert.Equal(2, observedEvents);
+                Assert.Equal(1, observerCalls);
                 Assert.Equal(8f, store.EnemyHealth[enemy]);
+            }
+        }
+
+        [Fact]
+        public void HitConfirmedObserverRunsOnceForLethalHitAfterAllRequiredFactsCommit()
+        {
+            using (var store = new ComponentStore())
+            {
+                store.AddPlayer(0, 3f, 1f, 1f, 1);
+                int enemy = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+                int observerCalls = 0;
+                float healthAtObservation = -1f;
+                int eventCountAtObservation = -1;
+                bool pendingDeathAtObservation = false;
+                store.DamageResolver.EventObserver = e =>
+                {
+                    Assert.Equal(GameplayEventType.HitConfirmed, e.Type);
+                    observerCalls++;
+                    healthAtObservation = store.EnemyHealth[enemy];
+                    eventCountAtObservation = store.DamageResolver.Events.Count;
+                    pendingDeathAtObservation = store.IsEnemyPendingDeath(enemy);
+                };
+
+                var result = store.DamageResolver.TryApply(new DamageRequest(
+                    store.GetEntityHandle(0), store.GetEntityHandle(enemy), 20f,
+                    DamageType.True, 44L, ownerPlayerId: 0));
+
+                Assert.True(result.Accepted);
+                Assert.True(result.DeathQueued);
+                Assert.Equal(1, observerCalls);
+                Assert.Equal(0f, healthAtObservation);
+                Assert.Equal(3, eventCountAtObservation);
+                Assert.True(pendingDeathAtObservation);
+                Assert.Equal(GameplayEventType.HitConfirmed, store.DamageResolver.Events.Get(0).Type);
+                Assert.Equal(GameplayEventType.DamageApplied, store.DamageResolver.Events.Get(1).Type);
+                Assert.Equal(GameplayEventType.DeathQueued, store.DamageResolver.Events.Get(2).Type);
+            }
+        }
+
+        [Fact]
+        public void HitObserverReentryCannotCausePartialDamageCommit()
+        {
+            using (var store = new ComponentStore())
+            {
+                store.AddPlayer(0, 3f, 1f, 1f, 1);
+                int enemy = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+                store.DamageResolver.EventObserver = e =>
+                {
+                    if (e.Type != GameplayEventType.HitConfirmed) return;
+                    var filler = new GameplayEvent(GameplayEventType.AbilityRejected, default(EntityHandle), default(EntityHandle), 9001L);
+                    while (store.DamageResolver.Events.TryPublish(filler, true)) { }
+                };
+                var result = store.DamageResolver.TryApply(new DamageRequest(store.GetEntityHandle(0), store.GetEntityHandle(enemy), 20f, DamageType.True, 43L, ownerPlayerId: 0));
+                Assert.True(result.Accepted);
+                Assert.True(result.DeathQueued);
+                Assert.Equal(0f, store.EnemyHealth[enemy]);
+                Assert.True(store.IsEnemyPendingDeath(enemy));
+                Assert.Equal(0, store.DamageResolver.EventPublicationFailures);
+                Assert.Equal(1, store.DamageResolver.AcceptedCount);
+                Assert.Equal(0, store.DamageResolver.GetRejectionCount(DamageRejectionReason.RequestQueueOverflow));
             }
         }
 

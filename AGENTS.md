@@ -136,7 +136,7 @@ BattleSystem-ECS/
 
 2. **`EventBus` / `EventChannel<T>`（系统 → 系统）** — 系统间类型化事件（`PlayerDamaged` / `EnemyHit` / `EnemyCrit` / `EnemyCharging` / `EnemyChargeReleased` / `BossPhaseChanged` / `SideQuestCompleted`），定义在 `Core/EventBus.cs` + `Core/GameEvents.cs`。零分配（多播委托单次调用），在 `SystemRegistry` 中构造并注入。
 
-> 注意：`ComponentStore` 持有 `OnEnemyKilled` / `OnTowerKill` 两个 C# 事件作为死亡通知中枢（死亡唯一事实源在 store），但**不持有**任何 eventBus 引用。
+> 注意：`ComponentStore` 持有 `OnEnemyKilled` / `OnTowerKill` 两个 C# 事件作为死亡通知中枢（死亡唯一事实源在 store）；订阅数组在注册期构建，dispatch 逐项容错且无每次死亡分配。store **不持有**任何 eventBus 引用。
 
 ### 3.4 Unity 渲染端
 
@@ -176,6 +176,8 @@ Assets/
 **关键规则**：
 - 热路径直接数组索引访问，禁止字典查询或 struct 复制。
 - `ActiveTowerIds` / `ActiveEnemyIds` 只缓存活跃实体。
+- GAS `EffectPool` 保持固定逻辑容量与 generation handle，但 handle 元数据和 runtime payload
+  按 256 槽分页；观测走内部 `GameplayObservation.Capture`，生产 Tick 不自动采样。
 
 ### 4.2 统一帧调度（FrameScheduler）
 
@@ -286,9 +288,9 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 性能压测结果、相对门禁和延期状态以最新 fresh evidence 为准；当前迁移轮次暂不运行
 mode2/mode4/mode5，未运行项不得标记为通过。
 
-M7 fresh evidence 的 `dirty-inventory.txt` 必须包含 `STATUS_BEGIN`/`STATUS_END` 标记，
-并在标记之间保存 `git status --short` 原文；`dirty-inventory-schema` capture gate 负责
-验证标记顺序和内容一致性。
+M8 fresh evidence 必须在 evidence 首写前捕获 HEAD/branch/index/patch/status/untracked hashes，
+并在全部命令后复核仓库状态未漂移。mode 2/4/5 的 `DEFERRED` 和 Unity 的
+`UNAVAILABLE/BLOCKED` 必须与 PASS command manifest 分开记录。
 
 ### 7.2 运行方式
 
@@ -362,6 +364,7 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 | 修改行为树 | `Data/Configs/behavior_trees.json` + `Systems/BehaviorTreeEvaluator.cs` |
 | 修改 Polyfill | `Core/{IsExternalInit,Rng,PolyfillExtensions}.cs`（经 Linked Files 编译进 Core 库） |
 | 修改测试 | `BattleSystemECS.Tests/<层级>/XxxTests.cs`（分层规则见 `BattleSystemECS.Tests/README.md`） |
+| 观察 GAS 稳定性/容量 | `Core/GAS/GameplayObservation.cs` + `tools/capture-m8-fresh-evidence.ps1`；只读显式采样，不接入生产 Tick |
 | CI 测试静态规则 | `tools/check-test-rules.ps1`（0 违规门禁：零断言测试 + 恒真/恒假断言） |
 | 查看 Bug 历史 | `docs/design-and-bugs.md` |
 | 查看架构决策 | `docs/architecture.md` |
@@ -369,4 +372,4 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 
 ---
 
-> **最后更新**：2026-09-02。当前构建、测试与审计结果以本轮仓外 final evidence 目录及其原始日志为准；文档不维护易腐的手工测试计数。
+> **最后更新**：2026-09-03。当前构建、测试与审计结果以本轮仓外 final evidence 目录及其原始日志为准；文档不维护易腐的手工测试计数。

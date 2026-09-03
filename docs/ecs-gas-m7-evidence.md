@@ -1,6 +1,8 @@
 # M7 Installer Registration Boundary Evidence
 
-状态：候选实现，等待总控授权提交。
+状态：已提交。基线 commit 为 `4bebc43024a74fd52462d6cb31a19ed0aa34efa3`，
+父提交为 `85139a4a1c169da6a8e3334d480882f10759f03e`；保护分支
+`codex/installer-registration-boundary-protected` 固定在该 commit。
 
 生产组装由 `ProductionSystemInstaller` 唯一负责。installer 在 mutation 前校验 schema v3
 manifest、typed recipes、依赖图和 FrameGraph binding；按 Construction、Wiring、Binding

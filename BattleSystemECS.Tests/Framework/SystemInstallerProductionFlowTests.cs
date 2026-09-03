@@ -621,6 +621,11 @@ namespace BattleSystemECS.Tests.Framework
 
         private static int SubscriptionCount(object owner, string eventField)
         {
+            if (owner is ComponentStore store)
+            {
+                if (eventField == "OnEnemyKilled") return store.EnemyKilledSubscriberCount;
+                if (eventField == "OnTowerKill") return store.TowerKillSubscriberCount;
+            }
             var field = owner.GetType().GetField(eventField,
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.NotNull(field);

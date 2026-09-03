@@ -37,10 +37,13 @@ namespace BattleSystemECS.Tests.Framework
             Assert.True(sink.Submit(value));
             Assert.False(sink.Submit(value, true));
             Assert.Equal(CommandRejection.CriticalCapacity, sink.LastRejection);
+            Assert.Equal(1, sink.PeakCount);
             Assert.Equal(1, sink.OverflowCount);
             sink.Clear();
+            Assert.Equal(1, sink.PeakCount);
             Assert.Equal(1, sink.OverflowCount);
             sink.ResetDiagnostics();
+            Assert.Equal(0, sink.PeakCount);
             Assert.Equal(0, sink.OverflowCount);
         }
 

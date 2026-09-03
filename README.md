@@ -26,13 +26,15 @@ BattleSystem-ECS/
 
 性能门禁和压测结果以最新一次完整门禁证据为准；易变化的性能指标、帧数和数据规模不在 README 中固化。当前迁移轮次暂不运行 mode2/mode4/mode5，详见 [迁移编排](docs/ecs-gas-migration-orchestration.md)。
 
-当前 M7 fresh evidence：`C:\WorkSpace\AI\battlesystem-ecs-gate-logs\m7-installer-registration-final-20260902T231500Z`。
+最近一次 M8 完整验证证据：`C:\WorkSpace\AI\battlesystem-ecs-gate-logs\m8-player-damage-concurrency-20260903T031142Z`
+（full tests 1805/1805、focused tests 29/29）。该证据早于本次跨 resolver 共享提交锁修复；修复后按用户要求未重跑门禁，不能视为 post-fix fresh PASS。
+mode 2/4/5 仍为 `DEFERRED`，Unity smoke 为 `UNAVAILABLE/BLOCKED`，均不属于 PASS。
 
 ---
 
 ## 架构特点
 
-- **SOA 存储**：所有组件用平行 `float[]/int[]/bool[]` 数组，CPU 缓存友好
+- **SOA 存储**：高频核心列使用 dense 平行数组；GAS Effect handle/runtime 使用按需分页稀疏池，实体热路径使用 active lists
 - **全系统并行**：每个系统内部用 `Parallel.For` 批处理
 - **行为树 AI**：flat-array BTCachedTree 驱动，O(1) 节点访问
 - **GAS 技能系统**：`Core/GAS/` 模块化 Attributes + GameplayEffect + GameplayAbility

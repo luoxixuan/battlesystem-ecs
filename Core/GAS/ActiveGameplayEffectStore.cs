@@ -9,8 +9,11 @@ namespace BattleSystemECS.Core.GAS
         private readonly ActiveGameplayEffect[][] _runtimePages;
         private readonly GameplayEffectDefinition[][] _definitionPages;
         private readonly LegacyEffectSnapshot[][] _legacySnapshotPages;
+        private int _allocatedPageCount;
 
         public EffectPool Handles { get; }
+        public int AllocatedPageCount => _allocatedPageCount;
+        public int AllocatedSlotCapacity => Math.Min(Handles.Capacity, _allocatedPageCount * PageSize);
 
         public ActiveGameplayEffectStore(int capacity)
         {
@@ -82,6 +85,7 @@ namespace BattleSystemECS.Core.GAS
             _runtimePages[page] = new ActiveGameplayEffect[PageSize];
             _definitionPages[page] = new GameplayEffectDefinition[PageSize];
             _legacySnapshotPages[page] = new LegacyEffectSnapshot[PageSize];
+            _allocatedPageCount++;
         }
     }
 }

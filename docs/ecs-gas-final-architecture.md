@@ -1,7 +1,7 @@
 # BattleSystem-ECS ECS + GAS 终态架构
 
 > 状态：目标架构决策（本文定义终态，不代表当前代码已经全部实现）
-> 更新日期：2026-08-29
+> 更新日期：2026-09-03
 > 相关审查：[skill-combat-arch-review.md](skill-combat-arch-review.md)
 
 ## 1. 决策摘要
@@ -110,6 +110,8 @@ BattleWorld
 - 动态 Shield、DoT 和其他效果实例。
 
 GAS 池中的外部句柄必须包含 `index + generation`。实体销毁会使关联代数失效；槽位耗尽必须返回明确错误并记录诊断，不能静默覆盖或丢弃。
+大逻辑容量 pool 的 handle 元数据和 runtime payload 可以分别按需分页；分页是该 module 的
+implementation，不能改变 handle、容量、失败或回收 interface。
 
 ### 5.3 属性与资源
 
@@ -462,6 +464,13 @@ GAS 的 `AbilityCommit`、`EffectTick`、`GameplayEventCommit` 和 `AttributeAgg
 
 `HitConfirmed`、`DamageApplied` 等战斗事件由 `GameplayEventCommit` 消费；`KillConfirmed` 只有在 `DeathResolve` 完成后才由 `PostDeathEventCommit` 消费。这样 OnHit、OnDamage 和 OnKill 的时机不会混在同一个回调里。
 
+`DeathResolve` 在 Prepare 节点以固定锁序同时预留 `DamageResolver` 与 `ResourceResolver`
+事件槽位。预留只减少其他生产者的可用容量，不公开任何事实；Dispatch 暂存本批
+`ResourceChanged`/`KillConfirmed`，完成奖励、生命周期回调和实体销毁后才原子发布并释放预留。
+容量不足时不翻转死亡 ping-pong buffer，`BeginFrame` 保留原批并清理瞬态事实后重试。
+成功提交只清 prepared read bag；生命周期回调重入写入的 alternate bag 保留到同帧 cascade
+或下一帧。死亡/塔杀订阅者列表只在注册变更时重建，dispatch 逐项执行且在整批事实提交后重抛首异常。
+
 定义的消费者必须由 Catalog 和 FrameGraph 同时校验：
 
 | 定义 | 主要消费者 | 产出或写入 |
@@ -567,6 +576,16 @@ dense SOA core columns
 ```
 
 如果未来性能分析证明需要按稳定组件签名分块，可以在 `WorldStore` 下替换存储实现；GAS 的定义、句柄、命令和 Resolver 接口不应因此改变。动态 Buff、层数和周期计时不应通过增加或移除结构组件来表达。
+
+2026-09-03 的 M8 有界 profile 未达到 Archetype 量化闸门。当前实现选择继续使用上述组合，
+并仅将 Effect handle 元数据在既有 pool interface 后改为按需分页。该结论不删除未来 profile
+重新打开闸门的可能，也不把尚未迁移的公开 dense niche 数组声明为已完成。
+
+M8 的稳定观察是显式的只读 snapshot：它不进入生产 Tick 热路径，按实际 trigger definition
+消费数量和 Resolver publication failure 计数区分配置/运行事实，并在 harness 显式开启 digest 后
+通过无分配的状态与 Gameplay event sequence digest（按 publication 顺序累计）复核多轮 soak 的确定性；队列容量不足时关键
+事实在状态写入前以 `RequestQueueOverflow` 拒绝。这些字段不改变 Ability/Effect/Trigger/Request/
+Resolver contract。
 
 ## 14. 架构不变量
 

@@ -101,7 +101,7 @@ golden 结果不只记录最终 HP，还要记录请求、资源变化、死亡�
 推荐使用只读脚本 `tools/inventory-ecs-gas-migration.ps1` 快速生成候选清单。脚本只做静态候选统计，不替代人工审查：它应输出生产方法名、文件和行号，并将写入点分成 `Init`、`Resource`、`DamageCandidate`、`Unknown` 四类；分类不确定的项必须保留在 Unknown，不能为了让数字好看而自动排除。
 脚本对行注释有基本过滤，但不是 C# 语法解析器；块注释、预处理分支和跨行表达式仍可能出现在候选清单中。`disabledDefinitions` 只探测少数已知系统，完整的 active/disabled 状态必须由 M0 人工确认并记录。
 
-Windows PowerShell 5.1 的最小用法是 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/inventory-ecs-gas-migration.ps1 -OutputPath artifacts/gas-migration-ledger.json`；安装 PowerShell 7 后也可把入口替换为 `pwsh`。输出至少包含 `generatedAt`、`commit`、`filesScanned`、`enemyHealthAccesses`、`directWrites`、`applyEnemyDamage`、`damageLoops`、`abilityEntrypoints`、`effectTimerOwners`、`registryProperties`、`groupAssignments`、`nullableGroupSlots`、`registryInjectors` 和 `disabledDefinitions`。`OutputPath` 是可选的；不传时只打印摘要，不修改源码或配置。
+Windows PowerShell 5.1 的最小用法是 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/inventory-ecs-gas-migration.ps1 -OutputPath artifacts/gas-migration-ledger.json`；安装 PowerShell 7 后也可把入口替换为 `pwsh`。输出至少包含 `generatedAt`、`commit`、`filesScanned`、`enemyHealthAccesses`、`directWrites`、`applyEnemyDamage`、`damageLoops`、`abilityEntrypoints`、`effectTimerOwners`、`registryProperties`、`registrationModel`、`groupAssignments`、`nullableGroupSlots`、`registryInjectors` 和 `disabledDefinitions`。M7 以后当前注册事实以 schema-v3 `registrationModel` 为准；旧 `groupAssignments`/`registryInjectors` 文本扫描只为历史消费者保留，不能再用其 0 值代表生产未接线。`OutputPath` 是可选的；不传时只打印摘要，不修改源码或配置。
 
 直接写资源的生产点先分为三类，不能机械地全部替换：
 

@@ -52,24 +52,9 @@ namespace BattleSystemECS.Tests.Features.Buffs
 
         private void TriggerKill(int towerId, int playerId = 0, int enemyId = 0)
         {
-            // The kill pipeline is: enqueue → ResolveTowerKillsThisFrame drains
-            // and invokes OnTowerKill?.Invoke(enemyId, playerId, towerId).
-            // ResolveTowerKillsThisFrame is private; the cleanest test surface
-            // is to invoke the OnTowerKill event directly via reflection. The
-            // production code path is identical: same handler, same delegate.
-            var evField = typeof(ComponentStore).GetField(
-                "OnTowerKill",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            Assert.NotNull(evField);
-            var del = evField.GetValue(Store) as Delegate;
-            if (del != null)
-            {
-                // Each subscriber takes (enemyId, playerId, towerId).
-                foreach (var subscriber in del.GetInvocationList())
-                {
-                    subscriber.DynamicInvoke(enemyId, playerId, towerId);
-                }
-            }
+            // Use the same typed, allocation-free subscriber dispatch seam as
+            // the production tower-kill queue instead of compiler backing fields.
+            Store.NotifyTowerKillSubscribers(enemyId, playerId, towerId);
         }
 
         // ─── Default state (backward compat) ──────────────────────────────

@@ -1,5 +1,20 @@
 # 更新记录 (Changelog)
 
+### 2026-09-03（M8 稳定观察与存储决策，有界候选）
+- 死亡 ping-pong 提交只清 prepared read bag，回调重入排入 write bag 的级联死亡可在同帧再次 resolve 或跨 `BeginFrame` 精确提交一次；blocked batch、新死亡、奖励、`KillConfirmed` 与 pending guard 均有回归覆盖。
+- `OnEnemyKilled` / `OnTowerKill` 改为注册期构建 subscriber array，dispatch 无 `GetInvocationList()` 分配；单个订阅者抛错不再阻断后续订阅者、销毁或事实 commit，完成整批副作用后重抛首异常。
+- Gameplay event queue 新增 1/2/3-fact 无分配提交，Damage/Resource/Shield 成功循环 warmup 后 256 轮实测分配为 0 bytes。原子 reservation 先安全租 buffer 再按统一锁序占 slot；受控第二次 rent 失败会归还首 buffer 且不泄漏容量，Commit/Dispose 幂等。
+- 新增只读 `GameplayObservation`，聚合 Resolver/Effect/Trigger/pool 的 high-water、overflow、stale、按 reason 拒绝、abort、unconsumed、publication failure 与 legacy apply；生产 Tick 不自动采样。
+- 观察 snapshot 记录实际 `Consume` trigger definition 数量、Damage/Resource publication failure 次数，以及显式开启后无分配的状态/Gameplay event sequence digest；队列容量不足在状态写入前返回明确 `RequestQueueOverflow`，fresh capture 对 storage、production soak、lifecycle soak 做三轮稳定签名比较并复核仓库内容哈希。
+- `EffectPool` 保持固定逻辑容量和 generation handle interface，在内部改为 256 槽按需分页。800K 槽同进程 A/B 的初始元数据分配由 7,200,072 bytes 降至 75,160 bytes；跨页、满载、释放复用和 stale generation 均有回归测试。
+- 10K 敌 × 500 帧 sealed production soak 与 128 轮 Periodic death/entity recycle soak 提供结构化仓外 JSON；M0/M1/M3/M4 focused evidence 在同一 capture 中回收。
+- Archetype 未获授权：没有稳定签名 CPU/cache hotspot 证据；Trigger 利用率远低于 cap。公开 Ability/legacy Effect/Boss-phase dense 候选保留，等待 Unity/外部兼容验证。
+- mode 2/4/5 按用户决定继续 `DEFERRED`，Unity smoke 为 `UNAVAILABLE/BLOCKED`；本轮不宣称完整 M8 退出，未提交或推送。
+
+### 2026-09-02（M7 typed installer registration）
+- `ProductionSystemInstaller` 成为唯一生产组装入口；schema v3 typed recipe、稳定依赖顺序和 graph↔manifest 双向 Seal 校验取代自由 C# 注册语句。
+- M7 commit 为 `4bebc43024a74fd52462d6cb31a19ed0aa34efa3`，保护分支 `codex/installer-registration-boundary-protected` 固定于该提交；fresh evidence 见 `docs/ecs-gas-m7-evidence.md`。
+
 ### 2026-09-01（FrameGraph 与统一 TimeContext，待复审）
 - 11 个 SystemGroup 中实际配置的 `SetTurn` / `Update` / `Resolve` 调用已拆成稳定 system-node adapter；节点声明真实资源、`Before/After`、phase、time domain、执行策略与 required/optional dependency。拓扑平局按 `FrameNodeId` ordinal 排序，不依赖注册顺序。
 - `FrameScheduler.Tick` 仍是唯一帧入口，生产 composition 在 Registry 接线完成时 Build/Validate/Seal。`AbilityCommit`、`AttributeAggregate`、`EffectCommit`、Damage/Resource/Event commit 以及 primary/cascade death resolve 均有单一真实执行节点；legacy 仅能在启动构造时选择。

@@ -176,6 +176,12 @@ M0 记录实际数量，后续每阶段更新。不要用删除行数代替完�
 
 Archetype 不属于 M1-M7 的迁移必需步骤。M8 只在 profile 证明稳定组件签名的迭代和缓存 miss 已成为主要成本，且 sparse side table/capped pool 不能以更小风险解决时评估。无论最终采用与否，Ability/Effect/Trigger/Request/Resolver contract 不应改变；动态 Buff、层数和周期计时也不通过结构组件增删来表达。
 
+当前 M8 有界 profile 没有触发该闸门：production soak 的 Trigger/pool 利用率远低于 cap，
+active-list 已避免 full `MAX_ENTITIES` 扫描，且 mode 4/5 与 cache-miss 证据按现行约束不可用。
+本轮仅把 Effect handle 元数据改为 interface 内按需分页；继续采用 dense 高频核心列 +
+sparse/paged GAS pool + active lists。详见 [M8 evidence](ecs-gas-m8-evidence.md)。
+
 ## 10. 下一步
 
-真正开始实施时，先打开 [foundation](ecs-gas-migration-foundation.md) 的 M0，保存实际基线和 golden 场景，再依据结果更新后续工作包。本总览不替代阶段文档中的退出门槛。
+后续先完成 M8 evidence 双轴复审并保持观察；只有 mode 2/4/5 延期解除且 Unity 环境可用后，
+才评估完整 M8 退出。公开 dense 候选必须先确认外部调用兼容，不能从内存数字直接推导删除。

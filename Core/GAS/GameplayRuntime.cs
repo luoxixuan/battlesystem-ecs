@@ -14,6 +14,7 @@ namespace BattleSystemECS.Core.GAS
         private readonly List<int> _runtimeEntityIds = new List<int>(1024);
         private readonly int[] _runtimeEntityCounts = new int[ComponentStore.MAX_ENTITIES];
         public int ActiveRuntimeCount { get; private set; }
+        public int PeakActiveRuntimeCount { get; private set; }
         public bool HasActiveEffects => ActiveRuntimeCount > 0;
         public const int DefaultEventCapacity = 8192;
         public GameplayEventQueue Events { get; }
@@ -113,6 +114,7 @@ namespace BattleSystemECS.Core.GAS
             var app = new GameplayEffectApplication(definition, default(LegacyEffectSnapshot), runtime);
             if (!_store.TryAddGameplayEffect(targetId, app, out handle)) { Reject(source, target, id, 5); return false; }
             ActiveRuntimeCount++;
+            if (ActiveRuntimeCount > PeakActiveRuntimeCount) PeakActiveRuntimeCount = ActiveRuntimeCount;
             RegisterRuntimeEntity(targetId);
             if (!ApplyModifiers(targetId, definition, snapshot, handle))
             {
@@ -373,6 +375,13 @@ namespace BattleSystemECS.Core.GAS
         public int Rejections { get; private set; }
         private int _frameEventsConsumed;
         public int SeenCount => _seen.Count;
+        public int CounterCount => _counters.Count;
+        public int DefinitionCount => _definitions.Count;
+        public int TriggerDefinitionCount { get; private set; }
+        public int PeakSeenCount { get; private set; }
+        public int PeakCounterCount { get; private set; }
+        public int PeakDefinitionCount { get; private set; }
+        public int PeakTriggerDefinitionCount { get; private set; }
         public int DefinitionCapacity { get; } = 4096;
         public int SeenCapacity { get; } = 8192;
         public int MaxCounterEntries { get; } = 4096;
@@ -396,6 +405,7 @@ namespace BattleSystemECS.Core.GAS
                 return false;
             }
             _definitions[definition.Id] = definition;
+            if (_definitions.Count > PeakDefinitionCount) PeakDefinitionCount = _definitions.Count;
             return true;
         }
         public int GetCounter(TriggerDefinition definition, EntityHandle source, EntityHandle target)
@@ -423,6 +433,9 @@ namespace BattleSystemECS.Core.GAS
         public int Consume(GameplayEventQueue events, IReadOnlyList<TriggerDefinition> definitions, bool clear = false)
         {
             if (events == null || definitions == null) return 0;
+            TriggerDefinitionCount = definitions.Count;
+            if (TriggerDefinitionCount > PeakTriggerDefinitionCount)
+                PeakTriggerDefinitionCount = TriggerDefinitionCount;
             int fired = 0;
             int inputCount = events.Count;
             for (int i = 0; i < inputCount; i++)
@@ -434,6 +447,7 @@ namespace BattleSystemECS.Core.GAS
                 if (_frameEventsConsumed >= MaxEventsPerFrame) { Abort(e, 1, inputCount - i); break; }
                 if (_seen.Count >= SeenCapacity && !_seen.Contains(dedupe)) { Abort(e, 2, inputCount - i); continue; }
                 if (!_seen.Add(dedupe)) continue;
+                if (_seen.Count > PeakSeenCount) PeakSeenCount = _seen.Count;
                 _frameEventsConsumed++;
                 for (int t = 0; t < definitions.Count; t++)
                 {
@@ -478,6 +492,7 @@ namespace BattleSystemECS.Core.GAS
                     if (!_counters.ContainsKey(key) && _counters.Count >= MaxCounterEntries) { Abort(e, 3, events.Count - i); continue; }
                     _counters.TryGetValue(key, out int old); int total = old + 1; int crossings = d.Mode == TriggerMode.EveryN ? (total / d.Threshold) - (old / d.Threshold) : (old < d.Threshold && total >= d.Threshold ? 1 : 0);
                     _counters[key] = d.Mode == TriggerMode.EveryN && crossings > 0 && !d.PreserveRemainder ? 0 : (d.Mode == TriggerMode.EveryN && d.PreserveRemainder ? total % d.Threshold : total);
+                    if (_counters.Count > PeakCounterCount) PeakCounterCount = _counters.Count;
                     for (int k = 0; k < crossings; k++) { if (!_definitions.TryGetValue(d.Effect, out var effect)) { Rejections++; PublishNext(new GameplayEvent(GameplayEventType.EffectRejected, e.Source, e.Target, NextSequence(e.Source, e.Target), 3)); continue; } var effectTarget = d.EffectTarget == EffectTargetPolicy.Target ? e.Target : e.Source; int effectEventIndex = _effects.Events.Count; bool applied = _effects.TryApply(d.Effect, effect, e.Source, effectTarget, out _, d.EffectStackDelta, float.NaN, e.OwnerPlayerId, e.ProvenanceId); if (applied) fired++; if (_effects.Events.Count > effectEventIndex) { var generated = _effects.Events.Get(effectEventIndex); PublishNext(generated); _effects.Events.RemoveAt(effectEventIndex); } }
                 }
             }

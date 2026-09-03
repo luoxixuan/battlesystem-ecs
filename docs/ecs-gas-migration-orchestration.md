@@ -1,6 +1,6 @@
 # ECS + GAS 迁移编排
 
-本文记录当前 M7 注册边界和可复核门禁。生产组装唯一入口是
+本文记录当前 M7 注册边界、M8 稳定观察/存储决策和可复核门禁。生产组装唯一入口是
 `ProductionSystemInstaller`；它按 `Construction -> Wiring -> Binding` 顺序驱动
 `SystemRegistry`，完成 FrameGraph 合同校验后封存 composition。`GameManager` 和
 benchmark 入口不直接组装三段 registry facade。
@@ -33,3 +33,29 @@ Engine/Core/EXE/Tests 构建、focused/full tests、测试规则、diff-check、
 一致性、真实递归 IL↔JSON/metadata scanner、registration/content/phase/binding/BuffType 扫描均在同一 fresh 目录记录并通过。
 测试数量以该目录 command-manifest 的实测结果为准；mode2/4/5 按用户决定延期，Unity
 smoke 在当前主机不可用；二者不能冒充通过。
+
+## M8 有界工作包
+
+M8 当前只完成稳定观察、profile 支持的 Effect handle 分页，以及历史 evidence 缺口回收；
+完整证据与决策见 [ecs-gas-m8-evidence.md](ecs-gas-m8-evidence.md)。
+
+- 生产 FixedPopulation graph 以 10K 敌运行 500 帧并记录 Resolver、Effect、Trigger 和 pool
+  high-water；另有 128 轮 Periodic death/entity recycle soak。
+- 两类 soak 及 storage profile 各运行三轮；snapshot 的稳定实体 digest、按 publication 顺序累计的
+  Gameplay event sequence digest、published count 和结构化 profile 签名必须一致，publication failure 也必须
+  单独为零或可解释地记录。digest 仅由 harness 显式启用，生产默认不承担 hash 成本；关键
+  Damage/Resource 事实在无法预留事件槽时于状态写入前返回 `RequestQueueOverflow`。
+- `EffectPool` 在既有 interface 后按 256 槽分页；外部 handle 与失败合同不变。
+- 死亡提交通过双事件队列 reservation token 收口：容量不足不执行奖励、回调或销毁，
+  原死亡 batch 跨 `BeginFrame` 可重试；成功路径在全部副作用完成后一次发布
+  `ResourceChanged` 与 `KillConfirmed`，重入生产者不能偷取已预留槽位。
+- prepared read bag 提交后单独清理，回调重入的 alternate write bag 保留；生命周期订阅者
+  逐个执行，异常在整批销毁和事实提交后重抛。1/2/3-fact queue overload 保持 resolver 成功热路径零分配。
+- 最近一次完整验证证据：`C:\WorkSpace\AI\battlesystem-ecs-gate-logs\m8-player-damage-concurrency-20260903T031142Z`，
+  当时 full tests 为 1805/1805、focused tests 为 29/29。该证据早于本次跨 resolver 共享提交锁修复；
+  本次修复后按用户要求未重跑门禁，不能将该目录冒充为 post-fix fresh PASS。更早的
+  `m8-observation-*` / `m8-death-*` 目录只作历史参考。
+- dense Ability、legacy Effect projection 和 Boss phase 公共数组只记录 profile 候选，不在
+  Unity `UNAVAILABLE/BLOCKED` 时改动其公开 surface。
+- Trigger 当前利用率和零故障样本不支持固定开放寻址表改写；Archetype 量化闸门也未触发。
+- mode 2/4/5 继续按用户决定延期。因此本轮不能宣称完整 M8 phase exit。

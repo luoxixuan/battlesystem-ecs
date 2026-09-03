@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using BattleSystemECS.Config;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
 using BattleSystemECS.Tests.Infrastructure;
 using Xunit;
 
@@ -158,6 +160,7 @@ namespace BattleSystemECS.Tests.Integration
             // Bug 回归：mode4 必须执行 sealed production graph，但 500 帧不得生成额外波次敌人或 WaveStart。
             var events=new RecordingBattleEventBus();
             int playerId=Player(p=>p.Health=1000000f);
+            GameplayObservation.EnableDigests(Store);
             var runtime=Systems.BenchmarkCompositionFactory.Create(Store,Config,Renderer,playerId,events,
                 FrameScenarioKind.FixedPopulationBenchmark);
             int callbacks=0;
@@ -170,18 +173,48 @@ namespace BattleSystemECS.Tests.Integration
             runtime.StateMachine.TransitionTo(GameState.BuildPhase);
             runtime.StateMachine.TransitionTo(GameState.WavePhase);
 
+            var stopwatch=Stopwatch.StartNew();
             for(int frame=0;frame<500;frame++)
             {
                 runtime.Scheduler.Tick(0.016f,frame);
                 Assert.Equal(10000,Store.GetActiveEnemyCount());
                 Assert.Equal(0,Store.DamageResolver.LegacyApplyCount);
             }
+            stopwatch.Stop();
+            GameplayObservationSnapshot observation=GameplayObservation.Capture(Store);
 
             Assert.True(runtime.Scheduler.IsCompositionSealed);
             Assert.Equal(FrameScenarioKind.FixedPopulationBenchmark,runtime.Scheduler.ScenarioKind);
             Assert.Equal(0,runtime.Registry.WaveSpawning.GetTotalEnemiesSpawned());
             Assert.Equal(0,callbacks);
             Assert.Empty(events.WaveStarts);
+            Assert.Equal(0,observation.DamageRequestOverflows);
+            Assert.Equal(0,observation.DamageEventOverflows);
+            Assert.Equal(0,observation.DamageUnconsumedRequests);
+            Assert.Equal(0,observation.ResourceRequestOverflows);
+            Assert.Equal(0,observation.ResourceEventOverflows);
+            Assert.Equal(0,observation.DamageEventPublicationFailures);
+            Assert.Equal(0,observation.ResourceEventPublicationFailures);
+            Assert.Equal(0,observation.ResourceUnconsumedRequests);
+            Assert.Equal(0,observation.EffectPoolAllocationFailures);
+            Assert.Equal(0,observation.EffectRuntimeStateUpdateFailures);
+            Assert.Equal(0,observation.EffectRuntimePublicationFailures);
+            Assert.Equal(0,observation.TriggerLoopAborts);
+            Assert.Equal(0,observation.TriggerPublicationFailures);
+            EvidenceWriter.WriteJsonIfRequested("BATTLESYSTEM_PRODUCTION_SOAK_REPORT",new
+            {
+                schemaVersion=1,
+                scenario="sealed-production-fixed-population",
+                population=10000,
+                frames=500,
+                elapsedStopwatchTicks=stopwatch.ElapsedTicks,
+                composition=runtime.ExecutionFingerprint(10000),
+                topologyHash=runtime.Scheduler.FrameGraphTopologyHash,
+                stateDigest=observation.StateDigest,
+                gameplayEventSequenceDigest=observation.GameplayEventSequenceDigest,
+                gameplayEventPublishedCount=observation.GameplayEventPublishedCount,
+                observation
+            });
         }
 
         [Fact]

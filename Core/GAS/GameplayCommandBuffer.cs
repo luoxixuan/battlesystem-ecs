@@ -11,6 +11,7 @@ namespace BattleSystemECS.Core.GAS
         private int _count;
         public int Capacity => _items.Length;
         public int Count => _count;
+        public int PeakCount { get; private set; }
         public int OverflowCount { get; private set; }
         public CommandRejection LastRejection { get; private set; }
         public int Reserved { get; }
@@ -22,13 +23,23 @@ namespace BattleSystemECS.Core.GAS
                 LastRejection = critical ? CommandRejection.CriticalCapacity : (limit == Capacity ? CommandRejection.Capacity : CommandRejection.ReservedExhausted);
                 return false;
             }
-            _items[_count++] = value; LastRejection = CommandRejection.None; return true;
+            _items[_count++] = value;
+            if (_count > PeakCount) PeakCount = _count;
+            LastRejection = CommandRejection.None;
+            return true;
         }
         public bool CanAdd(int count, bool critical = false)
         {
             if (count < 0) return false;
             int limit = critical ? Capacity : Capacity - Reserved;
             return _count <= limit - count;
+        }
+        internal void RecordCapacityRejection(bool critical)
+        {
+            OverflowCount++;
+            int limit = critical ? Capacity : Capacity - Reserved;
+            LastRejection = critical ? CommandRejection.CriticalCapacity :
+                (limit == Capacity ? CommandRejection.Capacity : CommandRejection.ReservedExhausted);
         }
         public T Get(int index) => index >= 0 && index < _count ? _items[index] : throw new ArgumentOutOfRangeException(nameof(index));
         public void Sort(Comparison<T> comparison) { if (comparison == null) throw new ArgumentNullException(nameof(comparison)); Array.Sort(_items, 0, _count, Comparer<T>.Create(comparison)); }
@@ -62,6 +73,7 @@ namespace BattleSystemECS.Core.GAS
             _count--;
         }
         public void ResetOverflowCount() { OverflowCount = 0; }
+        public void ResetDiagnostics() { PeakCount = _count; OverflowCount = 0; }
     }
 
     public sealed class CommandSink<T> where T : struct
@@ -69,6 +81,7 @@ namespace BattleSystemECS.Core.GAS
         private readonly CommandBuffer<T> _buffer;
         public bool Aborted { get; private set; }
         public int Count => _buffer.Count;
+        public int PeakCount => _buffer.PeakCount;
         public int OverflowCount => _buffer.OverflowCount;
         public CommandRejection LastRejection => _buffer.LastRejection;
         public T Get(int index) => _buffer.Get(index);
@@ -83,6 +96,6 @@ namespace BattleSystemECS.Core.GAS
             return ok;
         }
         public void Clear() { _buffer.Clear(); Aborted = false; }
-        public void ResetDiagnostics() { _buffer.ResetOverflowCount(); Aborted = false; }
+        public void ResetDiagnostics() { _buffer.ResetDiagnostics(); Aborted = false; }
     }
 }
