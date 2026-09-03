@@ -22,6 +22,7 @@ namespace BattleSystemECS.Systems
         private float[] _projVelX = new float[MAX_PROJ];
         private float[] _projVelY = new float[MAX_PROJ];
         private int[] _projTargetId = new int[MAX_PROJ];
+        private int[] _projTargetGeneration = new int[MAX_PROJ];
         private float[] _projDamage = new float[MAX_PROJ];
         private int[] _projPlayerId = new int[MAX_PROJ];
         private int[] _projTowerId = new int[MAX_PROJ];
@@ -46,10 +47,12 @@ namespace BattleSystemECS.Systems
         private int[] _projArcType = new int[MAX_PROJ]; // 0=straight, 1=homing, 2=arc
         private float[] _projArcPeakHeight = new float[MAX_PROJ];
         private int _activeProjectileCount;
+        internal int ActiveProjectileCount => _activeProjectileCount;
+        public int TotalStaleTargetRejections { get; private set; }
 
         // Ping-pong damage queue (same pattern as TowerAttackSystem)
-        private List<(int enemyId, float damage, int playerId)>[] _damageQueue =
-            new List<(int, float, int)>[2];
+        private List<(EntityHandle target, float damage, int playerId)>[] _damageQueue =
+            new List<(EntityHandle, float, int)>[2];
         private readonly object _damageQueueLock = new object();
         private int _damageQueueIdx;
         // RNG used for projectile deflection roll (serial path, no thread-safety needed).
@@ -62,8 +65,8 @@ namespace BattleSystemECS.Systems
             this.store = store;
             this.logger = logger;
             _eventBus = eventBus ?? NullEventBus.Instance;
-            _damageQueue[0] = new List<(int, float, int)>(256);
-            _damageQueue[1] = new List<(int, float, int)>(256);
+            _damageQueue[0] = new List<(EntityHandle, float, int)>(256);
+            _damageQueue[1] = new List<(EntityHandle, float, int)>(256);
             for (int i = 0; i < MAX_PROJ; i++)
             {
                 _projTargetId[i] = -1;
@@ -102,6 +105,7 @@ namespace BattleSystemECS.Systems
             _projX[projId] = store.PositionX[towerId];
             _projY[projId] = store.PositionY[towerId];
             _projTargetId[projId] = targetId;
+            _projTargetGeneration[projId] = CaptureTargetGeneration(targetId);
             _projDamage[projId] = damage;
             _projPlayerId[projId] = playerId;
             _projTowerId[projId] = towerId;
@@ -205,6 +209,7 @@ namespace BattleSystemECS.Systems
             _projX[projId] = store.PositionX[towerId];
             _projY[projId] = store.PositionY[towerId];
             _projTargetId[projId] = targetId;
+            _projTargetGeneration[projId] = CaptureTargetGeneration(targetId);
             _projDamage[projId] = damage;
             _projPlayerId[projId] = playerId;
             _projTowerId[projId] = towerId;
@@ -253,8 +258,7 @@ namespace BattleSystemECS.Systems
             {
                 if (!_projActive[i]) continue;
 
-                int targetId = _projTargetId[i];
-                if (targetId >= 0 && store.EnemyActive[targetId])
+                if (TryResolveTarget(i, out int targetId, out HandleResolveFailure targetFailure))
                 {
                     float tx = store.PositionX[targetId];
                     float ty = store.PositionY[targetId];
@@ -288,6 +292,8 @@ namespace BattleSystemECS.Systems
                 }
                 else
                 {
+                    if (targetFailure == HandleResolveFailure.StaleGeneration)
+                        TotalStaleTargetRejections++;
                     // Target lost (enemy died or invalid)
                     _projActive[i] = false;
                     _activeProjectileCount--;
@@ -378,6 +384,7 @@ namespace BattleSystemECS.Systems
                             float falloff = _projPierceDmgFalloff[i];
                             _projDamage[i] *= falloff;
                             _projTargetId[i] = nextTargetId;
+                            _projTargetGeneration[i] = CaptureTargetGeneration(nextTargetId);
                             // Keep projectile active — it continues flying
                         }
                         else
@@ -403,21 +410,27 @@ namespace BattleSystemECS.Systems
             int writeIdx = 1 - _damageQueueIdx;
             _damageQueueIdx = writeIdx;
             _damageQueue[writeIdx].Clear();
-            foreach (var (enemyId, damage, playerId) in _damageQueue[readIdx])
+            foreach (var (target, damage, playerId) in _damageQueue[readIdx])
             {
                 var source = store.GetEntityHandle(store.PlayerEntityId);
-                var target = store.GetEntityHandle(enemyId);
                 if (source.IsValid)
                     store.DamageResolver.TryApply(new Core.GAS.DamageRequest(source, target, damage, DamageType.True,
                         ElementType.None, DamageFlags.None, DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve,
-                        store.AllocateGameplaySequence(enemyId), ownerPlayerId: playerId));
+                        store.AllocateGameplaySequence(target.Index), ownerPlayerId: playerId));
             }
             _damageQueue[readIdx].Clear();
         }
 
         private void ResolveHit(int projId)
         {
-            int targetId = _projTargetId[projId];
+            if (!TryResolveTarget(projId, out int targetId, out HandleResolveFailure targetFailure))
+            {
+                if (targetFailure == HandleResolveFailure.StaleGeneration)
+                    TotalStaleTargetRejections++;
+                return;
+            }
+
+            var target = new EntityHandle(targetId, _projTargetGeneration[projId]);
             float damage = _projDamage[projId];
             int playerId = _projPlayerId[projId];
             int towerId = _projTowerId[projId];
@@ -477,7 +490,7 @@ namespace BattleSystemECS.Systems
 
             lock (_damageQueueLock)
             {
-                _damageQueue[_damageQueueIdx].Add((targetId, damage, playerId));
+                _damageQueue[_damageQueueIdx].Add((target, damage, playerId));
             }
 
             // Fragmentation: spawn child projectiles on impact
@@ -556,6 +569,7 @@ namespace BattleSystemECS.Systems
             _projX[projId] = store.PositionX[towerId];
             _projY[projId] = store.PositionY[towerId];
             _projTargetId[projId] = targetId;
+            _projTargetGeneration[projId] = CaptureTargetGeneration(targetId);
             _projDamage[projId] = damage;
             _projPlayerId[projId] = playerId;
             _projTowerId[projId] = towerId;
@@ -584,6 +598,18 @@ namespace BattleSystemECS.Systems
             }
             _projActive[projId] = true;
             _activeProjectileCount++;
+        }
+
+        private int CaptureTargetGeneration(int targetId)
+        {
+            EntityHandle target = store.GetEntityHandle(targetId);
+            return target.IsValid ? target.Generation : 0;
+        }
+
+        private bool TryResolveTarget(int projId, out int targetId, out HandleResolveFailure failure)
+        {
+            var target = new EntityHandle(_projTargetId[projId], _projTargetGeneration[projId]);
+            return store.TryResolve(target, out targetId, out failure) && store.EnemyActive[targetId];
         }
     }
 }
