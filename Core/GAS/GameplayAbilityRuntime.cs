@@ -244,6 +244,11 @@ namespace BattleSystemECS.Core.GAS
                         return Reject(request, AbilityActivationRejectReason.UnsupportedDefinition);
             var source = store.GetEntityHandle(request.OwnerId);
             if (!source.IsValid) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            var primaryTarget = targets.Count > 0 ? store.GetEntityHandle(targets.TargetIdAt(0)) : default(EntityHandle);
+            var abilityRequest = new AbilityRequest(source, request.Ability, primaryTarget,
+                store.AllocateGameplaySequence(request.OwnerId));
+            if (!abilityRequest.Source.IsValid || abilityRequest.Ability.Value != ability.Id.Value)
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
             if (!activationState.IsReady)
                 return Reject(request, AbilityActivationRejectReason.Cooldown);
 
@@ -639,8 +644,7 @@ namespace BattleSystemECS.Core.GAS
         {
             float magnitude;
             if (!float.IsNaN(request.MagnitudeOverride)) magnitude = request.MagnitudeOverride;
-            else if (execution.MagnitudeSource != MagnitudeSource.Multiplier) magnitude = execution.Magnitude;
-            else
+            else if (execution.MagnitudeSource == MagnitudeSource.Multiplier)
             {
                 float basis = store.EnemyActive[sourceId] ? store.GetEnemyAttackDamageProjection(sourceId)
                     : store.TowerActive[sourceId] ? store.GetTowerAttackDamage(sourceId)
@@ -648,6 +652,14 @@ namespace BattleSystemECS.Core.GAS
                     : 0f;
                 magnitude = Math.Max(0f, basis * execution.Magnitude);
             }
+            else if (execution.MagnitudeSource == MagnitudeSource.Attribute)
+            {
+                var key = execution.Parameter != 0 ? new AttributeKey(execution.Parameter) : CatalogRegistries.AttackDamage;
+                float attr = store.AttributeAggregator.GetComputed(sourceId, key, 0f);
+                float scale = execution.Magnitude == 0f ? 1f : execution.Magnitude;
+                magnitude = Math.Max(0f, attr * scale);
+            }
+            else magnitude = execution.Magnitude;
             return magnitude * request.MagnitudeScale;
         }
         private static AbilityActivationResult Reject(AbilityActivationRequest request, AbilityActivationRejectReason reason) => new AbilityActivationResult(false, request.OwnerId, request.Slot, reason);

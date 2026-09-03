@@ -13,6 +13,8 @@ namespace BattleSystemECS.Tests.Framework
                 AbilityActivation.Instant, 0, 0);
             var inst = new AbilityInstance(def);
             inst.CurrentCooldown = cooldown;
+            Assert.Equal(cooldown, inst.State.Cooldown);
+            Assert.Equal(1, inst.State.MaxCharges);
             return inst;
         }
 

@@ -836,6 +836,7 @@ namespace BattleSystemECS.Core
             GameplayEffectsRuntime.CleanupEntity(entityId);
             GameplayTriggersRuntime.CleanupEntity(entityId);
             RemoveAllGameplayEffects(entityId);
+            TagState.ClearEntity(entityId);
             PositionActive[entityId] = false;
             AbilityCount[entityId] = 0;
             // H-1 fix: lock around dictionary removal (thread-safe)

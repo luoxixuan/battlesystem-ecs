@@ -86,6 +86,12 @@ namespace BattleSystemECS.Systems
                 RemoveEffectAtSlot(entityId, slot);
                 return false;
             }
+            if (active.SourceDeath == SourceDeathPolicy.Transfer && !store.TryResolve(active.Source, out _, out _))
+            {
+                var owner = store.GetEntityHandle(playerId);
+                active.Source = owner.IsValid ? owner : active.Target;
+                store.TryUpdateActiveEffect(store.GetEntityHandle(entityId), active);
+            }
             if (definition.Type == EffectType.Instant || definition.Type == EffectType.Heal || active.Clock != clock) return true;
 
             if (definition.Type == EffectType.Periodic)
@@ -198,12 +204,8 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Add a Periodic DoT effect to an entity with stacking support.
-        /// Implements stacking behaviors:
-        /// - None: replaces any existing effect of the same name
-        /// - DurationRefresh: refreshes duration only (no stacking)
-        /// - MaxStacks: stacks up to MaxStacks, no duration refresh
-        /// - MaxStacksRefresh: stacks up to MaxStacks, refreshes duration on each application
+        /// 把 Periodic DoT 交给 GameplayEffectRuntime：None 走 TryAdopt（可并存多份），
+        /// 其余叠层走 TryRestack（同一 owner 内改 RemainingTime / stacks）。
         /// </summary>
         public void ApplyDot(int targetId, GameplayEffectDef dotDef)
         {
@@ -213,57 +215,10 @@ namespace BattleSystemECS.Systems
             // Preserve a valid self-source only as a compatibility fallback for those worlds.
             if (!source.IsValid) return;
             var application = LegacyEffectAdapter.CreateApplication(dotDef, source, target);
-            // Fast path: StackingBehavior.None skips the search — same as old O(1) behavior
             if (dotDef.StackingBehavior == StackingBehavior.None)
-            {
-                store.TryAddGameplayEffect(targetId, application, out _);
-                return;
-            }
-
-            int count = store.GetEffectCount(targetId);
-            for (int slot = 0; slot < count; slot++)
-            {
-                if (!store.TryGetActiveEffectAt(targetId, slot, out var existing, out var definition, out var snapshot)) continue;
-                if (!string.Equals(snapshot.Name, dotDef.Name, StringComparison.Ordinal)) continue;
-                if (definition.Type != EffectType.Periodic) continue;
-
-                switch (dotDef.StackingBehavior)
-                {
-                    case StackingBehavior.DurationRefresh:
-                        // Refresh duration only, keep existing stacks
-                        existing.RemainingTime = application.Runtime.RemainingTime;
-                        existing.TicksRemaining = application.Runtime.TicksRemaining;
-                        existing.TickAccumulator = 0f;
-                        existing.FirstTickPending = true;
-                        store.TryUpdateActiveEffect(target, existing);
-                        return;
-
-                    case StackingBehavior.MaxStacks:
-                        // Stack up to MaxStacks, no duration refresh
-                        if (existing.StackCount < dotDef.MaxStacks)
-                        {
-                            existing.StackCount++;
-                            store.TryUpdateActiveEffect(target, existing);
-                        }
-                        return;
-
-                    case StackingBehavior.MaxStacksRefresh:
-                        // Stack up to MaxStacks, refresh duration on each application
-                        if (existing.StackCount < dotDef.MaxStacks)
-                        {
-                            existing.StackCount++;
-                        }
-                        existing.RemainingTime = application.Runtime.RemainingTime;
-                        existing.TicksRemaining = application.Runtime.TicksRemaining;
-                        existing.TickAccumulator = 0f;
-                        existing.FirstTickPending = true;
-                        store.TryUpdateActiveEffect(target, existing);
-                        return;
-                }
-                return;
-            }
-            // No existing effect found — add new one
-            store.TryAddGameplayEffect(targetId, application, out _);
+                store.GameplayEffectsRuntime.TryAdopt(application, playerId, out _);
+            else
+                store.GameplayEffectsRuntime.TryRestack(application, playerId, out _);
         }
 
         /// <summary>

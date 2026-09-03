@@ -111,12 +111,14 @@ BuildPhase 是同一规则的特殊边界：当前 BuildGroup 仍可能 tick Ski
 `ComponentStore.ApplyPlayerDamageAuthority` → `ResourceResolver.TryApply(PlayerDamageRequest)`。
 预检 `CanApplyPlayerDamageAuthority` 必须同时覆盖目标合法性与 `CanAccept(0,2)`（致死会发 2 个
 critical 事实），否则 `EnemyAISystem` 会在 overflow 拒绝前吃掉 `EnemyStealthMultiplier`。
-`DecreasePlayerHealth` 只保留为 ResourceResolver 内部 writer。BossTrailAoe / SuicideBomb 仍用负
-`AttributeKey(3)` `ResourceRequest`，不在本轮迁到 PlayerDamageRequest。
+`DecreasePlayerHealth` 只保留为 ResourceResolver 内部 writer。BossTrailAoe / SuicideBomb 已迁到
+`ApplyPlayerDamageAuthority`，会吃护盾/下限/复活。
 FrameGraph：`effect.tick` / `build.effect.tick` / `skill-buff.skill.update` 已替换旧
 `effect.commit` / `build.effect.commit` / `ability.commit`；`build.skill.update`、
 `build.auto-skill.update`、`build.global-skill.update` 不再声明 AbilityRequests，
 `post-death.corpse.update` 不再声明 EffectRequests。
+`BuffSystem.ApplyDot` 的 None 走 `TryAdopt`，叠层刷新走 `TryRestack`；该路径 timer 只由
+`GameplayEffectRuntime` 写。尚未 catalog 化；`TryAdopt` 仍跳过 BlockedTags。不是 F4 收口。
 
 M3 就要建立事件迁移表，逐项标记旧 `EventBus` 的 `LegacyOnly`/`Bridge`/`GameplayOnly` 状态；M4 才允许 Trigger 消费 `GameplayOnly`。Bridge 期间由新事实单向转发旧事件，按 sequence 去重，不能让旧 publisher 和新 publisher 各发一份。
 

@@ -1,3 +1,5 @@
+using BattleSystemECS.Components;
+
 namespace BattleSystemECS.Core.GAS
 {
     public enum AbilityActivation { Instant, InputPressed, Passive }
@@ -161,23 +163,50 @@ namespace BattleSystemECS.Core.GAS
     }
 
     /// <summary>
+    /// 跨帧能力运行态：Owner 句柄带 generation，冷却与充能集中在此。
+    /// </summary>
+    public struct AbilityState
+    {
+        public AbilityId Id;
+        public EntityHandle Owner;
+        public float Cooldown;
+        public int Charges;
+        public int MaxCharges;
+
+        public AbilityState(AbilityId id, EntityHandle owner, float cooldown, int charges, int maxCharges)
+        {
+            Id = id; Owner = owner; Cooldown = cooldown;
+            Charges = charges < 0 ? 0 : charges;
+            MaxCharges = maxCharges < 1 ? 1 : maxCharges;
+        }
+
+        public bool CanActivate() => Cooldown <= 0.0001f && (MaxCharges <= 1 || Charges > 0);
+    }
+
+    /// <summary>
     /// Runtime state for an ability on an entity (cooldown remaining, etc.).
     /// </summary>
     public struct AbilityInstance
     {
         public GameplayAbilityDef Definition;
-        public float CurrentCooldown;
+        public AbilityState State;
+        public float CurrentCooldown { get { return State.Cooldown; } set { State.Cooldown = value; } }
 
         public AbilityInstance(GameplayAbilityDef def)
         {
             Definition = def;
-            CurrentCooldown = 0f;
+            State = new AbilityState(default(AbilityId), default(EntityHandle), 0f, 1, 1);
         }
 
         // Bug#37: use epsilon instead of float equality to avoid floating-point residual
         private const float EPSILON = 0.0001f;
-        public bool CanActivate() => CurrentCooldown <= EPSILON;
+        public bool CanActivate() => State.CanActivate() && CurrentCooldown <= EPSILON;
 
-        public void Activate() { if (CanActivate()) CurrentCooldown = Definition.Cooldown; }
+        public void Activate()
+        {
+            if (!CanActivate()) return;
+            State.Cooldown = Definition.Cooldown;
+            if (State.MaxCharges > 1 && State.Charges > 0) State.Charges--;
+        }
     }
 }

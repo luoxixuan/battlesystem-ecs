@@ -198,10 +198,7 @@ namespace BattleSystemECS.Systems
                 // Apply stealth damage reduction for semi-stealth (type 3) towers
                 if (_towerStealthSystem != null)
                     finalDamage *= _towerStealthSystem.GetStealthDamageMultiplier(towerId);
-                // Apply damage directly to player health
-                var playerHandle = store.GetEntityHandle(store.PlayerEntityId);
-                if (playerHandle.IsValid)
-                    store.ResourceResolver.TryApply(new Core.GAS.ResourceRequest(playerHandle, playerHandle, new Core.GAS.AttributeKey(3), -finalDamage, Core.GAS.ResourceOperation.Add, evt.EnemyId, store.AllocateGameplaySequence(playerId), ownerPlayerId: playerId));
+                store.ApplyPlayerDamageAuthority(evt.EnemyId, playerId, finalDamage);
 
                 // Reflect tower: if this tower has reflect, queue reflect damage back to the suicide bomber
                 if (_reflectTowerSystem != null && store.TowerReflectRatio[towerId] > 0f)

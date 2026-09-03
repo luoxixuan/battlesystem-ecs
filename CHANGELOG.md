@@ -1,5 +1,15 @@
 # 更新记录 (Changelog)
 
+### 2026-09-03（ECS+GAS 缺口修正 F4–F9 进度 + 负血量旁路，⚠️ 有数值变化）
+- **F4 进度**：`ApplyDot` 的 None 走 `TryAdopt`，DurationRefresh/MaxStacks/MaxStacksRefresh 走 `TryRestack`；该路径的 timer 写入只在 `GameplayEffectRuntime`。BuffSystem 对 RuntimeOwned 不再 tick。`TryAdopt`/`TryRestack` 仍不跑 BlockedTags / Periodic payload 校验；5 个生产创建点尚未 catalog 化。
+- **BossTrail / SuicideBomb** 改为 `ApplyPlayerDamageAuthority`；首次吃护盾/下限/复活。负 `AttributeKey(3)` 玩家写入白名单清空。
+- **F5 进度**：`SourceDeathPolicy.Transfer`；Catalog 修饰器可读 `Clock` / `FirstTick` / `CatchUp` / `SourceDeath`。
+- **F6 进度**：`TryApply` 读 BlockedTags（reason 8）；`TagState.AddGranted` 在 `TryAddGameplayEffect`。HasTag 计数未命中仍扫槽。
+- **F7 进度**：Periodic / Ability `MagnitudeSource.Attribute` 不再当常量。
+- **F8**：`Explicit` 不再被每帧 `ResetFrame` 清掉，只在 `ResetCounters` 时清。
+- **F9 进度**：`AbilityState` 嵌在 `AbilityInstance`；`FindSlot` 优先 AbilityId；激活里构造 `AbilityRequest` 做合法性检查。主入口仍是 `AbilityActivationRequest`；敌方/英雄 float[] 与 SOA cooldown 列未合并。
+- 未做：`PlayerDamaged` / Rally 拆通道；死亡回调节点上的 `AbilityRequests` 声明。
+
 ### 2026-09-03（ECS+GAS 缺口修正 — overflow 预检与剩余假 Request 声明）
 - `CanApplyPlayerDamageAuthority` 增加 `CanAccept(0,2)`：队列溢出时近战预检失败，不重置 stealth、不 Commit 冷却。
 - `build.skill.update` / `build.auto-skill.update` / `build.global-skill.update` 去掉不存在的 `AbilityRequests`；`post-death.corpse.update` 去掉不存在的 `EffectRequests`；重算批准根与 topology hash。

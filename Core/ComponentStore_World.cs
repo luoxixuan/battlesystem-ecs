@@ -371,6 +371,7 @@ namespace BattleSystemECS.Core
         public readonly ActiveGameplayEffectStore GameplayEffects = new ActiveGameplayEffectStore(MAX_ENTITIES * MAX_ACTIVE_EFFECTS_PER_ENTITY);
         public GAS.GameplayEffectRuntime GameplayEffectsRuntime { get; }
         public GAS.GameplayTriggerRuntime GameplayTriggersRuntime { get; }
+        internal TagContributionState TagState { get; } = new TagContributionState();
         public EffectPool GameplayEffectPool => GameplayEffects.Handles;
         #endregion
 
@@ -897,6 +898,7 @@ namespace BattleSystemECS.Core
             ActiveEffectCount[entityId] = slot + 1;
             if (GameplayEffects.TryGet(handle, out runtime, out var definition, out var snapshot))
                 ActiveEffects[index] = LegacyEffectAdapter.ToProjection(runtime, definition, snapshot);
+            TagState.AddGranted(entityId, application.Definition.GrantedTags);
             return true;
         }
 
@@ -980,6 +982,7 @@ namespace BattleSystemECS.Core
             int baseIndex = entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY;
             var handle = _activeEffectHandles[baseIndex + slot];
             if (!GameplayEffects.TryGet(handle, out removed, out definition, out snapshot)) return false;
+            TagState.RemoveGranted(entityId, definition.GrantedTags);
             int lastSlot = ActiveEffectCount[entityId] - 1;
             if (slot != lastSlot)
             {
@@ -999,6 +1002,7 @@ namespace BattleSystemECS.Core
             GameplayEffectsRuntime.CleanupEntity(entityId);
             while (ActiveEffectCount[entityId] > 0)
                 if (!TryRemoveActiveEffectAt(entityId, ActiveEffectCount[entityId] - 1, out _, out _, out _)) break;
+            TagState.ClearEntity(entityId);
         }
 
         public void SetEffectCount(int entityId, int count) {

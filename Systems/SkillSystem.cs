@@ -89,7 +89,7 @@ namespace BattleSystemECS.Systems
                 if (!catalog.TryGetExecution(definition.Executions[i], out _))
                     return CatalogReject(abilityId, AbilityActivationRejectReason.UnsupportedDefinition);
 
-            int slot = FindSlot(definition.Name);
+            int slot = FindSlot(abilityId, definition.Name);
             if (slot < 0) return CatalogReject(abilityId, AbilityActivationRejectReason.InvalidRequest);
             if (!IsAbilityAllowed((int)definition.Targeting.Shape))
                 return CatalogReject(abilityId, AbilityActivationRejectReason.PhaseNotAllowed, slot);
@@ -113,12 +113,25 @@ namespace BattleSystemECS.Systems
                 _catalogTargets, _catalogMagnitudeScales, _payloadHandler);
         }
 
-        private int FindSlot(string name)
+        private int FindSlot(AbilityId abilityId, string name)
         {
             int count = store.AbilityCount[playerId];
+            int nameMatch = -1;
             for (int slot = 0; slot < count; slot++)
-                if (string.Equals(store.GetAbility(playerId, slot).Definition.Name, name, System.StringComparison.OrdinalIgnoreCase)) return slot;
-            return -1;
+            {
+                var inst = store.GetAbility(playerId, slot);
+                if (abilityId.Value != 0 && inst.State.Id.Value == abilityId.Value) return slot;
+                if (nameMatch < 0 && string.Equals(inst.Definition.Name, name, System.StringComparison.OrdinalIgnoreCase))
+                    nameMatch = slot;
+            }
+            if (nameMatch >= 0 && abilityId.Value != 0)
+            {
+                var inst = store.GetAbility(playerId, nameMatch);
+                inst.State.Id = abilityId;
+                inst.State.Owner = store.GetEntityHandle(playerId);
+                store.SetAbility(playerId, nameMatch, inst);
+            }
+            return nameMatch;
         }
 
         private static AbilityActivationResult CatalogReject(AbilityId abilityId, AbilityActivationRejectReason reason, int slot = -1) =>

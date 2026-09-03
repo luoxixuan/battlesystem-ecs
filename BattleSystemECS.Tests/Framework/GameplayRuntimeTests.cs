@@ -701,6 +701,8 @@ namespace BattleSystemECS.Tests.Framework
             Assert.True(queue.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, store.GetEntityHandle(source), store.GetEntityHandle(target), 1L)));
             store.GameplayTriggersRuntime.Consume(queue, new[] { trigger });
             Assert.Equal(1, store.GameplayTriggersRuntime.GetCounter(trigger, store.GetEntityHandle(source), store.GetEntityHandle(target)));
+            store.GameplayTriggersRuntime.ResetFrame();
+            Assert.Equal(1, store.GameplayTriggersRuntime.GetCounter(trigger, store.GetEntityHandle(source), store.GetEntityHandle(target)));
             store.GameplayTriggersRuntime.ResetCounters();
             Assert.Equal(0, store.GameplayTriggersRuntime.GetCounter(trigger, store.GetEntityHandle(source), store.GetEntityHandle(target)));
         }
@@ -752,8 +754,8 @@ namespace BattleSystemECS.Tests.Framework
         public void InvalidEffectDefinitionIsRejectedAtRegistration()
         {
             var store = new ComponentStore();
-            var invalidSpec = new PeriodicSpec(1f, new ExecutionId(109), EffectPayloadKind.Damage,
-                MagnitudeSource.Attribute, FirstTickPolicy.NextInterval, CatchUpPolicy.CatchUpAll,
+            var invalidSpec = new PeriodicSpec(0f, new ExecutionId(109), EffectPayloadKind.Damage,
+                MagnitudeSource.Constant, FirstTickPolicy.NextInterval, CatchUpPolicy.CatchUpAll,
                 magnitude: 2f);
             var definition = new GameplayEffectDefinition(new EffectId(109), EffectType.Periodic,
                 Array.Empty<ModifierDefinition>(), 2f, ClockId.Combat, StackingBehavior.None, 1,
@@ -765,6 +767,67 @@ namespace BattleSystemECS.Tests.Framework
             Assert.True(store.GameplayTriggersRuntime.NextEvents.Count > 0);
             Assert.Equal(GameplayEventType.EffectRejected,
                 store.GameplayTriggersRuntime.NextEvents.Get(0).Type);
+        }
+
+        [Fact]
+        public void SourceDeathTransfer_RebindsSourceToOwnerAndKeepsTicking()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int source = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            int target = store.AddEnemy(1, 0, 1f, 20f, 20f, 1f, 1, 1);
+            var def = new GameplayEffectDefinition(new EffectId(210), EffectType.Periodic, Array.Empty<ModifierDefinition>(),
+                4f, 1f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None, SourceDeathPolicy.Transfer,
+                EffectPayloadKind.Damage, default(TagId), Array.Empty<ExecutionId>(), periodicMagnitude: 2f);
+            Assert.True(store.GameplayEffectsRuntime.TryApply(def.Id, def, store.GetEntityHandle(source),
+                store.GetEntityHandle(target), out _, ownerPlayerId: 0));
+            store.DestroyEntity(source);
+            store.GameplayEffectsRuntime.Tick(1f, ClockId.Combat);
+            Assert.Equal(1, store.GetEffectCount(target));
+            Assert.True(store.TryGetActiveEffectAt(target, 0, out var active, out _, out _));
+            Assert.Equal(0, active.Source.Index);
+            Assert.Equal(18f, store.EnemyHealth[target], 3);
+        }
+
+        [Fact]
+        public void EffectBlockedTags_AreReadAtApplyAndReject()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            var grant = new GameplayEffectDefinition(new EffectId(211), EffectType.Duration,
+                Array.Empty<ModifierDefinition>(), 5f, 0f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None,
+                SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent, new TagId(3), Array.Empty<ExecutionId>(),
+                grantedTags: new[] { new TagId(3) });
+            Assert.True(store.GameplayEffectsRuntime.TryApply(grant.Id, grant, store.GetEntityHandle(0),
+                store.GetEntityHandle(target), out _));
+            Assert.True(GameplayTagRuntime.HasTag(store, target, new TagId(3)));
+            var blocked = new GameplayEffectDefinition(new EffectId(212), EffectType.Duration,
+                Array.Empty<ModifierDefinition>(), 5f, 0f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None,
+                SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent, default(TagId), Array.Empty<ExecutionId>(),
+                blockedTags: new[] { new TagId(3) });
+            Assert.False(store.GameplayEffectsRuntime.TryApply(blocked.Id, blocked, store.GetEntityHandle(0),
+                store.GetEntityHandle(target), out _));
+        }
+
+        [Fact]
+        public void PeriodicAttributeMagnitude_UsesSourceAttackProjection()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 5f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 50f, 50f, 1f, 1, 1);
+            var spec = new PeriodicSpec(1f, new ExecutionId(213), EffectPayloadKind.Damage,
+                MagnitudeSource.Attribute, FirstTickPolicy.NextInterval, CatchUpPolicy.CatchUpAll,
+                magnitude: 1f, resource: CatalogRegistries.AttackDamage);
+            var def = new GameplayEffectDefinition(new EffectId(213), EffectType.Periodic, Array.Empty<ModifierDefinition>(),
+                2f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None, SourceDeathPolicy.Persist,
+                EffectPayloadKind.Damage, default(TagId), spec, Array.Empty<ExecutionId>());
+            Assert.True(store.GameplayEffectsRuntime.TryApply(def.Id, def, store.GetEntityHandle(0),
+                store.GetEntityHandle(target), out _, ownerPlayerId: 0));
+            float expected = store.GetPlayerAttackDamageProjection(0);
+            Assert.True(expected > 0f);
+            store.GameplayEffectsRuntime.Tick(1f, ClockId.Combat);
+            Assert.Equal(50f - expected, store.EnemyHealth[target], 3);
         }
 
         private static HashSet<GameplayEventType> Events(GameplayEventQueue queue)

@@ -508,6 +508,7 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             GameplayEffectsRuntime.CleanupEntity(entityId);
             GameplayTriggersRuntime.CleanupEntity(entityId);
             RemoveAllGameplayEffects(entityId);
+            TagState.ClearEntity(entityId);
 
             // Players use the same handle contract as other entities. Reinitializing a
             // player slot starts a fresh identity and makes it resolvable by resource APIs.

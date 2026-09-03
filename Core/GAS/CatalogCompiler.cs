@@ -79,18 +79,19 @@ namespace BattleSystemECS.Core.GAS
             "HealPercent", "ShieldAmount", "ShieldDuration", "FreezeDuration", "FreezeChance", "ConeAngleDegrees",
             "SlowAmount", "SlowDuration", "PolymorphDuration", "PolymorphDamageTakenMultiplier", "ManaCost",
             "SummonDefId", "AoeStunDuration", "AoeRootDuration", "AoeKnockbackForce", "Modifiers", "AllowedPhases",
-            "RequiredTags", "BlockedTags", "TargetRequiredTags", "TargetBlockedTags"
+            "RequiredTags", "BlockedTags", "TargetRequiredTags", "TargetBlockedTags",
+            "Clock", "FirstTick", "CatchUp", "SourceDeath", "Charges"
         };
         private static readonly HashSet<string> ModifierProperties = new HashSet<string>(StringComparer.Ordinal)
         {
             "Name", "Type", "Duration", "StackingType", "StackLimitCount", "Value", "EffectTag",
-            "GrantedTags", "BlockedTags"
+            "GrantedTags", "BlockedTags", "Clock", "FirstTick", "CatchUp", "SourceDeath"
         };
         private static readonly HashSet<string> StaticSkillProperties = new HashSet<string>(StringComparer.Ordinal)
         {
             "Name", "Description", "Hotkey", "AttackRange", "Cooldown", "AutoCast", "AreaWidth", "AreaHeight",
             "DamageMultiplier", "ManaCost", "AllowedPhases", "RequiredTags", "BlockedTags",
-            "TargetRequiredTags", "TargetBlockedTags"
+            "TargetRequiredTags", "TargetBlockedTags", "Clock", "FirstTick", "CatchUp", "SourceDeath", "Charges"
         };
 
         public static GameplayCatalog CreateEmpty()
@@ -698,7 +699,31 @@ namespace BattleSystemECS.Core.GAS
                             var grantedTags = ParseTags(mod, "GrantedTags", canonicalSkillsPath, id);
                             var blockedEffectTags = ParseTags(mod, "BlockedTags", canonicalSkillsPath, id);
                             EnsureNoTagConflict(grantedTags, blockedEffectTags, canonicalSkillsPath, id, "effect");
-                            effects.Add(new GameplayEffectDefinition(new EffectId(effectIndex), period > 0 ? EffectType.Periodic : EffectType.Duration, Array.Empty<ModifierDefinition>(), Number(mod, "Duration", duration, canonicalSkillsPath, id), period, ClockId.Combat, stacking, maxStacks, stacking == StackingBehavior.None ? RefreshPolicy.None : RefreshPolicy.Duration, SourceDeathPolicy.Persist, modType == "CrowdControl" ? EffectPayloadKind.CrowdControl : EffectPayloadKind.Damage, tag, new[] { executions[executions.Count - 1].Id }, grantedTags, blockedEffectTags, periodicMagnitude: magnitude));
+                            ClockId effectClock = ParseClock(mod, canonicalSkillsPath, id);
+                            SourceDeathPolicy sourceDeath = ParseSourceDeath(mod, canonicalSkillsPath, id);
+                            FirstTickPolicy firstTick = ParseFirstTick(mod, canonicalSkillsPath, id);
+                            CatchUpPolicy catchUp = ParseCatchUp(mod, canonicalSkillsPath, id);
+                            float effectDuration = Number(mod, "Duration", duration, canonicalSkillsPath, id);
+                            GameplayEffectDefinition compiledEffect;
+                            if (period > 0f)
+                            {
+                                var spec = new PeriodicSpec(period, firstTick, catchUp, executions[executions.Count - 1].Id,
+                                    magnitude: magnitude);
+                                compiledEffect = new GameplayEffectDefinition(new EffectId(effectIndex), EffectType.Periodic,
+                                    Array.Empty<ModifierDefinition>(), effectDuration, effectClock, stacking, maxStacks,
+                                    stacking == StackingBehavior.None ? RefreshPolicy.None : RefreshPolicy.Duration,
+                                    sourceDeath, modType == "CrowdControl" ? EffectPayloadKind.CrowdControl : EffectPayloadKind.Damage,
+                                    tag, spec, new[] { executions[executions.Count - 1].Id }, grantedTags, blockedEffectTags);
+                            }
+                            else
+                            {
+                                compiledEffect = new GameplayEffectDefinition(new EffectId(effectIndex), EffectType.Duration,
+                                    Array.Empty<ModifierDefinition>(), effectDuration, 0f, effectClock, stacking, maxStacks,
+                                    stacking == StackingBehavior.None ? RefreshPolicy.None : RefreshPolicy.Duration,
+                                    sourceDeath, modType == "CrowdControl" ? EffectPayloadKind.CrowdControl : EffectPayloadKind.Damage,
+                                    tag, new[] { executions[executions.Count - 1].Id }, grantedTags, blockedEffectTags);
+                            }
+                            effects.Add(compiledEffect);
                             effectIds.Add(new EffectId(effectIndex));
                             AddAlias(aliases, modName, new AbilityId(id), canonicalSkillsPath);
                         }
@@ -814,6 +839,42 @@ namespace BattleSystemECS.Core.GAS
             foreach (var property in node.EnumerateObject())
                 if (Enum.TryParse(property.Name, true, out SkillSemanticField field)) fields |= field;
             return fields;
+        }
+
+        private static ClockId ParseClock(JsonElement node, string path, int id)
+        {
+            if (!node.TryGetProperty("Clock", out var value) || value.ValueKind != JsonValueKind.String)
+                return ClockId.Combat;
+            if (!Enum.TryParse(value.GetString(), true, out ClockId clock) || clock == ClockId.Invalid)
+                throw new CatalogValidationException($"{path}: invalid Clock for id {id}");
+            return clock;
+        }
+
+        private static SourceDeathPolicy ParseSourceDeath(JsonElement node, string path, int id)
+        {
+            if (!node.TryGetProperty("SourceDeath", out var value) || value.ValueKind != JsonValueKind.String)
+                return SourceDeathPolicy.Persist;
+            if (!Enum.TryParse(value.GetString(), true, out SourceDeathPolicy policy))
+                throw new CatalogValidationException($"{path}: invalid SourceDeath for id {id}");
+            return policy;
+        }
+
+        private static FirstTickPolicy ParseFirstTick(JsonElement node, string path, int id)
+        {
+            if (!node.TryGetProperty("FirstTick", out var value) || value.ValueKind != JsonValueKind.String)
+                return FirstTickPolicy.NextInterval;
+            if (!Enum.TryParse(value.GetString(), true, out FirstTickPolicy policy))
+                throw new CatalogValidationException($"{path}: invalid FirstTick for id {id}");
+            return policy;
+        }
+
+        private static CatchUpPolicy ParseCatchUp(JsonElement node, string path, int id)
+        {
+            if (!node.TryGetProperty("CatchUp", out var value) || value.ValueKind != JsonValueKind.String)
+                return CatchUpPolicy.CatchUpAll;
+            if (!Enum.TryParse(value.GetString(), true, out CatchUpPolicy policy))
+                throw new CatalogValidationException($"{path}: invalid CatchUp for id {id}");
+            return policy;
         }
 
         private static void ValidateProperties(JsonElement node, HashSet<string> allowed, string sourcePath, string nodePath)

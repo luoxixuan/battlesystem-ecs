@@ -60,8 +60,14 @@ namespace BattleSystemECS.Core.GAS
             if (definition.Type == EffectType.Periodic && (!definition.Periodic.HasValue || !ValidatePeriodicPayload(definition.Periodic.Value, targetId))) { Reject(source, target, id, 2); return false; }
             if (definition.Type == EffectType.Periodic)
             {
+                bool attributeMagnitude = definition.Periodic.Value.MagnitudeSource == MagnitudeSource.Attribute;
                 float requestedMagnitude = float.IsNaN(snapshot) ? definition.Periodic.Value.Magnitude : snapshot;
-                if (definition.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent && (requestedMagnitude <= 0f || float.IsNaN(requestedMagnitude) || float.IsInfinity(requestedMagnitude))) { Reject(source, target, id, 4); return false; }
+                if (!attributeMagnitude && definition.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent && (requestedMagnitude <= 0f || float.IsNaN(requestedMagnitude) || float.IsInfinity(requestedMagnitude))) { Reject(source, target, id, 4); return false; }
+            }
+            if (definition.BlockedTags != null && definition.BlockedTags.Count > 0)
+            {
+                for (int b = 0; b < definition.BlockedTags.Count; b++)
+                    if (GameplayTagRuntime.HasTag(_store, targetId, definition.BlockedTags[b])) { Reject(source, target, id, 8); return false; }
             }
             int count = _store.GetEffectCount(targetId);
             TagId key = definition.StackKey.Equals(default(TagId)) ? new TagId(id.Value) : definition.StackKey;
@@ -106,7 +112,9 @@ namespace BattleSystemECS.Core.GAS
             int ticks = CalculateTicks(definition);
             if (definition.Modifiers.Count > 0 && _modifierHandleCount + definition.Modifiers.Count > ModifierCapacity) { Reject(source, target, id, 3); return false; }
             float magnitude = float.IsNaN(snapshot) ? (definition.Periodic.HasValue ? definition.Periodic.Value.Magnitude : 0f) : snapshot;
-            if (definition.Type == EffectType.Periodic && definition.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent && (magnitude <= 0f || float.IsNaN(magnitude) || float.IsInfinity(magnitude))) { Reject(source, target, id, 4); return false; }
+            if (definition.Type == EffectType.Periodic && definition.Periodic.Value.MagnitudeSource == MagnitudeSource.Attribute && float.IsNaN(snapshot))
+                magnitude = ResolveAttributeMagnitude(source.Index, definition.Periodic.Value);
+            if (definition.Type == EffectType.Periodic && definition.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent && definition.Periodic.Value.MagnitudeSource != MagnitudeSource.Attribute && (magnitude <= 0f || float.IsNaN(magnitude) || float.IsInfinity(magnitude))) { Reject(source, target, id, 4); return false; }
             var runtime = new ActiveGameplayEffect(default(EffectHandle), id, source, target, definition.Duration, ticks, magnitude, definition.Clock,
                 definition.Periodic.HasValue ? definition.Periodic.Value.FirstTick : FirstTickPolicy.NextInterval,
                 definition.Periodic.HasValue ? definition.Periodic.Value.CatchUp : CatchUpPolicy.CatchUpAll, definition.SourceDeath, ownerPlayerId, _store.AllocateGameplaySequence(targetId), provenanceId, definition.Tag);
@@ -127,6 +135,82 @@ namespace BattleSystemECS.Core.GAS
             }
             Publish(new GameplayEvent(GameplayEventType.EffectApplied, source, target, handle, id, DamageFlags.None, _store.AllocateGameplaySequence(targetId), tag: definition.Tag, ownerPlayerId: ownerPlayerId));
             return true;
+        }
+
+        /// <summary>
+        /// 把 legacy Periodic 收进 runtime owner。None 每次新槽（保留可叠加多份）；
+        /// 其它 stacking 由 <see cref="TryRestack"/> 在同一 owner 内刷新 timer / stacks。
+        /// </summary>
+        internal bool TryAdopt(GameplayEffectApplication application, int ownerPlayerId, out EffectHandle handle)
+        {
+            handle = default(EffectHandle);
+            var runtime = application.Runtime;
+            var definition = application.Definition;
+            if (!runtime.Target.IsValid || !_store.TryResolve(runtime.Target, out int targetId, out _)) return false;
+            if (definition.Type == EffectType.Periodic && !IsDurationContractValid(definition)) return false;
+            runtime.RuntimeOwned = true;
+            runtime.OwnerPlayerId = ownerPlayerId;
+            if (runtime.ApplicationSequence == 0L)
+                runtime.ApplicationSequence = _store.AllocateGameplaySequence(targetId);
+            application = new GameplayEffectApplication(definition, application.LegacySnapshot, runtime);
+            if (!_store.TryAddGameplayEffect(targetId, application, out handle)) return false;
+            ActiveRuntimeCount++;
+            if (ActiveRuntimeCount > PeakActiveRuntimeCount) PeakActiveRuntimeCount = ActiveRuntimeCount;
+            RegisterRuntimeEntity(targetId);
+            Publish(new GameplayEvent(GameplayEventType.EffectApplied, runtime.Source, runtime.Target, handle, definition.Id,
+                DamageFlags.None, _store.AllocateGameplaySequence(targetId), tag: definition.Tag, ownerPlayerId: ownerPlayerId));
+            return true;
+        }
+
+        /// <summary>
+        /// 叠层刷新的唯一 timer writer：DurationRefresh / MaxStacks / MaxStacksRefresh 都在这里改 RemainingTime 与 stacks。
+        /// </summary>
+        internal bool TryRestack(GameplayEffectApplication application, int ownerPlayerId, out EffectHandle handle)
+        {
+            handle = default(EffectHandle);
+            var definition = application.Definition;
+            if (!application.Runtime.Target.IsValid || !_store.TryResolve(application.Runtime.Target, out int targetId, out _))
+                return false;
+            TagId key = definition.StackKey.Equals(default(TagId)) ? new TagId(definition.Id.Value) : definition.StackKey;
+            int count = _store.GetEffectCount(targetId);
+            for (int i = 0; i < count; i++)
+            {
+                if (!_store.TryGetActiveEffectAt(targetId, i, out var existing, out var existingDef, out _)) continue;
+                TagId existingKey = existingDef.StackKey.Equals(default(TagId)) ? new TagId(existingDef.Id.Value) : existingDef.StackKey;
+                if (!existingKey.Equals(key) || existingDef.Type != EffectType.Periodic) continue;
+                if (!existing.RuntimeOwned)
+                {
+                    existing.RuntimeOwned = true;
+                    existing.OwnerPlayerId = ownerPlayerId;
+                    ActiveRuntimeCount++;
+                    if (ActiveRuntimeCount > PeakActiveRuntimeCount) PeakActiveRuntimeCount = ActiveRuntimeCount;
+                    RegisterRuntimeEntity(targetId);
+                }
+                switch (definition.Stacking)
+                {
+                    case StackingBehavior.DurationRefresh:
+                        RefreshRuntime(ref existing, definition);
+                        break;
+                    case StackingBehavior.MaxStacks:
+                        if (existing.StackCount < (definition.MaxStacks < 1 ? 1 : definition.MaxStacks))
+                            existing.StackCount++;
+                        break;
+                    case StackingBehavior.MaxStacksRefresh:
+                        if (existing.StackCount < (definition.MaxStacks < 1 ? 1 : definition.MaxStacks))
+                            existing.StackCount++;
+                        RefreshRuntime(ref existing, definition);
+                        break;
+                    default:
+                        return TryAdopt(application, ownerPlayerId, out handle);
+                }
+                if (!UpdateActive(existing.Target, existing)) return false;
+                handle = existing.Handle;
+                Publish(new GameplayEvent(GameplayEventType.EffectApplied, existing.Source, existing.Target, handle,
+                    definition.Id, DamageFlags.None, _store.AllocateGameplaySequence(targetId), tag: definition.Tag,
+                    ownerPlayerId: ownerPlayerId));
+                return true;
+            }
+            return TryAdopt(application, ownerPlayerId, out handle);
         }
 
         private void Reject(EntityHandle source, EntityHandle target, EffectId id, int reason)
@@ -150,7 +234,10 @@ namespace BattleSystemECS.Core.GAS
             if (spec.Period <= 0f || float.IsNaN(spec.Period) || float.IsInfinity(spec.Period)) return false;
             bool player = (uint)targetId < ComponentStore.MAX_PLAYERS && _store.PositionActive[targetId];
             bool enemy = ComponentStore.IsValidEntity(targetId) && _store.EnemyActive[targetId];
-            if (!player && !enemy || spec.MagnitudeSource != MagnitudeSource.Constant) return false;
+            if (!player && !enemy) return false;
+            if (spec.MagnitudeSource == MagnitudeSource.Attribute)
+                return spec.Resource.Value >= 0 && CatalogRegistries.TryAttribute(spec.Resource);
+            if (spec.MagnitudeSource != MagnitudeSource.Constant) return false;
             switch (spec.Payload)
             {
                 case EffectPayloadKind.Damage:
@@ -213,6 +300,53 @@ namespace BattleSystemECS.Core.GAS
             active.TicksRemaining = CalculateTicks(definition);
             active.TickAccumulator = 0f;
             active.FirstTickPending = true;
+        }
+
+        private bool ApplySourceDeathPolicy(ref ActiveGameplayEffect active)
+        {
+            if (active.Source.IsValid && _store.TryResolve(active.Source, out _, out _)) return true;
+            switch (active.SourceDeath)
+            {
+                case SourceDeathPolicy.Remove:
+                    return false;
+                case SourceDeathPolicy.Transfer:
+                    EntityHandle transferred = default(EntityHandle);
+                    if (active.OwnerPlayerId >= 0 && active.OwnerPlayerId < ComponentStore.MAX_PLAYERS)
+                    {
+                        transferred = _store.GetEntityHandle(active.OwnerPlayerId);
+                        if (!transferred.IsValid || !_store.TryResolve(transferred, out _, out _))
+                            transferred = default(EntityHandle);
+                    }
+                    if (!transferred.IsValid) transferred = active.Target;
+                    if (!transferred.IsValid || !_store.TryResolve(transferred, out _, out _)) return false;
+                    active.Source = transferred;
+                    return true;
+                default:
+                    return true;
+            }
+        }
+
+        private float ResolveAttributeMagnitude(int sourceId, PeriodicSpec spec)
+        {
+            float attr = _store.AttributeAggregator.GetComputed(sourceId, spec.Resource, float.NaN);
+            if (float.IsNaN(attr))
+            {
+                if (spec.Resource.Equals(CatalogRegistries.AttackDamage))
+                    attr = _store.EnemyActive[sourceId] ? _store.GetEnemyAttackDamageProjection(sourceId)
+                        : _store.TowerActive[sourceId] ? _store.GetTowerAttackDamage(sourceId)
+                        : sourceId == _store.PlayerEntityId ? _store.GetPlayerAttackDamageProjection(sourceId)
+                        : 0f;
+                else attr = 0f;
+            }
+            float scale = spec.Magnitude == 0f ? 1f : spec.Magnitude;
+            return Math.Max(0f, attr * scale);
+        }
+
+        private float ResolvePeriodicMagnitude(ActiveGameplayEffect active, PeriodicSpec spec)
+        {
+            if (spec.MagnitudeSource != MagnitudeSource.Attribute) return active.CapturedMagnitude;
+            int sourceId = active.Source.IsValid ? active.Source.Index : active.Target.Index;
+            return ResolveAttributeMagnitude(sourceId, spec);
         }
 
         public bool Remove(EntityHandle target, EffectHandle handle, GameplayEventType reason = GameplayEventType.EffectRemoved)
@@ -286,8 +420,12 @@ namespace BattleSystemECS.Core.GAS
             {
                 if (!_store.TryGetActiveEffectAt(entityId, slot, out var active, out var definition, out _)) continue;
                 if (!active.RuntimeOwned || active.Clock != clock) continue;
-                if (active.SourceDeath == SourceDeathPolicy.Remove && (!active.Source.IsValid || !_store.TryResolve(active.Source, out _, out _))) { Remove(active.Target, active.Handle); expired++; continue; }
-                if (definition.DurationPolicy == DurationPolicy.Infinite) continue;
+                if (!ApplySourceDeathPolicy(ref active)) { Remove(active.Target, active.Handle); expired++; continue; }
+                if (definition.DurationPolicy == DurationPolicy.Infinite)
+                {
+                    UpdateActive(active.Target, active);
+                    continue;
+                }
                 if (definition.Type == EffectType.Periodic && definition.Periodic.HasValue && active.TicksRemaining > 0)
                 {
                     active.TickAccumulator += dt;
@@ -305,7 +443,8 @@ namespace BattleSystemECS.Core.GAS
                         active.TickAccumulator -= scheduledConsumed * definition.Periodic.Value.Period;
                     }
                     active.TicksRemaining -= due;
-                    for (int tick = 0; tick < due; tick++) { DispatchPeriodic(active, definition, active.CapturedMagnitude); active.TicksProcessed++; }
+                    float tickMagnitude = ResolvePeriodicMagnitude(active, definition.Periodic.Value);
+                    for (int tick = 0; tick < due; tick++) { DispatchPeriodic(active, definition, tickMagnitude); active.TicksProcessed++; }
                 }
                 if (definition.DurationPolicy != DurationPolicy.Infinite)
                 {
@@ -388,7 +527,7 @@ namespace BattleSystemECS.Core.GAS
         public GameplayTriggerRuntime(ComponentStore store, GameplayEffectRuntime effects, int capacity = 8192, int maxEventsPerFrame = 8192) { _store = store ?? throw new ArgumentNullException(nameof(store)); _effects = effects ?? throw new ArgumentNullException(nameof(effects)); NextEvents = new GameplayEventQueue(Math.Max(1, capacity), Math.Min(64, Math.Max(0, capacity / 8))); AbortEvents = new GameplayEventQueue(Math.Max(4, Math.Min(64, Math.Max(1, capacity))), 1); MaxEventsPerFrame = Math.Max(1, maxEventsPerFrame); }
         public bool RegisterEffect(GameplayEffectDefinition definition)
         {
-            if (definition.Id.Value < 0 || !GameplayEffectRuntime.IsDurationContractValid(definition) || (definition.Type == EffectType.Periodic && (!definition.Periodic.HasValue || definition.Periodic.Value.MagnitudeSource != MagnitudeSource.Constant || definition.Periodic.Value.Period <= 0f || float.IsNaN(definition.Periodic.Value.Period) || float.IsInfinity(definition.Periodic.Value.Period) || definition.Duration <= 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration) || (definition.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent && (definition.Periodic.Value.Magnitude <= 0f || float.IsNaN(definition.Periodic.Value.Magnitude) || float.IsInfinity(definition.Periodic.Value.Magnitude))))))
+            if (definition.Id.Value < 0 || !GameplayEffectRuntime.IsDurationContractValid(definition) || (definition.Type == EffectType.Periodic && (!definition.Periodic.HasValue || (definition.Periodic.Value.MagnitudeSource != MagnitudeSource.Constant && definition.Periodic.Value.MagnitudeSource != MagnitudeSource.Attribute) || definition.Periodic.Value.Period <= 0f || float.IsNaN(definition.Periodic.Value.Period) || float.IsInfinity(definition.Periodic.Value.Period) || definition.Duration <= 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration) || (definition.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent && definition.Periodic.Value.MagnitudeSource == MagnitudeSource.Constant && (definition.Periodic.Value.Magnitude <= 0f || float.IsNaN(definition.Periodic.Value.Magnitude) || float.IsInfinity(definition.Periodic.Value.Magnitude))))))
             {
                 Rejections++;
                 var invalid = new GameplayEvent(GameplayEventType.EffectRejected, default(EntityHandle), default(EntityHandle), default(EffectHandle), definition.Id, DamageFlags.None, 0L, reason: 7);
@@ -541,9 +680,7 @@ namespace BattleSystemECS.Core.GAS
         public void ResetFrame()
         {
             _seen.Clear(); NextEvents.Clear(); AbortEvents.Clear(); _frameEventsConsumed = 0; LastAbortSequence = 0L; LastAbortReason = 0; LastAbortRemaining = 0;
-            _staleCounters.Clear();
-            foreach (var pair in _counters) if (_resetPolicies.TryGetValue(pair.Key.id, out var policy) && policy == TriggerResetPolicy.Explicit) _staleCounters.Add(pair.Key);
-            for (int i = 0; i < _staleCounters.Count; i++) _counters.Remove(_staleCounters[i]);
+            // Explicit 只在 ResetCounters 时清；None 跨帧保留（EveryN 依赖）。ResetFrame 不再自动清任何计数器。
         }
         public void ResetCounters() { _counters.Clear(); }
         public void CleanupEntity(int entityId)

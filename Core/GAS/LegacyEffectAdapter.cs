@@ -1,3 +1,5 @@
+using BattleSystemECS.Components;
+
 namespace BattleSystemECS.Core.GAS
 {
     public readonly struct LegacyEffectSnapshot
@@ -36,11 +38,23 @@ namespace BattleSystemECS.Core.GAS
             var modifiers = definition.AttributeIndex >= 0
                 ? new[] { new ModifierDefinition(new AttributeKey(definition.AttributeIndex), definition.ModifierOp, definition.Magnitude, snapshot: SnapshotPolicy.CaptureOnApply) }
                 : System.Array.Empty<ModifierDefinition>();
-            var immutable = new GameplayEffectDefinition(id, definition.Type, modifiers, definition.Duration,
-                definition.TickInterval, ClockId.Combat, definition.StackingBehavior, System.Math.Max(1, definition.MaxStacks),
-                refresh, SourceDeathPolicy.Persist,
-                definition.Type == EffectType.Periodic ? EffectPayloadKind.Damage : EffectPayloadKind.GameplayEvent,
-                default(TagId), System.Array.Empty<ExecutionId>());
+            GameplayEffectDefinition immutable;
+            if (definition.Type == EffectType.Periodic && definition.TickInterval > 0f)
+            {
+                var spec = new PeriodicSpec(definition.TickInterval, FirstTickPolicy.NextInterval, CatchUpPolicy.CatchUpAll,
+                    default(ExecutionId), DamageType.True, ElementType.Poison, definition.Magnitude);
+                immutable = new GameplayEffectDefinition(id, EffectType.Periodic, modifiers, definition.Duration,
+                    ClockId.Combat, definition.StackingBehavior, System.Math.Max(1, definition.MaxStacks),
+                    refresh, SourceDeathPolicy.Persist, EffectPayloadKind.Damage, default(TagId), spec,
+                    System.Array.Empty<ExecutionId>());
+            }
+            else
+            {
+                immutable = new GameplayEffectDefinition(id, definition.Type, modifiers, definition.Duration,
+                    definition.TickInterval, ClockId.Combat, definition.StackingBehavior, System.Math.Max(1, definition.MaxStacks),
+                    refresh, SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent, default(TagId),
+                    System.Array.Empty<ExecutionId>());
+            }
             var runtime = new ActiveGameplayEffect(default(EffectHandle), id, source, target, definition.Duration,
                 definition.TotalTicks, definition.Magnitude, immutable.Clock,
                 immutable.Periodic.HasValue ? immutable.Periodic.Value.FirstTick : FirstTickPolicy.NextInterval,

@@ -12,7 +12,7 @@ namespace BattleSystemECS.Core.GAS
     public enum EffectPayloadKind { Damage, Heal, Shield, Resurrect, Resource, CrowdControl, Slow, GameplayEvent, WorldAction, Status, Dispel, Freeze, Telegraph }
     public enum ExecutionOperation { Default, ApplyDamage, ApplyHeal, ApplyShield, Resurrect, RestoreSnapshot, ApplyCrowdControl, ApplySlow, SummonEnemy, PrepareStealth, ApplyEnemyBuff, ApplyTowerSilence, RemoveDispellableEffects, ApplyFreeze, QueueTelegraph }
     public enum RefreshPolicy { None, Duration, StacksAndDuration }
-    public enum SourceDeathPolicy { Persist, Remove }
+    public enum SourceDeathPolicy { Persist, Remove, Transfer }
     [Flags]
     public enum SkillSemanticField : ulong
     {

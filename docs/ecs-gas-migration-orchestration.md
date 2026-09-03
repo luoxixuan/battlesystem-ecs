@@ -25,7 +25,10 @@ benchmark 入口不直接组装三段 registry facade。
   `CanApplyPlayerDamageAuthority` 预检 `CanAccept(0,2)`，队列溢出时不消耗 stealth；
   近战 `AttackInterval` 冷却门控首次生效（含裂变/克隆/死灵继承）；`PlayerDamaged`
   四站点改发 `applied`；thorns/trample/leap/projectile 保持静默；`EnemyProjectile`
-  改打 `PlayerEntityId`；BossTrailAoe/SuicideBomb 负 CurrentHealth 白名单由守卫测试冻结。
+  改打 `PlayerEntityId`；BossTrailAoe/SuicideBomb 已迁到 `ApplyPlayerDamageAuthority`。
+- 2026-09-03 F4–F9 进度：`ApplyDot` None→`TryAdopt`、叠层→`TryRestack`；Transfer / BlockedTags /
+  Attribute magnitude / Explicit 计数器合同 / 嵌套 `AbilityState` 已落地。不是收口：`TryAdopt`
+  仍跳过 BlockedTags；HasTag 回退扫槽；`AbilityRequest` 无 command buffer；cooldown 列未合并。
 
 ## M7 复核
 

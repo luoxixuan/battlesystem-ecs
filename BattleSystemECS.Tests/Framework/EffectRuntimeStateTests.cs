@@ -154,15 +154,44 @@ namespace BattleSystemECS.Tests.Framework
                 StackingBehavior.MaxStacksRefresh, 3);
             var system = new BuffSystem(store, 0);
             system.ApplyDot(target, definition);
-            system.Update(0.5f);
+            Assert.True(store.TryGetActiveEffectAt(target, 0, out var afterApply, out _, out _));
+            Assert.True(afterApply.RuntimeOwned);
+            store.GameplayEffectsRuntime.Tick(0.5f, ClockId.Combat);
+            Assert.True(store.TryGetActiveEffectAt(target, 0, out var afterTick, out _, out _));
+            Assert.Equal(3.5f, afterTick.RemainingTime, 3);
             system.ApplyDot(target, definition);
 
             Assert.True(store.TryGetActiveEffectAt(target, 0, out var active, out var immutable, out _));
+            Assert.True(active.RuntimeOwned);
             Assert.Equal(2, active.StackCount);
             Assert.Equal(4f, active.RemainingTime);
             Assert.Equal(4, active.TicksRemaining);
             Assert.Equal(0f, active.TickAccumulator);
             Assert.Equal(4f, immutable.Duration);
+
+            system.Update(1f);
+            Assert.True(store.TryGetActiveEffectAt(target, 0, out var afterBuffUpdate, out _, out _));
+            Assert.Equal(4f, afterBuffUpdate.RemainingTime);
+            Assert.Equal(2, afterBuffUpdate.StackCount);
+        }
+
+        [Fact]
+        public void MaxStacksRestackIncrementsWithoutRefreshingTimer()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 1f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1, 20, 20, 1, 1, 1);
+            var definition = GameplayEffectDef.Periodic("stack-only", -1, 1f, 4f, 1f,
+                StackingBehavior.MaxStacks, 3);
+            var system = new BuffSystem(store, 0);
+            system.ApplyDot(target, definition);
+            store.GameplayEffectsRuntime.Tick(0.5f, ClockId.Combat);
+            system.ApplyDot(target, definition);
+
+            Assert.True(store.TryGetActiveEffectAt(target, 0, out var active, out _, out _));
+            Assert.True(active.RuntimeOwned);
+            Assert.Equal(2, active.StackCount);
+            Assert.Equal(3.5f, active.RemainingTime, 3);
         }
 
         [Fact]
@@ -206,6 +235,25 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(0, effects.Handles.InvalidResolveCount);
             Assert.Equal(0, effects.Handles.StaleResolveCount);
             Assert.Equal(0, effects.Handles.InactiveResolveCount);
+        }
+
+        [Fact]
+        public void ApplyDot_IsRuntimeOwned_AndOnlyGameplayEffectRuntimeTicksDamage()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 20f, 20f, 1f, 1, 1);
+            var buff = new BuffSystem(store, 0);
+            buff.ApplyDot(target, 4f, 2);
+            Assert.True(store.TryGetActiveEffectAt(target, 0, out var active, out _, out _));
+            Assert.True(active.RuntimeOwned);
+
+            buff.Update(1f);
+            buff.ResolveDotDamage();
+            Assert.Equal(20f, store.EnemyHealth[target], 3);
+
+            store.GameplayEffectsRuntime.Tick(1f, ClockId.Combat);
+            Assert.Equal(16f, store.EnemyHealth[target], 3);
         }
 
         private static void AddWithPolicies(ComponentStore store, int targetId, FirstTickPolicy firstTick, CatchUpPolicy catchUp)

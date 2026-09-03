@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
 using BattleSystemECS.Components;
@@ -23,6 +24,13 @@ namespace BattleSystemECS.Tests.Features.Buffs
             var buff = new BuffSystem(Store, playerId, Renderer);
             var sys = new CorpseEffectSystem(Store, Config, buff, Renderer);
             return (sys, buff);
+        }
+
+        private void TickAdoptedDots(BuffSystem buff, float dt)
+        {
+            Store.GameplayEffectsRuntime.Tick(dt, ClockId.Combat);
+            buff.Update(dt);
+            buff.ResolveDotDamage();
         }
 
         private int AddEnemyAt(float x, float y, float hp)
@@ -100,8 +108,7 @@ namespace BattleSystemECS.Tests.Features.Buffs
 
             // 第 1 秒：区域 tick 写入 Periodic DoT → BuffSystem tick 入队 → 统一结算伤害。
             sys.Update(1.0f);
-            buff.Update(1.0f);
-            buff.ResolveDotDamage();
+            TickAdoptedDots(buff, 1.0f);
             // 期望值完全由显式注入的 enemyHp / damagePerTick 推导（如 100-4=96），不复制生产公式。
             Assert.Equal(expectedAfterTick1, Store.EnemyHealth[enemyId], 2);
             if (expectedSlow > 0f)
@@ -113,8 +120,7 @@ namespace BattleSystemECS.Tests.Features.Buffs
 
             // 第 2 秒：再结算一个 tick。
             sys.Update(1.0f);
-            buff.Update(1.0f);
-            buff.ResolveDotDamage();
+            TickAdoptedDots(buff, 1.0f);
             Assert.Equal(expectedAfterTick2, Store.EnemyHealth[enemyId], 2);
         }
 
@@ -134,8 +140,7 @@ namespace BattleSystemECS.Tests.Features.Buffs
             float hpBefore = Store.EnemyHealth[enemyId];
 
             sys.Update(1.0f);
-            buff.Update(1.0f);
-            buff.ResolveDotDamage();
+            TickAdoptedDots(buff, 1.0f);
 
             // 范围外：DoT / slow / debuff 全部不写。
             Assert.Equal(hpBefore, Store.EnemyHealth[enemyId]);
