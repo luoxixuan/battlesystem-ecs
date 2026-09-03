@@ -57,18 +57,7 @@ namespace BattleSystemECS.Core.GAS
             if (definition.Type == EffectType.Periodic && (definition.DurationPolicy != DurationPolicy.Duration || definition.Duration <= 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration))) { Reject(source, target, id, 6); return false; }
             if (definition.Type == EffectType.Duration && definition.DurationPolicy == DurationPolicy.Duration && (definition.Duration <= 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration))) { Reject(source, target, id, 6); return false; }
             if (definition.Type == EffectType.Duration && definition.DurationPolicy == DurationPolicy.Infinite && (definition.Duration != 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration))) { Reject(source, target, id, 6); return false; }
-            if (definition.Type == EffectType.Periodic && (!definition.Periodic.HasValue || !ValidatePeriodicPayload(definition.Periodic.Value, targetId))) { Reject(source, target, id, 2); return false; }
-            if (definition.Type == EffectType.Periodic)
-            {
-                bool attributeMagnitude = definition.Periodic.Value.MagnitudeSource == MagnitudeSource.Attribute;
-                float requestedMagnitude = float.IsNaN(snapshot) ? definition.Periodic.Value.Magnitude : snapshot;
-                if (!attributeMagnitude && definition.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent && (requestedMagnitude <= 0f || float.IsNaN(requestedMagnitude) || float.IsInfinity(requestedMagnitude))) { Reject(source, target, id, 4); return false; }
-            }
-            if (definition.BlockedTags != null && definition.BlockedTags.Count > 0)
-            {
-                for (int b = 0; b < definition.BlockedTags.Count; b++)
-                    if (GameplayTagRuntime.HasTag(_store, targetId, definition.BlockedTags[b])) { Reject(source, target, id, 8); return false; }
-            }
+            if (RejectPeriodicAndBlocked(definition, source, target, targetId, snapshot)) return false;
             int count = _store.GetEffectCount(targetId);
             TagId key = definition.StackKey.Equals(default(TagId)) ? new TagId(id.Value) : definition.StackKey;
             for (int i = 0; i < count; i++)
@@ -147,7 +136,8 @@ namespace BattleSystemECS.Core.GAS
             var runtime = application.Runtime;
             var definition = application.Definition;
             if (!runtime.Target.IsValid || !_store.TryResolve(runtime.Target, out int targetId, out _)) return false;
-            if (definition.Type == EffectType.Periodic && !IsDurationContractValid(definition)) return false;
+            if (!IsDurationContractValid(definition)) { Reject(runtime.Source, runtime.Target, definition.Id, 6); return false; }
+            if (RejectPeriodicAndBlocked(definition, runtime.Source, runtime.Target, targetId, float.NaN)) return false;
             runtime.RuntimeOwned = true;
             runtime.OwnerPlayerId = ownerPlayerId;
             if (runtime.ApplicationSequence == 0L)
@@ -170,6 +160,10 @@ namespace BattleSystemECS.Core.GAS
             handle = default(EffectHandle);
             var definition = application.Definition;
             if (!application.Runtime.Target.IsValid || !_store.TryResolve(application.Runtime.Target, out int targetId, out _))
+                return false;
+            if (!IsDurationContractValid(definition))
+            { Reject(application.Runtime.Source, application.Runtime.Target, definition.Id, 6); return false; }
+            if (RejectPeriodicAndBlocked(definition, application.Runtime.Source, application.Runtime.Target, targetId, float.NaN))
                 return false;
             TagId key = definition.StackKey.Equals(default(TagId)) ? new TagId(definition.Id.Value) : definition.StackKey;
             int count = _store.GetEffectCount(targetId);
@@ -227,6 +221,28 @@ namespace BattleSystemECS.Core.GAS
                 var abort = new GameplayEvent(GameplayEventType.GameplayLoopAborted, e.Source, e.Target, e.Sequence, 6);
                 if (!AbortEvents.TryPublish(abort, true)) AbortPublicationFailures++;
             }
+        }
+
+        private bool RejectPeriodicAndBlocked(GameplayEffectDefinition definition, EntityHandle source,
+            EntityHandle target, int targetId, float snapshot)
+        {
+            if (definition.Type == EffectType.Periodic)
+            {
+                if (!definition.Periodic.HasValue || !ValidatePeriodicPayload(definition.Periodic.Value, targetId))
+                { Reject(source, target, definition.Id, 2); return true; }
+                bool attributeMagnitude = definition.Periodic.Value.MagnitudeSource == MagnitudeSource.Attribute;
+                float requestedMagnitude = float.IsNaN(snapshot) ? definition.Periodic.Value.Magnitude : snapshot;
+                if (!attributeMagnitude && definition.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent &&
+                    (requestedMagnitude <= 0f || float.IsNaN(requestedMagnitude) || float.IsInfinity(requestedMagnitude)))
+                { Reject(source, target, definition.Id, 4); return true; }
+            }
+            if (definition.BlockedTags != null && definition.BlockedTags.Count > 0)
+            {
+                for (int b = 0; b < definition.BlockedTags.Count; b++)
+                    if (GameplayTagRuntime.HasTag(_store, targetId, definition.BlockedTags[b]))
+                    { Reject(source, target, definition.Id, 8); return true; }
+            }
+            return false;
         }
 
         private bool ValidatePeriodicPayload(PeriodicSpec spec, int targetId)

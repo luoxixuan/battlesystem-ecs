@@ -242,7 +242,7 @@
 - **F8 Trigger reset 合同自相矛盾**：`TriggerResetPolicy` 的命名与行为相反——`Explicit` 的计数器被每帧 `ResetFrame` **自动**清除，`None` 反而跨帧保留（这正是 `EveryN` 阈值累计得以工作的原因）。`ResetCounters()` 无条件全清且**无生产调用方**。`Framework/GameplayRuntimeTests.cs:693` 名为 `ExplicitTriggerCounterResetClearsOnlyWhenRequested`，但从不调用 `ResetFrame`，改成 `None` 也照样通过——该合同实际未被测试。
 - **F9 AbilityState**：无该类型。cooldown 分散在三套存储：`AbilityInstance.CurrentCooldown` 位于 `MAX_ENTITIES * MAX_ABILITIES_PER_ENTITY` 数组、按值内嵌 29 字段的 `GameplayAbilityDef`，而所有调用方只传 `playerId`；调用方自有 `float[]`（`EnemyAbilitySystem`、`HeroSkillSystem`）；另有约 40 条专用 SOA cooldown 列。无 charges。主激活入口 `AbilityActivationRequest` 全程用裸 `int`，`AbilityRequest`（handle 版）零使用。`SkillSystem.FindSlot` 每次激活按**字符串比较**查槽位。
 
-2026-09-03 后续进度（登记快照之后，未宣称 F4–F9 收口）：ApplyDot 的 None 走 `TryAdopt`、叠层走 `TryRestack`，timer writer 在 `GameplayEffectRuntime`；`TryAdopt` 仍跳过 BlockedTags，5 个创建点尚未 catalog 化。`SourceDeathPolicy.Transfer` 与 Catalog 策略键已有。`TryApply` 读 BlockedTags；HasTag 未命中仍扫槽。Periodic/Ability `MagnitudeSource.Attribute` 已求值。`Explicit` 不再被 `ResetFrame` 清掉。`AbilityState` 嵌在 `AbilityInstance`；`FindSlot` 优先 AbilityId；激活里构造 `AbilityRequest` 做合法性检查，主入口仍是 `AbilityActivationRequest`。
+2026-09-03 后续进度（登记快照之后，未宣称 F4–F9 终态收口）：ApplyDot 的 None 走 `TryAdopt`、叠层走 `TryRestack`；`TryAdopt`/`TryRestack` 已跑 BlockedTags 与 Periodic payload 校验。`HasTag` 只走 `TagState`。死亡回调节点已去掉假 `AbilityRequests`。5 个创建点尚未 catalog 化。`AbilityRequest` 仍无 command buffer；主入口仍是 `AbilityActivationRequest`。`PlayerDamaged` / Rally 未拆通道。
 
 ---
 

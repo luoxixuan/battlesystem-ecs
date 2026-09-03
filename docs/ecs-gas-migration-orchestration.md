@@ -27,8 +27,9 @@ benchmark 入口不直接组装三段 registry facade。
   四站点改发 `applied`；thorns/trample/leap/projectile 保持静默；`EnemyProjectile`
   改打 `PlayerEntityId`；BossTrailAoe/SuicideBomb 已迁到 `ApplyPlayerDamageAuthority`。
 - 2026-09-03 F4–F9 进度：`ApplyDot` None→`TryAdopt`、叠层→`TryRestack`；Transfer / BlockedTags /
-  Attribute magnitude / Explicit 计数器合同 / 嵌套 `AbilityState` 已落地。不是收口：`TryAdopt`
-  仍跳过 BlockedTags；HasTag 回退扫槽；`AbilityRequest` 无 command buffer；cooldown 列未合并。
+  Attribute magnitude / Explicit 计数器合同 / 嵌套 `AbilityState` 已落地。随后 `TryAdopt` 补上
+  BlockedTags 与 Periodic 校验，`HasTag` 去掉槽位回退，死亡回调去掉假 `AbilityRequests`。
+  仍未做：`AbilityRequest` command buffer；cooldown 列未合并；Rally 拆通道；DoT catalog 化。
 
 ## M7 复核
 

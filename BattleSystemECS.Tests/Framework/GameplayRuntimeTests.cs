@@ -811,6 +811,53 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
+        public void TryAdopt_RejectsBlockedTagsAndNonPositivePeriodicMagnitude()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 20f, 20f, 1f, 1, 1);
+            var grant = new GameplayEffectDefinition(new EffectId(214), EffectType.Duration,
+                Array.Empty<ModifierDefinition>(), 5f, 0f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None,
+                SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent, new TagId(4), Array.Empty<ExecutionId>(),
+                grantedTags: new[] { new TagId(4) });
+            Assert.True(store.GameplayEffectsRuntime.TryApply(grant.Id, grant, store.GetEntityHandle(0),
+                store.GetEntityHandle(target), out _));
+
+            var blocked = new GameplayEffectDefinition(new EffectId(215), EffectType.Periodic,
+                Array.Empty<ModifierDefinition>(), 2f, 1f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None,
+                SourceDeathPolicy.Persist, EffectPayloadKind.Damage, default(TagId), Array.Empty<ExecutionId>(),
+                blockedTags: new[] { new TagId(4) }, periodicMagnitude: 1f);
+            Assert.False(store.GameplayEffectsRuntime.TryAdopt(PeriodicApp(blocked, store, 0, target), 0, out _));
+            Assert.Equal(8, LastRejectReason(store));
+            Assert.Equal(1, store.GetEffectCount(target));
+
+            var zero = new GameplayEffectDefinition(new EffectId(216), EffectType.Periodic,
+                Array.Empty<ModifierDefinition>(), 2f, 1f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None,
+                SourceDeathPolicy.Persist, EffectPayloadKind.Damage, default(TagId), Array.Empty<ExecutionId>(),
+                periodicMagnitude: 0f);
+            Assert.False(store.GameplayEffectsRuntime.TryAdopt(PeriodicApp(zero, store, 0, target), 0, out _));
+            Assert.Equal(4, LastRejectReason(store));
+        }
+
+        [Fact]
+        public void HasTag_UsesContributionCountsWithoutSlotScan()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            var grant = new GameplayEffectDefinition(new EffectId(217), EffectType.Duration,
+                Array.Empty<ModifierDefinition>(), 5f, 0f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None,
+                SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent, default(TagId), Array.Empty<ExecutionId>(),
+                grantedTags: new[] { new TagId(7) });
+            Assert.True(store.GameplayEffectsRuntime.TryApply(grant.Id, grant, store.GetEntityHandle(0),
+                store.GetEntityHandle(target), out _));
+            Assert.True(GameplayTagRuntime.HasTag(store, target, new TagId(7)));
+            store.TagState.ClearEntity(target);
+            Assert.False(GameplayTagRuntime.HasTag(store, target, new TagId(7)));
+            Assert.Equal(1, store.GetEffectCount(target));
+        }
+
+        [Fact]
         public void PeriodicAttributeMagnitude_UsesSourceAttackProjection()
         {
             var store = new ComponentStore();
@@ -833,6 +880,24 @@ namespace BattleSystemECS.Tests.Framework
         private static HashSet<GameplayEventType> Events(GameplayEventQueue queue)
         {
             var result = new HashSet<GameplayEventType>(); for (int i = 0; i < queue.Count; i++) result.Add(queue.Get(i).Type); return result;
+        }
+
+        private static int LastRejectReason(ComponentStore store)
+        {
+            var queue = store.GameplayEffectsRuntime.Events;
+            for (int i = queue.Count - 1; i >= 0; i--)
+                if (queue.Get(i).Type == GameplayEventType.EffectRejected) return queue.Get(i).Reason;
+            return -1;
+        }
+
+        private static GameplayEffectApplication PeriodicApp(GameplayEffectDefinition definition, ComponentStore store,
+            int sourceId, int targetId)
+        {
+            var runtime = new ActiveGameplayEffect(default(EffectHandle), definition.Id,
+                store.GetEntityHandle(sourceId), store.GetEntityHandle(targetId), definition.Duration,
+                2, definition.Periodic.HasValue ? definition.Periodic.Value.Magnitude : 0f, ClockId.Combat,
+                FirstTickPolicy.NextInterval, CatchUpPolicy.CatchUpAll, SourceDeathPolicy.Persist);
+            return new GameplayEffectApplication(definition, default(LegacyEffectSnapshot), runtime);
         }
     }
 }

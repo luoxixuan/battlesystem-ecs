@@ -118,7 +118,8 @@ FrameGraph：`effect.tick` / `build.effect.tick` / `skill-buff.skill.update` 已
 `build.auto-skill.update`、`build.global-skill.update` 不再声明 AbilityRequests，
 `post-death.corpse.update` 不再声明 EffectRequests。
 `BuffSystem.ApplyDot` 的 None 走 `TryAdopt`，叠层刷新走 `TryRestack`；该路径 timer 只由
-`GameplayEffectRuntime` 写。尚未 catalog 化；`TryAdopt` 仍跳过 BlockedTags。不是 F4 收口。
+`GameplayEffectRuntime` 写。`TryAdopt` 已校验 BlockedTags 与 Periodic payload。尚未 catalog 化。
+死亡回调不再声明 `AbilityRequests`。不是 F4–F9 终态收口。
 
 M3 就要建立事件迁移表，逐项标记旧 `EventBus` 的 `LegacyOnly`/`Bridge`/`GameplayOnly` 状态；M4 才允许 Trigger 消费 `GameplayOnly`。Bridge 期间由新事实单向转发旧事件，按 sequence 去重，不能让旧 publisher 和新 publisher 各发一份。
 

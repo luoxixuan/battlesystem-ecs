@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-09-03（ECS+GAS 缺口收口续：Adopt 校验 / TagState / 死亡回调声明）
+- `TryAdopt` / `TryRestack` 与 `TryApply` 共用 BlockedTags（reason 8）和 Periodic payload / 非正 magnitude（reason 2/4）校验。
+- `HasTag` 只读 `TagState` 贡献计数，不再在未命中时扫槽。
+- `primary-death.callback-dispatch` / `cascade-death.callback-dispatch` 去掉不存在的 `AbilityRequests` 写声明；重算 Gameplay/FixedPopulation 批准根与 topology hash。
+- 仍未做：`PlayerDamaged` / Rally 拆通道；`AbilityRequest` command buffer；敌方/英雄 cooldown 列合并；5 个 ApplyDot 创建点 catalog 化。
+
 ### 2026-09-03（ECS+GAS 缺口修正 F4–F9 进度 + 负血量旁路，⚠️ 有数值变化）
 - **F4 进度**：`ApplyDot` 的 None 走 `TryAdopt`，DurationRefresh/MaxStacks/MaxStacksRefresh 走 `TryRestack`；该路径的 timer 写入只在 `GameplayEffectRuntime`。BuffSystem 对 RuntimeOwned 不再 tick。`TryAdopt`/`TryRestack` 仍不跑 BlockedTags / Periodic payload 校验；5 个生产创建点尚未 catalog 化。
 - **BossTrail / SuicideBomb** 改为 `ApplyPlayerDamageAuthority`；首次吃护盾/下限/复活。负 `AttributeKey(3)` 玩家写入白名单清空。
