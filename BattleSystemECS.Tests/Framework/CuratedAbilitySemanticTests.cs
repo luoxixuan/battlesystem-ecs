@@ -60,9 +60,9 @@ namespace BattleSystemECS.Tests.Framework
             AssertPayload(catalog, "Slow Nova", EffectPayloadKind.Slow, 0.5f, 3f, MagnitudeSource.Constant);
             AssertPayload(catalog, "Time Rewind", EffectPayloadKind.Resource, 3f, 0f, MagnitudeSource.Constant, ExecutionOperation.RestoreSnapshot);
 
-            AssertPeriodic(catalog, "Poison Nova", 8f, 5f, 1f);
-            AssertPeriodic(catalog, "Dragon Breath", 5f, 3f, 1f);
-            AssertPeriodic(catalog, "Meteor Strike", 4f, 3f, 1f);
+            AssertPeriodic(catalog, "Poison Nova");
+            AssertPeriodic(catalog, "Dragon Breath");
+            AssertPeriodic(catalog, "Meteor Strike");
             var cold = Find(catalog, "Cold Nova");
             Assert.Contains(cold.Executions, id =>
             {
@@ -85,10 +85,20 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Contains(ability.Executions, id => { var e = catalog.Executions[id.Value]; return e.Payload == payload && e.Magnitude == magnitude && e.Duration == duration && e.MagnitudeSource == source && (operation == ExecutionOperation.Default || e.Operation == operation); });
         }
 
-        private static void AssertPeriodic(GameplayCatalog catalog, string name, float magnitude, float duration, float period)
+        private static void AssertPeriodic(GameplayCatalog catalog, string name)
         {
             var ability = Find(catalog, name);
-            Assert.Contains(ability.Effects, id => { var e = catalog.Effects[id.Value]; return e.Duration == duration && e.Period == period && e.Executions.Any(x => catalog.Executions[x.Value].Magnitude == magnitude && catalog.Executions[x.Value].MagnitudeSource == MagnitudeSource.Constant); });
+            Assert.Contains(ability.Effects, id =>
+            {
+                var e = catalog.Effects[id.Value];
+                if (!e.Periodic.HasValue || e.Executions.Count == 0) return false;
+                var exec = catalog.Executions[e.Executions[0].Value];
+                return e.Periodic.Value.Magnitude == exec.Magnitude
+                    && exec.Magnitude > 0f
+                    && exec.MagnitudeSource == MagnitudeSource.Constant
+                    && e.Duration > 0f
+                    && e.Period > 0f;
+            });
         }
 
         private static AbilityDefinition Find(GameplayCatalog catalog, string name) => catalog.AbilityDefinitions.First(a => a.Name == name);

@@ -143,6 +143,22 @@ namespace BattleSystemECS.Systems
             _phaseMinionEvents.Clear();
             _phaseChangeEvents.Clear();
 
+            // 递减攻击冷却（秒制）；interval≤0 的敌人不受门控。
+            if (_currentDeltaTime > 0f)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    int eid = activeEnemyIds[i];
+                    if (!store.EnemyActive[eid]) continue;
+                    float left = store.EnemyAttackCooldownLeft[eid];
+                    if (left > 0f)
+                    {
+                        left -= _currentDeltaTime;
+                        store.EnemyAttackCooldownLeft[eid] = left > 0f ? left : 0f;
+                    }
+                }
+            }
+
             if (count < PARALLEL_MIN_ENEMIES)
             {
                 // Sequential — avoid Parallel.For overhead for small counts (< 2 batches)
@@ -1048,23 +1064,26 @@ namespace BattleSystemECS.Systems
 
         private void ExecuteMeleeAttack(int enemyId)
         {
+            if (!store.IsEnemyAttackReady(enemyId)) return;
             float damage = store.GetEnemyAttackDamageProjection(enemyId);
-            // Apply stealth multiplier and reset to 1.0f for next attack
             float stealthMult = store.EnemyStealthMultiplier[enemyId];
             damage *= stealthMult;
+            if (!store.CanApplyPlayerDamageAuthority(enemyId, playerId, damage)) return;
             store.EnemyStealthMultiplier[enemyId] = 1f;
-            store.DecreasePlayerHealth(playerId, damage);
+            if (!store.ApplyPlayerDamageAuthority(enemyId, playerId, damage, out float applied)) return;
+            store.CommitEnemyAttackCooldown(enemyId);
             float remaining = store.GetPlayerCurrentHealth(playerId);
             _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
             {
-                Damage = damage,
+                Damage = applied,
                 RemainingHealth = remaining,
                 AttackerId = enemyId
             });
             store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
-            logger.Log($"[AI] Enemy {enemyId} attacks player for {damage} damage (HP: {remaining})");
+            logger.Log($"[AI] Enemy {enemyId} attacks player for {applied} damage (HP: {remaining})");
 
             // Lifesteal: collect event for serial apply (two-phase pattern)
+            // 用量保持减伤前（含 stealth）量，避免额外数值变化。
             if (store.EnemyLifestealActive[enemyId])
             {
                 float ratio = store.EnemyLifestealRatio[enemyId];
@@ -1086,12 +1105,14 @@ namespace BattleSystemECS.Systems
 
         private void ExecuteRangedAttack(int enemyId)
         {
+            if (!store.IsEnemyAttackReady(enemyId)) return;
             float damage = store.GetEnemyAttackDamageProjection(enemyId);
-            // Apply stealth multiplier and reset to 1.0f for next attack
             float stealthMult = store.EnemyStealthMultiplier[enemyId];
             damage *= stealthMult;
+            if (!store.CanApplyPlayerDamageAuthority(enemyId, playerId, damage)) return;
             store.EnemyStealthMultiplier[enemyId] = 1f;
-            store.DecreasePlayerHealth(playerId, damage);
+            if (!store.ApplyPlayerDamageAuthority(enemyId, playerId, damage, out float applied)) return;
+            store.CommitEnemyAttackCooldown(enemyId);
             float remaining = store.GetPlayerCurrentHealth(playerId);
             _eventBus.EnemyCharging.Publish(new EnemyChargingEvent
             {
@@ -1101,12 +1122,12 @@ namespace BattleSystemECS.Systems
             });
             _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
             {
-                Damage = damage,
+                Damage = applied,
                 RemainingHealth = remaining,
                 AttackerId = enemyId
             });
             store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
-            logger.Log($"[AI] Enemy {enemyId} ranged attacks player for {damage} damage (HP: {remaining})");
+            logger.Log($"[AI] Enemy {enemyId} ranged attacks player for {applied} damage (HP: {remaining})");
 
             // Lifesteal: collect event for serial apply (two-phase pattern)
             if (store.EnemyLifestealActive[enemyId])
@@ -1147,13 +1168,15 @@ namespace BattleSystemECS.Systems
             }
             else
             {
+                if (!store.IsEnemyAttackReady(enemyId)) return;
                 float baseDamage = store.GetEnemyAttackDamageProjection(enemyId);
-                // Apply stealth multiplier and reset to 1.0f for next attack
                 float stealthMult = store.EnemyStealthMultiplier[enemyId];
                 baseDamage *= stealthMult;
-                store.EnemyStealthMultiplier[enemyId] = 1f;
                 float chargedDamage = baseDamage * 3f;
-                store.DecreasePlayerHealth(playerId, chargedDamage);
+                if (!store.CanApplyPlayerDamageAuthority(enemyId, playerId, chargedDamage)) return;
+                store.EnemyStealthMultiplier[enemyId] = 1f;
+                if (!store.ApplyPlayerDamageAuthority(enemyId, playerId, chargedDamage, out float applied)) return;
+                store.CommitEnemyAttackCooldown(enemyId);
                 float remaining = store.GetPlayerCurrentHealth(playerId);
                 _eventBus.EnemyChargeReleased.Publish(new EnemyChargeReleasedEvent
                 {
@@ -1163,14 +1186,14 @@ namespace BattleSystemECS.Systems
                 });
                 _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
                 {
-                    Damage = chargedDamage,
+                    Damage = applied,
                     RemainingHealth = remaining,
                     AttackerId = enemyId
                 });
                 store.SetEnemyAIChargeCounter(enemyId, 0);
                 store.EnemyChargeParam[enemyId] = 0f;
                 store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
-                logger.Log($"[AI] Enemy {enemyId} releases CHARGE for {chargedDamage} damage (3x)! HP: {remaining}");
+                logger.Log($"[AI] Enemy {enemyId} releases CHARGE for {applied} damage (3x)! HP: {remaining}");
 
                 // Lifesteal: collect event for serial apply (two-phase pattern)
                 if (store.EnemyLifestealActive[enemyId])

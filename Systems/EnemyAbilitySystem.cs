@@ -709,17 +709,17 @@ namespace BattleSystemECS.Systems
                 }
                 else
                 {
-                    store.DecreasePlayerHealth(playerId, aoeDamage);
+                    if (!store.ApplyPlayerDamageAuthority(enemyId, playerId, aoeDamage, out float applied)) return;
                     float remaining = store.GetPlayerCurrentHealth(playerId);
 
                     _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
                     {
-                        Damage = aoeDamage,
+                        Damage = applied,
                         RemainingHealth = remaining,
                         AttackerId = enemyId
                     });
 
-                    logger.Log($"[ABILITY] Enemy {enemyId} AOE hits player for {aoeDamage:F1} damage ({ability.Name}). HP: {remaining:F1}");
+                    logger.Log($"[ABILITY] Enemy {enemyId} AOE hits player for {applied:F1} damage ({ability.Name}). HP: {remaining:F1}");
                 }
             }
             else

@@ -921,8 +921,7 @@ switch (actionEnum)
             // _activeEnemyList? No — player is in ActiveEnemyIds? Let's check: in this
             // codebase, ComponentStore stores the player separately. To be safe, read
             // PositionX/Y directly using playerId without requiring EnemyActive[playerId].
-            // If playerId is invalid (not used as enemy slot), DecreasePlayerHealth itself
-            // is a no-op via IsValidPlayer check, so we just call it.
+            // If playerId is invalid, ApplyPlayerDamageAuthority 会拒绝写入。
             float px = store.PositionX[playerId];
             float py = store.PositionY[playerId];
 
@@ -945,8 +944,7 @@ switch (actionEnum)
                 float distSqP = dxp * dxp + dyp * dyp;
                 if (distSqP <= r2)
                 {
-                    // DecreasePlayerHealth already handles shield + armor mitigation.
-                    store.DecreasePlayerHealth(playerId, dmg);
+                    store.ApplyPlayerDamageAuthority(tramplerId, playerId, dmg);
                 }
 
                 // (b) Other enemies: knockback 0.5 unit away from trampler.
@@ -1081,7 +1079,7 @@ switch (actionEnum)
         /// Resolve Leap / Jump Attack landing AoE. Runs after the parallel movement pass.
         /// Detects enemies whose leap animation just completed this frame (EnemyLeapElapsed
         /// crossed past EnemyLeapDuration during the parallel pass). For each such leaper:
-        ///   1. If player is within EnemyLeapRadius, apply AoE damage via DecreasePlayerHealth.
+        ///   1. If player is within EnemyLeapRadius, apply AoE damage via ApplyPlayerDamageAuthority.
         ///   2. If EnemyLeapStunDuration > 0, stun all enemies within EnemyLeapRadius (excluding
         ///      the leaper itself and any dead/inactive enemies).
         ///   3. Reset: EnemyLeapElapsed = 0, EnemyLeapCooldown = EnemyLeapCooldownRef, action enum
@@ -1131,8 +1129,7 @@ switch (actionEnum)
                     float distSqP = dxp * dxp + dyp * dyp;
                     if (distSqP <= r2)
                     {
-                        // DecreasePlayerHealth handles shield + armor mitigation.
-                        store.DecreasePlayerHealth(playerId, dmg);
+                        store.ApplyPlayerDamageAuthority(leaperId, playerId, dmg);
                     }
                 }
 

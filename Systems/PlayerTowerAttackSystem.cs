@@ -85,7 +85,7 @@ namespace BattleSystemECS.Systems
             = new List<(int, float, bool, DamageType)>(256);
 
         // Ping-pong double-buffer for thorns damage reflect (enemy -> player, from player attacking enemy)
-        private List<float>[] _thornsQueue = new List<float>[2];
+        private List<(float damage, int enemyId)>[] _thornsQueue = new List<(float, int)>[2];
         private int _thornsQueueIdx = 0;
 
         private global::BattleSystemECS.Content.Contracts.IHitShieldResolver _hitShieldSystem;
@@ -111,8 +111,8 @@ namespace BattleSystemECS.Systems
             this.gameConfig = gameConfig;
             this._eventBus = eventBus ?? new EventBus();
             _battleEventBus = battleEventBus ?? NullEventBus.Instance;
-            _thornsQueue[0] = new List<float>(64);
-            _thornsQueue[1] = new List<float>(64);
+            _thornsQueue[0] = new List<(float, int)>(64);
+            _thornsQueue[1] = new List<(float, int)>(64);
         }
 
         public void SetTurn(int turn)
@@ -346,7 +346,7 @@ public void SetWaveNumber(int waveNumber)
                 if (thornsRatio > 0f && finalDamage > 0f)
                 {
                     float thornsDamage = finalDamage * thornsRatio;
-                    _thornsQueue[_thornsQueueIdx].Add(thornsDamage);
+                    _thornsQueue[_thornsQueueIdx].Add((thornsDamage, enemyId));
                 }
                 // Round 67: On-Hit / On-Crit trigger event publication.
                 // EnemyHit fires for every applied hit; EnemyCrit only fires on crits (companion event).
@@ -366,9 +366,9 @@ public void SetWaveNumber(int waveNumber)
             int thornsWriteIdx = 1 - _thornsQueueIdx;
             _thornsQueueIdx = thornsWriteIdx;
             _thornsQueue[thornsWriteIdx].Clear();
-            foreach (float thornsDamage in _thornsQueue[thornsReadIdx])
+            foreach (var (thornsDamage, enemyId) in _thornsQueue[thornsReadIdx])
             {
-                store.DecreasePlayerHealth(playerId, thornsDamage);
+                store.ApplyPlayerDamageAuthority(enemyId, playerId, thornsDamage);
             }
         }
 
@@ -480,7 +480,7 @@ public void SetWaveNumber(int waveNumber)
             if (thornsRatio > 0f && finalLinkedDmg > 0f)
             {
                 float thornsDamage = finalLinkedDmg * thornsRatio;
-                _thornsQueue[_thornsQueueIdx].Add(thornsDamage);
+                _thornsQueue[_thornsQueueIdx].Add((thornsDamage, linkedEnemyId));
             }
 
             // Check if linked enemy dies from shared damage

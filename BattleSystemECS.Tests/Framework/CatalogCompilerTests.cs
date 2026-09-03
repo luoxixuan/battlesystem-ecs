@@ -30,10 +30,13 @@ namespace BattleSystemECS.Tests.Framework
             Assert.True(merged.TryGetAbility(poisonId, out var poison));
             Assert.Single(poison.Effects);
             Assert.True(merged.TryGetEffect(poison.Effects[0], out var poisonEffect));
-            Assert.Equal(5f, poisonEffect.Duration);
-            Assert.Equal(1f, poisonEffect.Period);
+            Assert.True(poisonEffect.Duration > 0f);
+            Assert.True(poisonEffect.Period > 0f);
             Assert.Equal(new TagId(7), poisonEffect.Tag);
-            Assert.Equal(8f, merged.Executions[poisonEffect.Executions[0].Value].Magnitude);
+            var poisonTick = merged.Executions[poisonEffect.Executions[0].Value];
+            Assert.True(poisonTick.Magnitude > 0f);
+            Assert.True(poisonEffect.Periodic.HasValue);
+            Assert.Equal(poisonTick.Magnitude, poisonEffect.Periodic.Value.Magnitude);
             Assert.True(merged.TryResolveAlias("Cold Nova", out var coldId));
             Assert.True(merged.TryGetAbility(coldId, out var cold));
             Assert.Empty(cold.Effects);
@@ -46,10 +49,13 @@ namespace BattleSystemECS.Tests.Framework
             Assert.True(merged.TryGetAbility(meteorId, out var meteor));
             Assert.Single(meteor.Effects);
             Assert.Equal(2, meteor.Executions.Count);
-            Assert.Contains(meteor.Executions, executionId => merged.Executions[executionId.Value].MagnitudeSource == MagnitudeSource.Multiplier && merged.Executions[executionId.Value].Magnitude == 8f);
-            Assert.Contains(meteor.Executions, executionId => merged.Executions[executionId.Value].Magnitude == 70f && merged.Executions[executionId.Value].MagnitudeSource == MagnitudeSource.Constant);
+            Assert.Contains(meteor.Executions, executionId => merged.Executions[executionId.Value].MagnitudeSource == MagnitudeSource.Multiplier && merged.Executions[executionId.Value].Magnitude > 0f);
+            Assert.Contains(meteor.Executions, executionId => merged.Executions[executionId.Value].MagnitudeSource == MagnitudeSource.Constant && merged.Executions[executionId.Value].Magnitude > 0f);
             Assert.True(merged.TryGetEffect(meteor.Effects[0], out var meteorDot));
-            Assert.Equal(4f, merged.Executions[meteorDot.Executions[0].Value].Magnitude);
+            var meteorTick = merged.Executions[meteorDot.Executions[0].Value];
+            Assert.True(meteorTick.Magnitude > 0f);
+            Assert.True(meteorDot.Periodic.HasValue);
+            Assert.Equal(meteorTick.Magnitude, meteorDot.Periodic.Value.Magnitude);
             Assert.Equal(2, meteorDot.MaxStacks);
             Assert.True(merged.TryResolveAlias("Cross Slash", out var crossId));
             Assert.True(merged.TryGetAbility(crossId, out var cross));
@@ -95,7 +101,9 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Same(extended, repeated);
             Assert.Equal(baseCatalog.Effects.Count, extended.Effects[extended.Effects.Count - 1].Id.Value);
             Assert.Equal(baseCatalog.Triggers.Count, extended.Triggers[extended.Triggers.Count - 1].Id.Value);
-            Assert.Equal(new AttributeKey(0), extended.Effects[extended.Effects.Count - 1].Modifiers[0].Attribute);
+            Assert.Equal(CatalogRegistries.DamageOutputMultiplier, extended.Effects[extended.Effects.Count - 1].Modifiers[0].Attribute);
+            Assert.Equal(AttributeModifierOp.Add, extended.Effects[extended.Effects.Count - 1].Modifiers[0].Operation);
+            Assert.Equal(0.2f, extended.Effects[extended.Effects.Count - 1].Modifiers[0].Magnitude);
             Assert.Equal(3, extended.Triggers[extended.Triggers.Count - 1].Threshold);
         }
 

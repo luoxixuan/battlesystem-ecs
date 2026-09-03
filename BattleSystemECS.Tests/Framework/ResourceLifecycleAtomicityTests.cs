@@ -1,6 +1,7 @@
 using BattleSystemECS.Core;
 using BattleSystemECS.Core.GAS;
 using BattleSystemECS.Components;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -751,6 +752,101 @@ namespace BattleSystemECS.Tests.Framework
                 store.ResolveEnemiesKilledThisFrame();
                 Assert.False(store.EnemyActive[enemy]);
                 Assert.Equal(1, store.TotalKills);
+            }
+        }
+
+        [Fact]
+        public void ApplyPlayerDamageAuthority_SequencesAllocatedAtCommitAndStrictlyIncrease()
+        {
+            using (var store = new ComponentStore())
+            {
+                store.AddPlayer(0, 100f, 1f, 1f, 1);
+                store.PlayerMaxHealth[0] = 100f;
+                store.PlayerCurrentHealth[0] = 100f;
+                int enemy = store.AddEnemy(0, 0, 1f, 10f, 10f, 5f, 1, 1);
+
+                Assert.True(store.ApplyPlayerDamageAuthority(enemy, 0, 3f, out _));
+                Assert.True(store.ApplyPlayerDamageAuthority(enemy, 0, 4f, out _));
+
+                Assert.Equal(2, store.ResourceResolver.Events.Count);
+                long first = store.ResourceResolver.Events.Get(0).Sequence;
+                long second = store.ResourceResolver.Events.Get(1).Sequence;
+                Assert.True(first > 0L);
+                Assert.True(second > first);
+            }
+        }
+
+        [Fact]
+        public void ApplyPlayerDamageAuthority_AppliedIncludesShieldConsumption()
+        {
+            using (var store = new ComponentStore())
+            {
+                store.AddPlayer(0, 100f, 1f, 1f, 1);
+                store.PlayerMaxHealth[0] = 100f;
+                store.PlayerCurrentHealth[0] = 80f;
+                store.PlayerShield[0] = 10f;
+                int enemy = store.AddEnemy(0, 0, 1f, 10f, 10f, 5f, 1, 1);
+
+                Assert.True(store.ApplyPlayerDamageAuthority(enemy, 0, 15f, out float applied));
+
+                Assert.Equal(0f, store.PlayerShield[0], 3);
+                Assert.Equal(75f, store.PlayerCurrentHealth[0], 3);
+                Assert.Equal(15f, applied, 3);
+            }
+        }
+
+        [Fact]
+        public void ApplyPlayerDamageAuthority_CapacityExhaustedLeavesSixFieldsAndNoFacts()
+        {
+            using (var store = StoreWithFullResourceQueue())
+            {
+                store.PlayerMaxHealth[0] = 100f;
+                store.PlayerCurrentHealth[0] = 40f;
+                store.PlayerShield[0] = 5f;
+                store.PlayerManaShield[0] = 3f;
+                store.PlayerManaShieldTriggered[0] = false;
+                store.PlayerReincarnationCharges[0] = 1;
+                store.PlayerHasReincarnated[0] = false;
+                int enemy = store.AddEnemy(0, 0, 1f, 10f, 10f, 5f, 1, 1);
+                int eventsBefore = store.ResourceResolver.Events.Count;
+                long deathsBefore = store.DeathEnqueueCount;
+
+                Assert.False(store.ApplyPlayerDamageAuthority(enemy, 0, 12f, out float applied));
+
+                Assert.Equal(0f, applied);
+                Assert.Equal(40f, store.PlayerCurrentHealth[0]);
+                Assert.Equal(5f, store.PlayerShield[0]);
+                Assert.Equal(3f, store.PlayerManaShield[0]);
+                Assert.False(store.PlayerManaShieldTriggered[0]);
+                Assert.Equal(1, store.PlayerReincarnationCharges[0]);
+                Assert.False(store.PlayerHasReincarnated[0]);
+                Assert.Equal(eventsBefore, store.ResourceResolver.Events.Count);
+                Assert.Equal(deathsBefore, store.DeathEnqueueCount);
+            }
+        }
+
+        [Fact]
+        public void ApplyPlayerDamageAuthority_LethalPublishesTwoFactsAndRejectsFollowUp()
+        {
+            using (var store = new ComponentStore())
+            {
+                store.AddPlayer(0, 100f, 1f, 1f, 1);
+                store.PlayerMaxHealth[0] = 100f;
+                store.PlayerCurrentHealth[0] = 8f;
+                store.PlayerShield[0] = 0f;
+                store.PlayerReincarnationCharges[0] = 0;
+                int enemy = store.AddEnemy(0, 0, 1f, 10f, 10f, 5f, 1, 1);
+
+                Assert.True(store.ApplyPlayerDamageAuthority(enemy, 0, 20f, out float applied));
+                Assert.True(applied > 0f);
+                Assert.Equal(2, store.ResourceResolver.Events.Count);
+                Assert.Equal(GameplayEventType.DamageApplied, store.ResourceResolver.Events.Get(0).Type);
+                Assert.Equal(GameplayEventType.DeathQueued, store.ResourceResolver.Events.Get(1).Type);
+                Assert.True(store.PlayerCurrentHealth[0] <= 0f);
+
+                Assert.False(store.ApplyPlayerDamageAuthority(enemy, 0, 1f, out float secondApplied));
+                Assert.Equal(0f, secondApplied);
+                Assert.Equal(2, store.ResourceResolver.Events.Count);
             }
         }
     }

@@ -15,6 +15,17 @@ benchmark 入口不直接组装三段 registry facade。
 - FrameGraph/FrameSystemGraph/FrameScheduler 的签名和递归 IL 闭包不暴露具体
   `BattleSystemECS.Systems.*` 内容类型；业务依赖通过 `BattleSystemECS.Content.Contracts`。
 - strict production 路径的 legacy damage apply 计数为零；compat 入口仅在显式测试中可用。
+- 2026-09-03 缺口修正 Phase 2：`effect.commit`/`build.effect.commit`/`ability.commit`
+  已更名为 `effect.tick`/`build.effect.tick`/`skill-buff.skill.update`；`combat.player-attack`/
+  `combat.tower-attack` 补齐 `PlayerResources`。随后清掉 `build.skill.update` /
+  `build.auto-skill.update` / `build.global-skill.update` 上不存在的 `AbilityRequests`
+  声明，以及 `post-death.corpse.update` 上不存在的 `EffectRequests` 声明，并重算批准根
+  与 topology hash。
+- 2026-09-03 缺口修正 Phase 3：玩家伤害收口到 `ApplyPlayerDamageAuthority`；
+  `CanApplyPlayerDamageAuthority` 预检 `CanAccept(0,2)`，队列溢出时不消耗 stealth；
+  近战 `AttackInterval` 冷却门控首次生效（含裂变/克隆/死灵继承）；`PlayerDamaged`
+  四站点改发 `applied`；thorns/trample/leap/projectile 保持静默；`EnemyProjectile`
+  改打 `PlayerEntityId`；BossTrailAoe/SuicideBomb 负 CurrentHealth 白名单由守卫测试冻结。
 
 ## M7 复核
 

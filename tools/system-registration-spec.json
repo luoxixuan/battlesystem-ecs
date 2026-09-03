@@ -1,4 +1,4 @@
-﻿{
+{
   "schemaVersion": 3,
   "bootstrap": {
     "prepare": "PrepareInstallation",
@@ -294,7 +294,7 @@
           "providedTokens": []
         },
         {
-          "nodeId": "ability.commit",
+          "nodeId": "skill-buff.skill.update",
           "registrationId": "Skill",
           "phase": "Wave",
           "executionPolicy": "InternalParallelCollectSerialCommit",
@@ -4109,7 +4109,7 @@
           "providedTokens": []
         },
         {
-          "nodeId": "build.effect.commit",
+          "nodeId": "build.effect.tick",
           "registrationId": "FrameScheduler",
           "phase": "Build",
           "executionPolicy": "SerialCommit",
@@ -4274,7 +4274,7 @@
           "providedTokens": []
         },
         {
-          "nodeId": "effect.commit",
+          "nodeId": "effect.tick",
           "registrationId": "FrameScheduler",
           "phase": "Wave",
           "executionPolicy": "SerialCommit",

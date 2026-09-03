@@ -104,9 +104,9 @@ namespace BattleSystemECS.Tests.Framework
                 .GetField("_runtimeComboEffect", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(registry)!;
             var triggers = (System.Collections.Generic.List<TriggerDefinition>)typeof(SystemRegistry)
                 .GetField("_runtimeTriggers", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(registry)!;
-            Assert.Equal(new AttributeKey(0), effect.Modifiers[0].Attribute);
-            Assert.Equal(AttributeModifierOp.Multiply, effect.Modifiers[0].Operation);
-            Assert.Equal(1.2f, effect.Modifiers[0].Magnitude);
+            Assert.Equal(CatalogRegistries.DamageOutputMultiplier, effect.Modifiers[0].Attribute);
+            Assert.Equal(AttributeModifierOp.Add, effect.Modifiers[0].Operation);
+            Assert.Equal(config.Combo.ComboDamageBonusPerKill, effect.Modifiers[0].Magnitude);
             Assert.Equal(3, triggers[0].Threshold);
             registry.WireDependencies(Store, playerId);
             var scheduler = new FrameScheduler(Store, config);

@@ -27,6 +27,7 @@ namespace BattleSystemECS.Core.GAS
         public static TagId SkillTag => _tags["Normal"];
         public static AttributeKey Mana => _attributes["Mana"];
         public static AttributeKey AttackDamage => _attributes["AttackDamage"];
+        public static AttributeKey DamageOutputMultiplier => _attributes["DamageOutputMultiplier"];
         public static TagId EnemyBuffTag => _tags["EnemyBuff"];
         public static TagId TowerSilencedTag => _tags["TowerSilenced"];
         public static TagId DispellableTag => _tags["Dispellable"];

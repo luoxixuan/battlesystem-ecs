@@ -427,7 +427,7 @@ namespace BattleSystemECS.Tests.Framework
             // Bug 回归：删除或绕过任一真实生产节点时，composition 快照必须失败。
             Assert.Equal(FrameAccessReviewCatalog.ReviewedNodeCount-scheduler.FrameGraphDiagnostics.Count,
                 scheduler.FrameGraphPlan.Count);
-            Assert.Equal("8077e0885152522ba2c9297151d9c175dccdbf926d90a4a8235583201d27f45c",scheduler.FrameGraphTopologyHash);
+            Assert.Equal("d02c3bdf3a6f782d1c7417f25178c4ce5d4a4b08c38a3bbb6de1f70036edf3f3",scheduler.FrameGraphTopologyHash);
             Assert.Contains(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="frame.input.publish");
             FrameNodeAdapter publisher=Assert.Single(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="frame.input.publish");
             Assert.Contains(FrameResource.EnemyHealth,publisher.Metadata.Reads);
@@ -438,8 +438,8 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Contains(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="pregame.random-event.callback-dispatch");
             Assert.Contains(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="spawning.wave.callback-dispatch");
             Assert.DoesNotContain(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value.EndsWith("Group",StringComparison.Ordinal));
-            AssertParallelNode(scheduler,"ability.commit",FrameResource.AbilitiesCommitted);
-            AssertCommitNode(scheduler,"effect.commit");
+            AssertParallelNode(scheduler,"skill-buff.skill.update",FrameResource.AbilitiesCommitted);
+            AssertCommitNode(scheduler,"effect.tick");
             AssertCommitNode(scheduler,"attribute.aggregate");
             AssertCommitNode(scheduler,"damage.commit");
             AssertCommitNode(scheduler,"resource.commit");
@@ -485,8 +485,8 @@ namespace BattleSystemECS.Tests.Framework
                     Assert.True(n.Metadata.AccessProfile.RequiresSystemBinding,$"{n.Metadata.Id} must fail when its Registry binding is removed.");
                     Assert.Contains(n.Metadata.AccessProfile.Owner.Value,n.Metadata.RequiredDependencies);
                 });
-            Assert.Equal("registration.Skill.Update(delta)/ability.commit",
-                Assert.Single(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="ability.commit").Metadata.AccessProfile.BindingId.Value);
+            Assert.Equal("registration.Skill.Update(delta)/skill-buff.skill.update",
+                Assert.Single(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="skill-buff.skill.update").Metadata.AccessProfile.BindingId.Value);
             Assert.Equal("registration.Pathfinding.SetTurn(turn)/movement.pathfinding.prepare",
                 Assert.Single(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="movement.pathfinding.prepare").Metadata.AccessProfile.BindingId.Value);
             Assert.Equal("BattleSystemECS.Core.FrameScheduler.GraphBeginFrame/frame.begin",
@@ -541,6 +541,24 @@ namespace BattleSystemECS.Tests.Framework
             AssertProfileResources(scheduler,"movement.enemy.update",
                 new[]{FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.TowerState,FrameResource.PlayerResources,FrameResource.WeatherState,FrameResource.TerrainState},
                 new[]{FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.TowerState,FrameResource.PlayerResources,FrameResource.DamageRequests,FrameResource.ResourceRequests,FrameResource.BossTrailPrepared});
+            AssertProfileResources(scheduler,"combat.player-attack.update",
+                new[]{FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.EnemyPosition,FrameResource.PlayerAttributes,FrameResource.PlayerResources,FrameResource.ComputedAttributes,FrameResource.PlayerAttackPrepared},
+                new[]{FrameResource.EnemyControl,FrameResource.PlayerAttributes,FrameResource.PlayerResources,FrameResource.DamageRequests,FrameResource.ResourceRequests,FrameResource.DeathQueue,FrameResource.GameplayEvents,FrameResource.PresentationEvents});
+            AssertProfileResources(scheduler,"combat.tower-attack.update",
+                new[]{FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.TowerState,FrameResource.TowerCombatCache,FrameResource.PlayerAttributes,FrameResource.PlayerResources,FrameResource.ComputedAttributes,FrameResource.SpatialIndex,FrameResource.WeatherState,FrameResource.ProjectileState,FrameResource.TowerAttackPrepared},
+                new[]{FrameResource.TowerState,FrameResource.EnemyControl,FrameResource.PlayerResources,FrameResource.DamageRequests,FrameResource.ResourceRequests,FrameResource.DeathQueue,FrameResource.ProjectileState,FrameResource.GameplayEvents,FrameResource.PresentationEvents,FrameResource.DodgePrepared});
+            AssertProfileResources(scheduler,"build.skill.update",
+                new[]{FrameResource.PlayerResources,FrameResource.PlayerAttributes,FrameResource.PlayerSnapshotState,FrameResource.EntityLifecycle},
+                new[]{FrameResource.PlayerResources,FrameResource.ResourceRequests,FrameResource.PlayerSnapshotState});
+            AssertProfileResources(scheduler,"build.auto-skill.update",
+                new[]{FrameResource.PlayerResources,FrameResource.PlayerAttributes,FrameResource.PlayerSnapshotState,FrameResource.EntityLifecycle},
+                new[]{FrameResource.ResourceRequests,FrameResource.PlayerSnapshotState});
+            AssertProfileResources(scheduler,"build.global-skill.update",
+                new[]{FrameResource.PlayerResources,FrameResource.PlayerAttributes,FrameResource.TowerState},
+                new[]{FrameResource.PlayerResources,FrameResource.TowerState,FrameResource.ResourceRequests});
+            AssertProfileResources(scheduler,"post-death.corpse.update",
+                new[]{FrameResource.PrimaryDeathsResolved,FrameResource.CorpseState,FrameResource.EnemyPosition,FrameResource.EnemyControl,FrameResource.TowerState},
+                new[]{FrameResource.CorpseState,FrameResource.DamageRequests,FrameResource.ActiveEffects,FrameResource.AttributeModifiers,FrameResource.EnemyControl,FrameResource.EnemyMovement,FrameResource.TowerState});
             Assert.Contains(scheduler.FrameGraphDiagnostics,d=>d.NodeId.Value=="combat.energy.update"&&d.Policy==OptionalDependencyPolicy.Disabled);
             Assert.Contains(scheduler.FrameGraphDiagnostics,d=>d.NodeId.Value=="ai.lifesteal.update"&&d.Policy==OptionalDependencyPolicy.Disabled);
             Assert.Same(registry.Sapper,scheduler.AI.Sapper);
@@ -648,7 +666,7 @@ namespace BattleSystemECS.Tests.Framework
             var scheduler=new FrameScheduler(Store,Config);
             registry.AssignToGroups(scheduler);
             FrameNodeAdapter original=Assert.Single(scheduler.FrameGraphPlan,
-                node=>node.Metadata.Id.Value=="ability.commit");
+                node=>node.Metadata.Id.Value=="skill-buff.skill.update");
             FrameNodeMetadata metadata=original.Metadata;
             FrameBindingId changedBinding=metadata.AccessProfile.BindingId.Value+"/changed";
             Assert.True(FrameAccessReviewCatalog.TryCreate(metadata.Id.Value,changedBinding,metadata.ActivePhases,
@@ -685,7 +703,7 @@ namespace BattleSystemECS.Tests.Framework
             var scheduler=new FrameScheduler(Store,Config);
             registry.AssignToGroups(scheduler);
             FrameNodeAdapter original=Assert.Single(scheduler.FrameGraphPlan,
-                node=>node.Metadata.Id.Value=="ability.commit");
+                node=>node.Metadata.Id.Value=="skill-buff.skill.update");
             FrameNodeMetadata source=original.Metadata;
             var variants=new[]
             {
@@ -762,7 +780,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal($"ProductionRegistry:{runtime.Scheduler.FrameGraphTopologyHash};Scenario=Gameplay;WaveSpawning=Enabled",runtime.Fingerprint);
             Assert.Equal(FrameAccessReviewCatalog.ApprovedFingerprintRootGameplay,
                 runtime.Scheduler.FrameGraphReviewRoot);
-            Assert.Contains(runtime.Scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="effect.commit");
+            Assert.Contains(runtime.Scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="effect.tick");
             Assert.NotNull(runtime.Registry.WaveSpawning);
             Assert.NotNull(runtime.Registry.Skill);
             Assert.Contains(runtime.Scheduler.FrameGraphDiagnostics,d=>
@@ -796,7 +814,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(1,mode4.StateEntryCount(GameState.WavePhase));
             Assert.Contains(";Scenario=FixedPopulationBenchmark;WaveSpawning=Suppressed;Population=64;WaveStart=Suppressed",
                 mode4.CompositionFingerprint,StringComparison.Ordinal);
-            Assert.StartsWith("ProductionRegistry:3ad80041065ca9efb7d8011aec314b8a01baf2008c463732d4466d02fe5e0d31",
+            Assert.StartsWith("ProductionRegistry:4621d8a2e09aedc87d09153e6055ca4b2b05f119892e3d77c6abe5cfeeb83444",
                 mode4.CompositionFingerprint,StringComparison.Ordinal);
             Assert.Equal(Systems.BenchmarkCompositionContract.ProductionRegistryGraph,mode5.Composition);
             Assert.Equal(4,mode5.FramesExecuted);
@@ -833,9 +851,9 @@ namespace BattleSystemECS.Tests.Framework
             var fixedPopulation=Systems.BenchmarkCompositionFactory.Create(fixedWorld.Store,fixedWorld.Config,
                 fixedWorld.Renderer,fixedPlayer,scenarioKind:FrameScenarioKind.FixedPopulationBenchmark);
             Assert.NotEqual(gameplay.Scheduler.FrameGraphTopologyHash,fixedPopulation.Scheduler.FrameGraphTopologyHash);
-            Assert.Equal("8077e0885152522ba2c9297151d9c175dccdbf926d90a4a8235583201d27f45c",
+            Assert.Equal("d02c3bdf3a6f782d1c7417f25178c4ce5d4a4b08c38a3bbb6de1f70036edf3f3",
                 gameplay.Scheduler.FrameGraphTopologyHash);
-            Assert.Equal("3ad80041065ca9efb7d8011aec314b8a01baf2008c463732d4466d02fe5e0d31",
+            Assert.Equal("4621d8a2e09aedc87d09153e6055ca4b2b05f119892e3d77c6abe5cfeeb83444",
                 fixedPopulation.Scheduler.FrameGraphTopologyHash);
             Assert.NotEqual(gameplay.Scheduler.FrameGraphReviewRoot,fixedPopulation.Scheduler.FrameGraphReviewRoot);
             Assert.Equal(FrameAccessReviewCatalog.ApprovedFingerprintRootGameplay,gameplay.Scheduler.FrameGraphReviewRoot);

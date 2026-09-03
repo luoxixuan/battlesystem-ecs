@@ -271,6 +271,7 @@ namespace BattleSystemECS.Systems
             float baseArmor = 0f;
             float baseShield = 0f;
             float baseMagicResist = 0f;
+            float baseAttackInterval = 0f;
 
             if (_gameConfig.MonsterTypes != null)
             {
@@ -285,6 +286,7 @@ namespace BattleSystemECS.Systems
                         baseArmor = mc.Armor;
                         baseShield = mc.Shield;
                         baseMagicResist = mc.MagicResist;
+                        baseAttackInterval = mc.AttackInterval;
                         break;
                     }
                 }
@@ -310,6 +312,7 @@ namespace BattleSystemECS.Systems
 
             if (minionId < 0) return -1; // Pool exhausted — corpse already claimed; minion won't spawn
 
+            _store.SetEnemyAttackInterval(minionId, baseAttackInterval);
             // Mark as reanimated (shared flag for both necromancer + mass-resurrect paths)
             _store.EnemyIsReanimated[minionId] = true;
             _store.EnemyOwnerId[minionId] = ownerId;

@@ -195,13 +195,13 @@ Terrain.Execute()         # 地形/变异/变形（enemyDt）
 CombatSetup.Execute()     # 战斗系统 SetTurn 缓存（enemyDt）
 Spatial.Execute()         # 空间网格重建 + 巡逻/时光/迷雾/预警（enemyDt）
 Combat.Execute()          # 攻击/协同/光环/投射物（combatDt，全速）
-SkillBuff.Execute()       # 技能结算 + DoT + 流血（combatDt）
+SkillBuff.Execute()       # 技能结算 + DoT + 流血（combatDt）；节点为 effect.tick / skill-buff.skill.update
 ResolveEnemiesKilledThisFrame()  # 帧末统一死亡结算（dt-free）
 PostDeath.Execute()       # 分裂/生命链接/目标/资源/尸体/连击（combatDt）
 Threat Score EMA 更新      # 玩家 DPS 威胁分指数滑动平均
 ```
 
-> 说明：bullet-time（子弹时间）开启时，`enemyDt`（敌人侧 7 个 group）按比例减速，`combatDt`（玩家/塔攻击侧）保持全速——战术暂停效果。BuildPhase 只运行 `BuildGroup`，不运行任何战斗系统。
+> 说明：bullet-time（子弹时间）开启时，`enemyDt`（敌人侧 7 个 group）按比例减速，`combatDt`（玩家/塔攻击侧）保持全速——战术暂停效果。BuildPhase 只运行 `BuildGroup`，不运行任何战斗系统。SkillBuff 真实节点是 `effect.tick`（Periodic）与 `skill-buff.skill.update`（SkillSystem.Update）；旧 id `effect.commit` / `ability.commit` 已删除。`build.skill/auto-skill/global-skill.update` 与 `post-death.corpse.update` 不再声明不存在的 AbilityRequests/EffectRequests。
 
 ### 4.3 两阶段并行安全模式
 
@@ -355,11 +355,12 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 |------|------|
 | 添加新组件字段 | 对应领域的 `Core/ComponentStore_Xxx.cs` |
 | 添加新系统 | `Systems/XxxSystem.cs` + `Core/SystemRegistry.cs` 属性 + `Core/SystemRegistrationRecipes.cs` typed recipe + schema v3 `tools/system-registration-spec.json`；运行生成器同步 manifest/ledger，并由 installer/Seal 校验 |
-| 修改帧顺序 | `Core/FrameScheduler.cs` 的 `RunWavePhase()` 方法 |
+| 修改帧顺序 | `Core/FrameSystemGraph.cs`（节点 reads/writes 与更名）+ `Core/FrameBindingFacts.cs`；生产 Tick 前必须 `SealGraphComposition` |
 | 添加事件发射 | 逻辑→渲染走 `Core/IBattleEventBus.cs`；系统间走 `Core/EventBus.cs` + `Core/GameEvents.cs`（DTO） |
 | 修改并行策略 | 对应系统的 `Update()`，注意两阶段模式审查 |
 | 修改配置格式 | `Core/GameConfig.cs` + `Core/GameConfigLoader.cs` + `Data/Configs/*.json` |
 | 修改技能/效果 | `Core/GAS/*.cs` + `Systems/SkillSystem.cs` + `game_config.json` Skills 数组（玩家技能栏）；共享技能表（SkillDefs）= `Data/Configs/skills.json`（精选）+ `Data/Skills/*.json`（静态）。技能 id/name 互解析统一走 `GameConfig.GetSkillIdByName / TryGetSkillById / GetSkillDisplayName`（归一化索引空间：[0, SkillDefs.Count) 索引共享表，其后偏移索引 Skills），消费方禁止各自手写遍历 |
+| 玩家伤害写入 | 生产路径只走 `ComponentStore.ApplyPlayerDamageAuthority`（`ResourceResolver.TryApply(PlayerDamageRequest)`）；`DecreasePlayerHealth` 仅允许 `ResourceResolver` 调用 |
 | 修改科技树 | `Core/TechTreeDef.cs` + `Systems/TechTreeSystem.cs` + `Data/Configs/tech_tree.json` |
 | 修改行为树 | `Data/Configs/behavior_trees.json` + `Systems/BehaviorTreeEvaluator.cs` |
 | 修改 Polyfill | `Core/{IsExternalInit,Rng,PolyfillExtensions}.cs`（经 Linked Files 编译进 Core 库） |

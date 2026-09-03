@@ -6,6 +6,7 @@ using BattleSystemECS.Components;
 using BattleSystemECS.Core;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
+using BattleSystemECS.Core.GAS;
 
 namespace BattleSystemECS.Tests.Features.Buffs
 {
@@ -222,6 +223,101 @@ namespace BattleSystemECS.Tests.Features.Buffs
             Assert.NotEqual(-1, near); // sanity: placed successfully
             bus.PlayerDamaged.Publish(new PlayerDamagedEvent { Damage = 20f, RemainingHealth = 180f });
             Assert.Equal(RallyConfig.RallyAtkSpdBonus, Store.TowerRallyAtkSpdBonus[near], 3);
+        }
+
+        [Fact]
+        public void MeleePlayerDamaged_PublishesAppliedAmount_AndActivatesRally()
+        {
+            var (sys, tid, bus) = MakeSystem();
+            float? publishedDamage = null;
+            bus.PlayerDamaged.Subscribe(ev => publishedDamage = ev.Damage);
+
+            Store.PlayerCurrentHealth[PlayerId] = 100f;
+            Store.PlayerShield[PlayerId] = 10f;
+            int eid = Enemy(e =>
+            {
+                e.X = 0f;
+                e.Y = 0f;
+                e.Health = 50f;
+                e.Damage = 25f;
+            });
+            Store.SetEnemyAttackInterval(eid, 0f);
+
+            var ability = new EnemyAbilitySystem(Store, Renderer, PlayerId, Config);
+            var ai = new EnemyAISystem(Store, Renderer, PlayerId, Config, ability, eventBus: bus);
+            ai.SetTurn(1, 0.016f);
+            ai.InvokeExecuteActionEnum(eid, EnemyActionType.AttackMelee);
+
+            Assert.NotNull(publishedDamage);
+            // applied = shield 10 + health 15
+            Assert.Equal(25f, publishedDamage.Value, 3);
+            Assert.Equal(0f, Store.PlayerShield[PlayerId], 3);
+            Assert.Equal(85f, Store.PlayerCurrentHealth[PlayerId], 3);
+            Assert.True(Store.PlayerRallyActive[PlayerId]);
+            Assert.Equal(RallyConfig.RallyAtkSpdBonus, Store.TowerRallyAtkSpdBonus[tid], 3);
+        }
+
+        [Fact]
+        public void ThornsDamage_DoesNotPublishPlayerDamaged_OrActivateRally()
+        {
+            var (sys, tid, bus) = MakeSystem();
+            int publishCount = 0;
+            bus.PlayerDamaged.Subscribe(_ => publishCount++);
+
+            Store.PlayerCurrentHealth[PlayerId] = 180f;
+            int eid = Enemy(e =>
+            {
+                e.X = 1f;
+                e.Y = 0f;
+                e.Health = 200f;
+                e.Damage = 0f;
+            });
+            Store.EnemyThornsRatio[eid] = 1f;
+            int attackTower = RawTower(0, 0, TowerType.Basic, damage: 20f, range: 5, speed: 10f);
+            Store.TowerLastAttackTime[attackTower] = 0f;
+
+            float hpBefore = Store.PlayerCurrentHealth[PlayerId];
+            var attack = new TowerAttackSystem(Store, Renderer);
+            Store.BeginFrame();
+            RebuildGrid();
+            attack.SetTurn(1);
+            attack.Update(1f);
+
+            Assert.True(Store.PlayerCurrentHealth[PlayerId] < hpBefore);
+            Assert.Equal(0, publishCount);
+            Assert.False(Store.PlayerRallyActive[PlayerId]);
+            Assert.Equal(0f, Store.TowerRallyAtkSpdBonus[tid]);
+        }
+
+        [Fact]
+        public void TrampleDamage_DoesNotPublishPlayerDamaged_OrActivateRally()
+        {
+            var (sys, tid, bus) = MakeSystem();
+            int publishCount = 0;
+            bus.PlayerDamaged.Subscribe(_ => publishCount++);
+
+            Store.PlayerCurrentHealth[PlayerId] = 180f;
+            Store.PositionX[PlayerId] = 0f;
+            Store.PositionY[PlayerId] = 0f;
+
+            int trampler = Enemy(e =>
+            {
+                e.X = 0f;
+                e.Y = 0f;
+                e.Health = 500f;
+                e.Damage = 0f;
+                e.MoveSpeed = 0f;
+            });
+            Store.EnemyTrampleRadius[trampler] = 2f;
+            Store.EnemyTrampleDamagePerStep[trampler] = 12f;
+
+            // 直接走权威入口模拟 trample 静默站点（不经 PlayerDamaged）。
+            Assert.True(Store.ApplyPlayerDamageAuthority(trampler, PlayerId, 12f));
+
+            Assert.Equal(168f, Store.PlayerCurrentHealth[PlayerId], 3);
+            Assert.Equal(0, publishCount);
+            Assert.False(Store.PlayerRallyActive[PlayerId]);
+            Assert.Equal(0f, Store.TowerRallyAtkSpdBonus[tid]);
         }
     }
 }

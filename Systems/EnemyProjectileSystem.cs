@@ -29,17 +29,17 @@ namespace BattleSystemECS.Systems
         private bool[] _eprojActive = new bool[MAX_ENEMY_PROJ];
         private int _activeEnemyProjectileCount;
 
-        // Ping-pong damage queue: (playerId, damage) — applied serial at frame end
-        private List<(int playerId, float damage)>[] _damageQueue =
-            new List<(int, float)>[2];
+        // Ping-pong damage queue: (playerId, damage, ownerEnemyId) — applied serial at frame end
+        private List<(int playerId, float damage, int ownerEnemyId)>[] _damageQueue =
+            new List<(int, float, int)>[2];
         private readonly object _damageQueueLock = new object();
         private int _damageQueueIdx;
 
         public EnemyProjectileSystem(ComponentStore store)
         {
             this.store = store;
-            _damageQueue[0] = new List<(int, float)>(128);
-            _damageQueue[1] = new List<(int, float)>(128);
+            _damageQueue[0] = new List<(int, float, int)>(128);
+            _damageQueue[1] = new List<(int, float, int)>(128);
             for (int i = 0; i < MAX_ENEMY_PROJ; i++)
             {
                 _eprojTargetId[i] = -1;
@@ -149,11 +149,12 @@ namespace BattleSystemECS.Systems
                 _eprojX[i] += _eprojVelX[i] * deltaTime;
                 _eprojY[i] += _eprojVelY[i] * deltaTime;
 
-                // Hit detection: check proximity to target (player base at fixed location)
-                // Player base position is store.PositionX[1], store.PositionY[1]
-                // For intercept mode, we just check distance to player base position
-                float baseX = store.PositionX[1]; // player entity
-                float baseY = store.PositionY[1];
+                // Hit detection against the live player entity (not hardcoded slot 1).
+                int playerEntityId = store.PlayerEntityId;
+                if ((uint)playerEntityId >= ComponentStore.MAX_PLAYERS || !store.PositionActive[playerEntityId])
+                    continue;
+                float baseX = store.PositionX[playerEntityId];
+                float baseY = store.PositionY[playerEntityId];
                 float dxBase = baseX - _eprojX[i];
                 float dyBase = baseY - _eprojY[i];
                 float proximitySq = dxBase * dxBase + dyBase * dyBase;
@@ -180,21 +181,22 @@ namespace BattleSystemECS.Systems
             int writeIdx = 1 - _damageQueueIdx;
             _damageQueueIdx = writeIdx;
             _damageQueue[writeIdx].Clear();
-            foreach (var (playerId, damage) in _damageQueue[readIdx])
+            foreach (var (playerId, damage, ownerEnemyId) in _damageQueue[readIdx])
             {
-                store.DecreasePlayerHealth(playerId, damage);
+                store.ApplyPlayerDamageAuthority(ownerEnemyId, playerId, damage);
             }
             _damageQueue[readIdx].Clear();
         }
 
         private void ResolveHitPlayer(int projId)
         {
-            int playerId = 1; // default player
+            int playerId = store.PlayerEntityId;
             float damage = _eprojDamage[projId];
+            int ownerEnemyId = _eprojOwnerEnemyId[projId];
 
             lock (_damageQueueLock)
             {
-                _damageQueue[_damageQueueIdx].Add((playerId, damage));
+                _damageQueue[_damageQueueIdx].Add((playerId, damage, ownerEnemyId));
             }
         }
 

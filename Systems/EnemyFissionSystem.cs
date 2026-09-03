@@ -144,6 +144,7 @@ namespace BattleSystemECS.Systems
 
                 // Inherit behavior tree from parent
                 store.EnemyBehaviorTree[childId] = store.EnemyBehaviorTree[parentId];
+                store.SetEnemyAttackInterval(childId, store.EnemyAttackInterval[parentId]);
 
                 // Set fission capability
                 store.EnemyFissionDefId[childId] = parentFissionDefId;

@@ -55,6 +55,11 @@ namespace BattleSystemECS.Systems
             new List<(EntityHandle, float, int)>[2];
         private readonly object _damageQueueLock = new object();
         private int _damageQueueIdx;
+        // Thorns reflect queue: drained after damage queue without holding _damageQueueLock,
+        // so GameplayCommitLock is never nested under the projectile lock.
+        private List<(int playerId, float damage, int enemyId)>[] _thornsQueue =
+            new List<(int, float, int)>[2];
+        private int _thornsQueueIdx;
         // RNG used for projectile deflection roll (serial path, no thread-safety needed).
         // Kept here rather than in store so ProjectileSystem is self-contained and testable in isolation.
         private readonly System.Random _deflectRng = new System.Random(0xDEFE17);
@@ -67,6 +72,8 @@ namespace BattleSystemECS.Systems
             _eventBus = eventBus ?? NullEventBus.Instance;
             _damageQueue[0] = new List<(EntityHandle, float, int)>(256);
             _damageQueue[1] = new List<(EntityHandle, float, int)>(256);
+            _thornsQueue[0] = new List<(int, float, int)>(64);
+            _thornsQueue[1] = new List<(int, float, int)>(64);
             for (int i = 0; i < MAX_PROJ; i++)
             {
                 _projTargetId[i] = -1;
@@ -419,6 +426,16 @@ namespace BattleSystemECS.Systems
                         store.AllocateGameplaySequence(target.Index), ownerPlayerId: playerId));
             }
             _damageQueue[readIdx].Clear();
+
+            int thornsRead = _thornsQueueIdx;
+            int thornsWrite = 1 - _thornsQueueIdx;
+            _thornsQueueIdx = thornsWrite;
+            _thornsQueue[thornsWrite].Clear();
+            foreach (var (playerId, thornsDamage, enemyId) in _thornsQueue[thornsRead])
+            {
+                store.ApplyPlayerDamageAuthority(enemyId, playerId, thornsDamage);
+            }
+            _thornsQueue[thornsRead].Clear();
         }
 
         private void ResolveHit(int projId)
@@ -477,14 +494,13 @@ namespace BattleSystemECS.Systems
                 }
             }
 
-            // Thorns reflect: enemy reflects a fraction of projectile damage
+            // Thorns reflect: enemy reflects a fraction of projectile damage (queued, drained without lock)
             float thornsRatio = store.EnemyThornsRatio[targetId];
             if (thornsRatio > 0f && damage > 0f)
             {
                 lock (_damageQueueLock)
                 {
-                    // Thorns damage goes to player — use DecreasePlayerHealth
-                    store.DecreasePlayerHealth(playerId, damage * thornsRatio);
+                    _thornsQueue[_thornsQueueIdx].Add((playerId, damage * thornsRatio, targetId));
                 }
             }
 

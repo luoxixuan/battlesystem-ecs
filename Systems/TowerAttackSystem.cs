@@ -92,7 +92,7 @@ namespace BattleSystemECS.Systems
         private int _healQueueIdx = 0;
 
         // Ping-pong double-buffer for thorns damage reflect (enemy -> player)
-        private List<(int playerId, float damage)>[] _thornsQueue = new List<(int, float)>[2];
+        private List<(int playerId, float damage, int enemyId)>[] _thornsQueue = new List<(int, float, int)>[2];
         private int _thornsQueueIdx = 0;
 
         // Cached player armor stats (updated each SetTurn)
@@ -155,7 +155,7 @@ namespace BattleSystemECS.Systems
             public readonly List<(int enemyId,int towerId)> Debuff = new List<(int,int)>(8);
             public readonly List<(int enemyId,int towerId,float armorShred,int invulnFrames)> OnHit = new List<(int,int,float,int)>(4);
             public readonly List<(int playerId,float healAmount)> Heal = new List<(int,float)>(2);
-            public readonly List<(int playerId,float damage)> Thorns = new List<(int,float)>(2);
+            public readonly List<(int playerId,float damage,int enemyId)> Thorns = new List<(int,float,int)>(2);
             public readonly List<(int chainId,int enemyId,float damage,int playerId,int towerId)> Chain = new List<(int,int,float,int,int)>(4);
             public readonly List<(int primaryEnemyId,float splashDamage,int playerId,int towerId)> Splash = new List<(int,float,int,int)>(4);
             public readonly List<(int bounceLevel,int enemyId,float damage,int playerId,int towerId)> Bounce = new List<(int,int,float,int,int)>(4);
@@ -193,7 +193,7 @@ namespace BattleSystemECS.Systems
             List<(int enemyId, int towerId)> debuff = _debuffQueue[_debuffQueueIdx];
             List<(int enemyId, int towerId, float armorShred, int invulnFrames)> onHit = _onHitStateQueue[_onHitStateQueueIdx];
             List<(int playerId, float healAmount)> heal = _healQueue[_healQueueIdx];
-            List<(int playerId, float damage)> thorns = _thornsQueue[_thornsQueueIdx];
+            List<(int playerId, float damage, int enemyId)> thorns = _thornsQueue[_thornsQueueIdx];
             List<(int chainId, int enemyId, float damage, int playerId, int towerId)> chain = _chainDamageQueue[_chainDamageQueueIdx];
             List<(int primaryEnemyId, float splashDamage, int playerId, int towerId)> splash = _splashDamageQueue[_splashDamageQueueIdx];
             List<(int bounceLevel, int enemyId, float damage, int playerId, int towerId)> bounce = _bounceDamageQueue[_bounceDamageQueueIdx];
@@ -247,8 +247,8 @@ namespace BattleSystemECS.Systems
             _onHitStateQueue[1] = new List<(int, int, float, int)>(256);
             _healQueue[0] = new List<(int, float)>(64);
             _healQueue[1] = new List<(int, float)>(64);
-            _thornsQueue[0] = new List<(int, float)>(64);
-            _thornsQueue[1] = new List<(int, float)>(64);
+            _thornsQueue[0] = new List<(int, float, int)>(64);
+            _thornsQueue[1] = new List<(int, float, int)>(64);
             _chainDamageQueue[0] = new List<(int, int, float, int, int)>(64);
             _chainDamageQueue[1] = new List<(int, int, float, int, int)>(64);
             _splashDamageQueue[0] = new List<(int, float, int, int)>(64);
@@ -2000,7 +2000,7 @@ namespace BattleSystemECS.Systems
                 if (thornsRatio > 0f && finalDmg > 0f)
                 {
                     float thornsDamage = finalDmg * thornsRatio;
-                    _thornsQueue[_thornsQueueIdx].Add((playerId, thornsDamage));
+                    _thornsQueue[_thornsQueueIdx].Add((playerId, thornsDamage, enemyId));
                 }
                 // Round 67: On-Hit / On-Crit trigger event publication (tower attack path).
                 // EnemyHit fires for every applied hit. EnemyCrit fires only for damage entries
@@ -2339,7 +2339,7 @@ namespace BattleSystemECS.Systems
             if (thornsRatio > 0f && finalLinkedDmg > 0f)
             {
                 float thornsDamage = finalLinkedDmg * thornsRatio;
-                _thornsQueue[_thornsQueueIdx].Add((playerId, thornsDamage));
+                _thornsQueue[_thornsQueueIdx].Add((playerId, thornsDamage, linkedEnemyId));
             }
 
             if (store.IsEnemyPendingDeath(linkedEnemyId)) store.QueueTowerKill(linkedEnemyId, playerId, -1);
@@ -2390,7 +2390,7 @@ namespace BattleSystemECS.Systems
             if (partnerThorns > 0f && finalShared > 0f)
             {
                 float thornsDamage = finalShared * partnerThorns;
-                _thornsQueue[_thornsQueueIdx].Add((playerId, thornsDamage));
+                _thornsQueue[_thornsQueueIdx].Add((playerId, thornsDamage, partnerId));
             }
 
             // Tether shared damage can also kill the partner — queue death + kill
@@ -2697,10 +2697,10 @@ namespace BattleSystemECS.Systems
             _thornsQueueIdx = writeIdx;
             _thornsQueue[writeIdx].Clear();
 
-            foreach (var (playerId, thornsDamage) in _thornsQueue[readIdx])
+            foreach (var (playerId, thornsDamage, enemyId) in _thornsQueue[readIdx])
             {
                 if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) continue;
-                store.DecreasePlayerHealth(playerId, thornsDamage);
+                store.ApplyPlayerDamageAuthority(enemyId, playerId, thornsDamage);
             }
         }
 

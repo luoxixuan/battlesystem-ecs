@@ -113,7 +113,7 @@ namespace BattleSystemECS.Core.GAS
             int maxStacks = spec.DamageBonusPerKill > 0f ? Math.Max(1, (int)Math.Ceiling((spec.MaxMultiplier - 1f) / spec.DamageBonusPerKill)) : 1;
             var effects = new List<GameplayEffectDefinition>(catalog.Effects);
             effects.Add(new GameplayEffectDefinition(new EffectId(effectId), EffectType.Duration,
-                new[] { new ModifierDefinition(CatalogRegistries.AttackDamage, AttributeModifierOp.Multiply, 1f + spec.DamageBonusPerKill) },
+                new[] { new ModifierDefinition(CatalogRegistries.DamageOutputMultiplier, AttributeModifierOp.Add, spec.DamageBonusPerKill) },
                 0f, 0f, ClockId.Combat, StackingBehavior.MaxStacksRefresh, maxStacks, RefreshPolicy.StacksAndDuration,
                 SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent, CatalogRegistries.SkillTag, Array.Empty<ExecutionId>(),
                 stackKey: CatalogRegistries.SkillTag));
@@ -698,7 +698,7 @@ namespace BattleSystemECS.Core.GAS
                             var grantedTags = ParseTags(mod, "GrantedTags", canonicalSkillsPath, id);
                             var blockedEffectTags = ParseTags(mod, "BlockedTags", canonicalSkillsPath, id);
                             EnsureNoTagConflict(grantedTags, blockedEffectTags, canonicalSkillsPath, id, "effect");
-                            effects.Add(new GameplayEffectDefinition(new EffectId(effectIndex), period > 0 ? EffectType.Periodic : EffectType.Duration, Array.Empty<ModifierDefinition>(), Number(mod, "Duration", duration, canonicalSkillsPath, id), period, ClockId.Combat, stacking, maxStacks, stacking == StackingBehavior.None ? RefreshPolicy.None : RefreshPolicy.Duration, SourceDeathPolicy.Persist, modType == "CrowdControl" ? EffectPayloadKind.CrowdControl : EffectPayloadKind.Damage, tag, new[] { executions[executions.Count - 1].Id }, grantedTags, blockedEffectTags));
+                            effects.Add(new GameplayEffectDefinition(new EffectId(effectIndex), period > 0 ? EffectType.Periodic : EffectType.Duration, Array.Empty<ModifierDefinition>(), Number(mod, "Duration", duration, canonicalSkillsPath, id), period, ClockId.Combat, stacking, maxStacks, stacking == StackingBehavior.None ? RefreshPolicy.None : RefreshPolicy.Duration, SourceDeathPolicy.Persist, modType == "CrowdControl" ? EffectPayloadKind.CrowdControl : EffectPayloadKind.Damage, tag, new[] { executions[executions.Count - 1].Id }, grantedTags, blockedEffectTags, periodicMagnitude: magnitude));
                             effectIds.Add(new EffectId(effectIndex));
                             AddAlias(aliases, modName, new AbilityId(id), canonicalSkillsPath);
                         }

@@ -1,5 +1,30 @@
 # 更新记录 (Changelog)
 
+### 2026-09-03（ECS+GAS 缺口修正 — overflow 预检与剩余假 Request 声明）
+- `CanApplyPlayerDamageAuthority` 增加 `CanAccept(0,2)`：队列溢出时近战预检失败，不重置 stealth、不 Commit 冷却。
+- `build.skill.update` / `build.auto-skill.update` / `build.global-skill.update` 去掉不存在的 `AbilityRequests`；`post-death.corpse.update` 去掉不存在的 `EffectRequests`；重算批准根与 topology hash。
+- 裂变/克隆继承父体 `AttackInterval`；死灵召唤写入怪物表 `AttackInterval`。
+
+### 2026-09-03（ECS+GAS 缺口修正 Phase 3 — 玩家伤害权威收口，⚠️ 有数值变化）
+- **近战攻击冷却首次生效**：怪物 `AttackInterval` 写入 SOA 并门控 `attack_melee` / `can_attack`；相对旧实现（每帧可打）接触战 DPS **显著下降**，同时把 Resource 事件量从 O(接触敌人数/帧) 压到冷却节奏。
+- 10 个生产绕过点统一走 `ApplyPlayerDamageAuthority`；`EnemyAI`/`EnemyAbility` 的 legacy `PlayerDamaged` 改为发布 `applied`（含护盾消耗）；thorns/trample/leap/projectile 保持静默（Rally 不新启用）。
+- `EnemyProjectile` 命中目标改为 `PlayerEntityId`（修硬编码槽位 1）；`ProjectileSystem` thorns 独立 ping-pong，避免把 `GameplayCommitLock` 嵌进 damage 锁。
+- `ai.enemy.update` adapter 闭包文案更新后重算 Gameplay/FixedPopulation topology hash（批准根未变）。
+- `CombatGoldenReplayTests` 手工 Direct composition 在 Tick 前补 `SealGraphComposition`，修复图封印门禁回归。
+
+### 2026-09-03（ECS+GAS 缺口修正 Phase 2 — FrameGraph 声明诚实化）
+- 移除 `effect.tick` / `build.effect.tick` / `skill-buff.skill.update` / ability.reject 节点上与真实执行不符的 `AbilityRequests`/`EffectRequests` 声明；删除死代码 `CombatWrite`。
+- `combat.player-attack.update` / `combat.tower-attack.update` 补齐 `PlayerResources`（及 player-attack 的 `ResourceRequests`）漏声明。
+- 节点更名：`effect.commit`→`effect.tick`、`build.effect.commit`→`build.effect.tick`、`ability.commit`→`skill-buff.skill.update`；同步 BindingFacts / AdapterCatalog / AccessReview / spec / manifest，并重算 Gameplay/FixedPopulation 批准根与 topology hash。
+
+### 2026-09-03（ECS+GAS 缺口修正 Phase 1 — 属性键与 combo 语义，⚠️ 有数值变化）
+- **玩家 combo**：由 `(1+b)^n`（Multiply on AttackDamage）改为 `1+n*b`（Add on DamageOutputMultiplier），与 `maxStacks` 公式及 legacy `GetComboDamageMultiplier` 一致；相对旧实现**变弱**。
+- **塔首次获得 combo 增伤**：塔 base 迁到 AttackDamage（key 0），投影为 `computed(key0)*computed(key8,1)`，HitConfirmed combo 挂到塔源后 `GetTowerAttackDamage` 生效；相对旧实现**变强**。
+- **Ability magnitude**：`ResolveMagnitude` 对敌人/塔/玩家统一读三条 projection，Multiplier 能力伤害首次吃 `DamageOutputMultiplier`；相对旧实现**变强**。
+
+### 2026-09-03（ECS+GAS 缺口修正 Phase 0 — Periodic magnitude 编译丢失）
+- curated Debuff+DoT 技能（Poison Nova / Dragon Breath / Meteor Strike）编译 Periodic effect 时补传 `periodicMagnitude`；CatalogValidator 启动期拒绝 Magnitude≤0 的非 GameplayEvent Periodic，避免激活时帧内抛异常。
+
 ### 2026-09-03（M8 稳定观察与存储决策，有界候选）
 - 死亡 ping-pong 提交只清 prepared read bag，回调重入排入 write bag 的级联死亡可在同帧再次 resolve 或跨 `BeginFrame` 精确提交一次；blocked batch、新死亡、奖励、`KillConfirmed` 与 pending guard 均有回归覆盖。
 - `OnEnemyKilled` / `OnTowerKill` 改为注册期构建 subscriber array，dispatch 无 `GetInvocationList()` 分配；单个订阅者抛错不再阻断后续订阅者、销毁或事实 commit，完成整批副作用后重抛首异常。

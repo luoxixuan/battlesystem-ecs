@@ -58,6 +58,12 @@ namespace BattleSystemECS.Core.GAS
                     if (effect.Type == EffectType.Instant && effect.DurationPolicy != DurationPolicy.Instant) throw new CatalogValidationException($"{path}: instant effect {effect.Id.Value} has incompatible duration policy");
                     if (effect.Type == EffectType.Duration && (effect.DurationPolicy != DurationPolicy.Duration && effect.DurationPolicy != DurationPolicy.Infinite || effect.Periodic.HasValue)) throw new CatalogValidationException($"{path}: duration effect {effect.Id.Value} has incompatible duration policy/spec");
                     if (effect.Type == EffectType.Periodic && (effect.DurationPolicy != DurationPolicy.Duration || !effect.Periodic.HasValue)) throw new CatalogValidationException($"{path}: periodic effect {effect.Id.Value} has incompatible duration policy/spec");
+                    if (effect.Type == EffectType.Periodic && effect.Periodic.HasValue
+                        && effect.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent
+                        && (effect.Periodic.Value.Magnitude <= 0f
+                            || float.IsNaN(effect.Periodic.Value.Magnitude)
+                            || float.IsInfinity(effect.Periodic.Value.Magnitude)))
+                        throw new CatalogValidationException($"{path}: periodic effect {effect.Id.Value} requires magnitude > 0");
                     if (!Enum.IsDefined(typeof(ClockId), effect.Clock) || effect.Clock == ClockId.Invalid) throw new CatalogValidationException($"{path}: invalid clock for effect {effect.Id.Value}");
                     if (!CatalogRegistries.TryTag(effect.Tag)) throw new CatalogValidationException($"{path}: effect {effect.Id.Value} has unregistered tag");
                     foreach (var execution in effect.Executions) if ((uint)execution.Value >= (uint)catalog.Executions.Count) throw new CatalogValidationException($"{path}: effect {effect.Id.Value} references missing execution {execution.Value}");

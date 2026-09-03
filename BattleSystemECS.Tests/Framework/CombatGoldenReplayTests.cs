@@ -92,6 +92,7 @@ namespace BattleSystemECS.Tests.Framework
             scheduler.Combat.TowerAttack = attack;
             scheduler.CombatSetup.TowerAttack = attack;
             RebuildGrid();
+            SealDirect(scheduler);
             scheduler.Tick(1f, 0);
             scheduler.Tick(0f, 1);
             Assert.Equal(14, events.DamageTargets.Count);
@@ -383,6 +384,7 @@ namespace BattleSystemECS.Tests.Framework
             scheduler.SkillBuff.Buff = buff;
             Store.PlayerBulletTimeTurnsLeft[0] = 2f;
             Store.PlayerBulletTimeScale[0] = 0.25f;
+            SealDirect(scheduler);
             scheduler.Tick(1f, 0);
             scheduler.Tick(1f, 1);
             Assert.Equal(80f, Store.EnemyHealth[enemyId]);
@@ -403,6 +405,7 @@ namespace BattleSystemECS.Tests.Framework
             Store.PlayerBulletTimeTurnsLeft[0] = 2f;
             Store.PlayerBulletTimeScale[0] = 0.25f;
             RebuildGrid();
+            SealDirect(scheduler);
             scheduler.Tick(1f, 0);
             scheduler.Tick(0f, 1);
             Assert.Equal(200f, Store.EnemyHealth[enemyId]);
@@ -421,6 +424,7 @@ namespace BattleSystemECS.Tests.Framework
             scheduler.PreGame.Weather = weather;
             Store.PlayerBulletTimeTurnsLeft[0] = 2f;
             Store.PlayerBulletTimeScale[0] = 0.25f;
+            SealDirect(scheduler);
             scheduler.Tick(1f, 0);
             Assert.Equal(99.875f, Store.EnemyHealth[enemyId], 3);
         }
@@ -438,6 +442,7 @@ namespace BattleSystemECS.Tests.Framework
             scheduler.Movement.Wound = wound;
             Store.PlayerBulletTimeTurnsLeft[0] = 2f;
             Store.PlayerBulletTimeScale[0] = 0.25f;
+            SealDirect(scheduler);
             scheduler.Tick(1f, 0);
             Assert.True(Store.EnemyIsWounded[enemyId]);
             Assert.Equal(1f, Store.EnemyMoveSpeed[enemyId]);
@@ -478,6 +483,7 @@ namespace BattleSystemECS.Tests.Framework
             scheduler.CombatSetup.TowerAttack = attack;
             scheduler.Phase = GameState.WavePhase;
             world.Store.RebuildSpatialGrid();
+            SealDirect(scheduler);
             scheduler.Tick(1f, 0);
             var active = new List<int>(world.Store.ActiveEnemyIds);
             var damageFacts = Enumerable.Range(0, world.Store.DamageResolver.Events.Count)
@@ -517,6 +523,7 @@ namespace BattleSystemECS.Tests.Framework
             scheduler.CombatSetup.TowerAttack = attack;
             scheduler.Phase = GameState.WavePhase;
             world.Store.RebuildSpatialGrid();
+            SealDirect(scheduler);
             scheduler.Tick(1f, 0);
             Assert.True(world.Store.EnemyActive[enemyId]);
             return Assert.Single(events.DamageAmounts);
@@ -534,6 +541,12 @@ namespace BattleSystemECS.Tests.Framework
             var scheduler = new FrameScheduler(Store, Config, events);
             registry.AssignToGroups(scheduler);
             return (registry, scheduler, enemyId);
+        }
+
+        private static void SealDirect(FrameScheduler scheduler)
+        {
+            if (!scheduler.IsCompositionSealed)
+                scheduler.SealGraphComposition();
         }
 
         private sealed class RecordingEventBus : IBattleEventBus

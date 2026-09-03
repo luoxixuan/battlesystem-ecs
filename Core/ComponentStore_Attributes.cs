@@ -17,6 +17,40 @@ namespace BattleSystemECS.Core
             var result = DamageResolver.TryApplyValidated(new DamageRequest(source, target, amount, damageType, element, flags, stage, boundary, AllocateGameplaySequence(targetId), parentSequence, ownerPlayerId: ownerPlayerId, provenanceId: provenanceId, provenanceDepth: provenanceDepth));
             return result.Accepted;
         }
+        /// <summary>
+        /// 玩家伤害权威入口：固定 ownerPlayerId=playerId，在提交时刻分配 sequence。
+        /// 拒绝时不抛异常（与 Ability 两阶段合同不同）。
+        /// </summary>
+        internal bool ApplyPlayerDamageAuthority(int sourceId, int playerId, float amount, out float applied)
+        {
+            applied = 0f;
+            var source = GetEntityHandle(sourceId);
+            var target = GetEntityHandle(playerId);
+            if (!source.IsValid || !target.IsValid) return false;
+            var request = new PlayerDamageRequest(source, target, amount, AllocateGameplaySequence(playerId),
+                ownerPlayerId: playerId);
+            var result = ResourceResolver.TryApply(request);
+            if (!result.Accepted) return false;
+            applied = result.Applied;
+            return true;
+        }
+        internal bool ApplyPlayerDamageAuthority(int sourceId, int playerId, float amount)
+        {
+            float applied;
+            return ApplyPlayerDamageAuthority(sourceId, playerId, amount, out applied);
+        }
+        internal bool CanApplyPlayerDamageAuthority(int sourceId, int playerId, float amount)
+        {
+            var source = GetEntityHandle(sourceId);
+            var target = GetEntityHandle(playerId);
+            if (!source.IsValid || !target.IsValid) return false;
+            if (!ResourceResolver.CanApplyPlayerDamage(new PlayerDamageRequest(source, target, amount, 0L,
+                ownerPlayerId: playerId)))
+                return false;
+            // PlayerDamage 直接发布 1 或 2 个 critical 事实（致死多 DeathQueued），不进 pending。
+            // 预检必须挡住队列溢出，否则调用方会在 TryApply 失败前先消耗 stealth 等一次性状态。
+            return ResourceResolver.CanAccept(0, 2);
+        }
         internal bool ApplyPlayerResourceAuthority(int sourceId, int playerId, AttributeKey resource, float delta, long sequence = 0L)
         {
             var source = GetEntityHandle(sourceId); var target = GetEntityHandle(playerId);
@@ -66,7 +100,7 @@ namespace BattleSystemECS.Core
             for (int i = 0; i < ActiveTowerIds.Count; i++)
             {
                 int towerId = ActiveTowerIds[i];
-                AttributeAggregator.SetBase(towerId, new AttributeKey(8), TowerAttackDamage[towerId]);
+                AttributeAggregator.SetBase(towerId, CatalogRegistries.AttackDamage, TowerAttackDamage[towerId]);
             }
             for (int i = 0; i < ActiveEnemyIds.Count; i++)
             {
@@ -76,7 +110,7 @@ namespace BattleSystemECS.Core
             int playerId = PlayerEntityId;
             if ((uint)playerId < MAX_PLAYERS && PositionActive[playerId] && !EnemyActive[playerId])
             {
-                AttributeAggregator.SetBase(playerId, new AttributeKey(0), GetPlayerAttackDamage(playerId));
+                AttributeAggregator.SetBase(playerId, CatalogRegistries.AttackDamage, GetPlayerAttackDamage(playerId));
                 AttributeAggregator.SetBase(playerId, new AttributeKey(1), PlayerAttackRange[playerId]);
                 AttributeAggregator.SetBase(playerId, new AttributeKey(5), PlayerPreFightCritBonus[playerId]);
                 AttributeAggregator.SetBase(playerId, new AttributeKey(10), PlayerArmor[playerId]);
@@ -87,18 +121,25 @@ namespace BattleSystemECS.Core
         {
             var baseValue = TowerAttackDamage[towerId];
             if (!UseComputedAttributes) return baseValue;
-            return AttributeAggregator.GetComputed(towerId, new AttributeKey(8), baseValue);
+            float attack = AttributeAggregator.GetComputed(towerId, CatalogRegistries.AttackDamage, baseValue);
+            float multiplier = AttributeAggregator.GetComputed(towerId, CatalogRegistries.DamageOutputMultiplier, 1f);
+            return attack * multiplier;
         }
         public float GetPlayerAttackDamageProjection(int playerId)
         {
             var baseValue = GetPlayerAttackDamage(playerId);
-            return !_useComputedAttributes ? baseValue : AttributeAggregator.GetComputed(playerId, new AttributeKey(0), baseValue);
+            if (!_useComputedAttributes) return baseValue;
+            float attack = AttributeAggregator.GetComputed(playerId, CatalogRegistries.AttackDamage, baseValue);
+            float multiplier = AttributeAggregator.GetComputed(playerId, CatalogRegistries.DamageOutputMultiplier, 1f);
+            return attack * multiplier;
         }
         public float GetEnemyAttackDamageProjection(int enemyId)
         {
             var baseValue = EnemyDamage[enemyId];
-            return !_useComputedAttributes ? baseValue : AttributeAggregator.GetComputed(enemyId,
-                CatalogRegistries.AttackDamage, baseValue);
+            if (!_useComputedAttributes) return baseValue;
+            float attack = AttributeAggregator.GetComputed(enemyId, CatalogRegistries.AttackDamage, baseValue);
+            float multiplier = AttributeAggregator.GetComputed(enemyId, CatalogRegistries.DamageOutputMultiplier, 1f);
+            return attack * multiplier;
         }
         public float GetPlayerCritRateProjection(int playerId, float legacyBase)
         {

@@ -180,6 +180,7 @@ namespace BattleSystemECS.Systems
 
             // Inherit behavior tree from master
             store.EnemyBehaviorTree[childId] = store.EnemyBehaviorTree[masterId];
+            store.SetEnemyAttackInterval(childId, store.EnemyAttackInterval[masterId]);
 
             // Inherit path
             store.EnemyPathId[childId] = store.EnemyPathId[masterId];

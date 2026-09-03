@@ -998,6 +998,10 @@ namespace BattleSystemECS.Core
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
         public int[] EnemyAIChargeCounter = new int[MAX_ENTITIES];
         public int[] EnemyAILastAttackTurn = new int[MAX_ENTITIES];
+        /// <summary>怪物配置 AttackInterval（秒）。≤0 表示不门控（AddEnemy 默认 / 测试路径）。</summary>
+        public float[] EnemyAttackInterval = new float[MAX_ENTITIES];
+        /// <summary>距下次允许攻击玩家的剩余秒数；accept 后重置为 EnemyAttackInterval。</summary>
+        public float[] EnemyAttackCooldownLeft = new float[MAX_ENTITIES];
         public string[] EnemyTypeName = new string[MAX_ENTITIES];
         // Pre-cached behavior tree per enemy — set once at spawn in WaveSpawningSystem
         public BTCachedTree[] EnemyBehaviorTree = new BTCachedTree[MAX_ENTITIES];
@@ -2629,6 +2633,27 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(enemyId)) return;
             EnemyAILastAttackTurn[enemyId] = turn;
+        }
+
+        public void SetEnemyAttackInterval(int enemyId, float intervalSeconds)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            EnemyAttackInterval[enemyId] = intervalSeconds < 0f ? 0f : intervalSeconds;
+        }
+
+        public bool IsEnemyAttackReady(int enemyId)
+        {
+            if (!IsValidEntity(enemyId)) return false;
+            float interval = EnemyAttackInterval[enemyId];
+            if (interval <= 0f) return true;
+            return EnemyAttackCooldownLeft[enemyId] <= 0f;
+        }
+
+        public void CommitEnemyAttackCooldown(int enemyId)
+        {
+            if (!IsValidEntity(enemyId)) return;
+            float interval = EnemyAttackInterval[enemyId];
+            if (interval > 0f) EnemyAttackCooldownLeft[enemyId] = interval;
         }
 
         public EnemyActionType GetEnemyActionEnum(int enemyId)

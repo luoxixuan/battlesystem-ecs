@@ -866,6 +866,8 @@ namespace BattleSystemECS.Core
                 EnemyActionEnum[entityId] = EnemyActionType.None;
                 EnemyAIChargeCounter[entityId] = 0;
                 EnemyAILastAttackTurn[entityId] = 0;
+                EnemyAttackInterval[entityId] = 0f;
+                EnemyAttackCooldownLeft[entityId] = 0f;
                 EnemyArmor[entityId] = 0f;
                 EnemyStunFlag[entityId] = false;
                 EnemyStunDurationLeft[entityId] = 0f;
@@ -1667,6 +1669,7 @@ namespace BattleSystemECS.Core
             NestSpawnTimer = null!; NestSpawnInterval = null!; NestMonsterTypeStr = null!;
             NestMaxAlive = null!; NestActiveCount = null!; NestOriginId = null!;
             EnemyAIAction = null!; EnemyAIChargeCounter = null!; EnemyAILastAttackTurn = null!;
+            EnemyAttackInterval = null!; EnemyAttackCooldownLeft = null!;
             EnemyTypeName = null!; EnemyBehaviorTree = null!; EnemyActionEnum = null!;
             EnemyCastAbilityId = null!;
             EnemyMarked = null!; EnemyMarkedThreshold = null!; EnemyMarkedDamageBonus = null!;

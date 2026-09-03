@@ -29,10 +29,10 @@ namespace BattleSystemECS.Systems
     ///   in test / reset paths). The _subscribed flag prevents duplicate handlers.
     /// - No allocations on the hot path: the publisher already passes a pooled
     ///   EnemyHitEvent; we only read fields and increment counters.
-    /// - All counters are 64-bit (long) and reset to 0 at the start of each frame
-    ///   via the frame scheduler's BeginFrame() call (Round 67 convention: the
-    ///   scheduler calls HitTriggerSystem.ResetCounters() at the start of every
-    ///   wave-phase tick).
+    /// - All counters are 64-bit (long). ResetCounters() exists for harness/debug
+    ///   callers; this class is not constructed in production (see
+    ///   ecs-gas-migration-combat.md: HitTriggerSystem is disabled / LegacyOnly)
+    ///   and the frame scheduler never invokes ResetCounters().
     /// </summary>
     public class HitTriggerSystem
     {

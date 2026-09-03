@@ -344,6 +344,7 @@ namespace BattleSystemECS.Systems
                 string enemyName = $"[AMBUSH] NormalL{currentLevel}W{currentWave}";
                 int enemyId = store.AddEnemy(startX, startY, scaledSpeed, scaledHealth, scaledMaxHealth, scaledDamage, monsterConfig.GoldReward, currentWave, enemyName, scaledArmor, monsterConfig.Shield, monsterConfig.MagicResist);
                 if (enemyId < 0) continue;
+                store.SetEnemyAttackInterval(enemyId, monsterConfig.AttackInterval);
                 _eventBus.OnEntityCreated(enemyId, startX, startY, "Enemy");
                 store.SetEntityName(enemyId, enemyName);
                 store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
@@ -388,6 +389,7 @@ namespace BattleSystemECS.Systems
             string enemyName = $"[BOSS RUSH] NormalL{currentLevel}W{currentWave}";
             int enemyId = store.AddEnemy(startX, startY, scaledSpeed, scaledHealth, scaledMaxHealth, scaledDamage, monsterConfig.GoldReward * 3, currentWave, enemyName, scaledArmor, monsterConfig.Shield, monsterConfig.MagicResist);
             if (enemyId < 0) return;
+            store.SetEnemyAttackInterval(enemyId, monsterConfig.AttackInterval);
             _eventBus.OnEntityCreated(enemyId, startX, startY, "Enemy");
             store.SetEntityName(enemyId, enemyName);
             store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
@@ -515,6 +517,7 @@ namespace BattleSystemECS.Systems
                     scaledMagicResist
                 );
                 if (enemyId < 0) continue; // pool exhausted; bail out for this slot
+                store.SetEnemyAttackInterval(enemyId, monsterConfig.AttackInterval);
                 _eventBus.OnEntityCreated(enemyId, spawnX, spawnY, "Enemy");
                 store.SetEntityName(enemyId, enemyName);
                 store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());
@@ -755,6 +758,7 @@ namespace BattleSystemECS.Systems
                         renderer.Log($"[SPAWN] Failed to spawn enemy (entity pool exhausted)");
                         continue;
                     }
+                    store.SetEnemyAttackInterval(enemyId, monsterConfig.AttackInterval);
                     _eventBus.OnEntityCreated(enemyId, startX, startY, "Enemy");
                     store.SetEntityName(enemyId, enemyName);
                     store.SetDamageImmunityMask(enemyId, monsterConfig.ComputeDamageImmunityMask());

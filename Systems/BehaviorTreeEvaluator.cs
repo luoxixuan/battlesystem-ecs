@@ -248,6 +248,7 @@ namespace BattleSystemECS.Systems
                 }
                 case "can_attack":
                 {
+                    if (!store.IsEnemyAttackReady(enemyId)) return false;
                     float ex = store.PositionX[enemyId], ey = store.PositionY[enemyId];
                     float px = store.PositionX[playerId], py = store.PositionY[playerId];
                     return Compare(Math.Abs(ex - px) + Math.Abs(ey - py), 1.5f, node.Operator);

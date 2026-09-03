@@ -19,11 +19,18 @@ namespace BattleSystemECS.Tests.Integration
             var ability = Buff("war-cry", 0.3f, 3f, 5f);
             var config = StrictConfig(ability);
             int player = Player(p => { p.Health = 1000f; p.AttackDamage = 0f; p.X = 1f; p.Y = 0f; });
+            config.ManaShield.Enabled = false;
             int source = Enemy(e => { e.X = 0f; e.Y = 0f; e.Damage = 1f; e.MoveSpeed = 0f; });
             int ally = Enemy(e => { e.X = 1f; e.Y = 0f; e.Damage = 10f; e.MoveSpeed = 0f; });
+            Store.SetEnemyAttackInterval(source, 0f);
+            Store.SetEnemyAttackInterval(ally, 0f);
             Store.EnemyBehaviorTree[source] = ActionTree("enemy_cast_buff", EnemyActionType.BuffAllies, ability.Id);
             Store.EnemyBehaviorTree[ally] = ActionTree("attack_melee", EnemyActionType.AttackMelee, null);
             var (registry, scheduler) = Production(config, player);
+            scheduler.Combat.ManaShield = null;
+            Store.PlayerManaShield[player] = 0f;
+            Store.PlayerManaShieldCap[player] = 0f;
+            Store.PlayerManaShieldAbsorbRatio[player] = 0f;
             var damageFacts = new List<PlayerDamagedEvent>();
             registry.EventBus!.PlayerDamaged.Subscribe(damageFacts.Add);
 
@@ -32,12 +39,19 @@ namespace BattleSystemECS.Tests.Integration
             Assert.Equal(13f, Store.GetEnemyAttackDamageProjection(ally), 3);
             Assert.True(Renderer.HasLogContaining("typed 'war-cry'"));
             var firstAttack = Assert.Single(damageFacts, fact => fact.AttackerId == ally);
+            // 同帧 AI 先开火再由 ability 系统落 buff：首击是未加成 raw=10 的 applied。
+            float armor = Store.GetPlayerArmorProjection(player);
+            Assert.Equal(10f * (1f - armor), firstAttack.Damage, 3);
 
             damageFacts.Clear();
+            Store.SetEnemyAttackInterval(ally, 0f);
+            Store.EnemyAttackCooldownLeft[ally] = 0f;
             registry.EnemyAI!.InvokeExecuteActionEnum(ally, EnemyActionType.AttackMelee);
             var buffedAttack = Assert.Single(damageFacts);
             Assert.Equal(ally, buffedAttack.AttackerId);
-            Assert.Equal(3f, buffedAttack.Damage - firstAttack.Damage, 3);
+            // 二次近战吃到投影 13；PlayerDamaged 发护甲后的 applied。
+            Assert.Equal(13f * (1f - armor), buffedAttack.Damage, 3);
+            Assert.Equal(3f * (1f - armor), buffedAttack.Damage - firstAttack.Damage, 3);
         }
 
         [Fact]

@@ -642,8 +642,8 @@ namespace BattleSystemECS.Core.GAS
             else if (execution.MagnitudeSource != MagnitudeSource.Multiplier) magnitude = execution.Magnitude;
             else
             {
-                float basis = store.EnemyActive[sourceId] ? store.EnemyDamage[sourceId]
-                    : store.TowerActive[sourceId] ? store.TowerAttackDamage[sourceId]
+                float basis = store.EnemyActive[sourceId] ? store.GetEnemyAttackDamageProjection(sourceId)
+                    : store.TowerActive[sourceId] ? store.GetTowerAttackDamage(sourceId)
                     : sourceId == store.PlayerEntityId ? store.GetPlayerAttackDamageProjection(sourceId)
                     : 0f;
                 magnitude = Math.Max(0f, basis * execution.Magnitude);

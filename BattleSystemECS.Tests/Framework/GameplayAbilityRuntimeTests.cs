@@ -12,6 +12,60 @@ namespace BattleSystemECS.Tests.Framework
     public sealed class GameplayAbilityRuntimeTests
     {
         [Fact]
+        public void MultiplierMagnitudeUsesAttackDamageProjectionsForPlayerTowerAndEnemy()
+        {
+            var store = WaveStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            store.PlayerAttackDamage[0] = 20f;
+            store.PlayerMaxHealth[0] = 10f;
+            store.PlayerMaxMana[0] = 10f;
+            store.UseComputedAttributes = true;
+            store.ApplyComputedAttributeModeAtFrameBoundary();
+
+            int enemy = store.AddEnemy(0, 0, 1f, 100f, 100f, 10f, 1, 1);
+            int tower = store.CreateEntity();
+            store.AddTower(tower, TowerType.Basic, 30f, 3, 1f, 1, 10f);
+            store.SyncComputedAttributeBases();
+            store.AddAttributeModifier(0,
+                new ModifierDefinition(CatalogRegistries.DamageOutputMultiplier, AttributeModifierOp.Add, 0.5f));
+            store.AddAttributeModifier(tower,
+                new ModifierDefinition(CatalogRegistries.DamageOutputMultiplier, AttributeModifierOp.Add, 0.5f));
+            store.AddAttributeModifier(enemy,
+                new ModifierDefinition(CatalogRegistries.DamageOutputMultiplier, AttributeModifierOp.Add, 0.5f));
+
+            var execution = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage, 2f,
+                new TagId(0), MagnitudeSource.Multiplier, DamageAmountStage.LegacyMultiplier,
+                operation: ExecutionOperation.ApplyDamage);
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 10, 1, 1, 1);
+            var ability = new AbilityDefinition(new AbilityId(0), "scaled", targeting, ClockId.Combat, 1f,
+                GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, executions: new[] { execution.Id });
+            var catalog = new GameplayCatalog(new[] { ability }, new[] { targeting }, Array.Empty<GameplayEffectDefinition>(),
+                new[] { execution }, Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
+                new Dictionary<string, AbilityId> { ["scaled"] = ability.Id });
+
+            int victim = store.AddEnemy(2, 2, 1f, 1000f, 1000f, 1f, 1, 1);
+            float before = store.EnemyHealth[victim];
+
+            Assert.True(GameplayAbilityRuntime.Activate(store, catalog, new float[1],
+                new AbilityActivationRequest(0, 0, 0f, victim, ability: ability.Id)).Accepted);
+            float playerDealt = before - store.EnemyHealth[victim];
+            Assert.Equal(store.GetPlayerAttackDamageProjection(0) * 2f, playerDealt, 3);
+
+            before = store.EnemyHealth[victim];
+            Assert.True(GameplayAbilityRuntime.Activate(store, catalog, new float[1],
+                new AbilityActivationRequest(tower, 0, 0f, victim, ability: ability.Id)).Accepted);
+            float towerDealt = before - store.EnemyHealth[victim];
+            Assert.Equal(store.GetTowerAttackDamage(tower) * 2f, towerDealt, 3);
+
+            before = store.EnemyHealth[victim];
+            Assert.True(GameplayAbilityRuntime.Activate(store, catalog, new float[1],
+                new AbilityActivationRequest(enemy, 0, 0f, victim, ability: ability.Id)).Accepted);
+            float enemyDealt = before - store.EnemyHealth[victim];
+            Assert.Equal(store.GetEnemyAttackDamageProjection(enemy) * 2f, enemyDealt, 3);
+        }
+
+        [Fact]
         public void TryActivateDoesNotMutateUntilAbilityCommit()
         {
             var store = WaveStore();

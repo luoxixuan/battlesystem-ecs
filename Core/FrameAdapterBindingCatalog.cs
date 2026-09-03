@@ -148,7 +148,7 @@ namespace BattleSystemECS.Core
         private static readonly Dictionary<string, string> Semantics =
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                { "ability.commit", "Update(delta)/ability.commit" },
+                { "skill-buff.skill.update", "Update(delta)/skill-buff.skill.update" },
                 { "ai.burrow.apply", "ApplyBurrowEffects()/ai.burrow.apply" },
                 { "ai.burrow.prepare", "SetTurn(turn)/ai.burrow.prepare" },
                 { "ai.burrow.update", "Update(turn-step;legacy-delta-ignored)/ai.burrow.update" },
@@ -185,7 +185,7 @@ namespace BattleSystemECS.Core
                 { "build.auto-skill.update", "Update(false)/build.auto-skill.update" },
                 { "build.damage.commit", "GraphCommitBuildDamage/build.damage.commit" },
                 { "build.desperation.update", "Update()/build.desperation.update" },
-                { "build.effect.commit", "GraphTickEffects(clock=Build)/build.effect.commit" },
+                { "build.effect.tick", "GraphTickEffects(clock=Build)/build.effect.tick" },
                 { "build.effect.tick.global", "GraphTickEffects(clock=Global)/build.effect.tick.global" },
                 { "build.effect.tick.real", "GraphTickEffects(clock=RealTime)/build.effect.tick.real" },
                 { "build.frame.close", "GraphCloseDeferredResolvers/build.frame.close" },
@@ -278,7 +278,7 @@ namespace BattleSystemECS.Core
                 { "damage.commit", "GraphCommitGameplayDamage/damage.commit" },
                 { "early.damage.commit", "GraphCommitEarlyDamage/early.damage.commit" },
                 { "early.resource.commit", "GraphCommitEarlyResources/early.resource.commit" },
-                { "effect.commit", "GraphTickConfiguredEffect/effect.commit" },
+                { "effect.tick", "GraphTickConfiguredEffect/effect.tick" },
                 { "effect.tick.combat", "GraphTickSupplementalEffect(clock=Combat)/effect.tick.combat" },
                 { "effect.tick.enemy", "GraphTickSupplementalEffect(clock=Enemy)/effect.tick.enemy" },
                 { "effect.tick.global", "GraphTickSupplementalEffect(clock=Global)/effect.tick.global" },
@@ -392,7 +392,7 @@ namespace BattleSystemECS.Core
             "pregame.random-event.update" => "RandomEventSystem.Update+RandomEventSystem.ApplyEvent+RandomEventSystem.QueueCallback",
             "pregame.random-event.callback-dispatch" => "RandomEventSystem.DispatchPendingCallbacks+ordered fixed callback batch+OnEventTriggered+OnEventEnded",
             "spawning.wave.update" => "FrameScheduler.GraphUpdateWaveSpawning+FrameScheduler.ScenarioKind+WaveSpawningSystem.SetLevel+WaveSpawningSystem.Update+WaveSpawningSystem.QueueWaveStart(single owner)",
-            "ai.enemy.update" => "EnemyAISystem.Update+EnemyAISystem.TryCollectExpiredDecoy+EnemyAISystem.MergeCollectBuffers+stable death queue drain+EnemyAISystem.ApplyAttackEvents+EnemyAISystem.ApplyLifestealEvents+ComponentStore.DecreasePlayerHealth",
+            "ai.enemy.update" => "EnemyAISystem.Update+EnemyAISystem.TryCollectExpiredDecoy+EnemyAISystem.MergeCollectBuffers+stable death queue drain+EnemyAISystem.ApplyAttackEvents+EnemyAISystem.ApplyLifestealEvents+ComponentStore.ApplyPlayerDamageAuthority",
             "ai.burrow.update" => "EnemyBurrowSystem.Update+active-index-owned emerge buffer",
             "ai.enemy-ability.cast-timers" => "EnemyAbilitySystem.TickCastTimers+turn-step channel timer",
             "ai.fear.update" => "FearSystem.Update+turn-step fear duration+parallel disjoint enemy slots",

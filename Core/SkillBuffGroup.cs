@@ -49,7 +49,7 @@ namespace BattleSystemECS.Core
         internal void RegisterFrameBindings(FrameScheduler s)
         {
             if(Buff!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.buff.update"),c=>Buff?.Update(c.Delta));s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.buff.resolve-dot"),c=>Buff?.ResolveDotDamage());}
-            if(Skill!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.skill.resolve-damage"),c=>Skill?.ResolveSkillDamage());s.RegisterFrameBinding(FrameBindingFacts.Get("ability.commit"),c=>Skill?.Update(c.Delta));}
+            if(Skill!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.skill.resolve-damage"),c=>Skill?.ResolveSkillDamage());s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.skill.update"),c=>Skill?.Update(c.Delta));}
             if(ElementalReaction!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.elemental.update"),c=>ElementalReaction?.Update(c.Delta));s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.elemental.resolve"),c=>ElementalReaction?.ResolveReactionDamage());}
             if(Bleed!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.bleed.update"),c=>Bleed?.Update(c.Delta));s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.bleed.resolve"),c=>Bleed?.ResolveBleedDamage());}
             if(Frostbite!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.frostbite.update"),c=>Frostbite?.Update(c.Delta));s.RegisterFrameBinding(FrameBindingFacts.Get("skill-buff.frostbite.resolve"),c=>Frostbite?.ResolveFrostbiteDamage());}

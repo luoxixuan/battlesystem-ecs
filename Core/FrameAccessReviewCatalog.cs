@@ -35,7 +35,7 @@ namespace BattleSystemECS.Core
         private static readonly Dictionary<string, FrameAccessReviewId> Reviews =
             new Dictionary<string, FrameAccessReviewId>(StringComparer.Ordinal)
             {
-                { "ability.commit", "FG-ACCESS-20260901/ability.commit" },
+                { "skill-buff.skill.update", "FG-ACCESS-20260901/skill-buff.skill.update" },
                 { "ai.burrow.apply", "FG-ACCESS-20260901/ai.burrow.apply" },
                 { "ai.burrow.prepare", "FG-ACCESS-20260901/ai.burrow.prepare" },
                 { "ai.burrow.update", "FG-ACCESS-20260901/ai.burrow.update" },
@@ -72,7 +72,7 @@ namespace BattleSystemECS.Core
                 { "build.auto-skill.update", "FG-ACCESS-20260901/build.auto-skill.update" },
                 { "build.damage.commit", "FG-ACCESS-20260901/build.damage.commit" },
                 { "build.desperation.update", "FG-ACCESS-20260901/build.desperation.update" },
-                { "build.effect.commit", "FG-ACCESS-20260901/build.effect.commit" },
+                { "build.effect.tick", "FG-ACCESS-20260901/build.effect.tick" },
                 { "build.effect.tick.global", "FG-ACCESS-20260901/build.effect.tick.global" },
                 { "build.effect.tick.real", "FG-ACCESS-20260901/build.effect.tick.real" },
                 { "build.frame.close", "FG-ACCESS-20260901/build.frame.close" },
@@ -165,7 +165,7 @@ namespace BattleSystemECS.Core
                 { "damage.commit", "FG-ACCESS-20260901/damage.commit" },
                 { "early.damage.commit", "FG-ACCESS-20260901/early.damage.commit" },
                 { "early.resource.commit", "FG-ACCESS-20260901/early.resource.commit" },
-                { "effect.commit", "FG-ACCESS-20260901/effect.commit" },
+                { "effect.tick", "FG-ACCESS-20260901/effect.tick" },
                 { "effect.tick.combat", "FG-ACCESS-20260901/effect.tick.combat" },
                 { "effect.tick.enemy", "FG-ACCESS-20260901/effect.tick.enemy" },
                 { "effect.tick.global", "FG-ACCESS-20260901/effect.tick.global" },
@@ -264,8 +264,8 @@ namespace BattleSystemECS.Core
             };
 
         // 生产 profile 按 NodeId 排序后的完整根指纹；任何节点或元数据变化都必须重新审阅。
-        internal const string ApprovedFingerprintRootGameplay = "2a203d28213c0dbe58bb4845210176670a62fd6fb3391c2bfd5d266ad58bdac1";
-        internal const string ApprovedFingerprintRootFixedPopulation = "68aa64756e2336033d16d8120f943b2bb77279d6ffa298bbdcaa3dcb0de4ce9f";
+        internal const string ApprovedFingerprintRootGameplay = "1ff4eb87bfdf46d018b87f3b3436f995bfe516c5f12501567cc0e52f3ab49ce6";
+        internal const string ApprovedFingerprintRootFixedPopulation = "eb4fe698c4d4a7859f5361cd02db4000a02e11f19157a076a338ebb237904fb6";
 
         public static bool TryGet(string nodeId, out FrameAccessReviewId reviewId) =>
             Reviews.TryGetValue(nodeId, out reviewId);

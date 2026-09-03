@@ -107,6 +107,17 @@ BuildPhase 是同一规则的特殊边界：当前 BuildGroup 仍可能 tick Ski
 
 生产路径不能同时让 legacy 和 new 写 HP 或发布同一事实。未切流来源可以继续经过 `LegacyDamageAdapter`，但不得直接绕过 Resolver 写入资源。
 
+2026-09-03：对**玩家**的真伤害不再走生产侧 `DecreasePlayerHealth`。10 个站点统一经
+`ComponentStore.ApplyPlayerDamageAuthority` → `ResourceResolver.TryApply(PlayerDamageRequest)`。
+预检 `CanApplyPlayerDamageAuthority` 必须同时覆盖目标合法性与 `CanAccept(0,2)`（致死会发 2 个
+critical 事实），否则 `EnemyAISystem` 会在 overflow 拒绝前吃掉 `EnemyStealthMultiplier`。
+`DecreasePlayerHealth` 只保留为 ResourceResolver 内部 writer。BossTrailAoe / SuicideBomb 仍用负
+`AttributeKey(3)` `ResourceRequest`，不在本轮迁到 PlayerDamageRequest。
+FrameGraph：`effect.tick` / `build.effect.tick` / `skill-buff.skill.update` 已替换旧
+`effect.commit` / `build.effect.commit` / `ability.commit`；`build.skill.update`、
+`build.auto-skill.update`、`build.global-skill.update` 不再声明 AbilityRequests，
+`post-death.corpse.update` 不再声明 EffectRequests。
+
 M3 就要建立事件迁移表，逐项标记旧 `EventBus` 的 `LegacyOnly`/`Bridge`/`GameplayOnly` 状态；M4 才允许 Trigger 消费 `GameplayOnly`。Bridge 期间由新事实单向转发旧事件，按 sequence 去重，不能让旧 publisher 和新 publisher 各发一份。
 
 `TowerAttackSystem.Update` 不能作为一次性“大改”处理：这是一个 2923 行的系统，暴露 16 个 system dependency setter，另有 `SetGameConfig`、`SetTurn`、`SetWaveNumber`，共 19 个 `Set*` 方法；构造函数还接收 Store、renderer、TechTree、EventBus 等依赖。它在同一串行调用中按顺序消费主伤害、Tesla chain、splash、bounce、lifesteal、thorns、debuff、knockback 和 fragment 队列，部分分支还依赖本帧目标的死亡状态/位置。迁移时先给 queue item 增加 `parentSequence`/`phase` 等上下文，用 `TowerAttackLegacyAdapter` 保留原有 Phase 2a-3d 消费顺序并逐项提交统一 Resolver；等每类 queue 都有 golden 测试后，才拆成 FrameGraph 节点。这里的行数、setter 数和队列数都是当前快照的定位指标，不是迁移完成度指标。
