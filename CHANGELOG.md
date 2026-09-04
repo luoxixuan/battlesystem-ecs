@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-09-05（Lumio P5：同帧顺序 A4 + 随机领号 A3，⚠️ 可见随机变化）
+- **同帧顺序**：保持 AI 组 `RemoveDispellableEffects` 为批外 remove-first；`effect.commit` 批内堆叠 → 溢出 → Replace 捕获 → 时长/周期 → 过期/Remove 垫后。禁止「施加又移除 = 抵消」，`EffectApplied` 与 `EffectRemoved` 都进 digest。未引入 `RemoveRequests` 尾节点，未改 FrameGraph 根哈希。生产仍只有这一处显式 Remove。
+- **随机领号**：新增 Frame 注入的 `DeterminismContext`，生产 Tick 仅 CommitSerial 等价语义取数。下列模拟路径不再用 `Rng.Shared` / 无种子 `new Random()`：EchoClone / EnemyTeleport / PointDefense / Skill 冰冻 / Upgrade / Weather / Fission / Clone / AutoSkill / Pickup / Affix / RandomEvent / WaveSpawning（含路径偏移相位）/ Crafting / PreFightBuff / Reforge / TowerModifier。Portal 未使用的 `Rng.Shared` 字段删除。ShopReroll 保留固定种子私有流（BuildPhase，不进 digest）。Benchmark `new Random(42)` 不迁。
+- **可见随机变化（单列）**：天气切换与强度、分裂/克隆落点、波次出生 X、词缀分配、掉落与随机事件、回声分身、传送落点、点防拦截、技能冰冻判定、升级随机 buff、自动技能洗牌、合成（seed=0）、路径偏移相位，以及出战 buff / 重铸 / 塔修饰现在走同一场比赛流，不再用墙钟或系统私有种子。同一固定种子下 soak digest 应一致。
+- V1 `stackSnapshotPolicy` 仍是 Replace；未实现 KeepPerLayer。mode 2/4/5 与 Unity 保持 DEFERRED/UNAVAILABLE。
+
 ### 2026-09-05（Lumio P4：Tag 层级 A2 + 准入序对齐 A5）
 - **准入原因对调用方可见**：`ActivateCore` 第二段改为 `PhaseNotAllowed` → `Cooldown` → `Cost` → 实体 `NoTarget` → `TagRequirementsNotMet` → `UnsupportedDefinition`（时长合同 / 内容 CanCommit / 未知 execution）。形状类 `NoTarget` / ForbidEffects·heal-only 仍在冷却前。建造期战斗技能在冷却未转好时仍报 `PhaseNotAllowed`，不再先看到 `Cooldown`。空目标列表仍是 `NoTarget` 且发生在冷却检查之前。队列满仍是 `QueueOverflow`。
 - 内容 `CanCommit` 失败与时长合同失败从 `InvalidRequest` 改为 `UnsupportedDefinition`。

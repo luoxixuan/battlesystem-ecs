@@ -15,7 +15,6 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore store;
         private readonly int playerId;
-        private readonly Random _rand = Rng.Shared;
 
         // Portal data (loaded from config)
         private PortalDef[] _portalDefs;

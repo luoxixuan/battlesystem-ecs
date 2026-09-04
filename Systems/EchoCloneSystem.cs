@@ -331,11 +331,11 @@ namespace BattleSystemECS.Systems
 
         // ─── Internal helpers ─────────────────────────────────────────────
 
-        private static bool RollChance(float p)
+        private bool RollChance(float p)
         {
             if (p <= 0f) return false;
             if (p >= 1f) return true;
-            return Rng.Shared.NextDouble() < p;
+            return store.Determinism.NextDouble() < p;
         }
 
         private bool IsValidParent(int parentTowerId)

@@ -25,7 +25,6 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore _store;
         private readonly GameConfig _gameConfig;
-        private readonly Random _rng = new Random();
 
         // Cached per-type multipliers — updated on weather change
         private float _cachedEnemySpeedMult = 1.0f;
@@ -140,9 +139,9 @@ namespace BattleSystemECS.Systems
             }
 
             // 70% chance to roll a new weather type (30% Clear)
-            if (_rng.NextDouble() < 0.7 && weatherConfig.Types.Count > 0)
+            if (_store.Determinism.NextDouble() < 0.7 && weatherConfig.Types.Count > 0)
             {
-                int roll = _rng.Next(weatherConfig.Types.Count);
+                int roll = _store.Determinism.Next(weatherConfig.Types.Count);
                 int idx = 0;
                 string chosenType = "";
                 WeatherTypeConfig chosenConfig = null;
@@ -164,7 +163,7 @@ namespace BattleSystemECS.Systems
 
                     // Random intensity within configured range
                     float intensity = chosenConfig.MinIntensity
-                        + (float)(_rng.NextDouble() * (chosenConfig.MaxIntensity - chosenConfig.MinIntensity));
+                        + (float)(_store.Determinism.NextDouble() * (chosenConfig.MaxIntensity - chosenConfig.MinIntensity));
                     _store.SetWeatherIntensity(playerId, intensity);
                     _store.SetWeatherTimer(playerId, chosenConfig.DefaultDuration);
 

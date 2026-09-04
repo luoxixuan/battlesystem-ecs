@@ -242,7 +242,7 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 ### 5.2 并行与性能规范
 
 - 热路径使用 `Parallel.For`。
-- 禁止在热路径中 `new Random()`；使用 `Rng.Shared`（Core 库 polyfill）。
+- 模拟热路径禁止 `new Random()` / `Rng.Shared`；只从 Frame `DeterminismContext` 领号，且仅 `CommitSerial`（本仓 SerialUpdate / SerialCommit / SerialPrepare / InternalParallelCollectSerialCommit 的串行段）取数。并行工作线程不得领号。`Rng.Shared` 仅保留给压测等非模拟路径。
 - `GetAllActiveEnemyIds()` 不在循环内调用；由 `SetTurn()` 缓存。
 - 禁止每帧分配 List/字典；复用数组或缓存。
 - 空间查询使用 `SpatialGrid`。
@@ -344,7 +344,8 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
   - 测试项目：`#nullable enable`，`ImplicitUsings=enable`
   - 保持现有设置，不要统一。
 - **netstandard2.1 兼容**：新增代码可能依赖 .NET 6+ API（如 `Random.Shared`、`init;` 语法），需要：
-  - 用 `Rng.Shared` 替代 `Random.Shared`
+  - 模拟热路径用 Frame `DeterminismContext` 领号，禁止 `Random.Shared` / `Rng.Shared` / 无种子 `new Random()`
+  - 非模拟（压测等）若仍需要线程局部 Random，用 `Rng.Shared` 替代 `Random.Shared`
   - 确保 `IsExternalInit` polyfill 已覆盖
   - 用 `PolyfillExtensions` 替代 `CollectionsMarshal.AsSpan`
 
@@ -361,6 +362,7 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 | 修改并行策略 | 对应系统的 `Update()`，注意两阶段模式审查 |
 | 修改配置格式 | `Core/GameConfig.cs` + `Core/GameConfigLoader.cs` + `Data/Configs/*.json` |
 | 修改技能/效果 | `Core/GAS/*.cs` + `Systems/SkillSystem.cs` + `game_config.json` Skills 数组（玩家技能栏）；共享技能表（SkillDefs）= `Data/Configs/skills.json`（精选）+ `Data/Skills/*.json`（静态）。技能 id/name 互解析统一走 `GameConfig.GetSkillIdByName / TryGetSkillById / GetSkillDisplayName`（归一化索引空间：[0, SkillDefs.Count) 索引共享表，其后偏移索引 Skills），消费方禁止各自手写遍历 |
+| 模拟随机领号 | `Core/DeterminismContext.cs`（挂在 `ComponentStore.Determinism`）；生产 Tick 由 `FrameGraph.Execute` 按节点语义在 CommitSerial 取数 |
 | 玩家伤害写入 | 生产路径只走 `ComponentStore.ApplyPlayerDamageAuthority`（`ResourceResolver.TryApply(PlayerDamageRequest)`）；`DecreasePlayerHealth` 仅允许 `ResourceResolver` 调用 |
 | 修改科技树 | `Core/TechTreeDef.cs` + `Systems/TechTreeSystem.cs` + `Data/Configs/tech_tree.json` |
 | 修改行为树 | `Data/Configs/behavior_trees.json` + `Systems/BehaviorTreeEvaluator.cs` |
@@ -376,4 +378,4 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 
 ---
 
-> **最后更新**：2026-09-04。当前构建、测试与审计结果以本轮仓外 final evidence 目录及其原始日志为准；文档不维护易腐的手工测试计数。
+> **最后更新**：2026-09-05。当前构建、测试与审计结果以本轮仓外 final evidence 目录及其原始日志为准；文档不维护易腐的手工测试计数。

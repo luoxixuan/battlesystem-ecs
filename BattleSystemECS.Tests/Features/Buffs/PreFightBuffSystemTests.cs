@@ -59,18 +59,12 @@ namespace BattleSystemECS.Tests.Features.Buffs
  }
 
  /// <summary>
- /// 把系统 RNG 固定到指定种子。生产钩子 SystemRandomSeed 的字段初值会在
- /// 构造函数内被 _rng 读取，构造后再赋值不会重播种，所以测试侧写入钩子字段后，
- /// 用同一值把私有 _rng 重设为 new Random(seed)，语义与生产钩子保持一致。
+ /// 把系统 RNG 固定到指定种子。生产走 store.Determinism，测试 Reset 同一条流。
  /// </summary>
- private static void SeedSystemRng(PreFightBuffSystem sys, int seed)
+ private static void SeedSystemRng(PreFightBuffSystem sys, ComponentStore store, int seed)
  {
  sys.SystemRandomSeed = seed;
- var rngField = typeof(PreFightBuffSystem).GetField(
- "_rng",
- System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
- Assert.NotNull(rngField);
- rngField!.SetValue(sys, new Random(seed));
+ store.Determinism.Reset(seed);
  }
 
  // ─── Default state (backward compat) ──────────────────────────────
@@ -467,7 +461,7 @@ namespace BattleSystemECS.Tests.Features.Buffs
  store.TowerAttackDamage[0] =10f;
  var sys = new PreFightBuffSystem(store, Config);
  // 每个新实例显式递增固定种子，消除 Environment.TickCount 的随机性。
- SeedSystemRng(sys, i);
+ SeedSystemRng(sys, store, i);
  sys.SetWavePending(true);
  sys.Update(0.016f);
  string picked = store.PlayerPreFightOption1Id[PlayerId];

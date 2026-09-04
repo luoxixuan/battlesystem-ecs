@@ -72,8 +72,6 @@ namespace BattleSystemECS.Systems
         private int currentLevel = 1;
         private int enemiesSpawnedInWave = 0;
         private int totalEnemiesSpawned = 0;
-        private Random _spawnRandom;
-        private readonly object _spawnRandomLock = new object();
         private readonly global::BattleSystemECS.Content.Contracts.IEnemyAffixDecorator _enemyAffixSystem;
 
         // Multi-type support
@@ -308,7 +306,7 @@ namespace BattleSystemECS.Systems
                 count = ApplySpawnMultiplier(count);
                 if (count <= 0) return;
             }
-            var random = GetSpawnRandom();
+            var random = store.Determinism;
             for (int i = 0; i < count; i++)
             {
                 float startX = (float)random.Next(0, 10);
@@ -372,7 +370,7 @@ namespace BattleSystemECS.Systems
         /// </summary>
         public void InjectMiniBoss()
         {
-            float startX = (float)GetSpawnRandom().Next(0, 10);
+            float startX = (float)store.Determinism.Next(0, 10);
             float startY = 19f;
             var monsterConfig = gameConfig.GetMonsterConfig("Normal");
             if (monsterConfig == null) return;
@@ -571,16 +569,6 @@ namespace BattleSystemECS.Systems
             _multiSpawnedForType = 0;
         }
 
-        private Random GetSpawnRandom()
-        {
-            if (_spawnRandom != null) return _spawnRandom;
-            lock (_spawnRandomLock)
-            {
-                _spawnRandom ??= new Random();
-                return _spawnRandom;
-            }
-        }
-
         /// <summary>
         /// Returns the currently active WaveConfig for this wave.
         /// If a branch was selected, this reflects the AppliedBranchOption.
@@ -627,7 +615,7 @@ namespace BattleSystemECS.Systems
 
             if (enemiesSpawnedInWave < waveConfig.GetTotalEnemyCount())
             {
-                Random random = GetSpawnRandom();
+                DeterminismContext random = store.Determinism;
 
                 // Batch spawn 5 enemies
                 for (int i = 0; i < 5; i++)
@@ -981,10 +969,9 @@ namespace BattleSystemECS.Systems
                     {
                         store.EnemyPathDeviationType[enemyId] = monsterConfig.PathDeviationType;
                         store.EnemyPathDeviationAmplitude[enemyId] = monsterConfig.PathDeviationAmplitude;
-                        // Per-enemy random phase/seed to de-synchronize the wave (no synchronised bobbing)
-                        var rng = new System.Random(enemyId * 7919 + currentWave * 31);
-                        store.EnemyPathDeviationPhase[enemyId] = (float)(rng.NextDouble() * Math.PI * 2.0);
-                        store.EnemyPathDeviationSeed[enemyId] = rng.Next(1, int.MaxValue);
+                        // 模拟路径只从 Frame 流领号，不再用 entityId 哈希另开 Random。
+                        store.EnemyPathDeviationPhase[enemyId] = (float)(store.Determinism.NextDouble() * Math.PI * 2.0);
+                        store.EnemyPathDeviationSeed[enemyId] = store.Determinism.Next(1, int.MaxValue);
                     }
 
                     // Initialize stat-drain fields from monster config. Drains are gated on

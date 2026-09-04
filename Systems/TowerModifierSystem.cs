@@ -36,7 +36,6 @@ namespace BattleSystemECS.Systems
     public class TowerModifierSystem : global::BattleSystemECS.Content.Contracts.ITowerModifierRoller
     {
         private readonly ComponentStore store;
-        private readonly Random rng;
         // GameConfig reference — needed to look up the modifier pool (TowerModifiers[])
         // and resolve an index back to a TowerModifierDef for read helpers. Optional:
         // when null, the system is inert (RollAtPlacement → -1, read helpers → "" / 0).
@@ -46,11 +45,11 @@ namespace BattleSystemECS.Systems
         // Designer-tunable via SetMinRarity(int) for variant rulesets.
         private int _minRarity = 0;
 
-        public TowerModifierSystem(ComponentStore store, GameConfig? gameConfig = null, int seed = 13579)
+        public TowerModifierSystem(ComponentStore store, GameConfig? gameConfig = null, int seed = 0)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this._gameConfig = gameConfig;
-            this.rng = new Random(seed);
+            if (seed != 0) store.Determinism.Reset(seed);
         }
 
         /// <summary>
@@ -179,7 +178,7 @@ namespace BattleSystemECS.Systems
             }
             if (total <= 0) return -1;
 
-            double r = rng.NextDouble() * total;
+            double r = store.Determinism.NextDouble() * total;
             double cum = 0;
             for (int i = 0; i < pool.Length; i++)
             {

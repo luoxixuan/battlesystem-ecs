@@ -38,7 +38,6 @@ namespace BattleSystemECS.Systems
         private readonly GameConfig gameConfig;
         private readonly global::BattleSystemECS.Content.Contracts.IInventoryCommandPort inventory;
         private readonly IRenderer renderer;
-        private readonly Random rng;
 
         // O(1) telemetry counters — exposed for tests / HUD / quest completion checks.
         public int TotalAttempts = 0;
@@ -59,10 +58,8 @@ namespace BattleSystemECS.Systems
             this.gameConfig = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));
             this.inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
             this.renderer = renderer;
-            // seed=0 → use a time-based default so consecutive same-frame crafts
-            // don't all see the same RNG sequence. Tests can pass an explicit seed
-            // for determinism.
-            this.rng = seed == 0 ? new Random() : new Random(seed);
+            // seed≠0 仅测试播种 store 流；生产 seed=0 不 Reset、不另开墙钟 Random。
+            if (seed != 0) store.Determinism.Reset(seed);
         }
 
         /// <summary>
@@ -365,14 +362,7 @@ namespace BattleSystemECS.Systems
         // pass a fixed seed for determinism.
         private float NextFloat()
         {
-            // Random.NextDouble returns [0, 1); we want the same range for our
-            // probability comparisons. Lock protects the shared Random instance
-            // (Random is not thread-safe, and AddItem may be called on the
-            // game-thread but we want this safe under future parallelism).
-            lock (rng)
-            {
-                return (float)rng.NextDouble();
-            }
+            return (float)store.Determinism.NextDouble();
         }
 
         // ── read helpers ────────────────────────────────────────────────

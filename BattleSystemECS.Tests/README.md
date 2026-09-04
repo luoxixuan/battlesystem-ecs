@@ -55,7 +55,7 @@ BattleSystemECS.Tests/
    `shrine_towers.json 必须包含 "Gold Shrine"`）。期望值必须从读取到的配置
    推导，或由测试代码显式注入。测试 `TowerPlacementSystem` 前用
    `TestWorld.DisablePerTypeTowerCaps(store)` 清除数据 cap；要测 cap 机制再显式写值。
-5. 确定性优先：随机数必须固定种子（`new Random(seed)`）；不用 `DateTime.Now`；不依赖测试执行顺序。
+5. 确定性优先：模拟随机走 `store.Determinism.Reset(seed)`，只从 Frame `DeterminismContext` 领号；不用 `DateTime.Now` / 无种子 `new Random()` / `Rng.Shared`；不依赖测试执行顺序。BuildPhase 商店等非模拟路径可以保留固定种子私有流，但不得进 digest。
 6. 优先使用 `BattleTestBase` 的 `World.Enemy/Tower/Player` 工厂，
    避免散落的 `new ComponentStore()` + 魔法数字。
 7. 手工 `AddTower` 已自动注册 `ActiveTowerIds`（M-race fix），不要再重复调用

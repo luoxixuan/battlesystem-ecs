@@ -54,14 +54,12 @@ namespace BattleSystemECS.Systems
  // paths stacking duplicate OnWaveStart/OnWaveComplete handlers.
  // Re-usable Random instance. Seeded once per system so a test can
  // pass a deterministic seed by setting SystemRandomSeed (test hook).
- public int SystemRandomSeed = Environment.TickCount;
- private Random _rng;
+ public int SystemRandomSeed = DeterminismContext.DefaultSeed;
 
  public PreFightBuffSystem(ComponentStore store, GameConfig gameConfig)
  {
  this.store = store;
  this.gameConfig = gameConfig;
- _rng = new Random(SystemRandomSeed);
  }
 
  /// <summary>
@@ -179,7 +177,7 @@ namespace BattleSystemECS.Systems
  if (w >0f) total += w;
  }
  if (total <=0f) return -1;
- double r = _rng.NextDouble() * total;
+ double r = store.Determinism.NextDouble() * total;
  double acc =0;
  for (int i =0; i < pool.Length; i++)
  {

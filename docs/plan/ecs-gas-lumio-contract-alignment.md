@@ -1,8 +1,8 @@
 # ECS + GAS：Lumio 合同对照收口计划
 
-> 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）、P3（A1 属性公式）、P4（Tag 层级 A2 + 准入序 A5）已实施；P5–P6 未宣称完成
+> 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）、P3（A1 属性公式）、P4（Tag parent 词汇表 + 准入序）、P5（同帧顺序 A4 + 随机领号 A3）已实施；P6 未宣称完成
 >
-> 更新日期：2026-09-05（P3 落地：Lumio 公式 / Percent 加项 / Override 最终覆盖 / 残留 Multiply 拒绝；P4 落地：Tag parent 词汇表 + 冻结准入序）
+> 更新日期：2026-09-05（P5 落地：remove-first + commit 批内 Remove 垫后；DeterminismContext 仅 CommitSerial 领号）
 >
 > 基线 commit：`b5cfe52`（对照审查时的 HEAD）
 >
@@ -421,7 +421,7 @@ GAS / 战斗公式 / 决定实体数量与位置的模拟路径禁止 `Rng.Share
 
 顺序表无 flag。RNG 切流按调用点逐个替换，禁止半帧混用墙钟种子与确定性流。删除条件：GAS 热路径与上表模拟路径零 `new Random` / `Rng.Shared`。
 
-排期本按 clock 虚拟时间、批量取件只覆盖纯时长效果：本阶段只写终态约束，实现放到 P6。
+**实施状态（2026-09-05）**：已落地。AI dispel 仍是批外 remove-first，未改 FrameGraph。`effect.commit` 批内 Remove 垫后，Applied/Removed 不抵消。`DeterminismContext` 挂在 `ComponentStore`，由 `FrameGraph.Execute` 按节点语义 Enter/Exit CommitSerial；并行工作线程不得领号。上表模拟路径已改领号；ShopReroll 保留固定种子私有流（不进 digest）；Benchmark 不迁。Portal 未使用 RNG 字段已删。digest：生产 `Parallel.For` 已按 batch/entity 串行归并；`CommandBuffer.TryMerge` 先 Sort 源再累计。防假绿：分裂 jitter 临时改回 `new Random()` 后 `FixedSeedFissionSoak` StateDigest 红，已恢复领号。未做 KeepPerLayer、未做排期本（P6）。mode 2/4/5 保持 DEFERRED。
 
 ## 11. P6 — 后置（不阻塞 P1–P5）
 

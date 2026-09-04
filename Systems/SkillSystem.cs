@@ -1176,7 +1176,7 @@ namespace BattleSystemECS.Systems
 
             CollectCircleHits(playerX, playerY, radius * radius);
 
-            // Serial phase: apply damage + freeze roll（命中序 = 敌人索引序，RNG 逐敌顺序与串行实现一致）
+            // Serial phase: apply damage + freeze roll（命中序 = 敌人索引序；只从 Frame DeterminismContext 领号）
             int hitCount = 0;
             foreach (int enemyId in _mergedHits)
             {
@@ -1184,7 +1184,7 @@ namespace BattleSystemECS.Systems
 
                 if (def.FreezeDuration > 0f && def.FreezeChance > 0f)
                 {
-                    float roll = (float)Rng.Shared.NextDouble();
+                    float roll = (float)store.Determinism.NextDouble();
                     if (roll < def.FreezeChance)
                     {
                         int freezeTurns = Math.Max(1, (int)Math.Ceiling(def.FreezeDuration * (1f - _enemyFreezeResistance)));

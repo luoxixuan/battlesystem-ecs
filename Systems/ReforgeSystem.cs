@@ -32,15 +32,14 @@ namespace BattleSystemECS.Systems
         private readonly IRenderer renderer;
         private readonly GameConfig gameConfig;
         private readonly int playerId;
-        private readonly Random rng;
 
-        public ReforgeSystem(ComponentStore store, IRenderer renderer, GameConfig gameConfig, int playerId, int seed = 98765)
+        public ReforgeSystem(ComponentStore store, IRenderer renderer, GameConfig gameConfig, int playerId, int seed = 0)
         {
             this.store = store;
             this.renderer = renderer;
             this.gameConfig = gameConfig;
             this.playerId = playerId;
-            this.rng = new Random(seed);
+            if (seed != 0) store.Determinism.Reset(seed);
         }
 
         // Cached config — keeps behavior safe when gameConfig.Reforge is null
@@ -276,7 +275,7 @@ namespace BattleSystemECS.Systems
                 total += v;
             }
             if (total <= 0f) return 0;
-            double r = rng.NextDouble() * total;
+            double r = store.Determinism.NextDouble() * total;
             float cum = 0f;
             for (int i = 0; i < w.Length; i++)
             {
@@ -331,7 +330,7 @@ namespace BattleSystemECS.Systems
                 if (a.MinLevel > towerLevel) continue;
                 count++;
                 // random pick with 1/count probability
-                if (rng.Next(count) == 0) picked = i;
+                if (store.Determinism.Next(count) == 0) picked = i;
             }
             return picked;
         }

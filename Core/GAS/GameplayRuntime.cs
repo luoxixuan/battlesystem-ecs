@@ -104,17 +104,47 @@ namespace BattleSystemECS.Core.GAS
             return true;
         }
 
+        private struct PendingRemove
+        {
+            public EntityHandle Target;
+            public EffectHandle Handle;
+            public GameplayEventType Reason;
+        }
+
+        private readonly List<PendingRemove> _pendingRemoves = new List<PendingRemove>(16);
+        private bool _effectCommitBatch;
+
+        /// <summary>
+        /// effect.commit 批内顺序：堆叠命中 → 溢出 → Replace 捕获 → 时长/周期（均在 TryApply）
+        /// → 过期 / 批内显式 Remove 垫后。禁止「施加又移除 = 抵消」；两条事实都要发布。
+        /// AI 组 dispel 是批外 remove-first，不走这里。
+        /// </summary>
         internal void CommitQueuedEffects()
         {
-            int count = _store.EffectRequests.Count;
-            for (int i = 0; i < count; i++)
+            _effectCommitBatch = true;
+            _pendingRemoves.Clear();
+            try
             {
-                var request = _store.EffectRequests.Get(i);
-                TryApply(request.Effect, _store.QueuedEffectDefinitions[i], request.Source, request.Target, out _,
-                    request.StackDelta, _store.QueuedEffectSnapshots[i], _store.QueuedEffectModifierCaptures[i],
-                    _store.QueuedEffectOwnerPlayerIds[i]);
+                int count = _store.EffectRequests.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    var request = _store.EffectRequests.Get(i);
+                    TryApply(request.Effect, _store.QueuedEffectDefinitions[i], request.Source, request.Target, out _,
+                        request.StackDelta, _store.QueuedEffectSnapshots[i], _store.QueuedEffectModifierCaptures[i],
+                        _store.QueuedEffectOwnerPlayerIds[i]);
+                }
+                for (int i = 0; i < _pendingRemoves.Count; i++)
+                {
+                    PendingRemove pending = _pendingRemoves[i];
+                    RemoveImmediate(pending.Target, pending.Handle, pending.Reason);
+                }
             }
-            _store.ClearEffectQueue();
+            finally
+            {
+                _effectCommitBatch = false;
+                _pendingRemoves.Clear();
+                _store.ClearEffectQueue();
+            }
         }
 
         internal void RejectQueuedEffects()
@@ -543,6 +573,21 @@ namespace BattleSystemECS.Core.GAS
         }
 
         public bool Remove(EntityHandle target, EffectHandle handle, GameplayEventType reason = GameplayEventType.EffectRemoved)
+        {
+            if (!handle.IsValid || !_store.TryGetActiveEffect(target, handle, out _, out _, out _)) return false;
+            if (_effectCommitBatch)
+            {
+                // 批内 Remove 垫后：先把本批 Apply 做完，再移除，两条事件都进 digest。
+                for (int i = 0; i < _pendingRemoves.Count; i++)
+                    if (_pendingRemoves[i].Handle.Equals(handle) && _pendingRemoves[i].Target.Equals(target))
+                        return true;
+                _pendingRemoves.Add(new PendingRemove { Target = target, Handle = handle, Reason = reason });
+                return true;
+            }
+            return RemoveImmediate(target, handle, reason);
+        }
+
+        private bool RemoveImmediate(EntityHandle target, EffectHandle handle, GameplayEventType reason)
         {
             if (!handle.IsValid || !_store.TryGetActiveEffect(target, handle, out var runtime, out _, out _)) return false;
             if (_modifiers.TryGetValue(handle, out _)) ReleaseModifierCache(target.Index, handle);

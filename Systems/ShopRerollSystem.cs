@@ -30,7 +30,7 @@ namespace BattleSystemECS.Systems
         private readonly IRenderer renderer;
         private readonly GameConfig gameConfig;
         private readonly int playerId;
-        private readonly Random rng;
+        private readonly Random rng; // BuildPhase 商店，非模拟；固定种子私有流，不进 digest。
 
         public ShopRerollSystem(ComponentStore store, IRenderer renderer, GameConfig gameConfig, int playerId, int seed = 12345)
         {

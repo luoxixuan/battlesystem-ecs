@@ -87,7 +87,7 @@ namespace BattleSystemECS.Systems
             // Scan enemy projectile slots — this is a simple linear scan of MAX_ENEMY_PROJ
             // In practice enemy projectiles are sparse and short-lived, so this is acceptable.
             // For future optimization: maintain a list of active enemy projectile IDs.
-            var rng = Rng.Shared;
+            var rng = store.Determinism;
 
             // 通过窄接口查询弹道，不读取 EnemyProjectileSystem 的内部数组。
             // For now we use a simplified approach: iterate all slots and check distance.

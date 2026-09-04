@@ -13,8 +13,6 @@ namespace BattleSystemECS.Systems
     /// </summary>
     public class UpgradeSystem
     {
-        private static readonly System.Random _sharedRandom = Rng.Shared;
-
         private Core.ComponentStore store;
         private IRenderer renderer;
         private int playerId;
@@ -72,7 +70,7 @@ namespace BattleSystemECS.Systems
         {
             var buffs = gameConfig.GetUpgradeBuffs();
             if (buffs == null || buffs.Count == 0) return;
-            int randomIndex = _sharedRandom.Next(buffs.Count);
+            int randomIndex = store.Determinism.Next(buffs.Count);
             string newBuff = buffs[randomIndex];
 
             var playerBuffs = store.GetPlayerBuffs(playerId);

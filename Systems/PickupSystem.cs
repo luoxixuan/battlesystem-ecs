@@ -27,7 +27,6 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore store;
         private readonly GameConfig gameConfig;
         private readonly IRenderer renderer;
-        private readonly Random _rng = new Random();
 
         private const int MAX_PICKUP = 1024;
 
@@ -90,7 +89,7 @@ namespace BattleSystemECS.Systems
             // Bonus drop: only 15% of kills drop a bonus (backward-compatible trigger probability).
             // Within that 15%, roll a rarity tier (0..4), then pick a pickup whose Rarity matches the tier.
             // Luck = sum of active towers' TowerLuck (owned by this player), capped by config.
-            if (_rng.NextDouble() >= 0.15f) return;
+            if (store.Determinism.NextDouble() >= 0.15f) return;
             int bonusRarity = RollPickupRarity();
             int bonusType = PickTypeByRarity(bonusRarity);
             if (bonusType > 0)
@@ -150,7 +149,7 @@ namespace BattleSystemECS.Systems
             if (total <= 0f) return 0;
 
             // Weighted draw.
-            double r = _rng.NextDouble() * total;
+            double r = store.Determinism.NextDouble() * total;
             double acc = 0;
             acc += w0; if (r < acc) return 0;
             acc += w1; if (r < acc) return 1;
@@ -182,11 +181,11 @@ namespace BattleSystemECS.Systems
             {
                 // No def at this rarity — fall back to any non-zero type (preserves 15% chance behavior).
                 if (gameConfig.PickupDefs.Length <= 1) return 0;
-                return _rng.Next(1, gameConfig.PickupDefs.Length);
+                return store.Determinism.Next(1, gameConfig.PickupDefs.Length);
             }
             if (matchCount == 1) return firstMatch;
             // Multiple matches — pick uniformly.
-            int pick = _rng.Next(0, matchCount);
+            int pick = store.Determinism.Next(0, matchCount);
             int seen = 0;
             for (int i = 1; i < gameConfig.PickupDefs.Length; i++)
             {

@@ -34,7 +34,6 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore store;
         private readonly GameConfig gameConfig;
         private readonly IRenderer renderer;
-        private readonly Random _spawnRandom = new Random();
 
         // Clone events: processed serially to avoid concurrent writes to ComponentStore
         private readonly List<(int masterId, int playerId, float x, float y, GameConfig.CloneDef def)> _cloneQueue =
@@ -148,8 +147,8 @@ namespace BattleSystemECS.Systems
             float cloneMaxHealth = Math.Max(1f, masterMaxHealth * def.CloneHpMult);
 
             // Jittered spawn position (avoid stacking perfectly)
-            float jitterX = (float)(_spawnRandom.NextDouble() * 1.6 - 0.8); // ±0.8 tiles
-            float jitterY = (float)(_spawnRandom.NextDouble() * 1.6 - 0.8);
+            float jitterX = (float)(store.Determinism.NextDouble() * 1.6 - 0.8); // ±0.8 tiles
+            float jitterY = (float)(store.Determinism.NextDouble() * 1.6 - 0.8);
             float spawnX = Math.Clamp(x + jitterX, 0f, 9f);
             float spawnY = y + jitterY; // no Y clamp needed (map extends vertically)
 

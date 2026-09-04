@@ -39,7 +39,7 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void DigestIncludesSemanticPayloadAndPreservesPublicationOrderAcrossMerge()
+        public void DigestIncludesSemanticPayloadAndStableMergeOrder()
         {
             var first = new GameplayEvent(GameplayEventType.DamageApplied, default(EntityHandle),
                 default(EntityHandle), default(EffectHandle), default(EffectId), 1L,
@@ -60,7 +60,8 @@ namespace BattleSystemECS.Tests.Framework
             sortedDestination.DigestEnabled = true;
             Assert.True(reverseDestination.TryMerge(reverseSource, GameplayEventOrdering.Compare));
             Assert.True(sortedDestination.TryMerge(sortedSource, GameplayEventOrdering.Compare));
-            Assert.NotEqual(sortedDestination.SequenceDigest, reverseDestination.SequenceDigest);
+            // 源队列先按 sequence/entity 归并再累计 digest，不依赖发布运气。
+            Assert.Equal(sortedDestination.SequenceDigest, reverseDestination.SequenceDigest);
             Assert.Equal(2, reverseDestination.PublishedCount);
 
             var preexisting = new GameplayEventQueue(4);

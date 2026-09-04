@@ -27,7 +27,6 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore store;
         private readonly GameConfig gameConfig;
-        private readonly Random rng = new Random();
 
         // Per-player event state (indexed by playerId)
         private bool[] _eventApplied = new bool[ComponentStore.MAX_PLAYERS];
@@ -122,7 +121,7 @@ namespace BattleSystemECS.Systems
             if (config == null || config.Events.Count == 0) return;
 
             // Global chance check
-            if (rng.NextDouble() >= config.GlobalEventChance) return;
+            if (store.Determinism.NextDouble() >= config.GlobalEventChance) return;
 
             // Collect eligible events (weight-based selection)
             float totalWeight = 0f;
@@ -143,7 +142,7 @@ namespace BattleSystemECS.Systems
             if (eligible.Count == 0 || totalWeight <= 0f) return;
 
             // Weighted random selection
-            float roll = (float)(rng.NextDouble() * totalWeight);
+            float roll = (float)(store.Determinism.NextDouble() * totalWeight);
             float cumulative = 0f;
             RandomEventDef chosen = null;
 

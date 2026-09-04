@@ -51,6 +51,8 @@ namespace BattleSystemECS.Core.GAS
                 LastRejection = critical ? CommandRejection.CriticalCapacity : (limit == Capacity ? CommandRejection.Capacity : CommandRejection.ReservedExhausted);
                 return false;
             }
+            // 先按 comparison 钉源序（sequence / entity），再追加；digest 不依赖线程完成序。
+            if (source._count > 1) source.Sort(comparison);
             for (int i = 0; i < source._count; i++) if (!TryAdd(source._items[i], critical)) return false;
             Sort(comparison); return true;
         }

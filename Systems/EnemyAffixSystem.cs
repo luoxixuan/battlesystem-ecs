@@ -22,7 +22,6 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore store;
         private readonly IRenderer renderer;
-        private readonly Random _random;
         private readonly int _playerId;
 
         // Affix candidates: all available affixes to randomly assign
@@ -45,7 +44,6 @@ namespace BattleSystemECS.Systems
             this.store = store;
             this.renderer = renderer;
             _playerId = playerId;
-            _random = new Random();
 
             // Subscribe to kill events for AffixVampiric (on-kill healing) and affix death effects
             store.OnEnemyKilled += OnEnemyKilledHandler;
@@ -72,12 +70,12 @@ namespace BattleSystemECS.Systems
             if (enemyId < 0 || enemyId >= ComponentStore.MAX_ENTITIES) return;
 
             // Roll 1-3 affixes
-            int affixCount = 1 + _random.Next(MAX_AFFIXES_PER_ENEMY);
+            int affixCount = 1 + store.Determinism.Next(MAX_AFFIXES_PER_ENEMY);
             BuffType flags = BuffType.None;
 
             for (int i = 0; i < affixCount; i++)
             {
-                int idx = _random.Next(AFFIX_CANDIDATES.Length);
+                int idx = store.Determinism.Next(AFFIX_CANDIDATES.Length);
                 flags |= AFFIX_CANDIDATES[idx];
             }
 
@@ -131,7 +129,7 @@ namespace BattleSystemECS.Systems
                     if (cooldown <= 0f)
                     {
                         // Teleport to random X position [0, 9] and forward Y
-                        float newX = (float)_random.Next(0, 10);
+                        float newX = (float)store.Determinism.Next(0, 10);
                         float newY = store.PositionY[id] - 3f; // move forward 3 units
                         if (newY < 0f) newY = 0f;
                         store.PositionX[id] = newX;

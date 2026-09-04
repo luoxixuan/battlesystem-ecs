@@ -222,7 +222,11 @@ namespace BattleSystemECS.Core.GAS
 
     internal static class GameplayObservation
     {
-        /// <summary>由 soak/profile harness 显式开启；生产 Tick 默认不承担 digest 计算成本。</summary>
+        /// <summary>
+        /// 由 soak/profile harness 显式开启；生产 Tick 默认不承担 digest 计算成本。
+        /// digest 按发布顺序累计。生产 Parallel.For 的线程局部缓冲必须先按 entity/batch 索引
+        /// 归并再串行 Publish；不得按线程完成序直接写入共享队列，否则多轮 soak 会抖。
+        /// </summary>
         public static void EnableDigests(ComponentStore store)
         {
             if (store == null) throw new ArgumentNullException(nameof(store));

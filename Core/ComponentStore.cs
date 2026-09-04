@@ -20,6 +20,8 @@ namespace BattleSystemECS.Core
         internal PhaseContext GameplayPhaseContext { get; set; } = PhaseContext.Unbound;
         // 同一 store 上的伤害与资源提交必须串行，避免跨 resolver 回滚已提交状态。
         internal object GameplayCommitLock { get; } = new object();
+        /// <summary>帧注入的确定性随机流。生产 Tick 仅 CommitSerial 领号。</summary>
+        public DeterminismContext Determinism { get; }
         #region Constants & Helpers
         public const int MAX_ENTITIES = 100000;
 
@@ -713,6 +715,7 @@ namespace BattleSystemECS.Core
 
         public ComponentStore()
         {
+            Determinism = new DeterminismContext();
             ResourceResolver = new GAS.ResourceResolver(this);
             DamageResolver = new GAS.DamageResolver(this);
             GameplayEffectsRuntime = new GAS.GameplayEffectRuntime(this);

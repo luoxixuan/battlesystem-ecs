@@ -144,7 +144,26 @@ namespace BattleSystemECS.Core
         internal FrameGraph(FrameNodeAdapter[] nodes,FrameCompositionDiagnostic[] diagnostics,string[] availableDependencies,string topologyHash,string reviewRoot,FrameGraphCompositionKind compositionKind){_nodes=nodes;_readOnlyNodes=Array.AsReadOnly(nodes);var engineNodes=new BattleSystemECS.Engine.IFrameNode[nodes.Length];for(int i=0;i<nodes.Length;i++)engineNodes[i]=nodes[i];_engineNodes=Array.AsReadOnly(engineNodes);_diagnostics=Array.AsReadOnly(diagnostics);_availableDependencies=Array.AsReadOnly(availableDependencies);TopologyHash=topologyHash;ReviewRoot=reviewRoot;CompositionKind=compositionKind;}
         public IReadOnlyList<FrameNodeAdapter> Nodes=>_readOnlyNodes; public IReadOnlyList<FrameCompositionDiagnostic> Diagnostics=>_diagnostics; public IReadOnlyList<string> AvailableDependencies=>_availableDependencies; public string TopologyHash{get;} public string ReviewRoot{get;} public FrameGraphCompositionKind CompositionKind{get;}
         IReadOnlyList<BattleSystemECS.Engine.IFrameNode> BattleSystemECS.Engine.IFrameExecutionPlan.Nodes=>_engineNodes;
-        public void Execute(FrameExecutionContext context){FramePhaseMask current=FrameGraphValidator.ToMask(context.Time.Phase.Kind);for(int i=0;i<_nodes.Length;i++){FrameNodeAdapter node=_nodes[i];if((node.Metadata.ActivePhases&current)==0)continue;node.System.Execute(new NodeExecutionContext(context,node.Metadata.TimeDomain));}}
+        public void Execute(FrameExecutionContext context)
+        {
+            FramePhaseMask current=FrameGraphValidator.ToMask(context.Time.Phase.Kind);
+            DeterminismContext determinism=context.Store.Determinism;
+            // 随机只在 CommitSerial 等价语义领号；拓扑与节点列表不变，不重算根哈希。
+            determinism.BeginStrictFrame();
+            try
+            {
+                for(int i=0;i<_nodes.Length;i++)
+                {
+                    FrameNodeAdapter node=_nodes[i];
+                    if((node.Metadata.ActivePhases&current)==0)continue;
+                    bool allowDraw=FrameDeterminism.AllowsCommitSerialDraw(node.Metadata.ExecutionSemantics);
+                    if(allowDraw)determinism.EnterCommitSerial();
+                    try{node.System.Execute(new NodeExecutionContext(context,node.Metadata.TimeDomain));}
+                    finally{if(allowDraw)determinism.ExitCommitSerial();}
+                }
+            }
+            finally{determinism.EndStrictFrame();}
+        }
     }
     public sealed class FrameGraphBuilder
     {

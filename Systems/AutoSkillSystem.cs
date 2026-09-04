@@ -35,9 +35,6 @@ namespace BattleSystemECS.Systems
         public int SuccessfulCastCount => _successfulCastCount;
         public SkillDamageRejectReason LastRejectReason => _lastRejectReason;
 
-        // 选优策略枚举
-        private static readonly Random _rng = new Random();
-
         public AutoSkillSystem(
             ComponentStore store,
             IRenderer renderer,
@@ -195,12 +192,12 @@ namespace BattleSystemECS.Systems
             return candidates;
         }
 
-        private static void Shuffle(List<CandidateSkill> list)
+        private void Shuffle(List<CandidateSkill> list)
         {
             int n = list.Count;
             while (n > 1)
             {
-                int k = _rng.Next(n--);
+                int k = store.Determinism.Next(n--);
                 var tmp = list[n];
                 list[n] = list[k];
                 list[k] = tmp;

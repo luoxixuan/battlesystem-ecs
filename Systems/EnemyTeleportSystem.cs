@@ -17,7 +17,6 @@ namespace BattleSystemECS.Systems
     {
         private readonly ComponentStore store;
         private readonly int playerId;
-        private readonly Random _rand = Rng.Shared;
 
         // Teleport type constants
         public const int TYPE_NONE = 0;
@@ -102,13 +101,13 @@ namespace BattleSystemECS.Systems
 
                 case TYPE_RANDOM_PHASE_AHEAD:
                     // Warp to a random point ahead in the path (destX = ahead offset range)
-                    float aheadY = store.PositionY[enemyId] + (float)(_rand.NextDouble() * destX * 2 - destX);
+                    float aheadY = store.PositionY[enemyId] + (float)(store.Determinism.NextDouble() * destX * 2 - destX);
                     float maxY = 20f; // map height limit
                     if (aheadY > maxY) aheadY = maxY;
                     if (aheadY < 0) aheadY = 0;
                     store.PositionY[enemyId] = aheadY;
                     // X stays same for forward phase, or scatter slightly
-                    float scatterX = (float)(_rand.NextDouble() * 2 - 1); // ±1 grid unit
+                    float scatterX = (float)(store.Determinism.NextDouble() * 2 - 1); // ±1 grid unit
                     store.PositionX[enemyId] = store.PositionX[enemyId] + scatterX;
                     break;
 
@@ -117,8 +116,8 @@ namespace BattleSystemECS.Systems
                     float px = store.PositionX[playerId];
                     float py = store.PositionY[playerId];
                     float retreatRange = destX; // use destination X as range parameter
-                    float angle = (float)(_rand.NextDouble() * Math.PI * 2);
-                    float dist = (float)(_rand.NextDouble() * retreatRange);
+                    float angle = (float)(store.Determinism.NextDouble() * Math.PI * 2);
+                    float dist = (float)(store.Determinism.NextDouble() * retreatRange);
                     float newX = px + (float)Math.Cos(angle) * dist;
                     float newY = py + (float)Math.Sin(angle) * dist;
                     // Clamp to map bounds

@@ -33,7 +33,6 @@ namespace BattleSystemECS.Systems
         private readonly ComponentStore store;
         private readonly GameConfig gameConfig;
         private readonly IRenderer renderer;
-        private readonly Random _spawnRandom = new Random();
 
         // Fission events collected during OnEnemyKilled — processed serially in Update()
         private readonly List<(int parentId, int playerId, float deathX, float deathY, FissionDef def, int generation)> _fissionQueue =
@@ -113,8 +112,8 @@ namespace BattleSystemECS.Systems
                 int childGold = Math.Max(1, (int)(parentGold * def.GoldScale));
 
                 // Jittered spawn position (avoid stacking perfectly)
-                float jitterX = (float)(_spawnRandom.NextDouble() * 1.6 - 0.8); // ±0.8 tiles
-                float jitterY = (float)(_spawnRandom.NextDouble() * 1.6 - 0.8);
+                float jitterX = (float)(store.Determinism.NextDouble() * 1.6 - 0.8); // ±0.8 tiles
+                float jitterY = (float)(store.Determinism.NextDouble() * 1.6 - 0.8);
                 float spawnX = deathX + jitterX;
                 float spawnY = deathY + jitterY;
 
