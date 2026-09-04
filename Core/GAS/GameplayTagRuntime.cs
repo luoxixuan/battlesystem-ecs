@@ -12,28 +12,44 @@ namespace BattleSystemECS.Core.GAS
         {
             if (granted == null) return;
             for (int i = 0; i < granted.Count; i++)
-            {
-                var key = (entityId, granted[i].Value);
-                _counts.TryGetValue(key, out int n);
-                _counts[key] = n + 1;
-            }
+                AdjustContribution(entityId, granted[i], 1);
         }
 
         public void RemoveGranted(int entityId, IReadOnlyList<TagId> granted)
         {
             if (granted == null) return;
             for (int i = 0; i < granted.Count; i++)
-            {
-                var key = (entityId, granted[i].Value);
-                if (!_counts.TryGetValue(key, out int n)) continue;
-                if (n <= 1) _counts.Remove(key);
-                else _counts[key] = n - 1;
-            }
+                AdjustContribution(entityId, granted[i], -1);
         }
 
         public bool Has(int entityId, TagId tag)
         {
-            return _counts.TryGetValue((entityId, tag.Value), out int n) && n > 0;
+            return GetCount(entityId, tag) > 0;
+        }
+
+        public int GetCount(int entityId, TagId tag)
+        {
+            return _counts.TryGetValue((entityId, tag.Value), out int n) ? n : 0;
+        }
+
+        /// <summary>
+        /// 授予叶标签时把已编译祖先一并计入。HasTag(祖先) 走同一整数键，不在运行时扫平列表。
+        /// </summary>
+        private void AdjustContribution(int entityId, TagId leaf, int delta)
+        {
+            AddDelta(entityId, leaf, delta);
+            var ancestors = GameplayTagVocabulary.AncestorsOf(leaf);
+            for (int i = 0; i < ancestors.Count; i++)
+                AddDelta(entityId, ancestors[i], delta);
+        }
+
+        private void AddDelta(int entityId, TagId tag, int delta)
+        {
+            var key = (entityId, tag.Value);
+            _counts.TryGetValue(key, out int n);
+            int next = n + delta;
+            if (next <= 0) _counts.Remove(key);
+            else _counts[key] = next;
         }
 
         public void ClearEntity(int entityId)

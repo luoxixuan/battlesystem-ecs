@@ -149,5 +149,37 @@ namespace BattleSystemECS.Tests.Framework
             }
             finally { File.Delete(path); }
         }
+
+        [Fact]
+        public void StrictGrantedTagsCompilationRejectsUnknownIds()
+        {
+            string path = Path.Combine(Path.GetTempPath(), "catalog-granted-" + Guid.NewGuid().ToString("N") + ".json");
+            File.WriteAllText(path, "[{\"Name\":\"granted\",\"AreaShape\":\"single\",\"AttackRange\":1," +
+                "\"AreaWidth\":1,\"AreaHeight\":1,\"Cooldown\":1,\"Modifiers\":[{\"Name\":\"x\",\"Type\":\"Debuff\"," +
+                "\"EffectTag\":\"Normal\",\"StackingType\":\"None\",\"Value\":1,\"Duration\":1," +
+                "\"GrantedTags\":[\"missing-granted-tag\"]}]}]");
+            try
+            {
+                var error = Assert.Throws<CatalogValidationException>(() => CatalogCompiler.Compile(path));
+                Assert.Contains("unknown tag", error.Message, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains(path, error.Message, StringComparison.Ordinal);
+            }
+            finally { File.Delete(path); }
+        }
+
+        [Fact]
+        public void KnownHierarchyTagNameCompilesIntoRequiredTags()
+        {
+            string path = Path.Combine(Path.GetTempPath(), "catalog-stun-" + Guid.NewGuid().ToString("N") + ".json");
+            File.WriteAllText(path, "[{\"Name\":\"needs-stun\",\"AreaShape\":\"shield\",\"AttackRange\":0," +
+                "\"AreaWidth\":1,\"AreaHeight\":1,\"Cooldown\":1,\"ShieldAmount\":1,\"ShieldDuration\":1," +
+                "\"AllowedPhases\":[\"Build\",\"Wave\"],\"RequiredTags\":[\"Stun\"],\"Modifiers\":[]}]");
+            try
+            {
+                var catalog = CatalogCompiler.Compile(path);
+                Assert.Equal(CatalogRegistries.StunTag, catalog.AbilityDefinitions[0].RequiredTags[0]);
+            }
+            finally { File.Delete(path); }
+        }
     }
 }

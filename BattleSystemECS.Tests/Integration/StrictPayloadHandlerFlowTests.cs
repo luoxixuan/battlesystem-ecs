@@ -168,7 +168,7 @@ namespace BattleSystemECS.Tests.Integration
 
                 Assert.False(hero.TriggerHeroSkill(0, 0));
 
-                Assert.Equal(AbilityActivationRejectReason.InvalidRequest, hero.LastActivation.Reason);
+                Assert.Equal(AbilityActivationRejectReason.UnsupportedDefinition, hero.LastActivation.Reason);
                 Assert.True(Store.CorpseActive[0]);
                 Assert.False(Store.CorpseReanimated[0]);
                 Assert.Equal(-1, Store.CorpseOwnerId[0]);
@@ -208,7 +208,7 @@ namespace BattleSystemECS.Tests.Integration
 
             Assert.False(registry.TowerActiveSkill.TriggerTowerActive(tower));
 
-            Assert.Equal(AbilityActivationRejectReason.InvalidRequest, registry.TowerActiveSkill.LastActivation.Reason);
+            Assert.Equal(AbilityActivationRejectReason.UnsupportedDefinition, registry.TowerActiveSkill.LastActivation.Reason);
             Assert.Equal(10f, Store.PlayerCurrentHealth[player]);
             Assert.Equal(20f, Store.PlayerMana[player]);
             Assert.Equal(30f, Store.PlayerShield[player]);

@@ -1,5 +1,10 @@
 # 更新记录 (Changelog)
 
+### 2026-09-05（Lumio P4：Tag 层级 A2 + 准入序对齐 A5）
+- **准入原因对调用方可见**：`ActivateCore` 第二段改为 `PhaseNotAllowed` → `Cooldown` → `Cost` → 实体 `NoTarget` → `TagRequirementsNotMet` → `UnsupportedDefinition`（时长合同 / 内容 CanCommit / 未知 execution）。形状类 `NoTarget` / ForbidEffects·heal-only 仍在冷却前。建造期战斗技能在冷却未转好时仍报 `PhaseNotAllowed`，不再先看到 `Cooldown`。空目标列表仍是 `NoTarget` 且发生在冷却检查之前。队列满仍是 `QueueOverflow`。
+- 内容 `CanCommit` 失败与时长合同失败从 `InvalidRequest` 改为 `UnsupportedDefinition`。
+- **Tag**：`GameplayTagVocabulary` 带 parent；授予 `Stun` 时 `Control` / `Debuff` 计数各 +1，移除对称。`stackKey` 与 `EffectApplied.Tag` 仍是叶 id。未知 Tag 启动硬失败（补测试）。
+
 ### 2026-09-04（Lumio P2：Commit 预留 F11 + 预校验后禁止 throw F12）
 - **少付钱不再生效**：同帧多条 `AbilityRequest` 入队时按 sequence 预留 Spend 资源与容量；后请求看到的可用 = 当前值 − 已预留。Commit 每条先复查冷却 + 预留，失败整单 `AbilityCancelled`，不调用 `CommitPlan`。支付只走 `ResourceOperation.Spend`（不足即拒、原子、实际扣减必须等于请求）。
 - **容量满报 `QueueOverflow`**：入队满槽与 `ValidateCapacityPlan` 失败不再混进 `InvalidRequest`。`GameplayEventType.AbilityCancelled` 加在枚举末尾。

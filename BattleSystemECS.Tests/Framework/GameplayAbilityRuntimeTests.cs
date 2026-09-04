@@ -880,6 +880,67 @@ namespace BattleSystemECS.Tests.Framework
                 StringSplitOptions.None).Length - 1);
             Assert.DoesNotContain("ValidateSingleCapacity", source, StringComparison.Ordinal);
             Assert.DoesNotContain("ValidateBatchCapacity", source, StringComparison.Ordinal);
+
+            int core = source.IndexOf("private static AbilityActivationResult ActivateCore", StringComparison.Ordinal);
+            int build = source.IndexOf("private static AbilityActivationRejectReason BuildActivationPlan(", StringComparison.Ordinal);
+            int validate = source.IndexOf("private static AbilityActivationRejectReason ValidatePlan(", StringComparison.Ordinal);
+            Assert.True(core >= 0 && build > core && validate > build);
+            string activateCore = source.Substring(core, build - core);
+            int phase = activateCore.IndexOf("ValidatePhase", StringComparison.Ordinal);
+            int ready = activateCore.IndexOf("activationState.IsReady", StringComparison.Ordinal);
+            int planCall = activateCore.IndexOf("BuildActivationPlan(store", StringComparison.Ordinal);
+            Assert.InRange(phase, 0, ready - 1);
+            Assert.InRange(ready, phase + 1, planCall - 1);
+            string validatePlan = source.Substring(validate, source.IndexOf("private enum BuiltInPayloadKind", StringComparison.Ordinal) - validate);
+            Assert.DoesNotContain("PhaseNotAllowed", validatePlan);
+        }
+
+        [Fact]
+        public void BuildPhaseCombatAbilityReportsPhaseNotAllowedBeforeCooldown()
+        {
+            var store = PlayerStore();
+            store.GameplayPhaseContext = new PhaseContext(PhaseContextKind.Build);
+            var timers = new float[] { 4f };
+            var catalog = Catalog(Execution(EffectPayloadKind.Shield, 2f, ExecutionOperation.ApplyShield));
+
+            var result = GameplayAbilityRuntime.Activate(store, catalog, timers, Request(0));
+
+            Assert.False(result.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.PhaseNotAllowed, result.Reason);
+            Assert.Equal(4f, timers[0]);
+        }
+
+        [Fact]
+        public void EmptyTargetListReportsNoTargetBeforeCooldown()
+        {
+            var store = PlayerStore();
+            var timers = new float[] { 6f };
+            var catalog = Catalog(Execution(EffectPayloadKind.Damage, 3f, ExecutionOperation.ApplyDamage));
+
+            var result = GameplayAbilityRuntime.ActivateTargets(store, catalog, timers, Request(0), Array.Empty<int>());
+
+            Assert.False(result.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.NoTarget, result.Reason);
+            Assert.Equal(6f, timers[0]);
+            Assert.Equal(0, store.AbilityRequests.Count);
+        }
+
+        [Fact]
+        public void FullAbilityQueueStillReportsQueueOverflow()
+        {
+            var store = PlayerStore();
+            int enemy = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            var catalog = Catalog(Execution(EffectPayloadKind.Damage, 3f, ExecutionOperation.ApplyDamage));
+            var dummy = new AbilityRequest(store.GetEntityHandle(0), new AbilityId(0), store.GetEntityHandle(enemy), 1);
+            for (int i = 0; i < store.AbilityRequests.Capacity; i++)
+                Assert.True(store.AbilityRequests.TryAdd(dummy));
+
+            var result = GameplayAbilityRuntime.Activate(store, catalog, new float[1], Request(enemy));
+
+            Assert.False(result.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.QueueOverflow, result.Reason);
+            Assert.Equal(store.AbilityRequests.Capacity, store.AbilityRequests.Count);
+            Assert.Equal(10f, store.EnemyHealth[enemy], 3);
         }
 
         private static void AssertEventTypesEqual(GameplayEventQueue expected, GameplayEventQueue actual)

@@ -1,8 +1,8 @@
 # ECS + GAS：Lumio 合同对照收口计划
 
-> 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）已实施；P3–P6 未宣称完成
+> 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）、P4（Tag 层级 A2 + 准入序 A5）已实施；P3 / P5–P6 未宣称完成
 >
-> 更新日期：2026-09-04（P2 落地：入队预留 / Spend / Commit 先复查 / QueueOverflow / 预校验后不 throw）
+> 更新日期：2026-09-05（P4 落地：Tag parent 词汇表 + 冻结准入序）
 >
 > 基线 commit：`b5cfe52`（对照审查时的 HEAD）
 >
@@ -359,6 +359,8 @@ P0 退出。可与 P1/P2 并行。`QueueOverflow` 枚举若尚未由 P2 落地�
 ### 9.3–9.6
 
 内部切换；无存档 Tag 推导值。回滚还原祖先表与检查顺序。删除「运行时扫平列表做层级匹配」若被引入。删除「用 `InvalidRequest` 表示队列满」。
+
+**实施状态（2026-09-05）**：已落地。词汇表 `GameplayTagVocabulary`（Stun ⊂ Control ⊂ Debuff，既有 0–10 无 parent）；授予叶标签时祖先计数 +1。`ActivateCore` 第二段 `PhaseNotAllowed` → `Cooldown` → `Cost` → 实体 `NoTarget` → Tag → `UnsupportedDefinition`（时长合同 / CanCommit / 未知 execution），容量仍 `QueueOverflow`。Commit 复查仍不查 Tag。未改 P3 公式、未改 FrameGraph / Spend / RestackLedger。mode 2/4/5 保持 DEFERRED。
 
 ## 10. P5 — 同帧顺序与随机领号（A4 / A3）
 

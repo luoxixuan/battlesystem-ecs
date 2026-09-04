@@ -343,6 +343,11 @@ namespace BattleSystemECS.Core.GAS
             => ActivateCore(store, catalog, new StoredAbilityActivationState(store, entityId, slot),
                 request, ActivationTargetSet.Scaled(targetIds, magnitudeScales), payloadHandler);
 
+        /// <summary>
+        /// 冻结准入序：第一段 InvalidRequest / 形状 NoTarget / ForbidEffects·heal-only UnsupportedDefinition；
+        /// 第二段 PhaseNotAllowed → Cooldown → Cost → 实体 NoTarget → Tag → 时长/CanCommit/未知 execution；
+        /// 第三段 QueueOverflow。形状类检查不得挪到 Cost 之后。
+        /// </summary>
         private static AbilityActivationResult ActivateCore<TState>(ComponentStore store, GameplayCatalog catalog,
             TState activationState, AbilityActivationRequest request, ActivationTargetSet targets,
             IAbilityPayloadHandler payloadHandler) where TState : struct, IAbilityActivationState
@@ -364,6 +369,9 @@ namespace BattleSystemECS.Core.GAS
                         return Reject(request, AbilityActivationRejectReason.UnsupportedDefinition);
             var source = store.GetEntityHandle(request.OwnerId);
             if (!source.IsValid) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            // 第二段：PhaseNotAllowed → Cooldown → Cost；容量仍在末尾 QueueOverflow。
+            var phaseReject = ValidatePhase(store, ability);
+            if (phaseReject != AbilityActivationRejectReason.None) return Reject(request, phaseReject);
             if (!activationState.IsReady)
                 return Reject(request, AbilityActivationRejectReason.Cooldown);
 
@@ -582,21 +590,29 @@ namespace BattleSystemECS.Core.GAS
                 : AbilityActivationRejectReason.QueueOverflow;
         }
 
-        private static AbilityActivationRejectReason ValidatePlan(ComponentStore store, GameplayCatalog catalog,
-            AbilityDefinition ability, AbilityActivationRequest request, EntityHandle source, EntityHandle target,
-            IAbilityPayloadHandler payloadHandler)
+        private static AbilityActivationRejectReason ValidatePhase(ComponentStore store, AbilityDefinition ability)
         {
             GameplayPhaseMask phase = PhaseMask(store.GameplayPhaseContext.Kind);
             if (phase == GameplayPhaseMask.None || (ability.AllowedPhases & phase) == 0)
                 return AbilityActivationRejectReason.PhaseNotAllowed;
+            return AbilityActivationRejectReason.None;
+        }
+
+        private static AbilityActivationRejectReason ValidatePlan(ComponentStore store, GameplayCatalog catalog,
+            AbilityDefinition ability, AbilityActivationRequest request, EntityHandle source, EntityHandle target,
+            IAbilityPayloadHandler payloadHandler)
+        {
             if (!GameplayTagRuntime.Matches(store, source.Index, ability.RequiredTags, ability.BlockedTags) ||
                 !GameplayTagRuntime.Matches(store, target.Index,
                     ability.Targeting.RequiredTags, ability.Targeting.BlockedTags))
                 return AbilityActivationRejectReason.TagRequirementsNotMet;
             for (int i = 0; i < ability.Effects.Count; i++)
-                if (!catalog.TryGetEffect(ability.Effects[i], out var effect) ||
-                    !GameplayEffectRuntime.IsDurationContractValid(effect))
+            {
+                if (!catalog.TryGetEffect(ability.Effects[i], out var effect))
                     return AbilityActivationRejectReason.InvalidRequest;
+                if (!GameplayEffectRuntime.IsDurationContractValid(effect))
+                    return AbilityActivationRejectReason.UnsupportedDefinition;
+            }
             for (int i = 0; i < ability.Executions.Count; i++)
             {
                 if (!catalog.TryGetExecution(ability.Executions[i], out var execution))
@@ -605,7 +621,7 @@ namespace BattleSystemECS.Core.GAS
                 var context = new AbilityPayloadContext(store, ability, execution, request, source, target, magnitude);
                 if (payloadHandler != null && payloadHandler.Supports(execution))
                 {
-                    if (!payloadHandler.CanCommit(context)) return AbilityActivationRejectReason.InvalidRequest;
+                    if (!payloadHandler.CanCommit(context)) return AbilityActivationRejectReason.UnsupportedDefinition;
                     continue;
                 }
                 if (!TryBuildBuiltInPayload(context, out _, out bool supported))
