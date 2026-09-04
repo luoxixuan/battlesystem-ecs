@@ -2,7 +2,7 @@
 
 > 状态：执行计划（不代表迁移已经开始）
 >
-> 更新日期：2026-08-30
+> 更新日期：2026-09-04
 >
 > 终态约束：[ecs-gas-final-architecture.md](../ecs-gas-final-architecture.md)
 >
@@ -21,6 +21,7 @@
 | [foundation](ecs-gas-migration-foundation.md) | M0-M2 | 基线、语义冻结、Catalog/ID/Handle、属性和资源基座 |
 | [combat](ecs-gas-migration-combat.md) | M3-M4 | Damage/Resource/Death Resolver、Gameplay Effect、Trigger runtime |
 | [orchestration](ecs-gas-migration-orchestration.md) | M5-M8 | FrameGraph、能力和配置收口、注册模型、清理、性能与 Archetype 闸门 |
+| [lumio-contract-alignment](ecs-gas-lumio-contract-alignment.md) | 对照收口 | 2026-09-04 Lumio 会计合同：终态冻结、F10/F11/F12、公式、Tag 层级、Commit 预留、Spend、随机全清单 |
 
 每份阶段文档都使用相同模板：进入条件 → 范围和产物 → 切流策略 → 退出门槛 → 回滚 → 删除旧路径的条件。
 

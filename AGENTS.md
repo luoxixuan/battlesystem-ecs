@@ -371,6 +371,7 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 | 查看 Bug 历史 | `docs/design-and-bugs.md` |
 | 查看架构决策 | `docs/architecture.md` |
 | 查看 ECS+GAS 迁移计划 | `docs/plan/ecs-gas-migration-plan.md` |
+| 查看 Lumio 对照收口计划 | `docs/plan/ecs-gas-lumio-contract-alignment.md` |
 | 查看 CodeReview 改进 | `Research/CodeReview_Improvements.md` |
 
 ---

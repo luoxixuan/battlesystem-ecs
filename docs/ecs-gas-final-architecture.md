@@ -1,9 +1,10 @@
 # BattleSystem-ECS ECS + GAS 终态架构
 
 > 状态：目标架构决策（本文定义终态，不代表当前代码已经全部实现）
-> 更新日期：2026-09-03
+> 更新日期：2026-09-04
 > 相关审查：[skill-combat-arch-review.md](skill-combat-arch-review.md)
 > 迁移计划：[ecs-gas-migration-plan.md](plan/ecs-gas-migration-plan.md)
+> Lumio 对照收口：[plan/ecs-gas-lumio-contract-alignment.md](plan/ecs-gas-lumio-contract-alignment.md)
 
 ## 1. 决策摘要
 
@@ -42,16 +43,34 @@
 | Ability | 可被激活的动作，包含成本、冷却、条件和效果引用 |
 | Targeting | 从 ECS 世界收集目标的规则，不负责施加效果 |
 | Gameplay Effect | 对目标施加的状态变化描述，可为瞬时、持续、永久或周期 |
-| Modifier | 对 Attribute 的数值修饰 |
+| Modifier | 对 Attribute 的数值修饰；无独立生命周期，见 §5.2 / §5.3 |
 | Trigger | 监听已提交 Gameplay Event 并产生效果申请的规则 |
 | Execution | 需要代码计算的特殊效果算法，例如链式跳转或时间回溯 |
 | Attribute | 可被聚合的数值，例如攻击力、暴击率、移动速度 |
 | Resource | 可直接消耗或恢复的动态池，例如当前生命、法力和护盾 |
-| Tag | 分类状态或条件，例如 `Stunned`、`Silenced`、`Boss` |
+| Tag | 分类状态或条件；运行时是计数容器，层级见 §3.1 |
 | Request | 当前帧尚未提交的意图 |
 | Event | 已经经过验证并提交的事实 |
 
 `Request` 和 `Event` 不能混用：请求可以被拒绝，事件表示事实已经发生。
+
+### 3.1 Tag
+
+`Tag` 是 `(entity, tagId)` **计数容器**：授予 +1，移除 −1，`HasTag` 读计数是否大于 0。同一实体多个来源授予同一标签时，摘除一层不得清掉其余贡献。
+
+层级不在运行时扫字符串。Catalog 持有带 `parent` 的 Tag **词汇表**；编译期对每个 `TagId` 展开祖先闭包。授予叶标签（例如 `Stun`）时，祖先（例如 `Control`、`Debuff`）的贡献计数各 +1，移除对称 −1。运行时 `HasTag` / Required / Blocked 仍是整数键计数。
+
+祖先展开**只**作用于：
+
+- 贡献计数；
+- Required / Blocked 匹配。
+
+祖先展开**不**作用于：
+
+- `stackKey` 身份（叠层键仍是定义自己的键，不因祖先相同而合并）；
+- 事件上的 `definition.Tag`（`EffectApplied` 等仍发布叶标签，不改写成祖先）。
+
+未知 Tag 启动硬失败（见 §12）。
 
 ## 4. 分层与依赖方向
 
@@ -104,11 +123,12 @@ BattleWorld
 以下数据使用预分配的稀疏池和空闲链表：
 
 - `AbilityState`；
-- `ActiveGameplayEffect`；
-- `Modifier`；
-- `TagState`；
+- `ActiveGameplayEffect`（账本条目：层数、时长、周期、捕获值、Tag 贡献都挂在这条上）；
+- `TagState`（计数容器，见 §3.1）；
 - `TriggerState`；
 - 动态 Shield、DoT 和其他效果实例。
+
+`Modifier` **没有独立生命周期**，不得作为与 `ActiveGameplayEffect` 并列的一等池对象按层 `new` 或扩 handle。`stackCount` 是该条目对 ΣAdd / ΣPercent 的乘数，不把同一条展开成 N 份独立 modifier。
 
 GAS 池中的外部句柄必须包含 `index + generation`。实体销毁会使关联代数失效；槽位耗尽必须返回明确错误并记录诊断，不能静默覆盖或丢弃。
 大逻辑容量 pool 的 handle 元数据和 runtime payload 可以分别按需分页；分页是该 module 的
@@ -116,14 +136,17 @@ implementation，不能改变 handle、容量、失败或回收 interface。
 
 ### 5.3 属性与资源
 
-基础值只有一个来源，Modifier 只存在于 GAS 运行态：
+基础值只有一个来源。运行时 Modifier 从属于 ActiveEffect，不单独存活：
 
 ```text
 ECS base columns
-  + GAS ModifierPool
+  + ActiveGameplayEffect（账本）
+  + GAS ModifierPool（仅 AttributeAggregator 派生缓存，可丢弃后从账本重建）
   -> AttributeAggregator
   -> ECS computed cache
 ```
+
+`ModifierPool` 只能是 Aggregator 派生缓存，不是第二份账本。移除效果或 `ClearEntity` 后必须能从 ActiveEffect 全量重建；禁止只改池、不改条目而导致 computed 与层数分叉。
 
 `CurrentHealth`、`Mana`、`Shield` 是 Resource，不应被每帧属性重算覆盖。它们只能通过对应的 Resolver 修改。`MaxHealth` 等可聚合属性变化后，应由资源规则决定当前值是否需要裁剪。
 
@@ -148,7 +171,40 @@ AbilityDefinition
   triggerIds[]          # 被动能力可选
 ```
 
-`allowedPhases` 是运行时激活合同，不只是 UI 提示。战斗型 Ability 默认只允许在 Wave；Build 中的资源、建设和准备类 Ability 必须显式声明。`AbilityCommit` 在产生任何 Effect、Damage 或 Resource Request 前校验当前阶段，拒绝时产生带原因的诊断事实。
+`allowedPhases` 是运行时激活合同，不只是 UI 提示。战斗型 Ability 默认只允许在 Wave；Build 中的资源、建设和准备类 Ability 必须显式声明。
+
+#### 激活准入序（提示优先级）
+
+准入检查按下列顺序，**先匹配的原因先返回**。这是整张冻结表，不是「只把 `PhaseNotAllowed` 提前」一句。实现必须与本表对齐。
+
+```text
+第一段（冷却之前，与当前 ActivateCore 前半段对齐）：
+  InvalidRequest（空 store/catalog、句柄无效、catalog 缺失、请求畸形）
+  NoTarget（ValidateShape 空列表等形状失败）
+  UnsupportedDefinition（ForbidEffects 带 effects、heal-only 形状不匹配）
+
+第二段：
+  PhaseNotAllowed
+  Cooldown
+  Cost（含同帧预留：后请求看到的可用 = 当前值 − 已预留）
+  NoTarget（目标实体无效 / RequireEnemy 未激活）
+  TagRequirementsNotMet
+  UnsupportedDefinition（时长合同 / 内容 CanCommit / 未知 execution）
+
+第三段（末尾，独立原因，不复用 InvalidRequest）：
+  QueueOverflow（语义对齐 Resolver 的 RequestQueueOverflow：
+    AbilityRequests / EffectRequests / Damage·Resource 队列 / modifier 槽）
+```
+
+`NoTarget` 与 `UnsupportedDefinition` 在第一段与第二段各出现一次，细类不同：第一段是形状/定义合法性，第二段是目标实体与定义合同。调用方按返回的原因枚举区分。容量失败不得报成 `InvalidRequest`。
+
+#### Commit 复查与支付
+
+已入队请求在入队时预留资源与容量。Commit **必须先**复查冷却 + 预留消耗/容量，**再** `CommitPlan`（硬要求）。复查不查 Tag：当前 granted effect 到 `effect.commit` 才 `TryApply`，`ability.commit` 时 Tag 还不存在；跨帧蓄力的 commit 才会踩到 Tag 变化。失败发 `AbilityCancelled`，不 throw、不半价、不把 World 作废。
+
+支付走 `ResourceOperation.Spend`：不足即拒、原子、实际扣减必须等于请求。禁止改通用 `ResourceResolver` 夹紧语义：`BossTrailAoeSystem` / `SuicideBombSystem` 用负增量打血，夹到 0 仍 `Accepted` 是预期。
+
+预留释放钉在 `ClearAbilityQueue`。三个调用方必须都释放：`CommitQueuedAbilities`、`RejectQueuedAbilities`、`ComponentStore` 的 `frame.begin`。漏绑会把预留漏到下一帧。
 
 ### 6.2 TargetingDefinition
 
@@ -180,6 +236,7 @@ GameplayEffectDefinition
   stackingPolicy
   stackKey
   maxStacks
+  stackSnapshotPolicy  # V1 仅 Replace（默认）；KeepPerLayer 不进 V1
   refreshPolicy
   grantedTags
   blockedTags
@@ -201,16 +258,44 @@ PeriodicSpec
 
 `firstTickPolicy = NextInterval` 是默认值；需要施加时立即触发的效果必须显式选择 `Immediate`。`clockId` 决定 duration 和 period 使用哪一个模拟时钟，不能由调用方临时传入 `enemyDt` 或 `combatDt`。
 
-Modifier 的定义也必须独立于效果生命周期：
+静态 `ModifierDefinition` 与效果的 duration / period 字段分离（定义层拆分）。运行时 Modifier 实例**没有**独立于 `ActiveGameplayEffect` 的生命周期（见 §5.2 / §5.3）。
 
 ```text
 ModifierDefinition
   attributeKey
-  operation            # Add / Multiply / Override
+  operation            # Add / Percent / Override
   magnitudeSource      # 常量、Attribute、Curve 或 Execution
-  priority
+  priority             # Override 必填；数字大者赢，同级后写赢
   snapshotPolicy       # CaptureOnApply / ReevaluateOnRead
 ```
+
+#### 同帧效果顺序
+
+生产路径上，AI 组 `EnemyAbilitySystem.RemoveDispellableEffects` 是 **批外 remove-first**：在 `effect.commit` **之前**执行。此处不单独改 FrameGraph。
+
+```text
+AI 组 dispel（批外，remove-first）：
+  RemoveDispellableEffects → 之后同帧才入队 / effect.commit 施加
+
+effect.commit 批内（结果不得依赖遍历顺序）：
+  堆叠命中
+    → 溢出判定
+    → 按 stackSnapshotPolicy 应用捕获（V1 = Replace，且为默认）
+    → 时长策略
+    → 周期策略
+    → 过期 / 批内显式 Remove 垫后
+```
+
+禁止「同帧施加又移除 = 抵消」。`EffectApplied` / `EffectRemoved` 都是已发生的事实，Trigger 与 digest 按发布顺序消费；抵消会吞掉事实。两条事件都必须发布。
+
+#### 堆叠快照（V1）
+
+| 值 | V1 | 含义 |
+|---|---|---|
+| `Replace` | **实现，默认** | 新快照整张替换当前条目的捕获 |
+| `KeepPerLayer` | **不做** | 每层各自捕获。单条目 × 乘数无法表达，除非条目内 `maxStacks` 长度捕获数组 |
+
+默认必须是 `Replace`，不得写成 `KeepPerLayer`。catalog modifier 全为 `ReevaluateOnRead`，聚合器忽略 `Captured`；唯一 `CaptureOnApply` 是 `LegacyEffectAdapter`，且走 `TryAdopt` / `TryRestack` 不加层。因此默认 `Replace` 对 shipped 内容零可见变化。`KeepPerLayer` 若将来要做，必须先规定条目内定长捕获数组，并单列 CHANGELOG。
 
 ### 6.4 TriggerDefinition
 
@@ -240,6 +325,9 @@ AbilityState
   abilityId
   cooldown
   charges
+  # 仅时长能力（蓄力 / 读条 / 引导）才有：
+  # Executing / Completed / Cancelled / Expired
+  # 瞬时能力不背状态机；不设 RolledBack；不为 10K 瞬发路径引入八态机
 
 ActiveGameplayEffect
   effectId
@@ -265,21 +353,30 @@ TriggerState
   generation
 ```
 
+瞬时能力只占用冷却 / 充能，**不背状态机**。`Executing` / `Completed` / `Cancelled` / `Expired` 只给蓄力、读条、引导等时长能力。不引入 `RolledBack`，不为 10K 瞬发路径套八态机。`ActiveGameplayEffect.modifierHandles[]` 若保留，只指向 Aggregator 派生缓存，不是独立账本身份。
+
 ## 7. 属性聚合规则
 
-属性聚合器是唯一解释 `ModifierOp` 的模块。默认规则应固定为：
+属性聚合器是唯一解释 `ModifierOp` 的模块。同一 AttributeKey 的求值**整段**采用 Lumio 冻结公式，不是「只改乘区、覆盖仍换起点」：
 
 ```text
-overrideBase = highest-priority Override, or base when none exists
-computed = (overrideBase + sum(Add)) * product(Multiply)
-computed = Clamp / domain rule
+aggregated     = (Base + ΣAdd) × max(PercentFloor, 1 + ΣPercent)
+winningOverride = 配表 priority 最高的 Override；同级后写赢（applicationSequence）
+computed       = winningOverride 若存在，否则 aggregated
+computed       = Clamp / domain rule
 ```
 
-`Override` 替换的是聚合起点，不是最后一步覆盖结果；同优先级时按 `applicationSequence` 决定胜者。若某个属性需要最终覆盖，必须注册独立的 `FinalOverride` 语义，不能复用 `Override` 猜测。
+`Override` 是最终覆盖：有它则「这个值就是该 magnitude」，Add / Percent 全部不生效。不存在换聚合起点的 Override，也不另注册 `FinalOverride`。priority 必须写在 Modifier 定义上，禁止靠容器插入顺序隐式重排。
 
-属性定义必须声明范围、默认值和裁剪规则。`MaxHealth` 下降时，`ResourceResolver` 将 `CurrentHealth` 裁剪到新的上限；`MaxHealth` 上升不会自动治疗，除非效果明确声明对应的资源策略。
+`Percent` 的 magnitude 是加项：`+30%` 配 `0.30`，不是 `1.30`。两个 `+30%` 得到 `1.60`，不是 `1.69`。`stackCount` 是该条目对 ΣAdd / ΣPercent 的乘数，不把同一条展开成 N 份独立 modifier。Override 条目若叠层，只比较各层给出的覆盖值，胜者仍是最终值，不会在覆盖值上再加 Percent。
 
-属性变化采用 dirty 重算，而不是移除 Modifier 时做浮点逆运算。添加、刷新、移除或过期效果都会标记相关实体 dirty；聚合器从基础值重新计算，避免跨帧累加误差。
+`PercentFloor` 由属性定义声明，**默认 `0`**：百分比不能把符号翻负（两个 `−60%` 是 `max(0, 1 − 1.20) = 0`，不是 `−0.20`）。移速等属性可以声明更高下限（例如 `0.1`）。这与属性自身的 Clamp 是两道裁剪：先保证百分比因子合法，再套值域。
+
+跨通道仍按 gap Phase 1 已定：`computed(AttackDamage) × computed(DamageOutputMultiplier)`。本公式只约束**同一 AttributeKey 内部**；通道之间的乘积不是 `Percent` 聚合。某一通道上的 Override 只盖住该通道的 computed，不会跨通道生效。
+
+属性定义必须声明范围、默认值、`PercentFloor` 和裁剪规则。`MaxHealth` 下降时，`ResourceResolver` 将 `CurrentHealth` 裁剪到新的上限；`MaxHealth` 上升不会自动治疗，除非效果明确声明对应的资源策略。
+
+属性变化采用 dirty 重算，而不是移除 Modifier 时做浮点逆运算。添加、刷新、移除或过期效果都会标记相关实体 dirty；聚合器从基础值重新计算，避免跨帧累加误差。当前实现仍是「Override 换起点 + ΠMultiply」；切到本公式是数值语义变更，实施时必须在 `CHANGELOG.md` 单列，并把生产路径上的 `Multiply(1 + x)` 迁成 `Percent(x)`。
 
 ## 8. 请求、事实与统一战斗管线
 
@@ -338,6 +435,8 @@ ResourceRequest
   sequence
 ```
 
+`operation` 含 `Spend`（不足即拒、原子，能力支付只走这条）与既有夹紧类增减。负增量打血等旁路继续走通用夹紧，夹到边界仍可 `Accepted`（见 §6.1）。
+
 `ExecutionContext` 是值类型上下文，至少包含 source/target handle、ability/effect ID、事件序号、时间域、快照值和 owner player ID。它不能在热路径中临时创建字典或字符串上下文。
 
 ### 8.2 已提交事实
@@ -347,6 +446,7 @@ HitConfirmed
 DamageApplied
 AbilityActivated
 AbilityRejected
+AbilityCancelled
 EffectApplied
 EffectRejected
 EffectExpired
@@ -362,6 +462,8 @@ GameplayLoopAborted
 ```
 
 `HitConfirmed` 表示命中验证通过；`DamageApplied` 表示实际造成了有效伤害；`DeathQueued` 表示已经进入死亡队列；`KillConfirmed` 只在死亡解析和奖励归属确定后产生。触发器必须选择正确的事实类型，不能用 `KillConfirmed` 提前触发效果。
+
+`AbilityRejected` 表示**准入**失败（未入队或入队前拒绝），原因见 §6.1 冻结表。`AbilityCancelled` 表示已入队请求在 Commit 复查失败（冷却或预留消耗/容量不再有效），整单取消，不 throw、不半价。不得用 `AbilityRejected` 表示复查失败，也不得用 `AbilityCancelled` 表示准入失败。
 
 内部 Gameplay Event Queue 与 `IBattleEventBus` 是两个不同的 seam：前者供模拟系统触发规则，后者只在提交后向渲染层发送展示事实。并行阶段不得直接广播任一总线。
 
@@ -451,6 +553,10 @@ Presentation events
 - `CommitSerial`：按确定顺序修改共享状态；
 - `Presentation`：只消费已提交事实。
 
+时长与周期效果的**排期本**按每个 `clockId` 的虚拟时间取件，**不按帧号**。子弹时间缩放 `enemyDt`；按帧号排期不是合法实现。排期本是派生缓存，不登记闭包。
+
+模拟路径的随机数只从 Frame `DeterminismContext` 领号，且**仅**在 `CommitSerial` 相取数。`Rng.Shared`（墙钟 `TickCount xor ManagedThreadId`）与无种子 `new Random()` 都不是确定性资产，不得进入 GAS、战斗公式、或决定实体数量与位置的模拟路径。
+
 GAS 的 `AbilityCommit`、`EffectTick`、`GameplayEventCommit` 和 `AttributeAggregate` 都是 ECS 帧图中的系统，不拥有第二个调度器。`ResourceResolve` 处理非伤害的治疗、护盾、法力和其他资源请求。
 
 每个 active phase 必须满足提交闭包：该阶段允许产生的 Request 必须在同一帧存在对应的 Effect、Damage、Resource、Event 和 Death commit，或在入口被明确拒绝。帧级命令缓冲不得静默跨越 Build/Wave/Intermission 边界；显式延迟命令必须使用另一种带目标帧和生命周期的合同。
@@ -534,6 +640,8 @@ remainder = (oldCount + deltaHits) % threshold
 
 清理操作必须幂等。效果槽位不能用裸数组索引作为长期外部引用。
 
+墓碑查询必须能区分「这个句柄曾经活过、现在死了」与「这个句柄从未存在」。实体 ID **仍然回收**，代数靠 `generation` 失效旧句柄；不把 ID 永不复用当成合同。过期 generation 的命令丢弃并记诊断。
+
 `sourceDeathPolicy` 的允许值必须是显式枚举：
 
 ```text
@@ -588,6 +696,8 @@ M8 的稳定观察是显式的只读 snapshot：它不进入生产 Tick 热路�
 事实在状态写入前以 `RequestQueueOverflow` 拒绝。这些字段不改变 Ability/Effect/Trigger/Request/
 Resolver contract。
 
+该 digest 合同**不**把 `Rng.Shared` 或无种子 `new Random()` 当成确定性资产。模拟随机见 §9：只从 Frame `DeterminismContext` 在 `CommitSerial` 领号。
+
 ## 14. 架构不变量
 
 以下规则是终态的强约束：
@@ -602,5 +712,9 @@ Resolver contract。
 8. 同一帧的提交顺序必须由 FrameGraph 声明并可测试。
 9. 内容系统依赖 Engine contract，不直接依赖其他内容系统的具体实现。
 10. 新增配置在启动校验失败时必须显式失败，而不是静默降级。
+11. 同一 AttributeKey 内部使用 Lumio 公式：先 `(Base + ΣAdd) × (1 + ΣPercent)`，有 `Override` 则最终覆盖，Add / Percent 不再生效；`Percent` 不得实现为连乘。
+12. Modifier 无独立生命周期；账本是 `ActiveGameplayEffect`，`ModifierPool` 只能是 Aggregator 派生缓存。
+13. Event 是已发生的事实，不得因同帧施加又移除被抵消吞掉。
+14. 模拟随机禁止墙钟种子与无种子 `new Random()`；只从 Frame `DeterminismContext` 在 `CommitSerial` 领号。
 
 本文只定义终态架构和不变量，不规定从当前代码迁移到终态的步骤、兼容层或删除顺序；迁移规划另行记录。

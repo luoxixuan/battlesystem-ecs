@@ -1,5 +1,20 @@
 # 更新记录 (Changelog)
 
+### 2026-09-04（文档：Lumio P0 终态合同冻结，文档-only）
+- 终态写入：§3.1 Tag 计数+parent 词汇+祖先展开边界；§5.2/§5.3 账本无独立生命周期与 `ModifierPool` 派生缓存；§6.1 整张准入表与 Commit 复查/`Spend`/`ClearAbilityQueue`；§6.3 同帧顺序、禁止抵消、V1 默认 `Replace`；§6.5 瞬时能力不背状态机；§8.2 `AbilityCancelled`；§9 排期本按 clock、随机只在 `CommitSerial` 领号；§11 墓碑；§13 明确 `Rng.Shared` 不是确定性资产；§14 不变量 12–14。
+- 对照计划 §2.1 文档状态改为已写入；缺口计划 §9.3 改为已写入。
+- **未改生产代码**。§7 公式保持 Lumio 整段，未改回 Override 换起点 / `FinalOverride` / `ΠMultiply`。
+
+### 2026-09-04（文档：Lumio 对照收口计划）
+- 新增 [docs/plan/ecs-gas-lumio-contract-alignment.md](docs/plan/ecs-gas-lumio-contract-alignment.md)：P0 终态冻结 → P1 账本（F10）→ P2 Commit 预留（F11）+ 预校验后禁止 throw（F12）→ P3 Lumio 公式 → P4 Tag 层级/准入序整表 → P5 同帧顺序与随机领号。
+- 审查修订：`stackSnapshotPolicy` V1 默认 `Replace`（`KeepPerLayer` 不做）；支付走 `Spend` 不改通用夹紧；复查硬性置于 `CommitPlan` 之前；A1 补 `SkillSystem` Multiply；A3 补九处无种子 `new Random()`；A4 收窄为「一处 dispel remove-first」；准入冻结补形状类与 `QueueOverflow`。
+- 缺口计划登记 F10 / F11 / F12；不改生产代码。
+
+### 2026-09-04（终态：属性公式整段收成 Lumio，文档-only）
+- **公式拍板**：`aggregated = (Base + ΣAdd) × max(PercentFloor, 1 + ΣPercent)`；若存在 Override，则 `computed = winningOverride`（配表 priority，同级后写赢），Add / Percent 全部忽略。不再把 Override 当成换聚合起点，也不另设 `FinalOverride`。
+- `Percent` magnitude 是加项（`+30%` 配 `0.30`）；`PercentFloor` 默认 `0`。跨通道 `computed(AttackDamage) × computed(DamageOutputMultiplier)` 不变，通道上的 Override 只盖该通道。
+- **未改代码**：`AttributeAggregator` 仍是「Override 换起点 + ΠMultiply」。切实现时必须单列数值条目，并把 `Multiply(1 + x)` 迁成 `Percent(x)`。
+
 ### 2026-09-04（ECS+GAS：能力 granted effect 延到 effect.commit，⚠️ 有时序变化）
 - **CommitPlan 不再同步 TryApply**：能力 granted effect 只 `EnqueueApply` 进 `EffectRequests`，与世界 DoT（Firewall/岩浆/尸体）同在 Combat 后的 `effect.commit` 才 `TryApply`。伤害/治疗/CC/预警执行项仍在 `ability.commit` 当场提交，技能伤害请求继续先于塔攻入队。
 - **Combat 段读不到当帧能力 modifier/tag**：AI 入队 → PreCombat 只执行载荷并入队 GE → Combat（无当帧 granted 修饰）→ SkillBuff `effect.commit` → `effect.tick`。全帧结束后的 tag/投影断言仍成立。

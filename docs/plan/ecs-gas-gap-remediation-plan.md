@@ -2,13 +2,15 @@
 
 > 状态：执行计划（本文不代表已实施）
 >
-> 更新日期：2026-09-03
+> 更新日期：2026-09-04
 >
-> 基线 commit：`dd55f619`
+> 基线 commit：`dd55f619`（F0–F9 核实）；F10 / F11 / F12 对照基线 `b5cfe52`
 >
 > 终态约束：[ecs-gas-final-architecture.md](../ecs-gas-final-architecture.md)
 >
 > 迁移总览：[ecs-gas-migration-plan.md](ecs-gas-migration-plan.md)
+>
+> Lumio 对照收口：[ecs-gas-lumio-contract-alignment.md](ecs-gas-lumio-contract-alignment.md)
 
 ## 1. 背景与本文职责
 
@@ -252,6 +254,13 @@
 
 2026-09-04 能力 GE 解耦（仍未宣称 F4–F9 / M5 / M6 完成）：`CommitPlan` 对 granted effect 只 `EnqueueApply`，与 `ApplyDot` 同在 `effect.commit` `TryApply`。Combat 段读不到当帧能力 modifier/tag。敌方 `Execute*` 当场结算已去掉。技能伤害执行仍在 `ability.commit`，不是 `damage.commit` 缓冲。
 
+2026-09-04 对照登记（不改生产代码，实施走 [lumio-contract-alignment.md](ecs-gas-lumio-contract-alignment.md)）：
+
+- **F10 TryApply / TryRestack 叠层加成不一致**（路径判断）：`GameplayRuntime.TryApply` 每层展开 modifier handle（`:115-129`）；`TryRestack` 只 `StackCount++`（`:242-249`）；周期 tick 用 `StackCount` 乘（`:531`）。`TryApply` / `TryAdopt` 把同一个 `snapshot` 既当周期伤害又当 modifier 捕获值（`:143` / `:157` / `:190-192`）。带 modifier 的 Periodic 走哪条入口，层数和面板加成就会分叉。
+- **F11 同帧多 AbilityRequest 消耗无预留**（路径判断，未构造复现）：`ValidateCosts` 各自看当前法力（`GameplayAbilityRuntime.cs:779`）；`CommitCosts` 失败 throw（`:463-464`）；今日先 `CommitPlan` 再扣费，无法整单取消。支付应走 `Spend`（不足即拒），**不**改通用 `ApplyMana` 夹紧（负增量打血旁路依赖夹到 0 仍 Accepted）。
+- **F12 预校验通过后 throw**（路径判断，与 F11 同形）：审查点名 `CommitPlan` `:460` 与 dispel `:518`。同形 `prevalidated * during commit` 还有玩家伤害 `:438`、预警 `:465`、召唤 `:661`、群体复活 `NecromancerSystem.cs:216`、回放 `TimeRewindSnapshot.cs:152` / `ProductionAbilityPayloadHandler.cs:57`。实施在对照计划 P2，一并改为拒绝事实、不炸帧。
+- **F6 更正**：`HasTag` 已走 `TagContributionState` 计数；最初「无贡献计数」只适用于登记当时。剩余是层级（平 `TagId`、无 parent 词汇表）与 `ClearEntity` 扫表分配。
+
 ---
 
 ## 8. 门禁
@@ -278,9 +287,12 @@ git diff --check
 
 ---
 
-## 9. 执行前需决定的两处
+## 9. 执行前需决定的事项
 
 1. **§4.2 第 5 项**：`GameplayAbilityRuntime.ResolveMagnitude` 是否一并改为读三条 projection。改则满足"单一解释者"，但 ability magnitude 也会吃增伤，是额外数值变化。
 2. **§6.4 (2)**：`BehaviorTreeEvaluator.cs:249-253` 的 `can_attack` 缺攻击冷却是否按 bug 修。若修，会显著改变战斗数值，但同时直接消除 Tier C 的容量风险；若不修，Tier C 必须带容量提升。
+3. **对照 P0**：准入序里 `PhaseNotAllowed` 先于 `Cooldown` / `Cost` **已写入**终态 §6.1（整张冻结表：形状类 `NoTarget` / `UnsupportedDefinition` 归第一段；容量独立 `QueueOverflow` 放末尾）。若要改回「先冷却后阶段」，必须先改终态再改代码。
 
-两项都属数值语义变更，不应在实施中静默决定。
+F10 / F11 / F12 与属性公式的实施顺序以 [ecs-gas-lumio-contract-alignment.md](ecs-gas-lumio-contract-alignment.md) 为准，不在本文件的 F0→F3 飞行中插入。
+
+第 1、2 项都属数值语义变更，不应在实施中静默决定。第 3 项是合同文档，P0 已写入终态。
