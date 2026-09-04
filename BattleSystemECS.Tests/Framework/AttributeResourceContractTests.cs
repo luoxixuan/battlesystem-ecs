@@ -12,12 +12,10 @@ namespace BattleSystemECS.Tests.Framework
         private static ModifierDefinition Mod(AttributeModifierOp op, float value, int priority = 0, SnapshotPolicy snapshot = SnapshotPolicy.ReevaluateOnRead)
             => new ModifierDefinition(Damage, op, value, priority, snapshot: snapshot);
 
-        [Fact] public void Aggregator_OrdersOperationsByPriorityAndSequence()
-        { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); a.AddModifier(1, Mod(AttributeModifierOp.Add, 2f, 0)); a.AddModifier(1, Mod(AttributeModifierOp.Multiply, 3f, 1)); Assert.Equal(36f, a.GetComputed(1, Damage)); }
-        [Fact] public void Aggregator_OverrideReplacesAggregationStart()
-        { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); a.AddModifier(1, Mod(AttributeModifierOp.Override, 4f)); a.AddModifier(1, Mod(AttributeModifierOp.Add, 2f, 1)); Assert.Equal(6f, a.GetComputed(1, Damage)); }
-        [Fact] public void Aggregator_UsesOverrideThenAllAddsThenAllMultipliers()
-        { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); a.AddModifier(1, Mod(AttributeModifierOp.Add, 2f, 10)); a.AddModifier(1, Mod(AttributeModifierOp.Override, 4f, 0)); a.AddModifier(1, Mod(AttributeModifierOp.Multiply, 3f, 0)); Assert.Equal(18f, a.GetComputed(1, Damage)); }
+        [Fact] public void Aggregator_AddsThenAppliesPercentFactor()
+        { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); a.AddModifier(1, Mod(AttributeModifierOp.Add, 2f, 0)); a.AddModifier(1, Mod(AttributeModifierOp.Percent, 0.5f, 1)); Assert.Equal(18f, a.GetComputed(1, Damage)); }
+        [Fact] public void Aggregator_OverrideIgnoresAddAndPercent()
+        { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); a.AddModifier(1, Mod(AttributeModifierOp.Override, 4f)); a.AddModifier(1, Mod(AttributeModifierOp.Add, 2f, 1)); a.AddModifier(1, Mod(AttributeModifierOp.Percent, 0.5f, 1)); Assert.Equal(4f, a.GetComputed(1, Damage)); }
         [Fact] public void Aggregator_TiePriorityUsesApplicationSequence()
         { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); a.AddModifier(1, Mod(AttributeModifierOp.Override, 2f)); a.AddModifier(1, Mod(AttributeModifierOp.Override, 7f)); Assert.Equal(7f, a.GetComputed(1, Damage)); }
         [Fact] public void Aggregator_CaptureSnapshotSurvivesRefreshAndBaseChange()
@@ -25,7 +23,7 @@ namespace BattleSystemECS.Tests.Framework
         [Fact] public void Aggregator_ReevaluateSnapshotRefreshesMagnitude()
         { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); var h = a.AddModifier(1, Mod(AttributeModifierOp.Add, 2f)); Assert.True(a.RefreshModifier(1, h, 9f)); Assert.Equal(19f, a.GetComputed(1, Damage)); }
         [Fact] public void Aggregator_RemoveRecomputesFromBaseWithoutInverseMath()
-        { var a = new AttributeAggregator(); a.SetBase(1, Damage, 1f); var h = a.AddModifier(1, Mod(AttributeModifierOp.Multiply, 1.1f)); Assert.Equal(1.1f, a.GetComputed(1, Damage), 5); Assert.True(a.RemoveModifier(1, h)); Assert.Equal(1f, a.GetComputed(1, Damage)); }
+        { var a = new AttributeAggregator(); a.SetBase(1, Damage, 1f); var h = a.AddModifier(1, Mod(AttributeModifierOp.Percent, 0.1f)); Assert.Equal(1.1f, a.GetComputed(1, Damage), 5); Assert.True(a.RemoveModifier(1, h)); Assert.Equal(1f, a.GetComputed(1, Damage)); }
         [Fact] public void Aggregator_DirtyIsConsumedAtExplicitBoundary()
         { var a = new AttributeAggregator(); a.SetBase(1, Damage, 4f); Assert.True(a.DirtyCount > 0); a.AggregateDirty(); Assert.Equal(0, a.DirtyCount); Assert.Equal(4f, a.GetComputed(1, Damage)); }
         [Fact] public void Aggregator_RejectsModifierOnResource()
@@ -52,7 +50,7 @@ namespace BattleSystemECS.Tests.Framework
             {
                 s.AddPlayer(0, 5f, 1f, 10f, 1);
                 s.SetPlayerAttackDamage(0, 10f);
-                s.AddAttributeModifier(0, new ModifierDefinition(new AttributeKey(0), AttributeModifierOp.Multiply, 2f));
+                s.AddAttributeModifier(0, new ModifierDefinition(new AttributeKey(0), AttributeModifierOp.Percent, 1f));
                 s.UseComputedAttributes = true;
                 Assert.Equal(10f, s.GetPlayerAttackDamageProjection(0));
                 var scheduler = new FrameScheduler(s, new GameConfig());

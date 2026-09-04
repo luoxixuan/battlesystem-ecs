@@ -1,8 +1,8 @@
 # ECS + GAS：Lumio 合同对照收口计划
 
-> 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）、P4（Tag 层级 A2 + 准入序 A5）已实施；P3 / P5–P6 未宣称完成
+> 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）、P3（A1 属性公式）、P4（Tag 层级 A2 + 准入序 A5）已实施；P5–P6 未宣称完成
 >
-> 更新日期：2026-09-05（P4 落地：Tag parent 词汇表 + 冻结准入序）
+> 更新日期：2026-09-05（P3 落地：Lumio 公式 / Percent 加项 / Override 最终覆盖 / 残留 Multiply 拒绝；P4 落地：Tag parent 词汇表 + 冻结准入序）
 >
 > 基线 commit：`b5cfe52`（对照审查时的 HEAD）
 >
@@ -65,7 +65,7 @@ Damage / Resource Resolver、Targeting 与 Effect 正交、Trigger 一等公民�
 | F10 | `TryApply` 叠层每层展开 modifier handle；`TryRestack` 只 `StackCount++`；周期 tick 用 `StackCount` 乘。`TryApply` / `TryAdopt` 把同一个 `snapshot` 既当周期伤害又当 modifier 捕获值 | `GameplayRuntime.cs` `:115-129` / `:143` / `:157` / `:190-192` / `:242-249` / `:531` | 带 modifier 的 Periodic 走哪条入口，层数和加成分叉；在 DoT 跳伤参数上定义 `stackSnapshotPolicy` 会定义错对象 |
 | F11 | 同帧多 `AbilityRequest` 各自 `ValidateCosts`，不为已入队请求预留；`CommitCosts` 失败 throw。当前先 `CommitPlan` 再 `CommitCosts`，无法整单取消 | `GameplayAbilityRuntime.cs` `:457-464` `:779` | 第二技能可少付钱也生效；Resolver 拒绝则炸帧 |
 | F12 | 生产路径上全部 `prevalidated * during commit` throw（审查点名容量 + dispel；grep 另有伤害/预警/召唤/复活/回放） | 见 §7.2 表 | 与「不把 Fail-stop 毁世界引入本仓」矛盾 |
-| A1 | 属性公式实现仍是 Override 换起点 + `ΠMultiply`。生产 Multiply：**两处** | `Attributes.cs` `:100`；`CatalogCompiler.cs:212` BuffAllies；`SkillSystem.cs:333`（`ATTACK_DAMAGE, Multiply, 1.1f`，经 `LegacyEffectAdapter` 且 `CaptureOnApply`） | 与终态 §7 不一致；Catalog 校验看不到运行时构造的 legacy def |
+| A1 | ~~属性公式仍是 Override 换起点 + ΠMultiply~~ **P3 已关闭**：已切终态 §7 公式；BuffAllies `Percent(x)`；SkillSystem Instant 仍写 `Multiply(1.1)`，adapter 映射 `Percent(0.1)`；Catalog + `AddModifier` 拒绝残留 Multiply | `Attributes.cs` Aggregate；`CatalogCompiler` BuffAllies；`LegacyEffectAdapter` | 已落地；旧 ΠMultiply 不得再对同一 key 贡献 |
 | A2 | Tag 无层级；`TagId` 是 `CatalogRegistries` 散列常量，无 parent 词汇表 | `GameplayTagRuntime.cs` | 计数已实现；`Debuff.Control` 不能匹配 `Stun` |
 | A3 | 随机源不止 `Rng.Shared`。`Rng.Shared` 用 `TickCount xor ManagedThreadId`；`Systems/` 另有无种子 `new Random()` | `Rng.cs` `:19-21`；Rng.Shared 生产：EchoClone / EnemyTeleport / Portal / PointDefense / Skill / Upgrade。无种子 `new Random()`：Weather / EnemyFission / EnemyClone / AutoSkill（static）/ Pickup / EnemyAffix / RandomEvent / WaveSpawning（`??= new Random()`）/ Crafting（`seed == 0`） | 分裂/克隆/波次/词缀直接决定实体数量和位置；只修 `Rng.Shared` 过不了「固定种子多轮 soak 与 digest 一致」 |
 | A4 | 生产运行时之外**只有一处**显式 `Remove`：`EnemyAbilitySystem.RemoveDispellableEffects`（`:509-519`），在 AI 组、`effect.commit` **之前**，语义是先移除后施加 | `EnemyAbilitySystem.cs:509-519` | 「移除垫后」若只钉 `effect.commit` 批内，与这条批外 remove-first 接不上 |
@@ -322,6 +322,8 @@ computed   = Clamp
 ### 8.4 退出门槛
 
 门禁 §12。CHANGELOG **必须**单列数值语义（即使 shipped 内容预期零可见变化）。Catalog 校验拒绝残留 `Multiply`；运行时守卫覆盖 adapter / `SkillSystem` 路径。
+
+**落地（2026-09-05）**：Aggregator 一次切换；BuffAllies / adapter 已映射；`AddModifier` 与 Catalog 均拒绝残留 Multiply；`product(Multiply)` 已从 Aggregate 删除。枚举值 `Multiply` 暂留作 legacy 输入。
 
 ### 8.5 回滚
 

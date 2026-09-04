@@ -107,7 +107,7 @@ namespace BattleSystemECS.Tests.Framework
             Store.PlayerIsWaveActive[0] = true;
             Store.PlayerArmor[0] = 0.2f;
             Store.UseComputedAttributes = true;
-            Store.AddAttributeModifier(0, new BattleSystemECS.Core.GAS.ModifierDefinition(new BattleSystemECS.Core.GAS.AttributeKey(0), BattleSystemECS.Core.GAS.AttributeModifierOp.Multiply, 2f));
+            Store.AddAttributeModifier(0, new BattleSystemECS.Core.GAS.ModifierDefinition(new BattleSystemECS.Core.GAS.AttributeKey(0), BattleSystemECS.Core.GAS.AttributeModifierOp.Percent, 1f));
             Store.AddAttributeModifier(0, new BattleSystemECS.Core.GAS.ModifierDefinition(new BattleSystemECS.Core.GAS.AttributeKey(5), BattleSystemECS.Core.GAS.AttributeModifierOp.Add, 1f));
             Store.AddAttributeModifier(0, new BattleSystemECS.Core.GAS.ModifierDefinition(new BattleSystemECS.Core.GAS.AttributeKey(10), BattleSystemECS.Core.GAS.AttributeModifierOp.Add, 0.1f));
             var events = new EventBus();

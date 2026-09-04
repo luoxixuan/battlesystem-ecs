@@ -376,7 +376,7 @@ computed       = Clamp / domain rule
 
 属性定义必须声明范围、默认值、`PercentFloor` 和裁剪规则。`MaxHealth` 下降时，`ResourceResolver` 将 `CurrentHealth` 裁剪到新的上限；`MaxHealth` 上升不会自动治疗，除非效果明确声明对应的资源策略。
 
-属性变化采用 dirty 重算，而不是移除 Modifier 时做浮点逆运算。添加、刷新、移除或过期效果都会标记相关实体 dirty；聚合器从基础值重新计算，避免跨帧累加误差。当前实现仍是「Override 换起点 + ΠMultiply」；切到本公式是数值语义变更，实施时必须在 `CHANGELOG.md` 单列，并把生产路径上的 `Multiply(1 + x)` 迁成 `Percent(x)`。
+属性变化采用 dirty 重算，而不是移除 Modifier 时做浮点逆运算。添加、刷新、移除或过期效果都会标记相关实体 dirty；聚合器从基础值重新计算，避免跨帧累加误差。实现已切到本公式。切公式是数值语义变更，已在 `CHANGELOG.md` 单列；生产路径上的 `Multiply(1 + x)` 已迁成 `Percent(x)`（`SkillSystem` Instant 仍写 `Multiply(1.1)`，由 `LegacyEffectAdapter` 映射为 `Percent(0.1)`）。
 
 ## 8. 请求、事实与统一战斗管线
 

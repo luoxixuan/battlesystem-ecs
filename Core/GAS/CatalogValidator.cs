@@ -30,6 +30,7 @@ namespace BattleSystemECS.Core.GAS
                 foreach (var execution in ability.Executions) if ((uint)execution.Value >= (uint)catalog.Executions.Count) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} references missing execution {execution.Value}");
                 foreach (var effect in ability.Effects) if ((uint)effect.Value >= (uint)catalog.Effects.Count) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} references missing effect {effect.Value}");
                 foreach (var trigger in ability.TriggerRefs) if ((uint)trigger.Value >= (uint)catalog.Triggers.Count) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} ({ability.Name}) references missing trigger {trigger.Value}");
+                foreach (var modifier in ability.Modifiers) RejectResidualMultiply(modifier, path, $"ability {ability.Id.Value}");
                 ValidateModifierProvenance(catalog, ability, path);
             }
             if (catalog.AbilityDefinitions == null || catalog.AbilityDefinitions.Count != catalog.Abilities.Count)
@@ -69,7 +70,11 @@ namespace BattleSystemECS.Core.GAS
                     foreach (var execution in effect.Executions) if ((uint)execution.Value >= (uint)catalog.Executions.Count) throw new CatalogValidationException($"{path}: effect {effect.Id.Value} references missing execution {execution.Value}");
                     foreach (var tag in effect.GrantedTags) if (!CatalogRegistries.TryTag(tag)) throw new CatalogValidationException($"{path}: effect {effect.Id.Value} has unregistered granted tag");
                     foreach (var tag in effect.BlockedTags) if (!CatalogRegistries.TryTag(tag)) throw new CatalogValidationException($"{path}: effect {effect.Id.Value} has unregistered blocked tag");
-                    foreach (var modifier in effect.Modifiers) if (!CatalogRegistries.TryAttribute(modifier.Attribute)) throw new CatalogValidationException($"{path}: effect {effect.Id.Value} has unregistered modifier attribute");
+                    foreach (var modifier in effect.Modifiers)
+                    {
+                        if (!CatalogRegistries.TryAttribute(modifier.Attribute)) throw new CatalogValidationException($"{path}: effect {effect.Id.Value} has unregistered modifier attribute");
+                        RejectResidualMultiply(modifier, path, $"effect {effect.Id.Value}");
+                    }
                 }
             }
             for (int i = 0; i < CatalogRegistries.TagCount; i++)
@@ -103,6 +108,11 @@ namespace BattleSystemECS.Core.GAS
                 if (!ProductionAbilityPayloadRegistry.Supports(execution))
                     throw new CatalogValidationException($"{path}: execution {execution.Id.Value} has no production handler for {execution.Payload}/{execution.Operation}");
             }
+            if (catalog.Modifiers != null)
+            {
+                for (int i = 0; i < catalog.Modifiers.Count; i++)
+                    RejectResidualMultiply(catalog.Modifiers[i], path, $"catalog modifier {i}");
+            }
             if (catalog.Aliases != null) foreach (var alias in catalog.Aliases) if ((uint)alias.Value.Value >= (uint)catalog.AbilityDefinitions.Count) throw new CatalogValidationException($"{path}: alias '{alias.Key}' references missing ability {alias.Value.Value}");
             for (int i = 0; i < catalog.Abilities.Count; i++)
             {
@@ -110,6 +120,12 @@ namespace BattleSystemECS.Core.GAS
                 if (legacy.Id.Value != i || legacy.Id.Value != catalog.AbilityDefinitions[i].Id.Value || !string.Equals(legacy.Name, catalog.AbilityDefinitions[i].Name, StringComparison.OrdinalIgnoreCase))
                     throw new CatalogValidationException($"{path}: legacy ability mapping is not closed at index {i}");
             }
+        }
+
+        private static void RejectResidualMultiply(ModifierDefinition modifier, string path, string location)
+        {
+            if (modifier.Operation == AttributeModifierOp.Multiply)
+                throw new CatalogValidationException($"{path}: {location} residual Multiply is rejected; use Percent");
         }
 
         private static void ValidateCapacity(GameplayCatalog catalog, string path)

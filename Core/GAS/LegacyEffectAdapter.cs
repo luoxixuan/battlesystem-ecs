@@ -36,8 +36,9 @@ namespace BattleSystemECS.Core.GAS
                     ? RefreshPolicy.StacksAndDuration
                     : RefreshPolicy.None;
             // Periodic 伤害走 payload tick，禁止再挂 ENEMY_HEALTH 这类 modifier（TryApply 会立刻改血）。
+            // SkillSystem 等仍写 Multiply(m)；运行时映射为 Percent(m−1)，Catalog 校验看不到这条路径。
             var modifiers = definition.Type != EffectType.Periodic && definition.AttributeIndex >= 0
-                ? new[] { new ModifierDefinition(new AttributeKey(definition.AttributeIndex), definition.ModifierOp, definition.Magnitude, snapshot: SnapshotPolicy.CaptureOnApply) }
+                ? new[] { MapLegacyModifier(definition.AttributeIndex, definition.ModifierOp, definition.Magnitude) }
                 : System.Array.Empty<ModifierDefinition>();
             GameplayEffectDefinition immutable;
             if (definition.Type == EffectType.Periodic && definition.TickInterval > 0f)
@@ -118,6 +119,16 @@ namespace BattleSystemECS.Core.GAS
                 FirstTickPending = runtime.FirstTickPending
             };
             return projection;
+        }
+
+        private static ModifierDefinition MapLegacyModifier(int attributeIndex, AttributeModifierOp op, float magnitude)
+        {
+            if (op == AttributeModifierOp.Multiply)
+            {
+                op = AttributeModifierOp.Percent;
+                magnitude -= 1f;
+            }
+            return new ModifierDefinition(new AttributeKey(attributeIndex), op, magnitude, snapshot: SnapshotPolicy.CaptureOnApply);
         }
 
         private static int StableId(string name)

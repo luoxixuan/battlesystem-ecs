@@ -5,6 +5,15 @@
 - 内容 `CanCommit` 失败与时长合同失败从 `InvalidRequest` 改为 `UnsupportedDefinition`。
 - **Tag**：`GameplayTagVocabulary` 带 parent；授予 `Stun` 时 `Control` / `Debuff` 计数各 +1，移除对称。`stackKey` 与 `EffectApplied.Tag` 仍是叶 id。未知 Tag 启动硬失败（补测试）。
 
+### 2026-09-05（Lumio P3：属性公式 A1，⚠️ 数值语义变更）
+- **同一 AttributeKey 公式**：`aggregated = (Base + ΣAdd) × max(PercentFloor, 1 + ΣPercent)`；若存在 winning Override，则 `computed = Override`（Add / Percent 全部忽略），再 Clamp。Override 不再换聚合起点，也不另设 `FinalOverride`。同 priority 时 `Sequence` 更大者胜。
+- **Percent 是加项**：`+30%` 配 `0.30`。两个 `Percent(0.30)` 得到 `1.60`，不是 `1.69`。`PercentFloor` 进 `AttributeSchema`，默认 `0`：两个 `Percent(-0.60)` 因子为 `0`，不是 `-0.20`。
+- **生产映射**：CatalogCompiler BuffAllies `Multiply(1+x)` → `Percent(x)`；`SkillSystem` Attack+10% 仍写 `Multiply(1.1)`，`LegacyEffectAdapter` 运行时映射为 `Percent(0.1)`。`MaxStacks=1` / 无其它乘区时与旧 `ΠMultiply` 数值一致（允许 ulp）。
+- **残留 Multiply**：Catalog 校验拒绝；`AttributeAggregator.AddModifier` 运行时拒绝。`product(Multiply)` 已从 Aggregate 删除；枚举值暂留作 legacy 输入，无法进入聚合。
+- **叠层**：Percent 走既有 P1 乘数（`stackCount × magnitude`，一份 handle），不再保留 ΠMultiply 的不乘层数行为。Override 仍不乘层数。
+- combo 仍走 `DamageOutputMultiplier` 的 Add；跨通道 `computed(AttackDamage) × computed(DamageOutputMultiplier)` 不变。
+- **shipped 内容预期零可见变化**：BuffAllies `MaxStacks=1`；SkillSystem AttackBoost 生产仍靠 `BuffType.AttackBoost` 位旗 ×1.1（Instant GE 不写 Aggregator）。golden / 既有面板断言应无 diff。
+
 ### 2026-09-04（Lumio P2：Commit 预留 F11 + 预校验后禁止 throw F12）
 - **少付钱不再生效**：同帧多条 `AbilityRequest` 入队时按 sequence 预留 Spend 资源与容量；后请求看到的可用 = 当前值 − 已预留。Commit 每条先复查冷却 + 预留，失败整单 `AbilityCancelled`，不调用 `CommitPlan`。支付只走 `ResourceOperation.Spend`（不足即拒、原子、实际扣减必须等于请求）。
 - **容量满报 `QueueOverflow`**：入队满槽与 `ValidateCapacityPlan` 失败不再混进 `InvalidRequest`。`GameplayEventType.AbilityCancelled` 加在枚举末尾。

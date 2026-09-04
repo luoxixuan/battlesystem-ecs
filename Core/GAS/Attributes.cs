@@ -14,17 +14,22 @@ namespace BattleSystemECS.Core.GAS
         public readonly float DefaultValue, Minimum, Maximum;
         public readonly AttributeUnit Unit;
         public readonly bool AllowsModifiers;
+        /// <summary>百分比因子下限，默认 0：两个 −60% 得到 0 而不是 −0.20。</summary>
+        public readonly float PercentFloor;
         public AttributeDefinition(AttributeKey key, string name, AttributeDomain domain, float defaultValue,
             AttributeUnit unit = AttributeUnit.Scalar, float minimum = float.NegativeInfinity,
-            float maximum = float.PositiveInfinity, bool allowsModifiers = true)
+            float maximum = float.PositiveInfinity, bool allowsModifiers = true, float percentFloor = 0f)
         {
             if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Attribute name is required", nameof(name));
             if (float.IsNaN(minimum) || float.IsNaN(maximum) || minimum > maximum)
                 throw new ArgumentOutOfRangeException(nameof(minimum), "Attribute range is invalid");
             if (float.IsInfinity(defaultValue)) throw new ArgumentOutOfRangeException(nameof(defaultValue));
             if (float.IsNaN(defaultValue) || defaultValue < minimum || defaultValue > maximum) throw new ArgumentOutOfRangeException(nameof(defaultValue));
+            if (float.IsNaN(percentFloor) || float.IsInfinity(percentFloor) || percentFloor < 0f)
+                throw new ArgumentOutOfRangeException(nameof(percentFloor));
             Key = key; Name = name; Domain = domain; DefaultValue = defaultValue; Unit = unit;
             Minimum = minimum; Maximum = maximum; AllowsModifiers = allowsModifiers;
+            PercentFloor = percentFloor;
         }
         public float Clamp(float value) => Math.Min(Maximum, Math.Max(Minimum, value));
     }
@@ -84,6 +89,10 @@ namespace BattleSystemECS.Core.GAS
         public AttributeModifierHandle AddModifier(int entityId, ModifierDefinition definition, float capturedMagnitude = float.NaN)
         {
             var d = _schema.Get(definition.Attribute); if (!d.AllowsModifiers) throw new InvalidOperationException("Attribute does not allow modifiers");
+            // 残留 Multiply 不得进账本：Catalog 校验看不到 SkillSystem 等运行时构造的 legacy def。
+            if (definition.Operation != AttributeModifierOp.Add && definition.Operation != AttributeModifierOp.Percent
+                && definition.Operation != AttributeModifierOp.Override)
+                throw new InvalidOperationException("Multiply cannot enter the aggregator; map to Percent");
             var id = new AttributeModifierHandle(++_nextId); var value = definition.Snapshot == SnapshotPolicy.CaptureOnApply && !float.IsNaN(capturedMagnitude) ? capturedMagnitude : definition.Magnitude;
             var m = new Modifier { Handle = id, Key = definition.Attribute, Op = definition.Operation, Magnitude = definition.Magnitude, Captured = value, Snapshot = definition.Snapshot, Priority = definition.Priority, Sequence = ++_sequence };
             var slot = (entityId, definition.Attribute); if (!_modifiers.TryGetValue(slot, out var list)) _modifiers[slot] = list = new List<Modifier>(); list.Add(m); _dirty.Add(slot); return id;
@@ -97,7 +106,50 @@ namespace BattleSystemECS.Core.GAS
         public void ClearAllComputed() { _computed.Clear(); }
         public void MarkAllDirty() { foreach (var pair in _base) _dirty.Add(pair.Key); foreach (var pair in _modifiers) _dirty.Add(pair.Key); }
         public float GetComputed(int entityId, AttributeKey key, float fallback = 0f) { if (_dirty.Contains((entityId, key))) AggregateDirty(); return _computed.TryGetValue((entityId, key), out var value) ? value : fallback; }
-        private void Aggregate(int entityId, AttributeKey key) { var slot = (entityId, key); var definition = _schema.Get(key); var value = _base.TryGetValue(slot, out var b) ? b : definition.DefaultValue; if (_modifiers.TryGetValue(slot, out var list)) { int overridePriority = int.MinValue; long overrideSequence = long.MinValue; float overrideValue = value; float add = 0f; float multiply = 1f; for (int i = 0; i < list.Count; i++) { var m = list[i]; var magnitude = m.Snapshot == SnapshotPolicy.CaptureOnApply ? m.Captured : m.Magnitude; if (m.Op == AttributeModifierOp.Override) { if (m.Priority > overridePriority || (m.Priority == overridePriority && m.Sequence > overrideSequence)) { overridePriority = m.Priority; overrideSequence = m.Sequence; overrideValue = magnitude; } } else if (m.Op == AttributeModifierOp.Add) add += magnitude; else multiply *= magnitude; } value = (overridePriority == int.MinValue ? value : overrideValue) + add; value *= multiply; } _computed[slot] = definition.Clamp(value); }
+        /// <summary>
+        /// Lumio 公式：aggregated = (Base + ΣAdd) × max(PercentFloor, 1 + ΣPercent)；
+        /// 有 winning Override 则覆盖（Add / Percent 全忽略），最后 Clamp。同 priority 时 Sequence 更大者胜。
+        /// </summary>
+        private void Aggregate(int entityId, AttributeKey key)
+        {
+            var slot = (entityId, key);
+            var definition = _schema.Get(key);
+            float baseValue = _base.TryGetValue(slot, out var b) ? b : definition.DefaultValue;
+            float add = 0f;
+            float percent = 0f;
+            bool hasOverride = false;
+            int overridePriority = int.MinValue;
+            long overrideSequence = long.MinValue;
+            float overrideValue = 0f;
+            if (_modifiers.TryGetValue(slot, out var list))
+            {
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var m = list[i];
+                    float magnitude = m.Snapshot == SnapshotPolicy.CaptureOnApply ? m.Captured : m.Magnitude;
+                    if (m.Op == AttributeModifierOp.Override)
+                    {
+                        if (m.Priority > overridePriority || (m.Priority == overridePriority && m.Sequence > overrideSequence))
+                        {
+                            hasOverride = true;
+                            overridePriority = m.Priority;
+                            overrideSequence = m.Sequence;
+                            overrideValue = magnitude;
+                        }
+                    }
+                    else if (m.Op == AttributeModifierOp.Add)
+                        add += magnitude;
+                    else if (m.Op == AttributeModifierOp.Percent)
+                        percent += magnitude;
+                    else
+                        throw new InvalidOperationException("Multiply cannot enter Aggregate; use Percent");
+                }
+            }
+            float value = hasOverride
+                ? overrideValue
+                : (baseValue + add) * Math.Max(definition.PercentFloor, 1f + percent);
+            _computed[slot] = definition.Clamp(value);
+        }
     }
 
     /// <summary>

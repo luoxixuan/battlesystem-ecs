@@ -208,8 +208,9 @@ namespace BattleSystemECS.Core.GAS
                             if (magnitude <= 0f || duration <= 0f)
                                 throw new CatalogValidationException($"enemy abilities: '{source.Id}' requires positive buff magnitude and duration");
                             var buffEffect = new EffectId(effects.Count);
+                            // DamageMultiplier 是加项：0.30 表示 +30%。旧 Multiply(1+x) 在 MaxStacks=1 下与 Percent(x) 同值。
                             effects.Add(new GameplayEffectDefinition(buffEffect, EffectType.Duration,
-                                new[] { new ModifierDefinition(CatalogRegistries.AttackDamage, AttributeModifierOp.Multiply, 1f + magnitude) },
+                                new[] { new ModifierDefinition(CatalogRegistries.AttackDamage, AttributeModifierOp.Percent, magnitude) },
                                 duration, 0f, ClockId.Enemy, StackingBehavior.DurationRefresh, 1, RefreshPolicy.Duration,
                                 SourceDeathPolicy.Persist, EffectPayloadKind.Status, CatalogRegistries.EnemyBuffTag,
                                 Array.Empty<ExecutionId>(), grantedTags: new[] { CatalogRegistries.EnemyBuffTag },

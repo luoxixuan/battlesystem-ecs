@@ -35,6 +35,38 @@ namespace BattleSystemECS.Tests.Framework
         [Fact] public void RejectsAliasWithoutAbility() => AssertInvalid(new GameplayCatalog(new[] { Ability() }, new[] { Ability().Targeting }, Array.Empty<GameplayEffectDefinition>(), Array.Empty<ExecutionDefinition>(), Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(), new Dictionary<string, AbilityId> { ["orphan"] = new AbilityId(4) }), "alias");
 
         [Fact]
+        public void RejectsResidualMultiplyOnEffectModifier()
+        {
+            var modifier = new ModifierDefinition(new AttributeKey(0), AttributeModifierOp.Multiply, 1.1f);
+            var effect = new GameplayEffectDefinition(new EffectId(0), EffectType.Duration, new[] { modifier }, 1f, 0f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent, new TagId(0), Array.Empty<ExecutionId>());
+            var error = Assert.Throws<CatalogValidationException>(() =>
+                CatalogValidator.Validate(Make(Ability(effects: new[] { new EffectId(0) }), new[] { effect }), Path));
+            Assert.Contains(Path, error.Message, StringComparison.Ordinal);
+            Assert.Contains("Multiply", error.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void AcceptsPercentModifierOnEffect()
+        {
+            var modifier = new ModifierDefinition(new AttributeKey(0), AttributeModifierOp.Percent, 0.3f);
+            var effect = new GameplayEffectDefinition(new EffectId(0), EffectType.Duration, new[] { modifier }, 1f, 0f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent, new TagId(0), Array.Empty<ExecutionId>());
+            CatalogValidator.Validate(Make(Ability(effects: new[] { new EffectId(0) }), new[] { effect }), Path);
+            Assert.Equal(AttributeModifierOp.Percent, effect.Modifiers[0].Operation);
+            Assert.Equal(0.3f, effect.Modifiers[0].Magnitude);
+        }
+
+        [Fact]
+        public void RejectsUnregisteredGrantedTag()
+        {
+            var effect = new GameplayEffectDefinition(new EffectId(0), EffectType.Duration, Array.Empty<ModifierDefinition>(),
+                1, 0, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None, SourceDeathPolicy.Persist,
+                EffectPayloadKind.GameplayEvent, new TagId(0), Array.Empty<ExecutionId>(), grantedTags: new[] { new TagId(999) });
+            var error = Assert.Throws<CatalogValidationException>(() => CatalogValidator.Validate(Make(Ability(), new[] { effect }), Path));
+            Assert.Contains(Path, error.Message, StringComparison.Ordinal);
+            Assert.Contains("unregistered granted tag", error.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
         public void AcceptsClosedTagCostModifierAndTriggerGraph()
         {
             var execution = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage, 2f, new TagId(0));

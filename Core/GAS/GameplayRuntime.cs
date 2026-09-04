@@ -423,12 +423,13 @@ namespace BattleSystemECS.Core.GAS
         }
 
         /// <summary>
-        /// 一份定义贡献一份 handle。Add 的捕获/幅度乘 stackCount；Override / Multiply 不乘。
+        /// 一份定义贡献一份 handle。Add / Percent 的捕获/幅度乘 stackCount；Override 不乘。
         /// </summary>
         private static void ContributeModifier(ModifierDefinition def, float modifierCapture, int stacks,
             out ModifierDefinition stacked, out float capture)
         {
-            bool scale = def.Operation == AttributeModifierOp.Add && stacks > 1;
+            bool scale = (def.Operation == AttributeModifierOp.Add || def.Operation == AttributeModifierOp.Percent)
+                && stacks > 1;
             stacked = scale
                 ? new ModifierDefinition(def.Attribute, def.Operation, def.Magnitude * stacks, def.Priority,
                     def.MagnitudeSource, def.Snapshot)

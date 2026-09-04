@@ -4,7 +4,11 @@ namespace BattleSystemECS.Core.GAS
 {
     public enum EffectType { Instant, Duration, Periodic, Heal }
 
-    public enum AttributeModifierOp { Add, Multiply, Override }
+    /// <summary>
+    /// 属性修饰运算。Percent 的 magnitude 是加项（+30% 配 0.30）。
+    /// Multiply 仅作 legacy 输入，不得进入 Aggregator（adapter 映射为 Percent(m−1)）。
+    /// </summary>
+    public enum AttributeModifierOp { Add, Multiply, Override, Percent }
 
     /// <summary>
     /// Defines how multiple instances of the same effect stack on a target.
