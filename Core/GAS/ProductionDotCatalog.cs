@@ -7,7 +7,7 @@ namespace BattleSystemECS.Core.GAS
     /// <summary>
     /// 生产 Periodic DoT 的 catalog 模板。Id 与 Compile() 时 effects 下标连续；
     /// 运行时按名字物化出空 modifier、Periodic Damage payload 的定义。
-    /// ApplyDot 的 None 走 TryAdopt（脉冲可并存）；叠层走 TryRestack。
+    /// ApplyDot 入 EffectRequest，commit 走 TryApply（None 同 key 不刷新）。
     /// </summary>
     public static class ProductionDotCatalog
     {

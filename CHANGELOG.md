@@ -1,5 +1,13 @@
 # 更新记录 (Changelog)
 
+### 2026-09-04（ECS+GAS 终态收口续：Ability/Effect 真 buffer + PreCombat commit，⚠️ 有数值与时序变化）
+- **AbilityRequests 真 buffer**：`ActivateCore` 校验后入队；Seal 后 `DeferAbilityAndEffectCommit`，由 `ability.commit`（Combat 前）/ `build.ability.commit` drain。满槽拒绝且不提交。`frame.begin` 对未消费队列记 `UnconsumedAbilityRequests` 并清空。
+- **EffectRequests 活管线**：`ApplyDot` / catalog Periodic 入队，`effect.commit`（`effect.tick` 前）与 `post-death.effect.commit` 走 `TryApply`。`TryAdopt` 挂槽后补 `ApplyModifiers`，失败撤槽。
+- **时序**：技能/全局/塔主动/英雄技能在 Spatial 之后、Combat 之前只入队；技能伤害请求先于塔攻入队，同帧仍由 primary `damage.commit` drain。走 catalog `Activate` 的敌方技能延到 PreCombat commit；兼容 `Execute*` 仍在 AI 当场结算。预警带在 `ability.commit` 才创建，当帧 `spatial.telegraph.update` 已过，首次倒计时从下一帧开始。
+- **数值：None DoT 同 key 不叠槽**。`Stacking.None` 重复 Apply 不刷新、不新开槽 → 尸体区 / 多塔 Firewall / 岩浆 DPS 相对脉冲重挂下降。技能 DoT 现在会在同帧 `effect.tick` 跳（以前 `skill.update` 在 tick 之后）。
+- **稀疏 AbilityState**：`AbilityPool` / `ActiveAbilityStore` 为 owner；`AbilityInstances[]` 仍是同帧 facade，Unity 可见形状不变。burrow / leap / totem 冷却并进 `MechanismCooldownColumn`（允许 -1 哨兵）。
+- 仍不宣称整个 M5/M6/F4–F9 完成：生产 DoT 仍是空 modifier Periodic；未把十几族机制冷却全部并进 AbilityState；未删 `FrameResource.EffectRequests` 枚举位。
+
 ### 2026-09-04（ECS+GAS 诚实化：AbilityRequests 日志 / Rally writes / 脉冲 DoT 并存，⚠️ 有数值变化）
 - **AbilityRequests**：不是 command buffer。`ActivateCore` 仍同步 `CommitPlan`；只在 **accept 之后** 写入当帧日志，`frame.begin` 清空。冷却 / plan 拒绝不再占 256 槽；日志满不得回滚已提交激活。`build.skill/auto-skill/global-skill.update` 补 `AbilityRequests` 写声明（Build 治疗/护盾可走到 ActivateCore）。没有 consume/commit 节点。
 - **Rally 图声明**：`combat.rally.consume` / `skill-buff.rally.update` 的 writes 从假 `TowerCombatCache` 改为真实的 `TowerState`（`TowerRallyAtkSpdBonus`）+ `PlayerAttributes`。重算批准根与 topology hash。

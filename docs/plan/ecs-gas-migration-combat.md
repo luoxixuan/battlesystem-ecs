@@ -126,6 +126,9 @@ Rally 改消费 `DamageApplied`，新增 `combat.rally.consume`（`tower-attack`
 2026-09-04：`AbilityRequests` 改为 accept 后旁路日志（拒绝不占槽）；Rally writes 改为
 `PlayerAttributes` + `TowerState`；`ApplyDot` None 改回 `TryAdopt`（尸体区/Firewall/岩浆
 脉冲重挂可并存多份）。仍不是终态收口。
+2026-09-04 终态收口续：`ApplyDot` 经 `EffectRequest` → `TryApply`；`Stacking.None` 同 key
+不刷新不新开槽。`ability.commit` 在 Combat 前，技能伤害请求先于塔攻入队。技能 Periodic
+同帧 `effect.tick`。catalog 敌方技能延到 PreCombat。仍不是 F4–F9 终态收口。
 
 M3 就要建立事件迁移表，逐项标记旧 `EventBus` 的 `LegacyOnly`/`Bridge`/`GameplayOnly` 状态；M4 才允许 Trigger 消费 `GameplayOnly`。Bridge 期间由新事实单向转发旧事件，按 sequence 去重，不能让旧 publisher 和新 publisher 各发一份。
 

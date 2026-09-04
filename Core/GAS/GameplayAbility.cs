@@ -209,6 +209,33 @@ namespace BattleSystemECS.Core.GAS
     }
 
     /// <summary>
+    /// 机制 SOA 冷却投影：读写都落在 AbilityState.Cooldown，允许 -1 哨兵（burrow/leap 不可用）。
+    /// </summary>
+    public readonly struct MechanismCooldownColumn
+    {
+        public readonly AbilityState[] States;
+        public readonly AbilityId Id;
+        public MechanismCooldownColumn(AbilityState[] states, AbilityId id)
+        {
+            States = states ?? throw new ArgumentNullException(nameof(states));
+            Id = id;
+        }
+        public int Length => States.Length;
+        public float this[int index]
+        {
+            get => (uint)index < (uint)States.Length ? States[index].Cooldown : 0f;
+            set
+            {
+                if ((uint)index >= (uint)States.Length) return;
+                var state = States[index];
+                state.Id = Id;
+                state.Cooldown = value;
+                States[index] = state;
+            }
+        }
+    }
+
+    /// <summary>
     /// Runtime state for an ability on an entity (cooldown remaining, etc.).
     /// </summary>
     public struct AbilityInstance

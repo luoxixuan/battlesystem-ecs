@@ -149,6 +149,7 @@ namespace BattleSystemECS.Core
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 { "skill-buff.skill.update", "Update(delta)/skill-buff.skill.update" },
+                { "ability.commit", "GraphCommitQueuedAbilities/ability.commit" },
                 { "ai.burrow.apply", "ApplyBurrowEffects()/ai.burrow.apply" },
                 { "ai.burrow.prepare", "SetTurn(turn)/ai.burrow.prepare" },
                 { "ai.burrow.update", "Update(turn-step;legacy-delta-ignored)/ai.burrow.update" },
@@ -181,6 +182,7 @@ namespace BattleSystemECS.Core
                 { "ai.sapper.update", "Update(delta)/ai.sapper.update" },
                 { "ai.zone-control.update", "Update(delta)/ai.zone-control.update" },
                 { "attribute.aggregate", "GraphAggregateAttributes/attribute.aggregate" },
+                { "build.ability.commit", "GraphCommitQueuedAbilities/build.ability.commit" },
                 { "build.ability.reject", "GraphRejectNonWaveAbilities/build.ability.reject" },
                 { "build.auto-skill.update", "Update(false)/build.auto-skill.update" },
                 { "build.damage.commit", "GraphCommitBuildDamage/build.damage.commit" },
@@ -279,6 +281,7 @@ namespace BattleSystemECS.Core
                 { "damage.commit", "GraphCommitGameplayDamage/damage.commit" },
                 { "early.damage.commit", "GraphCommitEarlyDamage/early.damage.commit" },
                 { "early.resource.commit", "GraphCommitEarlyResources/early.resource.commit" },
+                { "effect.commit", "GraphCommitQueuedEffects/effect.commit" },
                 { "effect.tick", "GraphTickConfiguredEffect/effect.tick" },
                 { "effect.tick.combat", "GraphTickSupplementalEffect(clock=Combat)/effect.tick.combat" },
                 { "effect.tick.enemy", "GraphTickSupplementalEffect(clock=Enemy)/effect.tick.enemy" },
@@ -314,6 +317,7 @@ namespace BattleSystemECS.Core
                 { "post-death.combo.update", "Update(delta)/post-death.combo.update" },
                 { "post-death.corpse.update", "Update(delta)/post-death.corpse.update" },
                 { "post-death.doom-clock.update", "Update(delta,GameState.WavePhase)/post-death.doom-clock.update" },
+                { "post-death.effect.commit", "GraphCommitQueuedEffects/post-death.effect.commit" },
                 { "post-death.fission.update", "Update()/post-death.fission.update" },
                 { "post-death.gameplay-event.commit", "GraphCommitPostDeathGameplayEvents/post-death.gameplay-event.commit" },
                 { "post-death.life-link.resolve", "ResolveBreakPenalties()/post-death.life-link.resolve" },
@@ -386,6 +390,10 @@ namespace BattleSystemECS.Core
 
         public static string ReviewClosure(string nodeId) => nodeId switch
         {
+            "ability.commit" => "FrameScheduler.GraphCommitQueuedAbilities+GameplayAbilityRuntime.CommitQueuedAbilities",
+            "build.ability.commit" => "FrameScheduler.GraphCommitQueuedAbilities+GameplayAbilityRuntime.CommitQueuedAbilities",
+            "effect.commit" => "FrameScheduler.GraphCommitQueuedEffects+GameplayEffectRuntime.CommitQueuedEffects",
+            "post-death.effect.commit" => "FrameScheduler.GraphCommitQueuedEffects+GameplayEffectRuntime.CommitQueuedEffects",
             "frame.begin" => "FrameScheduler.GraphBeginFrame+ComponentStore.BeginFrame+ComponentStore.SetTurnCCFlags",
             "frame.input.publish" => "FrameScheduler.GraphPublishPersistentFrameState+Thread.MemoryBarrier+FrameSystemGraph.PersistentFrameState",
             "frame.blinker.update" => "FrameScheduler.GraphTickBlinker+PathfindingSystem.GetPathWaypointCount",

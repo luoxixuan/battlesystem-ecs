@@ -131,12 +131,13 @@ namespace BattleSystemECS.Tests.Features.Skills
             const BindingFlags Flags = BindingFlags.NonPublic | BindingFlags.Instance;
             // 私有字段 nameof 在类外不可用，保留字符串（反射点）。
             var idField = typeof(HeroSkillSystem).GetField("_heroSkillIds", Flags);
-            var cdField = typeof(HeroSkillSystem).GetField("_heroSkillCooldowns", Flags);
+            var storeField = typeof(HeroSkillSystem).GetField("store", Flags);
             var maxField = typeof(HeroSkillSystem).GetField("_heroSkillCooldownMax", Flags);
             var anyField = typeof(HeroSkillSystem).GetField("_anySkillConfigured", Flags);
 
             var ids = (int[])idField!.GetValue(sys)!;
-            var cds = (AbilityState[])cdField!.GetValue(sys)!;
+            var store = (ComponentStore)storeField!.GetValue(sys)!;
+            var cds = store.HeroSkillCooldown.States;
             var maxs = (float[])maxField!.GetValue(sys)!;
             int flat = hero * HeroSkillSystem.MAX_HERO_SKILLS + slot;
             ids[flat] = skillId;

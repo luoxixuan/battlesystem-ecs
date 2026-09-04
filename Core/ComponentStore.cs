@@ -368,7 +368,18 @@ namespace BattleSystemECS.Core
             _deathQueueResolved = false;
             DamageResolver.Events.Clear();
             ResourceResolver.Events.Clear();
-            AbilityRequests.Clear();
+            if (AbilityRequests.Count != 0)
+            {
+                UnconsumedAbilityRequests += AbilityRequests.Count;
+                ClearAbilityQueue();
+            }
+            else AbilityRequests.Clear();
+            if (EffectRequests.Count != 0)
+            {
+                UnconsumedEffectRequests += EffectRequests.Count;
+                ClearEffectQueue();
+            }
+            else EffectRequests.Clear();
             DamageResolver.BeginFrame();
             DamageResolver.ResetDiagnostics();
             ResourceResolver.BeginFrame();
@@ -839,7 +850,7 @@ namespace BattleSystemECS.Core
             RemoveAllGameplayEffects(entityId);
             TagState.ClearEntity(entityId);
             PositionActive[entityId] = false;
-            AbilityCount[entityId] = 0;
+            ReleaseEntityAbilities(entityId);
             // H-1 fix: lock around dictionary removal (thread-safe)
             lock (entityNamesLock)
             {
@@ -1614,7 +1625,7 @@ namespace BattleSystemECS.Core
             EnemyWoundThreshold = null!; EnemyWoundSlowRatio = null!; EnemyIsWounded = null!;
             EnemyKnockbackForceLeft = null!; EnemyIsElite = null!; EnemyIsFlying = null!;
             EnemyFlightHeight = null!; EnemyCanLand = null!; EnemyStealthMultiplier = null!;
-            EnemyIsBurrowed = null!; EnemyBurrowTimer = null!; EnemyBurrowCooldown = null!;
+            EnemyIsBurrowed = null!; EnemyBurrowTimer = null!; EnemyBurrowCooldown = default;
             EnemyBurrowCooldownRef = null!; EnemyBurrowSpeedMult = null!;
             EnemyBurrowEmergeDamage = null!; EnemyBurrowRadius = null!;
             EnemyCanResurrect = null!; EnemyResurrectRange = null!; EnemyResurrectCooldown = null!;
@@ -1653,7 +1664,7 @@ namespace BattleSystemECS.Core
             EnemyTeleportCooldown = null!; EnemyTeleportDestinationX = null!;
             EnemyTeleportDestinationY = null!; EnemyTeleportType = null!;
             EnemyLeaperArchetype = null!; EnemyLeapDistance = null!;
-            EnemyLeapCooldown = null!; EnemyLeapCooldownRef = null!;
+            EnemyLeapCooldown = default; EnemyLeapCooldownRef = null!;
             EnemyLeapDuration = null!; EnemyLeapStartX = null!; EnemyLeapStartY = null!;
             EnemyLeapTargetX = null!; EnemyLeapTargetY = null!; EnemyLeapElapsed = null!;
             EnemyLeapDamage = null!; EnemyLeapRadius = null!; EnemyLeapStunDuration = null!;

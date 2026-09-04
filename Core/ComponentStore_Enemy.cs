@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BattleSystemECS.Components;
 using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
 using BattleSystemECS.Config;
 using BattleSystemECS.Systems;
 
@@ -447,8 +448,9 @@ namespace BattleSystemECS.Core
         public bool[] EnemyIsBurrowed = new bool[MAX_ENTITIES];
         // EnemyBurrowTimer: remaining underground duration in turns (0 = about to emerge)
         public float[] EnemyBurrowTimer = new float[MAX_ENTITIES];
-        // EnemyBurrowCooldown: cooldown before can burrow again (-1 = cannot burrow, 0 = always can, >0 = turns remaining)
-        public float[] EnemyBurrowCooldown = new float[MAX_ENTITIES];
+        // EnemyBurrowCooldown: AbilityState 投影。-1 = 不能钻地，0 = 就绪，>0 = 剩余回合。
+        public MechanismCooldownColumn EnemyBurrowCooldown =
+            new MechanismCooldownColumn(new AbilityState[MAX_ENTITIES], MechanismAbilityIds.Burrow);
         // EnemyBurrowCooldownRef: original cooldown value (for reset after emerge, only meaningful if CanBurrow)
         public float[] EnemyBurrowCooldownRef = new float[MAX_ENTITIES];
         // EnemyBurrowSpeedMult: movement speed multiplier while underground (typically faster/slower)
@@ -469,7 +471,9 @@ namespace BattleSystemECS.Core
         public float[] EnemyLeapDistance = new float[MAX_ENTITIES];
         // EnemyLeapCooldown: turns until next leap is available (0 = ready, >0 = cooling down).
         //   -1 = no leap ability. Decremented each frame in EnemyMovementSystem; reset to ref after leap.
-        public float[] EnemyLeapCooldown = new float[MAX_ENTITIES];
+        // EnemyLeapCooldown: AbilityState 投影。0 = 就绪，>0 = 冷却中，-1 = 非跳跃单位。
+        public MechanismCooldownColumn EnemyLeapCooldown =
+            new MechanismCooldownColumn(new AbilityState[MAX_ENTITIES], MechanismAbilityIds.Leap);
         // EnemyLeapCooldownRef: reference cooldown value (used to reset cooldown after a leap completes)
         public float[] EnemyLeapCooldownRef = new float[MAX_ENTITIES];
         // EnemyLeapDuration: total frames the leap animation takes (parabolic interpolation window)

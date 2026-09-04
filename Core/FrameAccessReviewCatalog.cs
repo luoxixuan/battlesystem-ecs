@@ -13,9 +13,9 @@ namespace BattleSystemECS.Core
         internal const string CommitArtifactSha256 = "3E38DB03DF92438283631D554E7D61B14B4624C129E67876522CB62D6D8421C1";
         internal const string SupplementalArtifactSha256 = "EA9FA8D9563DD0AEE189B6873573659C8C9CB3EE6E057873EDBD0932754A11FE";
         internal static int ReviewedNodeCount => Reviews.Count;
-        internal const int ReportedEarlyNodeCount = 91;
+        internal const int ReportedEarlyNodeCount = 92;
         internal const int ReportedCombatNodeCount = 84;
-        internal const int ReportedPostDeathNodeCount = 49;
+        internal const int ReportedPostDeathNodeCount = 52;
         internal const int ReportedEarlyCombatOverlap = 0;
         internal const int ReportedEarlyPostDeathOverlap = 12;
         internal const int ReportedCombatPostDeathOverlap = 4;
@@ -35,6 +35,7 @@ namespace BattleSystemECS.Core
         private static readonly Dictionary<string, FrameAccessReviewId> Reviews =
             new Dictionary<string, FrameAccessReviewId>(StringComparer.Ordinal)
             {
+                { "ability.commit", "FG-ACCESS-20260901/ability.commit" },
                 { "skill-buff.skill.update", "FG-ACCESS-20260901/skill-buff.skill.update" },
                 { "ai.burrow.apply", "FG-ACCESS-20260901/ai.burrow.apply" },
                 { "ai.burrow.prepare", "FG-ACCESS-20260901/ai.burrow.prepare" },
@@ -68,6 +69,7 @@ namespace BattleSystemECS.Core
                 { "ai.sapper.update", "FG-ACCESS-20260901/ai.sapper.update" },
                 { "ai.zone-control.update", "FG-ACCESS-20260901/ai.zone-control.update" },
                 { "attribute.aggregate", "FG-ACCESS-20260901/attribute.aggregate" },
+                { "build.ability.commit", "FG-ACCESS-20260901/build.ability.commit" },
                 { "build.ability.reject", "FG-ACCESS-20260901/build.ability.reject" },
                 { "build.auto-skill.update", "FG-ACCESS-20260901/build.auto-skill.update" },
                 { "build.damage.commit", "FG-ACCESS-20260901/build.damage.commit" },
@@ -166,6 +168,7 @@ namespace BattleSystemECS.Core
                 { "damage.commit", "FG-ACCESS-20260901/damage.commit" },
                 { "early.damage.commit", "FG-ACCESS-20260901/early.damage.commit" },
                 { "early.resource.commit", "FG-ACCESS-20260901/early.resource.commit" },
+                { "effect.commit", "FG-ACCESS-20260901/effect.commit" },
                 { "effect.tick", "FG-ACCESS-20260901/effect.tick" },
                 { "effect.tick.combat", "FG-ACCESS-20260901/effect.tick.combat" },
                 { "effect.tick.enemy", "FG-ACCESS-20260901/effect.tick.enemy" },
@@ -201,6 +204,7 @@ namespace BattleSystemECS.Core
                 { "post-death.combo.update", "FG-ACCESS-20260901/post-death.combo.update" },
                 { "post-death.corpse.update", "FG-ACCESS-20260901/post-death.corpse.update" },
                 { "post-death.doom-clock.update", "FG-ACCESS-20260901/post-death.doom-clock.update" },
+                { "post-death.effect.commit", "FG-ACCESS-20260901/post-death.effect.commit" },
                 { "post-death.fission.update", "FG-ACCESS-20260901/post-death.fission.update" },
                 { "post-death.gameplay-event.commit", "FG-ACCESS-20260901/post-death.gameplay-event.commit" },
                 { "post-death.life-link.resolve", "FG-ACCESS-20260901/post-death.life-link.resolve" },
@@ -265,8 +269,8 @@ namespace BattleSystemECS.Core
             };
 
         // 生产 profile 按 NodeId 排序后的完整根指纹；任何节点或元数据变化都必须重新审阅。
-        internal const string ApprovedFingerprintRootGameplay = "0218dac3a038f8f2c0923d521d7b1eb13a42e5a32ffab4b02a5351796ac875b5";
-        internal const string ApprovedFingerprintRootFixedPopulation = "0fe069685c78775f3784e00af26b4a29c64c55ad47c900257c0a20149bc41dc1";
+        internal const string ApprovedFingerprintRootGameplay = "bf047764a619a298907376fd83fb4cafcb2cca69a39967f5be8f97ede1bc4ce3";
+        internal const string ApprovedFingerprintRootFixedPopulation = "6b5e316fc17857053169fc7c5c730abe34dc380af8c83ade92d876d538cdcbbe";
 
         public static bool TryGet(string nodeId, out FrameAccessReviewId reviewId) =>
             Reviews.TryGetValue(nodeId, out reviewId);
@@ -424,7 +428,7 @@ namespace BattleSystemECS.Core
         {
             "early-groups.md" => ReportedEarlyNodeCount,
             "combat-groups.md" => ReportedCombatNodeCount,
-            "commit-postdeath.md" => 33,
+            "commit-postdeath.md" => 36,
             "supplemental-production-nodes.md" => SupplementalNodeIds.Count,
             _ => throw new ArgumentOutOfRangeException(nameof(artifactId),artifactId,"Unknown review artifact.")
         };

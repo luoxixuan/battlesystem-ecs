@@ -49,6 +49,46 @@ namespace BattleSystemECS.Core.GAS
             return true;
         }
 
+        internal bool EnqueueApply(EffectId id, GameplayEffectDefinition definition, EntityHandle source,
+            EntityHandle target, int ownerPlayerId, float snapshot)
+        {
+            if (!_store.EffectRequests.CanAdd(1))
+            {
+                _store.EffectRequests.RecordCapacityRejection(false);
+                return false;
+            }
+            var context = new ExecutionContext(source, target, default(AbilityId), id, definition.Clock,
+                _store.AllocateGameplaySequence(target.Index), ownerPlayerId, snapshot);
+            if (!_store.EffectRequests.TryAdd(new EffectRequest(source, target, id, 1, definition.Clock, context)))
+                return false;
+            int index = _store.EffectRequests.Count - 1;
+            _store.QueuedEffectDefinitions[index] = definition;
+            _store.QueuedEffectOwnerPlayerIds[index] = ownerPlayerId;
+            _store.QueuedEffectSnapshots[index] = snapshot;
+            if (!_store.DeferAbilityAndEffectCommit)
+                CommitQueuedEffects();
+            return true;
+        }
+
+        internal void CommitQueuedEffects()
+        {
+            int count = _store.EffectRequests.Count;
+            for (int i = 0; i < count; i++)
+            {
+                var request = _store.EffectRequests.Get(i);
+                TryApply(request.Effect, _store.QueuedEffectDefinitions[i], request.Source, request.Target, out _,
+                    request.StackDelta, _store.QueuedEffectSnapshots[i], _store.QueuedEffectOwnerPlayerIds[i]);
+            }
+            _store.ClearEffectQueue();
+        }
+
+        internal void RejectQueuedEffects()
+        {
+            int n = _store.EffectRequests.Count;
+            if (n > 0) _store.UnconsumedEffectRequests += n;
+            _store.ClearEffectQueue();
+        }
+
         public bool TryApply(EffectId id, GameplayEffectDefinition definition, EntityHandle source, EntityHandle target, out EffectHandle handle, int stackDelta = 1, float snapshot = float.NaN, int ownerPlayerId = -1, long provenanceId = 0L)
         {
             handle = default(EffectHandle);
@@ -127,8 +167,8 @@ namespace BattleSystemECS.Core.GAS
         }
 
         /// <summary>
-        /// 把 legacy Periodic 收进 runtime owner。None 每次新槽（保留可叠加多份）；
-        /// 其它 stacking 由 <see cref="TryRestack"/> 在同一 owner 内刷新 timer / stacks。
+        /// 把 legacy Periodic 收进 runtime owner。挂槽后与 TryApply 一样 ApplyModifiers；
+        /// 失败撤槽并 EffectRejected。生产 DoT 走 EffectRequest→TryApply，Adopt 留给遗留/测试。
         /// </summary>
         internal bool TryAdopt(GameplayEffectApplication application, int ownerPlayerId, out EffectHandle handle)
         {
@@ -147,6 +187,17 @@ namespace BattleSystemECS.Core.GAS
             ActiveRuntimeCount++;
             if (ActiveRuntimeCount > PeakActiveRuntimeCount) PeakActiveRuntimeCount = ActiveRuntimeCount;
             RegisterRuntimeEntity(targetId);
+            float snapshot = application.Definition.Periodic.HasValue
+                ? application.Definition.Periodic.Value.Magnitude : float.NaN;
+            if (!ApplyModifiers(targetId, definition, snapshot, handle))
+            {
+                _store.TryRemoveEffect(runtime.Target, handle, out _);
+                ActiveRuntimeCount = Math.Max(0, ActiveRuntimeCount - 1);
+                UnregisterRuntimeEntity(targetId);
+                handle = default(EffectHandle);
+                Reject(runtime.Source, runtime.Target, definition.Id, 3);
+                return false;
+            }
             Publish(new GameplayEvent(GameplayEventType.EffectApplied, runtime.Source, runtime.Target, handle, definition.Id,
                 DamageFlags.None, _store.AllocateGameplaySequence(targetId), tag: definition.Tag, ownerPlayerId: ownerPlayerId));
             return true;

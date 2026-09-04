@@ -118,8 +118,8 @@ namespace BattleSystemECS.Tests.Framework
             for (int i = 0; i < store.DamageResolver.Events.Count; i++)
                 if (store.DamageResolver.Events.Get(i).Type == GameplayEventType.AbilityActivated) published = true;
             Assert.True(published);
-            Assert.Equal(1, store.AbilityRequests.Count);
             Assert.True(store.AbilityRequests.PeakCount >= 1);
+            Assert.Equal(0, store.AbilityRequests.Count);
         }
 
         [Fact]
@@ -146,9 +146,9 @@ namespace BattleSystemECS.Tests.Framework
                 store.AllocateGameplaySequence(0));
             var result = GameplayAbilityRuntime.Activate(store, catalog, request);
             Assert.True(result.Accepted, result.Reason.ToString());
-            Assert.Equal(1, store.AbilityRequests.Count);
-            Assert.Equal(ability.Id, store.AbilityRequests.Get(0).Ability);
-            Assert.Equal(0, store.AbilityRequests.Get(0).Source.Index);
+            Assert.True(store.AbilityRequests.PeakCount >= 1);
+            Assert.Equal(0, store.AbilityRequests.Count);
+            Assert.Equal(1, result.AppliedEffects);
         }
 
         [Fact]
@@ -194,7 +194,7 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void AbilityRequest_FullFrameLogDoesNotRollbackAcceptedActivation()
+        public void AbilityRequest_FullFrameLogRejectsInsteadOfCommit()
         {
             var store = WaveStore();
             store.AddPlayer(0, 20f, 1f, 1f, 1);
@@ -213,10 +213,11 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(store.AbilityRequests.Capacity, store.AbilityRequests.Count);
             var result = GameplayAbilityRuntime.Activate(store, catalog, new float[1],
                 new AbilityActivationRequest(0, 0, 0f, enemy, ability: ability.Id));
-            Assert.True(result.Accepted, result.Reason.ToString());
+            Assert.False(result.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.InvalidRequest, result.Reason);
             Assert.Equal(store.AbilityRequests.Capacity, store.AbilityRequests.Count);
             Assert.True(store.AbilityRequests.OverflowCount >= 1);
-            Assert.Equal(7f, store.EnemyHealth[enemy], 3);
+            Assert.Equal(10f, store.EnemyHealth[enemy], 3);
         }
 
         [Fact]

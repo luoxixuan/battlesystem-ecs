@@ -224,17 +224,21 @@ namespace BattleSystemECS.Tests.Framework
             registry.AssignToGroups(scheduler);
             scheduler.Phase = GameState.WavePhase;
 
-            int resolverEventsBefore = Store.DamageResolver.Events.Count;
-            var result = sys.TryActivateCatalogAbility(new AbilityId(0));
-            Assert.True(result.Accepted, result.Reason.ToString());
+            Assert.True(sys.RequestCatalogAbility(new AbilityId(0)));
+            Assert.Equal(100f, Store.EnemyHealth[enemy]);
+            Assert.Equal(0f, Store.GetAbility(pid, 0).CurrentCooldown);
+
+            scheduler.Tick(0f, 0);
+
+            Assert.True(sys.LastCatalogActivation.Accepted, sys.LastCatalogActivation.Reason.ToString());
             Assert.Equal(0, sys.PendingSkillDamageCount);
             Assert.Equal(0, Store.DamageResolver.PendingRequestCount);
             Assert.Equal(80f, Store.EnemyHealth[enemy]);
             Assert.Equal(3f, Store.GetAbility(pid, 0).CurrentCooldown);
-            Assert.Equal(resolverEventsBefore + 3, Store.DamageResolver.Events.Count);
-            Assert.Equal(GameplayEventType.AbilityActivated, Store.DamageResolver.Events.Get(resolverEventsBefore + 2).Type);
+            Assert.Contains(Enumerable.Range(0, Store.DamageResolver.Events.Count),
+                i => Store.DamageResolver.Events.Get(i).Type == GameplayEventType.AbilityActivated);
 
-            scheduler.Tick(0f, 0);
+            scheduler.Tick(0f, 1);
 
             Assert.Equal(0, Store.DamageResolver.PendingRequestCount);
             Assert.Equal(3f, Store.GetAbility(pid, 0).CurrentCooldown);

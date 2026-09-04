@@ -194,14 +194,15 @@ EmitPositionEvents()      # 移动后发射 OnPositionsChanged（逻辑→渲染
 Terrain.Execute()         # 地形/变异/变形（enemyDt）
 CombatSetup.Execute()     # 战斗系统 SetTurn 缓存（enemyDt）
 Spatial.Execute()         # 空间网格重建 + 巡逻/时光/迷雾/预警（enemyDt）
+# PreCombat 图节点（无独立 Group）：skill-buff.skill.update / global-skill / tower-active-skill / hero-skill / ability.commit
 Combat.Execute()          # 攻击/协同/光环/投射物（combatDt，全速）；含 combat.rally.consume（tower-attack 前）
-SkillBuff.Execute()       # 技能结算 + DoT + 流血（combatDt）；节点为 effect.tick / skill-buff.skill.update / skill-buff.rally.update
+SkillBuff.Execute()       # effect.commit + effect.tick + DoT/流血/rally（combatDt）
 ResolveEnemiesKilledThisFrame()  # 帧末统一死亡结算（dt-free）
-PostDeath.Execute()       # 分裂/生命链接/目标/资源/尸体/连击（combatDt）
+PostDeath.Execute()       # 分裂/生命链接/目标/资源/尸体/连击（combatDt）；corpse 后 post-death.effect.commit
 Threat Score EMA 更新      # 玩家 DPS 威胁分指数滑动平均
 ```
 
-> 说明：bullet-time（子弹时间）开启时，`enemyDt`（敌人侧 7 个 group）按比例减速，`combatDt`（玩家/塔攻击侧）保持全速——战术暂停效果。BuildPhase 只运行 `BuildGroup`，不运行任何战斗系统。SkillBuff 真实节点是 `effect.tick`（Periodic）与 `skill-buff.skill.update`（SkillSystem.Update）；旧 id `effect.commit` / `ability.commit` 已删除。`build.skill/auto-skill/global-skill.update` 声明 `AbilityRequests`（Build 治疗/护盾可走到 ActivateCore 写当帧日志）；`post-death.corpse.update` 不再声明 EffectRequests。`AbilityRequests` 是已接受激活的当帧日志（accept 后写入，`frame.begin` 清空），不是独立 consume/commit 管线；`EffectRequests` 仍是死 token，保留以免 `FrameResource` 枚举移位。Rally 激活走 `combat.rally.consume` + `skill-buff.rally.update` 消费 `DamageApplied`，writes 为 `PlayerAttributes` + `TowerState`，不再订 `PlayerDamaged`。
+> 说明：bullet-time（子弹时间）开启时，`enemyDt`（敌人侧 7 个 group）按比例减速，`combatDt`（玩家/塔攻击侧）保持全速——战术暂停效果。BuildPhase 只运行 `BuildGroup`，不运行任何战斗系统。`skill-buff.skill.update` 已挪到 Combat 前只入队；`ability.commit` 在 PreCombat drain，`effect.commit` 在 SkillBuff 开头、`effect.tick` 之前 drain。Build 相位 `build.ability.commit` 在 shop-reroll 之后。`AbilityRequests` / `EffectRequests` 是真 command buffer（Seal 后 Activate/ApplyDot 只入队，对应 commit 节点 `TryApply`/`CommitPlan`）；`frame.begin` 对未消费队列记 `Unconsumed*` 并清空。`build.skill/auto-skill/global-skill.update` 写 `AbilityRequests`；`post-death.corpse.update` 写 `EffectRequests`。Rally 激活走 `combat.rally.consume` + `skill-buff.rally.update` 消费 `DamageApplied`，writes 为 `PlayerAttributes` + `TowerState`，不再订 `PlayerDamaged`。
 
 ### 4.3 两阶段并行安全模式
 

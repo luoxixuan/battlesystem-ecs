@@ -84,7 +84,26 @@ namespace BattleSystemECS.Core.GAS
             bool IsValid { get; }
             bool IsReady { get; }
             void Commit(float cooldown);
+            AbilityQueueCooldownKind QueueKind { get; }
+            float[] FloatCooldowns { get; }
+            AbilityState[] StateCooldowns { get; }
         }
+
+        internal enum AbilityQueueCooldownKind : byte
+        {
+            Stored = 0,
+            FloatArray = 1,
+            StateArray = 2,
+            TowerActive = 3,
+            PlayerGlobal = 4,
+            Hero = 5
+        }
+
+        private const byte QueueFlagRequireEnemy = 1;
+        private const byte QueueFlagRequireHeal = 2;
+        private const byte QueueFlagForbidEffects = 4;
+        private const byte QueueFlagIsSingle = 8;
+        private const byte QueueFlagMagnitudeOverride = 16;
 
         private readonly struct CooldownArrayActivationState : IAbilityActivationState
         {
@@ -95,14 +114,18 @@ namespace BattleSystemECS.Core.GAS
             public bool IsValid => _cooldowns != null && _slot >= 0 && _slot < _cooldowns.Length;
             public bool IsReady => IsValid && _cooldowns[_slot] <= 0f;
             public void Commit(float cooldown) => _cooldowns[_slot] = Math.Max(0f, cooldown);
+            public AbilityQueueCooldownKind QueueKind => AbilityQueueCooldownKind.FloatArray;
+            public float[] FloatCooldowns => _cooldowns;
+            public AbilityState[] StateCooldowns => null;
         }
 
         private readonly struct AbilityStateArrayActivationState : IAbilityActivationState
         {
             private readonly AbilityState[] _states;
             private readonly int _slot;
-            public AbilityStateArrayActivationState(AbilityState[] states, int slot)
-            { _states = states; _slot = slot; }
+            private readonly AbilityQueueCooldownKind _kind;
+            public AbilityStateArrayActivationState(AbilityState[] states, int slot, AbilityQueueCooldownKind kind)
+            { _states = states; _slot = slot; _kind = kind; }
             public bool IsValid => _states != null && _slot >= 0 && _slot < _states.Length;
             public bool IsReady => IsValid && _states[_slot].CanActivate();
             public void Commit(float cooldown)
@@ -112,6 +135,9 @@ namespace BattleSystemECS.Core.GAS
                 if (state.MaxCharges > 1 && state.Charges > 0) state.Charges--;
                 _states[_slot] = state;
             }
+            public AbilityQueueCooldownKind QueueKind => _kind;
+            public float[] FloatCooldowns => null;
+            public AbilityState[] StateCooldowns => _states;
         }
 
         private readonly struct StoredAbilityActivationState : IAbilityActivationState
@@ -136,6 +162,9 @@ namespace BattleSystemECS.Core.GAS
                 }
                 _store.SetAbility(_entityId, _slot, instance);
             }
+            public AbilityQueueCooldownKind QueueKind => AbilityQueueCooldownKind.Stored;
+            public float[] FloatCooldowns => null;
+            public AbilityState[] StateCooldowns => null;
         }
 
         private enum TargetMagnitudeMode { Scale, Override }
@@ -175,6 +204,28 @@ namespace BattleSystemECS.Core.GAS
 
             public static ActivationTargetSet Heals(IReadOnlyList<int> targetIds, IReadOnlyList<float> magnitudes) =>
                 new ActivationTargetSet(-1, targetIds, magnitudes, TargetMagnitudeMode.Override, false, true, true, true);
+
+            public static ActivationTargetSet FromQueue(ComponentStore store, int index)
+            {
+                byte flags = store.AbilityQueuedFlags[index];
+                int count = store.AbilityQueuedTargetCounts[index];
+                int start = store.AbilityQueuedTargetStarts[index];
+                if ((flags & QueueFlagIsSingle) != 0)
+                    return Single(store.AbilityQueuedTargetIds[start]);
+                var ids = new int[count];
+                var mags = new float[count];
+                for (int i = 0; i < count; i++)
+                {
+                    ids[i] = store.AbilityQueuedTargetIds[start + i];
+                    mags[i] = store.AbilityQueuedMagnitudes[start + i];
+                }
+                var mode = (flags & QueueFlagMagnitudeOverride) != 0
+                    ? TargetMagnitudeMode.Override : TargetMagnitudeMode.Scale;
+                return new ActivationTargetSet(-1, ids, mags, mode, false,
+                    (flags & QueueFlagRequireEnemy) != 0,
+                    (flags & QueueFlagRequireHeal) != 0,
+                    (flags & QueueFlagForbidEffects) != 0);
+            }
 
             public bool IsSingle => _isSingle;
             public int Count => IsSingle ? 1 : _targetIds == null ? 0 : _targetIds.Count;
@@ -226,7 +277,7 @@ namespace BattleSystemECS.Core.GAS
 
         public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, AbilityState[] cooldowns,
             AbilityActivationRequest request, IAbilityPayloadHandler payloadHandler = null)
-            => ActivateCore(store, catalog, new AbilityStateArrayActivationState(cooldowns, request.Slot),
+            => ActivateCore(store, catalog, new AbilityStateArrayActivationState(cooldowns, request.Slot, IdentifyStateArray(store, cooldowns)),
                 request, ActivationTargetSet.Single(request.TargetId >= 0 ? request.TargetId : request.OwnerId), payloadHandler);
 
         public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, AbilityCooldownColumn cooldowns,
@@ -269,7 +320,7 @@ namespace BattleSystemECS.Core.GAS
         public static AbilityActivationResult ActivateTargets(ComponentStore store, GameplayCatalog catalog,
             AbilityState[] cooldowns, AbilityActivationRequest request, IReadOnlyList<int> targetIds,
             IReadOnlyList<float> magnitudeOverrides = null, IAbilityPayloadHandler payloadHandler = null)
-            => ActivateCore(store, catalog, new AbilityStateArrayActivationState(cooldowns, request.Slot),
+            => ActivateCore(store, catalog, new AbilityStateArrayActivationState(cooldowns, request.Slot, IdentifyStateArray(store, cooldowns)),
                 request, ActivationTargetSet.Scaled(targetIds, magnitudeOverrides), payloadHandler);
 
         public static AbilityActivationResult ActivateTargets(ComponentStore store, GameplayCatalog catalog,
@@ -310,27 +361,149 @@ namespace BattleSystemECS.Core.GAS
             var validation = BuildActivationPlan(store, catalog, ability, request, source, targets, payloadHandler);
             if (validation != AbilityActivationRejectReason.None) return Reject(request, validation);
 
-            int applied = 0;
+            if (!TryEnqueueActivation(store, catalog, activationState, request, source, targets, payloadHandler))
+                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+            if (store.DeferAbilityAndEffectCommit)
+                return new AbilityActivationResult(true, request.OwnerId, request.Slot, appliedEffects: 0);
+            return CommitQueuedAbilities(store);
+        }
+
+        private static AbilityQueueCooldownKind IdentifyStateArray(ComponentStore store, AbilityState[] states)
+        {
+            if (store == null || states == null) return AbilityQueueCooldownKind.StateArray;
+            if (ReferenceEquals(states, store.TowerActiveCooldown.States)) return AbilityQueueCooldownKind.TowerActive;
+            if (ReferenceEquals(states, store.PlayerGlobalSkillCooldown.States)) return AbilityQueueCooldownKind.PlayerGlobal;
+            if (ReferenceEquals(states, store.HeroSkillCooldown.States)) return AbilityQueueCooldownKind.Hero;
+            return AbilityQueueCooldownKind.StateArray;
+        }
+
+        private static bool TryEnqueueActivation<TState>(ComponentStore store, GameplayCatalog catalog,
+            TState activationState, AbilityActivationRequest request, EntityHandle source,
+            ActivationTargetSet targets, IAbilityPayloadHandler payloadHandler)
+            where TState : struct, IAbilityActivationState
+        {
+            int packedStart = store.AbilityQueuedTargetFill;
+            if (targets.Count < 0 || packedStart > ComponentStore.MAX_ABILITY_QUEUE_TARGET_SLOTS - targets.Count)
+                return false;
+            if (!store.AbilityRequests.CanAdd(1))
+            {
+                store.AbilityRequests.RecordCapacityRejection(false);
+                return false;
+            }
+            int index = store.AbilityRequests.Count;
+            byte flags = 0;
+            if (targets.RequireEnemy) flags |= QueueFlagRequireEnemy;
+            if (targets.RequireHealExecutions) flags |= QueueFlagRequireHeal;
+            if (targets.ForbidEffects) flags |= QueueFlagForbidEffects;
+            if (targets.IsSingle) flags |= QueueFlagIsSingle;
+            store.AbilityQueuedCatalogs[index] = catalog;
+            store.AbilityQueuedHandlers[index] = payloadHandler;
+            store.AbilityQueuedActivations[index] = request;
+            store.AbilityQueuedTargetStarts[index] = packedStart;
+            store.AbilityQueuedTargetCounts[index] = targets.Count;
+            store.AbilityQueuedFlags[index] = flags;
+            store.AbilityQueuedCooldownKinds[index] = (byte)activationState.QueueKind;
+            store.AbilityQueuedFloatArrays[index] = activationState.FloatCooldowns;
+            store.AbilityQueuedStateArrays[index] = activationState.StateCooldowns;
             for (int i = 0; i < targets.Count; i++)
             {
-                targets.TryRequestAt(request, i, out var targetRequest);
-                int targetId = targets.TargetIdAt(i);
-                int targetApplied = CommitPlan(store, catalog, ability, targetRequest, source,
-                    store.GetEntityHandle(targetId), payloadHandler);
-                if (targetApplied < 0)
-                    throw new InvalidOperationException("prevalidated ability plan was rejected during commit");
-                applied += targetApplied;
+                int slot = packedStart + i;
+                store.AbilityQueuedTargetIds[slot] = targets.TargetIdAt(i);
+                store.AbilityQueuedMagnitudes[slot] = 1f;
+                if (!targets.IsSingle && targets.TryRequestAt(request, i, out var mapped))
+                {
+                    if (!float.IsNaN(mapped.MagnitudeOverride))
+                    {
+                        store.AbilityQueuedMagnitudes[slot] = mapped.MagnitudeOverride;
+                        store.AbilityQueuedFlags[index] |= QueueFlagMagnitudeOverride;
+                    }
+                    else
+                        store.AbilityQueuedMagnitudes[slot] = mapped.MagnitudeScale;
+                }
             }
-            if (!CommitCosts(store, ability, request, source))
-                throw new InvalidOperationException("prevalidated ability cost was rejected during commit");
-            activationState.Commit(ability.Cooldown);
-            int firstTargetId = targets.TargetIdAt(0);
-            var committedTarget = store.GetEntityHandle(firstTargetId);
-            PublishActivation(store, request, source, committedTarget, firstTargetId);
-            // 接受后才写入帧日志。这不是独立 consume/commit 管线；容量耗尽不得回滚已提交的激活。
-            store.AbilityRequests.TryAdd(new AbilityRequest(source, request.Ability, committedTarget,
-                store.AllocateGameplaySequence(request.OwnerId)));
-            return new AbilityActivationResult(true, request.OwnerId, request.Slot, appliedEffects: applied);
+            store.AbilityQueuedTargetFill = packedStart + targets.Count;
+            int firstTarget = targets.TargetIdAt(0);
+            return store.AbilityRequests.TryAdd(new AbilityRequest(source, request.Ability,
+                store.GetEntityHandle(firstTarget), store.AllocateGameplaySequence(request.OwnerId)));
+        }
+
+        public static AbilityActivationResult CommitQueuedAbilities(ComponentStore store)
+        {
+            if (store == null) return new AbilityActivationResult(false, -1, -1, AbilityActivationRejectReason.InvalidRequest);
+            int applied = 0;
+            int lastOwner = -1;
+            int lastSlot = -1;
+            int count = store.AbilityRequests.Count;
+            for (int i = 0; i < count; i++)
+            {
+                var catalog = store.AbilityQueuedCatalogs[i];
+                var request = store.AbilityQueuedActivations[i];
+                lastOwner = request.OwnerId;
+                lastSlot = request.Slot;
+                if (catalog == null || !catalog.TryGetAbility(request.Ability, out var ability))
+                    throw new InvalidOperationException("queued ability is missing from catalog");
+                var targets = ActivationTargetSet.FromQueue(store, i);
+                var source = store.GetEntityHandle(request.OwnerId);
+                var handler = store.AbilityQueuedHandlers[i];
+                for (int t = 0; t < targets.Count; t++)
+                {
+                    targets.TryRequestAt(request, t, out var targetRequest);
+                    int targetId = targets.TargetIdAt(t);
+                    int targetApplied = CommitPlan(store, catalog, ability, targetRequest, source,
+                        store.GetEntityHandle(targetId), handler);
+                    if (targetApplied < 0)
+                        throw new InvalidOperationException("prevalidated ability plan was rejected during commit");
+                    applied += targetApplied;
+                }
+                if (!CommitCosts(store, ability, request, source))
+                    throw new InvalidOperationException("prevalidated ability cost was rejected during commit");
+                CommitQueuedCooldown(store, i, request, ability.Cooldown);
+                int firstTargetId = targets.TargetIdAt(0);
+                PublishActivation(store, request, source, store.GetEntityHandle(firstTargetId), firstTargetId);
+            }
+            store.ClearAbilityQueue();
+            return new AbilityActivationResult(true, lastOwner, lastSlot, appliedEffects: applied);
+        }
+
+        public static void RejectQueuedAbilities(ComponentStore store)
+        {
+            if (store == null) return;
+            int n = store.AbilityRequests.Count;
+            if (n > 0) store.UnconsumedAbilityRequests += n;
+            store.ClearAbilityQueue();
+        }
+
+        private static void CommitQueuedCooldown(ComponentStore store, int index, AbilityActivationRequest request,
+            float cooldown)
+        {
+            var kind = (AbilityQueueCooldownKind)store.AbilityQueuedCooldownKinds[index];
+            switch (kind)
+            {
+                case AbilityQueueCooldownKind.FloatArray:
+                    new CooldownArrayActivationState(store.AbilityQueuedFloatArrays[index], request.Slot).Commit(cooldown);
+                    break;
+                case AbilityQueueCooldownKind.StateArray:
+                case AbilityQueueCooldownKind.TowerActive:
+                case AbilityQueueCooldownKind.PlayerGlobal:
+                case AbilityQueueCooldownKind.Hero:
+                    new AbilityStateArrayActivationState(ResolveQueuedStates(store, index, kind), request.Slot, kind)
+                        .Commit(cooldown);
+                    break;
+                default:
+                    new StoredAbilityActivationState(store, request.OwnerId, request.Slot).Commit(cooldown);
+                    break;
+            }
+        }
+
+        private static AbilityState[] ResolveQueuedStates(ComponentStore store, int index, AbilityQueueCooldownKind kind)
+        {
+            switch (kind)
+            {
+                case AbilityQueueCooldownKind.TowerActive: return store.TowerActiveCooldown.States;
+                case AbilityQueueCooldownKind.PlayerGlobal: return store.PlayerGlobalSkillCooldown.States;
+                case AbilityQueueCooldownKind.Hero: return store.HeroSkillCooldown.States;
+                default: return store.AbilityQueuedStateArrays[index];
+            }
         }
 
         private static AbilityActivationRejectReason BuildActivationPlan(ComponentStore store,
@@ -682,7 +855,7 @@ namespace BattleSystemECS.Core.GAS
         public static AbilityActivationResult ActivateHealTargets(ComponentStore store, GameplayCatalog catalog,
             AbilityState[] cooldowns, AbilityActivationRequest request, IReadOnlyList<int> targetIds,
             IReadOnlyList<float> magnitudes)
-            => ActivateCore(store, catalog, new AbilityStateArrayActivationState(cooldowns, request.Slot),
+            => ActivateCore(store, catalog, new AbilityStateArrayActivationState(cooldowns, request.Slot, IdentifyStateArray(store, cooldowns)),
                 request, ActivationTargetSet.Heals(targetIds, magnitudes), null);
 
         public static AbilityActivationResult ActivateHealTargets(ComponentStore store, GameplayCatalog catalog,

@@ -101,6 +101,7 @@ namespace BattleSystemECS.Tests.Integration
             var (registry, _) = Production(config, player);
             registry.EnemyAbility!.EnqueueAbility(source, ability.Id);
             registry.EnemyAbility.ExecuteAbilities();
+            GameplayAbilityRuntime.CommitQueuedAbilities(Store);
 
             Assert.Equal(1, Store.GetEffectCount(tower));
             Assert.False(GameplayTagRuntime.HasTag(Store, tower, CatalogRegistries.DispellableTag));

@@ -933,8 +933,8 @@ namespace BattleSystemECS.Systems
                 if (!catalog.TryGetEffect(ability.Effects[i], out var effect) ||
                     effect.Type != EffectType.Periodic || effect.Modifiers.Count != 0)
                     continue;
-                store.GameplayEffectsRuntime.TryApply(effect.Id, effect, source, target, out _,
-                    snapshot: def.DotDamagePerTick, ownerPlayerId: playerId);
+                store.GameplayEffectsRuntime.EnqueueApply(effect.Id, effect, source, target, playerId,
+                    def.DotDamagePerTick);
                 applied = true;
             }
             return applied;

@@ -36,6 +36,10 @@ benchmark 入口不直接组装三段 registry facade。
   Rally writes 改为 `TowerState`；`ApplyDot` None 改回 `TryAdopt`（脉冲重挂可并存）。
   仍不是终态：`AbilityState` 非稀疏池；机制 SOA 冷却未并；`EffectRequests` 死 token 保留；
   `TryAdopt` 不 `ApplyModifiers`；Skill 无 catalog Periodic 时仍 fallback。
+- 2026-09-04 终态收口续：`AbilityRequests`/`EffectRequests` 真 buffer；`ability.commit` 在
+  Spatial 之后、Combat 之前；`effect.commit` 在 `effect.tick` 前；Build 有 `build.ability.commit`。
+  稀疏 AbilityState 池保留 `AbilityInstances` facade。burrow/leap/totem 冷却列合并。
+  仍不宣称 M5/M6/F4–F9 完成。
 
 ## M7 复核
 

@@ -207,8 +207,8 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Periodic DoT：catalog 物化（空 modifier）或 adapter。None 走 TryAdopt（脉冲重挂可并存多份）；
-        /// 叠层走 TryRestack。不走 TryApply None（同 key 不刷新会让尸体区 / Firewall 丢脉冲）。
+        /// Periodic DoT：catalog 物化（空 modifier）或 adapter 后入 EffectRequest，commit 走 TryApply。
+        /// Stacking.None 同 key 不刷新、不新开槽。
         /// </summary>
         public void ApplyDot(int targetId, GameplayEffectDef dotDef)
         {
@@ -229,13 +229,10 @@ namespace BattleSystemECS.Systems
             }
             else if (application.Definition.Type == EffectType.Periodic && application.Definition.Modifiers.Count != 0)
                 return;
-            if (application.Definition.Type == EffectType.Periodic &&
-                application.Definition.Stacking != StackingBehavior.None)
-            {
-                store.GameplayEffectsRuntime.TryRestack(application, playerId, out _);
-                return;
-            }
-            store.GameplayEffectsRuntime.TryAdopt(application, playerId, out _);
+            float snapshot = application.Definition.Periodic.HasValue
+                ? application.Definition.Periodic.Value.Magnitude : dotDef.Magnitude;
+            store.GameplayEffectsRuntime.EnqueueApply(application.Definition.Id, application.Definition,
+                source, target, playerId, snapshot);
         }
 
         /// <summary>

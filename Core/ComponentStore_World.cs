@@ -357,13 +357,38 @@ namespace BattleSystemECS.Core
         public const int MAX_ABILITIES_PER_ENTITY = 5;
         public const int MAX_ACTIVE_EFFECTS_PER_ENTITY = 8;
 
-        // Per-entity ability instances (SOA: first dimension = entity, second = slot)
+        // Unity / 同帧 facade：稀疏池才是 AbilityState 的 owner，这里保持密数组投影。
         public AbilityInstance[] AbilityInstances = new AbilityInstance[MAX_ENTITIES * MAX_ABILITIES_PER_ENTITY];
+        private readonly AbilityHandle[] _abilitySlotHandles = new AbilityHandle[MAX_ENTITIES * MAX_ABILITIES_PER_ENTITY];
+        public readonly ActiveAbilityStore Abilities = new ActiveAbilityStore(MAX_ENTITIES * MAX_ABILITIES_PER_ENTITY);
+        public AbilityPool GameplayAbilityPool => Abilities.Handles;
+
         /// <summary>
-        /// 当帧已接受激活的旁路日志，不是独立 command 管线。ActivateCore 只在 accept 后写入，
-        /// <see cref="BeginFrame"/> 清空；没有 consume/commit 节点。
+        /// 未提交的能力意图。Activate 校验后入队；Seal 后由 ability.commit drain。
+        /// 单测默认立刻 commit。拒绝不占槽；满槽拒绝且不提交。
         /// </summary>
         public readonly CommandBuffer<AbilityRequest> AbilityRequests = new CommandBuffer<AbilityRequest>(256);
+        public readonly CommandBuffer<EffectRequest> EffectRequests = new CommandBuffer<EffectRequest>(256);
+        /// <summary>生产 Tick（SealGraphComposition）为 true：只入队，由帧节点 commit。</summary>
+        public bool DeferAbilityAndEffectCommit;
+        public int UnconsumedAbilityRequests;
+        public int UnconsumedEffectRequests;
+        internal const int MAX_ABILITY_QUEUE_TARGET_SLOTS = 65536;
+        internal readonly GameplayCatalog[] AbilityQueuedCatalogs = new GameplayCatalog[256];
+        internal readonly IAbilityPayloadHandler[] AbilityQueuedHandlers = new IAbilityPayloadHandler[256];
+        internal readonly AbilityActivationRequest[] AbilityQueuedActivations = new AbilityActivationRequest[256];
+        internal readonly int[] AbilityQueuedTargetIds = new int[MAX_ABILITY_QUEUE_TARGET_SLOTS];
+        internal readonly float[] AbilityQueuedMagnitudes = new float[MAX_ABILITY_QUEUE_TARGET_SLOTS];
+        internal readonly int[] AbilityQueuedTargetStarts = new int[256];
+        internal readonly int[] AbilityQueuedTargetCounts = new int[256];
+        internal int AbilityQueuedTargetFill;
+        internal readonly byte[] AbilityQueuedFlags = new byte[256];
+        internal readonly byte[] AbilityQueuedCooldownKinds = new byte[256];
+        internal readonly float[][] AbilityQueuedFloatArrays = new float[256][];
+        internal readonly AbilityState[][] AbilityQueuedStateArrays = new AbilityState[256][];
+        internal readonly GameplayEffectDefinition[] QueuedEffectDefinitions = new GameplayEffectDefinition[256];
+        internal readonly int[] QueuedEffectOwnerPlayerIds = new int[256];
+        internal readonly float[] QueuedEffectSnapshots = new float[256];
         public int AbilityPoolRejections;
         public int EffectPoolRejections;
         public event Action<int, bool> OnGasPoolRejected;
@@ -827,13 +852,31 @@ namespace BattleSystemECS.Core
         public AbilityInstance GetAbility(int entityId, int slot) {
             if (!IsValidEntity(entityId)) return default;
             if (slot < 0 || slot >= MAX_ABILITIES_PER_ENTITY) return default;
-            return AbilityInstances[entityId * MAX_ABILITIES_PER_ENTITY + slot];
+            int idx = entityId * MAX_ABILITIES_PER_ENTITY + slot;
+            if (Abilities.TryGet(_abilitySlotHandles[idx], out var inst))
+            {
+                AbilityInstances[idx] = inst;
+                return inst;
+            }
+            return AbilityInstances[idx];
         }
 
         public void SetAbility(int entityId, int slot, AbilityInstance inst) {
             if (!IsValidEntity(entityId)) return;
             if (slot < 0 || slot >= MAX_ABILITIES_PER_ENTITY) return;
-            AbilityInstances[entityId * MAX_ABILITIES_PER_ENTITY + slot] = inst;
+            int idx = entityId * MAX_ABILITIES_PER_ENTITY + slot;
+            var handle = _abilitySlotHandles[idx];
+            if (!Abilities.TryUpdate(handle, inst))
+            {
+                if (!Abilities.TryAdd(inst, out handle))
+                {
+                    AbilityPoolRejections++;
+                    OnGasPoolRejected?.Invoke(entityId, true);
+                    return;
+                }
+                _abilitySlotHandles[idx] = handle;
+            }
+            AbilityInstances[idx] = inst;
         }
 
         public void AddAbility(int entityId, GameplayAbilityDef def) { TryAddAbility(entityId, def); }
@@ -841,14 +884,66 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(entityId)) return false;
             int slot = AbilityCount[entityId];
             if (slot >= MAX_ABILITIES_PER_ENTITY) { AbilityPoolRejections++; OnGasPoolRejected?.Invoke(entityId, true); return false; }
-            SetAbility(entityId, slot, new AbilityInstance(def)); AbilityCount[entityId]++; return true;
+            var inst = new AbilityInstance(def);
+            if (!Abilities.TryAdd(inst, out var handle))
+            {
+                AbilityPoolRejections++;
+                OnGasPoolRejected?.Invoke(entityId, true);
+                return false;
+            }
+            int idx = entityId * MAX_ABILITIES_PER_ENTITY + slot;
+            _abilitySlotHandles[idx] = handle;
+            AbilityInstances[idx] = inst;
+            AbilityCount[entityId]++;
+            return true;
+        }
+
+        internal void ReleaseEntityAbilities(int entityId)
+        {
+            if (!IsValidEntity(entityId)) return;
+            int count = AbilityCount[entityId];
+            int baseIdx = entityId * MAX_ABILITIES_PER_ENTITY;
+            for (int slot = 0; slot < count; slot++)
+            {
+                int idx = baseIdx + slot;
+                Abilities.Release(_abilitySlotHandles[idx]);
+                _abilitySlotHandles[idx] = default(AbilityHandle);
+                AbilityInstances[idx] = default(AbilityInstance);
+            }
+            AbilityCount[entityId] = 0;
         }
 
         // Bug#9: Reset abilities for entity — clears all slots (used before re-initializing)
         public void ResetPlayerAbilities(int entityId) {
             if (!IsValidEntity(entityId)) return;
             RemoveAllGameplayEffects(entityId);
-            AbilityCount[entityId] = 0;
+            ReleaseEntityAbilities(entityId);
+        }
+
+        internal void ClearAbilityQueue()
+        {
+            int n = AbilityRequests.Count;
+            for (int i = 0; i < n; i++)
+            {
+                AbilityQueuedCatalogs[i] = null;
+                AbilityQueuedHandlers[i] = null;
+                AbilityQueuedFloatArrays[i] = null;
+                AbilityQueuedStateArrays[i] = null;
+            }
+            AbilityRequests.Clear();
+            AbilityQueuedTargetFill = 0;
+        }
+
+        internal void ClearEffectQueue()
+        {
+            int n = EffectRequests.Count;
+            for (int i = 0; i < n; i++)
+            {
+                QueuedEffectDefinitions[i] = default(GameplayEffectDefinition);
+                QueuedEffectOwnerPlayerIds[i] = -1;
+                QueuedEffectSnapshots[i] = float.NaN;
+            }
+            EffectRequests.Clear();
         }
 
         // Legacy same-frame slot projection. Cross-frame callers must use handle-aware APIs.

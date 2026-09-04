@@ -413,9 +413,11 @@ namespace BattleSystemECS.Tests.Integration
             var shapes = new List<int>(); var colors = new List<int>();
             registry.Telegraph.GetActiveZones(ids, xs, ys, radii, remaining, durations, shapes, colors);
             Assert.Equal(source.TelegraphDuration, Assert.Single(durations));
+            Assert.Equal(source.TelegraphDuration, Assert.Single(remaining));
             Assert.Equal(source.TelegraphColor, Assert.Single(colors));
 
-            scheduler.Tick(0.5f, 1);
+            // ability.commit 在 Spatial.telegraph.update 之后，创建当帧不倒计时。
+            scheduler.Tick(1f, 1);
 
             Assert.Equal(0, registry.Telegraph.ActiveZoneCount);
             Assert.Equal(1, published);

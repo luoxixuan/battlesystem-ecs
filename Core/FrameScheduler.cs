@@ -222,6 +222,7 @@ namespace BattleSystemECS.Core
         internal void SealGraphComposition()
         {
             if (_frameGraph != null) throw new InvalidOperationException("Frame graph composition is already sealed.");
+            store.DeferAbilityAndEffectCommit = true;
             _frameGraph = FrameSystemGraph.Build(this, _compositionKind);
         }
 
@@ -477,7 +478,18 @@ namespace BattleSystemECS.Core
             store.ResourceResolver.RejectPendingEnemyDamage();
         }
 
-        internal void GraphRejectNonWaveAbilities(NodeExecutionContext context) => RejectNonWaveAbilityWork();
+        internal void GraphRejectNonWaveAbilities(NodeExecutionContext context)
+        {
+            Core.GAS.GameplayAbilityRuntime.RejectQueuedAbilities(store);
+            store.GameplayEffectsRuntime.RejectQueuedEffects();
+            RejectNonWaveAbilityWork();
+        }
+
+        internal void GraphCommitQueuedAbilities(NodeExecutionContext context) =>
+            Core.GAS.GameplayAbilityRuntime.CommitQueuedAbilities(store);
+
+        internal void GraphCommitQueuedEffects(NodeExecutionContext context) =>
+            store.GameplayEffectsRuntime.CommitQueuedEffects();
         internal void GraphCloseDeferredResolvers(NodeExecutionContext context) { store.DamageResolver.EnableDeferred(false); store.ResourceResolver.EnableDeferred(false); }
         internal void GraphCommitEarlyDamage(NodeExecutionContext context) => store.DamageResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.EarlyResolve);
         internal void GraphCommitEarlyResources(NodeExecutionContext context) => store.ResourceResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.EarlyResolve);

@@ -4153,6 +4153,17 @@
           "providedTokens": []
         },
         {
+          "nodeId": "build.ability.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Build",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
           "nodeId": "build.ability.reject",
           "registrationId": "FrameScheduler",
           "phase": "Build",
@@ -4274,7 +4285,29 @@
           "providedTokens": []
         },
         {
+          "nodeId": "ability.commit",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
           "nodeId": "combat.rally.consume",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "effect.commit",
           "registrationId": "FrameScheduler",
           "phase": "Wave",
           "executionPolicy": "SerialCommit",
@@ -4429,6 +4462,17 @@
         },
         {
           "nodeId": "cascade-death.callback-dispatch",
+          "registrationId": "FrameScheduler",
+          "phase": "Wave",
+          "executionPolicy": "SerialCommit",
+          "requiredTokens": [
+            "ComponentStore",
+            "BattleSystemECS.Core.FrameScheduler"
+          ],
+          "providedTokens": []
+        },
+        {
+          "nodeId": "post-death.effect.commit",
           "registrationId": "FrameScheduler",
           "phase": "Wave",
           "executionPolicy": "SerialCommit",

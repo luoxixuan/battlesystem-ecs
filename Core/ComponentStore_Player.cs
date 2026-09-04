@@ -208,6 +208,8 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // PlayerGlobalSkillCooldown: AbilityState 冷却列投影（全局技能不占实体槽）
         public AbilityCooldownColumn PlayerGlobalSkillCooldown =
             new AbilityCooldownColumn(new AbilityState[MAX_PLAYERS * 8]);
+        public AbilityCooldownColumn HeroSkillCooldown =
+            new AbilityCooldownColumn(new AbilityState[MAX_HEROES * 4]);
         // PlayerGlobalSkillPressed: hotkey pressed signal this frame (consumed by GlobalSkillSystem)
         public bool[] PlayerGlobalSkillPressed = new bool[MAX_PLAYERS];
         // PlayerGlobalSkillHotkey: hotkey string per skill for UI display
@@ -1174,10 +1176,12 @@ PlayerCrestActiveId[entityId] = "";
         public float[] TotemDurationLeft = new float[MAX_TOTEMS];
         // TotemChargesLeft: remaining trigger count (0 = unlimited time-based only).
         public int[] TotemChargesLeft = new int[MAX_TOTEMS];
-        // TotemCooldown: seconds until next trigger (per-totem tick interval).
-        public float[] TotemCooldown = new float[MAX_TOTEMS];
-        // TotemPlayerCooldown: per-player cooldown after placing a totem (throttles spam).
-        public float[] PlayerTotemCooldown = new float[MAX_PLAYERS];
+        // TotemCooldown: AbilityState 冷却投影（图腾脉冲间隔，单位秒）。
+        public MechanismCooldownColumn TotemCooldown =
+            new MechanismCooldownColumn(new AbilityState[MAX_TOTEMS], MechanismAbilityIds.TotemPulse);
+        // TotemPlayerCooldown: 玩家再召唤冷却。
+        public MechanismCooldownColumn PlayerTotemCooldown =
+            new MechanismCooldownColumn(new AbilityState[MAX_PLAYERS], MechanismAbilityIds.TotemSummon);
 
         // ── Totem accessors (called by TotemSystem) ───────────────────────
         /// <summary>Allocate a totem slot from the pool. Returns -1 if full.</summary>

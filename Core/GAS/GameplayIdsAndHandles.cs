@@ -71,6 +71,26 @@ namespace BattleSystemECS.Core.GAS
         public override int GetHashCode() => (Index * 397) ^ Generation;
     }
 
+    public readonly struct AbilityHandle : IEquatable<AbilityHandle>
+    {
+        public readonly int Index;
+        public readonly int Generation;
+        public AbilityHandle(int index, int generation) { Index = index; Generation = generation; }
+        public bool IsValid => Index >= 0 && Generation > 0;
+        public bool Equals(AbilityHandle other) => Index == other.Index && Generation == other.Generation;
+        public override bool Equals(object obj) => obj is AbilityHandle other && Equals(other);
+        public override int GetHashCode() => (Index * 397) ^ Generation;
+    }
+
+    /// <summary>机制冷却并进 AbilityState 时使用的稳定 Id，避开 catalog 连续编号。</summary>
+    public static class MechanismAbilityIds
+    {
+        public static readonly AbilityId Burrow = new AbilityId(1000001);
+        public static readonly AbilityId Leap = new AbilityId(1000002);
+        public static readonly AbilityId TotemPulse = new AbilityId(1000003);
+        public static readonly AbilityId TotemSummon = new AbilityId(1000004);
+    }
+
     public readonly struct ExecutionContext
     {
         public readonly EntityHandle Source, Target;

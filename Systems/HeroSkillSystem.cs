@@ -44,8 +44,8 @@ namespace BattleSystemECS.Systems
 
         // Flattened [heroId * MAX_HERO_SKILLS + slot]; -1 = empty.
         private int[] _heroSkillIds = new int[ComponentStore.MAX_HEROES * MAX_HERO_SKILLS];
-        // Cooldowns：英雄不是 ECS 实体，冷却并进 AbilityState 列而不是造 dummy entity。
-        private AbilityState[] _heroSkillCooldowns = new AbilityState[ComponentStore.MAX_HEROES * MAX_HERO_SKILLS];
+        // 冷却并进 store.HeroSkillCooldown，供 deferred ability.commit 找回。
+        private AbilityState[] _heroSkillCooldowns => store.HeroSkillCooldown.States;
         // Cooldown max mirror (so HUD can show "ready in Xs" without re-parsing).
         private float[] _heroSkillCooldownMax = new float[ComponentStore.MAX_HEROES * MAX_HERO_SKILLS];
         // Track which slots have ever been configured — so we don't accidentally

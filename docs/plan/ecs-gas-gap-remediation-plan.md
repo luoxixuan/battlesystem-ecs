@@ -248,6 +248,8 @@
 
 2026-09-04 诚实化（仍未宣称终态收口）：`AbilityRequests` 不是 command buffer——`ActivateCore` 同步 `CommitPlan`，只在 accept 后写入当帧日志，拒绝不占槽，满槽不得回滚。`build.skill/auto-skill/global-skill.update` 补 `AbilityRequests` 写声明。Rally 节点 writes 改为真实 `PlayerAttributes` + `TowerState`（不再假写 `TowerCombatCache`）。`ApplyDot` 的 None 改回 `TryAdopt`（尸体区/Firewall/岩浆脉冲重挂可并存多份）；GAS `TryApply` None 仍是同 key 不刷新。Skill catalog Periodic 仍走 `TryApply`。无 consume/commit 节点；`TryAdopt` 仍不 `ApplyModifiers`；稀疏池与机制 SOA 冷却未做；`EffectRequests` 死 token 保留。
 
+2026-09-04 终态收口续（仍未宣称 F4–F9 / M5 / M6 完成）：`AbilityRequests`/`EffectRequests` 成为真 buffer；`ability.commit` 在 Combat 前，`effect.commit` 在 `effect.tick` 前；`TryAdopt` 补 `ApplyModifiers`；稀疏 `AbilityState` 池 + `AbilityInstances` facade；burrow/leap/totem 并进 `MechanismCooldownColumn`。`Stacking.None` 同 key 不叠槽。catalog 敌方技能延到 PreCombat commit。未把 Periodic 改成 `ENEMY_HEALTH` modifier；未合并其余机制冷却族；未删 `FrameResource.EffectRequests`。
+
 ---
 
 ## 8. 门禁
