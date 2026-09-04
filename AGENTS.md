@@ -202,7 +202,7 @@ PostDeath.Execute()       # 分裂/生命链接/目标/资源/尸体/连击（co
 Threat Score EMA 更新      # 玩家 DPS 威胁分指数滑动平均
 ```
 
-> 说明：bullet-time（子弹时间）开启时，`enemyDt`（敌人侧 7 个 group）按比例减速，`combatDt`（玩家/塔攻击侧）保持全速——战术暂停效果。BuildPhase 只运行 `BuildGroup`，不运行任何战斗系统。`skill-buff.skill.update` 已挪到 Combat 前只入队；`ability.commit` 在 PreCombat drain，`effect.commit` 在 SkillBuff 开头、`effect.tick` 之前 drain。Build 相位 `build.ability.commit` 在 shop-reroll 之后。`AbilityRequests` / `EffectRequests` 是真 command buffer（Seal 后 Activate/ApplyDot 只入队，对应 commit 节点 `TryApply`/`CommitPlan`）；`frame.begin` 对未消费队列记 `Unconsumed*` 并清空。`build.skill/auto-skill/global-skill.update` 写 `AbilityRequests`；`post-death.corpse.update` 写 `EffectRequests`。Rally 激活走 `combat.rally.consume` + `skill-buff.rally.update` 消费 `DamageApplied`，writes 为 `PlayerAttributes` + `TowerState`，不再订 `PlayerDamaged`。
+> 说明：bullet-time（子弹时间）开启时，`enemyDt`（敌人侧 7 个 group）按比例减速，`combatDt`（玩家/塔攻击侧）保持全速——战术暂停效果。BuildPhase 只运行 `BuildGroup`，不运行任何战斗系统。`skill-buff.skill.update` 已挪到 Combat 前只入队；`ability.commit` 在 PreCombat drain 执行项并入队 granted `EffectRequests`，`effect.commit` 在 SkillBuff 开头、`effect.tick` 之前统一 `TryApply`。Build 相位 `build.ability.commit` 在 shop-reroll 之后。`AbilityRequests` / `EffectRequests` 是真 command buffer（Seal 后 Activate/ApplyDot/CommitPlan-GE 只入队，对应 commit 节点 `CommitPlan`/`TryApply`）；`frame.begin` 对未消费队列记 `Unconsumed*` 并清空。`build.skill/auto-skill/global-skill.update` 写 `AbilityRequests`；`post-death.corpse.update` 写 `EffectRequests`。Rally 激活走 `combat.rally.consume` + `skill-buff.rally.update` 消费 `DamageApplied`，writes 为 `PlayerAttributes` + `TowerState`，不再订 `PlayerDamaged`。
 
 ### 4.3 两阶段并行安全模式
 

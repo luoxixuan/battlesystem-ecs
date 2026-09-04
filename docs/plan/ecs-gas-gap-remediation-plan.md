@@ -250,6 +250,8 @@
 
 2026-09-04 终态收口续（仍未宣称 F4–F9 / M5 / M6 完成）：`AbilityRequests`/`EffectRequests` 成为真 buffer；`ability.commit` 在 Combat 前，`effect.commit` 在 `effect.tick` 前；`TryAdopt` 补 `ApplyModifiers`；稀疏 `AbilityState` 池 + `AbilityInstances` facade；burrow/leap/totem 并进 `MechanismCooldownColumn`。`Stacking.None` 同 key 不叠槽。catalog 敌方技能延到 PreCombat commit。未把 Periodic 改成 `ENEMY_HEALTH` modifier；未合并其余机制冷却族；未删 `FrameResource.EffectRequests`。
 
+2026-09-04 能力 GE 解耦（仍未宣称 F4–F9 / M5 / M6 完成）：`CommitPlan` 对 granted effect 只 `EnqueueApply`，与 `ApplyDot` 同在 `effect.commit` `TryApply`。Combat 段读不到当帧能力 modifier/tag。敌方 `Execute*` 当场结算已去掉。技能伤害执行仍在 `ability.commit`，不是 `damage.commit` 缓冲。
+
 ---
 
 ## 8. 门禁

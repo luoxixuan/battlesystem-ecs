@@ -333,70 +333,19 @@ namespace BattleSystemECS.Systems
 
         private void ExecuteAbility(int enemyId, EnemyAbilityDef ability)
         {
-            if (gameConfig.StrictCatalogReferences)
+            // 生产与夹具都只走 typed Activate → AbilityRequests；失败则拒绝，不再当场改血/控/预警。
+            if (EnemyAbilityTypeRegistry.TryResolve(ability.AbilityType, out var type) &&
+                type.DispatchMode == EnemyAbilityDispatchMode.RuntimeAdapter)
             {
-                if (EnemyAbilityTypeRegistry.TryResolve(ability.AbilityType, out var type) &&
-                    type.DispatchMode == EnemyAbilityDispatchMode.RuntimeAdapter)
-                {
-                    var result = TryExecuteTypedSpecialAbility(enemyId, ability, type);
-                    if (!result.Accepted)
-                        logger.Log($"[ABILITY_REJECTED] {result.Reason} enemyAbility={ability.Id}");
-                    return;
-                }
-
-                var typed = TryExecuteTypedBasicAbility(enemyId, ability);
-                if (!typed.Accepted)
-                    logger.Log($"[ABILITY_REJECTED] {typed.Reason} enemyAbility={ability.Id}");
+                var result = TryExecuteTypedSpecialAbility(enemyId, ability, type);
+                if (!result.Accepted)
+                    logger.Log($"[ABILITY_REJECTED] {result.Reason} enemyAbility={ability.Id}");
                 return;
             }
 
-            // 仅供有意绕过严格启动的测试夹具兼容投影。
-            if (TryExecuteTypedBasicAbility(enemyId, ability).Accepted) return;
-
-            if (!EnemyAbilityTypeRegistry.TryResolve(ability.AbilityType, out var compatibilityType))
-            {
-                logger.Log($"[ABILITY] Unknown ability type '{ability.AbilityType}' on enemy {enemyId}, ignoring");
-            }
-            else switch (compatibilityType.Kind)
-            {
-                case EnemyAbilityKind.SelfHeal:
-                    ExecuteSelfHeal(enemyId, ability);
-                    break;
-                case EnemyAbilityKind.AoeDamage:
-                    ExecuteAoeDamage(enemyId, ability);
-                    break;
-                case EnemyAbilityKind.BuffAllies:
-                    ExecuteBuffAllies(enemyId, ability);
-                    break;
-                case EnemyAbilityKind.StunAoe:
-                    ExecuteStunAoe(enemyId, ability);
-                    break;
-                case EnemyAbilityKind.SlowAoe:
-                    ExecuteSlowAoe(enemyId, ability);
-                    break;
-                case EnemyAbilityKind.HealAllies:
-                    ExecuteHealAllies(enemyId, ability);
-                    break;
-                case EnemyAbilityKind.StealthAttack:
-                    ExecuteStealthAttack(enemyId, ability);
-                    break;
-                case EnemyAbilityKind.SummonMinion:
-                    ExecuteSummonMinion(enemyId, ability);
-                    break;
-                case EnemyAbilityKind.SilenceTower:
-                    ExecuteSilenceTower(enemyId, ability);
-                    break;
-                case EnemyAbilityKind.DispelTower:
-                    ExecuteDispelTower(enemyId, ability);
-                    break;
-                default:
-                    logger.Log($"[ABILITY] Unknown ability type '{ability.AbilityType}' on enemy {enemyId}, ignoring");
-                    break;
-            }
-
-            EnsureAbilitySlot(enemyId);
-            StampEnemyAbilityCooldown(enemyId, ability.Cooldown);
-            GameplayAbilityRuntime.AbilityCommit(store, enemyId, EnemyAbilitySlot);
+            var typed = TryExecuteTypedBasicAbility(enemyId, ability);
+            if (!typed.Accepted)
+                logger.Log($"[ABILITY_REJECTED] {typed.Reason} enemyAbility={ability.Id}");
         }
 
         private bool CanDispatchStrict(EnemyAbilityDef ability)
@@ -690,166 +639,6 @@ namespace BattleSystemECS.Systems
             }
         }
 
-        private void ExecuteSelfHeal(int enemyId, EnemyAbilityDef ability)
-        {
-            if (!store.EnemyActive[enemyId]) return;
-
-            float maxHealth = store.EnemyMaxHealth[enemyId];
-            float healAmount = maxHealth * ability.HealAmount;
-            store.ApplyEnemyResourceAuthority(enemyId, enemyId, new Core.GAS.AttributeKey(3), healAmount);
-
-            logger.Log($"[ABILITY] Enemy {enemyId} heals for {healAmount:F1} HP ({ability.Name})");
-        }
-
-        private void ExecuteAoeDamage(int enemyId, EnemyAbilityDef ability)
-        {
-            float enemyX = store.PositionX[enemyId];
-            float enemyY = store.PositionY[enemyId];
-            float playerX = store.PositionX[playerId];
-            float playerY = store.PositionY[playerId];
-
-            float dist = Math.Abs(enemyX - playerX) + Math.Abs(enemyY - playerY);
-            bool inRange = ability.AoeRadius <= 0 || dist <= ability.AoeRadius;
-
-            if (inRange)
-            {
-                float baseDamage = store.EnemyDamage[enemyId];
-                float aoeDamage = baseDamage * ability.DamageMultiplier;
-
-                // Queue as telegraph zone if telegraph duration > 0, otherwise instant damage
-                if (_telegraphSystem != null && ability.TelegraphDuration > 0f)
-                {
-                    _telegraphSystem.QueueTelegraphZone(
-                        enemyId,
-                        playerX, playerY,
-                        ability.AoeRadius,
-                        ability.TelegraphDuration,
-                        aoeDamage,
-                        playerId,
-                        global::BattleSystemECS.Content.Contracts.TelegraphShape.Circle,
-                        60f, 0f,
-                        ability.TelegraphColor);
-                    logger.Log($"[ABILITY] Enemy {enemyId} AOE telegraph zone queued for {ability.TelegraphDuration:F0} turns, damage={aoeDamage:F1} ({ability.Name})");
-                }
-                else
-                {
-                    if (!store.ApplyPlayerDamageAuthority(enemyId, playerId, aoeDamage, out float applied)) return;
-                    float remaining = store.GetPlayerCurrentHealth(playerId);
-
-                    _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
-                    {
-                        Damage = applied,
-                        RemainingHealth = remaining,
-                        AttackerId = enemyId
-                    });
-
-                    logger.Log($"[ABILITY] Enemy {enemyId} AOE hits player for {applied:F1} damage ({ability.Name}). HP: {remaining:F1}");
-                }
-            }
-            else
-            {
-                logger.Log($"[ABILITY] Enemy {enemyId} AOE missed (player out of range, dist={dist:F1})");
-            }
-        }
-
-        private void ExecuteBuffAllies(int enemyId, EnemyAbilityDef ability)
-        {
-            if (ability.AoeRadius <= 0) return;
-            float enemyX = store.PositionX[enemyId];
-            float enemyY = store.PositionY[enemyId];
-            var activeEnemyIds = store.GetCachedActiveEnemyIds();
-            int buffedCount = 0;
-            foreach (var allyId in activeEnemyIds)
-            {
-                if (!store.EnemyActive[allyId] || allyId == enemyId) continue;
-                float dist = Math.Abs(enemyX - store.PositionX[allyId]) +
-                             Math.Abs(enemyY - store.PositionY[allyId]);
-                if (dist > ability.AoeRadius) continue;
-                store.EnemyBuffDamageBonus[allyId] = store.EnemyDamage[allyId] * ability.DamageMultiplier;
-                store.EnemyBuffDurationLeft[allyId] = ability.BuffDuration;
-                buffedCount++;
-            }
-            if (buffedCount > 0)
-                logger.Log($"[ABILITY] Enemy {enemyId} buffs {buffedCount} allies with {ability.BuffStat} for {ability.BuffDuration} turns");
-        }
-
-        private void ExecuteStunAoe(int enemyId, EnemyAbilityDef ability)
-        {
-            if (ability.AoeRadius <= 0 || ability.StunDuration <= 0) return;
-
-            float enemyX = store.PositionX[enemyId];
-            float enemyY = store.PositionY[enemyId];
-            float playerX = store.PositionX[playerId];
-            float playerY = store.PositionY[playerId];
-
-            float dist = Math.Abs(enemyX - playerX) + Math.Abs(enemyY - playerY);
-            if (dist > ability.AoeRadius) return;
-
-            store.ApplyPlayerStun(playerId, ability.StunDuration);
-            logger.Log($"[ABILITY] Enemy {enemyId} stuns player for {ability.StunDuration} turn(s) ({ability.Name})");
-        }
-
-        private void ExecuteSlowAoe(int enemyId, EnemyAbilityDef ability)
-        {
-            if (ability.AoeRadius <= 0 || ability.SlowFactor <= 0f || ability.SlowDuration <= 0) return;
-
-            float enemyX = store.PositionX[enemyId];
-            float enemyY = store.PositionY[enemyId];
-            float playerX = store.PositionX[playerId];
-            float playerY = store.PositionY[playerId];
-
-            float dist = Math.Abs(enemyX - playerX) + Math.Abs(enemyY - playerY);
-            if (dist > ability.AoeRadius) return;
-
-            store.ApplyPlayerSlow(playerId, ability.SlowFactor, ability.SlowDuration);
-            logger.Log($"[ABILITY] Enemy {enemyId} slows player by {((1f - ability.SlowFactor) * 100):F0}% for {ability.SlowDuration} turn(s) ({ability.Name})");
-        }
-
-        private void ExecuteHealAllies(int enemyId, EnemyAbilityDef ability)
-        {
-            if (ability.AoeRadius <= 0) return;
-
-            float enemyX = store.PositionX[enemyId];
-            float enemyY = store.PositionY[enemyId];
-
-            var activeEnemyIds = store.GetCachedActiveEnemyIds();
-            int healedCount = 0;
-
-            foreach (var allyId in activeEnemyIds)
-            {
-                if (!store.EnemyActive[allyId]) continue;
-                if (allyId == enemyId) continue;
-
-                float allyX = store.PositionX[allyId];
-                float allyY = store.PositionY[allyId];
-                float dist = Math.Abs(enemyX - allyX) + Math.Abs(enemyY - allyY);
-
-                if (dist <= ability.AoeRadius)
-                {
-                    float maxHealth = store.EnemyMaxHealth[allyId];
-                    float healAmount = maxHealth * ability.HealAmount;
-            store.ApplyEnemyResourceAuthority(enemyId, allyId, new Core.GAS.AttributeKey(3), healAmount);
-                    healedCount++;
-                }
-            }
-
-            if (healedCount > 0)
-            {
-                logger.Log($"[ABILITY] Enemy {enemyId} heals {healedCount} allies for {ability.HealAmount * 100:F0}% max HP each ({ability.Name})");
-            }
-        }
-
-        private void ExecuteStealthAttack(int enemyId, EnemyAbilityDef ability)
-        {
-            EnemyWorldActionAdapter.PrepareStealth(store, logger, enemyId, ability);
-        }
-
-        private void ExecuteSummonMinion(int enemyId, EnemyAbilityDef ability)
-        {
-            EnemyWorldActionAdapter.Summon(store, logger, enemyId, ability,
-                ability.MinionHealthMult, ability.MinionDamageMult);
-        }
-
         private static class EnemyWorldActionAdapter
         {
             internal static int PrepareStealth(ComponentStore store, IRenderer logger, int enemyId,
@@ -887,43 +676,6 @@ namespace BattleSystemECS.Systems
                 store.AddActiveEnemyId(minionId);
                 logger.Log($"[ABILITY] Enemy {enemyId} summons minion {minionId} (HP: {baseHealth * healthMult:F0}, DMG: {baseDamage * damageMult:F0}) ({ability.Name})");
                 return 1;
-            }
-        }
-
-        private void ExecuteSilenceTower(int enemyId, EnemyAbilityDef ability)
-        {
-            if (ability.SilenceRadius <= 0 || ability.SilenceDuration <= 0) return;
-            float enemyX = store.PositionX[enemyId];
-            float enemyY = store.PositionY[enemyId];
-            var activeTowerIds = store.ActiveTowerIds;
-            for (int i = 0; i < activeTowerIds.Count; i++)
-            {
-                int towerId = activeTowerIds[i];
-                float dx = store.PositionX[towerId] - enemyX;
-                float dy = store.PositionY[towerId] - enemyY;
-                if ((float)Math.Sqrt(dx * dx + dy * dy) > ability.SilenceRadius) continue;
-                store.TowerIsSilenced[towerId] = true;
-                store.TowerSilenceTimer[towerId] = ability.SilenceDuration;
-                store.TowerSilenceSourceId[towerId] = enemyId;
-            }
-        }
-
-        private void ExecuteDispelTower(int enemyId, EnemyAbilityDef ability)
-        {
-            if (ability.DispelRadius <= 0f || ability.DispelDuration <= 0f) return;
-            float enemyX = store.PositionX[enemyId];
-            float enemyY = store.PositionY[enemyId];
-            var activeTowerIds = store.ActiveTowerIds;
-            for (int i = 0; i < activeTowerIds.Count; i++)
-            {
-                int towerId = activeTowerIds[i];
-                if (store.TowerDispelImmunityTimer[towerId] > 0f) continue;
-                float dx = store.PositionX[towerId] - enemyX;
-                float dy = store.PositionY[towerId] - enemyY;
-                if ((float)Math.Sqrt(dx * dx + dy * dy) > ability.DispelRadius) continue;
-                store.TowerIsDispelled[towerId] = true;
-                store.TowerDispelTimer[towerId] = ability.DispelDuration;
-                store.TowerDispelImmunityTimer[towerId] = 0f;
             }
         }
 

@@ -5,6 +5,7 @@ using System.Linq;
 using BattleSystemECS.Components;
 using BattleSystemECS.Config;
 using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
 using BattleSystemECS.Systems;
 using BattleSystemECS.Tests.Infrastructure;
 using Xunit;
@@ -226,6 +227,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         public void EnemyAbilityTelegraphRunsThroughProductionGraphAndPublishesDamageOnce()
         {
             // Bug 回归：EnemyAbility 创建的预警区必须由生产 graph 的 Telegraph 节点结算一次。
+            // typed Activate 只入队；预警带在 ability.commit（Spatial 之后）才创建，当帧不倒计时。
+            Config.StrictCatalogReferences = true;
             Config.EnemyAbilities=new List<EnemyAbilityDef>
             {
                 new EnemyAbilityDef
@@ -234,6 +237,8 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
                     AoeRadius=20,DamageMultiplier=2f,TelegraphDuration=1f,Cooldown=5f
                 }
             };
+            Config.CompiledCatalog = CatalogCompiler.CompileEnemyExtensions(CatalogCompiler.CreateEmpty(), Config.EnemyAbilities);
+            Config.ManaShield.Enabled = false;
             int playerId=Player(p=>{p.Health=100f;p.X=0f;p.Y=0f;});
             int enemyId=Enemy(e=>{e.X=0f;e.Y=10f;e.Damage=10f;});
             var registry=new SystemRegistry();
@@ -246,9 +251,18 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
             var scheduler=new FrameScheduler(Store,Config);
             registry.AssignToGroups(scheduler);
             scheduler.Phase=GameState.WavePhase;
+            scheduler.Combat.ManaShield = null;
+            Store.PlayerManaShield[playerId] = 0f;
+            Store.PlayerManaShieldCap[playerId] = 0f;
+            Store.PlayerManaShieldAbsorbRatio[playerId] = 0f;
             registry.EnemyAbility!.EnqueueAbility(enemyId,"graph_telegraph");
 
             scheduler.Tick(1f,0);
+            Assert.Equal(0,published);
+            Assert.Equal(100f,Store.PlayerCurrentHealth[playerId],3);
+            Assert.Equal(1,registry.Telegraph!.ActiveZoneCount);
+
+            scheduler.Tick(1f,1);
 
             Assert.Equal(1,published);
             Assert.Equal(100f-Store.PlayerCurrentHealth[playerId],publishedDamage,3);

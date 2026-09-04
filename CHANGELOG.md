@@ -1,5 +1,12 @@
 # 更新记录 (Changelog)
 
+### 2026-09-04（ECS+GAS：能力 granted effect 延到 effect.commit，⚠️ 有时序变化）
+- **CommitPlan 不再同步 TryApply**：能力 granted effect 只 `EnqueueApply` 进 `EffectRequests`，与世界 DoT（Firewall/岩浆/尸体）同在 Combat 后的 `effect.commit` 才 `TryApply`。伤害/治疗/CC/预警执行项仍在 `ability.commit` 当场提交，技能伤害请求继续先于塔攻入队。
+- **Combat 段读不到当帧能力 modifier/tag**：AI 入队 → PreCombat 只执行载荷并入队 GE → Combat（无当帧 granted 修饰）→ SkillBuff `effect.commit` → `effect.tick`。全帧结束后的 tag/投影断言仍成立。
+- **图声明**：`skill-buff.skill.update` 去掉假 `DamageRequests`；`ability.commit` / `build.ability.commit` 改写 `EffectRequests`，不再声明 `ActiveEffects`/`AttributeModifiers`/`EffectEvents`；`ai.enemy-ability.execute` 只写 `AbilityRequests`；`non-wave.ability.reject` 与 build 侧对齐清队列。
+- **兼容 Execute\***：敌方技能 typed 失败即拒绝，不再 AI 当场改血/控/预警。非 strict 的 `SkillSystem` shape handler 仍保留给测试夹具。
+- 仍不宣称整个 M5/M6/F4–F9 完成：生产 DoT 仍是空 modifier Periodic；未按占用做稀疏 Ability 池；未删 `FrameResource.EffectRequests` 枚举位。
+
 ### 2026-09-04（ECS+GAS 终态收口续：Ability/Effect 真 buffer + PreCombat commit，⚠️ 有数值与时序变化）
 - **AbilityRequests 真 buffer**：`ActivateCore` 校验后入队；Seal 后 `DeferAbilityAndEffectCommit`，由 `ability.commit`（Combat 前）/ `build.ability.commit` drain。满槽拒绝且不提交。`frame.begin` 对未消费队列记 `UnconsumedAbilityRequests` 并清空。
 - **EffectRequests 活管线**：`ApplyDot` / catalog Periodic 入队，`effect.commit`（`effect.tick` 前）与 `post-death.effect.commit` 走 `TryApply`。`TryAdopt` 挂槽后补 `ApplyModifiers`，失败撤槽。

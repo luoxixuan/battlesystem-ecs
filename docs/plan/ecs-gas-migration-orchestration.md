@@ -40,6 +40,8 @@ benchmark 入口不直接组装三段 registry facade。
   Spatial 之后、Combat 之前；`effect.commit` 在 `effect.tick` 前；Build 有 `build.ability.commit`。
   稀疏 AbilityState 池保留 `AbilityInstances` facade。burrow/leap/totem 冷却列合并。
   仍不宣称 M5/M6/F4–F9 完成。
+- 2026-09-04 能力 GE 解耦：`CommitPlan` 只入队 granted effect，`effect.commit` 才 `TryApply`；
+  Combat 看不到当帧能力 modifier。敌方不再走 `Execute*` 当场结算。仍不宣称 F4–F9 完成。
 
 ## M7 复核
 

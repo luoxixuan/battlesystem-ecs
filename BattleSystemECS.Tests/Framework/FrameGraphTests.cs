@@ -427,7 +427,7 @@ namespace BattleSystemECS.Tests.Framework
             // Bug 回归：删除或绕过任一真实生产节点时，composition 快照必须失败。
             Assert.Equal(FrameAccessReviewCatalog.ReviewedNodeCount-scheduler.FrameGraphDiagnostics.Count,
                 scheduler.FrameGraphPlan.Count);
-            Assert.Equal("0738140015dc7b286510a61456a115fc9428dd3d8773e5483b86f677f7e07b99",scheduler.FrameGraphTopologyHash);
+            Assert.Equal("e736ee11bf30126cd7666f1e62529e9f8e2d4420a410064e11b552f0b4a22a75",scheduler.FrameGraphTopologyHash);
             Assert.Contains(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="frame.input.publish");
             FrameNodeAdapter publisher=Assert.Single(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="frame.input.publish");
             Assert.Contains(FrameResource.EnemyHealth,publisher.Metadata.Reads);
@@ -574,6 +574,15 @@ namespace BattleSystemECS.Tests.Framework
             AssertProfileResources(scheduler,"cascade-death.callback-dispatch",
                 new[]{FrameResource.CascadeDeathFacts,FrameResource.DamageEvents,FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.TowerState,FrameResource.TowerCombatCache,FrameResource.PlayerAttributes,FrameResource.PlayerResources,FrameResource.ComboState,FrameResource.ObjectiveState,FrameResource.CorpseState,FrameResource.PickupState,FrameResource.ActiveEffects},
                 new[]{FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.PlayerResources,FrameResource.Rewards,FrameResource.PresentationEvents,FrameResource.DamageEvents,FrameResource.GameplayEvents,FrameResource.ComboState,FrameResource.PlayerAttributes,FrameResource.ObjectiveState,FrameResource.CorpseState,FrameResource.PickupState,FrameResource.TowerState,FrameResource.TowerCombatCache,FrameResource.DamageRequests,FrameResource.ResourceRequests,FrameResource.ActiveEffects,FrameResource.AttributeModifiers,FrameResource.CascadeDeathsResolved});
+            AssertProfileResources(scheduler,"skill-buff.skill.update",
+                new[]{FrameResource.PlayerResources,FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyPosition,FrameResource.EnemyControl,FrameResource.EnemyMovement,FrameResource.TowerState,FrameResource.CorpseState,FrameResource.PlayerAttributes,FrameResource.PlayerSnapshotState,FrameResource.SkillPrepared},
+                new[]{FrameResource.SkillDamageRequests,FrameResource.EnemyControl,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.PlayerResources,FrameResource.ResourceRequests,FrameResource.TimeScaleState,FrameResource.EntityLifecycle,FrameResource.CorpseState,FrameResource.PlayerSnapshotState,FrameResource.AbilityRequests,FrameResource.EffectRequests});
+            AssertProfileResources(scheduler,"ability.commit",
+                new[]{FrameResource.AbilityRequests,FrameResource.PhaseState,FrameResource.EntityLifecycle,FrameResource.PlayerResources,FrameResource.PlayerAttributes,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.EnemyPosition,FrameResource.TowerState,FrameResource.ActiveEffects,FrameResource.EffectRequests},
+                new[]{FrameResource.AbilityRequests,FrameResource.AbilitiesCommitted,FrameResource.DamageRequests,FrameResource.ResourceRequests,FrameResource.EffectRequests,FrameResource.PlayerResources,FrameResource.EnemyControl,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.TimeScaleState,FrameResource.EntityLifecycle,FrameResource.CorpseState,FrameResource.PlayerSnapshotState,FrameResource.GameplayEvents,FrameResource.TelegraphState});
+            AssertProfileResources(scheduler,"ai.enemy-ability.execute",
+                new[]{FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.TowerState,FrameResource.PlayerResources},
+                new[]{FrameResource.AbilityRequests});
             Assert.Contains(scheduler.FrameGraphDiagnostics,d=>d.NodeId.Value=="combat.energy.update"&&d.Policy==OptionalDependencyPolicy.Disabled);
             Assert.Contains(scheduler.FrameGraphDiagnostics,d=>d.NodeId.Value=="ai.lifesteal.update"&&d.Policy==OptionalDependencyPolicy.Disabled);
             Assert.Same(registry.Sapper,scheduler.AI.Sapper);
@@ -829,7 +838,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(1,mode4.StateEntryCount(GameState.WavePhase));
             Assert.Contains(";Scenario=FixedPopulationBenchmark;WaveSpawning=Suppressed;Population=64;WaveStart=Suppressed",
                 mode4.CompositionFingerprint,StringComparison.Ordinal);
-            Assert.StartsWith("ProductionRegistry:2fa45d96474949b620c995d9e2b48d30eb757391bd5af5a4f02f9f738540dc8a",
+            Assert.StartsWith("ProductionRegistry:7312f8c0f4765d031c49e3fa7de2599754ca0ba41c5ba6bd10e2dc0e088c2fc6",
                 mode4.CompositionFingerprint,StringComparison.Ordinal);
             Assert.Equal(Systems.BenchmarkCompositionContract.ProductionRegistryGraph,mode5.Composition);
             Assert.Equal(4,mode5.FramesExecuted);
@@ -866,9 +875,9 @@ namespace BattleSystemECS.Tests.Framework
             var fixedPopulation=Systems.BenchmarkCompositionFactory.Create(fixedWorld.Store,fixedWorld.Config,
                 fixedWorld.Renderer,fixedPlayer,scenarioKind:FrameScenarioKind.FixedPopulationBenchmark);
             Assert.NotEqual(gameplay.Scheduler.FrameGraphTopologyHash,fixedPopulation.Scheduler.FrameGraphTopologyHash);
-            Assert.Equal("0738140015dc7b286510a61456a115fc9428dd3d8773e5483b86f677f7e07b99",
+            Assert.Equal("e736ee11bf30126cd7666f1e62529e9f8e2d4420a410064e11b552f0b4a22a75",
                 gameplay.Scheduler.FrameGraphTopologyHash);
-            Assert.Equal("2fa45d96474949b620c995d9e2b48d30eb757391bd5af5a4f02f9f738540dc8a",
+            Assert.Equal("7312f8c0f4765d031c49e3fa7de2599754ca0ba41c5ba6bd10e2dc0e088c2fc6",
                 fixedPopulation.Scheduler.FrameGraphTopologyHash);
             Assert.NotEqual(gameplay.Scheduler.FrameGraphReviewRoot,fixedPopulation.Scheduler.FrameGraphReviewRoot);
             Assert.Equal(FrameAccessReviewCatalog.ApprovedFingerprintRootGameplay,gameplay.Scheduler.FrameGraphReviewRoot);

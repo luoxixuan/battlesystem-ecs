@@ -284,7 +284,12 @@ namespace BattleSystemECS.Core.GAS
             AbilityActivationRequest request, IAbilityPayloadHandler payloadHandler = null)
             => Activate(store, catalog, cooldowns.States, request, payloadHandler);
 
-        /// <summary>AbilityRequest 主入口：按 Source 句柄与 AbilityId 解析槽位后同步提交；接受后写入当帧日志。</summary>
+        /// <summary>
+        /// AbilityRequest 主入口：按 Source 句柄与 AbilityId 解析槽位后入队。
+        /// Seal 后只写入 AbilityRequests，由 <c>ability.commit</c> drain；未 Seal 则立刻
+        /// <see cref="CommitQueuedAbilities"/>。granted effect 经 EffectRequests 入队，
+        /// 由 <c>effect.commit</c> <c>TryApply</c>；执行项（伤害/治疗/CC）仍在 ability.commit 当场提交。
+        /// </summary>
         public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, AbilityRequest request,
             IAbilityPayloadHandler payloadHandler = null)
         {
@@ -621,6 +626,7 @@ namespace BattleSystemECS.Core.GAS
                 : store.GameplayEffectsRuntime.CanApplyPlan(targets.TargetIds, (int)runtimeSlots,
                     (int)modifiers, (int)effectEvents);
             return effectsOk &&
+                   store.EffectRequests.CanAdd((int)effectEvents) &&
                    store.DamageResolver.CanAccept((int)damageRequests, (int)damageEvents) &&
                    store.ResourceResolver.CanAccept((int)resourceRequests, (int)resourceEvents);
         }
@@ -634,7 +640,8 @@ namespace BattleSystemECS.Core.GAS
             for (int i = 0; i < ability.Effects.Count; i++)
             {
                 catalog.TryGetEffect(ability.Effects[i], out var effect);
-                if (!store.GameplayEffectsRuntime.TryApply(effect.Id, effect, source, target, out _, ownerPlayerId: request.OwnerPlayerId))
+                if (!store.GameplayEffectsRuntime.EnqueueApply(effect.Id, effect, source, target,
+                    request.OwnerPlayerId, float.NaN))
                     return -1;
                 applied++;
             }

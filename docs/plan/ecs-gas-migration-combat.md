@@ -129,6 +129,8 @@ Rally 改消费 `DamageApplied`，新增 `combat.rally.consume`（`tower-attack`
 2026-09-04 终态收口续：`ApplyDot` 经 `EffectRequest` → `TryApply`；`Stacking.None` 同 key
 不刷新不新开槽。`ability.commit` 在 Combat 前，技能伤害请求先于塔攻入队。技能 Periodic
 同帧 `effect.tick`。catalog 敌方技能延到 PreCombat。仍不是 F4–F9 终态收口。
+2026-09-04 能力 GE 解耦：granted effect 与世界 DoT 同在 Combat 后 `effect.commit` 挂槽；
+Combat 段无当帧能力 modifier/tag。执行项仍在 `ability.commit`。仍不是 F4–F9 终态收口。
 
 M3 就要建立事件迁移表，逐项标记旧 `EventBus` 的 `LegacyOnly`/`Bridge`/`GameplayOnly` 状态；M4 才允许 Trigger 消费 `GameplayOnly`。Bridge 期间由新事实单向转发旧事件，按 sequence 去重，不能让旧 publisher 和新 publisher 各发一份。
 
