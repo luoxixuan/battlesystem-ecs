@@ -192,7 +192,7 @@ namespace BattleSystemECS.Systems
         {
             if (radius <= 0f) return 0;
             if (hpFraction <= 0f) hpFraction = 0.3f; // safety default (matches direction spec)
-            if (!CanMassResurrect(centerX, centerY, radius)) return 0;
+            // 准入仍走 CanMassResurrect；提交时容量中途耗尽则停止，已成功的单位保留。
             float radiusSq = radius * radius;
             int revived = 0;
 
@@ -213,7 +213,7 @@ namespace BattleSystemECS.Systems
 
                 // Claim & spawn
                 int minionId = SpawnReanimatedMinion(i, playerId, hpFraction, centerX, centerY, radius, isNecromancer: false);
-                if (minionId < 0) throw new InvalidOperationException("prevalidated mass resurrect capacity was exhausted during commit");
+                if (minionId < 0) break;
                 _store.CorpseOwnerId[i] = playerId;
                 _store.CorpseReanimated[i] = true;
                 revived++;

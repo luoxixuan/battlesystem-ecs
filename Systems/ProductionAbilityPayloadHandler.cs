@@ -54,7 +54,7 @@ namespace BattleSystemECS.Systems
             }
 
             float restored = _snapshotRestore.RestoreFromSnapshot(context.Source.Index, owner, context.Magnitude);
-            if (restored < 0f) throw new InvalidOperationException("prevalidated rewind snapshot was unavailable during commit");
+            if (restored < 0f) return -1;
             return 1;
         }
     }

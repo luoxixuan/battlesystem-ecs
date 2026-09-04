@@ -24,6 +24,8 @@ namespace BattleSystemECS.Core.GAS
         public int PublicationFailures { get; private set; }
         public int AbortPublicationFailures { get; private set; }
         public int ModifierCapacity { get; } = 8192;
+        /// <summary>派生缓存占用：每个 ActiveEffect 一份 definition.Modifiers.Count，叠层不加。</summary>
+        internal int ModifierHandleCount => _modifierHandleCount;
         public int EventCapacity { get; }
         public GameplayEffectRuntime(ComponentStore store, int eventCapacity = DefaultEventCapacity) { _store = store ?? throw new ArgumentNullException(nameof(store)); EventCapacity = Math.Max(1, eventCapacity); Events = new GameplayEventQueue(EventCapacity, Math.Min(64, EventCapacity / 8)); }
         internal bool CanApplyPlan(int targetId, int runtimeSlots, int modifierCount, int eventCount)
@@ -31,7 +33,7 @@ namespace BattleSystemECS.Core.GAS
             if (!ComponentStore.IsValidEntity(targetId) || runtimeSlots < 0 || modifierCount < 0 || eventCount < 0) return false;
             return _store.ActiveEffectCount[targetId] <= ComponentStore.MAX_ACTIVE_EFFECTS_PER_ENTITY - runtimeSlots &&
                 _store.GameplayEffectPool.FreeCount >= runtimeSlots &&
-                _modifierHandleCount <= ModifierCapacity - modifierCount && Events.CanPublish(eventCount, true);
+                CanAllocateModifiers(modifierCount) && Events.CanPublish(eventCount, true);
         }
         internal bool CanApplyPlan(IReadOnlyList<int> targetIds, int runtimeSlotsPerTarget,
             int modifiersPerTarget, int eventCount)
@@ -41,7 +43,7 @@ namespace BattleSystemECS.Core.GAS
             long totalSlots = (long)runtimeSlotsPerTarget * targetIds.Count;
             long totalModifiers = (long)modifiersPerTarget * targetIds.Count;
             if (totalSlots > _store.GameplayEffectPool.FreeCount ||
-                totalModifiers > ModifierCapacity - _modifierHandleCount) return false;
+                !CanAllocateModifiers(totalModifiers)) return false;
             for (int i = 0; i < targetIds.Count; i++)
                 if (!ComponentStore.IsValidEntity(targetIds[i]) ||
                     _store.ActiveEffectCount[targetIds[i]] > ComponentStore.MAX_ACTIVE_EFFECTS_PER_ENTITY - runtimeSlotsPerTarget)
@@ -49,8 +51,39 @@ namespace BattleSystemECS.Core.GAS
             return true;
         }
 
+        /// <summary>
+        /// modifierCount / additional 是本计划将新占的派生缓存槽（按定义条数计，叠层相对第一层为 0）。
+        /// </summary>
+        internal bool CanAllocateModifiers(long additional)
+        {
+            if (additional <= 0) return true;
+            if (additional > int.MaxValue) return false;
+            return _modifierHandleCount <= ModifierCapacity - (int)additional;
+        }
+
+        /// <summary>
+        /// 与 TryApply 同一套占用：已有 stack-key 则只补定义条数差额，不为层数扩槽。
+        /// </summary>
+        internal void CountPlanOccupancy(int targetId, GameplayEffectDefinition definition, out int runtimeSlots, out int modifierSlots)
+        {
+            runtimeSlots = 0;
+            modifierSlots = 0;
+            if (TryGetExistingStack(targetId, definition, out _, out var existingDef))
+            {
+                modifierSlots = Math.Max(0, definition.Modifiers.Count - existingDef.Modifiers.Count);
+                return;
+            }
+            if (definition.Type == EffectType.Instant)
+            {
+                modifierSlots = definition.Modifiers.Count;
+                return;
+            }
+            runtimeSlots = 1;
+            modifierSlots = definition.Modifiers.Count;
+        }
+
         internal bool EnqueueApply(EffectId id, GameplayEffectDefinition definition, EntityHandle source,
-            EntityHandle target, int ownerPlayerId, float snapshot)
+            EntityHandle target, int ownerPlayerId, float periodicMagnitude, float modifierCapture = float.NaN)
         {
             if (!_store.EffectRequests.CanAdd(1))
             {
@@ -58,13 +91,14 @@ namespace BattleSystemECS.Core.GAS
                 return false;
             }
             var context = new ExecutionContext(source, target, default(AbilityId), id, definition.Clock,
-                _store.AllocateGameplaySequence(target.Index), ownerPlayerId, snapshot);
+                _store.AllocateGameplaySequence(target.Index), ownerPlayerId, periodicMagnitude);
             if (!_store.EffectRequests.TryAdd(new EffectRequest(source, target, id, 1, definition.Clock, context)))
                 return false;
             int index = _store.EffectRequests.Count - 1;
             _store.QueuedEffectDefinitions[index] = definition;
             _store.QueuedEffectOwnerPlayerIds[index] = ownerPlayerId;
-            _store.QueuedEffectSnapshots[index] = snapshot;
+            _store.QueuedEffectSnapshots[index] = periodicMagnitude;
+            _store.QueuedEffectModifierCaptures[index] = modifierCapture;
             if (!_store.DeferAbilityAndEffectCommit)
                 CommitQueuedEffects();
             return true;
@@ -77,7 +111,8 @@ namespace BattleSystemECS.Core.GAS
             {
                 var request = _store.EffectRequests.Get(i);
                 TryApply(request.Effect, _store.QueuedEffectDefinitions[i], request.Source, request.Target, out _,
-                    request.StackDelta, _store.QueuedEffectSnapshots[i], _store.QueuedEffectOwnerPlayerIds[i]);
+                    request.StackDelta, _store.QueuedEffectSnapshots[i], _store.QueuedEffectModifierCaptures[i],
+                    _store.QueuedEffectOwnerPlayerIds[i]);
             }
             _store.ClearEffectQueue();
         }
@@ -89,7 +124,7 @@ namespace BattleSystemECS.Core.GAS
             _store.ClearEffectQueue();
         }
 
-        public bool TryApply(EffectId id, GameplayEffectDefinition definition, EntityHandle source, EntityHandle target, out EffectHandle handle, int stackDelta = 1, float snapshot = float.NaN, int ownerPlayerId = -1, long provenanceId = 0L)
+        public bool TryApply(EffectId id, GameplayEffectDefinition definition, EntityHandle source, EntityHandle target, out EffectHandle handle, int stackDelta = 1, float periodicMagnitude = float.NaN, float modifierCapture = float.NaN, int ownerPlayerId = -1, long provenanceId = 0L)
         {
             handle = default(EffectHandle);
             if (!source.IsValid || !target.IsValid || definition.Id.Value != id.Value || !_store.TryResolve(target, out int targetId, out _) || !_store.TryResolve(source, out _, out _)) { Reject(source, target, id, 1); return false; }
@@ -97,14 +132,9 @@ namespace BattleSystemECS.Core.GAS
             if (definition.Type == EffectType.Periodic && (definition.DurationPolicy != DurationPolicy.Duration || definition.Duration <= 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration))) { Reject(source, target, id, 6); return false; }
             if (definition.Type == EffectType.Duration && definition.DurationPolicy == DurationPolicy.Duration && (definition.Duration <= 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration))) { Reject(source, target, id, 6); return false; }
             if (definition.Type == EffectType.Duration && definition.DurationPolicy == DurationPolicy.Infinite && (definition.Duration != 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration))) { Reject(source, target, id, 6); return false; }
-            if (RejectPeriodicAndBlocked(definition, source, target, targetId, snapshot)) return false;
-            int count = _store.GetEffectCount(targetId);
-            TagId key = definition.StackKey.Equals(default(TagId)) ? new TagId(id.Value) : definition.StackKey;
-            for (int i = 0; i < count; i++)
+            if (RejectPeriodicAndBlocked(definition, source, target, targetId, periodicMagnitude)) return false;
+            if (TryGetExistingStack(targetId, definition, out var existing, out _))
             {
-                if (!_store.TryGetActiveEffectAt(targetId, i, out var existing, out var existingDef, out _)) continue;
-                TagId existingKey = existingDef.StackKey.Equals(default(TagId)) ? new TagId(existingDef.Id.Value) : existingDef.StackKey;
-                if (!existingKey.Equals(key)) continue;
                 if (definition.Stacking == StackingBehavior.None || definition.Stacking == StackingBehavior.DurationRefresh)
                 {
                     if (definition.Refresh != RefreshPolicy.None) { RefreshRuntime(ref existing, definition); if (!UpdateActive(target, existing)) return false; }
@@ -112,22 +142,10 @@ namespace BattleSystemECS.Core.GAS
                     Publish(new GameplayEvent(GameplayEventType.EffectApplied, source, target, existing.Handle, id, DamageFlags.None, _store.AllocateGameplaySequence(targetId), tag: definition.Tag, ownerPlayerId: ownerPlayerId));
                     return true;
                 }
-                int previous = existing.StackCount;
-                int next = Math.Min(definition.MaxStacks < 1 ? 1 : definition.MaxStacks, existing.StackCount + Math.Max(1, stackDelta));
-                existing.StackCount = next;
-                if (next > previous && _modifiers.TryGetValue(existing.Handle, out var prior))
-                {
-                    int added = (next - previous) * definition.Modifiers.Count;
-                    if (_modifierHandleCount + added > ModifierCapacity) { Reject(source, target, id, 3); return false; }
-                    var expanded = new AttributeModifierHandle[prior.Length + added];
-                    Array.Copy(prior, expanded, prior.Length);
-                    int at = prior.Length;
-                    try { for (int layer = previous; layer < next; layer++) for (int m = 0; m < definition.Modifiers.Count; m++) { expanded[at++] = _store.AddAttributeModifier(targetId, definition.Modifiers[m], float.IsNaN(snapshot) ? float.NaN : snapshot); if (!expanded[at - 1].IsValid) throw new InvalidOperationException("modifier 分配失败"); } }
-                    catch { for (int j = prior.Length; j < at; j++) _store.RemoveAttributeModifier(targetId, expanded[j]); Reject(source, target, id, 3); return false; }
-                    _modifiers[existing.Handle] = expanded;
-                    _modifierHandleCount += added;
-                }
-                if (definition.Refresh == RefreshPolicy.StacksAndDuration || definition.Stacking == StackingBehavior.MaxStacksRefresh) RefreshRuntime(ref existing, definition);
+                if (!RestackLedger(ref existing, definition, targetId, stackDelta, modifierCapture))
+                { Reject(source, target, id, 3); return false; }
+                if (definition.Refresh == RefreshPolicy.StacksAndDuration || definition.Stacking == StackingBehavior.MaxStacksRefresh)
+                    RefreshRuntime(ref existing, definition);
                 if (!UpdateActive(target, existing)) return false;
                 handle = existing.Handle;
                 Publish(new GameplayEvent(GameplayEventType.EffectApplied, source, target, existing.Handle, id, DamageFlags.None, _store.AllocateGameplaySequence(targetId), tag: definition.Tag, ownerPlayerId: ownerPlayerId));
@@ -139,21 +157,22 @@ namespace BattleSystemECS.Core.GAS
                 return true;
             }
             int ticks = CalculateTicks(definition);
-            if (definition.Modifiers.Count > 0 && _modifierHandleCount + definition.Modifiers.Count > ModifierCapacity) { Reject(source, target, id, 3); return false; }
-            float magnitude = float.IsNaN(snapshot) ? (definition.Periodic.HasValue ? definition.Periodic.Value.Magnitude : 0f) : snapshot;
-            if (definition.Type == EffectType.Periodic && definition.Periodic.Value.MagnitudeSource == MagnitudeSource.Attribute && float.IsNaN(snapshot))
+            if (definition.Modifiers.Count > 0 && !CanAllocateModifiers(definition.Modifiers.Count)) { Reject(source, target, id, 3); return false; }
+            float magnitude = float.IsNaN(periodicMagnitude) ? (definition.Periodic.HasValue ? definition.Periodic.Value.Magnitude : 0f) : periodicMagnitude;
+            if (definition.Type == EffectType.Periodic && definition.Periodic.Value.MagnitudeSource == MagnitudeSource.Attribute && float.IsNaN(periodicMagnitude))
                 magnitude = ResolveAttributeMagnitude(source.Index, definition.Periodic.Value);
             if (definition.Type == EffectType.Periodic && definition.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent && definition.Periodic.Value.MagnitudeSource != MagnitudeSource.Attribute && (magnitude <= 0f || float.IsNaN(magnitude) || float.IsInfinity(magnitude))) { Reject(source, target, id, 4); return false; }
             var runtime = new ActiveGameplayEffect(default(EffectHandle), id, source, target, definition.Duration, ticks, magnitude, definition.Clock,
                 definition.Periodic.HasValue ? definition.Periodic.Value.FirstTick : FirstTickPolicy.NextInterval,
                 definition.Periodic.HasValue ? definition.Periodic.Value.CatchUp : CatchUpPolicy.CatchUpAll, definition.SourceDeath, ownerPlayerId, _store.AllocateGameplaySequence(targetId), provenanceId, definition.Tag);
             runtime.RuntimeOwned = true;
+            runtime.CapturedModifierMagnitude = modifierCapture;
             var app = new GameplayEffectApplication(definition, default(LegacyEffectSnapshot), runtime);
             if (!_store.TryAddGameplayEffect(targetId, app, out handle)) { Reject(source, target, id, 5); return false; }
             ActiveRuntimeCount++;
             if (ActiveRuntimeCount > PeakActiveRuntimeCount) PeakActiveRuntimeCount = ActiveRuntimeCount;
             RegisterRuntimeEntity(targetId);
-            if (!ApplyModifiers(targetId, definition, snapshot, handle))
+            if (!ApplyModifiers(targetId, definition, modifierCapture, handle, runtime.StackCount))
             {
                 _store.TryRemoveEffect(target, handle, out _);
                 ActiveRuntimeCount = Math.Max(0, ActiveRuntimeCount - 1);
@@ -168,7 +187,7 @@ namespace BattleSystemECS.Core.GAS
 
         /// <summary>
         /// 把 legacy Periodic 收进 runtime owner。挂槽后与 TryApply 一样 ApplyModifiers；
-        /// 失败撤槽并 EffectRejected。生产 DoT 走 EffectRequest→TryApply，Adopt 留给遗留/测试。
+        /// modifier 捕获不得回落到 Periodic 跳伤。失败撤槽并 EffectRejected。
         /// </summary>
         internal bool TryAdopt(GameplayEffectApplication application, int ownerPlayerId, out EffectHandle handle)
         {
@@ -177,9 +196,11 @@ namespace BattleSystemECS.Core.GAS
             var definition = application.Definition;
             if (!runtime.Target.IsValid || !_store.TryResolve(runtime.Target, out int targetId, out _)) return false;
             if (!IsDurationContractValid(definition)) { Reject(runtime.Source, runtime.Target, definition.Id, 6); return false; }
-            if (RejectPeriodicAndBlocked(definition, runtime.Source, runtime.Target, targetId, float.NaN)) return false;
+            if (RejectPeriodicAndBlocked(definition, runtime.Source, runtime.Target, targetId, runtime.CapturedMagnitude)) return false;
+            float modifierCapture = ResolveAdoptModifierCapture(application);
             runtime.RuntimeOwned = true;
             runtime.OwnerPlayerId = ownerPlayerId;
+            runtime.CapturedModifierMagnitude = modifierCapture;
             if (runtime.ApplicationSequence == 0L)
                 runtime.ApplicationSequence = _store.AllocateGameplaySequence(targetId);
             application = new GameplayEffectApplication(definition, application.LegacySnapshot, runtime);
@@ -187,9 +208,7 @@ namespace BattleSystemECS.Core.GAS
             ActiveRuntimeCount++;
             if (ActiveRuntimeCount > PeakActiveRuntimeCount) PeakActiveRuntimeCount = ActiveRuntimeCount;
             RegisterRuntimeEntity(targetId);
-            float snapshot = application.Definition.Periodic.HasValue
-                ? application.Definition.Periodic.Value.Magnitude : float.NaN;
-            if (!ApplyModifiers(targetId, definition, snapshot, handle))
+            if (!ApplyModifiers(targetId, definition, modifierCapture, handle, Math.Max(1, runtime.StackCount)))
             {
                 _store.TryRemoveEffect(runtime.Target, handle, out _);
                 ActiveRuntimeCount = Math.Max(0, ActiveRuntimeCount - 1);
@@ -205,6 +224,7 @@ namespace BattleSystemECS.Core.GAS
 
         /// <summary>
         /// 叠层刷新的唯一 timer writer：DurationRefresh / MaxStacks / MaxStacksRefresh 都在这里改 RemainingTime 与 stacks。
+        /// MaxStacks 路径与 TryApply 共用 RestackLedger，禁止第二套 StackCount++。
         /// </summary>
         internal bool TryRestack(GameplayEffectApplication application, int ownerPlayerId, out EffectHandle handle)
         {
@@ -214,14 +234,15 @@ namespace BattleSystemECS.Core.GAS
                 return false;
             if (!IsDurationContractValid(definition))
             { Reject(application.Runtime.Source, application.Runtime.Target, definition.Id, 6); return false; }
-            if (RejectPeriodicAndBlocked(definition, application.Runtime.Source, application.Runtime.Target, targetId, float.NaN))
+            if (RejectPeriodicAndBlocked(definition, application.Runtime.Source, application.Runtime.Target, targetId, application.Runtime.CapturedMagnitude))
                 return false;
-            TagId key = definition.StackKey.Equals(default(TagId)) ? new TagId(definition.Id.Value) : definition.StackKey;
+            TagId key = StackIdentity(definition);
             int count = _store.GetEffectCount(targetId);
+            float modifierCapture = ResolveAdoptModifierCapture(application);
             for (int i = 0; i < count; i++)
             {
                 if (!_store.TryGetActiveEffectAt(targetId, i, out var existing, out var existingDef, out var existingSnapshot)) continue;
-                TagId existingKey = existingDef.StackKey.Equals(default(TagId)) ? new TagId(existingDef.Id.Value) : existingDef.StackKey;
+                TagId existingKey = StackIdentity(existingDef);
                 if (!existingKey.Equals(key) || existingDef.Type != EffectType.Periodic) continue;
                 string incomingName = application.LegacySnapshot.Name;
                 if (!string.IsNullOrEmpty(incomingName) && !string.IsNullOrEmpty(existingSnapshot.Name) &&
@@ -240,12 +261,12 @@ namespace BattleSystemECS.Core.GAS
                         RefreshRuntime(ref existing, definition);
                         break;
                     case StackingBehavior.MaxStacks:
-                        if (existing.StackCount < (definition.MaxStacks < 1 ? 1 : definition.MaxStacks))
-                            existing.StackCount++;
+                        if (!RestackLedger(ref existing, definition, targetId, 1, modifierCapture))
+                        { Reject(application.Runtime.Source, application.Runtime.Target, definition.Id, 3); return false; }
                         break;
                     case StackingBehavior.MaxStacksRefresh:
-                        if (existing.StackCount < (definition.MaxStacks < 1 ? 1 : definition.MaxStacks))
-                            existing.StackCount++;
+                        if (!RestackLedger(ref existing, definition, targetId, 1, modifierCapture))
+                        { Reject(application.Runtime.Source, application.Runtime.Target, definition.Id, 3); return false; }
                         RefreshRuntime(ref existing, definition);
                         break;
                     default:
@@ -331,15 +352,115 @@ namespace BattleSystemECS.Core.GAS
             return false;
         }
 
-        private bool ApplyModifiers(int targetId, GameplayEffectDefinition definition, float snapshot, EffectHandle handle)
+        private static TagId StackIdentity(GameplayEffectDefinition definition)
+        {
+            return definition.StackKey.Equals(default(TagId)) ? new TagId(definition.Id.Value) : definition.StackKey;
+        }
+
+        private bool TryGetExistingStack(int targetId, GameplayEffectDefinition definition,
+            out ActiveGameplayEffect existing, out GameplayEffectDefinition existingDef)
+        {
+            existing = default(ActiveGameplayEffect);
+            existingDef = default(GameplayEffectDefinition);
+            if (!ComponentStore.IsValidEntity(targetId)) return false;
+            TagId key = StackIdentity(definition);
+            int count = _store.GetEffectCount(targetId);
+            for (int i = 0; i < count; i++)
+            {
+                if (!_store.TryGetActiveEffectAt(targetId, i, out existing, out existingDef, out _)) continue;
+                if (!StackIdentity(existingDef).Equals(key)) continue;
+                return true;
+            }
+            existing = default(ActiveGameplayEffect);
+            existingDef = default(GameplayEffectDefinition);
+            return false;
+        }
+
+        private static float ResolveAdoptModifierCapture(GameplayEffectApplication application)
+        {
+            var definition = application.Definition;
+            bool captureOnApply = false;
+            for (int i = 0; i < definition.Modifiers.Count; i++)
+                if (definition.Modifiers[i].Snapshot == SnapshotPolicy.CaptureOnApply) { captureOnApply = true; break; }
+            if (!captureOnApply) return float.NaN;
+            // CaptureOnApply 的账本捕获来自 legacy modifier 值；禁止回落到 Periodic 跳伤。
+            if (application.LegacySnapshot.AttributeIndex >= 0) return application.LegacySnapshot.Magnitude;
+            return float.NaN;
+        }
+
+        /// <summary>
+        /// 唯一叠层入口：stackCount 是 ΣAdd 乘数；V1 Replace 只替换 modifier 捕获；派生缓存按定义条数重建。
+        /// </summary>
+        private bool RestackLedger(ref ActiveGameplayEffect existing, GameplayEffectDefinition definition,
+            int targetId, int stackDelta, float modifierCapture)
+        {
+            int maxStacks = definition.MaxStacks < 1 ? 1 : definition.MaxStacks;
+            existing.StackCount = Math.Min(maxStacks, existing.StackCount + Math.Max(1, stackDelta));
+            existing.CapturedModifierMagnitude = modifierCapture;
+            return SyncModifierCache(targetId, definition, existing.Handle, existing.StackCount,
+                existing.CapturedModifierMagnitude);
+        }
+
+        private bool SyncModifierCache(int targetId, GameplayEffectDefinition definition, EffectHandle handle,
+            int stackCount, float modifierCapture)
+        {
+            int current = 0;
+            if (handle.IsValid && _modifiers.TryGetValue(handle, out var prior) && prior != null)
+                current = prior.Length;
+            int additional = definition.Modifiers.Count - current;
+            if (additional > 0 && !CanAllocateModifiers(additional)) return false;
+            ReleaseModifierCache(targetId, handle);
+            return ApplyModifiers(targetId, definition, modifierCapture, handle, stackCount);
+        }
+
+        private void ReleaseModifierCache(int targetId, EffectHandle handle)
+        {
+            if (!handle.IsValid || !_modifiers.TryGetValue(handle, out var modifiers)) return;
+            for (int i = 0; i < modifiers.Length; i++)
+                _store.RemoveAttributeModifier(targetId, modifiers[i]);
+            _modifierHandleCount -= modifiers.Length;
+            _modifiers.Remove(handle);
+        }
+
+        /// <summary>
+        /// 一份定义贡献一份 handle。Add 的捕获/幅度乘 stackCount；Override / Multiply 不乘。
+        /// </summary>
+        private static void ContributeModifier(ModifierDefinition def, float modifierCapture, int stacks,
+            out ModifierDefinition stacked, out float capture)
+        {
+            bool scale = def.Operation == AttributeModifierOp.Add && stacks > 1;
+            stacked = scale
+                ? new ModifierDefinition(def.Attribute, def.Operation, def.Magnitude * stacks, def.Priority,
+                    def.MagnitudeSource, def.Snapshot)
+                : def;
+            capture = modifierCapture;
+            if (def.Snapshot == SnapshotPolicy.CaptureOnApply && !float.IsNaN(modifierCapture) && scale)
+                capture = modifierCapture * stacks;
+        }
+
+        private bool ApplyModifiers(int targetId, GameplayEffectDefinition definition, float modifierCapture, EffectHandle handle, int stackCount)
         {
             if (definition.Modifiers.Count == 0) return true;
+            int stacks = Math.Max(1, stackCount);
             if (handle.IsValid)
             {
-                if (_modifierHandleCount + definition.Modifiers.Count > ModifierCapacity) return false;
+                if (!CanAllocateModifiers(definition.Modifiers.Count)) return false;
                 var hs = new AttributeModifierHandle[definition.Modifiers.Count];
-                try { for (int i = 0; i < hs.Length; i++) { hs[i] = _store.AddAttributeModifier(targetId, definition.Modifiers[i], float.IsNaN(snapshot) ? float.NaN : snapshot); if (!hs[i].IsValid) throw new InvalidOperationException("modifier 分配失败"); } }
-                catch { for (int i = 0; i < hs.Length; i++) if (hs[i].IsValid) _store.RemoveAttributeModifier(targetId, hs[i]); return false; }
+                try
+                {
+                    for (int i = 0; i < hs.Length; i++)
+                    {
+                        ContributeModifier(definition.Modifiers[i], modifierCapture, stacks, out var stacked, out var capture);
+                        hs[i] = _store.AddAttributeModifier(targetId, stacked, float.IsNaN(capture) ? float.NaN : capture);
+                        if (!hs[i].IsValid) throw new InvalidOperationException("modifier 分配失败");
+                    }
+                }
+                catch
+                {
+                    for (int i = 0; i < hs.Length; i++)
+                        if (hs[i].IsValid) _store.RemoveAttributeModifier(targetId, hs[i]);
+                    return false;
+                }
                 _modifiers[handle] = hs;
                 _modifierHandleCount += hs.Length;
             }
@@ -347,7 +468,8 @@ namespace BattleSystemECS.Core.GAS
             {
                 for (int i = 0; i < definition.Modifiers.Count; i++)
                 {
-                    var modifier = _store.AddAttributeModifier(targetId, definition.Modifiers[i], float.IsNaN(snapshot) ? float.NaN : snapshot);
+                    ContributeModifier(definition.Modifiers[i], modifierCapture, stacks, out var stacked, out var capture);
+                    var modifier = _store.AddAttributeModifier(targetId, stacked, float.IsNaN(capture) ? float.NaN : capture);
                     if (!modifier.IsValid) return false;
                 }
             }
@@ -422,7 +544,7 @@ namespace BattleSystemECS.Core.GAS
         public bool Remove(EntityHandle target, EffectHandle handle, GameplayEventType reason = GameplayEventType.EffectRemoved)
         {
             if (!handle.IsValid || !_store.TryGetActiveEffect(target, handle, out var runtime, out _, out _)) return false;
-            if (_modifiers.TryGetValue(handle, out var modifiers)) { for (int i = 0; i < modifiers.Length; i++) _store.RemoveAttributeModifier(target.Index, modifiers[i]); _modifierHandleCount -= modifiers.Length; _modifiers.Remove(handle); }
+            if (_modifiers.TryGetValue(handle, out _)) ReleaseModifierCache(target.Index, handle);
             bool removed = _store.TryRemoveEffect(target, handle, out _);
             if (removed) { if (runtime.RuntimeOwned) { ActiveRuntimeCount = Math.Max(0, ActiveRuntimeCount - 1); UnregisterRuntimeEntity(target.Index); } Publish(new GameplayEvent(reason, runtime.Source, target, handle, runtime.DefinitionId, DamageFlags.None, _store.AllocateGameplaySequence(target.Index), tag: runtime.Tag, ownerPlayerId: runtime.OwnerPlayerId)); }
             return removed;
@@ -702,7 +824,7 @@ namespace BattleSystemECS.Core.GAS
                     _counters.TryGetValue(key, out int old); int total = old + 1; int crossings = d.Mode == TriggerMode.EveryN ? (total / d.Threshold) - (old / d.Threshold) : (old < d.Threshold && total >= d.Threshold ? 1 : 0);
                     _counters[key] = d.Mode == TriggerMode.EveryN && crossings > 0 && !d.PreserveRemainder ? 0 : (d.Mode == TriggerMode.EveryN && d.PreserveRemainder ? total % d.Threshold : total);
                     if (_counters.Count > PeakCounterCount) PeakCounterCount = _counters.Count;
-                    for (int k = 0; k < crossings; k++) { if (!_definitions.TryGetValue(d.Effect, out var effect)) { Rejections++; PublishNext(new GameplayEvent(GameplayEventType.EffectRejected, e.Source, e.Target, NextSequence(e.Source, e.Target), 3)); continue; } var effectTarget = d.EffectTarget == EffectTargetPolicy.Target ? e.Target : e.Source; int effectEventIndex = _effects.Events.Count; bool applied = _effects.TryApply(d.Effect, effect, e.Source, effectTarget, out _, d.EffectStackDelta, float.NaN, e.OwnerPlayerId, e.ProvenanceId); if (applied) fired++; if (_effects.Events.Count > effectEventIndex) { var generated = _effects.Events.Get(effectEventIndex); PublishNext(generated); _effects.Events.RemoveAt(effectEventIndex); } }
+                    for (int k = 0; k < crossings; k++) { if (!_definitions.TryGetValue(d.Effect, out var effect)) { Rejections++; PublishNext(new GameplayEvent(GameplayEventType.EffectRejected, e.Source, e.Target, NextSequence(e.Source, e.Target), 3)); continue; } var effectTarget = d.EffectTarget == EffectTargetPolicy.Target ? e.Target : e.Source; int effectEventIndex = _effects.Events.Count; bool applied = _effects.TryApply(d.Effect, effect, e.Source, effectTarget, out _, d.EffectStackDelta, float.NaN, float.NaN, e.OwnerPlayerId, e.ProvenanceId); if (applied) fired++; if (_effects.Events.Count > effectEventIndex) { var generated = _effects.Events.Get(effectEventIndex); PublishNext(generated); _effects.Events.RemoveAt(effectEventIndex); } }
                 }
             }
             if (clear) events.RemovePrefix(inputCount); return fired;

@@ -1,5 +1,18 @@
 # 更新记录 (Changelog)
 
+### 2026-09-04（Lumio P2：Commit 预留 F11 + 预校验后禁止 throw F12）
+- **少付钱不再生效**：同帧多条 `AbilityRequest` 入队时按 sequence 预留 Spend 资源与容量；后请求看到的可用 = 当前值 − 已预留。Commit 每条先复查冷却 + 预留，失败整单 `AbilityCancelled`，不调用 `CommitPlan`。支付只走 `ResourceOperation.Spend`（不足即拒、原子、实际扣减必须等于请求）。
+- **容量满报 `QueueOverflow`**：入队满槽与 `ValidateCapacityPlan` 失败不再混进 `InvalidRequest`。`GameplayEventType.AbilityCancelled` 加在枚举末尾。
+- **commit 竞争失败不炸帧**：`Core/` 与 `Systems/` 中 `prevalidated * during commit` throw 改为拒绝事实。dispel Remove 失败跳过该 slot；玩家伤害未 Accepted 记拒绝并 Cancelled；预警/召唤容量失败跳过；群体复活容量耗尽停止并保留已成功单位；回放写入失败或快照不可用拒绝该次 Restore。通用 `ApplyMana` 夹紧未改（负 `AttributeKey(3)` 夹到 0 仍 Accepted）。
+- 预留是当帧瞬态，释放钉在 `ClearAbilityQueue`（`CommitQueuedAbilities` / `RejectQueuedAbilities` / `frame.begin`）。
+
+### 2026-09-04（Lumio P1：账本叠层 F10）
+- **P1 无数值变化**：生产 Multiply 仍是 CatalogCompiler BuffAllies（`MaxStacks=1`）与 `SkillSystem` Instant；golden / 既有面板断言无 diff。`AttributeAggregator.Aggregate` 仍是 Override 换起点 + ΠMultiply（P3）。
+- `TryApply` 删除「每层 `Array.Copy` 扩 modifier handle」。`stackCount` 是该 ActiveGameplayEffect 对 ΣAdd 的乘数；Override / Multiply 不乘层数。
+- `TryApply` 与 `TryRestack` 的 MaxStacks 路径共用 `RestackLedger`：Replace 捕获、按定义条数重建派生缓存。
+- `periodicMagnitude`（写入 `CapturedMagnitude`，供 tick）与 `modifierCapture`（`CapturedModifierMagnitude`）拆分；V1 `stackSnapshotPolicy` 只实现 Replace，且只作用于 modifier 捕获。
+- 容量按定义计：每个 ActiveEffect 只占一份 `Modifiers.Count`；`CanApplyPlan` / `CountPlanOccupancy` / `ValidateCapacityPlan` / `TryApply` restack 不再按层数要槽。
+
 ### 2026-09-04（文档：Lumio P0 终态合同冻结，文档-only）
 - 终态写入：§3.1 Tag 计数+parent 词汇+祖先展开边界；§5.2/§5.3 账本无独立生命周期与 `ModifierPool` 派生缓存；§6.1 整张准入表与 Commit 复查/`Spend`/`ClearAbilityQueue`；§6.3 同帧顺序、禁止抵消、V1 默认 `Replace`；§6.5 瞬时能力不背状态机；§8.2 `AbilityCancelled`；§9 排期本按 clock、随机只在 `CommitSerial` 领号；§11 墓碑；§13 明确 `Rng.Shared` 不是确定性资产；§14 不变量 12–14。
 - 对照计划 §2.1 文档状态改为已写入；缺口计划 §9.3 改为已写入。

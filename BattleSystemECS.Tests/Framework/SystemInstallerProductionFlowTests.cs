@@ -418,8 +418,10 @@ namespace BattleSystemECS.Tests.Framework
 
                 Assert.Equal(File.ReadAllText(ledger1), File.ReadAllText(ledger2));
                 Assert.Equal(File.ReadAllText(manifest1), File.ReadAllText(manifest2));
-                Assert.Equal(File.ReadAllText(Path.Combine(root, "docs", "ecs-gas-m7-nullable-ledger.md")), File.ReadAllText(ledger1));
-                Assert.Equal(File.ReadAllText(Path.Combine(root, "Core", "SystemRegistrationManifest.generated.cs")), File.ReadAllText(manifest1));
+                Assert.Equal(NormalizeNewlines(File.ReadAllText(Path.Combine(root, "docs", "ecs-gas-m7-nullable-ledger.md"))),
+                    NormalizeNewlines(File.ReadAllText(ledger1)));
+                Assert.Equal(NormalizeNewlines(File.ReadAllText(Path.Combine(root, "Core", "SystemRegistrationManifest.generated.cs"))),
+                    NormalizeNewlines(File.ReadAllText(manifest1)));
 
                 string rootA = Path.Combine(temp, "absolute-root-a");
                 string rootB = Path.Combine(temp, "different-absolute-root-b");
@@ -521,6 +523,8 @@ namespace BattleSystemECS.Tests.Framework
                 .Select(entry => entry.Property);
             Assert.All(documented, property => Assert.Contains("| " + property + " |", document, StringComparison.Ordinal));
         }
+
+        private static string NormalizeNewlines(string text) => text.Replace("\r\n", "\n").Replace('\r', '\n');
 
         private static void RunGenerator(string script, string ledger, string manifest,
             string? source = null, string? spec = null)

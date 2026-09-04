@@ -7,7 +7,7 @@ using BattleSystemECS.Components;
 namespace BattleSystemECS.Core.GAS
 {
     public enum ResourceKind { CurrentHealth, MaxHealth, Shield, Mana, Gold }
-    public enum ResourceRejectionReason { None, UnknownResource, InvalidValue, InvalidTarget, InvalidSource, InvalidOwner, UnsupportedOperation, InvalidOperation, TargetAlreadyDead, RequestQueueOverflow, UnconsumedRequests }
+    public enum ResourceRejectionReason { None, UnknownResource, InvalidValue, InvalidTarget, InvalidSource, InvalidOwner, UnsupportedOperation, InvalidOperation, TargetAlreadyDead, RequestQueueOverflow, UnconsumedRequests, Insufficient }
     public readonly struct ResourceApplyResult
     {
         public readonly bool Accepted; public readonly float Applied; public readonly bool Deferred; public readonly ResourceRejectionReason Reason;
@@ -264,7 +264,8 @@ namespace BattleSystemECS.Core.GAS
                 RecordRejection(result.Reason, 1, handleFailure);
                 return result;
             }
-            if (request.Operation != ResourceOperation.Add && request.Operation != ResourceOperation.Set)
+            if (request.Operation != ResourceOperation.Add && request.Operation != ResourceOperation.Set &&
+                request.Operation != ResourceOperation.Spend)
                 return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidOperation));
             ResourceKind kind;
             switch (request.Resource.Value)
@@ -277,9 +278,12 @@ namespace BattleSystemECS.Core.GAS
                 default: return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.UnknownResource));
             }
             if (float.IsNaN(request.Delta) || float.IsInfinity(request.Delta)) return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidValue));
+            if (request.Operation == ResourceOperation.Spend && request.Delta <= 0f)
+                return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidValue));
             if (request.Operation == ResourceOperation.Set && kind == ResourceKind.CurrentHealth && request.Delta < 0f)
                 return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.UnsupportedOperation));
-            if (_deferred && allowDeferred)
+            // Spend 必须当场原子扣减，不能进 deferred pending。
+            if (_deferred && allowDeferred && request.Operation != ResourceOperation.Spend)
             {
                 lock (_eventCommitLock)
                 {
@@ -318,7 +322,13 @@ namespace BattleSystemECS.Core.GAS
             float oldEnemyMaxHealth = isEnemy ? _store.EnemyMaxHealth[targetId] : 0f;
             float oldEnemyMana = isEnemy ? _store.EnemyCurrentMana[targetId] : 0f;
             float applied;
-            if (isEnemy)
+            if (request.Operation == ResourceOperation.Spend)
+            {
+                applied = ApplySpend(targetId, kind, isPlayer, isEnemy, request.Delta);
+                if (float.IsNaN(applied))
+                    return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.Insufficient));
+            }
+            else if (isEnemy)
             {
                 applied = ApplyEnemyResource(targetId, kind, request.Delta, request.Operation);
             }
@@ -333,7 +343,11 @@ namespace BattleSystemECS.Core.GAS
                     default: applied = request.Operation == ResourceOperation.Set ? SetShield(targetId, request.Delta) : ApplyShield(targetId, request.Delta); break;
                 }
             }
-            var type = kind == ResourceKind.CurrentHealth && request.Delta < 0f ? GameplayEventType.DamageApplied : kind == ResourceKind.CurrentHealth ? GameplayEventType.HealApplied : kind == ResourceKind.Shield ? GameplayEventType.ShieldChanged : GameplayEventType.ResourceChanged;
+            var type = request.Operation == ResourceOperation.Spend ? GameplayEventType.ResourceChanged
+                : kind == ResourceKind.CurrentHealth && request.Delta < 0f ? GameplayEventType.DamageApplied
+                : kind == ResourceKind.CurrentHealth ? GameplayEventType.HealApplied
+                : kind == ResourceKind.Shield ? GameplayEventType.ShieldChanged
+                : GameplayEventType.ResourceChanged;
             var resourceFact = new GameplayEvent(type, request.Source, request.Target, default(EffectHandle), default(EffectId), request.Sequence, provenanceId: request.ProvenanceId, ownerPlayerId: request.OwnerPlayerId);
             bool lethal = isEnemy && kind == ResourceKind.CurrentHealth && _store.EnemyHealth[targetId] <= 0f;
             bool published = lethal
@@ -501,6 +515,66 @@ namespace BattleSystemECS.Core.GAS
                     }
                     _store.PendingShieldBreaks.Add(id);
                 }
+            }
+        }
+        /// <summary>
+        /// 原子支付：不足即拒，实际扣减必须等于请求。不走夹紧。
+        /// 失败返回 NaN。
+        /// </summary>
+        private float ApplySpend(int id, ResourceKind kind, bool isPlayer, bool isEnemy, float amount)
+        {
+            if (!Finite(amount) || amount <= 0f) return float.NaN;
+            if (isPlayer)
+            {
+                switch (kind)
+                {
+                    case ResourceKind.CurrentHealth:
+                        if (_store.PlayerCurrentHealth[id] < amount) return float.NaN;
+                        _store.PlayerCurrentHealth[id] -= amount;
+                        return -amount;
+                    case ResourceKind.MaxHealth:
+                        if (_store.PlayerMaxHealth[id] < amount) return float.NaN;
+                        _store.PlayerMaxHealth[id] -= amount;
+                        if (_store.PlayerCurrentHealth[id] > _store.PlayerMaxHealth[id])
+                            _store.PlayerCurrentHealth[id] = _store.PlayerMaxHealth[id];
+                        return -amount;
+                    case ResourceKind.Gold:
+                        if (_store.PlayerGold[id] < amount) return float.NaN;
+                        _store.PlayerGold[id] -= amount;
+                        return -amount;
+                    case ResourceKind.Mana:
+                        if (_store.PlayerMana[id] < amount) return float.NaN;
+                        _store.PlayerMana[id] -= amount;
+                        return -amount;
+                    default:
+                        if (_store.PlayerShield[id] < amount) return float.NaN;
+                        _store.PlayerShield[id] -= amount;
+                        return -amount;
+                }
+            }
+            if (!isEnemy) return float.NaN;
+            switch (kind)
+            {
+                case ResourceKind.CurrentHealth:
+                    if (_store.EnemyHealth[id] < amount) return float.NaN;
+                    _store.EnemyHealth[id] -= amount;
+                    return -amount;
+                case ResourceKind.MaxHealth:
+                    if (_store.EnemyMaxHealth[id] < amount) return float.NaN;
+                    _store.EnemyMaxHealth[id] -= amount;
+                    if (_store.EnemyHealth[id] > _store.EnemyMaxHealth[id])
+                        _store.EnemyHealth[id] = _store.EnemyMaxHealth[id];
+                    return -amount;
+                case ResourceKind.Mana:
+                    if (_store.EnemyCurrentMana[id] < amount) return float.NaN;
+                    _store.EnemyCurrentMana[id] -= amount;
+                    return -amount;
+                case ResourceKind.Shield:
+                    if (_store.EnemyShield[id] < amount) return float.NaN;
+                    _store.EnemyShield[id] -= amount;
+                    return -amount;
+                default:
+                    return float.NaN;
             }
         }
         private float ApplyEnemyResource(int id, ResourceKind kind, float value, ResourceOperation operation)

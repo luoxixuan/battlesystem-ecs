@@ -901,6 +901,206 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(50f - expected, store.EnemyHealth[target], 3);
         }
 
+        [Fact]
+        public void TryApplyAndTryRestack_ShareStackCountComputedAndNextTick()
+        {
+            const float periodic = 5f;
+            const float add = 0.25f;
+            var apply = MeasureStackedPeriodic(viaRestack: false, periodic, add);
+            var restack = MeasureStackedPeriodic(viaRestack: true, periodic, add);
+            Assert.Equal(apply.StackCount, restack.StackCount);
+            Assert.Equal(2, apply.StackCount);
+            Assert.Equal(apply.Computed, restack.Computed, 3);
+            Assert.Equal(1f + add * 2f, apply.Computed, 3);
+            Assert.Equal(apply.TickDamage, restack.TickDamage, 3);
+            Assert.Equal(periodic * 2f, apply.TickDamage, 3);
+        }
+
+        [Fact]
+        public void Restack_DoesNotGrowModifierHandleCountRelativeToFirstLayer()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 100f, 100f, 1f, 1, 1);
+            var definition = StackingPeriodic(940, 5f, 0.25f, SnapshotPolicy.ReevaluateOnRead);
+            Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
+                store.GetEntityHandle(0), store.GetEntityHandle(target), out _, ownerPlayerId: 0));
+            int afterFirst = store.GameplayEffectsRuntime.ModifierHandleCount;
+            Assert.Equal(definition.Modifiers.Count, afterFirst);
+            Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
+                store.GetEntityHandle(0), store.GetEntityHandle(target), out _, ownerPlayerId: 0));
+            Assert.Equal(afterFirst, store.GameplayEffectsRuntime.ModifierHandleCount);
+            store.GameplayEffectsRuntime.CountPlanOccupancy(target, definition, out int extraRuntime, out int extraMods);
+            Assert.Equal(0, extraRuntime);
+            Assert.Equal(0, extraMods);
+        }
+
+        [Fact]
+        public void ApplyModifiers_DoesNotUsePeriodicMagnitudeAsCaptureOnApply()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 100f, 100f, 1f, 1, 1);
+            var key = CatalogRegistries.DamageOutputMultiplier;
+            const float periodic = 9f;
+            const float capture = 3f;
+            const float definitionMagnitude = 2f;
+            var definition = new GameplayEffectDefinition(new EffectId(941), EffectType.Periodic,
+                new[] { new ModifierDefinition(key, AttributeModifierOp.Add, definitionMagnitude,
+                    snapshot: SnapshotPolicy.CaptureOnApply) },
+                8f, 1f, ClockId.Combat, StackingBehavior.MaxStacks, 4, RefreshPolicy.None,
+                SourceDeathPolicy.Persist, EffectPayloadKind.Damage, default(TagId),
+                Array.Empty<ExecutionId>(), periodicMagnitude: periodic);
+            Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
+                store.GetEntityHandle(0), store.GetEntityHandle(target), out var handle,
+                periodicMagnitude: periodic, modifierCapture: capture, ownerPlayerId: 0));
+            Assert.True(store.GameplayEffects.TryGet(handle, out var active, out _, out _));
+            Assert.Equal(periodic, active.CapturedMagnitude);
+            Assert.Equal(capture, active.CapturedModifierMagnitude);
+            Assert.NotEqual(active.CapturedMagnitude, active.CapturedModifierMagnitude);
+            store.AttributeAggregator.SetBase(target, key, 1f);
+            float computed = store.AttributeAggregator.GetComputed(target, key, 1f);
+            Assert.Equal(1f + capture, computed, 3);
+            Assert.NotEqual(1f + periodic, computed, 3);
+            Assert.NotEqual(1f + definitionMagnitude, computed, 3);
+        }
+
+        [Fact]
+        public void StackSnapshotReplace_SecondApplyOverwritesFirstCapture()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 100f, 100f, 1f, 1, 1);
+            var key = CatalogRegistries.DamageOutputMultiplier;
+            const float firstCapture = 3f;
+            const float secondCapture = 7f;
+            var definition = new GameplayEffectDefinition(new EffectId(942), EffectType.Periodic,
+                new[] { new ModifierDefinition(key, AttributeModifierOp.Add, 2f,
+                    snapshot: SnapshotPolicy.CaptureOnApply) },
+                8f, 1f, ClockId.Combat, StackingBehavior.MaxStacks, 4, RefreshPolicy.None,
+                SourceDeathPolicy.Persist, EffectPayloadKind.Damage, default(TagId),
+                Array.Empty<ExecutionId>(), periodicMagnitude: 5f);
+            Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
+                store.GetEntityHandle(0), store.GetEntityHandle(target), out var handle,
+                periodicMagnitude: 5f, modifierCapture: firstCapture, ownerPlayerId: 0));
+            Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
+                store.GetEntityHandle(0), store.GetEntityHandle(target), out _,
+                periodicMagnitude: 5f, modifierCapture: secondCapture, ownerPlayerId: 0));
+            Assert.True(store.GameplayEffects.TryGet(handle, out var active, out _, out _));
+            Assert.Equal(2, active.StackCount);
+            Assert.Equal(secondCapture, active.CapturedModifierMagnitude);
+            Assert.NotEqual(firstCapture, active.CapturedModifierMagnitude);
+            store.AttributeAggregator.SetBase(target, key, 1f);
+            float computed = store.AttributeAggregator.GetComputed(target, key, 1f);
+            Assert.Equal(1f + secondCapture * 2f, computed, 3);
+            Assert.NotEqual(1f + firstCapture + secondCapture, computed, 3);
+            Assert.NotEqual(1f + firstCapture * 2f, computed, 3);
+            Assert.Equal(definition.Modifiers.Count, store.GameplayEffectsRuntime.ModifierHandleCount);
+        }
+
+        [Fact]
+        public void RemoveAndExpire_RestoreComputedBaselineWithoutInverseMath()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 100f, 100f, 1f, 1, 1);
+            var key = CatalogRegistries.DamageOutputMultiplier;
+            const float baseline = 1f;
+            store.AttributeAggregator.SetBase(target, key, baseline);
+            var definition = StackingPeriodic(943, 5f, 0.40f, SnapshotPolicy.ReevaluateOnRead);
+            Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
+                store.GetEntityHandle(0), store.GetEntityHandle(target), out var handle, ownerPlayerId: 0));
+            Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
+                store.GetEntityHandle(0), store.GetEntityHandle(target), out _, ownerPlayerId: 0));
+            Assert.Equal(baseline + 0.80f, store.AttributeAggregator.GetComputed(target, key, baseline), 3);
+            Assert.True(store.GameplayEffectsRuntime.Remove(store.GetEntityHandle(target), handle));
+            Assert.Equal(0, store.GetEffectCount(target));
+            Assert.Equal(0, store.GameplayEffectsRuntime.ModifierHandleCount);
+            Assert.Equal(baseline, store.AttributeAggregator.GetComputed(target, key, baseline), 3);
+
+            int expireTarget = store.AddEnemy(1, 0, 1f, 100f, 100f, 1f, 1, 1);
+            store.AttributeAggregator.SetBase(expireTarget, key, baseline);
+            var shortLived = new GameplayEffectDefinition(new EffectId(944), EffectType.Periodic,
+                new[] { new ModifierDefinition(key, AttributeModifierOp.Add, 0.40f) },
+                1f, 1f, ClockId.Combat, StackingBehavior.MaxStacks, 4, RefreshPolicy.None,
+                SourceDeathPolicy.Persist, EffectPayloadKind.Damage, default(TagId),
+                Array.Empty<ExecutionId>(), periodicMagnitude: 5f);
+            Assert.True(store.GameplayEffectsRuntime.TryApply(shortLived.Id, shortLived,
+                store.GetEntityHandle(0), store.GetEntityHandle(expireTarget), out _, ownerPlayerId: 0));
+            Assert.True(store.GameplayEffectsRuntime.TryApply(shortLived.Id, shortLived,
+                store.GetEntityHandle(0), store.GetEntityHandle(expireTarget), out _, ownerPlayerId: 0));
+            Assert.Equal(baseline + 0.80f, store.AttributeAggregator.GetComputed(expireTarget, key, baseline), 3);
+            store.GameplayEffectsRuntime.Tick(1f, ClockId.Combat);
+            Assert.Equal(0, store.GetEffectCount(expireTarget));
+            Assert.Equal(baseline, store.AttributeAggregator.GetComputed(expireTarget, key, baseline), 3);
+        }
+
+        [Fact]
+        public void Override_DoesNotMultiplyByStackCount()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 100f, 100f, 1f, 1, 1);
+            var key = CatalogRegistries.AttackDamage;
+            const float baseline = 10f;
+            const float overrideValue = 40f;
+            store.AttributeAggregator.SetBase(target, key, baseline);
+            var definition = new GameplayEffectDefinition(new EffectId(945), EffectType.Duration,
+                new[] { new ModifierDefinition(key, AttributeModifierOp.Override, overrideValue) },
+                8f, 0f, ClockId.Combat, StackingBehavior.MaxStacks, 4, RefreshPolicy.None,
+                SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent, default(TagId),
+                Array.Empty<ExecutionId>());
+            Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
+                store.GetEntityHandle(0), store.GetEntityHandle(target), out _, ownerPlayerId: 0));
+            Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
+                store.GetEntityHandle(0), store.GetEntityHandle(target), out _, ownerPlayerId: 0));
+            Assert.True(store.TryGetActiveEffectAt(target, 0, out var active, out _, out _));
+            Assert.Equal(2, active.StackCount);
+            Assert.Equal(overrideValue, store.AttributeAggregator.GetComputed(target, key, baseline), 3);
+            Assert.NotEqual(overrideValue * 2f, store.AttributeAggregator.GetComputed(target, key, baseline), 3);
+        }
+
+        private static (int StackCount, float Computed, float TickDamage) MeasureStackedPeriodic(
+            bool viaRestack, float periodic, float add)
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 100f, 100f, 1f, 1, 1);
+            var key = CatalogRegistries.DamageOutputMultiplier;
+            var definition = StackingPeriodic(viaRestack ? 947 : 946, periodic, add, SnapshotPolicy.ReevaluateOnRead);
+            store.AttributeAggregator.SetBase(target, key, 1f);
+            if (viaRestack)
+            {
+                Assert.True(store.GameplayEffectsRuntime.TryAdopt(
+                    PeriodicApp(definition, store, 0, target, "BurnA"), 0, out _));
+                Assert.True(store.GameplayEffectsRuntime.TryRestack(
+                    PeriodicApp(definition, store, 0, target, "BurnA"), 0, out _));
+            }
+            else
+            {
+                Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
+                    store.GetEntityHandle(0), store.GetEntityHandle(target), out _, ownerPlayerId: 0));
+                Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
+                    store.GetEntityHandle(0), store.GetEntityHandle(target), out _, ownerPlayerId: 0));
+            }
+            Assert.True(store.TryGetActiveEffectAt(target, 0, out var active, out _, out _));
+            float computed = store.AttributeAggregator.GetComputed(target, key, 1f);
+            float before = store.EnemyHealth[target];
+            store.GameplayEffectsRuntime.Tick(1f, ClockId.Combat);
+            return (active.StackCount, computed, before - store.EnemyHealth[target]);
+        }
+
+        private static GameplayEffectDefinition StackingPeriodic(int id, float periodic, float add,
+            SnapshotPolicy snapshot)
+        {
+            return new GameplayEffectDefinition(new EffectId(id), EffectType.Periodic,
+                new[] { new ModifierDefinition(CatalogRegistries.DamageOutputMultiplier, AttributeModifierOp.Add, add,
+                    snapshot: snapshot) },
+                8f, 1f, ClockId.Combat, StackingBehavior.MaxStacks, 4, RefreshPolicy.None,
+                SourceDeathPolicy.Persist, EffectPayloadKind.Damage, default(TagId),
+                Array.Empty<ExecutionId>(), stackKey: new TagId(id), periodicMagnitude: periodic);
+        }
+
         private static HashSet<GameplayEventType> Events(GameplayEventQueue queue)
         {
             var result = new HashSet<GameplayEventType>(); for (int i = 0; i < queue.Count; i++) result.Add(queue.Get(i).Type); return result;

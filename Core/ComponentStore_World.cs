@@ -386,9 +386,12 @@ namespace BattleSystemECS.Core
         internal readonly byte[] AbilityQueuedCooldownKinds = new byte[256];
         internal readonly float[][] AbilityQueuedFloatArrays = new float[256][];
         internal readonly AbilityState[][] AbilityQueuedStateArrays = new AbilityState[256][];
+        /// <summary>当帧 Ability 预留表。释放只走 <see cref="ClearAbilityQueue"/>。</summary>
+        internal readonly AbilityCommitReservation AbilityCommitReservation = new AbilityCommitReservation();
         internal readonly GameplayEffectDefinition[] QueuedEffectDefinitions = new GameplayEffectDefinition[256];
         internal readonly int[] QueuedEffectOwnerPlayerIds = new int[256];
         internal readonly float[] QueuedEffectSnapshots = new float[256];
+        internal readonly float[] QueuedEffectModifierCaptures = new float[256];
         public int AbilityPoolRejections;
         public int EffectPoolRejections;
         public event Action<int, bool> OnGasPoolRejected;
@@ -922,6 +925,8 @@ namespace BattleSystemECS.Core
 
         internal void ClearAbilityQueue()
         {
+            // 预留是当帧瞬态：三个调用方（commit / reject / frame.begin）都必须走到这里释放。
+            AbilityCommitReservation.Clear();
             int n = AbilityRequests.Count;
             for (int i = 0; i < n; i++)
             {
@@ -942,6 +947,7 @@ namespace BattleSystemECS.Core
                 QueuedEffectDefinitions[i] = default(GameplayEffectDefinition);
                 QueuedEffectOwnerPlayerIds[i] = -1;
                 QueuedEffectSnapshots[i] = float.NaN;
+                QueuedEffectModifierCaptures[i] = float.NaN;
             }
             EffectRequests.Clear();
         }

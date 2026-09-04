@@ -256,9 +256,9 @@
 
 2026-09-04 对照登记（不改生产代码，实施走 [lumio-contract-alignment.md](ecs-gas-lumio-contract-alignment.md)）：
 
-- **F10 TryApply / TryRestack 叠层加成不一致**（路径判断）：`GameplayRuntime.TryApply` 每层展开 modifier handle（`:115-129`）；`TryRestack` 只 `StackCount++`（`:242-249`）；周期 tick 用 `StackCount` 乘（`:531`）。`TryApply` / `TryAdopt` 把同一个 `snapshot` 既当周期伤害又当 modifier 捕获值（`:143` / `:157` / `:190-192`）。带 modifier 的 Periodic 走哪条入口，层数和面板加成就会分叉。
-- **F11 同帧多 AbilityRequest 消耗无预留**（路径判断，未构造复现）：`ValidateCosts` 各自看当前法力（`GameplayAbilityRuntime.cs:779`）；`CommitCosts` 失败 throw（`:463-464`）；今日先 `CommitPlan` 再扣费，无法整单取消。支付应走 `Spend`（不足即拒），**不**改通用 `ApplyMana` 夹紧（负增量打血旁路依赖夹到 0 仍 Accepted）。
-- **F12 预校验通过后 throw**（路径判断，与 F11 同形）：审查点名 `CommitPlan` `:460` 与 dispel `:518`。同形 `prevalidated * during commit` 还有玩家伤害 `:438`、预警 `:465`、召唤 `:661`、群体复活 `NecromancerSystem.cs:216`、回放 `TimeRewindSnapshot.cs:152` / `ProductionAbilityPayloadHandler.cs:57`。实施在对照计划 P2，一并改为拒绝事实、不炸帧。
+- **F10 TryApply / TryRestack 叠层加成不一致**（**P1 已实施 2026-09-04**）：`TryApply` / `TryRestack` 共用 `RestackLedger`；`stackCount` 乘数；不再每层扩 handle；`periodicMagnitude` 与 modifier 捕获分列。原路径判断坐标作废。
+- **F11 同帧多 AbilityRequest 消耗无预留**（**P2 已实施 2026-09-04**）：入队按 sequence 预留 Spend 资源与容量；Commit 先复查再 `CommitPlan`；`CommitCosts` 只走 `Spend`。原路径判断坐标作废。通用 `ApplyMana` 夹紧未改。
+- **F12 预校验通过后 throw**（**P2 已实施 2026-09-04**）：`Core/`/`Systems/` 不再有 `prevalidated` 且 `during commit` 的 throw。容量/消耗竞争走 `AbilityCancelled` 或 `QueueOverflow`；dispel/预警/召唤跳过失败 slot；群体复活保留已成功单位；回放拒绝该次 Restore。
 - **F6 更正**：`HasTag` 已走 `TagContributionState` 计数；最初「无贡献计数」只适用于登记当时。剩余是层级（平 `TagId`、无 parent 词汇表）与 `ClearEntity` 扫表分配。
 
 ---

@@ -1,8 +1,8 @@
 # ECS + GAS：Lumio 合同对照收口计划
 
-> 状态：执行计划（本文不代表已实施）
+> 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）已实施；P3–P6 未宣称完成
 >
-> 更新日期：2026-09-04（审查修订：拆 P1/P5 快照矛盾、收窄 P2、补全清单、对齐准入冻结）
+> 更新日期：2026-09-04（P2 落地：入队预留 / Spend / Commit 先复查 / QueueOverflow / 预校验后不 throw）
 >
 > 基线 commit：`b5cfe52`（对照审查时的 HEAD）
 >
@@ -194,6 +194,8 @@ P0 退出。F0–F3 若仍在飞行，不与本阶段改 `GameplayRuntime` 叠�
 
 仓库门禁 §12。新增叠层一致性测试全绿。CHANGELOG：若有任何面板数值变化必须单列；纯路径合并且 golden 无 diff 则记「无数值变化」。
 
+**实施状态（2026-09-04）**：已落地。`RestackLedger` 为唯一叠层函数；`TryApply` 扩 handle 分支已删；参数拆为 `periodicMagnitude` / `modifierCapture`；容量按定义条数。KeepPerLayer 未做。未改终态 §7 公式。
+
 ### 6.5 回滚
 
 还原该 commit。派生缓存允许丢弃重建，回滚不涉及存档。
@@ -267,6 +269,8 @@ P0 退出。`AbilityRequests` 仍是真 buffer（`ability.commit` 批量提交�
 ### 7.4 退出门槛
 
 门禁 §12。`Core/` 与 `Systems/` 中不再存在 `prevalidated` 且 `during commit` 的 throw（编程错误字符串除外）。CHANGELOG 记行为变化（少付钱不再生效；容量满报 `QueueOverflow`；commit 竞争失败不炸帧）。
+
+**实施状态（2026-09-04）**：已落地。预留表 `ComponentStore.AbilityCommitReservation`，释放只走 `ClearAbilityQueue`。Commit 每条先 `Release` + 复查冷却/Cost/容量，失败 `AbilityCancelled` 且不 `CommitPlan`；成功才 `CommitPlan` → `Spend` → 冷却。`CommitCosts` 只走 `ResourceOperation.Spend`。入队满槽与 `ValidateCapacityPlan` 走 `QueueOverflow`。F12 九处生产 throw 改为拒绝/跳过；`summon multipliers must be validated before commit` 与 catalog 缺失仍是编程错误 throw。未改通用夹紧，未改 P1 叠层/`CountPlanOccupancy`。mode 2/4/5 保持 DEFERRED。
 
 ### 7.5 回滚
 

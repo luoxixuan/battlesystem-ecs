@@ -5,7 +5,7 @@ using BattleSystemECS.Components;
 
 namespace BattleSystemECS.Core.GAS
 {
-    public enum AbilityActivationRejectReason { None, InvalidRequest, Cooldown, NoTarget, PhaseNotAllowed, TagRequirementsNotMet, Cost, UnsupportedDefinition }
+    public enum AbilityActivationRejectReason { None, InvalidRequest, Cooldown, NoTarget, PhaseNotAllowed, TagRequirementsNotMet, Cost, UnsupportedDefinition, QueueOverflow }
 
     public readonly struct AbilityActivationRequest
     {
@@ -65,7 +65,7 @@ namespace BattleSystemECS.Core.GAS
 
     /// <summary>
     /// 供需要 GAS 存储外部服务的载荷扩展。
-    /// CanCommit 是只读规划；返回 true 后 Commit 不得拒绝。
+    /// CanCommit 是只读规划；返回 true 后 Commit 不得 throw；资源/容量竞争走 AbilityCancelled。
     /// </summary>
     public interface IAbilityPayloadHandler
     {
@@ -104,6 +104,10 @@ namespace BattleSystemECS.Core.GAS
         private const byte QueueFlagForbidEffects = 4;
         private const byte QueueFlagIsSingle = 8;
         private const byte QueueFlagMagnitudeOverride = 16;
+
+        private static readonly int[] CostKeyScratch = new int[16];
+        private static readonly float[] CostAmountScratch = new float[16];
+        private static readonly int[] RuntimeTargetScratch = new int[AbilityCommitReservation.MaxRuntimeEntries];
 
         private readonly struct CooldownArrayActivationState : IAbilityActivationState
         {
@@ -367,7 +371,7 @@ namespace BattleSystemECS.Core.GAS
             if (validation != AbilityActivationRejectReason.None) return Reject(request, validation);
 
             if (!TryEnqueueActivation(store, catalog, activationState, request, source, targets, payloadHandler))
-                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
+                return Reject(request, AbilityActivationRejectReason.QueueOverflow);
             if (store.DeferAbilityAndEffectCommit)
                 return new AbilityActivationResult(true, request.OwnerId, request.Slot, appliedEffects: 0);
             return CommitQueuedAbilities(store);
@@ -428,8 +432,19 @@ namespace BattleSystemECS.Core.GAS
             }
             store.AbilityQueuedTargetFill = packedStart + targets.Count;
             int firstTarget = targets.TargetIdAt(0);
-            return store.AbilityRequests.TryAdd(new AbilityRequest(source, request.Ability,
-                store.GetEntityHandle(firstTarget), store.AllocateGameplaySequence(request.OwnerId)));
+            if (!TryReserveActivation(store, catalog, request, source, targets, payloadHandler, index))
+            {
+                store.AbilityQueuedTargetFill = packedStart;
+                return false;
+            }
+            if (!store.AbilityRequests.TryAdd(new AbilityRequest(source, request.Ability,
+                store.GetEntityHandle(firstTarget), store.AllocateGameplaySequence(request.OwnerId))))
+            {
+                store.AbilityCommitReservation.Release(index);
+                store.AbilityQueuedTargetFill = packedStart;
+                return false;
+            }
+            return true;
         }
 
         public static AbilityActivationResult CommitQueuedAbilities(ComponentStore store)
@@ -438,6 +453,8 @@ namespace BattleSystemECS.Core.GAS
             int applied = 0;
             int lastOwner = -1;
             int lastSlot = -1;
+            bool anyAccepted = false;
+            AbilityActivationRejectReason lastCancel = AbilityActivationRejectReason.None;
             int count = store.AbilityRequests.Count;
             for (int i = 0; i < count; i++)
             {
@@ -450,6 +467,17 @@ namespace BattleSystemECS.Core.GAS
                 var targets = ActivationTargetSet.FromQueue(store, i);
                 var source = store.GetEntityHandle(request.OwnerId);
                 var handler = store.AbilityQueuedHandlers[i];
+                // 先从预留表摘掉本条，复查只看到更晚请求的预留 + 当前真实值。
+                store.AbilityCommitReservation.Release(i);
+                var recheck = RecheckQueuedActivation(store, catalog, ability, request, source, targets, handler, i);
+                if (recheck != AbilityActivationRejectReason.None)
+                {
+                    PublishCancelled(store, request, source, targets, recheck);
+                    lastCancel = recheck;
+                    continue;
+                }
+                int requestApplied = 0;
+                bool planOk = true;
                 for (int t = 0; t < targets.Count; t++)
                 {
                     targets.TryRequestAt(request, t, out var targetRequest);
@@ -457,17 +485,37 @@ namespace BattleSystemECS.Core.GAS
                     int targetApplied = CommitPlan(store, catalog, ability, targetRequest, source,
                         store.GetEntityHandle(targetId), handler);
                     if (targetApplied < 0)
-                        throw new InvalidOperationException("prevalidated ability plan was rejected during commit");
-                    applied += targetApplied;
+                    {
+                        planOk = false;
+                        break;
+                    }
+                    requestApplied += targetApplied;
+                }
+                if (!planOk)
+                {
+                    PublishCancelled(store, request, source, targets, AbilityActivationRejectReason.QueueOverflow);
+                    lastCancel = AbilityActivationRejectReason.QueueOverflow;
+                    continue;
                 }
                 if (!CommitCosts(store, ability, request, source))
-                    throw new InvalidOperationException("prevalidated ability cost was rejected during commit");
+                {
+                    PublishCancelled(store, request, source, targets, AbilityActivationRejectReason.Cost);
+                    lastCancel = AbilityActivationRejectReason.Cost;
+                    continue;
+                }
                 CommitQueuedCooldown(store, i, request, ability.Cooldown);
                 int firstTargetId = targets.TargetIdAt(0);
                 PublishActivation(store, request, source, store.GetEntityHandle(firstTargetId), firstTargetId);
+                applied += requestApplied;
+                anyAccepted = true;
             }
             store.ClearAbilityQueue();
-            return new AbilityActivationResult(true, lastOwner, lastSlot, appliedEffects: applied);
+            if (count == 0)
+                return new AbilityActivationResult(true, lastOwner, lastSlot, appliedEffects: 0);
+            if (anyAccepted)
+                return new AbilityActivationResult(true, lastOwner, lastSlot, appliedEffects: applied);
+            return new AbilityActivationResult(false, lastOwner, lastSlot,
+                lastCancel == AbilityActivationRejectReason.None ? AbilityActivationRejectReason.Cost : lastCancel);
         }
 
         public static void RejectQueuedAbilities(ComponentStore store)
@@ -531,7 +579,7 @@ namespace BattleSystemECS.Core.GAS
             }
             return ValidateCapacityPlan(store, catalog, ability, request, source, targets, payloadHandler)
                 ? AbilityActivationRejectReason.None
-                : AbilityActivationRejectReason.InvalidRequest;
+                : AbilityActivationRejectReason.QueueOverflow;
         }
 
         private static AbilityActivationRejectReason ValidatePlan(ComponentStore store, GameplayCatalog catalog,
@@ -586,11 +634,23 @@ namespace BattleSystemECS.Core.GAS
         {
             long runtimeSlots = 0;
             long modifiers = 0;
+            bool single = targets.IsSingle;
+            int occupancyTarget = targets.Count > 0 ? targets.TargetIdAt(0) : -1;
             for (int i = 0; i < ability.Effects.Count; i++)
             {
                 catalog.TryGetEffect(ability.Effects[i], out var effect);
-                if (effect.Type != EffectType.Instant) runtimeSlots++;
-                modifiers += effect.Modifiers.Count;
+                if (single)
+                {
+                    store.GameplayEffectsRuntime.CountPlanOccupancy(occupancyTarget, effect,
+                        out int occupancyRuntime, out int occupancyModifiers);
+                    runtimeSlots += occupancyRuntime;
+                    modifiers += occupancyModifiers;
+                }
+                else
+                {
+                    if (effect.Type != EffectType.Instant) runtimeSlots++;
+                    modifiers += effect.Modifiers.Count;
+                }
             }
             long damageRequests = 0;
             long damageEvents = 1;
@@ -620,15 +680,39 @@ namespace BattleSystemECS.Core.GAS
             if (runtimeSlots > int.MaxValue || modifiers > int.MaxValue || effectEvents > int.MaxValue ||
                 damageRequests > int.MaxValue || damageEvents > int.MaxValue ||
                 resourceRequests > int.MaxValue || resourceEvents > int.MaxValue) return false;
-            bool effectsOk = targets.IsSingle
-                ? store.GameplayEffectsRuntime.CanApplyPlan(targets.TargetIdAt(0), (int)runtimeSlots,
-                    (int)modifiers, (int)effectEvents)
-                : store.GameplayEffectsRuntime.CanApplyPlan(targets.TargetIds, (int)runtimeSlots,
-                    (int)modifiers, (int)effectEvents);
+            bool effectsOk;
+            int extraModifiers = store.AbilityCommitReservation.Modifiers;
+            int extraEffectEvents = store.AbilityCommitReservation.EffectEvents;
+            if (targets.IsSingle)
+            {
+                int targetId = targets.TargetIdAt(0);
+                effectsOk = store.GameplayEffectsRuntime.CanApplyPlan(targetId,
+                    (int)runtimeSlots + store.AbilityCommitReservation.RuntimeFor(targetId),
+                    (int)modifiers + extraModifiers, (int)effectEvents + extraEffectEvents);
+            }
+            else
+            {
+                effectsOk = store.GameplayEffectsRuntime.Events.CanPublish((int)effectEvents + extraEffectEvents, true);
+                long totalRuntime = runtimeSlots * targets.Count + store.AbilityCommitReservation.TotalRuntime;
+                if (totalRuntime > store.GameplayEffectPool.FreeCount) effectsOk = false;
+                else
+                {
+                    for (int t = 0; t < targets.Count && effectsOk; t++)
+                    {
+                        int targetId = targets.TargetIdAt(t);
+                        if (!store.GameplayEffectsRuntime.CanApplyPlan(targetId,
+                            (int)runtimeSlots + store.AbilityCommitReservation.RuntimeFor(targetId),
+                            (int)modifiers + extraModifiers, 0))
+                            effectsOk = false;
+                    }
+                }
+            }
             return effectsOk &&
-                   store.EffectRequests.CanAdd((int)effectEvents) &&
-                   store.DamageResolver.CanAccept((int)damageRequests, (int)damageEvents) &&
-                   store.ResourceResolver.CanAccept((int)resourceRequests, (int)resourceEvents);
+                   store.EffectRequests.CanAdd((int)effectEvents + store.AbilityCommitReservation.EffectRequests) &&
+                   store.DamageResolver.CanAccept((int)damageRequests + store.AbilityCommitReservation.DamageRequests,
+                       (int)damageEvents + store.AbilityCommitReservation.DamageEvents) &&
+                   store.ResourceResolver.CanAccept((int)resourceRequests + store.AbilityCommitReservation.ResourceRequests,
+                       (int)resourceEvents + store.AbilityCommitReservation.ResourceEvents);
         }
 
         private static int CommitPlan(ComponentStore store, GameplayCatalog catalog, AbilityDefinition ability,
@@ -651,7 +735,11 @@ namespace BattleSystemECS.Core.GAS
                 float magnitude = ResolveMagnitude(store, execution, request, source.Index);
                 var context = new AbilityPayloadContext(store, ability, execution, request, source, target, magnitude);
                 if (payloadHandler != null && payloadHandler.Supports(execution))
-                    applied += Math.Max(0, payloadHandler.Commit(context));
+                {
+                    int committed = payloadHandler.Commit(context);
+                    if (committed < 0) return -1;
+                    applied += committed;
+                }
                 else if (damageInThisPlanQueuedTargetDeath && execution.Payload == EffectPayloadKind.Damage &&
                          store.IsEnemyPendingDeath(target.Index)) applied++;
                 else if (!TryBuildBuiltInPayload(context, out var payload, out _) || !CommitBuiltIn(payload, context)) return -1;
@@ -777,13 +865,15 @@ namespace BattleSystemECS.Core.GAS
         }
 
         private static bool ValidateCosts(ComponentStore store, AbilityDefinition ability,
-            AbilityActivationRequest request, EntityHandle source)
+            AbilityActivationRequest request, EntityHandle source, bool accountReservation = true)
         {
             for (int i = 0; i < ability.Costs.Count; i++)
             {
                 float amount = EffectiveCost(ability, request, i);
                 if (amount < 0f || float.IsNaN(amount) || float.IsInfinity(amount) ||
                     !TryGetResource(store, source.Index, ability.Costs[i].Resource, out float available)) return false;
+                if (accountReservation)
+                    available -= store.AbilityCommitReservation.PeekCost(source.Index, ability.Costs[i].Resource);
                 float sameResource = 0f;
                 for (int j = 0; j <= i; j++)
                     if (ability.Costs[j].Resource.Equals(ability.Costs[i].Resource)) sameResource += EffectiveCost(ability, request, j);
@@ -799,14 +889,145 @@ namespace BattleSystemECS.Core.GAS
             {
                 float amount = EffectiveCost(ability, request, i);
                 if (amount == 0f) continue;
-                if (!store.ResourceResolver.TryApply(new ResourceRequest(source, source, ability.Costs[i].Resource,
-                    -amount, store.AllocateGameplaySequence(source.Index), request.OwnerPlayerId)).Accepted) return false;
+                var spend = new ResourceRequest(source, source, ability.Costs[i].Resource, amount,
+                    ResourceOperation.Spend, 0, store.AllocateGameplaySequence(source.Index), request.OwnerPlayerId);
+                var result = store.ResourceResolver.TryApply(spend);
+                if (!result.Accepted || result.Applied != -amount) return false;
             }
             return true;
         }
 
         private static float EffectiveCost(AbilityDefinition ability, AbilityActivationRequest request, int index) =>
             request.Cost > 0f && ability.Costs.Count == 1 && index == 0 ? request.Cost : ability.Costs[index].Amount;
+
+        private static bool TryReserveActivation(ComponentStore store, GameplayCatalog catalog,
+            AbilityActivationRequest request, EntityHandle source, ActivationTargetSet targets,
+            IAbilityPayloadHandler payloadHandler, int queueIndex)
+        {
+            if (!catalog.TryGetAbility(request.Ability, out var ability)) return false;
+            if (!TryBuildCapacityNeed(store, catalog, ability, request, source, targets, payloadHandler, out var need))
+                return false;
+            int costCount = ability.Costs.Count;
+            if (costCount > CostKeyScratch.Length || targets.Count > RuntimeTargetScratch.Length) return false;
+            for (int i = 0; i < costCount; i++)
+            {
+                CostKeyScratch[i] = ability.Costs[i].Resource.Value;
+                CostAmountScratch[i] = EffectiveCost(ability, request, i);
+            }
+            for (int i = 0; i < targets.Count; i++)
+                RuntimeTargetScratch[i] = targets.TargetIdAt(i);
+            return store.AbilityCommitReservation.TryReserve(queueIndex, need, source.Index,
+                RuntimeTargetScratch, targets.Count, CostKeyScratch, CostAmountScratch, costCount);
+        }
+
+        private static bool TryBuildCapacityNeed(ComponentStore store, GameplayCatalog catalog,
+            AbilityDefinition ability, AbilityActivationRequest request, EntityHandle source,
+            ActivationTargetSet targets, IAbilityPayloadHandler payloadHandler,
+            out AbilityCommitReservation.CapacityNeed need)
+        {
+            need = default(AbilityCommitReservation.CapacityNeed);
+            long runtimeSlots = 0;
+            long modifiers = 0;
+            bool single = targets.IsSingle;
+            int occupancyTarget = targets.Count > 0 ? targets.TargetIdAt(0) : -1;
+            for (int i = 0; i < ability.Effects.Count; i++)
+            {
+                catalog.TryGetEffect(ability.Effects[i], out var effect);
+                if (single)
+                {
+                    store.GameplayEffectsRuntime.CountPlanOccupancy(occupancyTarget, effect,
+                        out int occupancyRuntime, out int occupancyModifiers);
+                    runtimeSlots += occupancyRuntime;
+                    modifiers += occupancyModifiers;
+                }
+                else
+                {
+                    if (effect.Type != EffectType.Instant) runtimeSlots++;
+                    modifiers += effect.Modifiers.Count;
+                }
+            }
+            long damageRequests = 0;
+            long damageEvents = 1;
+            long resourceRequests = 0;
+            long resourceEvents = 0;
+            for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
+            {
+                targets.TryRequestAt(request, targetIndex, out var targetRequest);
+                var target = store.GetEntityHandle(targets.TargetIdAt(targetIndex));
+                for (int i = 0; i < ability.Executions.Count; i++)
+                {
+                    catalog.TryGetExecution(ability.Executions[i], out var execution);
+                    float magnitude = ResolveMagnitude(store, execution, targetRequest, source.Index);
+                    var context = new AbilityPayloadContext(store, ability, execution, targetRequest,
+                        source, target, magnitude);
+                    if (payloadHandler != null && payloadHandler.Supports(execution)) continue;
+                    TryBuildBuiltInPayload(context, out var payload, out _);
+                    damageRequests += payload.DamageRequests;
+                    damageEvents += payload.DamageEvents;
+                    resourceRequests += payload.ResourceRequests;
+                    resourceEvents += payload.ResourceEvents;
+                }
+            }
+            for (int i = 0; i < ability.Costs.Count; i++)
+                if (EffectiveCost(ability, request, i) != 0f) { resourceRequests++; resourceEvents++; }
+            long effectEvents = (long)ability.Effects.Count * targets.Count;
+            if (runtimeSlots > int.MaxValue || modifiers > int.MaxValue || effectEvents > int.MaxValue ||
+                damageRequests > int.MaxValue || damageEvents > int.MaxValue ||
+                resourceRequests > int.MaxValue || resourceEvents > int.MaxValue) return false;
+            need = new AbilityCommitReservation.CapacityNeed
+            {
+                EffectRequests = (int)effectEvents,
+                EffectEvents = (int)effectEvents,
+                DamageRequests = (int)damageRequests,
+                DamageEvents = (int)damageEvents,
+                ResourceRequests = (int)resourceRequests,
+                ResourceEvents = (int)resourceEvents,
+                Modifiers = (int)modifiers,
+                RuntimeSlots = (int)runtimeSlots
+            };
+            return true;
+        }
+
+        private static AbilityActivationRejectReason RecheckQueuedActivation(ComponentStore store,
+            GameplayCatalog catalog, AbilityDefinition ability, AbilityActivationRequest request,
+            EntityHandle source, ActivationTargetSet targets, IAbilityPayloadHandler payloadHandler, int index)
+        {
+            if (!QueuedCooldownReady(store, index, request))
+                return AbilityActivationRejectReason.Cooldown;
+            // 本条预留已 Release；Cost 只看当前值（更早请求已 Spend）。不查 Tag。
+            if (!ValidateCosts(store, ability, request, source, accountReservation: false))
+                return AbilityActivationRejectReason.Cost;
+            if (!ValidateCapacityPlan(store, catalog, ability, request, source, targets, payloadHandler))
+                return AbilityActivationRejectReason.QueueOverflow;
+            return AbilityActivationRejectReason.None;
+        }
+
+        private static bool QueuedCooldownReady(ComponentStore store, int index, AbilityActivationRequest request)
+        {
+            var kind = (AbilityQueueCooldownKind)store.AbilityQueuedCooldownKinds[index];
+            switch (kind)
+            {
+                case AbilityQueueCooldownKind.FloatArray:
+                    return new CooldownArrayActivationState(store.AbilityQueuedFloatArrays[index], request.Slot).IsReady;
+                case AbilityQueueCooldownKind.StateArray:
+                case AbilityQueueCooldownKind.TowerActive:
+                case AbilityQueueCooldownKind.PlayerGlobal:
+                case AbilityQueueCooldownKind.Hero:
+                    return new AbilityStateArrayActivationState(ResolveQueuedStates(store, index, kind), request.Slot, kind)
+                        .IsReady;
+                default:
+                    return new StoredAbilityActivationState(store, request.OwnerId, request.Slot).IsReady;
+            }
+        }
+
+        private static void PublishCancelled(ComponentStore store, AbilityActivationRequest request,
+            EntityHandle source, ActivationTargetSet targets, AbilityActivationRejectReason reason)
+        {
+            int targetId = targets.Count > 0 ? targets.TargetIdAt(0) : request.OwnerId;
+            var target = store.GetEntityHandle(targetId);
+            store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.AbilityCancelled, source, target,
+                store.AllocateGameplaySequence(targetId), reason: (int)reason, ownerPlayerId: request.OwnerPlayerId));
+        }
 
         private static bool TryGetResource(ComponentStore store, int entityId, AttributeKey key, out float value)
         {

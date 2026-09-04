@@ -146,10 +146,19 @@ namespace BattleSystemECS.Systems
             float restoredHp = store.PlayerSnapshotHP[absSlot];
             if (restoredHp > maxHp) restoredHp = maxHp;
             if (restoredHp < 0f) restoredHp = 0f;
+            if (!store.ResourceResolver.CanAccept(3, 3)) return -1f;
+            float oldHp = store.PlayerCurrentHealth[playerId];
+            float oldMana = store.PlayerMana[playerId];
+            float oldShield = store.PlayerShield[playerId];
             if (!store.SetPlayerResourceAuthority(sourceEntityId, playerId, new Core.GAS.AttributeKey(3), restoredHp) ||
                 !store.SetPlayerResourceAuthority(sourceEntityId, playerId, new Core.GAS.AttributeKey(7), store.PlayerSnapshotMana[absSlot]) ||
                 !store.SetPlayerResourceAuthority(sourceEntityId, playerId, new Core.GAS.AttributeKey(9), store.PlayerSnapshotShield[absSlot]))
-                throw new InvalidOperationException("prevalidated rewind resource capacity was exhausted during commit");
+            {
+                store.PlayerCurrentHealth[playerId] = oldHp;
+                store.PlayerMana[playerId] = oldMana;
+                store.PlayerShield[playerId] = oldShield;
+                return -1f;
+            }
 
             TotalRestores++;
             return actualSeconds;

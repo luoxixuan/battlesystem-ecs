@@ -292,7 +292,7 @@ namespace BattleSystemECS.Tests.Framework
 
             Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
                 store.GetEntityHandle(0), store.GetEntityHandle(targetId), out var handle,
-                snapshot: 7f, ownerPlayerId: 0));
+                periodicMagnitude: 7f, ownerPlayerId: 0));
             Assert.True(store.GameplayEffectsRuntime.TryApply(definition.Id, definition,
                 store.GetEntityHandle(0), store.GetEntityHandle(defaultTargetId), out var defaultHandle,
                 ownerPlayerId: 0));

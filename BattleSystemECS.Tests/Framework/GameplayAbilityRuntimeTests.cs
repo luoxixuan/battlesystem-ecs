@@ -214,7 +214,7 @@ namespace BattleSystemECS.Tests.Framework
             var result = GameplayAbilityRuntime.Activate(store, catalog, new float[1],
                 new AbilityActivationRequest(0, 0, 0f, enemy, ability: ability.Id));
             Assert.False(result.Accepted);
-            Assert.Equal(AbilityActivationRejectReason.InvalidRequest, result.Reason);
+            Assert.Equal(AbilityActivationRejectReason.QueueOverflow, result.Reason);
             Assert.Equal(store.AbilityRequests.Capacity, store.AbilityRequests.Count);
             Assert.True(store.AbilityRequests.OverflowCount >= 1);
             Assert.Equal(10f, store.EnemyHealth[enemy], 3);
@@ -500,6 +500,7 @@ namespace BattleSystemECS.Tests.Framework
             var result = GameplayAbilityRuntime.Activate(store, catalog, cooldowns, Request(0));
 
             Assert.False(result.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.QueueOverflow, result.Reason);
             Assert.Equal(effectCount, store.GetEffectCount(0));
             Assert.Equal(effectEvents, store.GameplayEffectsRuntime.Events.Count);
             Assert.Equal(5f, store.PlayerMana[0]);
@@ -525,6 +526,7 @@ namespace BattleSystemECS.Tests.Framework
             var result = GameplayAbilityRuntime.Activate(store, catalog, cooldowns, Request(0));
 
             Assert.False(result.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.QueueOverflow, result.Reason);
             Assert.Equal(pending, store.ResourceResolver.PendingRequestCount);
             Assert.Equal(2f, store.PlayerCurrentHealth[0]);
             Assert.Equal(5f, store.PlayerMana[0]);
@@ -556,7 +558,8 @@ namespace BattleSystemECS.Tests.Framework
 
             Assert.True(accepted.Accepted);
             Assert.Equal(targets.Length, accepted.AppliedEffects);
-            Assert.Equal(3, pending);
+            Assert.Equal(2, pending);
+            Assert.Equal(4f, store.PlayerMana[0]);
             Assert.Equal(1, events);
             Assert.Equal(2f, cooldowns[0]);
             Assert.False(rejected.Accepted);
@@ -605,6 +608,7 @@ namespace BattleSystemECS.Tests.Framework
             var result = GameplayAbilityRuntime.Activate(store, catalog, cooldowns, Request(0));
 
             Assert.False(result.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.QueueOverflow, result.Reason);
             Assert.Equal(0f, store.PlayerShield[0]);
             Assert.Equal(5f, store.PlayerMana[0]);
             Assert.Equal(0f, cooldowns[0]);
@@ -635,6 +639,7 @@ namespace BattleSystemECS.Tests.Framework
             var result = GameplayAbilityRuntime.Activate(store, catalog, cooldowns, Request(0));
 
             Assert.False(result.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.QueueOverflow, result.Reason);
             Assert.Equal(before, store.GetEffectCount(0));
             Assert.Equal(0f, cooldowns[0]);
         }

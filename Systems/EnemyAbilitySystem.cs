@@ -435,7 +435,8 @@ namespace BattleSystemECS.Systems
                 var result = store.ResourceResolver.TryApply(new PlayerDamageRequest(context.Source, context.Target,
                     context.Magnitude, store.AllocateGameplaySequence(context.Target.Index), context.Ability.Id,
                     context.Target.Index));
-                if (!result.Accepted) throw new InvalidOperationException("prevalidated player damage was rejected during commit");
+                if (!result.Accepted)
+                    return -1;
                 _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
                 {
                     Damage = result.Applied,
@@ -462,7 +463,7 @@ namespace BattleSystemECS.Systems
                     context.Execution.Duration, context.Magnitude, context.Ability.Id,
                     context.Request.OwnerPlayerId, global::BattleSystemECS.Content.Contracts.TelegraphShape.Circle,
                     colorHint: context.Execution.Parameter);
-                if (!queued) throw new InvalidOperationException("prevalidated telegraph capacity was unavailable during commit");
+                if (!queued) return 0;
                 return 1;
             }
             if (context.Execution.Operation == ExecutionOperation.SummonEnemy)
@@ -515,7 +516,7 @@ namespace BattleSystemECS.Systems
                 if (!store.TryGetActiveEffectAt(towerId, slot, out var runtime, out var definition, out _) ||
                     !GrantsTag(definition, CatalogRegistries.DispellableTag)) continue;
                 if (!store.GameplayEffectsRuntime.Remove(target, runtime.Handle))
-                    throw new InvalidOperationException("prevalidated dispel removal failed during commit");
+                    continue;
                 removed++;
             }
             return removed;
@@ -591,7 +592,7 @@ namespace BattleSystemECS.Systems
                         store.GameplayEffectsRuntime.Events.CanPublish(requiredEvents, true);
                     if (!_dispelCapacityReserved)
                         return new AbilityActivationResult(false, enemyId, EnemyAbilitySlot,
-                            _typedTargets.Count == 0 ? AbilityActivationRejectReason.NoTarget : AbilityActivationRejectReason.InvalidRequest);
+                            _typedTargets.Count == 0 ? AbilityActivationRejectReason.NoTarget : AbilityActivationRejectReason.QueueOverflow);
                 }
                 EnsureAbilitySlot(enemyId);
                 StampEnemyAbilityCooldown(enemyId, ability.Cooldown);
@@ -658,7 +659,7 @@ namespace BattleSystemECS.Systems
                     throw new InvalidOperationException("summon multipliers must be validated before commit");
                 int minionId = store.CreateEntity();
                 if (minionId < 0)
-                    throw new InvalidOperationException("prevalidated summon capacity was unavailable during commit");
+                    return 0;
                 float baseHealth = store.EnemyMaxHealth[enemyId];
                 float baseDamage = store.EnemyDamage[enemyId];
                 store.EnemyHealth[minionId] = baseHealth * healthMult;
