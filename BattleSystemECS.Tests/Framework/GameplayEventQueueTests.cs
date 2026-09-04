@@ -104,6 +104,33 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
+        public void DigestCountsOnlyMutationNotInitialOrReplay()
+        {
+            var mutation = new GameplayEvent(GameplayEventType.EffectApplied, default(EntityHandle),
+                default(EntityHandle), 1L);
+            var initial = mutation.WithCause(GameplayEventCause.Initial);
+            var replay = mutation.WithCause(GameplayEventCause.Replay);
+            Assert.Equal(0, GameplayEventOrdering.Compare(mutation, initial));
+            Assert.Equal(0, GameplayEventOrdering.Compare(mutation, replay));
+
+            var mutationsOnly = new GameplayEventQueue(8) { DigestEnabled = true };
+            Assert.True(mutationsOnly.TryPublish(mutation));
+            ulong afterMutation = mutationsOnly.SequenceDigest;
+
+            var withSnapshots = new GameplayEventQueue(8) { DigestEnabled = true };
+            Assert.True(withSnapshots.TryPublish(mutation));
+            Assert.True(withSnapshots.TryPublish(initial));
+            Assert.True(withSnapshots.TryPublish(replay));
+            Assert.Equal(afterMutation, withSnapshots.SequenceDigest);
+            Assert.Equal(3, withSnapshots.PublishedCount);
+
+            var doubleMutation = new GameplayEventQueue(8) { DigestEnabled = true };
+            Assert.True(doubleMutation.TryPublish(mutation));
+            Assert.True(doubleMutation.TryPublish(mutation));
+            Assert.NotEqual(afterMutation, doubleMutation.SequenceDigest);
+        }
+
+        [Fact]
         public async Task ConcurrentSinglePublicationKeepsCountAndDigestAccountingAtomic()
         {
             var queue = new GameplayEventQueue(512);

@@ -1,7 +1,7 @@
 # BattleSystem-ECS ECS + GAS 终态架构
 
 > 状态：目标架构决策（本文定义终态，不代表当前代码已经全部实现）
-> 更新日期：2026-09-04
+> 更新日期：2026-09-05
 > 相关审查：[skill-combat-arch-review.md](skill-combat-arch-review.md)
 > 迁移计划：[ecs-gas-migration-plan.md](plan/ecs-gas-migration-plan.md)
 > Lumio 对照收口：[plan/ecs-gas-lumio-contract-alignment.md](plan/ecs-gas-lumio-contract-alignment.md)
@@ -328,6 +328,7 @@ AbilityState
   # 仅时长能力（蓄力 / 读条 / 引导）才有：
   # Executing / Completed / Cancelled / Expired
   # 瞬时能力不背状态机；不设 RolledBack；不为 10K 瞬发路径引入八态机
+  # 实现：AbilityState.Phase + AbilityDurationKind.Timed；瞬发 Activate 保持 None
 
 ActiveGameplayEffect
   effectId
@@ -353,7 +354,7 @@ TriggerState
   generation
 ```
 
-瞬时能力只占用冷却 / 充能，**不背状态机**。`Executing` / `Completed` / `Cancelled` / `Expired` 只给蓄力、读条、引导等时长能力。不引入 `RolledBack`，不为 10K 瞬发路径套八态机。`ActiveGameplayEffect.modifierHandles[]` 若保留，只指向 Aggregator 派生缓存，不是独立账本身份。
+瞬时能力只占用冷却 / 充能，**不背状态机**。`Executing` / `Completed` / `Cancelled` / `Expired` 只给蓄力、读条、引导等时长能力。不引入 `RolledBack`，不为 10K 瞬发路径套八态机。`ActiveGameplayEffect.modifierHandles[]` 若保留，只指向 Aggregator 派生缓存，不是独立账本身份。摘除式抑制在 Active 槽内去掉 modifier 与 granted tag 贡献（`TryInhibit`），不新增状态机枚举。
 
 ## 7. 属性聚合规则
 
@@ -465,7 +466,7 @@ GameplayLoopAborted
 
 `AbilityRejected` 表示**准入**失败（未入队或入队前拒绝），原因见 §6.1 冻结表。`AbilityCancelled` 表示已入队请求在 Commit 复查失败（冷却或预留消耗/容量不再有效），整单取消，不 throw、不半价。不得用 `AbilityRejected` 表示复查失败，也不得用 `AbilityCancelled` 表示准入失败。
 
-内部 Gameplay Event Queue 与 `IBattleEventBus` 是两个不同的 seam：前者供模拟系统触发规则，后者只在提交后向渲染层发送展示事实。并行阶段不得直接广播任一总线。
+内部 Gameplay Event Queue 与 `IBattleEventBus` 是两个不同的 seam：前者供模拟系统触发规则，后者只在提交后向渲染层发送展示事实。并行阶段不得直接广播任一总线。内部 Event 带 `GameplayEventCause`（Mutation / Initial / Replay）；sequence digest 只累计 Mutation，避免初次快照或回放被当成又一次变化。
 
 ### 8.3 Resolver
 
@@ -553,7 +554,7 @@ Presentation events
 - `CommitSerial`：按确定顺序修改共享状态；
 - `Presentation`：只消费已提交事实。
 
-时长与周期效果的**排期本**按每个 `clockId` 的虚拟时间取件，**不按帧号**。子弹时间缩放 `enemyDt`；按帧号排期不是合法实现。排期本是派生缓存，不登记闭包。
+时长与周期效果的**排期本**按每个 `clockId` 的虚拟时间取件，**不按帧号**。子弹时间缩放 `enemyDt`；按帧号排期不是合法实现。排期本是派生缓存，不登记闭包。实现挂在现有 `GameplayEffectRuntime.Tick`（`effect.tick` / supplemental clock 节点），不另开 FrameGraph 节点。
 
 模拟路径的随机数只从 Frame `DeterminismContext` 领号，且**仅**在 `CommitSerial` 相取数。`Rng.Shared`（墙钟 `TickCount xor ManagedThreadId`）与无种子 `new Random()` 都不是确定性资产，不得进入 GAS、战斗公式、或决定实体数量与位置的模拟路径。
 
@@ -640,7 +641,7 @@ remainder = (oldCount + deltaHits) % threshold
 
 清理操作必须幂等。效果槽位不能用裸数组索引作为长期外部引用。
 
-墓碑查询必须能区分「这个句柄曾经活过、现在死了」与「这个句柄从未存在」。实体 ID **仍然回收**，代数靠 `generation` 失效旧句柄；不把 ID 永不复用当成合同。过期 generation 的命令丢弃并记诊断。
+墓碑查询必须能区分「这个句柄曾经活过、现在死了」与「这个句柄从未存在」。实体 ID **仍然回收**，代数靠 `generation` 失效旧句柄；不把 ID 永不复用当成合同。过期 generation 的命令丢弃并记诊断。实现：`ComponentStore.QueryEntityTombstone`（NeverExisted / Dead / Alive / PendingDeath）。结构事务半实体泄漏未核实，未开卡，不作为现状。
 
 `sourceDeathPolicy` 的允许值必须是显式枚举：
 

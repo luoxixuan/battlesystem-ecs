@@ -1,5 +1,13 @@
 # 更新记录 (Changelog)
 
+### 2026-09-05（Lumio P6：时长 Ability 态 / 排期本 / 墓碑 / 摘除式抑制 / 表现原因）
+- **时长 Ability 态**：`AbilityPhase` 为 None / Executing / Completed / Cancelled / Expired，只给 `AbilityDurationKind.Timed`。瞬发 `Activate` / 生产 `ActivateCore` 相位保持 None。不引入 RolledBack，不套八态机。现有内容无 GAS channel 技能；测试用最小时长定义走完四态。
+- **排期本**：`GameplayScheduleBook` 按每个 `clockId` 的虚拟时间取件，可从 ActiveEffect 全量重建。挂在现有 `GameplayEffectRuntime.Tick`（effect.tick），未改 FrameGraph / 根哈希。子弹时间下 Enemy clock 与 Combat clock 到期解耦。
+- **墓碑查询**：`QueryEntityTombstone` 区分 NeverExisted / Dead / Alive / PendingDeath。实体 ID 仍回收 + generation。过期 generation 的伤害命令继续丢弃并累加 `StaleHandleRejectedCount`。
+- **摘除式抑制**：`TryInhibit` / `TryUninhibit` 摘除或重建 modifier 与 granted tag 贡献，效果槽仍在；`Inhibited` 是槽位 bool，不是新状态机枚举。
+- **表现原因**：`GameplayEvent.Cause`（Mutation / Initial / Replay）加在比较键之后；`GameplayEventOrdering` 不读 Cause；sequence digest 只累计 Mutation。
+- 半实体泄漏未核实、未开卡。KeepPerLayer 未做。mode 2/4/5 与 Unity 保持 DEFERRED/UNAVAILABLE。
+
 ### 2026-09-05（Lumio P5：同帧顺序 A4 + 随机领号 A3，⚠️ 可见随机变化）
 - **同帧顺序**：保持 AI 组 `RemoveDispellableEffects` 为批外 remove-first；`effect.commit` 批内堆叠 → 溢出 → Replace 捕获 → 时长/周期 → 过期/Remove 垫后。禁止「施加又移除 = 抵消」，`EffectApplied` 与 `EffectRemoved` 都进 digest。未引入 `RemoveRequests` 尾节点，未改 FrameGraph 根哈希。生产仍只有这一处显式 Remove。
 - **随机领号**：新增 Frame 注入的 `DeterminismContext`，生产 Tick 仅 CommitSerial 等价语义取数。下列模拟路径不再用 `Rng.Shared` / 无种子 `new Random()`：EchoClone / EnemyTeleport / PointDefense / Skill 冰冻 / Upgrade / Weather / Fission / Clone / AutoSkill / Pickup / Affix / RandomEvent / WaveSpawning（含路径偏移相位）/ Crafting / PreFightBuff / Reforge / TowerModifier。Portal 未使用的 `Rng.Shared` 字段删除。ShopReroll 保留固定种子私有流（BuildPhase，不进 digest）。Benchmark `new Random(42)` 不迁。

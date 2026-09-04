@@ -157,6 +157,23 @@ namespace BattleSystemECS.Core
             failure = BattleSystemECS.Core.GAS.HandleResolveFailure.None;
             return true;
         }
+
+        /// <summary>
+        /// 墓碑查询：从未分配的槽是 NeverExisted；销毁未回收或过期 generation 是 Dead。
+        /// ID 仍回收，过期 generation 的命令继续走 TryResolve 失败并记诊断。
+        /// </summary>
+        public BattleSystemECS.Core.GAS.EntityTombstone QueryEntityTombstone(BattleSystemECS.Core.GAS.EntityHandle handle)
+        {
+            if (!IsValidEntity(handle.Index)) return BattleSystemECS.Core.GAS.EntityTombstone.NeverExisted;
+            int liveGeneration = _entityGenerations[handle.Index];
+            if (liveGeneration == 0 || !handle.IsValid) return BattleSystemECS.Core.GAS.EntityTombstone.NeverExisted;
+            if (handle.Generation != liveGeneration) return BattleSystemECS.Core.GAS.EntityTombstone.Dead;
+            if (EnemyActive[handle.Index] && IsEnemyPendingDeath(handle.Index))
+                return BattleSystemECS.Core.GAS.EntityTombstone.PendingDeath;
+            if (PositionActive[handle.Index] || EnemyActive[handle.Index] || TowerActive[handle.Index])
+                return BattleSystemECS.Core.GAS.EntityTombstone.Alive;
+            return BattleSystemECS.Core.GAS.EntityTombstone.Dead;
+        }
         public bool IsEnemyPendingDeath(int enemyId) => (uint)enemyId < MAX_ENTITIES && Volatile.Read(ref _enemyDeathPending[enemyId]) != 0;
 
         // Expose as read-only references — zero allocation on read. All writes go through internal API (Add/Remove).

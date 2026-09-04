@@ -79,6 +79,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(0f, store.GetAbility(player, 0).CurrentCooldown);
             Assert.True(GameplayAbilityRuntime.AbilityCommit(store, player, 0));
             Assert.Equal(def.Cooldown, store.GetAbility(player, 0).CurrentCooldown);
+            Assert.Equal(AbilityPhase.None, store.GetAbility(player, 0).State.Phase);
         }
 
         [Fact]

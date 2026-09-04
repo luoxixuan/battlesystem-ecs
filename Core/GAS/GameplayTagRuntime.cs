@@ -80,5 +80,10 @@ namespace BattleSystemECS.Core.GAS
         {
             return store != null && store.TagState.Has(entityId, tag);
         }
+
+        public static int GetCount(ComponentStore store, int entityId, TagId tag)
+        {
+            return store == null ? 0 : store.TagState.GetCount(entityId, tag);
+        }
     }
 }

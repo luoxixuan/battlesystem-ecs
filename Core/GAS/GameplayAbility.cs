@@ -164,7 +164,16 @@ namespace BattleSystemECS.Core.GAS
     }
 
     /// <summary>
+    /// 时长能力相位。瞬时能力保持 None，不背八态机，不设 RolledBack。
+    /// </summary>
+    public enum AbilityPhase { None = 0, Executing = 1, Completed = 2, Cancelled = 3, Expired = 4 }
+
+    /// <summary>只有蓄力/读条/引导等时长能力才离开 None。</summary>
+    public enum AbilityDurationKind { Instant = 0, Timed = 1 }
+
+    /// <summary>
     /// 跨帧能力运行态：Owner 句柄带 generation，冷却与充能集中在此。
+    /// 时长相位只给 Timed；生产瞬发 Activate 不得自动进入 Executing。
     /// </summary>
     public struct AbilityState
     {
@@ -173,15 +182,71 @@ namespace BattleSystemECS.Core.GAS
         public float Cooldown;
         public int Charges;
         public int MaxCharges;
+        public AbilityPhase Phase;
+        public AbilityDurationKind DurationKind;
+        public ClockId DurationClock;
+        public float DurationRemaining;
+        public double DurationExpireVirtual;
 
         public AbilityState(AbilityId id, EntityHandle owner, float cooldown, int charges, int maxCharges)
+            : this(id, owner, cooldown, charges, maxCharges, AbilityDurationKind.Instant)
+        {
+        }
+
+        public AbilityState(AbilityId id, EntityHandle owner, float cooldown, int charges, int maxCharges,
+            AbilityDurationKind durationKind)
         {
             Id = id; Owner = owner; Cooldown = cooldown;
             Charges = charges < 0 ? 0 : charges;
             MaxCharges = maxCharges < 1 ? 1 : maxCharges;
+            Phase = AbilityPhase.None;
+            DurationKind = durationKind;
+            DurationClock = ClockId.Combat;
+            DurationRemaining = 0f;
+            DurationExpireVirtual = 0d;
         }
 
         public bool CanActivate() => Cooldown <= 0.0001f && (MaxCharges <= 1 || Charges > 0);
+
+        /// <summary>仅 Timed 可离开 None。virtualNow 为该 clock 的当前虚拟时间。</summary>
+        public bool TryBeginTimed(float duration, ClockId clock, double virtualNow = 0d)
+        {
+            if (DurationKind != AbilityDurationKind.Timed || Phase != AbilityPhase.None) return false;
+            if (duration <= 0f || float.IsNaN(duration) || float.IsInfinity(duration)) return false;
+            if (clock == ClockId.Invalid) return false;
+            Phase = AbilityPhase.Executing;
+            DurationClock = clock;
+            DurationRemaining = duration;
+            DurationExpireVirtual = virtualNow + duration;
+            return true;
+        }
+
+        public bool TryCompleteTimed()
+        {
+            if (DurationKind != AbilityDurationKind.Timed || Phase != AbilityPhase.Executing) return false;
+            Phase = AbilityPhase.Completed;
+            DurationRemaining = 0f;
+            return true;
+        }
+
+        public bool TryCancelTimed()
+        {
+            if (DurationKind != AbilityDurationKind.Timed || Phase != AbilityPhase.Executing) return false;
+            Phase = AbilityPhase.Cancelled;
+            DurationRemaining = 0f;
+            return true;
+        }
+
+        /// <summary>按 clock 虚拟时间到期；不按帧号。到期进入 Expired。</summary>
+        public bool TryTickTimed(double virtualNow)
+        {
+            if (DurationKind != AbilityDurationKind.Timed || Phase != AbilityPhase.Executing) return false;
+            DurationRemaining = (float)Math.Max(0d, DurationExpireVirtual - virtualNow);
+            if (DurationRemaining > 0f) return false;
+            Phase = AbilityPhase.Expired;
+            DurationRemaining = 0f;
+            return true;
+        }
     }
 
     /// <summary>
@@ -259,6 +324,39 @@ namespace BattleSystemECS.Core.GAS
             if (!CanActivate()) return;
             State.Cooldown = Definition.Cooldown;
             if (State.MaxCharges > 1 && State.Charges > 0) State.Charges--;
+            // 瞬发只占冷却/充能，相位保持 None。
+        }
+
+        public bool TryBeginTimed(float duration, ClockId clock, double virtualNow = 0d)
+        {
+            var state = State;
+            if (!state.TryBeginTimed(duration, clock, virtualNow)) return false;
+            State = state;
+            return true;
+        }
+
+        public bool TryCompleteTimed()
+        {
+            var state = State;
+            if (!state.TryCompleteTimed()) return false;
+            State = state;
+            return true;
+        }
+
+        public bool TryCancelTimed()
+        {
+            var state = State;
+            if (!state.TryCancelTimed()) return false;
+            State = state;
+            return true;
+        }
+
+        public bool TryTickTimed(double virtualNow)
+        {
+            var state = State;
+            if (!state.TryTickTimed(virtualNow)) return false;
+            State = state;
+            return true;
         }
     }
 }

@@ -901,6 +901,55 @@ namespace BattleSystemECS.Core
             return true;
         }
 
+        /// <summary>仅 Timed 时长能力进入 Executing。生产瞬发 Activate 不得走这里。</summary>
+        public bool TryBeginTimedAbility(int entityId, int slot, float duration, ClockId clock)
+        {
+            if (!IsValidEntity(entityId) || slot < 0 || slot >= AbilityCount[entityId]) return false;
+            var inst = GetAbility(entityId, slot);
+            var state = inst.State;
+            if (state.DurationKind != AbilityDurationKind.Timed)
+            {
+                state.DurationKind = AbilityDurationKind.Timed;
+                inst.State = state;
+            }
+            double now = GameplayEffectsRuntime.VirtualNow(clock);
+            if (!inst.TryBeginTimed(duration, clock, now)) return false;
+            SetAbility(entityId, slot, inst);
+            GameplayEffectsRuntime.RegisterTimedAbility(entityId, slot, clock, inst.State.DurationExpireVirtual);
+            return true;
+        }
+
+        public bool TryCompleteTimedAbility(int entityId, int slot)
+        {
+            if (!IsValidEntity(entityId) || slot < 0 || slot >= AbilityCount[entityId]) return false;
+            var inst = GetAbility(entityId, slot);
+            if (!inst.TryCompleteTimed()) return false;
+            SetAbility(entityId, slot, inst);
+            GameplayEffectsRuntime.UnregisterTimedAbility(entityId, slot);
+            return true;
+        }
+
+        public bool TryCancelTimedAbility(int entityId, int slot)
+        {
+            if (!IsValidEntity(entityId) || slot < 0 || slot >= AbilityCount[entityId]) return false;
+            var inst = GetAbility(entityId, slot);
+            if (!inst.TryCancelTimed()) return false;
+            SetAbility(entityId, slot, inst);
+            GameplayEffectsRuntime.UnregisterTimedAbility(entityId, slot);
+            return true;
+        }
+
+        public bool TryPrepareTimedAbility(int entityId, int slot)
+        {
+            if (!IsValidEntity(entityId) || slot < 0 || slot >= AbilityCount[entityId]) return false;
+            var inst = GetAbility(entityId, slot);
+            var state = inst.State;
+            state.DurationKind = AbilityDurationKind.Timed;
+            inst.State = state;
+            SetAbility(entityId, slot, inst);
+            return true;
+        }
+
         internal void ReleaseEntityAbilities(int entityId)
         {
             if (!IsValidEntity(entityId)) return;
@@ -1088,7 +1137,8 @@ namespace BattleSystemECS.Core
             int baseIndex = entityId * MAX_ACTIVE_EFFECTS_PER_ENTITY;
             var handle = _activeEffectHandles[baseIndex + slot];
             if (!GameplayEffects.TryGet(handle, out removed, out definition, out snapshot)) return false;
-            TagState.RemoveGranted(entityId, definition.GrantedTags);
+            if (!removed.Inhibited)
+                TagState.RemoveGranted(entityId, definition.GrantedTags);
             int lastSlot = ActiveEffectCount[entityId] - 1;
             if (slot != lastSlot)
             {

@@ -271,6 +271,8 @@ namespace BattleSystemECS.Core.GAS
 
         private void AddToDigest(GameplayEvent value)
         {
+            // 只有 Mutation 进 sequence digest；Initial/Replay 不得被当成又一次变化。
+            if (value.Cause != GameplayEventCause.Mutation) return;
             unchecked
             {
                 _sequenceDigest = Mix(_sequenceDigest, (ulong)value.Type);

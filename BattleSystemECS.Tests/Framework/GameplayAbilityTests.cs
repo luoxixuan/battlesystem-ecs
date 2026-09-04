@@ -39,6 +39,7 @@ namespace BattleSystemECS.Tests.Framework
             inst.Activate();
             // 期望值直接取注入的 def.Cooldown，不重复钉住 5f 字面量。
             Assert.Equal(def.Cooldown, inst.CurrentCooldown);
+            Assert.Equal(AbilityPhase.None, inst.State.Phase);
         }
 
         [Fact]

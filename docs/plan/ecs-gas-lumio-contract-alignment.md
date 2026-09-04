@@ -1,8 +1,8 @@
 # ECS + GAS：Lumio 合同对照收口计划
 
-> 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）、P3（A1 属性公式）、P4（Tag parent 词汇表 + 准入序）、P5（同帧顺序 A4 + 随机领号 A3）已实施；P6 未宣称完成
+> 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）、P3（A1 属性公式）、P4（Tag parent 词汇表 + 准入序）、P5（同帧顺序 A4 + 随机领号 A3）、P6（时长 Ability 态 / 排期本 / 墓碑 / 摘除式抑制 / 表现原因）已实施
 >
-> 更新日期：2026-09-05（P5 落地：remove-first + commit 批内 Remove 垫后；DeterminismContext 仅 CommitSerial 领号）
+> 更新日期：2026-09-05（P6 落地：AbilityPhase 仅 Timed；GameplayScheduleBook 挂 effect.tick；QueryEntityTombstone；摘除式抑制；GameplayEventCause）
 >
 > 基线 commit：`b5cfe52`（对照审查时的 HEAD）
 >
@@ -435,6 +435,8 @@ GAS / 战斗公式 / 决定实体数量与位置的模拟路径禁止 `Rng.Share
 | `KeepPerLayer` | 若玩法需要逐层捕获 | V1 不做；要做先规定条目内定长捕获数组 |
 
 结构事务亮相屏障：先举证分裂/召唤/弹道同帧秒杀路径，再开卡。未核实不得写进终态当现状。
+
+**实施状态（2026-09-05）**：已落地。`AbilityPhase`（None/Executing/Completed/Cancelled/Expired）只给 `AbilityDurationKind.Timed`；瞬发 Activate 保持 None，不引入 RolledBack。排期本 `GameplayScheduleBook` 是派生缓存，挂在现有 `GameplayEffectRuntime.Tick`（effect.tick），按 clock 虚拟时间取件，未改 FrameGraph / 根哈希。`QueryEntityTombstone` 区分 NeverExisted / Dead / Alive / PendingDeath；过期 generation 命令仍丢弃并记 `StaleHandleRejectedCount`。摘除式抑制走 `TryInhibit`/`TryUninhibit`（bool 槽位标志，无新状态机枚举）。`GameplayEventCause`（Mutation/Initial/Replay）加在比较键之后；digest 只累计 Mutation。半实体泄漏：分裂在 PostDeath 生成子体、弹道对失效句柄丢弃并记 stale、召唤 `CreateEntity` 失败跳过——**未核实同帧秒杀半实体路径，未开卡**。KeepPerLayer 未做。mode 2/4/5 与 Unity 保持 DEFERRED。
 
 ## 12. 跨阶段约束与门禁
 

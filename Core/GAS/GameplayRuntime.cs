@@ -13,6 +13,8 @@ namespace BattleSystemECS.Core.GAS
         private int _modifierHandleCount;
         private readonly List<int> _runtimeEntityIds = new List<int>(1024);
         private readonly int[] _runtimeEntityCounts = new int[ComponentStore.MAX_ENTITIES];
+        private readonly GameplayScheduleBook _schedule = new GameplayScheduleBook();
+        private readonly List<(int entityId, int slot)> _timedAbilities = new List<(int, int)>(32);
         public int ActiveRuntimeCount { get; private set; }
         public int PeakActiveRuntimeCount { get; private set; }
         public bool HasActiveEffects => ActiveRuntimeCount > 0;
@@ -27,7 +29,17 @@ namespace BattleSystemECS.Core.GAS
         /// <summary>派生缓存占用：每个 ActiveEffect 一份 definition.Modifiers.Count，叠层不加。</summary>
         internal int ModifierHandleCount => _modifierHandleCount;
         public int EventCapacity { get; }
-        public GameplayEffectRuntime(ComponentStore store, int eventCapacity = DefaultEventCapacity) { _store = store ?? throw new ArgumentNullException(nameof(store)); EventCapacity = Math.Max(1, eventCapacity); Events = new GameplayEventQueue(EventCapacity, Math.Min(64, EventCapacity / 8)); }
+        public GameplayEffectRuntime(ComponentStore store, int eventCapacity = DefaultEventCapacity)
+        {
+            _store = store ?? throw new ArgumentNullException(nameof(store));
+            EventCapacity = Math.Max(1, eventCapacity);
+            Events = new GameplayEventQueue(EventCapacity, Math.Min(64, EventCapacity / 8));
+        }
+        /// <summary>该 clock 当前虚拟时间。排期本按此取件，不按帧号。</summary>
+        public double VirtualNow(ClockId clock) => _schedule.VirtualNow(clock);
+
+        /// <summary>从 ActiveEffect 全量重建该 clock 的到期表（派生缓存）。</summary>
+        internal void RebuildSchedule(ClockId clock) => _schedule.RebuildEffects(_store, _runtimeEntityIds, clock);
         internal bool CanApplyPlan(int targetId, int runtimeSlots, int modifierCount, int eventCount)
         {
             if (!ComponentStore.IsValidEntity(targetId) || runtimeSlots < 0 || modifierCount < 0 || eventCount < 0) return false;
@@ -197,6 +209,7 @@ namespace BattleSystemECS.Core.GAS
                 definition.Periodic.HasValue ? definition.Periodic.Value.CatchUp : CatchUpPolicy.CatchUpAll, definition.SourceDeath, ownerPlayerId, _store.AllocateGameplaySequence(targetId), provenanceId, definition.Tag);
             runtime.RuntimeOwned = true;
             runtime.CapturedModifierMagnitude = modifierCapture;
+            BindSchedule(ref runtime, definition, resetPeriodic: true);
             var app = new GameplayEffectApplication(definition, default(LegacyEffectSnapshot), runtime);
             if (!_store.TryAddGameplayEffect(targetId, app, out handle)) { Reject(source, target, id, 5); return false; }
             ActiveRuntimeCount++;
@@ -211,6 +224,7 @@ namespace BattleSystemECS.Core.GAS
                 Reject(source, target, id, 3);
                 return false;
             }
+            SyncSchedule(handle, runtime, definition);
             Publish(new GameplayEvent(GameplayEventType.EffectApplied, source, target, handle, id, DamageFlags.None, _store.AllocateGameplaySequence(targetId), tag: definition.Tag, ownerPlayerId: ownerPlayerId));
             return true;
         }
@@ -231,6 +245,7 @@ namespace BattleSystemECS.Core.GAS
             runtime.RuntimeOwned = true;
             runtime.OwnerPlayerId = ownerPlayerId;
             runtime.CapturedModifierMagnitude = modifierCapture;
+            BindSchedule(ref runtime, definition, resetPeriodic: runtime.ExpireAtVirtual <= 0d);
             if (runtime.ApplicationSequence == 0L)
                 runtime.ApplicationSequence = _store.AllocateGameplaySequence(targetId);
             application = new GameplayEffectApplication(definition, application.LegacySnapshot, runtime);
@@ -247,6 +262,7 @@ namespace BattleSystemECS.Core.GAS
                 Reject(runtime.Source, runtime.Target, definition.Id, 3);
                 return false;
             }
+            SyncSchedule(handle, runtime, definition);
             Publish(new GameplayEvent(GameplayEventType.EffectApplied, runtime.Source, runtime.Target, handle, definition.Id,
                 DamageFlags.None, _store.AllocateGameplaySequence(targetId), tag: definition.Tag, ownerPlayerId: ownerPlayerId));
             return true;
@@ -427,6 +443,7 @@ namespace BattleSystemECS.Core.GAS
             int maxStacks = definition.MaxStacks < 1 ? 1 : definition.MaxStacks;
             existing.StackCount = Math.Min(maxStacks, existing.StackCount + Math.Max(1, stackDelta));
             existing.CapturedModifierMagnitude = modifierCapture;
+            if (existing.Inhibited) return true;
             return SyncModifierCache(targetId, definition, existing.Handle, existing.StackCount,
                 existing.CapturedModifierMagnitude);
         }
@@ -441,6 +458,33 @@ namespace BattleSystemECS.Core.GAS
             if (additional > 0 && !CanAllocateModifiers(additional)) return false;
             ReleaseModifierCache(targetId, handle);
             return ApplyModifiers(targetId, definition, modifierCapture, handle, stackCount);
+        }
+
+        /// <summary>
+        /// 摘除式抑制：去掉 modifier 与 granted tag 贡献，效果槽仍在。不新增 Inhibited 枚举。
+        /// </summary>
+        public bool TryInhibit(EntityHandle target, EffectHandle handle)
+        {
+            if (!handle.IsValid || !_store.TryGetActiveEffect(target, handle, out var runtime, out var definition, out _))
+                return false;
+            if (runtime.Inhibited) return true;
+            if (_modifiers.TryGetValue(handle, out _)) ReleaseModifierCache(target.Index, handle);
+            _store.TagState.RemoveGranted(target.Index, definition.GrantedTags);
+            runtime.Inhibited = true;
+            return UpdateActive(target, runtime);
+        }
+
+        /// <summary>解除抑制：从账本重建派生缓存（与叠层同一套 SyncModifierCache）。</summary>
+        public bool TryUninhibit(EntityHandle target, EffectHandle handle)
+        {
+            if (!handle.IsValid || !_store.TryGetActiveEffect(target, handle, out var runtime, out var definition, out _))
+                return false;
+            if (!runtime.Inhibited) return true;
+            if (!SyncModifierCache(target.Index, definition, handle, runtime.StackCount, runtime.CapturedModifierMagnitude))
+                return false;
+            _store.TagState.AddGranted(target.Index, definition.GrantedTags);
+            runtime.Inhibited = false;
+            return UpdateActive(target, runtime);
         }
 
         private void ReleaseModifierCache(int targetId, EffectHandle handle)
@@ -517,12 +561,50 @@ namespace BattleSystemECS.Core.GAS
             StateUpdateFailures++;
             return false;
         }
-        private static void RefreshRuntime(ref ActiveGameplayEffect active, GameplayEffectDefinition definition)
+        private void BindSchedule(ref ActiveGameplayEffect active, GameplayEffectDefinition definition, bool resetPeriodic)
+        {
+            double now = _schedule.VirtualNow(active.Clock);
+            if (definition.DurationPolicy == DurationPolicy.Infinite)
+                active.ExpireAtVirtual = double.PositiveInfinity;
+            else
+            {
+                float remaining = active.RemainingTime > 0f ? active.RemainingTime : definition.Duration;
+                active.ExpireAtVirtual = now + Math.Max(0f, remaining);
+                active.RemainingTime = remaining;
+            }
+            if (definition.Type == EffectType.Periodic && definition.Periodic.HasValue)
+            {
+                float period = definition.Periodic.Value.Period;
+                if (resetPeriodic || active.NextTickAtVirtual <= 0d)
+                {
+                    bool immediate = active.FirstTick == FirstTickPolicy.Immediate &&
+                        (resetPeriodic || active.FirstTickPending);
+                    float remainder = resetPeriodic ? 0f : Math.Max(0f, active.TickAccumulator);
+                    active.NextTickAtVirtual = immediate ? now : now + Math.Max(0f, period - remainder);
+                    if (resetPeriodic) active.TickAccumulator = 0f;
+                }
+            }
+            else active.NextTickAtVirtual = double.PositiveInfinity;
+        }
+
+        private void SyncSchedule(EffectHandle handle, ActiveGameplayEffect runtime, GameplayEffectDefinition definition)
+        {
+            if (!handle.IsValid) return;
+            _schedule.ClearEffect(handle);
+            if (definition.DurationPolicy != DurationPolicy.Infinite)
+                _schedule.UpsertEffectExpire(runtime.Clock, handle, runtime.Target, runtime.ExpireAtVirtual);
+            if (definition.Type == EffectType.Periodic && runtime.TicksRemaining > 0)
+                _schedule.UpsertPeriodic(runtime.Clock, handle, runtime.Target, runtime.NextTickAtVirtual);
+        }
+
+        private void RefreshRuntime(ref ActiveGameplayEffect active, GameplayEffectDefinition definition)
         {
             active.RemainingTime = definition.DurationPolicy == DurationPolicy.Infinite ? 0f : definition.Duration;
             active.TicksRemaining = CalculateTicks(definition);
             active.TickAccumulator = 0f;
             active.FirstTickPending = true;
+            BindSchedule(ref active, definition, resetPeriodic: true);
+            SyncSchedule(active.Handle, active, definition);
         }
 
         private bool ApplySourceDeathPolicy(ref ActiveGameplayEffect active)
@@ -590,7 +672,8 @@ namespace BattleSystemECS.Core.GAS
         private bool RemoveImmediate(EntityHandle target, EffectHandle handle, GameplayEventType reason)
         {
             if (!handle.IsValid || !_store.TryGetActiveEffect(target, handle, out var runtime, out _, out _)) return false;
-            if (_modifiers.TryGetValue(handle, out _)) ReleaseModifierCache(target.Index, handle);
+            if (!runtime.Inhibited && _modifiers.TryGetValue(handle, out _)) ReleaseModifierCache(target.Index, handle);
+            _schedule.ClearEffect(handle);
             bool removed = _store.TryRemoveEffect(target, handle, out _);
             if (removed) { if (runtime.RuntimeOwned) { ActiveRuntimeCount = Math.Max(0, ActiveRuntimeCount - 1); UnregisterRuntimeEntity(target.Index); } Publish(new GameplayEvent(reason, runtime.Source, target, handle, runtime.DefinitionId, DamageFlags.None, _store.AllocateGameplaySequence(target.Index), tag: runtime.Tag, ownerPlayerId: runtime.OwnerPlayerId)); }
             return removed;
@@ -598,7 +681,13 @@ namespace BattleSystemECS.Core.GAS
 
         public void CleanupEntity(int entityId)
         {
-            if (ActiveRuntimeCount == 0 && _modifiers.Count == 0) return;
+            if (ActiveRuntimeCount == 0 && _modifiers.Count == 0 && _timedAbilities.Count == 0) return;
+            for (int i = _timedAbilities.Count - 1; i >= 0; i--)
+                if (_timedAbilities[i].entityId == entityId)
+                {
+                    _schedule.ClearAbility(entityId, _timedAbilities[i].slot);
+                    _timedAbilities.RemoveAt(i);
+                }
             for (int i = _store.GetEffectCount(entityId) - 1; i >= 0; i--)
                 if (_store.TryGetActiveEffectAt(entityId, i, out var active, out _, out _)) Remove(active.Target, active.Handle);
             for (int i = 0; i < _runtimeEntityIds.Count; i++)
@@ -626,12 +715,13 @@ namespace BattleSystemECS.Core.GAS
         public int Tick(float deltaTime, ClockId clock)
         {
             _store.ResourceResolver.TickTimedShields(deltaTime, clock);
-            if (ActiveRuntimeCount == 0) return 0;
-            int expired = 0;
+            _schedule.Advance(clock, deltaTime);
+            int expired = TickTimedAbilities(clock);
+            if (ActiveRuntimeCount == 0) return expired;
             for (int n = 0; n < _runtimeEntityIds.Count; n++)
             {
                 int entityId = _runtimeEntityIds[n];
-                expired += TickEntity(entityId, deltaTime, clock);
+                expired += TickEntity(entityId, clock);
                 if (n < _runtimeEntityIds.Count && _runtimeEntityIds[n] != entityId) n--;
             }
             return expired;
@@ -651,13 +741,16 @@ namespace BattleSystemECS.Core.GAS
             _runtimeEntityIds.RemoveAt(last);
         }
         public void ResetFrame() { Events.Clear(); AbortEvents.Clear(); }
-        private int TickEntity(int entityId, float dt, ClockId clock)
+        private int TickEntity(int entityId, ClockId clock)
         {
             int expired = 0;
+            double now = _schedule.VirtualNow(clock);
             for (int slot = _store.GetEffectCount(entityId) - 1; slot >= 0; slot--)
             {
                 if (!_store.TryGetActiveEffectAt(entityId, slot, out var active, out var definition, out _)) continue;
                 if (!active.RuntimeOwned || active.Clock != clock) continue;
+                if (active.ExpireAtVirtual <= 0d && definition.DurationPolicy != DurationPolicy.Infinite)
+                    BindSchedule(ref active, definition, resetPeriodic: false);
                 if (!ApplySourceDeathPolicy(ref active)) { Remove(active.Target, active.Handle); expired++; continue; }
                 if (definition.DurationPolicy == DurationPolicy.Infinite)
                 {
@@ -665,31 +758,89 @@ namespace BattleSystemECS.Core.GAS
                     continue;
                 }
                 if (definition.Type == EffectType.Periodic && definition.Periodic.HasValue && active.TicksRemaining > 0)
+                    TickPeriodicDue(ref active, definition, now);
+                active.RemainingTime = (float)Math.Max(0d, active.ExpireAtVirtual - now);
+                if (definition.Type == EffectType.Periodic && definition.Periodic.HasValue)
                 {
-                    active.TickAccumulator += dt;
-                    int scheduledDue = (int)Math.Floor(active.TickAccumulator / definition.Periodic.Value.Period);
-                    bool immediateTick = active.FirstTickPending && active.FirstTick == FirstTickPolicy.Immediate;
-                    int due = scheduledDue;
-                    if (immediateTick) { due++; active.FirstTickPending = false; }
-                    if (active.FirstTickPending) active.FirstTickPending = false;
-                    if (active.CatchUp == CatchUpPolicy.OnePerFrame && due > 1) due = 1;
-                    if (active.CatchUp == CatchUpPolicy.SkipMissed && due > 0) { due = 1; active.TickAccumulator = 0f; }
-                    due = Math.Min(due, active.TicksRemaining);
-                    if (active.CatchUp != CatchUpPolicy.SkipMissed && due > 0)
-                    {
-                        int scheduledConsumed = Math.Min(scheduledDue, immediateTick ? Math.Max(0, due - 1) : due);
-                        active.TickAccumulator -= scheduledConsumed * definition.Periodic.Value.Period;
-                    }
-                    active.TicksRemaining -= due;
-                    float tickMagnitude = ResolvePeriodicMagnitude(active, definition.Periodic.Value);
-                    for (int tick = 0; tick < due; tick++) { DispatchPeriodic(active, definition, tickMagnitude); active.TicksProcessed++; }
+                    float period = definition.Periodic.Value.Period;
+                    if (active.CatchUp == CatchUpPolicy.SkipMissed)
+                        active.TickAccumulator = (float)Math.Max(0d, period - (active.NextTickAtVirtual - now));
+                    else
+                        active.TickAccumulator = (float)Math.Max(0d, period - (active.NextTickAtVirtual - now));
                 }
-                if (definition.DurationPolicy != DurationPolicy.Infinite)
+                if (active.RemainingTime <= 0f)
                 {
-                    active.RemainingTime -= dt;
-                    if (active.RemainingTime <= 0f) { Remove(active.Target, active.Handle, GameplayEventType.EffectExpired); expired++; continue; }
+                    Remove(active.Target, active.Handle, GameplayEventType.EffectExpired);
+                    expired++;
+                    continue;
                 }
+                SyncSchedule(active.Handle, active, definition);
                 UpdateActive(active.Target, active);
+            }
+            return expired;
+        }
+
+        private void TickPeriodicDue(ref ActiveGameplayEffect active, GameplayEffectDefinition definition, double now)
+        {
+            float period = definition.Periodic.Value.Period;
+            if (period <= 0f) return;
+            int dueCount = 0;
+            active.FirstTickPending = false;
+            while (active.TicksRemaining > 0 && active.NextTickAtVirtual <= now)
+            {
+                if (active.CatchUp == CatchUpPolicy.OnePerFrame && dueCount >= 1) break;
+                if (active.CatchUp == CatchUpPolicy.SkipMissed && dueCount >= 1) break;
+                float tickMagnitude = ResolvePeriodicMagnitude(active, definition.Periodic.Value);
+                DispatchPeriodic(active, definition, tickMagnitude);
+                active.TicksProcessed++;
+                active.TicksRemaining--;
+                dueCount++;
+                if (active.CatchUp == CatchUpPolicy.SkipMissed)
+                {
+                    active.NextTickAtVirtual = now + period;
+                    active.TickAccumulator = 0f;
+                    break;
+                }
+                active.NextTickAtVirtual += period;
+            }
+        }
+
+        internal void RegisterTimedAbility(int entityId, int slot, ClockId clock, double expireAt)
+        {
+            _schedule.UpsertAbility(clock, entityId, slot, expireAt);
+            for (int i = 0; i < _timedAbilities.Count; i++)
+                if (_timedAbilities[i].entityId == entityId && _timedAbilities[i].slot == slot) return;
+            _timedAbilities.Add((entityId, slot));
+        }
+
+        internal void UnregisterTimedAbility(int entityId, int slot)
+        {
+            _schedule.ClearAbility(entityId, slot);
+            for (int i = _timedAbilities.Count - 1; i >= 0; i--)
+                if (_timedAbilities[i].entityId == entityId && _timedAbilities[i].slot == slot)
+                    _timedAbilities.RemoveAt(i);
+        }
+
+        private int TickTimedAbilities(ClockId clock)
+        {
+            int expired = 0;
+            double now = _schedule.VirtualNow(clock);
+            for (int i = _timedAbilities.Count - 1; i >= 0; i--)
+            {
+                int entityId = _timedAbilities[i].entityId;
+                int slot = _timedAbilities[i].slot;
+                var instance = _store.GetAbility(entityId, slot);
+                if (instance.State.Phase != AbilityPhase.Executing || instance.State.DurationClock != clock)
+                    continue;
+                if (!instance.TryTickTimed(now))
+                {
+                    _store.SetAbility(entityId, slot, instance);
+                    continue;
+                }
+                _store.SetAbility(entityId, slot, instance);
+                _schedule.ClearAbility(entityId, slot);
+                _timedAbilities.RemoveAt(i);
+                expired++;
             }
             return expired;
         }
