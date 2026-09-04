@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-09-04（ECS+GAS 诚实化：AbilityRequests 日志 / Rally writes / 脉冲 DoT 并存，⚠️ 有数值变化）
+- **AbilityRequests**：不是 command buffer。`ActivateCore` 仍同步 `CommitPlan`；只在 **accept 之后** 写入当帧日志，`frame.begin` 清空。冷却 / plan 拒绝不再占 256 槽；日志满不得回滚已提交激活。`build.skill/auto-skill/global-skill.update` 补 `AbilityRequests` 写声明（Build 治疗/护盾可走到 ActivateCore）。没有 consume/commit 节点。
+- **Rally 图声明**：`combat.rally.consume` / `skill-buff.rally.update` 的 writes 从假 `TowerCombatCache` 改为真实的 `TowerState`（`TowerRallyAtkSpdBonus`）+ `PlayerAttributes`。重算批准根与 topology hash。
+- **数值：脉冲 DoT 可并存多份**。`ApplyDot` 的 None 改回 `TryAdopt`（每次新槽），不再走 `TryApply` 同 key 不刷新。尸体区每脉冲、多座 Firewall、岩浆每帧重挂恢复为多份 Periodic（受 `MAX_ACTIVE_EFFECTS_PER_ENTITY = 8` 上限）。这是对 2026-09-03「None 不再多开槽」的生产语义纠正；GAS `TryApply` None 本身仍是同 key 不刷新。
+- 仍不是终态：没有 AbilityRequests consume/commit 节点；`TryAdopt` 仍不 `ApplyModifiers`；`AbilityState` 仍嵌在 `AbilityInstance`；burrow/leap/totem 等机制 SOA 冷却未并；`EffectRequests` 仍是死 token；生产 DoT 仍是空 modifier Periodic，不是带 `ENEMY_HEALTH` 的 catalog 伤害修饰。
+
 ### 2026-09-03（ECS+GAS 缺口续：Rally 拆通道 / AbilityRequest buffer / cooldown 合并 / catalog DoT，⚠️ 有数值变化）
 - **Rally**：不再订阅 `EventBus.PlayerDamaged`，只读消费 `ResourceResolver.Events` 的 `DamageApplied`。新增 `combat.rally.consume`（`tower-attack` 之前）重写塔加成；`skill-buff.rally.update` 再消费一次以覆盖战斗段伤害。四站点仍可发 `PlayerDamaged`（渲染），但不再激活 Rally。
 - **数值：原静默站点也会 Rally**。thorns / trample / leap / projectile（及一切 `ApplyPlayerDamageAuthority`）现在会触发 Rally。战斗段伤害同帧要等到 `skill-buff.rally.update` 才激活，该帧塔攻已结束；下一帧 `combat.rally.consume` 才让塔吃到加成。近战等战斗前伤害可在同帧 `tower-attack` 前生效。持续帧因 consume 在清零之后、塔攻之前重写，塔攻速加成不再只活在触发当帧的 SkillBuff 段。

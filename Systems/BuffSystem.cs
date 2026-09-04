@@ -207,8 +207,8 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Periodic DoT 走 catalog 形状的 TryApply：空 modifier + Periodic Damage payload。
-        /// 叠层由 TryApply 解释；None 不再每次新开槽。
+        /// Periodic DoT：catalog 物化（空 modifier）或 adapter。None 走 TryAdopt（脉冲重挂可并存多份）；
+        /// 叠层走 TryRestack。不走 TryApply None（同 key 不刷新会让尸体区 / Firewall 丢脉冲）。
         /// </summary>
         public void ApplyDot(int targetId, GameplayEffectDef dotDef)
         {
@@ -219,21 +219,23 @@ namespace BattleSystemECS.Systems
             if (!source.IsValid) return;
             if (dotDef.Type == EffectType.Periodic)
                 dotDef.AttributeIndex = -1;
-            GameplayEffectDefinition typed;
-            if (!ProductionDotCatalog.TryMaterialize(_catalog, dotDef.Name, dotDef.Duration, dotDef.TickInterval,
-                    dotDef.Magnitude, dotDef.StackingBehavior, dotDef.MaxStacks, out typed))
+            var application = LegacyEffectAdapter.CreateApplication(dotDef, source, target);
+            if (ProductionDotCatalog.TryMaterialize(_catalog, dotDef.Name, dotDef.Duration, dotDef.TickInterval,
+                    dotDef.Magnitude, dotDef.StackingBehavior, dotDef.MaxStacks, out var typed))
             {
-                typed = LegacyEffectAdapter.CreateApplication(dotDef, source, target).Definition;
-                if (typed.Type == EffectType.Periodic && typed.Modifiers.Count != 0) return;
+                var runtime = application.Runtime;
+                runtime.DefinitionId = typed.Id;
+                application = new GameplayEffectApplication(typed, application.LegacySnapshot, runtime);
             }
-            if (typed.Type == EffectType.Periodic && typed.Stacking != StackingBehavior.None)
+            else if (application.Definition.Type == EffectType.Periodic && application.Definition.Modifiers.Count != 0)
+                return;
+            if (application.Definition.Type == EffectType.Periodic &&
+                application.Definition.Stacking != StackingBehavior.None)
             {
-                var application = LegacyEffectAdapter.CreateApplication(dotDef, source, target);
                 store.GameplayEffectsRuntime.TryRestack(application, playerId, out _);
                 return;
             }
-            store.GameplayEffectsRuntime.TryApply(typed.Id, typed, source, target, out _,
-                snapshot: dotDef.Magnitude, ownerPlayerId: playerId);
+            store.GameplayEffectsRuntime.TryAdopt(application, playerId, out _);
         }
 
         /// <summary>

@@ -29,9 +29,11 @@ benchmark 入口不直接组装三段 registry facade。
 - 2026-09-03 F4–F9 进度：`ApplyDot` None→`TryAdopt`、叠层→`TryRestack`；Transfer / BlockedTags /
   Attribute magnitude / Explicit 计数器合同 / 嵌套 `AbilityState` 已落地。随后 `TryAdopt` 补上
   BlockedTags 与 Periodic 校验，`HasTag` 去掉槽位回退，死亡回调去掉假 `AbilityRequests`。
-  再续：`AbilityRequest` command buffer + `Activate(AbilityRequest)` 主入口；敌方/英雄/全局/塔
+  再续：`Activate(AbilityRequest)` 主入口；敌方/英雄/全局/塔
   主动技能冷却并进 `AbilityState`；Rally 拆出 `combat.rally.consume` 消费 `DamageApplied`；
-  lava/firewall/corpse/demolish/skill 走 catalog Periodic + 空 modifier `TryApply`。
+  lava/firewall/corpse/demolish/skill 走 catalog Periodic + 空 modifier。
+  2026-09-04：`AbilityRequests` 是 accept 后当帧日志，不是独立 consume/commit 管线；
+  Rally writes 改为 `TowerState`；`ApplyDot` None 改回 `TryAdopt`（脉冲重挂可并存）。
   仍不是终态：`AbilityState` 非稀疏池；机制 SOA 冷却未并；`EffectRequests` 死 token 保留；
   `TryAdopt` 不 `ApplyModifiers`；Skill 无 catalog Periodic 时仍 fallback。
 

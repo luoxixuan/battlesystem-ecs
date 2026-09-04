@@ -120,9 +120,12 @@ FrameGraph：`effect.tick` / `build.effect.tick` / `skill-buff.skill.update` 已
 `BuffSystem.ApplyDot` 的 None 走 `TryAdopt`，叠层刷新走 `TryRestack`；该路径 timer 只由
 `GameplayEffectRuntime` 写。`TryAdopt` 已校验 BlockedTags 与 Periodic payload。尚未 catalog 化。
 死亡回调不再声明 `AbilityRequests`。不是 F4–F9 终态收口。
-2026-09-03 再续：生产 DoT 经 `ProductionDotCatalog` 物化后 `TryApply`（Periodic 空 modifier）；
+2026-09-03 再续：生产 DoT 经 `ProductionDotCatalog` 物化后走 Periodic 空 modifier；
 Rally 改消费 `DamageApplied`，新增 `combat.rally.consume`（`tower-attack` 前）；
-`AbilityRequests` 成为真实 command buffer。`EffectRequests` 仍是死 token。仍不是终态收口。
+`AbilityRequests` 入队。`EffectRequests` 仍是死 token。仍不是终态收口。
+2026-09-04：`AbilityRequests` 改为 accept 后旁路日志（拒绝不占槽）；Rally writes 改为
+`PlayerAttributes` + `TowerState`；`ApplyDot` None 改回 `TryAdopt`（尸体区/Firewall/岩浆
+脉冲重挂可并存多份）。仍不是终态收口。
 
 M3 就要建立事件迁移表，逐项标记旧 `EventBus` 的 `LegacyOnly`/`Bridge`/`GameplayOnly` 状态；M4 才允许 Trigger 消费 `GameplayOnly`。Bridge 期间由新事实单向转发旧事件，按 sequence 去重，不能让旧 publisher 和新 publisher 各发一份。
 

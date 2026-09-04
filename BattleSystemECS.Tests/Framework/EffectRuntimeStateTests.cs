@@ -258,6 +258,22 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(16f, store.EnemyHealth[target], 3);
         }
 
+        [Fact]
+        public void ApplyDot_NonePulse_OpensNewSlotOnRepeat()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 20f, 20f, 1f, 1, 1);
+            var buff = new BuffSystem(store, 0);
+            var corpse = GameplayEffectDef.Periodic("corpse_zone_tick_3", -1, 5f, 1f, 1f);
+            buff.ApplyDot(target, corpse);
+            buff.ApplyDot(target, corpse);
+            Assert.Equal(2, store.GetEffectCount(target));
+            buff.ApplyDot(target, 4f, 2);
+            buff.ApplyDot(target, 4f, 2);
+            Assert.Equal(4, store.GetEffectCount(target));
+        }
+
         private static void AddWithPolicies(ComponentStore store, int targetId, FirstTickPolicy firstTick, CatchUpPolicy catchUp)
         {
             var application = LegacyEffectAdapter.CreateApplication(

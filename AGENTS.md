@@ -201,7 +201,7 @@ PostDeath.Execute()       # 分裂/生命链接/目标/资源/尸体/连击（co
 Threat Score EMA 更新      # 玩家 DPS 威胁分指数滑动平均
 ```
 
-> 说明：bullet-time（子弹时间）开启时，`enemyDt`（敌人侧 7 个 group）按比例减速，`combatDt`（玩家/塔攻击侧）保持全速——战术暂停效果。BuildPhase 只运行 `BuildGroup`，不运行任何战斗系统。SkillBuff 真实节点是 `effect.tick`（Periodic）与 `skill-buff.skill.update`（SkillSystem.Update）；旧 id `effect.commit` / `ability.commit` 已删除。`build.skill/auto-skill/global-skill.update` 不再声明不存在的 AbilityRequests；`post-death.corpse.update` 不再声明 EffectRequests。`AbilityRequests` 现为真实 command buffer（`frame.begin` 清空，能力执行节点写入）；`EffectRequests` 仍是死 token，保留以免 `FrameResource` 枚举移位。Rally 激活走 `combat.rally.consume` + `skill-buff.rally.update` 消费 `DamageApplied`，不再订 `PlayerDamaged`。
+> 说明：bullet-time（子弹时间）开启时，`enemyDt`（敌人侧 7 个 group）按比例减速，`combatDt`（玩家/塔攻击侧）保持全速——战术暂停效果。BuildPhase 只运行 `BuildGroup`，不运行任何战斗系统。SkillBuff 真实节点是 `effect.tick`（Periodic）与 `skill-buff.skill.update`（SkillSystem.Update）；旧 id `effect.commit` / `ability.commit` 已删除。`build.skill/auto-skill/global-skill.update` 声明 `AbilityRequests`（Build 治疗/护盾可走到 ActivateCore 写当帧日志）；`post-death.corpse.update` 不再声明 EffectRequests。`AbilityRequests` 是已接受激活的当帧日志（accept 后写入，`frame.begin` 清空），不是独立 consume/commit 管线；`EffectRequests` 仍是死 token，保留以免 `FrameResource` 枚举移位。Rally 激活走 `combat.rally.consume` + `skill-buff.rally.update` 消费 `DamageApplied`，writes 为 `PlayerAttributes` + `TowerState`，不再订 `PlayerDamaged`。
 
 ### 4.3 两阶段并行安全模式
 
@@ -374,4 +374,4 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 
 ---
 
-> **最后更新**：2026-09-03。当前构建、测试与审计结果以本轮仓外 final evidence 目录及其原始日志为准；文档不维护易腐的手工测试计数。
+> **最后更新**：2026-09-04。当前构建、测试与审计结果以本轮仓外 final evidence 目录及其原始日志为准；文档不维护易腐的手工测试计数。

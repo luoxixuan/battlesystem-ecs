@@ -233,7 +233,7 @@ namespace BattleSystemECS.Core.GAS
             AbilityActivationRequest request, IAbilityPayloadHandler payloadHandler = null)
             => Activate(store, catalog, cooldowns.States, request, payloadHandler);
 
-        /// <summary>AbilityRequest 主入口：按 Source 句柄与 AbilityId 解析槽位后入 command buffer 再提交。</summary>
+        /// <summary>AbilityRequest 主入口：按 Source 句柄与 AbilityId 解析槽位后同步提交；接受后写入当帧日志。</summary>
         public static AbilityActivationResult Activate(ComponentStore store, GameplayCatalog catalog, AbilityRequest request,
             IAbilityPayloadHandler payloadHandler = null)
         {
@@ -304,13 +304,6 @@ namespace BattleSystemECS.Core.GAS
                         return Reject(request, AbilityActivationRejectReason.UnsupportedDefinition);
             var source = store.GetEntityHandle(request.OwnerId);
             if (!source.IsValid) return Reject(request, AbilityActivationRejectReason.InvalidRequest);
-            var primaryTarget = targets.Count > 0 ? store.GetEntityHandle(targets.TargetIdAt(0)) : default(EntityHandle);
-            var abilityRequest = new AbilityRequest(source, request.Ability, primaryTarget,
-                store.AllocateGameplaySequence(request.OwnerId));
-            if (!abilityRequest.Source.IsValid || abilityRequest.Ability.Value != ability.Id.Value)
-                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
-            if (!store.AbilityRequests.TryAdd(abilityRequest))
-                return Reject(request, AbilityActivationRejectReason.InvalidRequest);
             if (!activationState.IsReady)
                 return Reject(request, AbilityActivationRejectReason.Cooldown);
 
@@ -332,7 +325,11 @@ namespace BattleSystemECS.Core.GAS
                 throw new InvalidOperationException("prevalidated ability cost was rejected during commit");
             activationState.Commit(ability.Cooldown);
             int firstTargetId = targets.TargetIdAt(0);
-            PublishActivation(store, request, source, store.GetEntityHandle(firstTargetId), firstTargetId);
+            var committedTarget = store.GetEntityHandle(firstTargetId);
+            PublishActivation(store, request, source, committedTarget, firstTargetId);
+            // 接受后才写入帧日志。这不是独立 consume/commit 管线；容量耗尽不得回滚已提交的激活。
+            store.AbilityRequests.TryAdd(new AbilityRequest(source, request.Ability, committedTarget,
+                store.AllocateGameplaySequence(request.OwnerId)));
             return new AbilityActivationResult(true, request.OwnerId, request.Slot, appliedEffects: applied);
         }
 

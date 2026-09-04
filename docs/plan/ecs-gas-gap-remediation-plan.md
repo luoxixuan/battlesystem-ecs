@@ -246,6 +246,8 @@
 
 2026-09-03 再续（仍未宣称终态收口）：lava / firewall / corpse / demolish 经 `ProductionDotCatalog` 物化后 `TryApply`（空 modifier）；Skill 有 catalog Periodic 时直接 `TryApply`，否则 fallback adapter。`AbilityRequest` 已入 command buffer，`Activate(AbilityRequest)` 为主入口（多目标仍 `AbilityActivationRequest`，经 `ActivateCore` 入队）。敌方/英雄/全局/塔主动技能冷却并进 `AbilityState`/`AbilityCooldownColumn`；burrow/leap/totem 等机制 SOA 未并。Rally 不再订 `PlayerDamaged`，改消费 `DamageApplied`，新增 `combat.rally.consume`。`TryRestack` 同 StackKey 还要比 Name。`EffectRequests` 仍是死 token。`AbilityState` 仍嵌在 `AbilityInstance`。`TryAdopt` 仍不 `ApplyModifiers`。
 
+2026-09-04 诚实化（仍未宣称终态收口）：`AbilityRequests` 不是 command buffer——`ActivateCore` 同步 `CommitPlan`，只在 accept 后写入当帧日志，拒绝不占槽，满槽不得回滚。`build.skill/auto-skill/global-skill.update` 补 `AbilityRequests` 写声明。Rally 节点 writes 改为真实 `PlayerAttributes` + `TowerState`（不再假写 `TowerCombatCache`）。`ApplyDot` 的 None 改回 `TryAdopt`（尸体区/Firewall/岩浆脉冲重挂可并存多份）；GAS `TryApply` None 仍是同 key 不刷新。Skill catalog Periodic 仍走 `TryApply`。无 consume/commit 节点；`TryAdopt` 仍不 `ApplyModifiers`；稀疏池与机制 SOA 冷却未做；`EffectRequests` 死 token 保留。
+
 ---
 
 ## 8. 门禁

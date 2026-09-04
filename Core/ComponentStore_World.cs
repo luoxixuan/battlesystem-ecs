@@ -359,6 +359,10 @@ namespace BattleSystemECS.Core
 
         // Per-entity ability instances (SOA: first dimension = entity, second = slot)
         public AbilityInstance[] AbilityInstances = new AbilityInstance[MAX_ENTITIES * MAX_ABILITIES_PER_ENTITY];
+        /// <summary>
+        /// 当帧已接受激活的旁路日志，不是独立 command 管线。ActivateCore 只在 accept 后写入，
+        /// <see cref="BeginFrame"/> 清空；没有 consume/commit 节点。
+        /// </summary>
         public readonly CommandBuffer<AbilityRequest> AbilityRequests = new CommandBuffer<AbilityRequest>(256);
         public int AbilityPoolRejections;
         public int EffectPoolRejections;

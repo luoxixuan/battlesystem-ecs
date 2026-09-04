@@ -123,7 +123,7 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void AbilityRequest_IsPrimaryEntryAndEnqueuesCommandBuffer()
+        public void AbilityRequest_AcceptedActivationIsRecordedInFrameLog()
         {
             var store = WaveStore();
             store.AddPlayer(0, 20f, 1f, 1f, 1);
@@ -167,6 +167,56 @@ namespace BattleSystemECS.Tests.Framework
                 new AbilityActivationRequest(0, 0, 1f, 0, ability: ability.Id));
             Assert.False(result.Accepted);
             Assert.Equal(AbilityActivationRejectReason.InvalidRequest, result.Reason);
+            Assert.Equal(0, store.AbilityRequests.Count);
+        }
+
+        [Fact]
+        public void AbilityRequest_RejectedActivationDoesNotOccupyFrameLog()
+        {
+            var store = WaveStore();
+            store.AddPlayer(0, 20f, 1f, 1f, 1);
+            int enemy = store.AddEnemy(0, 0, 1, 10f, 10f, 1, 1, 1);
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 10, 1, 1, 1);
+            var execution = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage, 3f, new TagId(0));
+            var ability = new AbilityDefinition(new AbilityId(0), "typed", targeting, ClockId.Combat, 2f,
+                GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, executions: new[] { execution.Id });
+            var catalog = new GameplayCatalog(new[] { ability }, new[] { targeting }, Array.Empty<GameplayEffectDefinition>(),
+                new[] { execution }, Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
+                new System.Collections.Generic.Dictionary<string, AbilityId> { ["typed"] = ability.Id });
+            var timers = new float[] { 2f };
+            var result = GameplayAbilityRuntime.Activate(store, catalog, timers,
+                new AbilityActivationRequest(0, 0, 2f, enemy, ability: ability.Id));
+            Assert.False(result.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.Cooldown, result.Reason);
+            Assert.Equal(0, store.AbilityRequests.Count);
+            Assert.Equal(10f, store.EnemyHealth[enemy], 3);
+        }
+
+        [Fact]
+        public void AbilityRequest_FullFrameLogDoesNotRollbackAcceptedActivation()
+        {
+            var store = WaveStore();
+            store.AddPlayer(0, 20f, 1f, 1f, 1);
+            int enemy = store.AddEnemy(0, 0, 1, 10f, 10f, 1, 1, 1);
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 10, 1, 1, 1);
+            var execution = new ExecutionDefinition(new ExecutionId(0), EffectPayloadKind.Damage, 3f, new TagId(0));
+            var ability = new AbilityDefinition(new AbilityId(0), "typed", targeting, ClockId.Combat, 2f,
+                GameplayPhaseMask.Wave, Array.Empty<EffectId>(), Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer, executions: new[] { execution.Id });
+            var catalog = new GameplayCatalog(new[] { ability }, new[] { targeting }, Array.Empty<GameplayEffectDefinition>(),
+                new[] { execution }, Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
+                new System.Collections.Generic.Dictionary<string, AbilityId> { ["typed"] = ability.Id });
+            var dummy = new AbilityRequest(store.GetEntityHandle(0), ability.Id, store.GetEntityHandle(enemy), 1);
+            for (int i = 0; i < store.AbilityRequests.Capacity; i++)
+                Assert.True(store.AbilityRequests.TryAdd(dummy));
+            Assert.Equal(store.AbilityRequests.Capacity, store.AbilityRequests.Count);
+            var result = GameplayAbilityRuntime.Activate(store, catalog, new float[1],
+                new AbilityActivationRequest(0, 0, 0f, enemy, ability: ability.Id));
+            Assert.True(result.Accepted, result.Reason.ToString());
+            Assert.Equal(store.AbilityRequests.Capacity, store.AbilityRequests.Count);
+            Assert.True(store.AbilityRequests.OverflowCount >= 1);
+            Assert.Equal(7f, store.EnemyHealth[enemy], 3);
         }
 
         [Fact]
