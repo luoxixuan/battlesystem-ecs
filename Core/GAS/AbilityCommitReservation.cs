@@ -3,13 +3,20 @@ using System;
 namespace BattleSystemECS.Core.GAS
 {
     /// <summary>
-    /// 当帧 AbilityRequests 的资源/容量预留。不进存档；只由 <c>ClearAbilityQueue</c> 释放。
+    /// 当帧 AbilityRequests 的资源/容量预留。不进存档。
+    /// Commit 每条先 <see cref="Release"/> 再复查；队列清空时 <c>ClearAbilityQueue</c> 再 <see cref="Clear"/>。
     /// </summary>
     internal sealed class AbilityCommitReservation
     {
         public const int MaxQueue = 256;
         public const int MaxCostEntries = 1024;
         public const int MaxRuntimeEntries = 1024;
+        public const int MaxCostScratch = 16;
+
+        /// <summary>每 store 一份 Activate 暂存，禁止 static 跨 store 并行测试互踩。</summary>
+        internal readonly int[] CostKeyScratch = new int[MaxCostScratch];
+        internal readonly float[] CostAmountScratch = new float[MaxCostScratch];
+        internal readonly int[] RuntimeTargetScratch = new int[MaxRuntimeEntries];
 
         internal struct CapacityNeed
         {
@@ -52,6 +59,8 @@ namespace BattleSystemECS.Core.GAS
         public int ResourceEvents => _resourceEvents;
         public int Modifiers => _modifiers;
         public int TotalRuntime => _totalRuntime;
+        /// <summary>Release 把负计数夹到 0 的次数；生产应为 0，非零说明预留记账漂移。</summary>
+        public int ReleaseUnderflowCount { get; private set; }
 
         public void Clear()
         {
@@ -129,14 +138,16 @@ namespace BattleSystemECS.Core.GAS
             _modifiers -= need.Modifiers;
             int runtimeTargets = _itemRuntimeCount[queueIndex];
             _totalRuntime -= need.RuntimeSlots * runtimeTargets;
-            if (_effectRequests < 0) _effectRequests = 0;
-            if (_effectEvents < 0) _effectEvents = 0;
-            if (_damageRequests < 0) _damageRequests = 0;
-            if (_damageEvents < 0) _damageEvents = 0;
-            if (_resourceRequests < 0) _resourceRequests = 0;
-            if (_resourceEvents < 0) _resourceEvents = 0;
-            if (_modifiers < 0) _modifiers = 0;
-            if (_totalRuntime < 0) _totalRuntime = 0;
+            bool underflow = false;
+            if (_effectRequests < 0) { _effectRequests = 0; underflow = true; }
+            if (_effectEvents < 0) { _effectEvents = 0; underflow = true; }
+            if (_damageRequests < 0) { _damageRequests = 0; underflow = true; }
+            if (_damageEvents < 0) { _damageEvents = 0; underflow = true; }
+            if (_resourceRequests < 0) { _resourceRequests = 0; underflow = true; }
+            if (_resourceEvents < 0) { _resourceEvents = 0; underflow = true; }
+            if (_modifiers < 0) { _modifiers = 0; underflow = true; }
+            if (_totalRuntime < 0) { _totalRuntime = 0; underflow = true; }
+            if (underflow) ReleaseUnderflowCount++;
             int costStart = _itemCostStart[queueIndex];
             int costCount = _itemCostCount[queueIndex];
             for (int i = 0; i < costCount; i++) _costAmounts[costStart + i] = 0f;

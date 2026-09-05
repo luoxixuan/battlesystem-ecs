@@ -98,8 +98,13 @@ namespace BattleSystemECS.Core.GAS
             var slot = (entityId, definition.Attribute); if (!_modifiers.TryGetValue(slot, out var list)) _modifiers[slot] = list = new List<Modifier>(); list.Add(m); _dirty.Add(slot); return id;
         }
         public bool RemoveModifier(int entityId, AttributeModifierHandle handle) { foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) { var index = pair.Value.FindIndex(m => m.Handle.Equals(handle)); if (index >= 0) { _dirty.Add(pair.Key); pair.Value.RemoveAt(index); return true; } } return false; }
-        public bool RefreshModifier(int entityId, AttributeModifierHandle handle, float magnitude)
-        { foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) { var modifier = pair.Value.Find(m => m.Handle.Equals(handle)); if (modifier != null) { modifier.Magnitude = magnitude; if (modifier.Snapshot == SnapshotPolicy.ReevaluateOnRead) modifier.Captured = magnitude; _dirty.Add(pair.Key); return true; } } return false; }
+        public bool RefreshModifier(int entityId, AttributeModifierHandle handle, float magnitude) =>
+            RefreshModifier(entityId, handle, magnitude, float.NaN);
+        /// <summary>
+        /// 原地改幅度。CaptureOnApply 也更新 Captured（叠层 Replace）；capturedMagnitude 为 NaN 时 Captured 跟 Magnitude。
+        /// </summary>
+        public bool RefreshModifier(int entityId, AttributeModifierHandle handle, float magnitude, float capturedMagnitude)
+        { foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) { var modifier = pair.Value.Find(m => m.Handle.Equals(handle)); if (modifier != null) { modifier.Magnitude = magnitude; modifier.Captured = float.IsNaN(capturedMagnitude) ? magnitude : capturedMagnitude; _dirty.Add(pair.Key); return true; } } return false; }
         public void MarkDirty(int entityId, AttributeKey key) => _dirty.Add((entityId, key));
         public void AggregateDirty() { _pending.Clear(); foreach (var slot in _dirty) _pending.Add(slot); _dirty.Clear(); for (int i = 0; i < _pending.Count; i++) Aggregate(_pending[i].Item1, _pending[i].Item2); }
         public void ClearEntity(int entityId) { var keys = new List<(int, AttributeKey)>(); foreach (var pair in _base) if (pair.Key.Item1 == entityId) keys.Add(pair.Key); foreach (var pair in _computed) if (pair.Key.Item1 == entityId && !keys.Contains(pair.Key)) keys.Add(pair.Key); foreach (var pair in _dirty) if (pair.Item1 == entityId && !keys.Contains(pair)) keys.Add(pair); foreach (var key in keys) { _base.Remove(key); _computed.Remove(key); _dirty.Remove(key); } foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) pair.Value.Clear(); }

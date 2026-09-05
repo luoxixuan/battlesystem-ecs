@@ -66,8 +66,9 @@ namespace BattleSystemECS.Tests.Features.Economy
                 new ItemDef { Type = "cleanse_charm", Name = "Cleanse Charm", ItemType = InventoryItemType.Cleanse, MaxStack = maxStackOverride },
             };
             Config.CraftingRecipes = recipes ?? Array.Empty<CraftingRecipeDef>();
+            Store.Determinism.Reset(seed);
             var inv = new InventorySystem(Store, Config, null);
-            var system = new CraftingSystem(Store, Config, inv, null, seed: seed);
+            var system = new CraftingSystem(Store, Config, inv, null);
             inv.BindCraftingSystem(system);
             return (system, inv);
         }
@@ -313,8 +314,9 @@ namespace BattleSystemECS.Tests.Features.Economy
                 new ItemDef { Type = "mana", Name = "Mana", ItemType = InventoryItemType.Mana, MaxStack = 1 }, // <-- stack cap 1 so 8 slots = 8 mana
             };
             Config.CraftingRecipes = new[] { recipe };
+            Store.Determinism.Reset(1);
             var inv = new InventorySystem(Store, Config, null);
-            var system = new CraftingSystem(Store, Config, inv, null, seed: 1);
+            var system = new CraftingSystem(Store, Config, inv, null);
             inv.BindCraftingSystem(system);
 
             // Add 1 healing potion FIRST so the input slot is reserved before

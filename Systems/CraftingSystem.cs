@@ -51,15 +51,12 @@ namespace BattleSystemECS.Systems
             ComponentStore store,
             GameConfig gameConfig,
             global::BattleSystemECS.Content.Contracts.IInventoryCommandPort inventory,
-            IRenderer renderer,
-            int seed = 0)
+            IRenderer renderer)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this.gameConfig = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));
             this.inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
             this.renderer = renderer;
-            // seed≠0 仅测试播种 store 流；生产 seed=0 不 Reset、不另开墙钟 Random。
-            if (seed != 0) store.Determinism.Reset(seed);
         }
 
         /// <summary>

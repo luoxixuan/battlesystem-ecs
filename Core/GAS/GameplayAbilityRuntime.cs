@@ -105,10 +105,6 @@ namespace BattleSystemECS.Core.GAS
         private const byte QueueFlagIsSingle = 8;
         private const byte QueueFlagMagnitudeOverride = 16;
 
-        private static readonly int[] CostKeyScratch = new int[16];
-        private static readonly float[] CostAmountScratch = new float[16];
-        private static readonly int[] RuntimeTargetScratch = new int[AbilityCommitReservation.MaxRuntimeEntries];
-
         private readonly struct CooldownArrayActivationState : IAbilityActivationState
         {
             private readonly float[] _cooldowns;
@@ -501,12 +497,14 @@ namespace BattleSystemECS.Core.GAS
                 }
                 if (!planOk)
                 {
+                    // 残余：多目标 CommitPlan 中途 -1 时前面目标可能已提交，仍记 QueueOverflow。
                     PublishCancelled(store, request, source, targets, AbilityActivationRejectReason.QueueOverflow);
                     lastCancel = AbilityActivationRejectReason.QueueOverflow;
                     continue;
                 }
                 if (!CommitCosts(store, ability, request, source))
                 {
+                    // 残余：自耗/自伤 execution 使 Spend 在 CommitPlan 之后失败——效果已落、费用未扣。
                     PublishCancelled(store, request, source, targets, AbilityActivationRejectReason.Cost);
                     lastCancel = AbilityActivationRejectReason.Cost;
                     continue;
@@ -924,16 +922,19 @@ namespace BattleSystemECS.Core.GAS
             if (!TryBuildCapacityNeed(store, catalog, ability, request, source, targets, payloadHandler, out var need))
                 return false;
             int costCount = ability.Costs.Count;
-            if (costCount > CostKeyScratch.Length || targets.Count > RuntimeTargetScratch.Length) return false;
+            var reservation = store.AbilityCommitReservation;
+            if (costCount > reservation.CostKeyScratch.Length || targets.Count > reservation.RuntimeTargetScratch.Length)
+                return false;
             for (int i = 0; i < costCount; i++)
             {
-                CostKeyScratch[i] = ability.Costs[i].Resource.Value;
-                CostAmountScratch[i] = EffectiveCost(ability, request, i);
+                reservation.CostKeyScratch[i] = ability.Costs[i].Resource.Value;
+                reservation.CostAmountScratch[i] = EffectiveCost(ability, request, i);
             }
             for (int i = 0; i < targets.Count; i++)
-                RuntimeTargetScratch[i] = targets.TargetIdAt(i);
-            return store.AbilityCommitReservation.TryReserve(queueIndex, need, source.Index,
-                RuntimeTargetScratch, targets.Count, CostKeyScratch, CostAmountScratch, costCount);
+                reservation.RuntimeTargetScratch[i] = targets.TargetIdAt(i);
+            return reservation.TryReserve(queueIndex, need, source.Index,
+                reservation.RuntimeTargetScratch, targets.Count, reservation.CostKeyScratch,
+                reservation.CostAmountScratch, costCount);
         }
 
         private static bool TryBuildCapacityNeed(ComponentStore store, GameplayCatalog catalog,

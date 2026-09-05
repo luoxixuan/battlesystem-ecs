@@ -48,8 +48,8 @@ dotnet build BattleSystemECS.Engine
 # 构建核心库（会引用 Engine，必须 0 warnings 0 errors）
 dotnet build BattleSystemECS.Core
 
-# 构建主程序（net6.0，引用 Core）
-dotnet build
+# 构建主程序（net6.0，引用 Core；本机若存在被 ignore 的 .sln，裸 `dotnet build` 会 MSB1011）
+dotnet build BattleSystemECS.csproj
 
 # 运行交互式游戏（菜单选择）
 dotnet run
@@ -242,7 +242,7 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 ### 5.2 并行与性能规范
 
 - 热路径使用 `Parallel.For`。
-- 模拟热路径禁止 `new Random()` / `Rng.Shared`；只从 Frame `DeterminismContext` 领号，且仅 `CommitSerial`（本仓 SerialUpdate / SerialCommit / SerialPrepare / InternalParallelCollectSerialCommit 的串行段）取数。并行工作线程不得领号。`Rng.Shared` 仅保留给压测等非模拟路径。
+- 模拟热路径禁止 `new Random()` / `Rng.Shared`；只从 Frame `DeterminismContext` 领号，且仅 `CommitSerial`（本仓 SerialUpdate / SerialCommit / SerialPrepare / InternalParallelCollectSerialCommit 的串行段）取数。并行工作线程不得领号。`Rng.Shared` 仅保留给压测等非模拟路径。比赛种子由 `GameManager.Initialize` 开局 `Reset` 一次；系统构造器不得改种。
 - `GetAllActiveEnemyIds()` 不在循环内调用；由 `SetTurn()` 缓存。
 - 禁止每帧分配 List/字典；复用数组或缓存。
 - 空间查询使用 `SpatialGrid`。
@@ -309,7 +309,7 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 
 1. **`dotnet build BattleSystemECS.Engine`** — Engine 0 warnings, 0 errors
 2. **`dotnet build BattleSystemECS.Core`** — Core 库 0 warnings, 0 errors
-3. **`dotnet build`** — EXE 0 warnings, 0 errors
+3. **`dotnet build BattleSystemECS.csproj`** — EXE 0 warnings, 0 errors（不要对含 sln 的工作目录裸 `dotnet build`）
 4. **`dotnet test BattleSystemECS.Tests`** — 当前发现的全部测试通过
 5. **`pwsh -File tools\check-test-rules.ps1`** — 测试静态规则 0 违规（零断言测试 + 恒真/恒假断言）
 6. **`git diff --check`** — 无空白/行尾错误（CRLF、trailing whitespace）
@@ -362,7 +362,7 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 | 修改并行策略 | 对应系统的 `Update()`，注意两阶段模式审查 |
 | 修改配置格式 | `Core/GameConfig.cs` + `Core/GameConfigLoader.cs` + `Data/Configs/*.json` |
 | 修改技能/效果 | `Core/GAS/*.cs` + `Systems/SkillSystem.cs` + `game_config.json` Skills 数组（玩家技能栏）；共享技能表（SkillDefs）= `Data/Configs/skills.json`（精选）+ `Data/Skills/*.json`（静态）。技能 id/name 互解析统一走 `GameConfig.GetSkillIdByName / TryGetSkillById / GetSkillDisplayName`（归一化索引空间：[0, SkillDefs.Count) 索引共享表，其后偏移索引 Skills），消费方禁止各自手写遍历 |
-| 模拟随机领号 | `Core/DeterminismContext.cs`（挂在 `ComponentStore.Determinism`）；生产 Tick 由 `FrameGraph.Execute` 按节点语义在 CommitSerial 取数 |
+| 模拟随机领号 | `Core/DeterminismContext.cs`（挂在 `ComponentStore.Determinism`）；开局由 `GameManager.Initialize` `Reset` 一次；生产 Tick 由 `FrameGraph.Execute` 按节点语义在 CommitSerial 取数 |
 | 玩家伤害写入 | 生产路径只走 `ComponentStore.ApplyPlayerDamageAuthority`（`ResourceResolver.TryApply(PlayerDamageRequest)`）；`DecreasePlayerHealth` 仅允许 `ResourceResolver` 调用 |
 | 修改科技树 | `Core/TechTreeDef.cs` + `Systems/TechTreeSystem.cs` + `Data/Configs/tech_tree.json` |
 | 修改行为树 | `Data/Configs/behavior_trees.json` + `Systems/BehaviorTreeEvaluator.cs` |

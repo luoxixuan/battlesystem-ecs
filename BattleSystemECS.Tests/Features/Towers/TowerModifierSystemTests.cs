@@ -172,7 +172,8 @@ namespace BattleSystemECS.Tests.Features.Towers
             // distribution. We don't assert exact percentages (RNG-dependent) — only
             // that the roll function is reaching all entries.
             SetupModifiers();
-            var sys = new TowerModifierSystem(Store, Config, seed: 42);
+            Store.Determinism.Reset(42);
+            var sys = new TowerModifierSystem(Store, Config);
             int[] counts = new int[Config.TowerModifiers.Length];
             for (int i = 0; i < 1000; i++)
             {
@@ -195,7 +196,8 @@ namespace BattleSystemECS.Tests.Features.Towers
         public void RerollModifier_DropsExisting_AndRollsNew()
         {
             SetupModifiers();
-            var sys = new TowerModifierSystem(Store, Config, seed: 7);
+            Store.Determinism.Reset(7);
+            var sys = new TowerModifierSystem(Store, Config);
             int tid = MakeTower();
 
             int first = sys.RollAtPlacement(tid);

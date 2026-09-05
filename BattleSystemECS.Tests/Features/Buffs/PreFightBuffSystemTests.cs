@@ -63,7 +63,7 @@ namespace BattleSystemECS.Tests.Features.Buffs
  /// </summary>
  private static void SeedSystemRng(PreFightBuffSystem sys, ComponentStore store, int seed)
  {
- sys.SystemRandomSeed = seed;
+ _ = sys;
  store.Determinism.Reset(seed);
  }
 

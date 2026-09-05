@@ -36,6 +36,7 @@ namespace BattleSystemECS.Core
         private FrameScheduler scheduler;
         private readonly FrameSchedulerExecutionMode _schedulerExecutionMode;
         private readonly Core.GAS.ClockId _effectClock;
+        private readonly int? _matchSeedOverride;
 
         // 游戏状态机（管理 BuildPhase / WavePhase / Intermission 切换）
         private StateMachine stateMachine;
@@ -44,6 +45,8 @@ namespace BattleSystemECS.Core
         internal StateMachine StateMachineDiagnostics => stateMachine;
         internal SystemRegistry RegistryDiagnostics => registry;
         internal FrameSchedulerExecutionMode ConfiguredExecutionMode => _schedulerExecutionMode;
+        /// <summary>本局比赛种子。Initialize 时 Reset 一次并写日志；系统构造器不得改种。</summary>
+        public int MatchSeed { get; private set; }
 
         // 渲染器
         private IRenderer logger;
@@ -68,7 +71,7 @@ namespace BattleSystemECS.Core
         /// 初始化游戏管理器
         /// </summary>
         public GameManager(FrameSchedulerExecutionMode schedulerExecutionMode = FrameSchedulerExecutionMode.Graph,
-            Core.GAS.ClockId effectClock = Core.GAS.ClockId.Combat)
+            Core.GAS.ClockId effectClock = Core.GAS.ClockId.Combat, int? matchSeed = null)
         {
             if (!Enum.IsDefined(typeof(FrameSchedulerExecutionMode), schedulerExecutionMode))
                 throw new ArgumentOutOfRangeException(nameof(schedulerExecutionMode), schedulerExecutionMode, "Unknown scheduler execution mode.");
@@ -76,6 +79,7 @@ namespace BattleSystemECS.Core
                 throw new ArgumentOutOfRangeException(nameof(effectClock), effectClock, "Unknown effect clock.");
             _schedulerExecutionMode = schedulerExecutionMode;
             _effectClock = effectClock;
+            _matchSeedOverride = matchSeed;
             // 初始化 SOA 组件存储
             store = new ComponentStore();
             entityManager = new EntityManager(store);
@@ -92,6 +96,10 @@ namespace BattleSystemECS.Core
         {
             Console.WriteLine();
             logger.Log("[BOOTSTRAP] ========== Game Initialization ==========");
+            int matchSeed = ResolveMatchSeed();
+            store.Determinism.Reset(matchSeed);
+            MatchSeed = store.Determinism.Seed;
+            logger.Log("[BOOTSTRAP] match seed=" + MatchSeed);
             logger.Log("[BOOTSTRAP] 1. Loading Game Configuration...");
 
             // 加载游戏配置
@@ -150,6 +158,14 @@ namespace BattleSystemECS.Core
 
             logger.Log("[BOOTSTRAP] ========== Game Initialization Complete ==========");
             Console.WriteLine();
+        }
+
+        private int ResolveMatchSeed()
+        {
+            if (_matchSeedOverride.HasValue) return _matchSeedOverride.Value;
+            string env = Environment.GetEnvironmentVariable("BATTLE_MATCH_SEED");
+            if (!string.IsNullOrEmpty(env) && int.TryParse(env, out int parsed)) return parsed;
+            return Environment.TickCount;
         }
 
         /// <summary>

@@ -18,7 +18,8 @@ namespace BattleSystemECS.Core.GAS
     }
 
     /// <summary>
-    /// 排期本：按每个 clock 的虚拟时间取件，不按帧号。派生缓存，可从 ActiveEffect 全量重建，不登记闭包。
+    /// 排期本：Timed Ability 与诊断 Rebuild 用。effect.tick 热路径不每帧 Sync/Clear（避免 O(E²)+闭包分配）。
+    /// CollectDue 仅测试/Rebuild；生产 Tick 对效果走 float RemainingTime / TickAccumulator。
     /// </summary>
     internal sealed class GameplayScheduleBook
     {
@@ -51,13 +52,25 @@ namespace BattleSystemECS.Core.GAS
         {
             if (!handle.IsValid) return;
             for (int c = 0; c < ClockCount; c++)
-                RemoveMatching(_entries[c], e => e.Effect.Equals(handle));
+            {
+                var list = _entries[c];
+                for (int n = list.Count - 1; n >= 0; n--)
+                    if (list[n].Effect.Equals(handle)) list.RemoveAt(n);
+            }
         }
 
         public void ClearAbility(int entityId, int slot)
         {
             for (int c = 0; c < ClockCount; c++)
-                RemoveMatching(_entries[c], e => e.Kind == GameplayScheduleKind.AbilityExpire && e.EntityId == entityId && e.AbilitySlot == slot);
+            {
+                var list = _entries[c];
+                for (int n = list.Count - 1; n >= 0; n--)
+                {
+                    var e = list[n];
+                    if (e.Kind == GameplayScheduleKind.AbilityExpire && e.EntityId == entityId && e.AbilitySlot == slot)
+                        list.RemoveAt(n);
+                }
+            }
         }
 
         public void UpsertEffectExpire(ClockId clock, EffectHandle handle, EntityHandle target, double due)
@@ -109,7 +122,13 @@ namespace BattleSystemECS.Core.GAS
             return written;
         }
 
-        /// <summary>从 ActiveEffect 全量重建该 clock 的效果条目；虚拟时钟本身不重置。</summary>
+        internal int DebugCount(ClockId clock)
+        {
+            int i = Index(clock);
+            return i < 0 ? 0 : _entries[i].Count;
+        }
+
+        /// <summary>从 ActiveEffect 全量重建该 clock 的效果条目；虚拟时钟本身不重置。生产 Tick 不调用。</summary>
         public void RebuildEffects(ComponentStore store, IReadOnlyList<int> runtimeEntityIds, ClockId clock)
         {
             int i = Index(clock);
@@ -175,12 +194,6 @@ namespace BattleSystemECS.Core.GAS
                 EntityId = entityId,
                 AbilitySlot = slot
             });
-        }
-
-        private static void RemoveMatching(List<GameplayScheduleEntry> list, Predicate<GameplayScheduleEntry> match)
-        {
-            for (int n = list.Count - 1; n >= 0; n--)
-                if (match(list[n])) list.RemoveAt(n);
         }
 
         internal static int Index(ClockId clock)

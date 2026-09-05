@@ -1,8 +1,8 @@
 # ECS + GAS：Lumio 合同对照收口计划
 
-> 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）、P3（A1 属性公式）、P4（Tag parent 词汇表 + 准入序）、P5（同帧顺序 A4 + 随机领号 A3）、P6（时长 Ability 态 / 排期本 / 墓碑 / 摘除式抑制 / 表现原因）已实施
+> 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）、P3（A1 属性公式）、P4（Tag parent 词汇表 + 准入序）、P5（同帧顺序 A4 + 随机领号 A3）、P6（时长 Ability 态 / 墓碑 / 摘除式抑制 / 表现原因；排期本热路径已撤回）已实施
 >
-> 更新日期：2026-09-05（P6 落地：AbilityPhase 仅 Timed；GameplayScheduleBook 挂 effect.tick；QueryEntityTombstone；摘除式抑制；GameplayEventCause）
+> 更新日期：2026-09-05（门禁复核：H1 撤 effect.tick 每帧 SyncSchedule；H2 开局播种；H3 scratch 进 store；M1 真 soak；M2 恢复 float 累加）
 >
 > 基线 commit：`b5cfe52`（对照审查时的 HEAD）
 >
@@ -226,7 +226,9 @@ P0 退出。`AbilityRequests` 仍是真 buffer（`ability.commit` 批量提交�
 
 **预留释放**
 
-- 释放点钉在 `ClearAbilityQueue`（`ComponentStore_World.cs:923`）。三个调用方：`CommitQueuedAbilities:469`、`RejectQueuedAbilities:478`、`ComponentStore.cs:373`（`frame.begin` 清未消费）。漏绑则 `build.ability.reject` / `non-wave.ability.reject` 会把预留漏到下一帧。
+- Commit 对每条已入队请求先 `Release(i)` 再复查（复查只看到更晚请求的预留 + 当前真实值）。逐条 Release 是对的。
+- `RejectQueuedAbilities` 与 `frame.begin` 走 `ClearAbilityQueue` → `Clear()`。漏绑会把预留漏到下一帧。
+- 规划原文曾写「释放只走 `ClearAbilityQueue`」；代码是逐条 `Release` + 队列清空时 `Clear`，以代码为准。
 
 **F12：所有 `prevalidated * during commit` 提交路径不得 throw**
 
@@ -270,7 +272,7 @@ P0 退出。`AbilityRequests` 仍是真 buffer（`ability.commit` 批量提交�
 
 门禁 §12。`Core/` 与 `Systems/` 中不再存在 `prevalidated` 且 `during commit` 的 throw（编程错误字符串除外）。CHANGELOG 记行为变化（少付钱不再生效；容量满报 `QueueOverflow`；commit 竞争失败不炸帧）。
 
-**实施状态（2026-09-04）**：已落地。预留表 `ComponentStore.AbilityCommitReservation`，释放只走 `ClearAbilityQueue`。Commit 每条先 `Release` + 复查冷却/Cost/容量，失败 `AbilityCancelled` 且不 `CommitPlan`；成功才 `CommitPlan` → `Spend` → 冷却。`CommitCosts` 只走 `ResourceOperation.Spend`。入队满槽与 `ValidateCapacityPlan` 走 `QueueOverflow`。F12 九处生产 throw 改为拒绝/跳过；`summon multipliers must be validated before commit` 与 catalog 缺失仍是编程错误 throw。未改通用夹紧，未改 P1 叠层/`CountPlanOccupancy`。mode 2/4/5 保持 DEFERRED。
+**实施状态（2026-09-05）**：已落地。预留表 `ComponentStore.AbilityCommitReservation`。Commit 每条先 `Release` + 复查冷却/Cost/容量，失败 `AbilityCancelled` 且不 `CommitPlan`；成功才 `CommitPlan` → `Spend` → 冷却。Activate scratch 在 reservation 实例上，不是 static。`CommitCosts` 只走 `ResourceOperation.Spend`。入队满槽与 `ValidateCapacityPlan` 走 `QueueOverflow`。F12 九处生产 throw 改为拒绝/跳过。复查通过后的残余：多目标 `CommitPlan` 中途 -1、以及 `CommitCosts` 在 Plan 之后失败（自耗/自伤），CHANGELOG 已单列。P1 与 P2 曾合成 commit `190873d`，不能按「还原该 commit」独立回滚账本或预留。未改通用夹紧。mode 2/4/5 保持 DEFERRED。
 
 ### 7.5 回滚
 
@@ -421,7 +423,7 @@ GAS / 战斗公式 / 决定实体数量与位置的模拟路径禁止 `Rng.Share
 
 顺序表无 flag。RNG 切流按调用点逐个替换，禁止半帧混用墙钟种子与确定性流。删除条件：GAS 热路径与上表模拟路径零 `new Random` / `Rng.Shared`。
 
-**实施状态（2026-09-05）**：已落地。AI dispel 仍是批外 remove-first，未改 FrameGraph。`effect.commit` 批内 Remove 垫后，Applied/Removed 不抵消。`DeterminismContext` 挂在 `ComponentStore`，由 `FrameGraph.Execute` 按节点语义 Enter/Exit CommitSerial；并行工作线程不得领号。上表模拟路径已改领号；ShopReroll 保留固定种子私有流（不进 digest）；Benchmark 不迁。Portal 未使用 RNG 字段已删。digest：生产 `Parallel.For` 已按 batch/entity 串行归并；`CommandBuffer.TryMerge` 先 Sort 源再累计。防假绿：分裂 jitter 临时改回 `new Random()` 后 `FixedSeedFissionSoak` StateDigest 红，已恢复领号。未做 KeepPerLayer、未做排期本（P6）。mode 2/4/5 保持 DEFERRED。
+**实施状态（2026-09-05）**：已落地。AI dispel 仍是批外 remove-first，未改 FrameGraph。`effect.commit` 批内 Remove 垫后，Applied/Removed 不抵消。`DeterminismContext` 挂在 `ComponentStore`，由 `FrameGraph.Execute` 按节点语义 Enter/Exit CommitSerial；并行工作线程不得领号。比赛种子由 `GameManager.Initialize` 开局 `Reset` 一次。上表模拟路径已改领号；ShopReroll 保留固定种子私有流（不进 digest）；Benchmark 不迁。digest：生产 `Parallel.For` 已按 batch/entity 串行归并；`CommandBuffer.TryMerge` 先 Sort 源再累计。P5 退出准则补了完整图 200 帧 soak。mode 2/4/5 保持 DEFERRED。
 
 ## 11. P6 — 后置（不阻塞 P1–P5）
 
@@ -436,7 +438,7 @@ GAS / 战斗公式 / 决定实体数量与位置的模拟路径禁止 `Rng.Share
 
 结构事务亮相屏障：先举证分裂/召唤/弹道同帧秒杀路径，再开卡。未核实不得写进终态当现状。
 
-**实施状态（2026-09-05）**：已落地。`AbilityPhase`（None/Executing/Completed/Cancelled/Expired）只给 `AbilityDurationKind.Timed`；瞬发 Activate 保持 None，不引入 RolledBack。排期本 `GameplayScheduleBook` 是派生缓存，挂在现有 `GameplayEffectRuntime.Tick`（effect.tick），按 clock 虚拟时间取件，未改 FrameGraph / 根哈希。`QueryEntityTombstone` 区分 NeverExisted / Dead / Alive / PendingDeath；过期 generation 命令仍丢弃并记 `StaleHandleRejectedCount`。摘除式抑制走 `TryInhibit`/`TryUninhibit`（bool 槽位标志，无新状态机枚举）。`GameplayEventCause`（Mutation/Initial/Replay）加在比较键之后；digest 只累计 Mutation。半实体泄漏：分裂在 PostDeath 生成子体、弹道对失效句柄丢弃并记 stale、召唤 `CreateEntity` 失败跳过——**未核实同帧秒杀半实体路径，未开卡**。KeepPerLayer 未做。mode 2/4/5 与 Unity 保持 DEFERRED。
+**实施状态（2026-09-05）**：时长 Ability 态 / 墓碑 / 摘除式抑制 / Cause 已落地。排期本 `GameplayScheduleBook` 仍是派生缓存，**不再**在 `effect.tick` 对每个未过期 effect 每帧 `SyncSchedule`/`ClearEffect`（那会变成 O(E²)+闭包分配）。生产 Tick 对 Duration/Periodic 恢复 float `RemainingTime` / `TickAccumulator`；`VirtualNow` 只给 Timed Ability 与诊断。`CollectDue` 无生产调用者。`QueryEntityTombstone` 区分 NeverExisted / Dead / Alive / PendingDeath。摘除式抑制走 `TryInhibit`/`TryUninhibit`。`GameplayEventCause` 不进比较键。KeepPerLayer 未做。mode 2/4/5 与 Unity 保持 DEFERRED。
 
 ## 12. 跨阶段约束与门禁
 
@@ -450,7 +452,7 @@ GAS / 战斗公式 / 决定实体数量与位置的模拟路径禁止 `Rng.Share
 ```bash
 dotnet build BattleSystemECS.Engine
 dotnet build BattleSystemECS.Core
-dotnet build
+dotnet build BattleSystemECS.csproj
 dotnet test BattleSystemECS.Tests
 powershell -File tools/check-test-rules.ps1
 git diff --check

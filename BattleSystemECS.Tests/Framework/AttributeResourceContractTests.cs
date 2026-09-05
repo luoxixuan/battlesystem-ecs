@@ -18,8 +18,10 @@ namespace BattleSystemECS.Tests.Framework
         { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); a.AddModifier(1, Mod(AttributeModifierOp.Override, 4f)); a.AddModifier(1, Mod(AttributeModifierOp.Add, 2f, 1)); a.AddModifier(1, Mod(AttributeModifierOp.Percent, 0.5f, 1)); Assert.Equal(4f, a.GetComputed(1, Damage)); }
         [Fact] public void Aggregator_TiePriorityUsesApplicationSequence()
         { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); a.AddModifier(1, Mod(AttributeModifierOp.Override, 2f)); a.AddModifier(1, Mod(AttributeModifierOp.Override, 7f)); Assert.Equal(7f, a.GetComputed(1, Damage)); }
-        [Fact] public void Aggregator_CaptureSnapshotSurvivesRefreshAndBaseChange()
-        { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); var h = a.AddModifier(1, Mod(AttributeModifierOp.Add, 2f, snapshot: SnapshotPolicy.CaptureOnApply), 5f); a.SetBase(1, Damage, 20f); Assert.True(a.RefreshModifier(1, h, 9f)); Assert.Equal(25f, a.GetComputed(1, Damage)); }
+        [Fact] public void Aggregator_CaptureSnapshotSurvivesBaseChange()
+        { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); a.AddModifier(1, Mod(AttributeModifierOp.Add, 2f, snapshot: SnapshotPolicy.CaptureOnApply), 5f); a.SetBase(1, Damage, 20f); Assert.Equal(25f, a.GetComputed(1, Damage)); }
+        [Fact] public void Aggregator_RefreshModifierUpdatesCaptureOnApply()
+        { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); var h = a.AddModifier(1, Mod(AttributeModifierOp.Add, 2f, snapshot: SnapshotPolicy.CaptureOnApply), 5f); a.SetBase(1, Damage, 20f); Assert.True(a.RefreshModifier(1, h, 9f)); Assert.Equal(29f, a.GetComputed(1, Damage)); }
         [Fact] public void Aggregator_ReevaluateSnapshotRefreshesMagnitude()
         { var a = new AttributeAggregator(); a.SetBase(1, Damage, 10f); var h = a.AddModifier(1, Mod(AttributeModifierOp.Add, 2f)); Assert.True(a.RefreshModifier(1, h, 9f)); Assert.Equal(19f, a.GetComputed(1, Damage)); }
         [Fact] public void Aggregator_RemoveRecomputesFromBaseWithoutInverseMath()

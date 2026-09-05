@@ -50,11 +50,6 @@ namespace BattleSystemECS.Systems
  // Phase latch — true between OnWaveComplete and the next OnWaveStart.
  // Cleared on OnWaveStart. Detected by Update() to know when to roll.
  private bool _wavePending;
- // Idempotency guard against WireDependencies re-init / test reset
- // paths stacking duplicate OnWaveStart/OnWaveComplete handlers.
- // Re-usable Random instance. Seeded once per system so a test can
- // pass a deterministic seed by setting SystemRandomSeed (test hook).
- public int SystemRandomSeed = DeterminismContext.DefaultSeed;
 
  public PreFightBuffSystem(ComponentStore store, GameConfig gameConfig)
  {

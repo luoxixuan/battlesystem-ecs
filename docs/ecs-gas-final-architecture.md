@@ -200,11 +200,11 @@ AbilityDefinition
 
 #### Commit 复查与支付
 
-已入队请求在入队时预留资源与容量。Commit **必须先**复查冷却 + 预留消耗/容量，**再** `CommitPlan`（硬要求）。复查不查 Tag：当前 granted effect 到 `effect.commit` 才 `TryApply`，`ability.commit` 时 Tag 还不存在；跨帧蓄力的 commit 才会踩到 Tag 变化。失败发 `AbilityCancelled`，不 throw、不半价、不把 World 作废。
+已入队请求在入队时预留资源与容量。Commit **必须先**复查冷却 + 预留消耗/容量，**再** `CommitPlan`（硬要求）。复查不查 Tag：当前 granted effect 到 `effect.commit` 才 `TryApply`，`ability.commit` 时 Tag 还不存在；跨帧蓄力的 commit 才会踩到 Tag 变化。复查失败发 `AbilityCancelled` 且不调用 `CommitPlan`。复查通过后的残余半状态：多目标 `CommitPlan` 中途返回 -1 时前面目标可能已提交；`CommitCosts` 在 `CommitPlan` 之后失败则效果已落、费用未扣（自耗/自伤 execution）。不 throw、不半价、不把 World 作废。
 
 支付走 `ResourceOperation.Spend`：不足即拒、原子、实际扣减必须等于请求。禁止改通用 `ResourceResolver` 夹紧语义：`BossTrailAoeSystem` / `SuicideBombSystem` 用负增量打血，夹到 0 仍 `Accepted` 是预期。
 
-预留释放钉在 `ClearAbilityQueue`。三个调用方必须都释放：`CommitQueuedAbilities`、`RejectQueuedAbilities`、`ComponentStore` 的 `frame.begin`。漏绑会把预留漏到下一帧。
+预留在 Commit 时对每条已提交请求逐条 `Release`（复查只看到更晚预留）。`RejectQueuedAbilities` 与 `frame.begin` 走 `ClearAbilityQueue` → `Clear()` 兜底。漏绑会把预留漏到下一帧。
 
 ### 6.2 TargetingDefinition
 
@@ -554,7 +554,7 @@ Presentation events
 - `CommitSerial`：按确定顺序修改共享状态；
 - `Presentation`：只消费已提交事实。
 
-时长与周期效果的**排期本**按每个 `clockId` 的虚拟时间取件，**不按帧号**。子弹时间缩放 `enemyDt`；按帧号排期不是合法实现。排期本是派生缓存，不登记闭包。实现挂在现有 `GameplayEffectRuntime.Tick`（`effect.tick` / supplemental clock 节点），不另开 FrameGraph 节点。
+时长与周期效果按 `clockId` 分别推进。子弹时间缩放 `enemyDt`；按帧号排期不是合法实现。`GameplayScheduleBook` 是派生缓存（Timed Ability 虚拟到期、诊断 `Rebuild`），不登记闭包、**不在 `effect.tick` 热路径每帧 Sync/Clear**。效果到期与 Periodic 跳伤走 float `RemainingTime` / `TickAccumulator`（与 P6 前同一套边界帧语义）。`CollectDue` 不是生产 Tick 取件路径。实现仍挂在现有 `GameplayEffectRuntime.Tick`，不另开 FrameGraph 节点。
 
 模拟路径的随机数只从 Frame `DeterminismContext` 领号，且**仅**在 `CommitSerial` 相取数。`Rng.Shared`（墙钟 `TickCount xor ManagedThreadId`）与无种子 `new Random()` 都不是确定性资产，不得进入 GAS、战斗公式、或决定实体数量与位置的模拟路径。
 

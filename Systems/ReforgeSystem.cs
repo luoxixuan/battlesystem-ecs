@@ -33,13 +33,12 @@ namespace BattleSystemECS.Systems
         private readonly GameConfig gameConfig;
         private readonly int playerId;
 
-        public ReforgeSystem(ComponentStore store, IRenderer renderer, GameConfig gameConfig, int playerId, int seed = 0)
+        public ReforgeSystem(ComponentStore store, IRenderer renderer, GameConfig gameConfig, int playerId)
         {
             this.store = store;
             this.renderer = renderer;
             this.gameConfig = gameConfig;
             this.playerId = playerId;
-            if (seed != 0) store.Determinism.Reset(seed);
         }
 
         // Cached config — keeps behavior safe when gameConfig.Reforge is null

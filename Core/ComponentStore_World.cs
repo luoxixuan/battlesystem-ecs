@@ -386,7 +386,7 @@ namespace BattleSystemECS.Core
         internal readonly byte[] AbilityQueuedCooldownKinds = new byte[256];
         internal readonly float[][] AbilityQueuedFloatArrays = new float[256][];
         internal readonly AbilityState[][] AbilityQueuedStateArrays = new AbilityState[256][];
-        /// <summary>当帧 Ability 预留表。释放只走 <see cref="ClearAbilityQueue"/>。</summary>
+        /// <summary>当帧 Ability 预留表。Commit 逐条 Release；队列清空时 ClearAbilityQueue 再 Clear。</summary>
         internal readonly AbilityCommitReservation AbilityCommitReservation = new AbilityCommitReservation();
         internal readonly GameplayEffectDefinition[] QueuedEffectDefinitions = new GameplayEffectDefinition[256];
         internal readonly int[] QueuedEffectOwnerPlayerIds = new int[256];
@@ -974,7 +974,7 @@ namespace BattleSystemECS.Core
 
         internal void ClearAbilityQueue()
         {
-            // 预留是当帧瞬态：三个调用方（commit / reject / frame.begin）都必须走到这里释放。
+            // 预留：Commit 已对提交过的条目逐条 Release；此处 Clear 兜底 reject / frame.begin / 收尾。
             AbilityCommitReservation.Clear();
             int n = AbilityRequests.Count;
             for (int i = 0; i < n; i++)

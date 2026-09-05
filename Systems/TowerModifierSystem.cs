@@ -45,11 +45,10 @@ namespace BattleSystemECS.Systems
         // Designer-tunable via SetMinRarity(int) for variant rulesets.
         private int _minRarity = 0;
 
-        public TowerModifierSystem(ComponentStore store, GameConfig? gameConfig = null, int seed = 0)
+        public TowerModifierSystem(ComponentStore store, GameConfig? gameConfig = null)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this._gameConfig = gameConfig;
-            if (seed != 0) store.Determinism.Reset(seed);
         }
 
         /// <summary>

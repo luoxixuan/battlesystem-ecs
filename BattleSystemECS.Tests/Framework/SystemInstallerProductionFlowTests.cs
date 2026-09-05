@@ -496,6 +496,15 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
+        public void GameManagerInitialize_ResetsMatchSeedOnce()
+        {
+            var manager = new GameManager(matchSeed: 99);
+            manager.Initialize();
+            Assert.Equal(99, manager.MatchSeed);
+            Assert.Equal(99, manager.SchedulerDiagnostics.Store.Determinism.Seed);
+        }
+
+        [Fact]
         public void GameManagerProductionBootstrapDoesNotReachLegacyDamageAdapter()
         {
             var manager = new GameManager();

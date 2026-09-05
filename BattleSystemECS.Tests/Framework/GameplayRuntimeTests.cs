@@ -1060,6 +1060,22 @@ namespace BattleSystemECS.Tests.Framework
             Assert.NotEqual(overrideValue * 2f, store.AttributeAggregator.GetComputed(target, key, baseline), 3);
         }
 
+        [Fact]
+        public void TryAdopt_MapsLegacyMultiplyCaptureToPercentOffset()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 10f, 1f, 1f, 1);
+            int target = store.AddEnemy(0, 0, 1f, 100f, 100f, 1f, 1, 1);
+            var key = CatalogRegistries.AttackDamage;
+            store.AttributeAggregator.SetBase(target, key, 10f);
+            var legacy = new GameplayEffectDef("atk-boost", EffectType.Duration, key.Value,
+                AttributeModifierOp.Multiply, 1.1f, 5f);
+            var application = LegacyEffectAdapter.CreateApplication(legacy,
+                store.GetEntityHandle(0), store.GetEntityHandle(target));
+            Assert.True(store.GameplayEffectsRuntime.TryAdopt(application, 0, out _));
+            Assert.Equal(11f, store.AttributeAggregator.GetComputed(target, key, 10f), 3);
+        }
+
         private static (int StackCount, float Computed, float TickDamage) MeasureStackedPeriodic(
             bool viaRestack, float periodic, float add)
         {

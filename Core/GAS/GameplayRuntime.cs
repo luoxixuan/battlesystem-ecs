@@ -35,11 +35,12 @@ namespace BattleSystemECS.Core.GAS
             EventCapacity = Math.Max(1, eventCapacity);
             Events = new GameplayEventQueue(EventCapacity, Math.Min(64, EventCapacity / 8));
         }
-        /// <summary>该 clock 当前虚拟时间。排期本按此取件，不按帧号。</summary>
+        /// <summary>该 clock 当前虚拟时间。Timed Ability 到期按此比较；效果 DoT/时长热路径走 float 累加，不按此每帧改排期表。</summary>
         public double VirtualNow(ClockId clock) => _schedule.VirtualNow(clock);
 
         /// <summary>从 ActiveEffect 全量重建该 clock 的到期表（派生缓存）。</summary>
         internal void RebuildSchedule(ClockId clock) => _schedule.RebuildEffects(_store, _runtimeEntityIds, clock);
+        internal int ScheduleListCount(ClockId clock) => _schedule.DebugCount(clock);
         internal bool CanApplyPlan(int targetId, int runtimeSlots, int modifierCount, int eventCount)
         {
             if (!ComponentStore.IsValidEntity(targetId) || runtimeSlots < 0 || modifierCount < 0 || eventCount < 0) return false;
@@ -429,23 +430,54 @@ namespace BattleSystemECS.Core.GAS
             for (int i = 0; i < definition.Modifiers.Count; i++)
                 if (definition.Modifiers[i].Snapshot == SnapshotPolicy.CaptureOnApply) { captureOnApply = true; break; }
             if (!captureOnApply) return float.NaN;
-            // CaptureOnApply 的账本捕获来自 legacy modifier 值；禁止回落到 Periodic 跳伤。
-            if (application.LegacySnapshot.AttributeIndex >= 0) return application.LegacySnapshot.Magnitude;
+            // CaptureOnApply 与 adapter 同一套映射：Multiply(m) → Percent(m−1)，禁止用未映射的 legacy m。
+            if (application.LegacySnapshot.AttributeIndex >= 0)
+            {
+                float magnitude = application.LegacySnapshot.Magnitude;
+                if (application.LegacySnapshot.ModifierOp == AttributeModifierOp.Multiply)
+                    magnitude -= 1f;
+                return magnitude;
+            }
             return float.NaN;
         }
 
         /// <summary>
-        /// 唯一叠层入口：stackCount 是 ΣAdd 乘数；V1 Replace 只替换 modifier 捕获；派生缓存按定义条数重建。
+        /// 唯一叠层入口：stackCount 是 ΣAdd 乘数；V1 Replace 只替换 modifier 捕获。
+        /// 已有 handle 时 RefreshModifier 原地改幅度，失败才回退 Sync（释放+重建）。
         /// </summary>
         private bool RestackLedger(ref ActiveGameplayEffect existing, GameplayEffectDefinition definition,
             int targetId, int stackDelta, float modifierCapture)
         {
             int maxStacks = definition.MaxStacks < 1 ? 1 : definition.MaxStacks;
-            existing.StackCount = Math.Min(maxStacks, existing.StackCount + Math.Max(1, stackDelta));
-            existing.CapturedModifierMagnitude = modifierCapture;
-            if (existing.Inhibited) return true;
-            return SyncModifierCache(targetId, definition, existing.Handle, existing.StackCount,
-                existing.CapturedModifierMagnitude);
+            int newStacks = Math.Min(maxStacks, existing.StackCount + Math.Max(1, stackDelta));
+            float capture = existing.CapturedModifierMagnitude;
+            if (!float.IsNaN(modifierCapture)) capture = modifierCapture;
+            if (!existing.Inhibited &&
+                !RefreshModifierCache(targetId, definition, existing.Handle, newStacks, capture))
+                return false;
+            existing.StackCount = newStacks;
+            existing.CapturedModifierMagnitude = capture;
+            return true;
+        }
+
+        /// <summary>叠层热路径：已有等长 handle 则 Refresh；否则 Sync 重建。</summary>
+        private bool RefreshModifierCache(int targetId, GameplayEffectDefinition definition, EffectHandle handle,
+            int stackCount, float modifierCapture)
+        {
+            if (definition.Modifiers.Count == 0) return true;
+            if (!handle.IsValid || !_modifiers.TryGetValue(handle, out var hs) || hs == null ||
+                hs.Length != definition.Modifiers.Count)
+                return SyncModifierCache(targetId, definition, handle, stackCount, modifierCapture);
+            int stacks = Math.Max(1, stackCount);
+            for (int i = 0; i < hs.Length; i++)
+            {
+                ContributeModifier(definition.Modifiers[i], modifierCapture, stacks, out var stacked, out var cap);
+                float magnitude = stacked.Magnitude;
+                float captured = float.IsNaN(cap) ? magnitude : cap;
+                if (!_store.AttributeAggregator.RefreshModifier(targetId, hs[i], magnitude, captured))
+                    return SyncModifierCache(targetId, definition, handle, stackCount, modifierCapture);
+            }
+            return true;
         }
 
         private bool SyncModifierCache(int targetId, GameplayEffectDefinition definition, EffectHandle handle,
@@ -721,7 +753,7 @@ namespace BattleSystemECS.Core.GAS
             for (int n = 0; n < _runtimeEntityIds.Count; n++)
             {
                 int entityId = _runtimeEntityIds[n];
-                expired += TickEntity(entityId, clock);
+                expired += TickEntity(entityId, deltaTime, clock);
                 if (n < _runtimeEntityIds.Count && _runtimeEntityIds[n] != entityId) n--;
             }
             return expired;
@@ -741,16 +773,13 @@ namespace BattleSystemECS.Core.GAS
             _runtimeEntityIds.RemoveAt(last);
         }
         public void ResetFrame() { Events.Clear(); AbortEvents.Clear(); }
-        private int TickEntity(int entityId, ClockId clock)
+        private int TickEntity(int entityId, float dt, ClockId clock)
         {
             int expired = 0;
-            double now = _schedule.VirtualNow(clock);
             for (int slot = _store.GetEffectCount(entityId) - 1; slot >= 0; slot--)
             {
                 if (!_store.TryGetActiveEffectAt(entityId, slot, out var active, out var definition, out _)) continue;
                 if (!active.RuntimeOwned || active.Clock != clock) continue;
-                if (active.ExpireAtVirtual <= 0d && definition.DurationPolicy != DurationPolicy.Infinite)
-                    BindSchedule(ref active, definition, resetPeriodic: false);
                 if (!ApplySourceDeathPolicy(ref active)) { Remove(active.Target, active.Handle); expired++; continue; }
                 if (definition.DurationPolicy == DurationPolicy.Infinite)
                 {
@@ -758,51 +787,39 @@ namespace BattleSystemECS.Core.GAS
                     continue;
                 }
                 if (definition.Type == EffectType.Periodic && definition.Periodic.HasValue && active.TicksRemaining > 0)
-                    TickPeriodicDue(ref active, definition, now);
-                active.RemainingTime = (float)Math.Max(0d, active.ExpireAtVirtual - now);
-                if (definition.Type == EffectType.Periodic && definition.Periodic.HasValue)
                 {
                     float period = definition.Periodic.Value.Period;
-                    if (active.CatchUp == CatchUpPolicy.SkipMissed)
-                        active.TickAccumulator = (float)Math.Max(0d, period - (active.NextTickAtVirtual - now));
-                    else
-                        active.TickAccumulator = (float)Math.Max(0d, period - (active.NextTickAtVirtual - now));
+                    active.TickAccumulator += dt;
+                    int scheduledDue = period > 0f ? (int)Math.Floor(active.TickAccumulator / period) : 0;
+                    bool immediateTick = active.FirstTickPending && active.FirstTick == FirstTickPolicy.Immediate;
+                    int due = scheduledDue;
+                    if (immediateTick) { due++; active.FirstTickPending = false; }
+                    if (active.FirstTickPending) active.FirstTickPending = false;
+                    if (active.CatchUp == CatchUpPolicy.OnePerFrame && due > 1) due = 1;
+                    if (active.CatchUp == CatchUpPolicy.SkipMissed && due > 0) { due = 1; active.TickAccumulator = 0f; }
+                    due = Math.Min(due, active.TicksRemaining);
+                    if (active.CatchUp != CatchUpPolicy.SkipMissed && due > 0)
+                    {
+                        int scheduledConsumed = Math.Min(scheduledDue, immediateTick ? Math.Max(0, due - 1) : due);
+                        active.TickAccumulator -= scheduledConsumed * period;
+                    }
+                    active.TicksRemaining -= due;
+                    float tickMagnitude = ResolvePeriodicMagnitude(active, definition.Periodic.Value);
+                    for (int tick = 0; tick < due; tick++) { DispatchPeriodic(active, definition, tickMagnitude); active.TicksProcessed++; }
                 }
-                if (active.RemainingTime <= 0f)
+                if (definition.DurationPolicy != DurationPolicy.Infinite)
                 {
-                    Remove(active.Target, active.Handle, GameplayEventType.EffectExpired);
-                    expired++;
-                    continue;
+                    active.RemainingTime -= dt;
+                    if (active.RemainingTime <= 0f)
+                    {
+                        Remove(active.Target, active.Handle, GameplayEventType.EffectExpired);
+                        expired++;
+                        continue;
+                    }
                 }
-                SyncSchedule(active.Handle, active, definition);
                 UpdateActive(active.Target, active);
             }
             return expired;
-        }
-
-        private void TickPeriodicDue(ref ActiveGameplayEffect active, GameplayEffectDefinition definition, double now)
-        {
-            float period = definition.Periodic.Value.Period;
-            if (period <= 0f) return;
-            int dueCount = 0;
-            active.FirstTickPending = false;
-            while (active.TicksRemaining > 0 && active.NextTickAtVirtual <= now)
-            {
-                if (active.CatchUp == CatchUpPolicy.OnePerFrame && dueCount >= 1) break;
-                if (active.CatchUp == CatchUpPolicy.SkipMissed && dueCount >= 1) break;
-                float tickMagnitude = ResolvePeriodicMagnitude(active, definition.Periodic.Value);
-                DispatchPeriodic(active, definition, tickMagnitude);
-                active.TicksProcessed++;
-                active.TicksRemaining--;
-                dueCount++;
-                if (active.CatchUp == CatchUpPolicy.SkipMissed)
-                {
-                    active.NextTickAtVirtual = now + period;
-                    active.TickAccumulator = 0f;
-                    break;
-                }
-                active.NextTickAtVirtual += period;
-            }
         }
 
         internal void RegisterTimedAbility(int entityId, int slot, ClockId clock, double expireAt)

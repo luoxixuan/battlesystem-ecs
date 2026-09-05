@@ -1,5 +1,19 @@
 # 更新记录 (Changelog)
 
+### 2026-09-05（门禁复核：H1/H2/H3 + M1–M6）
+- **H1 排期本热路径**：`effect.tick` 不再对每个未过期 effect 每帧 `SyncSchedule` → `ClearEffect`（带闭包线性删 5 个 clock 列表）+ `Upsert`。E=10K 时那是 O(E²)+每帧分配。Tick 恢复 float `RemainingTime -= dt` 与 `TickAccumulator` Periodic 到期；`GameplayScheduleBook` 只给 Timed Ability 虚拟时钟、Apply/Remove/`RebuildSchedule`。`CollectDue` 仍无生产调用者。
+- **H2 生产播种**：`GameManager.Initialize` 开局 `Determinism.Reset` 一次并打 `[BOOTSTRAP] match seed=`（构造器 `matchSeed` / 环境变量 `BATTLE_MATCH_SEED` / 否则 `Environment.TickCount`）。Crafting / Reforge / TowerModifier 构造器删除 `seed` 改种参数；测试直接 `store.Determinism.Reset`。
+- **H3 Activate scratch**：`CostKeyScratch` / `CostAmountScratch` / `RuntimeTargetScratch` 搬进每 store 一份的 `AbilityCommitReservation`，去掉进程级 static。
+- **M1 soak**：`ProductionGraphFixedSeedSoak` 用 `ProductionSystemInstaller` 完整图跑 200 帧两遍比 `StateDigest` + `GameplayEventSequenceDigest`。原 `FixedSeedFissionSoak` 保留。
+- **M2 虚拟时间边界**：Periodic/时长到期不再用 `NextTickAtVirtual <= (double)now`（dt=0.1f、period=0.3f 会从第 3 帧推到第 4 帧）。CHANGELOG 单列：与 P6 短暂引入的 double 虚拟比较相比，边界帧回到 float 累加。SkipMissed 死分支已删。
+- **M3 RestackLedger**：已有等长 modifier handle 时 `RefreshModifier` 原地改幅度（CaptureOnApply 也更新 Captured）；先改 aggregator 成功再写 `StackCount`。NaN capture 不再覆盖旧捕获。
+- **M4**：P1+P2 仍在历史 commit `190873d`，无法独立回滚；规划已改「逐条 Release」措辞。
+- **M5**：复查失败仍不 `CommitPlan`。复查通过后的残余半状态（多目标 Plan 中途 -1、Plan 后 Spend 失败）写入终态与本条，未改支付顺序。
+- **M6**：`TimeRewindSnapshot` 去掉对玩家 HP/Mana/Shield 数组的手工回滚；失败只 `return -1`，写入仍走 Resolver。
+- **L1**：`ResolveAdoptModifierCapture` 对 Multiply 走与 adapter 相同的 `m−1`。**L2**：`Release` 夹负计数时累加 `ReleaseUnderflowCount`。**L4**：删除 `PreFightBuffSystem.SystemRandomSeed`。**L5**：检查清单 EXE 构建写 `dotnet build BattleSystemECS.csproj`。
+- **L3** 未改代码：敌方玩家伤害 `Commit` 返回 -1 仍会以 `QueueOverflow` 发 Cancelled（原因不准确）；与 M5 残余同类。
+- mode 2/4/5 与 Unity 保持 DEFERRED/UNAVAILABLE。本轮补跑 **mode 4**（`dotnet run --project BattleSystemECS.csproj -- 4`）：10K 敌 × 500 帧生产 FrameGraph，Debug **155 FPS**（6.47 ms/frame），Release **233 FPS**（4.30 ms/frame）。不写入 PASS manifest。
+
 ### 2026-09-05（Lumio P6：时长 Ability 态 / 排期本 / 墓碑 / 摘除式抑制 / 表现原因）
 - **时长 Ability 态**：`AbilityPhase` 为 None / Executing / Completed / Cancelled / Expired，只给 `AbilityDurationKind.Timed`。瞬发 `Activate` / 生产 `ActivateCore` 相位保持 None。不引入 RolledBack，不套八态机。现有内容无 GAS channel 技能；测试用最小时长定义走完四态。
 - **排期本**：`GameplayScheduleBook` 按每个 `clockId` 的虚拟时间取件，可从 ActiveEffect 全量重建。挂在现有 `GameplayEffectRuntime.Tick`（effect.tick），未改 FrameGraph / 根哈希。子弹时间下 Enemy clock 与 Combat clock 到期解耦。

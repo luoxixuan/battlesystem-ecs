@@ -60,6 +60,43 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(0, store.GetEffectCount(target));
         }
 
+        [Fact]
+        public void PeriodicDueUsesFloatAccumulator_Dt01Period03_TicksOnFrame3()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 1f, 1f, 1f, 1);
+            int source = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            int target = store.AddEnemy(1, 0, 1f, 100f, 100f, 1f, 1, 1);
+            var def = Periodic(50, ClockId.Combat, period: 0.3f, duration: 10f, magnitude: 1f);
+            Assert.True(store.GameplayEffectsRuntime.TryApply(def.Id, def,
+                store.GetEntityHandle(source), store.GetEntityHandle(target), out _, ownerPlayerId: 0));
+            store.GameplayEffectsRuntime.Tick(0.1f, ClockId.Combat);
+            store.GameplayEffectsRuntime.Tick(0.1f, ClockId.Combat);
+            Assert.Equal(100f, store.EnemyHealth[target], 3);
+            store.GameplayEffectsRuntime.Tick(0.1f, ClockId.Combat);
+            Assert.Equal(99f, store.EnemyHealth[target], 3);
+        }
+
+        [Fact]
+        public void TickDoesNotResyncScheduleListEachFrame()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 1f, 1f, 1f, 1);
+            int source = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            int target = store.AddEnemy(1, 0, 1f, 20f, 20f, 1f, 1, 1);
+            var def = new GameplayEffectDefinition(new EffectId(51), EffectType.Duration,
+                Array.Empty<ModifierDefinition>(), 10f, 0f, ClockId.Combat, StackingBehavior.None, 1,
+                RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent,
+                default(TagId), Array.Empty<ExecutionId>());
+            Assert.True(store.GameplayEffectsRuntime.TryApply(def.Id, def,
+                store.GetEntityHandle(source), store.GetEntityHandle(target), out _, ownerPlayerId: 0));
+            int afterApply = store.GameplayEffectsRuntime.ScheduleListCount(ClockId.Combat);
+            Assert.True(afterApply > 0);
+            for (int i = 0; i < 8; i++)
+                store.GameplayEffectsRuntime.Tick(0.1f, ClockId.Combat);
+            Assert.Equal(afterApply, store.GameplayEffectsRuntime.ScheduleListCount(ClockId.Combat));
+        }
+
         private static GameplayEffectDefinition Periodic(int id, ClockId clock, float period, float duration, float magnitude)
         {
             var spec = new PeriodicSpec(period, FirstTickPolicy.NextInterval, CatchUpPolicy.CatchUpAll,
