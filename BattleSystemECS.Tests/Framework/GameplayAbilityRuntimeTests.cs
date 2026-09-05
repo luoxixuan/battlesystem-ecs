@@ -1014,6 +1014,9 @@ namespace BattleSystemECS.Tests.Framework
                 LastPayload = context.Execution.Payload;
                 return 1;
             }
+            public void ContributeCommitCapacity(AbilityPayloadContext context,
+                ref int resourceRequests, ref int resourceEvents, ref int damageRequests, ref int damageEvents)
+            { }
         }
     }
 }

@@ -41,8 +41,32 @@ namespace BattleSystemECS.Tests.Framework
             Assert.False(committed.Accepted);
             Assert.Equal(AbilityActivationRejectReason.QueueOverflow, committed.Reason);
             Assert.Equal(health, Store.PlayerCurrentHealth[player]);
-            Assert.Equal(ResourceRejectionReason.RequestQueueOverflow, Store.ResourceResolver.LastRejectionReason);
             Assert.DoesNotContain("prevalidated", thrown?.Message ?? string.Empty, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void PlayerDamageTargetInvalidBeforeCommit_CancelsAsNoTarget()
+        {
+            int player = Player(p => { p.Health = 80f; });
+            Store.GameplayPhaseContext = new PhaseContext(PhaseContextKind.Wave);
+            Store.PlayerMaxHealth[player] = 80f;
+            int enemy = Enemy(e => { e.X = 0f; e.Y = 0f; e.Damage = 10f; });
+            var catalog = DamageToPlayerCatalog();
+            var handler = new EnemyAbilitySystem(Store, Renderer, player, new GameConfig { CompiledCatalog = catalog });
+            Store.DeferAbilityAndEffectCommit = true;
+            var request = new AbilityActivationRequest(enemy, 0, 0f, player, new AbilityId(0),
+                magnitudeOverride: 5f, ownerPlayerId: player);
+            Assert.True(GameplayAbilityRuntime.Activate(Store, catalog, new float[1], request, handler).Accepted);
+            Store.PlayerCurrentHealth[player] = 0f;
+
+            AbilityActivationResult committed = default;
+            Exception? thrown = Record.Exception(() =>
+                committed = GameplayAbilityRuntime.CommitQueuedAbilities(Store));
+
+            Assert.Null(thrown);
+            Assert.False(committed.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.NoTarget, committed.Reason);
+            Assert.Equal(0f, Store.PlayerCurrentHealth[player]);
         }
 
         [Fact]
@@ -224,7 +248,7 @@ namespace BattleSystemECS.Tests.Framework
 
             Assert.Null(thrown);
             Assert.False(committed.Accepted);
-            Assert.Equal(AbilityActivationRejectReason.QueueOverflow, committed.Reason);
+            Assert.Equal(AbilityActivationRejectReason.UnsupportedDefinition, committed.Reason);
             Assert.Equal(10f, Store.PlayerCurrentHealth[player]);
             Assert.Equal(20f, Store.PlayerMana[player]);
             Assert.Equal(30f, Store.PlayerShield[player]);

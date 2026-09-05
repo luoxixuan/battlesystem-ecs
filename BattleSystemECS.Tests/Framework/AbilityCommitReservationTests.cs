@@ -7,7 +7,7 @@ using Xunit;
 namespace BattleSystemECS.Tests.Framework
 {
     /// <summary>
-    /// P2 / F11：入队预留、Spend 原子支付、Commit 先复查再 CommitPlan。
+    /// P2 / F11：入队预留、Spend 原子支付。Commit 先复查，再 Spend，再 CommitPlan；Plan 失败退款。
     /// 防假绿：同帧两技能超法力断言第二技能在入队时 Cost（看 PeekCost），
     /// 不是只看「第二份载荷没交上」——没有预留表时顺序 Spend 也会挡住第二份载荷。
     /// </summary>
@@ -229,6 +229,34 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
+        public void HandlerCommitFailureAfterSpend_RefundsManaAndCancels()
+        {
+            var store = PlayerStore();
+            store.DeferAbilityAndEffectCommit = true;
+            store.PlayerMana[0] = 10f;
+            int enemy = store.AddEnemy(0, 0, 1f, 100f, 100f, 1f, 1, 1);
+            var catalog = Catalog(Execution(EffectPayloadKind.Damage, 5f, ExecutionOperation.ApplyDamage),
+                costs: new[] { new CostDefinition(new AttributeKey(7), 6f) });
+            var handler = new FailCommitHandler();
+            Assert.True(GameplayAbilityRuntime.Activate(store, catalog, new float[1], Request(enemy), handler).Accepted);
+
+            AbilityActivationResult committed = default;
+            Exception? thrown = Record.Exception(() =>
+                committed = GameplayAbilityRuntime.CommitQueuedAbilities(store));
+
+            Assert.Null(thrown);
+            Assert.False(committed.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.UnsupportedDefinition, committed.Reason);
+            Assert.Equal(10f, store.PlayerMana[0]);
+            Assert.Equal(100f, store.EnemyHealth[enemy]);
+            Assert.Contains(Enumerable.Range(0, store.DamageResolver.Events.Count),
+                i => store.DamageResolver.Events.Get(i).Type == GameplayEventType.AbilityCancelled &&
+                     store.DamageResolver.Events.Get(i).Reason == (int)AbilityActivationRejectReason.UnsupportedDefinition);
+            Assert.DoesNotContain(Enumerable.Range(0, store.DamageResolver.Events.Count),
+                i => store.DamageResolver.Events.Get(i).Type == GameplayEventType.AbilityActivated);
+        }
+
+        [Fact]
         public void Spend_Insufficient_RejectsAtomically()
         {
             var store = PlayerStore();
@@ -315,6 +343,16 @@ namespace BattleSystemECS.Tests.Framework
 
         private static AbilityActivationRequest Request(int targetId) =>
             new AbilityActivationRequest(0, 0, 0f, targetId, new AbilityId(0));
+
+        private sealed class FailCommitHandler : IAbilityPayloadHandler
+        {
+            public bool Supports(ExecutionDefinition execution) => true;
+            public bool CanCommit(AbilityPayloadContext context) => true;
+            public int Commit(AbilityPayloadContext context) => -1;
+            public void ContributeCommitCapacity(AbilityPayloadContext context,
+                ref int resourceRequests, ref int resourceEvents, ref int damageRequests, ref int damageEvents)
+            { }
+        }
 
         private static GameplayCatalog TwoDamageAbilities(float costA, float costB)
         {

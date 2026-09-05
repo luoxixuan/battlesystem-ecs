@@ -41,6 +41,16 @@ namespace BattleSystemECS.Systems
                        _store.PositionY[context.Source.Index], radius);
         }
 
+        public void ContributeCommitCapacity(AbilityPayloadContext context,
+            ref int resourceRequests, ref int resourceEvents, ref int damageRequests, ref int damageEvents)
+        {
+            if (context.Execution.Payload == EffectPayloadKind.Resource)
+            {
+                resourceRequests += 3;
+                resourceEvents += 3;
+            }
+        }
+
         public int Commit(AbilityPayloadContext context)
         {
             int owner = context.Request.OwnerPlayerId;

@@ -257,7 +257,7 @@
 2026-09-04 对照登记（不改生产代码，实施走 [lumio-contract-alignment.md](ecs-gas-lumio-contract-alignment.md)）：
 
 - **F10 TryApply / TryRestack 叠层加成不一致**（**P1 已实施 2026-09-04**）：`TryApply` / `TryRestack` 共用 `RestackLedger`；`stackCount` 乘数；不再每层扩 handle；`periodicMagnitude` 与 modifier 捕获分列。原路径判断坐标作废。
-- **F11 同帧多 AbilityRequest 消耗无预留**（**P2 已实施 2026-09-04**）：入队按 sequence 预留 Spend 资源与容量；Commit 先复查再 `CommitPlan`；`CommitCosts` 只走 `Spend`。原路径判断坐标作废。通用 `ApplyMana` 夹紧未改。
+- **F11 同帧多 AbilityRequest 消耗无预留**（**P2 已实施 2026-09-04**；**M5 2026-09-06** 改为复查后先 Spend 再 `CommitPlan`，失败退款）：入队按 sequence 预留 Spend 资源与容量；`CommitCosts` 只走 `Spend`。原路径判断坐标作废。通用 `ApplyMana` 夹紧未改。
 - **F12 预校验通过后 throw**（**P2 已实施 2026-09-04**）：`Core/`/`Systems/` 不再有 `prevalidated` 且 `during commit` 的 throw。容量/消耗竞争走 `AbilityCancelled` 或 `QueueOverflow`；dispel/预警/召唤跳过失败 slot；群体复活保留已成功单位；回放拒绝该次 Restore。
 - **F6 更正**：`HasTag` 已走 `TagContributionState` 计数；最初「无贡献计数」只适用于登记当时。剩余是层级（平 `TagId`、无 parent 词汇表）与 `ClearEntity` 扫表分配。
 

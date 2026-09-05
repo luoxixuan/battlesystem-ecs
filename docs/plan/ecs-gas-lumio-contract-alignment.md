@@ -2,7 +2,7 @@
 
 > 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）、P3（A1 属性公式）、P4（Tag parent 词汇表 + 准入序）、P5（同帧顺序 A4 + 随机领号 A3）、P6（时长 Ability 态 / 墓碑 / 摘除式抑制 / 表现原因；排期本热路径已撤回）已实施
 >
-> 更新日期：2026-09-05（门禁复核：H1 撤 effect.tick 每帧 SyncSchedule；H2 开局播种；H3 scratch 进 store；M1 真 soak；M2 恢复 float 累加）
+> 更新日期：2026-09-06（门禁复核剩余：L3 Commit -1 映射原因；M5 先 Spend 再 Plan）
 >
 > 基线 commit：`b5cfe52`（对照审查时的 HEAD）
 >
@@ -32,7 +32,7 @@ Lumio 是联网体素引擎；本仓是单进程塔防基准。只吸收与 10K 
 |---|---|---|
 | 属性公式整段 | `aggregated = (Base + ΣAdd) × max(PercentFloor, 1 + ΣPercent)`；有 Override 则最终覆盖，Add / Percent 忽略 | §7 已写 |
 | 账本即条目 | Modifier 无独立生命周期；`stackCount` 是该条目对 ΣAdd / ΣPercent 的乘数，不把同一条展开成 N 份独立 modifier；`ModifierPool` 只能是 Aggregator 派生缓存 | §5.2 / §5.3 / §14.12 已写 |
-| Commit 消耗 | 已入队请求预留资源与容量；Commit **先**复查冷却 + 预留，**再** `CommitPlan`；失败走 `AbilityCancelled`，不 throw、不半价。支付走 `ResourceOperation.Spend`（不足即拒），不改通用夹紧 | §6.1 / §8.1 / §8.2 已写 |
+| Commit 消耗 | 已入队请求预留资源与容量；Commit **先**复查冷却 + 预留，**再 Spend，再 `CommitPlan`**；Plan 失败 `Add` 退款。失败走 `AbilityCancelled`，不 throw、不半价。支付走 `ResourceOperation.Spend`（不足即拒），不改通用夹紧 | §6.1 / §8.1 / §8.2 已写 |
 | 同帧效果顺序 | `effect.commit` 批内：结果不得依赖遍历顺序；移除垫后。AI 组 dispel 是批外 remove-first，单独写进顺序表。禁止「施加又移除 = 抵消」 | §6.3 已写 |
 | 堆叠快照 | V1 只实现 `Replace`（新快照整张替换当前条目捕获）。默认 `Replace`。catalog modifier 全为 `ReevaluateOnRead`，shipped 零可见变化。`KeepPerLayer` 不进 V1 | §6.3 已写 |
 | 随机领号 | 只从 Frame 确定性上下文领号，仅 `CommitSerial` 相取数；`Rng.Shared` 与无种子 `new Random()` 都不是确定性资产 | §9 / §13 / §14.14 已写 |
@@ -221,8 +221,9 @@ P0 退出。`AbilityRequests` 仍是真 buffer（`ability.commit` 批量提交�
 
 **提交顺序（硬要求，不是推荐）**
 
-- 今日：先 `CommitPlan`（伤害/CC 载荷当场提交）再 `CommitCosts`（`:457-464`）。「整单取消」只有复查放在 `CommitPlan` **之前**才可能。
-- P2：对每条已入队请求，先复查冷却 + 预留（资源与容量）仍有效 → 失败则该请求整单 `AbilityCancelled`，不调用 `CommitPlan` → 成功才 `CommitPlan`，再 `Spend` 扣费、提交冷却。
+- 基线：先 `CommitPlan` 再 `CommitCosts`。「整单取消」只有复查放在 `CommitPlan` **之前**才可能。
+- P2：对每条已入队请求，先复查冷却 + 预留仍有效 → 失败则该请求整单 `AbilityCancelled`，不调用 `CommitPlan`。
+- 门禁复核 M5：复查通过后改为 **先 Spend 再 `CommitPlan`**；Plan 失败 `Add` 退款。多目标中途 -1 仍可能留下已提交的当场载荷。
 
 **预留释放**
 
@@ -272,7 +273,7 @@ P0 退出。`AbilityRequests` 仍是真 buffer（`ability.commit` 批量提交�
 
 门禁 §12。`Core/` 与 `Systems/` 中不再存在 `prevalidated` 且 `during commit` 的 throw（编程错误字符串除外）。CHANGELOG 记行为变化（少付钱不再生效；容量满报 `QueueOverflow`；commit 竞争失败不炸帧）。
 
-**实施状态（2026-09-05）**：已落地。预留表 `ComponentStore.AbilityCommitReservation`。Commit 每条先 `Release` + 复查冷却/Cost/容量，失败 `AbilityCancelled` 且不 `CommitPlan`；成功才 `CommitPlan` → `Spend` → 冷却。Activate scratch 在 reservation 实例上，不是 static。`CommitCosts` 只走 `ResourceOperation.Spend`。入队满槽与 `ValidateCapacityPlan` 走 `QueueOverflow`。F12 九处生产 throw 改为拒绝/跳过。复查通过后的残余：多目标 `CommitPlan` 中途 -1、以及 `CommitCosts` 在 Plan 之后失败（自耗/自伤），CHANGELOG 已单列。P1 与 P2 曾合成 commit `190873d`，不能按「还原该 commit」独立回滚账本或预留。未改通用夹紧。mode 2/4/5 保持 DEFERRED。
+**实施状态（2026-09-06）**：已落地。预留表 `ComponentStore.AbilityCommitReservation`。Commit 每条先 `Release` + 复查冷却/Cost/容量/载荷 `CanCommit`，失败 `AbilityCancelled` 且不 Spend、不 `CommitPlan`；成功才 Spend → `CommitPlan` → 冷却。Plan 失败 `Add` 退款。`Commit` 返回 -1 按 Resolver 新拒绝原因映射，不再一律 `QueueOverflow`。Activate scratch 在 reservation 实例上。`CommitCosts` 只走 `ResourceOperation.Spend`。P1 与 P2 曾合成 commit `190873d`，不能按「还原该 commit」独立回滚账本或预留。未改通用夹紧。mode 2/4/5 保持 DEFERRED。
 
 ### 7.5 回滚
 

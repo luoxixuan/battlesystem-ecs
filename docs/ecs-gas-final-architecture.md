@@ -200,7 +200,7 @@ AbilityDefinition
 
 #### Commit 复查与支付
 
-已入队请求在入队时预留资源与容量。Commit **必须先**复查冷却 + 预留消耗/容量，**再** `CommitPlan`（硬要求）。复查不查 Tag：当前 granted effect 到 `effect.commit` 才 `TryApply`，`ability.commit` 时 Tag 还不存在；跨帧蓄力的 commit 才会踩到 Tag 变化。复查失败发 `AbilityCancelled` 且不调用 `CommitPlan`。复查通过后的残余半状态：多目标 `CommitPlan` 中途返回 -1 时前面目标可能已提交；`CommitCosts` 在 `CommitPlan` 之后失败则效果已落、费用未扣（自耗/自伤 execution）。不 throw、不半价、不把 World 作废。
+已入队请求在入队时预留资源与容量。Commit **必须先**复查冷却 + 预留消耗/容量，**再 Spend，再 `CommitPlan`**（硬要求）。复查不查 Tag：当前 granted effect 到 `effect.commit` 才 `TryApply`，`ability.commit` 时 Tag 还不存在；跨帧蓄力的 commit 才会踩到 Tag 变化。复查失败发 `AbilityCancelled` 且不 Spend、不 `CommitPlan`。`CommitPlan` 失败则 `Add` 退回已 Spend 的费用。载荷 `Commit` 返回 -1 时按 Resolver **新**拒绝原因映射（`RequestQueueOverflow`→`QueueOverflow`，目标无效→`NoTarget`，无新拒绝则 `UnsupportedDefinition`），不再一律 `QueueOverflow`。多目标 `CommitPlan` 中途 -1 时前面目标的当场载荷可能已提交（无法整单撤回伤害），费用已退。退款若事件队列已满，`Add` 可能发不出事实，资源列以 Resolver 结果为准。不 throw、不半价、不把 World 作废。
 
 支付走 `ResourceOperation.Spend`：不足即拒、原子、实际扣减必须等于请求。禁止改通用 `ResourceResolver` 夹紧语义：`BossTrailAoeSystem` / `SuicideBombSystem` 用负增量打血，夹到 0 仍 `Accepted` 是预期。
 
@@ -464,7 +464,7 @@ GameplayLoopAborted
 
 `HitConfirmed` 表示命中验证通过；`DamageApplied` 表示实际造成了有效伤害；`DeathQueued` 表示已经进入死亡队列；`KillConfirmed` 只在死亡解析和奖励归属确定后产生。触发器必须选择正确的事实类型，不能用 `KillConfirmed` 提前触发效果。
 
-`AbilityRejected` 表示**准入**失败（未入队或入队前拒绝），原因见 §6.1 冻结表。`AbilityCancelled` 表示已入队请求在 Commit 复查失败（冷却或预留消耗/容量不再有效），整单取消，不 throw、不半价。不得用 `AbilityRejected` 表示复查失败，也不得用 `AbilityCancelled` 表示准入失败。
+`AbilityRejected` 表示**准入**失败（未入队或入队前拒绝），原因见 §6.1 冻结表。`AbilityCancelled` 表示已入队请求在 Commit 复查失败，或复查通过后 Spend/`CommitPlan` 失败（含退款后的取消），整单取消，不 throw、不半价。不得用 `AbilityRejected` 表示复查失败，也不得用 `AbilityCancelled` 表示准入失败。
 
 内部 Gameplay Event Queue 与 `IBattleEventBus` 是两个不同的 seam：前者供模拟系统触发规则，后者只在提交后向渲染层发送展示事实。并行阶段不得直接广播任一总线。内部 Event 带 `GameplayEventCause`（Mutation / Initial / Replay）；sequence digest 只累计 Mutation，避免初次快照或回放被当成又一次变化。
 

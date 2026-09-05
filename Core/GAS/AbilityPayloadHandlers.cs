@@ -63,6 +63,15 @@ namespace BattleSystemECS.Core.GAS
             return _handlers[index].Commit(context);
         }
 
+        public void ContributeCommitCapacity(AbilityPayloadContext context,
+            ref int resourceRequests, ref int resourceEvents, ref int damageRequests, ref int damageEvents)
+        {
+            int index = Find(context.Execution);
+            if (index < 0) return;
+            _handlers[index].ContributeCommitCapacity(context,
+                ref resourceRequests, ref resourceEvents, ref damageRequests, ref damageEvents);
+        }
+
         private int Find(ExecutionDefinition execution)
         {
             for (int i = 0; i < _handlers.Length; i++)

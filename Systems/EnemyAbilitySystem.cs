@@ -403,7 +403,8 @@ namespace BattleSystemECS.Systems
                 (uint)context.Target.Index < ComponentStore.MAX_PLAYERS)
                 return store.ResourceResolver.CanApplyPlayerDamage(new PlayerDamageRequest(context.Source,
                     context.Target, context.Magnitude, 0L,
-                    context.Ability.Id, context.Target.Index));
+                    context.Ability.Id, context.Target.Index)) &&
+                       store.ResourceResolver.CanAccept(1, 2);
             if (!_payloadDefinitions.TryGetValue(context.Ability.Id.Value, out var ability) ||
                 !store.EnemyActive[context.Source.Index]) return false;
             if (context.Execution.Operation == ExecutionOperation.ApplyEnemyBuff)
@@ -413,8 +414,12 @@ namespace BattleSystemECS.Systems
                 return context.Execution.Payload == EffectPayloadKind.Status && IsActiveTower(context.Target.Index) &&
                        ability.SilenceDuration > 0f;
             if (context.Execution.Operation == ExecutionOperation.RemoveDispellableEffects)
-                return context.Execution.Payload == EffectPayloadKind.Dispel && IsActiveTower(context.Target.Index) &&
-                       _dispelCapacityReserved && CountDispellableEffects(context.Target.Index) > 0;
+            {
+                int count = CountDispellableEffects(context.Target.Index);
+                return context.Execution.Payload == EffectPayloadKind.Dispel &&
+                       IsActiveTower(context.Target.Index) && count > 0 &&
+                       store.GameplayEffectsRuntime.Events.CanPublish(count, true);
+            }
             if (context.Execution.Operation == ExecutionOperation.QueueTelegraph)
                 return context.Execution.Payload == EffectPayloadKind.Telegraph && _telegraphSystem != null &&
                        (uint)context.Target.Index < ComponentStore.MAX_PLAYERS &&
@@ -425,6 +430,17 @@ namespace BattleSystemECS.Systems
                 return store.HasEntityCapacity && HasValidSummonContract(ability, context.Execution);
             return context.Execution.Operation == ExecutionOperation.PrepareStealth &&
                    ability.DamageMultiplier > 0f;
+        }
+
+        void IAbilityPayloadHandler.ContributeCommitCapacity(AbilityPayloadContext context,
+            ref int resourceRequests, ref int resourceEvents, ref int damageRequests, ref int damageEvents)
+        {
+            if (context.Execution.Payload == EffectPayloadKind.Damage &&
+                (uint)context.Target.Index < ComponentStore.MAX_PLAYERS)
+            {
+                resourceRequests++;
+                resourceEvents += 2;
+            }
         }
 
         int IAbilityPayloadHandler.Commit(AbilityPayloadContext context)

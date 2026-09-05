@@ -1,5 +1,10 @@
 # 更新记录 (Changelog)
 
+### 2026-09-06（门禁复核剩余：L3 拒绝原因 + M5 Spend 先于 Plan）
+- **L3**：`CommitPlan` 载荷 `Commit` 返回 -1 时按 Resource/Damage Resolver **新**拒绝原因映射（队列满→`QueueOverflow`，目标无效→`NoTarget`，无新拒绝→`UnsupportedDefinition`），不再一律 `QueueOverflow`。复查补载荷 `CanCommit`：玩家已死为 `NoTarget`，快照不可用为 `UnsupportedDefinition`。敌方玩家伤害计入 Resource 事件容量。
+- **M5**：复查通过后改为先 `Spend` 再 `CommitPlan`；Plan 失败 `Add` 退回费用。多目标中途 -1 仍可能留下已提交的当场载荷。
+- 仍 DEFERRED：mode 2/4/5 与 Unity。
+
 ### 2026-09-05（门禁复核：H1/H2/H3 + M1–M6）
 - **H1 排期本热路径**：`effect.tick` 不再对每个未过期 effect 每帧 `SyncSchedule` → `ClearEffect`（带闭包线性删 5 个 clock 列表）+ `Upsert`。E=10K 时那是 O(E²)+每帧分配。Tick 恢复 float `RemainingTime -= dt` 与 `TickAccumulator` Periodic 到期；`GameplayScheduleBook` 只给 Timed Ability 虚拟时钟、Apply/Remove/`RebuildSchedule`。`CollectDue` 仍无生产调用者。
 - **H2 生产播种**：`GameManager.Initialize` 开局 `Determinism.Reset` 一次并打 `[BOOTSTRAP] match seed=`（构造器 `matchSeed` / 环境变量 `BATTLE_MATCH_SEED` / 否则 `Environment.TickCount`）。Crafting / Reforge / TowerModifier 构造器删除 `seed` 改种参数；测试直接 `store.Determinism.Reset`。
