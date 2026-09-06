@@ -55,10 +55,10 @@ dotnet build BattleSystemECS.csproj
 dotnet run
 
 # 非交互式压测（推荐在 CI / 脚本中使用）
-dotnet run 2   # mode 2：合并热路径压测（手写合并循环，10K 敌，500 帧）
-dotnet run 4   # mode 4：真实系统链路压测（真实 Update 链，10K 敌，500 帧）
+dotnet run 2   # mode 2：固定人口吞吐（手写合并循环，10K 存活 × 500 帧；valid=FALSE 则 FPS 作废）
+dotnet run 4   # mode 4：固定人口吞吐（生产 FrameGraph，10K 存活 × 500 帧）
 dotnet run 3   # mode 3：微基准测试（单系统操作级性能剖析）
-dotnet run 5   # mode 5：完整一局压测（5 关全通，真实波次生成）
+dotnet run 5   # mode 5：完整一局观察（人口随波次变化，不是 10K 钉死）
 
 # 运行单元测试（必须全部通过）
 dotnet test BattleSystemECS.Tests
@@ -287,7 +287,8 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 ### 7.1 性能门禁
 
 性能压测结果、相对门禁和延期状态以最新 fresh evidence 为准；当前迁移轮次暂不运行
-mode2/mode4/mode5，未运行项不得标记为通过。
+mode2/mode4/mode5，未运行项不得标记为通过。mode 2/4 合同是固定人口吞吐：测量帧内目标数量必须钉住
+（开局高 HP、移速 0、不补波、铺满 20 座开火塔）；人口漂移则 `valid=FALSE`，该次 FPS 不能当 10K 负载。mode 5 是完整局观察（8 座塔，每波 EnemyCount ×3）。
 
 M8 fresh evidence 必须在 evidence 首写前捕获 HEAD/branch/index/patch/status/untracked hashes，
 并在全部命令后复核仓库状态未漂移。mode 2/4/5 的 `DEFERRED` 和 Unity 的
@@ -378,4 +379,4 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 
 ---
 
-> **最后更新**：2026-09-05。当前构建、测试与审计结果以本轮仓外 final evidence 目录及其原始日志为准；文档不维护易腐的手工测试计数。
+> **最后更新**：2026-09-06。当前构建、测试与审计结果以本轮仓外 final evidence 目录及其原始日志为准；文档不维护易腐的手工测试计数。

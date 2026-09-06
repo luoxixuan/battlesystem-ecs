@@ -826,7 +826,9 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(1,mode2.ManualMergedCalls);
             Assert.Equal(0,mode2.GraphTickCalls);
             Assert.False(mode2.GraphSealed);
-            Assert.Equal("manual-merged-loop:v1",mode2.CompositionFingerprint);
+            Assert.Equal("manual-merged-loop:v2-fixed-population",mode2.CompositionFingerprint);
+            Assert.Equal(64,mode2.PopulationEnd);
+            Assert.Equal(64,mode2.PopulationMin);
             Assert.Equal(Systems.BenchmarkCompositionContract.ProductionRegistryGraph,mode4.Composition);
             Assert.Equal(1,mode4.FramesExecuted);
             Assert.Equal(1,mode4.BeginFrameCalls);
@@ -838,6 +840,8 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(1,mode4.StateEntryCount(GameState.WavePhase));
             Assert.Contains(";Scenario=FixedPopulationBenchmark;WaveSpawning=Suppressed;Population=64;WaveStart=Suppressed",
                 mode4.CompositionFingerprint,StringComparison.Ordinal);
+            Assert.Equal(64,mode4.PopulationEnd);
+            Assert.Equal(64,mode4.PopulationMin);
             Assert.StartsWith("ProductionRegistry:7312f8c0f4765d031c49e3fa7de2599754ca0ba41c5ba6bd10e2dc0e088c2fc6",
                 mode4.CompositionFingerprint,StringComparison.Ordinal);
             Assert.Equal(Systems.BenchmarkCompositionContract.ProductionRegistryGraph,mode5.Composition);

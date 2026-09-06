@@ -849,5 +849,34 @@ namespace BattleSystemECS.Tests.Framework
                 Assert.Equal(2, store.ResourceResolver.Events.Count);
             }
         }
+
+        [Fact]
+        public void MassDeathOverEventCapacity_DrainsAcrossFramesWithoutDroppingKills()
+        {
+            using (var store = new ComponentStore())
+            {
+                store.AddPlayer(0, 100f, 1f, 1f, 1);
+                int n = store.DamageResolver.Events.Capacity + 1;
+                var ids = new int[n];
+                for (int i = 0; i < n; i++)
+                {
+                    ids[i] = store.AddEnemy(0, 0, 1f, 1f, 1f, 1f, 0, 1);
+                    store.QueueEnemyDeath(ids[i], 0);
+                }
+
+                store.ResolveEnemiesKilledThisFrame();
+
+                Assert.Equal(store.DamageResolver.Events.Capacity, store.TotalKills);
+                Assert.Equal(1, store.GetActiveEnemyCount());
+                Assert.Equal(0, store.DamageResolver.EventPublicationFailures);
+
+                store.BeginFrame();
+                store.ResolveEnemiesKilledThisFrame();
+
+                Assert.Equal(n, store.TotalKills);
+                Assert.Equal(0, store.GetActiveEnemyCount());
+                Assert.Equal(0, store.DamageResolver.EventPublicationFailures);
+            }
+        }
     }
 }

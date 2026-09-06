@@ -8,10 +8,11 @@ namespace BattleSystemECS
         static void Main(string[] args)
         {
             // 非交互压测入口：
-            //   dotnet run 2        → 手工合并循环性能下界
-            //   dotnet run 4        → 生产 Registry FrameGraph 固定负载
-            //   dotnet run 5        → 生产 Registry FrameGraph 完整局观察
-            //   dotnet run          → 交互游戏
+            //   dotnet run --project BattleSystemECS.csproj -- 2  → 合并热路径，固定 10K 人口 × 500 帧
+            //   dotnet run --project BattleSystemECS.csproj -- 4  → 生产 FrameGraph，固定 10K 人口 × 500 帧
+            //   dotnet run --project BattleSystemECS.csproj -- 5  → 完整局观察（人口随波次变化，不是 10K 钉死）
+            //   dotnet run --project BattleSystemECS.csproj       → 交互游戏
+            // mode 2/4 若 Population valid=FALSE，该次 FPS 不能当 10K 负载。
             if (args.Length > 0 && int.TryParse(args[0], out int mode))
             {
                 if (mode == 2)

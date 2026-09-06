@@ -52,26 +52,89 @@ namespace BattleSystemECS.Systems
         public bool GraphSealed { get; }
         public string CompositionFingerprint { get; }
         public GameState FinalState { get; }
+        public int PopulationMin { get; }
+        public int PopulationMax { get; }
+        public int PopulationEnd { get; }
+        public int Kills { get; }
         private readonly int[] _stateEntryCounts;
         public BenchmarkExecutionEvidence(BenchmarkCompositionContract composition,int framesExecuted,
             int beginFrameCalls,int manualMergedCalls,int graphTickCalls,bool graphSealed,string compositionFingerprint,
-            GameState finalState,int[] stateEntryCounts)
+            GameState finalState,int[] stateEntryCounts,int populationMin,int populationMax,int populationEnd,int kills)
         {
             Composition=composition;FramesExecuted=framesExecuted;BeginFrameCalls=beginFrameCalls;
             ManualMergedCalls=manualMergedCalls;GraphTickCalls=graphTickCalls;GraphSealed=graphSealed;
             CompositionFingerprint=compositionFingerprint;FinalState=finalState;
             _stateEntryCounts=(int[])stateEntryCounts.Clone();
+            PopulationMin=populationMin;PopulationMax=populationMax;PopulationEnd=populationEnd;Kills=kills;
         }
         public int StateEntryCount(GameState state)=>_stateEntryCounts[(int)state];
     }
 
     /// <summary>
-    /// Full 12-system benchmark with per-system timing breakdown.
-    /// Run via: echo 2 | dotnet run
+    /// 压测入口。mode 2/4 是固定人口吞吐：目标数量的敌人在全部测量帧保持存活，
+    /// 禁止靠「开场秒杀后测空场」刷 FPS。mode 5 是完整局观察，人口随波次变化。
     /// </summary>
     public class BenchmarkSystem
     {
-        private const float BENCH_ENEMY_HEALTH = 100f;
+        // 高 HP 保证 500 帧战斗写入仍不把人口打空；移速 0 钉在交战带内。
+        // 这不是回满血 soak：开局一次设血，测量期间不补 HP、不补波。
+        private const float BENCH_ENEMY_HEALTH = 1e9f;
+        private const float BENCH_ENEMY_SPEED = 0f;
+        private const string MergedLoopFingerprint = "manual-merged-loop:v2-fixed-population";
+        // mode 2/4 铺满 PlayerMaxTowers=20；mode 5 中场 8 座。只放会开火的类型。
+        private const int BenchFullTowerCount = 20;
+        private const int BenchObservationTowerCount = 8;
+        // mode 5 只缩放内存里的关卡表，不写 game_config.json。批量加大避免「每波变多但仍每帧 5 只」。
+        private const int BenchWaveCountMultiplier = 3;
+        private const int BenchObservationSpawnBatch = 15;
+
+        private readonly struct BenchTowerSpec
+        {
+            public readonly TowerType Type;
+            public readonly float X, Y, Damage, Speed, Cost;
+            public readonly int Range;
+            public BenchTowerSpec(TowerType type, float x, float y, float damage, int range, float speed, float cost)
+            {
+                Type = type; X = x; Y = y; Damage = damage; Range = range; Speed = speed; Cost = cost;
+            }
+        }
+
+        // 8 Basic + 4 Sniper + 4 AOE + 4 Tesla，对齐 per-type cap，覆盖 y=4..16 交战带。
+        private static readonly BenchTowerSpec[] FullTowerLoadout =
+        {
+            new BenchTowerSpec(TowerType.Sniper, 1f, 16f, 25f, 5, 0.8f, 200f),
+            new BenchTowerSpec(TowerType.Sniper, 3f, 16f, 25f, 5, 0.8f, 200f),
+            new BenchTowerSpec(TowerType.Sniper, 6f, 16f, 25f, 5, 0.8f, 200f),
+            new BenchTowerSpec(TowerType.Sniper, 8f, 16f, 25f, 5, 0.8f, 200f),
+            new BenchTowerSpec(TowerType.Tesla, 1f, 13f, 18f, 3, 1.2f, 120f),
+            new BenchTowerSpec(TowerType.Tesla, 3f, 13f, 18f, 3, 1.2f, 120f),
+            new BenchTowerSpec(TowerType.Tesla, 6f, 13f, 18f, 3, 1.2f, 120f),
+            new BenchTowerSpec(TowerType.Tesla, 8f, 13f, 18f, 3, 1.2f, 120f),
+            new BenchTowerSpec(TowerType.AOE, 1f, 10f, 20f, 3, 1.0f, 150f),
+            new BenchTowerSpec(TowerType.AOE, 3f, 10f, 20f, 3, 1.0f, 150f),
+            new BenchTowerSpec(TowerType.AOE, 6f, 10f, 20f, 3, 1.0f, 150f),
+            new BenchTowerSpec(TowerType.AOE, 8f, 10f, 20f, 3, 1.0f, 150f),
+            new BenchTowerSpec(TowerType.Basic, 1f, 7f, 15f, 3, 1.0f, 50f),
+            new BenchTowerSpec(TowerType.Basic, 3f, 7f, 15f, 3, 1.0f, 50f),
+            new BenchTowerSpec(TowerType.Basic, 6f, 7f, 15f, 3, 1.0f, 50f),
+            new BenchTowerSpec(TowerType.Basic, 8f, 7f, 15f, 3, 1.0f, 50f),
+            new BenchTowerSpec(TowerType.Basic, 2f, 4f, 15f, 3, 1.0f, 50f),
+            new BenchTowerSpec(TowerType.Basic, 4f, 4f, 15f, 3, 1.0f, 50f),
+            new BenchTowerSpec(TowerType.Basic, 5f, 4f, 15f, 3, 1.0f, 50f),
+            new BenchTowerSpec(TowerType.Basic, 7f, 4f, 15f, 3, 1.0f, 50f),
+        };
+
+        private static readonly BenchTowerSpec[] ObservationTowerLoadout =
+        {
+            new BenchTowerSpec(TowerType.Basic, 2f, 5f, 15f, 3, 1.5f, 100f),
+            new BenchTowerSpec(TowerType.Basic, 7f, 5f, 15f, 3, 1.5f, 100f),
+            new BenchTowerSpec(TowerType.AOE, 2f, 9f, 20f, 3, 1.0f, 150f),
+            new BenchTowerSpec(TowerType.Sniper, 7f, 9f, 25f, 5, 0.8f, 200f),
+            new BenchTowerSpec(TowerType.Tesla, 2f, 13f, 18f, 3, 1.2f, 120f),
+            new BenchTowerSpec(TowerType.Basic, 7f, 13f, 15f, 3, 1.5f, 100f),
+            new BenchTowerSpec(TowerType.Sniper, 4f, 16f, 25f, 5, 0.8f, 200f),
+            new BenchTowerSpec(TowerType.AOE, 6f, 16f, 20f, 3, 1.0f, 150f),
+        };
 
         private ComponentStore store;
         private BenchmarkCompositionContract _executedComposition;
@@ -83,6 +146,9 @@ namespace BattleSystemECS.Systems
         private string _compositionFingerprint=string.Empty;
         private readonly int[] _stateEntryCounts=new int[Enum.GetValues(typeof(GameState)).Length];
         private GameState _finalState=GameState.Init;
+        private int _populationMin;
+        private int _populationMax;
+        private int _populationEnd;
 
         public BenchmarkSystem(ComponentStore store) { this.store = store; }
 
@@ -103,6 +169,76 @@ namespace BattleSystemECS.Systems
             return Dispatch(GetScenarioDefinition(mode).ForHarness(enemyCount));
         }
 
+        private void SpawnFixedCombatPopulation(int count, GameConfig gameConfig, Random random)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                float x = random.Next(0, 10);
+                float y = (float)random.Next(10, 19);
+                int id = store.AddEnemy(x, y, BENCH_ENEMY_SPEED, BENCH_ENEMY_HEALTH, BENCH_ENEMY_HEALTH, 10f, 0, 1);
+                store.SetEnemyAIAction(id, "");
+                store.SetEntityName(id, $"NormalL1W1E{i}");
+                store.EnemyBehaviorTree[id] = gameConfig.GetCachedBehaviorTree("Normal");
+            }
+        }
+
+        private int PlaceBenchmarkTowers(BenchTowerSpec[] loadout)
+        {
+            for (int i = 0; i < loadout.Length; i++)
+            {
+                BenchTowerSpec spec = loadout[i];
+                int id = store.CreateEntity();
+                store.AddTower(id, spec.Type, spec.Damage, spec.Range, spec.Speed, 1, spec.Cost);
+                store.PositionX[id] = spec.X;
+                store.PositionY[id] = spec.Y;
+            }
+            store.RebuildSpatialGrid();
+            return loadout.Length;
+        }
+
+        private static void ScaleBenchmarkWaves(GameConfig gameConfig, int multiplier)
+        {
+            if (gameConfig?.Levels == null || multiplier == 1) return;
+            for (int li = 0; li < gameConfig.Levels.Count; li++)
+            {
+                var level = gameConfig.Levels[li];
+                if (level?.Waves == null) continue;
+                for (int wi = 0; wi < level.Waves.Count; wi++)
+                {
+                    var wave = level.Waves[wi];
+                    if (wave == null) continue;
+                    wave.EnemyCount *= multiplier;
+                    wave.ExpectedKillCount *= multiplier;
+                    if (wave.EnemyTypes == null) continue;
+                    for (int ti = 0; ti < wave.EnemyTypes.Count; ti++)
+                    {
+                        var entry = wave.EnemyTypes[ti];
+                        if (entry != null) entry.Count *= multiplier;
+                    }
+                }
+            }
+        }
+
+        private void NotePopulation()
+        {
+            int n = store.GetActiveEnemyCount();
+            if (n < _populationMin) _populationMin = n;
+            if (n > _populationMax) _populationMax = n;
+        }
+
+        private void WriteFixedPopulationReport(int expected, int frames, double msTotal)
+        {
+            _populationEnd = store.GetActiveEnemyCount();
+            bool valid = expected > 0 && _populationMin == expected && _populationMax == expected &&
+                         _populationEnd == expected;
+            double fps = 1000.0 / (msTotal / frames);
+            Console.WriteLine($"[BENCHMARK] Contract: fixed-population {expected} alive × {frames} frames (high-HP, speed 0, no extra waves)");
+            Console.WriteLine($"[BENCHMARK] Population: min={_populationMin} max={_populationMax} end={_populationEnd} kills={store.TotalKills} DeathResolve={store.DeathResolveCount} valid={(valid ? "true" : "FALSE")}");
+            Console.WriteLine($"[BENCHMARK] Throughput: {fps:F0} FPS  ({msTotal/frames:F2} ms/frame)");
+            if (!valid)
+                Console.WriteLine("[BENCHMARK] INVALID: population drifted; FPS is not a 10K-load measurement.");
+        }
+
         private BenchmarkExecutionEvidence Dispatch(BenchmarkScenarioDefinition definition)
         {
             _executedComposition=definition.Composition;
@@ -114,6 +250,9 @@ namespace BattleSystemECS.Systems
             _compositionFingerprint=string.Empty;
             Array.Clear(_stateEntryCounts,0,_stateEntryCounts.Length);
             _finalState=GameState.Init;
+            _populationMin=int.MaxValue;
+            _populationMax=0;
+            _populationEnd=0;
             switch(definition.Runner)
             {
                 case BenchmarkRunnerKind.ManualMerged:
@@ -129,7 +268,18 @@ namespace BattleSystemECS.Systems
                     throw new ArgumentOutOfRangeException(nameof(definition),definition.Runner,"Unsupported benchmark runner.");
             }
             return new BenchmarkExecutionEvidence(_executedComposition,_executedFrames,_beginFrameCalls,
-                _manualMergedCalls,_graphTickCalls,_graphSealed,_compositionFingerprint,_finalState,_stateEntryCounts);
+                _manualMergedCalls,_graphTickCalls,_graphSealed,_compositionFingerprint,_finalState,_stateEntryCounts,
+                _populationMin==int.MaxValue?0:_populationMin,_populationMax,_populationEnd,store.TotalKills);
+        }
+
+        internal BenchmarkExecutionEvidence RunFixedPopulationSample(int mode,int enemyCount,int frames)
+        {
+            var baseline=GetScenarioDefinition(mode);
+            if(baseline.Runner==BenchmarkRunnerKind.GraphFullGame)
+                throw new ArgumentOutOfRangeException(nameof(mode),"mode 5 is a full-game observation, not fixed-population.");
+            var definition=new BenchmarkScenarioDefinition(baseline.Mode,baseline.Runner,baseline.Composition,
+                enemyCount,frames,0,baseline.ScenarioKind,false);
+            return Dispatch(definition);
         }
 
         public void RunBenchmark(int scenario)
@@ -150,8 +300,8 @@ namespace BattleSystemECS.Systems
 
         private void RunMergedSystemBenchmark(int scenario,int frames,int warmupFrames)
         {
-            _compositionFingerprint="manual-merged-loop:v1";
-            Console.WriteLine($"\n[BENCHMARK] Full 12-System Benchmark: {scenario} entities");
+            _compositionFingerprint=MergedLoopFingerprint;
+            Console.WriteLine($"\n[BENCHMARK] Merged hot path (fixed population): {scenario} entities");
             Console.WriteLine($"[BENCHMARK] Composition: {_compositionFingerprint} (lower bound; not production FrameGraph wiring evidence).");
             Console.WriteLine($"[BENCHMARK] Composition-Fingerprint: {_compositionFingerprint}");
 
@@ -170,19 +320,10 @@ namespace BattleSystemECS.Systems
             store.SetPlayerGold(playerId, 9999f);
 
             var random = new Random(42);
-            for (int i = 0; i < scenario; i++)
-            {
-                float x = random.Next(0, 10);
-                float y = (float)random.Next(10, 19);
-                int id = store.AddEnemy(x, y, 1f, BENCH_ENEMY_HEALTH, BENCH_ENEMY_HEALTH, 10f, 10, 1);
-                store.SetEnemyAIAction(id, "");
-                store.SetEntityName(id, $"NormalL1W1E{i}");
-                store.EnemyBehaviorTree[id] = gameConfig.GetCachedBehaviorTree("Normal");
-            }
-            Console.WriteLine($"[BENCHMARK] Spawned {scenario} enemies");
+            SpawnFixedCombatPopulation(scenario, gameConfig, random);
+            Console.WriteLine($"[BENCHMARK] Spawned {scenario} enemies (health={BENCH_ENEMY_HEALTH:E0}, speed={BENCH_ENEMY_SPEED})");
 
-            // 13 active game systems (EnemyAbilitySystem included)
-            var waveSpawning   = new WaveSpawningSystem(store, logger, gameConfig);
+            // 固定人口吞吐：不跑 WaveSpawning，避免补波或把战场打空。
             var enemyAbility   = new EnemyAbilitySystem(store, logger, playerId, gameConfig);
             var benchTechTree  = new TechTreeSystem(store, logger, playerId, null, gameConfig);
             var enemyAI       = new EnemyAISystem(store, logger, playerId, gameConfig, enemyAbility, benchTechTree);
@@ -206,14 +347,8 @@ namespace BattleSystemECS.Systems
             var pathfinding  = new PathfindingSystem(store);
             enemyMovement.SetPathfindingSystem(pathfinding);
 
-            // Place towers — use AddTower so ActiveTowerIds is populated (matching real game flow)
-            int t1 = store.CreateEntity();
-            store.AddTower(t1, TowerType.Basic, 15f, 3, 1f, 1, 50f);
-            store.PositionX[t1] = 3f; store.PositionY[t1] = 15f;
-
-            int t2 = store.CreateEntity();
-            store.AddTower(t2, TowerType.Sniper, 25f, 5, 1f, 1, 100f);
-            store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
+            int towers = PlaceBenchmarkTowers(FullTowerLoadout);
+            Console.WriteLine($"[BENCHMARK] Towers: {towers} (full cap {BenchFullTowerCount})");
 
             // Warm-up (BeginFrame is optional since Resolve clears _deathQueue)
             for (int f = 0; f < warmupFrames; f++)
@@ -230,7 +365,7 @@ namespace BattleSystemECS.Systems
 
             ConsoleLogger.EnableLog = false;
 
-            long tWaveSpawn = 0, tEnemyAI = 0, tMoveAttack = 0;
+            long tEnemyAI = 0, tMoveAttack = 0;
             long tTowerAttack = 0, tGold = 0;
             long tUpgrade = 0, tSkill = 0, tMap = 0;
             long tGridRebuild = 0;
@@ -251,7 +386,7 @@ namespace BattleSystemECS.Systems
                 _executedFrames++;
                 var sw = new Stopwatch();
 
-                sw.Start(); waveSpawning.Update(); tWaveSpawn += sw.ElapsedTicks;
+                // WaveSpawning 故意不跑：固定人口合同。
                 sw.Restart(); enemyAI.SetTurn(turn); enemyAI.Update(); tEnemyAI += sw.ElapsedTicks;
                 sw.Restart(); store.RebuildSpatialGrid(); tGridRebuild += sw.ElapsedTicks;
                 sw.Restart();
@@ -343,6 +478,7 @@ namespace BattleSystemECS.Systems
                 long tSkillAndBuff = sw.ElapsedTicks;
                 sw.Restart(); tSkill += tSkillAndBuff;
                 /* map.Update() = skip */
+                NotePopulation();
             }
 
             totalSw.Stop();
@@ -350,11 +486,10 @@ namespace BattleSystemECS.Systems
 
             double ticksPerMs = Stopwatch.Frequency / 1000.0;
             double msTotal = totalSw.Elapsed.TotalMilliseconds;
-            double fps = 1000.0 / (msTotal / frames);
 
             Console.WriteLine($"\n[BENCHMARK] Per-system timing ({frames} frames, {scenario} enemies):");
-            Console.WriteLine($"[BENCHMARK]   WaveSpawning:   {tWaveSpawn/ticksPerMs,7:F2} ms  ({tWaveSpawn/ticksPerMs/msTotal*100,5:F1}%)");
-Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms  ({tEnemyAI/ticksPerMs/msTotal*100,5:F1}%)");
+            Console.WriteLine($"[BENCHMARK]   WaveSpawning:   (suppressed; fixed-population contract)");
+            Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms  ({tEnemyAI/ticksPerMs/msTotal*100,5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   GridRebuild:   {tGridRebuild/ticksPerMs,7:F2} ms  ({tGridRebuild/ticksPerMs/msTotal*100,5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   MoveAttack:     {tMoveAttack/ticksPerMs,7:F2} ms  ({tMoveAttack/ticksPerMs/msTotal*100,5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   TowerAttack:    {tTowerAttack/ticksPerMs,7:F2} ms  ({tTowerAttack/ticksPerMs/msTotal*100,5:F1}%)");
@@ -364,7 +499,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             Console.WriteLine($"[BENCHMARK]   Map:            {tMap/ticksPerMs,7:F2} ms  ({tMap/ticksPerMs/msTotal*100,5:F1}%)");
             Console.WriteLine($"[BENCHMARK]   ----------------------------------------");
             Console.WriteLine($"[BENCHMARK]   TOTAL:          {msTotal,7:F2} ms");
-            Console.WriteLine($"\n[BENCHMARK] Throughput: {fps:F0} FPS  ({msTotal/frames:F2} ms/frame)");
+            WriteFixedPopulationReport(scenario, frames, msTotal);
         }
 
         private void RunMicroBenchmark(int enemyCount, int frames)
@@ -383,12 +518,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             store.SetPlayerGold(playerId, 9999f);
 
             var random = new Random(42);
-            for (int i = 0; i < enemyCount; i++)
-            {
-                int id = store.AddEnemy(random.Next(0, 10), random.Next(10, 19), 1f, BENCH_ENEMY_HEALTH, BENCH_ENEMY_HEALTH, 10f, 10, 1);
-                store.SetEntityName(id, $"NormalL1W1E{i}");
-                store.EnemyBehaviorTree[id] = gameConfig.GetCachedBehaviorTree("Normal");
-            }
+            SpawnFixedCombatPopulation(enemyCount, gameConfig, random);
 
             var activeEnemyIds = store.GetAllActiveEnemyIds();
             int totalIters = enemyCount * frames;
@@ -468,7 +598,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
         // ── 模式 4：生产 Registry FrameGraph 压测 ──────────────────────────────────
         private void RunProductionGraphBenchmark(BenchmarkScenarioDefinition definition)
         {
-            Console.WriteLine($"\n[BENCHMARK] Production FrameGraph: {definition.EnemyCount} enemies x {definition.Frames} frames");
+            Console.WriteLine($"\n[BENCHMARK] Production FrameGraph (fixed population): {definition.EnemyCount} enemies x {definition.Frames} frames");
 
             var logger = new ConsoleLogger();
             var gameConfig = GameConfigLoader.LoadConfig(logger);
@@ -496,29 +626,18 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             Console.WriteLine($"[BENCHMARK] Composition-Fingerprint: {_compositionFingerprint}");
 
             var random = new Random(42);
-            for (int i = 0; i < definition.EnemyCount; i++)
-            {
-                float x = random.Next(0, 10);
-                float y = (float)random.Next(10, 19);
-                int id = store.AddEnemy(x, y, 1f, BENCH_ENEMY_HEALTH, BENCH_ENEMY_HEALTH, 10f, 10, 1);
-                store.SetEnemyAIAction(id, "");
-                store.SetEntityName(id, $"NormalL1W1E{i}");
-                store.EnemyBehaviorTree[id] = gameConfig.GetCachedBehaviorTree("Normal");
-            }
+            SpawnFixedCombatPopulation(definition.EnemyCount, gameConfig, random);
 
-            int t1 = store.CreateEntity();
-            store.AddTower(t1, TowerType.Basic, 15f, 3, 1f, 1, 50f);
-            store.PositionX[t1] = 3f; store.PositionY[t1] = 15f;
-
-            int t2 = store.CreateEntity();
-            store.AddTower(t2, TowerType.Sniper, 25f, 5, 1f, 1, 100f);
-            store.PositionX[t2] = 7f; store.PositionY[t2] = 15f;
+            int towers = PlaceBenchmarkTowers(FullTowerLoadout);
+            Console.WriteLine($"[BENCHMARK] Towers: {towers} (full cap {BenchFullTowerCount})");
 
             TransitionBenchmarkState(runtime.StateMachine,GameState.WavePhase);
 
             if(definition.IsHarness)
             {
                 RunGraphFrame(scheduler,1);
+                NotePopulation();
+                _populationEnd=store.GetActiveEnemyCount();
                 return;
             }
 
@@ -526,17 +645,18 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             var totalSw = Stopwatch.StartNew();
 
             for (int f = 0; f < definition.Frames; f++)
+            {
                 RunGraphFrame(scheduler,f+6);
+                NotePopulation();
+            }
 
             totalSw.Stop();
             ConsoleLogger.EnableLog = true;
 
             double msTotal = totalSw.Elapsed.TotalMilliseconds;
-            double fps = 1000.0 / (msTotal / definition.Frames);
-
             Console.WriteLine($"\n[BENCHMARK] Production FrameGraph timing ({definition.Frames} frames, {definition.EnemyCount} enemies):");
             Console.WriteLine($"[BENCHMARK]   TOTAL:          {msTotal,7:F2} ms");
-            Console.WriteLine($"\n[BENCHMARK] Throughput: {fps:F0} FPS  ({msTotal/definition.Frames:F2} ms/frame)");
+            WriteFixedPopulationReport(definition.EnemyCount, definition.Frames, msTotal);
         }
 
         /// <summary>
@@ -549,6 +669,8 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
 
             var logger = new ConsoleLogger();
             var gameConfig = GameConfigLoader.LoadConfig(logger);
+            if (!definition.IsHarness)
+                ScaleBenchmarkWaves(gameConfig, BenchWaveCountMultiplier);
 
             int playerId = 1;
             store.AddPlayer(playerId, 10f, 1f, 50f, 1, 20);
@@ -565,6 +687,8 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             FrameScheduler scheduler = runtime.Scheduler;
             WaveSpawningSystem waveSpawning = runtime.Registry.WaveSpawning
                 ?? throw new InvalidOperationException("Production benchmark requires WaveSpawningSystem.");
+            if (!definition.IsHarness)
+                waveSpawning.SetSpawnBatchSize(BenchObservationSpawnBatch);
             SkillSystem skill = runtime.Registry.Skill
                 ?? throw new InvalidOperationException("Production benchmark requires SkillSystem.");
             _graphSealed=scheduler.IsCompositionSealed;
@@ -574,14 +698,10 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             Console.WriteLine($"[BENCHMARK] Composition: production-registry-frame-graph ({runtime.Fingerprint}).");
             Console.WriteLine($"[BENCHMARK] Composition-Fingerprint: {_compositionFingerprint}");
 
-            // 放塔（对齐交互式游戏）
-            int t1 = store.CreateEntity();
-            store.PositionX[t1] = 2f; store.PositionY[t1] = 5f;
-            store.AddTower(t1, TowerType.Basic, 15f, 3, 1.5f, 1, 100f);
-
-            int t2 = store.CreateEntity();
-            store.PositionX[t2] = 7f; store.PositionY[t2] = 12f;
-            store.AddTower(t2, TowerType.Sniper, 25f, 5, 0.8f, 1, 200f);
+            int towers = PlaceBenchmarkTowers(ObservationTowerLoadout);
+            Console.WriteLine($"[BENCHMARK] Towers: {towers} (observation loadout, {BenchObservationTowerCount} expected)");
+            if (!definition.IsHarness)
+                Console.WriteLine($"[BENCHMARK] Waves: EnemyCount ×{BenchWaveCountMultiplier}, spawn batch {BenchObservationSpawnBatch} (in-memory only; game_config.json unchanged)");
 
             if(definition.IsHarness)
             {
@@ -624,6 +744,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
                 {
                     totalFrames++;
                     RunGraphFrame(scheduler,totalFrames);
+                    NotePopulation();
                 }
 
                 // ── WavePhase ───────────────────────────────────
@@ -638,6 +759,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
                     int spawningLevelBefore=waveSpawning.GetCurrentLevel();
                     totalFrames++;
                     RunGraphFrame(scheduler,totalFrames);
+                    NotePopulation();
 
                     // 游戏结束检测：玩家死亡
                     if (store.PlayerCurrentHealth[playerId] <= 0f)
@@ -692,6 +814,7 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
                         TransitionBenchmarkState(runtime.StateMachine,GameState.Intermission);
                         totalFrames++;
                         RunGraphFrame(scheduler,totalFrames);
+                        NotePopulation();
                         TransitionBenchmarkState(runtime.StateMachine,GameState.WavePhase);
                     }
                 }
@@ -718,10 +841,12 @@ Console.WriteLine($"[BENCHMARK]   EnemyAI:        {tEnemyAI/ticksPerMs,7:F2} ms 
             double msTotal = totalSw.Elapsed.TotalMilliseconds;
             double fps = 1000.0 * totalFrames / msTotal;
 
-            Console.WriteLine($"\n[BENCHMARK] Full Game Results:");
+            Console.WriteLine($"\n[BENCHMARK] Full Game Results (dynamic population; not a 10K hold):");
             Console.WriteLine($"[BENCHMARK]   End reason:  {endReason}");
             Console.WriteLine($"[BENCHMARK]   Levels:      {completedLevels}/{maxLevels}");
             Console.WriteLine($"[BENCHMARK]   Total frames: {totalFrames}");
+            Console.WriteLine($"[BENCHMARK]   Enemy pop:   peak={_populationMax} end={store.GetActiveEnemyCount()}");
+            Console.WriteLine($"[BENCHMARK]   Towers:      {store.ActiveTowerIds.Count}");
             Console.WriteLine($"[BENCHMARK]   Wall-clock:  {msTotal:F2} ms ({msTotal/1000:F2} s)");
             Console.WriteLine($"[BENCHMARK]   Avg frame:   {msTotal/totalFrames:F3} ms/frame");
             Console.WriteLine($"[BENCHMARK]   Throughput:  {fps:F0} FPS");

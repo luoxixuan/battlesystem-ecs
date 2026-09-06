@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-09-06（压测改为固定人口吞吐）
+- **mode 2/4**：测量帧内钉住目标人口（开局 HP=`1e9`、移速 0、mode 2 不再跑 WaveSpawning）。禁止「秒杀后测空场」刷 FPS；人口漂移则打印 `valid=FALSE`。铺满 **20** 座开火塔（8 Basic + 4 Sniper + 4 AOE + 4 Tesla）。
+- **死亡抽干**：一帧击杀超过事件槽（8192）时按能装下的前缀提交，其余留到下一帧。此前 10K 整批预留失败会导致 500 帧零击杀。
+- **mode 5**：完整局观察，放 **8** 座塔；内存里把每波 `EnemyCount` ×3（30→90），每帧出怪批量 5→15。不改 `game_config.json`。输出人口峰值；不当作 10K 固定负载。
+- 仍 DEFERRED：mode 2/4/5 与 Unity，不写入 PASS manifest。
+
 ### 2026-09-06（Cancelled 整单：截断 granted GE + 退款当场生效）
 - **granted GE 泄漏**：`CommitPlan` 失败时把 `EffectRequests` 截断到本单入队前水位。生产 Defer 下 Cancelled 的 Buff 不再在 `effect.commit` 落地。当场伤害仍无法撤回，继续单列。
 - **退款当场**：退款走 `TryApplyImmediate(Add)`，生产 Tick deferred 打开时也不进 pending；`Accepted && Applied == amount`。每个非零 cost 预留 2 个 Resource 事件（Spend + 失败退款）。

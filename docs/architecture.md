@@ -162,7 +162,7 @@ List<int> ActiveTowerIds             // 仅活跃塔 ID（并行遍历用）
 | BuffSystem | Systems/ | 持续伤害（DoT）追踪 | Periodic EffectType；ping-pong 双缓冲 DoT 伤害队列；`ApplyDot`/`Update`/`ResolveDotDamage` |
 | EnemyAbilitySystem | Systems/ | 敌人技能系统 | `UpdateCooldowns`/`ExecuteAbilities`/`Update`；FrameScheduler 已集成；冷却/Buff/自疗/AoE |
 | AutoSkillSystem | Systems/ | BuildPhase 自动施放技能 | 冷却保护（`MinCooldownToConsider`）+ 选优策略（CoolestFirst/CooldownShortest/DamageHighest/AoeLargest/Random）；调用 `SkillSystem.CastSkill()`；**不影响战斗帧预算** |
-| BenchmarkSystem | Systems/ | 性能压测 | **dual mode**：mode 2 合并热路径 / mode 4 真实系统链路，各独立计时 |
+| BenchmarkSystem | Systems/ | 性能压测 | mode 2/4 固定人口吞吐（测量帧钉住目标存活数）；mode 5 完整局观察 |
 ---
 
 ## 6. GAS 模块（Core/GAS/）

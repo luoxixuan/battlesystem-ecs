@@ -291,6 +291,16 @@ namespace BattleSystemECS.Systems
         public int GetTotalEnemiesSpawned() => totalEnemiesSpawned;
 
         /// <summary>
+        /// 压测用：改每帧出怪批量。生产路径继续读 <c>wave_spawn.json</c>。
+        /// </summary>
+        internal void SetSpawnBatchSize(int batchSize)
+        {
+            if (batchSize < 1)
+                throw new ArgumentOutOfRangeException(nameof(batchSize));
+            spawnConfig.SpawnBatchSize = batchSize;
+        }
+
+        /// <summary>
         /// Injects extra enemies mid-wave (for Ambush random event).
         /// Adds count enemies immediately without resetting multi-type state.
         /// </summary>
@@ -617,8 +627,8 @@ namespace BattleSystemECS.Systems
             {
                 DeterminismContext random = store.Determinism;
 
-                // Batch spawn 5 enemies
-                for (int i = 0; i < 5; i++)
+                int batchSize = spawnConfig.SpawnBatchSize > 0 ? spawnConfig.SpawnBatchSize : 5;
+                for (int i = 0; i < batchSize; i++)
                 {
                     // Advance to next type if current is exhausted
                     while (_multiTypeIndex < _multiTypes.Length)
@@ -1085,7 +1095,7 @@ namespace BattleSystemECS.Systems
                     }
                 }
 
-                renderer.Log($"[SPAWN] Spawned {enemiesSpawnedInWave} enemies (batch 5) for Wave {currentWave}");
+                renderer.Log($"[SPAWN] Spawned {enemiesSpawnedInWave} enemies (batch {spawnConfig.SpawnBatchSize}) for Wave {currentWave}");
             }
             else
             {

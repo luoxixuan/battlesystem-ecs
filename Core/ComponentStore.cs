@@ -291,6 +291,8 @@ namespace BattleSystemECS.Core
         private readonly struct DeathEntry { public readonly int EnemyId, PlayerId, Generation; public readonly long Sequence; public readonly GAS.EntityHandle Source; public DeathEntry(int enemyId, int playerId, int generation, long sequence, GAS.EntityHandle source) { EnemyId = enemyId; PlayerId = playerId; Generation = generation; Sequence = sequence; Source = source; } }
         private ConcurrentBag<DeathEntry>[] _deathQueue = new ConcurrentBag<DeathEntry>[2];
         private int _deathQueueIdx = 0;
+        private readonly List<DeathEntry> _deathBatch = new List<DeathEntry>(256);
+        private int _preparedDeathCount;
 
         // Tower kill queue: (enemyId, playerId, towerId) — parallel-safe
         private ConcurrentBag<(int, int, int)>[] _towerKillQueue = new ConcurrentBag<(int, int, int)>[2];
@@ -540,17 +542,18 @@ namespace BattleSystemECS.Core
         /// </summary>
         public void ResolveEnemiesKilledThisFrame()
         {
-            PrepareEnemiesKilledThisFrame();
+            if (!TryPrepareDeathBatch()) return;
             DispatchPreparedEnemyDeaths();
         }
 
-        private int CountPendingDeathResourceFacts()
+        private int CountDeathResourceFacts(List<DeathEntry> batch, int take)
         {
             int count = 0;
-            foreach (var entry in _deathQueue[_deathQueueIdx])
+            int n = take < batch.Count ? take : batch.Count;
+            for (int i = 0; i < n; i++)
             {
+                var entry = batch[i];
                 int enemyId = entry.EnemyId;
-                if (!IsValidEntity(enemyId) || !EnemyActive[enemyId] || GetEntityHandle(enemyId).Generation != entry.Generation) continue;
                 int playerId = entry.PlayerId;
                 float gold = (EnemyHasStolenGold[enemyId] ? EnemyGoldOnReturn[enemyId] : EnemyGoldReward[enemyId]) * _goldKillMultiplier * _allIncomeMultKill * PlayerComboGoldMult[playerId];
                 if (EnemyIsBounty[enemyId]) gold *= EnemyBountyGoldMult[enemyId];
@@ -568,37 +571,95 @@ namespace BattleSystemECS.Core
             return count;
         }
 
+        private int FindLargestDeathFit(int pending)
+        {
+            int lo = 1, hi = pending, best = 0;
+            while (lo <= hi)
+            {
+                int mid = lo + ((hi - lo) >> 1);
+                int resNeed = CountDeathResourceFacts(_deathBatch, mid);
+                if (DamageResolver.Events.CanPublish(mid, true) &&
+                    ResourceResolver.Events.CanPublish(resNeed, true))
+                {
+                    best = mid;
+                    lo = mid + 1;
+                }
+                else hi = mid - 1;
+            }
+            return best;
+        }
+
         private int _preparedDeathReadIdx=-1;
         private int _preparedDeathWriteIdx=-1;
         private GameplayEventQueue.GameplayEventReservation _deathReservation;
 
         internal void PrepareEnemiesKilledThisFrame()
         {
-            if(_preparedDeathReadIdx>=0)throw new InvalidOperationException("Prepared death callbacks must be dispatched before preparing another batch.");
-            int pendingDeaths = CountPendingDeathKillFacts();
-            if (pendingDeaths > 0)
-            {
-                _deathReservation = GameplayEventQueue.TryReserveAtomic(DamageResolver.Events, pendingDeaths,
-                    ResourceResolver.Events, CountPendingDeathResourceFacts());
-                if (_deathReservation == null)
-                {
-                    DamageResolver.MarkEventPublicationFailure(true);
-                    _deathResolveBlocked = true;
-                    return;
-                }
-            }
-            _preparedDeathReadIdx=_deathQueueIdx;
-            _preparedDeathWriteIdx=1-_deathQueueIdx;
-            _deathQueueIdx=_preparedDeathWriteIdx;
+            TryPrepareDeathBatch();
         }
 
-        private int CountPendingDeathKillFacts()
+        /// <summary>
+        /// 死亡预留按当前事件槽能装下的最大前缀切分。10K 击杀超过 8192 槽时先抽干能装下的，其余留到下一帧。
+        /// 整批失败会让敌人永远活着，压测 FPS 从数千掉到一两百。
+        /// </summary>
+        private bool TryPrepareDeathBatch()
         {
-            int count = 0;
-            foreach (var entry in _deathQueue[_deathQueueIdx])
-                if (IsValidEntity(entry.EnemyId) && EnemyActive[entry.EnemyId] &&
-                    GetEntityHandle(entry.EnemyId).Generation == entry.Generation) count++;
-            return count;
+            if (_preparedDeathReadIdx >= 0)
+                throw new InvalidOperationException("Prepared death callbacks must be dispatched before preparing another batch.");
+            _deathBatch.Clear();
+            _preparedDeathCount = 0;
+            var source = _deathQueue[_deathQueueIdx];
+            DeathEntry taken;
+            while (source.TryTake(out taken))
+                _deathBatch.Add(taken);
+            int write = 0;
+            for (int i = 0; i < _deathBatch.Count; i++)
+            {
+                var entry = _deathBatch[i];
+                int enemyId = entry.EnemyId;
+                if (!IsValidEntity(enemyId) || !EnemyActive[enemyId] ||
+                    GetEntityHandle(enemyId).Generation != entry.Generation)
+                {
+                    if (IsValidEntity(enemyId)) Volatile.Write(ref _enemyDeathPending[enemyId], 0);
+                    continue;
+                }
+                _deathBatch[write++] = entry;
+            }
+            if (write < _deathBatch.Count) _deathBatch.RemoveRange(write, _deathBatch.Count - write);
+            int pending = _deathBatch.Count;
+            int best = pending == 0 ? 0 : FindLargestDeathFit(pending);
+            if (pending > 0 && best == 0)
+            {
+                for (int i = 0; i < pending; i++)
+                    source.Add(_deathBatch[i]);
+                _deathBatch.Clear();
+                DamageResolver.MarkEventPublicationFailure(true);
+                _deathResolveBlocked = true;
+                return false;
+            }
+            if (best > 0)
+            {
+                int resNeed = CountDeathResourceFacts(_deathBatch, best);
+                _deathReservation = GameplayEventQueue.TryReserveAtomic(DamageResolver.Events, best,
+                    ResourceResolver.Events, resNeed);
+                if (_deathReservation == null)
+                {
+                    for (int i = 0; i < pending; i++)
+                        source.Add(_deathBatch[i]);
+                    _deathBatch.Clear();
+                    DamageResolver.MarkEventPublicationFailure(true);
+                    _deathResolveBlocked = true;
+                    return false;
+                }
+            }
+            _preparedDeathReadIdx = _deathQueueIdx;
+            _preparedDeathWriteIdx = 1 - _deathQueueIdx;
+            _deathQueueIdx = _preparedDeathWriteIdx;
+            _preparedDeathCount = best;
+            for (int i = best; i < pending; i++)
+                _deathQueue[_deathQueueIdx].Add(_deathBatch[i]);
+            if (pending > best) _deathBatch.RemoveRange(best, pending - best);
+            return true;
         }
 
         internal void DispatchPreparedEnemyDeaths()
@@ -609,9 +670,9 @@ namespace BattleSystemECS.Core
                 throw new InvalidOperationException("Death callbacks require a prepared death batch.");
             }
             int readIdx=_preparedDeathReadIdx;
-            int writeIdx=_preparedDeathWriteIdx;
-            foreach (var entry in _deathQueue[readIdx])
+            for (int i = 0; i < _preparedDeathCount; i++)
             {
+                var entry = _deathBatch[i];
                 int enemyId = entry.EnemyId; int playerId = entry.PlayerId;
                 if (GetEntityHandle(enemyId).Generation != entry.Generation) continue;
                 Volatile.Write(ref _enemyDeathPending[enemyId], 0);
@@ -706,14 +767,15 @@ namespace BattleSystemECS.Core
             // All required facts for the batch now exist. Public callbacks may re-enter
             // producers, but cannot starve a later death in this same commit.
             Exception callbackFailure = null;
-            foreach (var entry in _deathQueue[readIdx])
+            for (int i = 0; i < _preparedDeathCount; i++)
             {
+                var entry = _deathBatch[i];
                 int enemyId = entry.EnemyId;
                 if (GetEntityHandle(enemyId).Generation != entry.Generation || !EnemyActive[enemyId]) continue;
                 Action<int, int>[] subscribers = Volatile.Read(ref _enemyKilledSubscribers);
-                for (int i = 0; i < subscribers.Length; i++)
+                for (int s = 0; s < subscribers.Length; s++)
                 {
-                    try { subscribers[i](enemyId, entry.PlayerId); }
+                    try { subscribers[s](enemyId, entry.PlayerId); }
                     catch (Exception ex) { if (callbackFailure == null) callbackFailure = ex; }
                 }
                 try { ResolveTowerKillsThisFrame(); }
@@ -724,6 +786,8 @@ namespace BattleSystemECS.Core
             _deathReservation?.Dispose();
             _deathReservation = null;
             _deathQueue[readIdx].Clear();
+            _deathBatch.Clear();
+            _preparedDeathCount = 0;
             _deathQueueResolved = true;
             _preparedDeathReadIdx=-1;
             _preparedDeathWriteIdx=-1;
