@@ -233,6 +233,7 @@ namespace BattleSystemECS.Tests.Framework
         {
             var store = PlayerStore();
             store.DeferAbilityAndEffectCommit = true;
+            store.ResourceResolver.EnableDeferred(true);
             store.PlayerMana[0] = 10f;
             int enemy = store.AddEnemy(0, 0, 1f, 100f, 100f, 1f, 1, 1);
             var catalog = Catalog(Execution(EffectPayloadKind.Damage, 5f, ExecutionOperation.ApplyDamage),
@@ -248,12 +249,64 @@ namespace BattleSystemECS.Tests.Framework
             Assert.False(committed.Accepted);
             Assert.Equal(AbilityActivationRejectReason.UnsupportedDefinition, committed.Reason);
             Assert.Equal(10f, store.PlayerMana[0]);
+            Assert.Equal(0, store.ResourceResolver.PendingRequestCount);
             Assert.Equal(100f, store.EnemyHealth[enemy]);
             Assert.Contains(Enumerable.Range(0, store.DamageResolver.Events.Count),
                 i => store.DamageResolver.Events.Get(i).Type == GameplayEventType.AbilityCancelled &&
                      store.DamageResolver.Events.Get(i).Reason == (int)AbilityActivationRejectReason.UnsupportedDefinition);
             Assert.DoesNotContain(Enumerable.Range(0, store.DamageResolver.Events.Count),
                 i => store.DamageResolver.Events.Get(i).Type == GameplayEventType.AbilityActivated);
+        }
+
+        [Fact]
+        public void HandlerCommitFailure_TruncatesGrantedEffectRequests()
+        {
+            var store = PlayerStore();
+            store.DeferAbilityAndEffectCommit = true;
+            store.PlayerMana[0] = 10f;
+            int enemy = store.AddEnemy(0, 0, 1f, 100f, 100f, 1f, 1, 1);
+            var catalog = CatalogWithGrantedEffect(new[] { new CostDefinition(new AttributeKey(7), 6f) });
+            var handler = new FailCommitHandler();
+            Assert.True(GameplayAbilityRuntime.Activate(store, catalog, new float[1], Request(enemy), handler).Accepted);
+
+            AbilityActivationResult committed = GameplayAbilityRuntime.CommitQueuedAbilities(store);
+
+            Assert.False(committed.Accepted);
+            Assert.Equal(0, store.EffectRequests.Count);
+            store.GameplayEffectsRuntime.CommitQueuedEffects();
+            Assert.Equal(0, store.GetEffectCount(enemy));
+            Assert.Equal(10f, store.PlayerMana[0]);
+        }
+
+        [Fact]
+        public void TwoCommitFailuresWithSameStickyRejection_MapEachTryApplyReason()
+        {
+            var store = PlayerStore();
+            store.DeferAbilityAndEffectCommit = true;
+            store.PlayerMana[0] = 0f;
+            int first = store.AddEnemy(0, 0, 1f, 100f, 100f, 1f, 1, 1);
+            int second = store.AddEnemy(1, 0, 1f, 100f, 100f, 1f, 1, 1);
+            var catalog = TwoDamageAbilities(0f, 0f);
+            var handler = new SpendFailHandler();
+            var cooldowns = new float[2];
+            Assert.True(GameplayAbilityRuntime.Activate(store, catalog, cooldowns,
+                new AbilityActivationRequest(0, 0, 0f, first, new AbilityId(0)), handler).Accepted);
+            Assert.True(GameplayAbilityRuntime.Activate(store, catalog, cooldowns,
+                new AbilityActivationRequest(0, 1, 0f, second, new AbilityId(1)), handler).Accepted);
+
+            AbilityActivationResult committed = GameplayAbilityRuntime.CommitQueuedAbilities(store);
+
+            Assert.False(committed.Accepted);
+            Assert.Equal(AbilityActivationRejectReason.Cost, committed.Reason);
+            int cancelled = 0;
+            for (int i = 0; i < store.DamageResolver.Events.Count; i++)
+            {
+                var ev = store.DamageResolver.Events.Get(i);
+                if (ev.Type == GameplayEventType.AbilityCancelled &&
+                    ev.Reason == (int)AbilityActivationRejectReason.Cost)
+                    cancelled++;
+            }
+            Assert.Equal(2, cancelled);
         }
 
         [Fact]
@@ -341,6 +394,20 @@ namespace BattleSystemECS.Tests.Framework
                 new Dictionary<string, AbilityId> { ["typed"] = ability.Id });
         }
 
+        private static GameplayCatalog CatalogWithGrantedEffect(CostDefinition[]? costs = null)
+        {
+            var targeting = new TargetingDefinition(new TargetingId(0), TargetingShape.Single, 10, 1, 1, 1);
+            var effect = DurationEffect(0);
+            var execution = Execution(EffectPayloadKind.Damage, 5f, ExecutionOperation.ApplyDamage);
+            var ability = new AbilityDefinition(new AbilityId(0), "typed", targeting, ClockId.Combat, 2f,
+                GameplayPhaseMask.Wave, new[] { effect.Id }, Array.Empty<ModifierDefinition>(),
+                CatalogRegistries.SkillExecutor, CatalogRegistries.SkillConsumer,
+                executions: new[] { execution.Id }, costs: costs ?? Array.Empty<CostDefinition>());
+            return new GameplayCatalog(new[] { ability }, new[] { targeting }, new[] { effect },
+                new[] { execution }, Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(),
+                new Dictionary<string, AbilityId> { ["typed"] = ability.Id });
+        }
+
         private static AbilityActivationRequest Request(int targetId) =>
             new AbilityActivationRequest(0, 0, 0f, targetId, new AbilityId(0));
 
@@ -348,7 +415,35 @@ namespace BattleSystemECS.Tests.Framework
         {
             public bool Supports(ExecutionDefinition execution) => true;
             public bool CanCommit(AbilityPayloadContext context) => true;
-            public int Commit(AbilityPayloadContext context) => -1;
+            public int Commit(AbilityPayloadContext context, out AbilityActivationRejectReason rejectReason)
+            {
+                rejectReason = AbilityActivationRejectReason.UnsupportedDefinition;
+                return -1;
+            }
+            public void ContributeCommitCapacity(AbilityPayloadContext context,
+                ref int resourceRequests, ref int resourceEvents, ref int damageRequests, ref int damageEvents)
+            { }
+        }
+
+        private sealed class SpendFailHandler : IAbilityPayloadHandler
+        {
+            public bool Supports(ExecutionDefinition execution) => true;
+            public bool CanCommit(AbilityPayloadContext context) => true;
+            public int Commit(AbilityPayloadContext context, out AbilityActivationRejectReason rejectReason)
+            {
+                var source = context.Source;
+                var spend = new ResourceRequest(source, source, new AttributeKey(7), 1f,
+                    ResourceOperation.Spend, 0, context.Store.AllocateGameplaySequence(source.Index),
+                    context.Request.OwnerPlayerId);
+                var result = context.Store.ResourceResolver.TryApply(spend);
+                if (result.Accepted)
+                {
+                    rejectReason = AbilityActivationRejectReason.None;
+                    return 1;
+                }
+                rejectReason = GameplayAbilityRuntime.MapResourceReject(result.Reason);
+                return -1;
+            }
             public void ContributeCommitCapacity(AbilityPayloadContext context,
                 ref int resourceRequests, ref int resourceEvents, ref int damageRequests, ref int damageEvents)
             { }

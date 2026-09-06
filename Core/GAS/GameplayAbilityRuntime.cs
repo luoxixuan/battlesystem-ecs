@@ -71,7 +71,7 @@ namespace BattleSystemECS.Core.GAS
     {
         bool Supports(ExecutionDefinition execution);
         bool CanCommit(AbilityPayloadContext context);
-        int Commit(AbilityPayloadContext context);
+        int Commit(AbilityPayloadContext context, out AbilityActivationRejectReason rejectReason);
         /// <summary>载荷占用的 Resolver 容量。默认 0；handler 独占的 execution 不会再走内建 payload 计数。</summary>
         void ContributeCommitCapacity(AbilityPayloadContext context,
             ref int resourceRequests, ref int resourceEvents, ref int damageRequests, ref int damageEvents)
@@ -491,6 +491,7 @@ namespace BattleSystemECS.Core.GAS
                     lastCancel = AbilityActivationRejectReason.Cost;
                     continue;
                 }
+                int grantedWatermark = store.EffectRequests.Count;
                 int requestApplied = 0;
                 bool planOk = true;
                 AbilityActivationRejectReason planFail = AbilityActivationRejectReason.None;
@@ -509,7 +510,11 @@ namespace BattleSystemECS.Core.GAS
                 }
                 if (!planOk)
                 {
-                    RefundCosts(store, ability, request, source);
+                    store.TruncateEffectQueue(grantedWatermark);
+                    if (!RefundCosts(store, ability, request, source))
+                        planFail = planFail == AbilityActivationRejectReason.None
+                            ? AbilityActivationRejectReason.QueueOverflow
+                            : planFail;
                     PublishCancelled(store, request, source, targets, planFail);
                     lastCancel = planFail;
                     continue;
@@ -711,7 +716,11 @@ namespace BattleSystemECS.Core.GAS
                 }
             }
             for (int i = 0; i < ability.Costs.Count; i++)
-                if (EffectiveCost(ability, request, i) != 0f) { resourceRequests++; resourceEvents++; }
+                if (EffectiveCost(ability, request, i) != 0f)
+                {
+                    resourceRequests++;
+                    resourceEvents += 2;
+                }
             long effectEvents = (long)ability.Effects.Count * targets.Count;
             if (runtimeSlots > int.MaxValue || modifiers > int.MaxValue || effectEvents > int.MaxValue ||
                 damageRequests > int.MaxValue || damageEvents > int.MaxValue ||
@@ -756,8 +765,6 @@ namespace BattleSystemECS.Core.GAS
             IAbilityPayloadHandler payloadHandler, out AbilityActivationRejectReason failReason)
         {
             failReason = AbilityActivationRejectReason.None;
-            var resourceBefore = store.ResourceResolver.LastRejectionReason;
-            var damageBefore = store.DamageResolver.LastRejection;
             int applied = 0;
             bool damageInThisPlanQueuedTargetDeath = false;
             for (int i = 0; i < ability.Effects.Count; i++)
@@ -778,19 +785,28 @@ namespace BattleSystemECS.Core.GAS
                 var context = new AbilityPayloadContext(store, ability, execution, request, source, target, magnitude);
                 if (payloadHandler != null && payloadHandler.Supports(execution))
                 {
-                    int committed = payloadHandler.Commit(context);
+                    int committed = payloadHandler.Commit(context, out failReason);
                     if (committed < 0)
                     {
-                        failReason = MapCommitFailure(store, resourceBefore, damageBefore);
+                        if (failReason == AbilityActivationRejectReason.None)
+                            failReason = AbilityActivationRejectReason.UnsupportedDefinition;
                         return -1;
                     }
                     applied += committed;
                 }
                 else if (damageInThisPlanQueuedTargetDeath && execution.Payload == EffectPayloadKind.Damage &&
                          store.IsEnemyPendingDeath(target.Index)) applied++;
-                else if (!TryBuildBuiltInPayload(context, out var payload, out _) || !CommitBuiltIn(payload, context))
+                else if (!TryBuildBuiltInPayload(context, out var payload, out bool supported))
                 {
-                    failReason = MapCommitFailure(store, resourceBefore, damageBefore);
+                    failReason = supported
+                        ? AbilityActivationRejectReason.InvalidRequest
+                        : AbilityActivationRejectReason.UnsupportedDefinition;
+                    return -1;
+                }
+                else if (!CommitBuiltIn(payload, context, out failReason))
+                {
+                    if (failReason == AbilityActivationRejectReason.None)
+                        failReason = AbilityActivationRejectReason.UnsupportedDefinition;
                     return -1;
                 }
                 else
@@ -803,17 +819,7 @@ namespace BattleSystemECS.Core.GAS
             return applied;
         }
 
-        private static AbilityActivationRejectReason MapCommitFailure(ComponentStore store,
-            ResourceRejectionReason resourceBefore, DamageRejectionReason damageBefore)
-        {
-            var resource = store.ResourceResolver.LastRejectionReason;
-            if (resource != resourceBefore) return MapResourceReject(resource);
-            var damage = store.DamageResolver.LastRejection;
-            if (damage != damageBefore) return MapDamageReject(damage);
-            return AbilityActivationRejectReason.UnsupportedDefinition;
-        }
-
-        private static AbilityActivationRejectReason MapResourceReject(ResourceRejectionReason reason)
+        internal static AbilityActivationRejectReason MapResourceReject(ResourceRejectionReason reason)
         {
             switch (reason)
             {
@@ -902,8 +908,10 @@ namespace BattleSystemECS.Core.GAS
             }
         }
 
-        private static bool CommitBuiltIn(BuiltInPayloadPlan plan, AbilityPayloadContext context)
+        private static bool CommitBuiltIn(BuiltInPayloadPlan plan, AbilityPayloadContext context,
+            out AbilityActivationRejectReason failReason)
         {
+            failReason = AbilityActivationRejectReason.None;
             var store = context.Store;
             int targetId = context.Target.Index;
             long sequence = store.AllocateGameplaySequence(targetId);
@@ -916,14 +924,22 @@ namespace BattleSystemECS.Core.GAS
                         DamageType.True, ElementType.None, DamageFlags.None, stage,
                         DamageCommitBoundary.GameplayResolve, sequence, ability: context.Ability.Id,
                         effect: context.Request.Effect.GetValueOrDefault(), ownerPlayerId: context.Request.OwnerPlayerId));
-                    return damage.Accepted;
+                    if (damage.Accepted) return true;
+                    failReason = MapDamageReject(damage.Reason);
+                    return false;
                 case BuiltInPayloadKind.Heal:
-                    return store.ResourceResolver.TryApply(new HealRequest(context.Source, context.Target,
-                        context.Magnitude, sequence, context.Request.OwnerPlayerId)).Accepted;
+                    var heal = store.ResourceResolver.TryApply(new HealRequest(context.Source, context.Target,
+                        context.Magnitude, sequence, context.Request.OwnerPlayerId));
+                    if (heal.Accepted) return true;
+                    failReason = MapResourceReject(heal.Reason);
+                    return false;
                 case BuiltInPayloadKind.Shield:
-                    return store.ResourceResolver.TryApply(new ShieldRequest(context.Source, context.Target,
+                    var shield = store.ResourceResolver.TryApply(new ShieldRequest(context.Source, context.Target,
                         context.Magnitude, context.Execution.Duration, context.Ability.Clock, sequence),
-                        context.Request.OwnerPlayerId).Accepted;
+                        context.Request.OwnerPlayerId);
+                    if (shield.Accepted) return true;
+                    failReason = MapResourceReject(shield.Reason);
+                    return false;
                 case BuiltInPayloadKind.Slow:
                     int slowDuration = Math.Max(1, (int)Math.Ceiling(context.Execution.Duration));
                     if (store.EnemyActive[targetId]) store.ApplyEnemySlow(targetId, context.Magnitude, slowDuration);
@@ -944,9 +960,13 @@ namespace BattleSystemECS.Core.GAS
                         store.ApplyEnemyFreeze(targetId, Math.Max(1, (int)Math.Ceiling(context.Magnitude)));
                     return true;
                 case BuiltInPayloadKind.GameplayEvent:
-                    return store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.EffectApplied,
-                        context.Source, context.Target, sequence, ownerPlayerId: context.Request.OwnerPlayerId));
+                    if (store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.EffectApplied,
+                        context.Source, context.Target, sequence, ownerPlayerId: context.Request.OwnerPlayerId)))
+                        return true;
+                    failReason = AbilityActivationRejectReason.QueueOverflow;
+                    return false;
                 default:
+                    failReason = AbilityActivationRejectReason.UnsupportedDefinition;
                     return false;
             }
         }
@@ -988,21 +1008,24 @@ namespace BattleSystemECS.Core.GAS
             return true;
         }
 
-        private static void RefundCosts(ComponentStore store, AbilityDefinition ability,
+        private static bool RefundCosts(ComponentStore store, AbilityDefinition ability,
             AbilityActivationRequest request, EntityHandle source) =>
             RefundCostRange(store, ability, request, source, 0, ability.Costs.Count);
 
-        private static void RefundCostRange(ComponentStore store, AbilityDefinition ability,
+        private static bool RefundCostRange(ComponentStore store, AbilityDefinition ability,
             AbilityActivationRequest request, EntityHandle source, int startInclusive, int endExclusive)
         {
+            bool ok = true;
             for (int i = startInclusive; i < endExclusive; i++)
             {
                 float amount = EffectiveCost(ability, request, i);
                 if (amount == 0f) continue;
                 var refund = new ResourceRequest(source, source, ability.Costs[i].Resource, amount,
                     ResourceOperation.Add, 0, store.AllocateGameplaySequence(source.Index), request.OwnerPlayerId);
-                store.ResourceResolver.TryApply(refund);
+                var result = store.ResourceResolver.TryApplyImmediate(refund);
+                if (!result.Accepted || result.Applied != amount) ok = false;
             }
+            return ok;
         }
 
         private static float EffectiveCost(AbilityDefinition ability, AbilityActivationRequest request, int index) =>
@@ -1076,7 +1099,11 @@ namespace BattleSystemECS.Core.GAS
                 }
             }
             for (int i = 0; i < ability.Costs.Count; i++)
-                if (EffectiveCost(ability, request, i) != 0f) { resourceRequests++; resourceEvents++; }
+                if (EffectiveCost(ability, request, i) != 0f)
+                {
+                    resourceRequests++;
+                    resourceEvents += 2;
+                }
             long effectEvents = (long)ability.Effects.Count * targets.Count;
             if (runtimeSlots > int.MaxValue || modifiers > int.MaxValue || effectEvents > int.MaxValue ||
                 damageRequests > int.MaxValue || damageEvents > int.MaxValue ||

@@ -748,7 +748,7 @@ namespace BattleSystemECS.Core.GAS
         {
             _store.ResourceResolver.TickTimedShields(deltaTime, clock);
             _schedule.Advance(clock, deltaTime);
-            int expired = TickTimedAbilities(clock);
+            int expired = TickTimedAbilities(clock, deltaTime);
             if (ActiveRuntimeCount == 0) return expired;
             for (int n = 0; n < _runtimeEntityIds.Count; n++)
             {
@@ -838,10 +838,9 @@ namespace BattleSystemECS.Core.GAS
                     _timedAbilities.RemoveAt(i);
         }
 
-        private int TickTimedAbilities(ClockId clock)
+        private int TickTimedAbilities(ClockId clock, float dt)
         {
             int expired = 0;
-            double now = _schedule.VirtualNow(clock);
             for (int i = _timedAbilities.Count - 1; i >= 0; i--)
             {
                 int entityId = _timedAbilities[i].entityId;
@@ -849,7 +848,7 @@ namespace BattleSystemECS.Core.GAS
                 var instance = _store.GetAbility(entityId, slot);
                 if (instance.State.Phase != AbilityPhase.Executing || instance.State.DurationClock != clock)
                     continue;
-                if (!instance.TryTickTimed(now))
+                if (!instance.TryTickTimed(dt))
                 {
                     _store.SetAbility(entityId, slot, instance);
                     continue;

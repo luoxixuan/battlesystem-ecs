@@ -72,5 +72,17 @@ namespace BattleSystemECS.Tests.Framework
             queue.Sort(GameplayEventOrdering.Compare);
             Assert.Equal(GameplayEventType.HitConfirmed, queue.Get(0).Type);
         }
+
+        [Fact]
+        public void TruncateToDropsTailAndKeepsPrefix()
+        {
+            var buffer = new CommandBuffer<int>(4);
+            Assert.True(buffer.TryAdd(1));
+            Assert.True(buffer.TryAdd(2));
+            Assert.True(buffer.TryAdd(3));
+            buffer.TruncateTo(1);
+            Assert.Equal(1, buffer.Count);
+            Assert.Equal(1, buffer.Get(0));
+        }
     }
 }

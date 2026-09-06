@@ -443,8 +443,9 @@ namespace BattleSystemECS.Systems
             }
         }
 
-        int IAbilityPayloadHandler.Commit(AbilityPayloadContext context)
+        int IAbilityPayloadHandler.Commit(AbilityPayloadContext context, out AbilityActivationRejectReason rejectReason)
         {
+            rejectReason = AbilityActivationRejectReason.None;
             if (context.Execution.Payload == EffectPayloadKind.Damage &&
                 (uint)context.Target.Index < ComponentStore.MAX_PLAYERS)
             {
@@ -452,7 +453,10 @@ namespace BattleSystemECS.Systems
                     context.Magnitude, store.AllocateGameplaySequence(context.Target.Index), context.Ability.Id,
                     context.Target.Index));
                 if (!result.Accepted)
+                {
+                    rejectReason = GameplayAbilityRuntime.MapResourceReject(result.Reason);
                     return -1;
+                }
                 _eventBus.PlayerDamaged.Publish(new PlayerDamagedEvent
                 {
                     Damage = result.Applied,

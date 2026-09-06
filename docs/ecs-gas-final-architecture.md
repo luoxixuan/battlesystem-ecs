@@ -200,7 +200,7 @@ AbilityDefinition
 
 #### Commit 复查与支付
 
-已入队请求在入队时预留资源与容量。Commit **必须先**复查冷却 + 预留消耗/容量，**再 Spend，再 `CommitPlan`**（硬要求）。复查不查 Tag：当前 granted effect 到 `effect.commit` 才 `TryApply`，`ability.commit` 时 Tag 还不存在；跨帧蓄力的 commit 才会踩到 Tag 变化。复查失败发 `AbilityCancelled` 且不 Spend、不 `CommitPlan`。`CommitPlan` 失败则 `Add` 退回已 Spend 的费用。载荷 `Commit` 返回 -1 时按 Resolver **新**拒绝原因映射（`RequestQueueOverflow`→`QueueOverflow`，目标无效→`NoTarget`，无新拒绝则 `UnsupportedDefinition`），不再一律 `QueueOverflow`。多目标 `CommitPlan` 中途 -1 时前面目标的当场载荷可能已提交（无法整单撤回伤害），费用已退。退款若事件队列已满，`Add` 可能发不出事实，资源列以 Resolver 结果为准。不 throw、不半价、不把 World 作废。
+已入队请求在入队时预留资源与容量。Commit **必须先**复查冷却 + 预留消耗/容量，**再 Spend，再 `CommitPlan`**（硬要求）。复查不查 Tag：当前 granted effect 到 `effect.commit` 才 `TryApply`，`ability.commit` 时 Tag 还不存在；跨帧蓄力的 commit 才会踩到 Tag 变化。复查失败发 `AbilityCancelled` 且不 Spend、不 `CommitPlan`。容量预留按「Spend 事件 + 失败退款事件」计（每个非零 cost 两个 Resource 事件）。`CommitPlan` 失败则：截断本单入队的 `EffectRequests`（生产 `DeferAbilityAndEffectCommit` 为真时 granted GE 不得在 `effect.commit` 落地）、`TryApplyImmediate(Add)` 当场退款（不进 deferred pending，`Accepted && Applied == amount`）。载荷 `Commit` 用这一次 `TryApply` 的 `Reason` 映射（`RequestQueueOverflow`→`QueueOverflow`，目标无效→`NoTarget`，无新拒绝则 `UnsupportedDefinition`），不读 sticky `LastRejectionReason`。多目标中途 -1 时前面目标的**当场伤害**可能已提交（无法整单撤回），granted GE 整单截断。不 throw、不半价、不把 World 作废。
 
 支付走 `ResourceOperation.Spend`：不足即拒、原子、实际扣减必须等于请求。禁止改通用 `ResourceResolver` 夹紧语义：`BossTrailAoeSystem` / `SuicideBombSystem` 用负增量打血，夹到 0 仍 `Accepted` 是预期。
 
@@ -554,7 +554,7 @@ Presentation events
 - `CommitSerial`：按确定顺序修改共享状态；
 - `Presentation`：只消费已提交事实。
 
-时长与周期效果按 `clockId` 分别推进。子弹时间缩放 `enemyDt`；按帧号排期不是合法实现。`GameplayScheduleBook` 是派生缓存（Timed Ability 虚拟到期、诊断 `Rebuild`），不登记闭包、**不在 `effect.tick` 热路径每帧 Sync/Clear**。效果到期与 Periodic 跳伤走 float `RemainingTime` / `TickAccumulator`（与 P6 前同一套边界帧语义）。`CollectDue` 不是生产 Tick 取件路径。实现仍挂在现有 `GameplayEffectRuntime.Tick`，不另开 FrameGraph 节点。
+时长与周期效果按 `clockId` 分别推进。子弹时间缩放 `enemyDt`；按帧号排期不是合法实现。`GameplayScheduleBook` 是派生缓存（诊断 `Rebuild`、Timed 注册元数据），不登记闭包、**不在 `effect.tick` 热路径每帧 Sync/Clear**。Duration/Periodic 走 float `RemainingTime` / `TickAccumulator`；**Timed Ability** 走 `elapsed += dt` 与初始 duration 比较（`dt=0.1` / `0.3` 第 3 帧）。`VirtualNow` 不驱动生产到期。`CollectDue` 不是生产 Tick 取件路径。实现仍挂在现有 `GameplayEffectRuntime.Tick`，不另开 FrameGraph 节点。
 
 模拟路径的随机数只从 Frame `DeterminismContext` 领号，且**仅**在 `CommitSerial` 相取数。`Rng.Shared`（墙钟 `TickCount xor ManagedThreadId`）与无种子 `new Random()` 都不是确定性资产，不得进入 GAS、战斗公式、或决定实体数量与位置的模拟路径。
 

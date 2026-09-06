@@ -2,7 +2,7 @@
 
 > 状态：P1（F10 账本）、P2（F11/F12 Commit 预留 + 禁 throw）、P3（A1 属性公式）、P4（Tag parent 词汇表 + 准入序）、P5（同帧顺序 A4 + 随机领号 A3）、P6（时长 Ability 态 / 墓碑 / 摘除式抑制 / 表现原因；排期本热路径已撤回）已实施
 >
-> 更新日期：2026-09-06（门禁复核剩余：L3 Commit -1 映射原因；M5 先 Spend 再 Plan）
+> 更新日期：2026-09-06（Cancelled 整单：截断 granted GE、退款当场、TryApply 原因、Timed elapsed）
 >
 > 基线 commit：`b5cfe52`（对照审查时的 HEAD）
 >
@@ -273,7 +273,7 @@ P0 退出。`AbilityRequests` 仍是真 buffer（`ability.commit` 批量提交�
 
 门禁 §12。`Core/` 与 `Systems/` 中不再存在 `prevalidated` 且 `during commit` 的 throw（编程错误字符串除外）。CHANGELOG 记行为变化（少付钱不再生效；容量满报 `QueueOverflow`；commit 竞争失败不炸帧）。
 
-**实施状态（2026-09-06）**：已落地。预留表 `ComponentStore.AbilityCommitReservation`。Commit 每条先 `Release` + 复查冷却/Cost/容量/载荷 `CanCommit`，失败 `AbilityCancelled` 且不 Spend、不 `CommitPlan`；成功才 Spend → `CommitPlan` → 冷却。Plan 失败 `Add` 退款。`Commit` 返回 -1 按 Resolver 新拒绝原因映射，不再一律 `QueueOverflow`。Activate scratch 在 reservation 实例上。`CommitCosts` 只走 `ResourceOperation.Spend`。P1 与 P2 曾合成 commit `190873d`，不能按「还原该 commit」独立回滚账本或预留。未改通用夹紧。mode 2/4/5 保持 DEFERRED。
+**实施状态（2026-09-06）**：已落地。预留表 `ComponentStore.AbilityCommitReservation`。Commit 每条先 `Release` + 复查冷却/Cost/容量/载荷 `CanCommit`，失败 `AbilityCancelled` 且不 Spend、不 `CommitPlan`；成功才 Spend → `CommitPlan` → 冷却。Plan 失败截断本单 `EffectRequests`，`TryApplyImmediate(Add)` 当场退款（每个非零 cost 预留 2 个 Resource 事件）。载荷 `Commit` 带出这一次 `TryApply.Reason`。当场伤害无法撤回。Activate scratch 在 reservation 实例上。`CommitCosts` 只走 `ResourceOperation.Spend`。P1 与 P2 曾合成 commit `190873d`。未改通用夹紧。mode 2/4/5 保持 DEFERRED。
 
 ### 7.5 回滚
 
@@ -424,7 +424,7 @@ GAS / 战斗公式 / 决定实体数量与位置的模拟路径禁止 `Rng.Share
 
 顺序表无 flag。RNG 切流按调用点逐个替换，禁止半帧混用墙钟种子与确定性流。删除条件：GAS 热路径与上表模拟路径零 `new Random` / `Rng.Shared`。
 
-**实施状态（2026-09-05）**：已落地。AI dispel 仍是批外 remove-first，未改 FrameGraph。`effect.commit` 批内 Remove 垫后，Applied/Removed 不抵消。`DeterminismContext` 挂在 `ComponentStore`，由 `FrameGraph.Execute` 按节点语义 Enter/Exit CommitSerial；并行工作线程不得领号。比赛种子由 `GameManager.Initialize` 开局 `Reset` 一次。上表模拟路径已改领号；ShopReroll 保留固定种子私有流（不进 digest）；Benchmark 不迁。digest：生产 `Parallel.For` 已按 batch/entity 串行归并；`CommandBuffer.TryMerge` 先 Sort 源再累计。P5 退出准则补了完整图 200 帧 soak。mode 2/4/5 保持 DEFERRED。
+**实施状态（2026-09-05）**：已落地。AI dispel 仍是批外 remove-first，未改 FrameGraph。`effect.commit` 批内 Remove 垫后，Applied/Removed 不抵消。`DeterminismContext` 挂在 `ComponentStore`，由 `FrameGraph.Execute` 按节点语义 Enter/Exit CommitSerial；并行工作线程不得领号。比赛种子由 `GameManager.Initialize` 开局 `Reset` 一次。上表模拟路径已改领号；ShopReroll 保留固定种子私有流（不进 digest）；Benchmark 不迁。digest：生产 `Parallel.For` 已按 batch/entity 串行归并；`CommandBuffer.TryMerge` 先 Sort 源再累计。`ProductionGraphFixedSeedSoak` 是密封 FrameGraph 回归（清 Waves、每帧回满存活敌血），**不是** P5 退出准则里的波次/词缀/掉落全路径 soak。mode 2/4/5 保持 DEFERRED。
 
 ## 11. P6 — 后置（不阻塞 P1–P5）
 
@@ -439,7 +439,7 @@ GAS / 战斗公式 / 决定实体数量与位置的模拟路径禁止 `Rng.Share
 
 结构事务亮相屏障：先举证分裂/召唤/弹道同帧秒杀路径，再开卡。未核实不得写进终态当现状。
 
-**实施状态（2026-09-05）**：时长 Ability 态 / 墓碑 / 摘除式抑制 / Cause 已落地。排期本 `GameplayScheduleBook` 仍是派生缓存，**不再**在 `effect.tick` 对每个未过期 effect 每帧 `SyncSchedule`/`ClearEffect`（那会变成 O(E²)+闭包分配）。生产 Tick 对 Duration/Periodic 恢复 float `RemainingTime` / `TickAccumulator`；`VirtualNow` 只给 Timed Ability 与诊断。`CollectDue` 无生产调用者。`QueryEntityTombstone` 区分 NeverExisted / Dead / Alive / PendingDeath。摘除式抑制走 `TryInhibit`/`TryUninhibit`。`GameplayEventCause` 不进比较键。KeepPerLayer 未做。mode 2/4/5 与 Unity 保持 DEFERRED。
+**实施状态（2026-09-06）**：时长 Ability 态 / 墓碑 / 摘除式抑制 / Cause 已落地。排期本 `GameplayScheduleBook` 是派生诊断表，**不是**生产批量取件。Duration/Periodic 走 float `RemainingTime` / `TickAccumulator`；Timed Ability 走 `elapsed += dt` 与初始 duration 比较（`dt=0.1` / `0.3` 第 3 帧）。`CollectDue` 无生产调用者。`QueryEntityTombstone` 区分 NeverExisted / Dead / Alive / PendingDeath。摘除式抑制走 `TryInhibit`/`TryUninhibit`。`GameplayEventCause` 不进比较键。KeepPerLayer 未做。mode 2/4/5 与 Unity 保持 DEFERRED。
 
 ## 12. 跨阶段约束与门禁
 

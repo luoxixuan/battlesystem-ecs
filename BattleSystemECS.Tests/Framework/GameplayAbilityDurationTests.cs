@@ -26,12 +26,12 @@ namespace BattleSystemECS.Tests.Framework
             var state = new AbilityState(new AbilityId(1), new EntityHandle(2, 1), 0f, 1, 1, AbilityDurationKind.Timed);
             Assert.True(state.TryBeginTimed(1.5f, ClockId.Combat, 0d));
             Assert.Equal(AbilityPhase.Executing, state.Phase);
-            Assert.False(state.TryTickTimed(1.0d));
+            Assert.False(state.TryTickTimed(1.0f));
             Assert.Equal(AbilityPhase.Executing, state.Phase);
             Assert.True(state.TryCompleteTimed());
             Assert.Equal(AbilityPhase.Completed, state.Phase);
             Assert.False(state.TryCancelTimed());
-            Assert.False(state.TryTickTimed(3d));
+            Assert.False(state.TryTickTimed(3f));
         }
 
         [Fact]
@@ -46,7 +46,7 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void TimedAbilityExpiresOnVirtualTime()
+        public void TimedAbilityExpiresOnRemainingTime()
         {
             var store = new ComponentStore();
             store.AddPlayer(0, 1f, 1f, 1f, 1);
@@ -60,6 +60,22 @@ namespace BattleSystemECS.Tests.Framework
             store.GameplayEffectsRuntime.Tick(1f, ClockId.Combat);
             Assert.Equal(AbilityPhase.Executing, store.GetAbility(owner, 0).State.Phase);
             store.GameplayEffectsRuntime.Tick(0.6f, ClockId.Enemy);
+            Assert.Equal(AbilityPhase.Expired, store.GetAbility(owner, 0).State.Phase);
+        }
+
+        [Fact]
+        public void TimedAbilityExpiresOnFrame3_Dt01Duration03()
+        {
+            var store = new ComponentStore();
+            store.AddPlayer(0, 1f, 1f, 1f, 1);
+            int owner = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+            Assert.True(store.TryAddAbility(owner, new GameplayAbilityDef("channel", "", 0f, 0f, -1, 0f,
+                AbilityActivation.Instant, 0, 0)));
+            Assert.True(store.TryBeginTimedAbility(owner, 0, 0.3f, ClockId.Combat));
+            store.GameplayEffectsRuntime.Tick(0.1f, ClockId.Combat);
+            store.GameplayEffectsRuntime.Tick(0.1f, ClockId.Combat);
+            Assert.Equal(AbilityPhase.Executing, store.GetAbility(owner, 0).State.Phase);
+            store.GameplayEffectsRuntime.Tick(0.1f, ClockId.Combat);
             Assert.Equal(AbilityPhase.Expired, store.GetAbility(owner, 0).State.Phase);
         }
     }

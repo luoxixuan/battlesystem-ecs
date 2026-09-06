@@ -74,6 +74,13 @@ namespace BattleSystemECS.Core.GAS
             _items[_count - 1] = default(T);
             _count--;
         }
+        public void TruncateTo(int count)
+        {
+            if (count < 0) count = 0;
+            if (count >= _count) return;
+            Array.Clear(_items, count, _count - count);
+            _count = count;
+        }
         public void ResetOverflowCount() { OverflowCount = 0; }
         public void ResetDiagnostics() { PeakCount = _count; OverflowCount = 0; }
     }

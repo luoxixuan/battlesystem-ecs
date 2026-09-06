@@ -186,6 +186,7 @@ namespace BattleSystemECS.Core.GAS
         public AbilityDurationKind DurationKind;
         public ClockId DurationClock;
         public float DurationRemaining;
+        public float DurationElapsed;
         public double DurationExpireVirtual;
 
         public AbilityState(AbilityId id, EntityHandle owner, float cooldown, int charges, int maxCharges)
@@ -203,12 +204,13 @@ namespace BattleSystemECS.Core.GAS
             DurationKind = durationKind;
             DurationClock = ClockId.Combat;
             DurationRemaining = 0f;
+            DurationElapsed = 0f;
             DurationExpireVirtual = 0d;
         }
 
         public bool CanActivate() => Cooldown <= 0.0001f && (MaxCharges <= 1 || Charges > 0);
 
-        /// <summary>仅 Timed 可离开 None。virtualNow 为该 clock 的当前虚拟时间。</summary>
+        /// <summary>仅 Timed 可离开 None。到期用 elapsed += dt 与初始 duration 比较，避开 remaining 连减 ulp。</summary>
         public bool TryBeginTimed(float duration, ClockId clock, double virtualNow = 0d)
         {
             if (DurationKind != AbilityDurationKind.Timed || Phase != AbilityPhase.None) return false;
@@ -217,6 +219,7 @@ namespace BattleSystemECS.Core.GAS
             Phase = AbilityPhase.Executing;
             DurationClock = clock;
             DurationRemaining = duration;
+            DurationElapsed = 0f;
             DurationExpireVirtual = virtualNow + duration;
             return true;
         }
@@ -226,6 +229,7 @@ namespace BattleSystemECS.Core.GAS
             if (DurationKind != AbilityDurationKind.Timed || Phase != AbilityPhase.Executing) return false;
             Phase = AbilityPhase.Completed;
             DurationRemaining = 0f;
+            DurationElapsed = 0f;
             return true;
         }
 
@@ -234,15 +238,18 @@ namespace BattleSystemECS.Core.GAS
             if (DurationKind != AbilityDurationKind.Timed || Phase != AbilityPhase.Executing) return false;
             Phase = AbilityPhase.Cancelled;
             DurationRemaining = 0f;
+            DurationElapsed = 0f;
             return true;
         }
 
-        /// <summary>按 clock 虚拟时间到期；不按帧号。到期进入 Expired。</summary>
-        public bool TryTickTimed(double virtualNow)
+        /// <summary>elapsed += dt，与初始 duration 比较；dt=0.1 / duration=0.3 第 3 帧到期。</summary>
+        public bool TryTickTimed(float dt)
         {
             if (DurationKind != AbilityDurationKind.Timed || Phase != AbilityPhase.Executing) return false;
-            DurationRemaining = (float)Math.Max(0d, DurationExpireVirtual - virtualNow);
-            if (DurationRemaining > 0f) return false;
+            float initial = DurationElapsed + DurationRemaining;
+            DurationElapsed += dt;
+            DurationRemaining = initial - DurationElapsed;
+            if (DurationElapsed < initial) return false;
             Phase = AbilityPhase.Expired;
             DurationRemaining = 0f;
             return true;
@@ -351,12 +358,12 @@ namespace BattleSystemECS.Core.GAS
             return true;
         }
 
-        public bool TryTickTimed(double virtualNow)
+        public bool TryTickTimed(float dt)
         {
             var state = State;
-            if (!state.TryTickTimed(virtualNow)) return false;
+            bool expired = state.TryTickTimed(dt);
             State = state;
-            return true;
+            return expired;
         }
     }
 }

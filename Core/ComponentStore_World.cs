@@ -1001,6 +1001,21 @@ namespace BattleSystemECS.Core
             EffectRequests.Clear();
         }
 
+        internal void TruncateEffectQueue(int keepCount)
+        {
+            int n = EffectRequests.Count;
+            if (keepCount < 0) keepCount = 0;
+            if (keepCount >= n) return;
+            for (int i = keepCount; i < n; i++)
+            {
+                QueuedEffectDefinitions[i] = default(GameplayEffectDefinition);
+                QueuedEffectOwnerPlayerIds[i] = -1;
+                QueuedEffectSnapshots[i] = float.NaN;
+                QueuedEffectModifierCaptures[i] = float.NaN;
+            }
+            EffectRequests.TruncateTo(keepCount);
+        }
+
         // Legacy same-frame slot projection. Cross-frame callers must use handle-aware APIs.
         public AppliedEffect GetEffect(int entityId, int slot) {
             if (!TryGetActiveEffectAt(entityId, slot, out var runtime, out var definition, out var snapshot)) return default;

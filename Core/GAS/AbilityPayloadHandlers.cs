@@ -56,11 +56,11 @@ namespace BattleSystemECS.Core.GAS
             return index >= 0 && _handlers[index].CanCommit(context);
         }
 
-        public int Commit(AbilityPayloadContext context)
+        public int Commit(AbilityPayloadContext context, out AbilityActivationRejectReason rejectReason)
         {
             int index = Find(context.Execution);
             if (index < 0) throw new InvalidOperationException("payload was not selected during ability planning");
-            return _handlers[index].Commit(context);
+            return _handlers[index].Commit(context, out rejectReason);
         }
 
         public void ContributeCommitCapacity(AbilityPayloadContext context,

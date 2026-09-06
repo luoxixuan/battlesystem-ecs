@@ -1,5 +1,13 @@
 # 更新记录 (Changelog)
 
+### 2026-09-06（Cancelled 整单：截断 granted GE + 退款当场生效）
+- **granted GE 泄漏**：`CommitPlan` 失败时把 `EffectRequests` 截断到本单入队前水位。生产 Defer 下 Cancelled 的 Buff 不再在 `effect.commit` 落地。当场伤害仍无法撤回，继续单列。
+- **退款当场**：退款走 `TryApplyImmediate(Add)`，生产 Tick deferred 打开时也不进 pending；`Accepted && Applied == amount`。每个非零 cost 预留 2 个 Resource 事件（Spend + 失败退款）。
+- **拒绝原因**：载荷 `Commit` 带出这一次 `TryApply.Reason`，不再用 sticky `LastRejectionReason` 是否变化。
+- **Timed Ability**：到期用 `elapsed += dt` 与初始 duration 比较（`dt=0.1` / `duration=0.3` 第 3 帧）。排期本 `VirtualNow` 不驱动生产到期。
+- **soak**：`ProductionGraphFixedSeedSoak` 标明是清波次回血的密封图回归，不是 P5 全路径退出准则。
+- 仍 DEFERRED：mode 2/4/5 与 Unity。
+
 ### 2026-09-06（门禁复核剩余：L3 拒绝原因 + M5 Spend 先于 Plan）
 - **L3**：`CommitPlan` 载荷 `Commit` 返回 -1 时按 Resource/Damage Resolver **新**拒绝原因映射（队列满→`QueueOverflow`，目标无效→`NoTarget`，无新拒绝→`UnsupportedDefinition`），不再一律 `QueueOverflow`。复查补载荷 `CanCommit`：玩家已死为 `NoTarget`，快照不可用为 `UnsupportedDefinition`。敌方玩家伤害计入 Resource 事件容量。
 - **M5**：复查通过后改为先 `Spend` 再 `CommitPlan`；Plan 失败 `Add` 退回费用。多目标中途 -1 仍可能留下已提交的当场载荷。

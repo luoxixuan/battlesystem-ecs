@@ -51,8 +51,9 @@ namespace BattleSystemECS.Systems
             }
         }
 
-        public int Commit(AbilityPayloadContext context)
+        public int Commit(AbilityPayloadContext context, out AbilityActivationRejectReason rejectReason)
         {
+            rejectReason = AbilityActivationRejectReason.None;
             int owner = context.Request.OwnerPlayerId;
             if (context.Execution.Payload == EffectPayloadKind.Resurrect)
             {
@@ -64,7 +65,13 @@ namespace BattleSystemECS.Systems
             }
 
             float restored = _snapshotRestore.RestoreFromSnapshot(context.Source.Index, owner, context.Magnitude);
-            if (restored < 0f) return -1;
+            if (restored < 0f)
+            {
+                rejectReason = !_store.ResourceResolver.CanAccept(3, 3)
+                    ? AbilityActivationRejectReason.QueueOverflow
+                    : AbilityActivationRejectReason.UnsupportedDefinition;
+                return -1;
+            }
             return 1;
         }
     }

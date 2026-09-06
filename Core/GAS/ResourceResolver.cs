@@ -256,6 +256,8 @@ namespace BattleSystemECS.Core.GAS
             }
         }
         public ResourceApplyResult TryApply(ResourceRequest request) => TryApply(request, allowDeferred: true);
+        /// <summary>Spend 与能力退款：跳过 deferred pending，当场改资源列并发布事实。</summary>
+        internal ResourceApplyResult TryApplyImmediate(ResourceRequest request) => TryApply(request, allowDeferred: false);
         private ResourceApplyResult TryApply(ResourceRequest request, bool allowDeferred)
         {
             ResourceApplyResult Reject(ResourceApplyResult result,
@@ -282,7 +284,7 @@ namespace BattleSystemECS.Core.GAS
                 return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.InvalidValue));
             if (request.Operation == ResourceOperation.Set && kind == ResourceKind.CurrentHealth && request.Delta < 0f)
                 return Reject(new ResourceApplyResult(false, 0f, ResourceRejectionReason.UnsupportedOperation));
-            // Spend 必须当场原子扣减，不能进 deferred pending。
+            // Spend 与能力退款必须当场原子改资源，不能进 deferred pending。
             if (_deferred && allowDeferred && request.Operation != ResourceOperation.Spend)
             {
                 lock (_eventCommitLock)

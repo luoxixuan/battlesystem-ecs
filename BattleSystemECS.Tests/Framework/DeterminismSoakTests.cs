@@ -53,6 +53,8 @@ namespace BattleSystemECS.Tests.Framework
         [Fact]
         public void ProductionGraphFixedSeedSoak_MatchesStateAndEventSequenceDigest()
         {
+            // 密封 FrameGraph 回归：清掉 Waves、每帧回满存活敌血，覆盖分裂 jitter，
+            // 不是 P5 退出准则里的「波次/词缀/掉落全路径 soak」。
             GameplayObservationSnapshot first = RunProductionGraphSoak(11);
             GameplayObservationSnapshot second = RunProductionGraphSoak(11);
             GameplayObservationSnapshot otherSeed = RunProductionGraphSoak(12);
