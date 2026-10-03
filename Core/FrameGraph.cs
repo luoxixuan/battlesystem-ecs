@@ -286,13 +286,14 @@ namespace BattleSystemECS.Core
         private static string ComputeTopologyHash(FrameNodeAdapter[] nodes,FrameCompositionDiagnostic[] diagnostics,HashSet<string> availableDependencies,FrameGraphCompositionKind compositionKind)
         {
             var text=new StringBuilder();
-            text.Append("composition|").Append((int)compositionKind).AppendLine();
+            // Hash input must be independent of the host platform's newline convention.
+            text.Append("composition|").Append((int)compositionKind).Append('\n');
             var dependencies=new string[availableDependencies.Count];
             availableDependencies.CopyTo(dependencies);
             Array.Sort(dependencies,StringComparer.Ordinal);
             text.Append("available");
             for(int i=0;i<dependencies.Length;i++)text.Append('|').Append(dependencies[i]);
-            text.AppendLine();
+            text.Append('\n');
             for(int i=0;i<nodes.Length;i++)
             {
                 FrameNodeMetadata m=nodes[i].Metadata;
@@ -308,7 +309,7 @@ namespace BattleSystemECS.Core
                     if(d>0)text.Append(',');
                     text.Append(m.OptionalDependencies[d].Name).Append(':').Append((int)m.OptionalDependencies[d].MissingPolicy);
                 }
-                text.AppendLine();
+                text.Append('\n');
             }
             for(int i=0;i<diagnostics.Length;i++)
             {
@@ -326,7 +327,7 @@ namespace BattleSystemECS.Core
                     if(d>0)text.Append(',');
                     text.Append(metadata.OptionalDependencies[d].Name).Append(':').Append((int)metadata.OptionalDependencies[d].MissingPolicy);
                 }
-                text.Append('|').Append(diagnostics[i].Reason).AppendLine();
+                text.Append('|').Append(diagnostics[i].Reason).Append('\n');
             }
             using var sha=SHA256.Create();
             byte[] hash=sha.ComputeHash(Encoding.UTF8.GetBytes(text.ToString()));

@@ -2050,12 +2050,17 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             const string staticDir = "Data/Skills";
             try
             {
+                // Directory enumeration order is platform-dependent, but SkillDefs IDs are
+                // index-based. Keep both parser routes on the same deterministic order.
+                string[] staticPaths = Directory.Exists(staticDir)
+                    ? Directory.GetFiles(staticDir, "skill_*.json")
+                    : Array.Empty<string>();
+                Array.Sort(staticPaths, StringComparer.Ordinal);
                 if (strict)
                 {
                     if (!Directory.Exists(staticDir))
                         throw ConfigLoadFailure(staticDir, "static skill definition directory not found");
-                    string[] paths = Directory.GetFiles(staticDir, "skill_*.json");
-                    gameConfig.SkillDefs = TypedGameConfigParser.LoadSkillDefinitions(curatedFile, paths);
+                    gameConfig.SkillDefs = TypedGameConfigParser.LoadSkillDefinitions(curatedFile, staticPaths);
                     renderer.Log("[SKILLDEF] Loaded " + gameConfig.SkillDefs.Count + " typed skill definitions");
                     return;
                 }
@@ -2081,7 +2086,7 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
                 int staticCount = 0, skipped = 0;
                 if (Directory.Exists(staticDir))
                 {
-                    foreach (string path in Directory.GetFiles(staticDir, "skill_*.json"))
+                    foreach (string path in staticPaths)
                     {
                         try
                         {
