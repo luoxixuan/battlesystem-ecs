@@ -12,6 +12,29 @@ namespace BattleSystemECS.Tests.Framework
     public sealed class GameplayAbilityRuntimeTests
     {
         [Fact]
+        public void StoreCooldownTickDecrementsPoolAndProjectionInPlaceAndFloorsAtZero()
+        {
+            var store = new ComponentStore();
+            int entity = store.CreateEntity();
+            Assert.True(store.TryAddAbility(entity, new GameplayAbilityDef("cd-probe", "", 2f, 0f, -1, 0f,
+                AbilityActivation.Instant, AreaShapeType.Single, 1)));
+            Assert.True(GameplayAbilityRuntime.AbilityCommit(store, entity, 0));
+            int idx = entity * ComponentStore.MAX_ABILITIES_PER_ENTITY;
+
+            Assert.True(GameplayAbilityRuntime.TickCooldown(store, entity, 0, 0.5f));
+            Assert.Equal(1.5f, store.AbilityInstances[idx].CurrentCooldown, 4);
+            Assert.Equal(1.5f, store.GetAbility(entity, 0).CurrentCooldown, 4);
+            Assert.Equal("cd-probe", store.GetAbility(entity, 0).Definition.Name);
+
+            Assert.True(GameplayAbilityRuntime.TickCooldown(store, entity, 0, 5f));
+            Assert.Equal(0f, store.AbilityInstances[idx].CurrentCooldown);
+            Assert.True(GameplayAbilityRuntime.TickCooldown(store, entity, 0, 1f));
+            Assert.Equal(0f, store.GetAbility(entity, 0).CurrentCooldown);
+            Assert.True(store.GetAbility(entity, 0).CanActivate());
+            Assert.False(GameplayAbilityRuntime.TickCooldown(store, entity, 1, 1f));
+        }
+
+        [Fact]
         public void MultiplierMagnitudeUsesAttackDamageProjectionsForPlayerTowerAndEnemy()
         {
             var store = WaveStore();

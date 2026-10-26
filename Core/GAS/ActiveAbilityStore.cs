@@ -53,6 +53,25 @@ namespace BattleSystemECS.Core.GAS
             return true;
         }
 
+        /// <summary>原地递减冷却（不拷贝整个 AbilityInstance）；handle 失效返回 false，cooldown 为递减后的值。</summary>
+        internal bool TryTickCooldown(AbilityHandle handle, float deltaSeconds, out float cooldown)
+        {
+            if (!Handles.TryResolveReadOnly(handle, out int index, out _))
+            {
+                cooldown = 0f;
+                return false;
+            }
+            ref AbilityInstance instance = ref _instancePages[index / PageSize][index % PageSize];
+            float current = instance.State.Cooldown;
+            if (current > 0f)
+            {
+                current = Math.Max(0f, current - deltaSeconds);
+                instance.State.Cooldown = current;
+            }
+            cooldown = current;
+            return true;
+        }
+
         public bool Release(AbilityHandle handle)
         {
             if (!Handles.Release(handle)) return false;

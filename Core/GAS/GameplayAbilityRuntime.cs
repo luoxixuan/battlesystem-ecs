@@ -1424,6 +1424,8 @@ namespace BattleSystemECS.Core.GAS
         {
             if (store == null || deltaSeconds <= 0f || entityId < 0 || entityId >= ComponentStore.MAX_ENTITIES ||
                 slot < 0 || slot >= store.AbilityCount[entityId]) return false;
+            if (store.TryTickAbilityCooldown(entityId, slot, deltaSeconds)) return true;
+            // handle 失效（池拒绝）时走投影回退路径，保持原语义
             var ability = store.GetAbility(entityId, slot);
             if (ability.CurrentCooldown <= 0f) return true;
             ability.CurrentCooldown = System.Math.Max(0f, ability.CurrentCooldown - deltaSeconds);

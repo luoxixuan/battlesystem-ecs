@@ -2,6 +2,7 @@
 
 ### 2026-10-26（生产 FrameGraph 热点优化：mode 4 84→100 FPS）
 - **mode 4 逐节点计时**：`FrameGraph` 新增仅压测开启的逐节点 tick 累加（默认 null，生产 Tick 零开销）；mode 4 报告按耗时降序打印节点、调用次数与图外开销。
+- **敌人技能冷却**（`ai.enemy-ability.cooldowns` 1.46→0.34 ms/帧）：`TickCooldown(store,…)` 原先对 10K 敌人每帧 GetAbility/SetAbility 整体拷贝 `AbilityInstance`（含完整定义）。改为池内 `ref` 原地递减，投影只同步 Cooldown 字段；handle 失效仍回退原路径。玩家 `SkillSystem` 共用同一入口。
 
 ### 2026-10-03（修复跨平台测试快照与技能定义顺序）
 - FrameGraph 拓扑哈希改用固定 `LF` 换行输入，避免 Windows/Linux 的 `AppendLine()` 差异造成黄金值漂移。

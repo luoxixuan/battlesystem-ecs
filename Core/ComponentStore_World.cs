@@ -882,6 +882,17 @@ namespace BattleSystemECS.Core
             AbilityInstances[idx] = inst;
         }
 
+        /// <summary>
+        /// 冷却热路径：池内原地递减，投影只同步 Cooldown 字段（handle 有效时池与投影恒一致）。
+        /// handle 失效返回 false，调用方回退 GetAbility/SetAbility 语义。
+        /// </summary>
+        internal bool TryTickAbilityCooldown(int entityId, int slot, float deltaSeconds) {
+            int idx = entityId * MAX_ABILITIES_PER_ENTITY + slot;
+            if (!Abilities.TryTickCooldown(_abilitySlotHandles[idx], deltaSeconds, out float cooldown)) return false;
+            AbilityInstances[idx].State.Cooldown = cooldown;
+            return true;
+        }
+
         public void AddAbility(int entityId, GameplayAbilityDef def) { TryAddAbility(entityId, def); }
         public bool TryAddAbility(int entityId, GameplayAbilityDef def) {
             if (!IsValidEntity(entityId)) return false;
