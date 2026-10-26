@@ -1,5 +1,8 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（生产 FrameGraph 热点优化：mode 4 84→100 FPS）
+- **mode 4 逐节点计时**：`FrameGraph` 新增仅压测开启的逐节点 tick 累加（默认 null，生产 Tick 零开销）；mode 4 报告按耗时降序打印节点、调用次数与图外开销。
+
 ### 2026-10-03（修复跨平台测试快照与技能定义顺序）
 - FrameGraph 拓扑哈希改用固定 `LF` 换行输入，避免 Windows/Linux 的 `AppendLine()` 差异造成黄金值漂移。
 - strict 与 legacy 技能定义加载路径统一按文件名排序，保持 `SkillDefs` 索引和定义内容一致。

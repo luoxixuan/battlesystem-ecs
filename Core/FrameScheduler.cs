@@ -373,6 +373,14 @@ namespace BattleSystemECS.Core
             Tick(deltaTime, turn);
         }
 
+        /// <summary>压测专用：开启生产 FrameGraph 逐节点计时（仅 BenchmarkSystem 调用）。</summary>
+        internal FrameGraph EnableFrameGraphNodeTiming()
+        {
+            FrameGraph graph = RequireFrameGraph();
+            graph.EnableNodeTiming();
+            return graph;
+        }
+
         private FrameGraph RequireFrameGraph()
         {
             return _frameGraph ?? throw new InvalidOperationException(

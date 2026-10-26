@@ -641,6 +641,7 @@ namespace BattleSystemECS.Systems
                 return;
             }
 
+            FrameGraph graph = scheduler.EnableFrameGraphNodeTiming();
             ConsoleLogger.EnableLog = false;
             var totalSw = Stopwatch.StartNew();
 
@@ -655,8 +656,34 @@ namespace BattleSystemECS.Systems
 
             double msTotal = totalSw.Elapsed.TotalMilliseconds;
             Console.WriteLine($"\n[BENCHMARK] Production FrameGraph timing ({definition.Frames} frames, {definition.EnemyCount} enemies):");
+            WriteNodeTimingReport(graph, msTotal);
             Console.WriteLine($"[BENCHMARK]   TOTAL:          {msTotal,7:F2} ms");
             WriteFixedPopulationReport(definition.EnemyCount, definition.Frames, msTotal);
+        }
+
+        // 逐节点耗时（降序）；<0.1% 的节点合并为一行，避免刷屏。
+        private static void WriteNodeTimingReport(FrameGraph graph, double msTotal)
+        {
+            long[] ticks = graph.NodeTicks;
+            int[] calls = graph.NodeCalls;
+            if (ticks == null || calls == null) return;
+            double ticksPerMs = Stopwatch.Frequency / 1000.0;
+            var order = new int[ticks.Length];
+            for (int i = 0; i < order.Length; i++) order[i] = i;
+            Array.Sort(order, (a, b) => ticks[b].CompareTo(ticks[a]));
+            double nodeSumMs = 0, tailMs = 0;
+            int tailCount = 0;
+            for (int k = 0; k < order.Length; k++)
+            {
+                int i = order[k];
+                double ms = ticks[i] / ticksPerMs;
+                nodeSumMs += ms;
+                double pct = msTotal > 0 ? ms / msTotal * 100.0 : 0;
+                if (pct < 0.1) { if (calls[i] > 0) { tailMs += ms; tailCount++; } continue; }
+                Console.WriteLine($"[BENCHMARK]   node {graph.Nodes[i].Id,-48} {ms,9:F2} ms ({pct,5:F1}%)  calls={calls[i]}");
+            }
+            Console.WriteLine($"[BENCHMARK]   node (other {tailCount} nodes <0.1%)                    {tailMs,9:F2} ms");
+            Console.WriteLine($"[BENCHMARK]   node SUM / outside-graph:                       {nodeSumMs,9:F2} ms / {msTotal - nodeSumMs:F2} ms");
         }
 
         /// <summary>

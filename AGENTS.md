@@ -290,6 +290,9 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 mode2/mode4/mode5，未运行项不得标记为通过。mode 2/4 合同是固定人口吞吐：测量帧内目标数量必须钉住
 （开局高 HP、移速 0、不补波、铺满 20 座开火塔）；人口漂移则 `valid=FALSE`，该次 FPS 不能当 10K 负载。mode 5 是完整局观察（8 座塔，每波 EnemyCount ×3）。
 
+mode 4 报告末尾按耗时降序打印生产 FrameGraph 逐节点耗时（`node <id> ms (%) calls=`，<0.1% 合并为一行），用于定位热点；计时仅在压测中经 `FrameScheduler.EnableFrameGraphNodeTiming()` 开启。
+mode 5 墙钟很短（~0.5s），FPS 对工作目录所在磁盘与机器负载敏感：新旧对比须用同一 cwd 交替运行两份构建产物。
+
 M8 fresh evidence 必须在 evidence 首写前捕获 HEAD/branch/index/patch/status/untracked hashes，
 并在全部命令后复核仓库状态未漂移。mode 2/4/5 的 `DEFERRED` 和 Unity 的
 `UNAVAILABLE/BLOCKED` 必须与 PASS command manifest 分开记录。
