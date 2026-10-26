@@ -509,6 +509,46 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
+        public void OrderedDeferredBatchRejectsPerRequestAndReusedBufferDoesNotReplay()
+        {
+            using (var store = new ComponentStore())
+            {
+                store.AddPlayer(0, 3f, 1f, 1f, 1);
+                int a = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+                int shielded = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+                int c = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+                store.EnemyIsInvulnerable[shielded] = true;
+                var source = store.GetEntityHandle(0);
+                DamageRequest Hit(int target, long sequence) => new DamageRequest(source, store.GetEntityHandle(target), 2f,
+                    DamageType.True, ElementType.None, DamageFlags.None, DamageAmountStage.Raw,
+                    DamageCommitBoundary.GameplayResolve, sequence, ownerPlayerId: 0);
+                store.DamageResolver.EnableDeferred(true);
+                // 第二个请求在入队后才变为无敌，确保拒绝发生在批量提交内而非入队校验
+                store.EnemyIsInvulnerable[shielded] = false;
+                Assert.True(store.DamageResolver.TryApply(Hit(a, 10L)).Deferred);
+                Assert.True(store.DamageResolver.TryApply(Hit(shielded, 11L)).Deferred);
+                Assert.True(store.DamageResolver.TryApply(Hit(c, 12L)).Deferred);
+                store.EnemyIsInvulnerable[shielded] = true;
+                long invulnerableBefore = store.DamageResolver.GetRejectionCount(DamageRejectionReason.Invulnerable);
+
+                store.DamageResolver.CommitBoundary(DamageCommitBoundary.GameplayResolve);
+
+                Assert.Equal(8f, store.EnemyHealth[a]);
+                Assert.Equal(10f, store.EnemyHealth[shielded]);
+                Assert.Equal(8f, store.EnemyHealth[c]);
+                Assert.Equal(invulnerableBefore + 1, store.DamageResolver.GetRejectionCount(DamageRejectionReason.Invulnerable));
+                Assert.Equal(a, store.DamageResolver.Events.Get(0).Target.Index);
+                Assert.Equal(c, store.DamageResolver.Events.Get(2).Target.Index);
+
+                Assert.True(store.DamageResolver.TryApply(Hit(c, 13L)).Deferred);
+                store.DamageResolver.CommitBoundary(DamageCommitBoundary.GameplayResolve);
+                Assert.Equal(8f, store.EnemyHealth[a]);
+                Assert.Equal(6f, store.EnemyHealth[c]);
+                Assert.Equal(0, store.DamageResolver.PendingRequestCount);
+            }
+        }
+
+        [Fact]
         public void ReflectProvenanceIsAcceptedAndSameChainRecursionIsRejected()
         {
             using (var store = new ComponentStore())

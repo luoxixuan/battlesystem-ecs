@@ -71,6 +71,32 @@ namespace BattleSystemECS.Core.GAS
         // 与 ResourceResolver 共用 store 级提交锁；提交区内保持状态与关键事实原子一致。
         private readonly object _eventCommitLock;
         private readonly List<DamageRequest> _pending = new List<DamageRequest>(256);
+        // 边界提交批次复用缓冲；CommitBoundary 由 _isCommitting 防重入，单缓冲安全。
+        private readonly List<DamageRequest> _commitBatch = new List<DamageRequest>(256);
+        private sealed class CommitOrderComparer : IComparer<DamageRequest>
+        {
+            public static readonly CommitOrderComparer Instance = new CommitOrderComparer();
+            public int Compare(DamageRequest left, DamageRequest right) => CompareCommitOrder(in left, in right);
+        }
+        private static int CompareCommitOrder(in DamageRequest left, in DamageRequest right)
+        {
+            int c = left.Sequence.CompareTo(right.Sequence);
+            if (c != 0) return c;
+            c = left.Target.Index.CompareTo(right.Target.Index);
+            if (c != 0) return c;
+            return left.Source.Index.CompareTo(right.Source.Index);
+        }
+        // 严格递增（无相等键）时排序结果唯一，跳过排序不改变提交顺序；有相等键仍走原排序。
+        private static bool IsStrictlyCommitOrdered(List<DamageRequest> batch)
+        {
+            for (int i = 1; i < batch.Count; i++)
+            {
+                DamageRequest previous = batch[i - 1];
+                DamageRequest current = batch[i];
+                if (CompareCommitOrder(in previous, in current) >= 0) return false;
+            }
+            return true;
+        }
         internal void ResetDiagnostics() { Interlocked.Exchange(ref _requestsValidated, 0); Interlocked.Exchange(ref _requestsFastPath, 0); Interlocked.Exchange(ref _factsPublished, 0); }
         internal void MarkEventPublicationFailure(bool failed)
         {
@@ -158,7 +184,8 @@ namespace BattleSystemECS.Core.GAS
             {
                 if (_pending.Count == 0) { if (boundary == DamageCommitBoundary.EarlyResolve) Volatile.Write(ref _earlyBoundaryClosed, 1); return; }
             // 先摘出当前批次再提交；提交期间产生的新请求继续延迟到下一边界，避免递归执行。
-            var batch = new List<DamageRequest>();
+            List<DamageRequest> batch = _commitBatch;
+            batch.Clear();
             int write = 0;
             for (int i = 0; i < _pending.Count; i++)
             {
@@ -166,17 +193,28 @@ namespace BattleSystemECS.Core.GAS
                 else _pending[write++] = _pending[i];
             }
             if (write < _pending.Count) _pending.RemoveRange(write, _pending.Count - write);
-            batch.Sort((left, right) =>
-            {
-                int c = left.Sequence.CompareTo(right.Sequence);
-                if (c != 0) return c;
-                c = left.Target.Index.CompareTo(right.Target.Index);
-                if (c != 0) return c;
-                return left.Source.Index.CompareTo(right.Source.Index);
-            });
+            if (!IsStrictlyCommitOrdered(batch)) batch.Sort(CommitOrderComparer.Instance);
             _isCommitting = true;
-            try { for (int i = 0; i < batch.Count; i++) TryApplyInternal(batch[i], false, bypassDeferred: true); }
-            finally { _isCommitting = false; }
+            try
+            {
+                if (EventObserver == null)
+                {
+                    // 无公开回调（生产路径）：串行提交整批只取一次提交锁，逐请求语义不变。
+                    lock (_eventCommitLock)
+                    {
+                        for (int i = 0; i < batch.Count; i++)
+                        {
+                            DamageRequest request = batch[i];
+                            if (PreValidate(in request, false).Accepted) CommitLocked(in request, out _);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < batch.Count; i++) TryApplyInternal(batch[i], false, bypassDeferred: true);
+                }
+            }
+            finally { _isCommitting = false; batch.Clear(); }
             if (boundary == DamageCommitBoundary.EarlyResolve) Volatile.Write(ref _earlyBoundaryClosed, 1);
             }
         }
@@ -184,18 +222,8 @@ namespace BattleSystemECS.Core.GAS
         internal DamageApplyResult TryApplyValidated(DamageRequest request) => TryApplyInternal(request, true, bypassDeferred: false);
         private DamageApplyResult TryApplyInternal(DamageRequest request, bool validated, bool bypassDeferred)
         {
-            if (DiagnosticsEnabled) { if (validated) Interlocked.Increment(ref _requestsFastPath); else Interlocked.Increment(ref _requestsValidated); }
-            if (float.IsNaN(request.RawAmount) || float.IsInfinity(request.RawAmount)) return Reject(DamageRejectionReason.NonFiniteAmount);
-            if (request.RawAmount <= 0f) return Reject(DamageRejectionReason.NonPositiveAmount);
-            if (!IsSupportedDamageType(request.DamageType)) return Reject(DamageRejectionReason.UnsupportedDamageType);
-            if (request.AmountStage != DamageAmountStage.Raw && request.AmountStage != DamageAmountStage.PostCrit && request.AmountStage != DamageAmountStage.PostMitigation) return Reject(DamageRejectionReason.UnsupportedAmountStage);
-            if ((request.Flags & ~(DamageFlags.IgnoreInvulnerability | DamageFlags.IgnoreShield | DamageFlags.IgnoreArmor | DamageFlags.IgnoreResistance | DamageFlags.Execute | DamageFlags.Reflect | DamageFlags.Transfer)) != DamageFlags.None) return Reject(DamageRejectionReason.UnsupportedFlags);
-            if ((request.Flags & (DamageFlags.Reflect | DamageFlags.Transfer)) != DamageFlags.None && request.ParentSequence == request.Sequence)
-                return Reject(DamageRejectionReason.UnsupportedFlags);
-            if ((request.Flags & (DamageFlags.Reflect | DamageFlags.Transfer)) != DamageFlags.None && request.ProvenanceDepth > MaxProvenanceDepth)
-                return Reject(DamageRejectionReason.UnsupportedFlags);
-            if (request.CommitBoundary != DamageCommitBoundary.GameplayResolve && request.CommitBoundary != DamageCommitBoundary.EarlyResolve) return Reject(DamageRejectionReason.UnsupportedCommitBoundary);
-            if (request.OwnerPlayerId < 0 || request.OwnerPlayerId >= ComponentStore.MAX_PLAYERS) return Reject(DamageRejectionReason.InvalidOwner);
+            DamageApplyResult preValidation = PreValidate(in request, validated);
+            if (!preValidation.Accepted) return preValidation;
             if (_deferred && !bypassDeferred)
             {
                 lock (_eventCommitLock)
@@ -212,9 +240,37 @@ namespace BattleSystemECS.Core.GAS
                 }
                 return new DamageApplyResult(true, 0f, 0f, false, DamageRejectionReason.None, deferred: true);
             }
-            var hitFact = new GameplayEvent(GameplayEventType.HitConfirmed, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId);
             DamageApplyResult result;
-            lock (_eventCommitLock)
+            GameplayEvent hitFact;
+            lock (_eventCommitLock) result = CommitLocked(in request, out hitFact);
+            if (!result.Accepted) return result;
+            // 公开回调必须位于提交锁外；状态与事实均已提交，重入不会阻塞同一提交单元。
+            EventObserver?.Invoke(hitFact);
+            return result;
+        }
+
+        /// <summary>不依赖实体状态的请求形状校验；Accepted=true 表示通过。</summary>
+        private DamageApplyResult PreValidate(in DamageRequest request, bool validated)
+        {
+            if (DiagnosticsEnabled) { if (validated) Interlocked.Increment(ref _requestsFastPath); else Interlocked.Increment(ref _requestsValidated); }
+            if (float.IsNaN(request.RawAmount) || float.IsInfinity(request.RawAmount)) return Reject(DamageRejectionReason.NonFiniteAmount);
+            if (request.RawAmount <= 0f) return Reject(DamageRejectionReason.NonPositiveAmount);
+            if (!IsSupportedDamageType(request.DamageType)) return Reject(DamageRejectionReason.UnsupportedDamageType);
+            if (request.AmountStage != DamageAmountStage.Raw && request.AmountStage != DamageAmountStage.PostCrit && request.AmountStage != DamageAmountStage.PostMitigation) return Reject(DamageRejectionReason.UnsupportedAmountStage);
+            if ((request.Flags & ~(DamageFlags.IgnoreInvulnerability | DamageFlags.IgnoreShield | DamageFlags.IgnoreArmor | DamageFlags.IgnoreResistance | DamageFlags.Execute | DamageFlags.Reflect | DamageFlags.Transfer)) != DamageFlags.None) return Reject(DamageRejectionReason.UnsupportedFlags);
+            if ((request.Flags & (DamageFlags.Reflect | DamageFlags.Transfer)) != DamageFlags.None && request.ParentSequence == request.Sequence)
+                return Reject(DamageRejectionReason.UnsupportedFlags);
+            if ((request.Flags & (DamageFlags.Reflect | DamageFlags.Transfer)) != DamageFlags.None && request.ProvenanceDepth > MaxProvenanceDepth)
+                return Reject(DamageRejectionReason.UnsupportedFlags);
+            if (request.CommitBoundary != DamageCommitBoundary.GameplayResolve && request.CommitBoundary != DamageCommitBoundary.EarlyResolve) return Reject(DamageRejectionReason.UnsupportedCommitBoundary);
+            if (request.OwnerPlayerId < 0 || request.OwnerPlayerId >= ComponentStore.MAX_PLAYERS) return Reject(DamageRejectionReason.InvalidOwner);
+            return new DamageApplyResult(true, 0f, 0f, false, DamageRejectionReason.None);
+        }
+
+        /// <summary>调用方必须持有 _eventCommitLock：实时校验 + 状态提交 + 关键事实发布。</summary>
+        private DamageApplyResult CommitLocked(in DamageRequest request, out GameplayEvent hitFact)
+        {
+            hitFact = new GameplayEvent(GameplayEventType.HitConfirmed, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId);
             {
                 DamageApplyResult validation = ValidateLiveRequest(request, out int target);
                 if (!validation.Accepted) return validation;
@@ -251,9 +307,8 @@ namespace BattleSystemECS.Core.GAS
                 bool death = _store.EnemyHealth[target] <= 0f;
                 if (death) _store.ResourceResolver.ClampEnemyHealthAtZero(target);
                 var damageFact = new GameplayEvent(GameplayEventType.DamageApplied, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId);
-                var deathFact = new GameplayEvent(GameplayEventType.DeathQueued, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId);
                 bool published = death
-                    ? Events.TryPublishBatch(hitFact, damageFact, deathFact, true)
+                    ? Events.TryPublishBatch(hitFact, damageFact, new GameplayEvent(GameplayEventType.DeathQueued, request.Source, request.Target, default(EffectHandle), request.Effect, request.Flags, request.Sequence, request.ParentSequence, provenanceId: request.ProvenanceId, provenanceDepth: request.ProvenanceDepth, ownerPlayerId: request.OwnerPlayerId), true)
                     : Events.TryPublishBatch(hitFact, damageFact, true);
                 if (!published)
                 {
@@ -273,11 +328,8 @@ namespace BattleSystemECS.Core.GAS
                 if (death) _store.QueueEnemyDeath(target, request.OwnerPlayerId, request.Sequence, request.Source);
                 if (DiagnosticsEnabled) Interlocked.Add(ref _factsPublished, death ? 3 : 2);
                 Interlocked.Increment(ref _acceptedCount);
-                result = new DamageApplyResult(true, applied, absorbed, death, DamageRejectionReason.None);
+                return new DamageApplyResult(true, applied, absorbed, death, DamageRejectionReason.None);
             }
-            // 公开回调必须位于提交锁外；状态与事实均已提交，重入不会阻塞同一提交单元。
-            EventObserver?.Invoke(hitFact);
-            return result;
         }
 
         private DamageApplyResult ValidateLiveRequest(DamageRequest request, out int target)
