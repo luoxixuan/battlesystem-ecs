@@ -18,6 +18,28 @@ namespace BattleSystemECS.Components
     }
 
     /// <summary>
+    /// 伤害类型名称缓存：热路径替代 DamageType.ToString()（每次调用都会分配新字符串）。
+    /// 已定义值返回与 ToString() 相同的字面量；未定义值回退 ToString()。
+    /// </summary>
+    public static class DamageTypeNames
+    {
+        public static string Get(DamageType type)
+        {
+            switch (type)
+            {
+                case DamageType.Physical: return "Physical";
+                case DamageType.Magic: return "Magic";
+                case DamageType.Fire: return "Fire";
+                case DamageType.Ice: return "Ice";
+                case DamageType.Lightning: return "Lightning";
+                case DamageType.True: return "True";
+                case DamageType.Holy: return "Holy";
+                default: return type.ToString();
+            }
+        }
+    }
+
+    /// <summary>
     /// Damage type flag mask for enemy damage immunity.
     /// Each bit corresponds to a DamageType value (bit 0 = Physical, bit 1 = Magic, etc.).
     /// If (damageTypeMask &amp; enemyImmunityMask) != 0, the enemy takes 0 damage from that type.

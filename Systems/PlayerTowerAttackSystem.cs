@@ -321,8 +321,15 @@ public void SetWaveNumber(int waveNumber)
                     (finalDamage, linkedDamage, linkedEnemyId) = _lifeLinkSystem.ComputeLinkedDamage(enemyId, finalDamage);
                 }
 
-                store.ApplyDamageAuthority(store.PlayerEntityId, enemyId, finalDamage, playerId, damageType, element: ElementType.None, stage: Core.GAS.DamageAmountStage.PostMitigation);
-                if (finalDamage > 0f) _battleEventBus.OnDamageDealt(enemyId, finalDamage, damageType.ToString(), wasCrit);
+                // 伤害权威拒绝（队列溢出 / 无敌 / 免疫 / 目标已死）时本次命中未落地：
+                // 跳过全部"命中"副作用（渲染事件、生命链接分摊、DPS、荆棘、命中事件），避免为被丢弃的伤害触发效果。
+                if (!store.ApplyDamageAuthority(store.PlayerEntityId, enemyId, finalDamage, playerId, damageType, element: ElementType.None, stage: Core.GAS.DamageAmountStage.PostMitigation))
+                {
+                    if (store.EnemyHealth[enemyId] <= 0f && prevHealth > 0f)
+                        store.QueueEnemyDeath(enemyId, playerId);
+                    continue;
+                }
+                if (finalDamage > 0f) _battleEventBus.OnDamageDealt(enemyId, finalDamage, DamageTypeNames.Get(damageType), wasCrit);
 
                 // Life Link: apply shared damage to linked enemy
                 if (linkedEnemyId >= 0 && linkedDamage > 0f)

@@ -4,6 +4,9 @@
 - **mode 4 逐节点计时**：`FrameGraph` 新增仅压测开启的逐节点 tick 累加（默认 null，生产 Tick 零开销）；mode 4 报告按耗时降序打印节点、调用次数与图外开销。
 - **敌人技能冷却**（`ai.enemy-ability.cooldowns` 1.46→0.34 ms/帧）：`TickCooldown(store,…)` 原先对 10K 敌人每帧 GetAbility/SetAbility 整体拷贝 `AbilityInstance`（含完整定义）。改为池内 `ref` 原地递减，投影只同步 Cooldown 字段；handle 失效仍回退原路径。玩家 `SkillSystem` 共用同一入口。
 - **damage.commit**（1.70→0.93 ms/帧）：边界批次复用缓冲（原每次 `new List`）；排序改缓存 `IComparer`，严格递增（无相等键）时跳过排序，有相等键仍走原排序；无 `EventObserver`（生产）时整批只取一次提交锁，逐请求校验/提交语义不变，有观察者仍逐请求锁外回调。非致死命中不再构造 DeathQueued 事实。
+- **玩家攻击**（`combat.player-attack.update` 2.27→1.88 ms/帧）：伤害权威拒绝时跳过全部命中副作用（渲染伤害事件、生命链接分摊、DPS/威胁累计、荆棘、EnemyHit/EnemyCrit）。此前返回值被忽略，被丢弃的伤害仍触发效果。`DamageType.ToString()`（每次命中分配字符串）改为 `DamageTypeNames.Get`。
+- **已知问题（未改）**：mode 4 玩家每帧命中全部 10K 敌人，deferred 队列上限 `MaxPendingRequests=4096`，每帧 5904 次命中以 `RequestQueueOverflow` 拒绝；提高上限还会撞上事件队列 8192 容量，需单独决策。
+- 对照（同 cwd 交替运行新旧产物）：mode 4 84→100 FPS（valid=true）；mode 5 持平（~788 vs ~786 FPS，Victory 457 帧一致）；mode 2 噪声内持平。
 
 ### 2026-10-03（修复跨平台测试快照与技能定义顺序）
 - FrameGraph 拓扑哈希改用固定 `LF` 换行输入，避免 Windows/Linux 的 `AppendLine()` 差异造成黄金值漂移。
