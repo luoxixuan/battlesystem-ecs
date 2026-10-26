@@ -1,5 +1,9 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（mode 2/4 容量拒绝计入有效性）
+- **Capacity 行**：mode 2/4 报告测量窗口内（不含预热）Damage/Resource Resolver 的 `RequestQueueOverflow` 拒绝数（覆盖 deferred pending 溢出与事件队列满回滚）及事件队列溢出数；任一拒绝 >0 即 `valid=FALSE`。
+- **证据（旧容量 pending 4096 / events 8192）**：mode 4 `damageDropped=5924.4/帧`（玩家 5904 + 塔全部约 20），`resourceDropped=82678`（随机事件对 10K 敌人群体治疗的帧，每帧约 5904）→ `valid=FALSE`；mode 2 无拒绝、`valid=true`。mode 5 完整局 damage pending 峰值 65。
+
 ### 2026-10-26（生产 FrameGraph 热点优化：mode 4 84→100 FPS）
 - **mode 4 逐节点计时**：`FrameGraph` 新增仅压测开启的逐节点 tick 累加（默认 null，生产 Tick 零开销）；mode 4 报告按耗时降序打印节点、调用次数与图外开销。
 - **敌人技能冷却**（`ai.enemy-ability.cooldowns` 1.46→0.34 ms/帧）：`TickCooldown(store,…)` 原先对 10K 敌人每帧 GetAbility/SetAbility 整体拷贝 `AbilityInstance`（含完整定义）。改为池内 `ref` 原地递减，投影只同步 Cooldown 字段；handle 失效仍回退原路径。玩家 `SkillSystem` 共用同一入口。

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using BattleSystemECS.Core;
+using BattleSystemECS.Core.GAS;
 using BattleSystemECS.Config;
 using BattleSystemECS.Components;
 
@@ -226,17 +227,39 @@ namespace BattleSystemECS.Systems
             if (n > _populationMax) _populationMax = n;
         }
 
+        // 测量窗口起点的容量拒绝计数（预热帧不计入）。RequestQueueOverflow 同时覆盖
+        // deferred pending 溢出与事件队列满导致的回滚拒绝。
+        private long _damageCapacityRejections0, _resourceCapacityRejections0;
+        private int _damageEventOverflow0, _resourceEventOverflow0;
+
+        private void BeginCapacityWindow()
+        {
+            _damageCapacityRejections0 = store.DamageResolver.GetRejectionCount(DamageRejectionReason.RequestQueueOverflow);
+            _resourceCapacityRejections0 = store.ResourceResolver.GetRejectionCount(ResourceRejectionReason.RequestQueueOverflow);
+            _damageEventOverflow0 = store.DamageResolver.EventOverflowCount;
+            _resourceEventOverflow0 = store.ResourceResolver.EventOverflowCount;
+        }
+
         private void WriteFixedPopulationReport(int expected, int frames, double msTotal)
         {
             _populationEnd = store.GetActiveEnemyCount();
-            bool valid = expected > 0 && _populationMin == expected && _populationMax == expected &&
-                         _populationEnd == expected;
+            bool populationValid = expected > 0 && _populationMin == expected && _populationMax == expected &&
+                                   _populationEnd == expected;
+            long damageDropped = store.DamageResolver.GetRejectionCount(DamageRejectionReason.RequestQueueOverflow) - _damageCapacityRejections0;
+            long resourceDropped = store.ResourceResolver.GetRejectionCount(ResourceRejectionReason.RequestQueueOverflow) - _resourceCapacityRejections0;
+            int damageEventOverflow = store.DamageResolver.EventOverflowCount - _damageEventOverflow0;
+            int resourceEventOverflow = store.ResourceResolver.EventOverflowCount - _resourceEventOverflow0;
+            bool capacityValid = damageDropped == 0 && resourceDropped == 0;
+            bool valid = populationValid && capacityValid;
             double fps = 1000.0 / (msTotal / frames);
             Console.WriteLine($"[BENCHMARK] Contract: fixed-population {expected} alive × {frames} frames (high-HP, speed 0, no extra waves)");
+            Console.WriteLine($"[BENCHMARK] Capacity: damageDropped={damageDropped} ({damageDropped / (double)frames:F1}/frame) resourceDropped={resourceDropped} damageEventOverflow={damageEventOverflow} resourceEventOverflow={resourceEventOverflow} pendingCap={DamageResolver.MaxPendingRequests} eventCap={store.DamageResolver.Events.Capacity}");
             Console.WriteLine($"[BENCHMARK] Population: min={_populationMin} max={_populationMax} end={_populationEnd} kills={store.TotalKills} DeathResolve={store.DeathResolveCount} valid={(valid ? "true" : "FALSE")}");
             Console.WriteLine($"[BENCHMARK] Throughput: {fps:F0} FPS  ({msTotal/frames:F2} ms/frame)");
-            if (!valid)
+            if (!populationValid)
                 Console.WriteLine("[BENCHMARK] INVALID: population drifted; FPS is not a 10K-load measurement.");
+            if (!capacityValid)
+                Console.WriteLine("[BENCHMARK] INVALID: damage/resource requests were dropped for capacity; FPS does not measure the full combat load.");
         }
 
         private BenchmarkExecutionEvidence Dispatch(BenchmarkScenarioDefinition definition)
@@ -370,6 +393,7 @@ namespace BattleSystemECS.Systems
             long tUpgrade = 0, tSkill = 0, tMap = 0;
             long tGridRebuild = 0;
 
+            BeginCapacityWindow();
             var totalSw = Stopwatch.StartNew();
 
             // Pre-compute move direction lookup to eliminate switch in hot path
@@ -643,6 +667,7 @@ namespace BattleSystemECS.Systems
 
             FrameGraph graph = scheduler.EnableFrameGraphNodeTiming();
             ConsoleLogger.EnableLog = false;
+            BeginCapacityWindow();
             var totalSw = Stopwatch.StartNew();
 
             for (int f = 0; f < definition.Frames; f++)
