@@ -31,8 +31,10 @@ namespace BattleSystemECS.Core
         // corresponding entry to avoid restoring a stale base speed onto a
         // different tower that happens to land on the same entityId.
         // Systems holding per-entity caches subscribe via += / -=
-        public static event Action<int> OnTowerEntityInvalidated;
-        internal static void RaiseTowerEntityInvalidated(int entityId)
+        // 实例事件：只通知持有本 store 的系统。旧的静态事件会让每个订阅系统（及其 ~250 MB 的 store）
+        // 被永久根引用，并且一个 store 销毁塔会误清其他 store 的缓存。
+        public event Action<int> OnTowerEntityInvalidated;
+        internal void RaiseTowerEntityInvalidated(int entityId)
         {
             var h = OnTowerEntityInvalidated;
             if (h != null) h(entityId);

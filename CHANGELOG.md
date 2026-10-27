@@ -1,5 +1,12 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（修复 TowerSynergySystem 经静态事件泄漏 store：测试宿主峰值 ~47→39 GB）
+- **问题**：`ComponentStore.OnTowerEntityInvalidated` 是静态事件，`TowerSynergySystem` 构造时订阅且从不退订——静态事件永久根引用每个协同系统及其 store（约 250 MB：数百个 MAX_ENTITIES 大小的数组）。每个构建生产组合的测试都泄漏一个 store，测试宿主私有内存峰值约 47 GB，逼近本机约 65 GB 提交上限，其他进程占内存时触发 CLR 致命错误。同时一个 store 销毁塔会误清其他 store 中协同系统的缓存。
+- **修复**：改为 store 实例事件，`TowerSynergySystem` 订阅自身 store；system 与 store 同生命周期，可一并回收。
+- **证据**：全量测试峰值 testhost 私有内存约 47 GB→39 GB，耗时约 3m25s→2m25s；修复前以 20 GB GC 堆硬上限运行 664 个测试 OOM，修复后同上限 1948/1948 通过（剩余峰值为待回收垃圾而非存活对象）。
+- 新测试：丢弃的协同系统与 store 可被 GC 回收；一个 store 的塔销毁只通知本 store 订阅者。
+- 对照（`tools/ab-bench.ps1`）：mode 2/4 持平；mode 5 Victory 457 帧一致。
+
 ### 2026-10-26（ProductionDotCatalog 名称映射并发安全）
 - **问题**：`ProductionDotCatalog` 用静态 `Dictionary` 记录 DoT 模板名→EffectId，每次 `CatalogCompiler.Compile` 先 `Clear()` 再逐个写入；并行测试类同时编译目录时字典被并发改写，`CatalogCompilerTests.KnownHierarchyTagNameCompilesIntoRequiredTags` 偶发抛出 "concurrent update ... corrupted its state"。生产只编译一次，但运行时 `TryGetId` 与重编译之间同样无保护。
 - **修复**：每次编译构建新字典，完成后 `Volatile.Write` 原子发布引用，`TryGetId` 经 `Volatile.Read` 读取；"以最近一次编译为准"的语义不变，读者不会看到清空或写入中途的字典。

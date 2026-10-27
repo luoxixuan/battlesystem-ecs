@@ -53,7 +53,7 @@ namespace BattleSystemECS.Systems
             // Round 103 — Buff Share: subscribe to entity-invalidated events so the per-frame
             // base-attack-speed cache is purged when a tower is destroyed, removed, or
             // recycled (Claude bug scan fix #2: stale cache on ID reuse).
-            ComponentStore.OnTowerEntityInvalidated += InvalidateBuffShareCache;
+            store.OnTowerEntityInvalidated += InvalidateBuffShareCache;
         }
 
         /// <summary>
