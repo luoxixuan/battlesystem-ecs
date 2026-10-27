@@ -182,6 +182,7 @@ namespace BattleSystemECS.Core
             FrameScenarioKind scenarioKind = FrameScenarioKind.Gameplay)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
+            _capacityWatch = new CapacityDropWatch(store);
             store.GameplayPhaseContext = PhaseContext.FromGameState(_phase);
             _ = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));
             if (!Enum.IsDefined(typeof(FrameSchedulerExecutionMode), executionMode))
@@ -267,7 +268,16 @@ namespace BattleSystemECS.Core
             else
                 TickLegacy(deltaTime, turn);
             LastTimeContext = _executionContext.Time;
+            // 每帧推进基线（几次计数读取），保证订阅前后的增量都按帧归属
+            if (_capacityWatch.TryCollect(_executionContext.Frame, out var report)) CapacityDropped?.Invoke(report);
         }
+
+        /// <summary>
+        /// 帧末容量丢弃通知：本帧新增 Resolver 请求溢出拒绝、事件溢出或触发器循环中止时发出。
+        /// 生产由 GameManager 订阅并限频记日志，使压测之外的丢弃也可见。
+        /// </summary>
+        public event Action<CapacityDropReport>? CapacityDropped;
+        private readonly CapacityDropWatch _capacityWatch;
 
         private void TickLegacy(float deltaTime, int turn)
         {

@@ -50,6 +50,29 @@ namespace BattleSystemECS.Core
 
         // 渲染器
         private IRenderer logger;
+
+        // 容量丢弃限频日志：首次立即记录，之后每 CapacityLogIntervalFrames 帧最多一条，汇总期间累计值
+        private const int CapacityLogIntervalFrames = 600;
+        private int _capacityLastLogFrame = int.MinValue / 2;
+        private int _capacityDropFrames;
+        private long _capacityDamage, _capacityResource, _capacityDamageEvents, _capacityResourceEvents, _capacityAborts;
+
+        private void LogCapacityDrop(CapacityDropReport report)
+        {
+            _capacityDropFrames++;
+            _capacityDamage += report.DamageDropped;
+            _capacityResource += report.ResourceDropped;
+            _capacityDamageEvents += report.DamageEventOverflows;
+            _capacityResourceEvents += report.ResourceEventOverflows;
+            _capacityAborts += report.TriggerAborts;
+            if (report.Frame - _capacityLastLogFrame < CapacityLogIntervalFrames) return;
+            logger?.Log($"[CAPACITY] frame {report.Frame}: {_capacityDropFrames} frame(s) dropped work since last report — " +
+                $"damageDropped={_capacityDamage} resourceDropped={_capacityResource} damageEventOverflow={_capacityDamageEvents} " +
+                $"resourceEventOverflow={_capacityResourceEvents} triggerAborts={_capacityAborts}");
+            _capacityLastLogFrame = report.Frame;
+            _capacityDropFrames = 0;
+            _capacityDamage = _capacityResource = _capacityDamageEvents = _capacityResourceEvents = _capacityAborts = 0;
+        }
         private IBattleEventBus _eventBus;
 
         // 游戏配置
@@ -142,6 +165,7 @@ namespace BattleSystemECS.Core
             registry = new SystemRegistry();
 
             scheduler = new FrameScheduler(store, gameConfig, _eventBus, _schedulerExecutionMode, _effectClock);
+            scheduler.CapacityDropped += LogCapacityDrop;
             new ProductionSystemInstaller().Install(registry, store, gameConfig, logger,
                 playerId, stateMachine, scheduler, _eventBus);
             // 初始化地形网格

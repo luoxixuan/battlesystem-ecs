@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（容量丢弃在压测之外可见：[CAPACITY] 日志）
+- **问题**：Resolver 请求溢出拒绝、事件队列溢出与触发器循环中止只在 mode 2/4 的 `Capacity:` 行或显式 `GameplayObservation.Capture` 中可见，正常游戏丢弃战斗工作时无任何提示。
+- **改动**：`FrameScheduler.Tick` 帧末经 `CapacityDropWatch` 读取上述单调计数并与上一帧比较（几次字段读取、无分配，不改帧图拓扑），有新增时发出 `CapacityDropped(CapacityDropReport)`；`GameManager` 订阅并以 `[CAPACITY]` 前缀限频记录（首次立即，之后每 600 帧最多一条，汇总期间累计值）。
+- 新测试：延迟伤害队列溢出 2 个请求，恰在当帧末报告 `DamageDropped=2` 一次，下一帧无新增不再报告。
+- 对照：mode 4 持平（293–296 vs 290–295 FPS）；mode 2 持平；mode 5 Victory 457 帧一致（噪声内）。
+
 ### 2026-10-26（敌人能力冷却批量并行：ai.enemy-ability.cooldowns 0.31→0.13 ms/帧）
 - **改动**：`EnemyAbilitySystem.UpdateCooldowns` 先串行为缺槽敌人分配能力（池分配非线程安全），再按 1024 个一批 `Parallel.For` 推进冷却与缴械计时（≥2048 敌人时；以下仍串行）。每个敌人只写自己的能力池实例、投影槽与缴械计时；handle 失效需走池写回退的敌人登记到本批缓冲，屏障后按批序串行处理，逐敌人结果与串行一致。
 - **合同同步**：节点 `ai.enemy-ability.cooldowns` 执行语义 `SerialUpdate`→`InternalParallelCollectSerialCommit`（`tools/system-registration-spec.json` + 生成器重建 manifest、`FrameBindingFacts`、`FrameSystemGraph`）；生产访问审阅根指纹（Gameplay / FixedPopulation）与 `FrameGraphTests` 钉住的拓扑哈希按新拓扑重新审阅更新，并把该节点加入并行语义断言。

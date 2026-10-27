@@ -237,7 +237,7 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 - 使用中文注释（与现有代码保持一致）。
 - 系统类命名：`XxxSystem.cs`，职责单一。
-- 日志前缀约定：`[BOOTSTRAP]` / `[INFO]` / `[HEALTH]` / `[TECH]` / `[PHASE]` / `[SHIELD]` / `[TEST]`
+- 日志前缀约定：`[BOOTSTRAP]` / `[INFO]` / `[HEALTH]` / `[TECH]` / `[PHASE]` / `[SHIELD]` / `[TEST]` / `[CAPACITY]`（`FrameScheduler.CapacityDropped`：Resolver 请求/事件溢出或触发器循环中止，GameManager 限频记录）
 
 ### 5.2 并行与性能规范
 
