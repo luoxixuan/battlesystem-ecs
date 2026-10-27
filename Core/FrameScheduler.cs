@@ -37,7 +37,6 @@ namespace BattleSystemECS.Core
         public FrameGraphCompositionKind CompositionKind => _compositionKind;
         public FrameSchedulerExecutionMode ExecutionMode => _executionMode;
         public bool IsCompositionSealed => _frameGraph != null;
-        internal void ClearFrameBindings() => _frameBindings.Clear();
         internal bool RemoveFrameBinding(string id) => _frameBindings.Remove(id) || Build.RemoveBinding(id);
         internal void RegisterFrameBinding(string id, Action<NodeExecutionContext> execute)
         {

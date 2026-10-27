@@ -2138,11 +2138,6 @@ namespace BattleSystemECS.Core
             ResourceResolver.ApplyEnemyDamageResources(enemyId, damage, attackElement, false);
         }
 
-        internal void ApplyEnemyDamageLegacy(int enemyId, float damage, ElementType attackElement, bool ignoreShield = false)
-        {
-            ApplyEnemyDamage(enemyId, damage, attackElement);
-        }
-
         private static int ElementOrdinalForShield(ElementType element)
         {
             // Mirrors ElementalReactionSystem ordinal mapping (Fire=0, Ice=1, Lightning=2, Poison=3)

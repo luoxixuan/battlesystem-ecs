@@ -146,7 +146,6 @@ namespace BattleSystemECS.Core.GAS
             return new DamageApplyResult(false, 0f, 0f, false, reason);
         }
         internal void EnableDeferred(bool value) { _deferred = value; }
-        internal void MarkBoundary(DamageCommitBoundary boundary) { Volatile.Write(ref _lastCommittedBoundary, (int)boundary); }
         internal void RejectPending(DamageCommitBoundary boundary)
         {
             lock (_pendingLock)

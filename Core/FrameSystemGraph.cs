@@ -438,8 +438,6 @@ namespace BattleSystemECS.Core
                 _builder.Add(new FrameNodeAdapter(bindingMetadata, new DelegateSystem(c => action!(c.Store, c.Delta))));
                 _lastBuild = bindingMetadata.Id;
             }
-            public void AddWave<T>(T? system,string id,FrameExecutionSemantics semantics,FrameResource[] reads,FrameResource[] writes,Action<T,NodeExecutionContext> action)where T:class=>AddSlot(ref _lastWave,system,id,FramePhaseMask.Wave,_waveDomain,semantics,reads,writes,action);
-            public void AddWaveAt<T>(T? system,string id,FrameTimeDomain domain,FrameExecutionSemantics semantics,FrameResource[] reads,FrameResource[] writes,Action<T,NodeExecutionContext> action)where T:class=>AddSlot(ref _lastWave,system,id,FramePhaseMask.Wave,domain,semantics,reads,writes,action);
             public void AddWaveBinding(FrameScheduler scheduler,string id,FrameTimeDomain domain,FrameExecutionSemantics semantics,FrameResource[] reads,FrameResource[] writes)
             {
                 Action<NodeExecutionContext>? action = null;
