@@ -25,6 +25,8 @@ namespace BattleSystemECS.Config
         // ReincarnationCharges: number of one-time auto-revives on player death (default 0 = disabled).
         // 1 = classic "one-time save". Each revive restores HP to ReincarnationHealFraction * MaxHP.
         public int ReincarnationCharges { get; set; } = 0;
+        // MaxTargetsPerFrame: 玩家每帧最多命中的目标数（沿进攻轴最近者优先）。0 = 不限（旧行为）。
+        public int MaxTargetsPerFrame { get; set; } = 0;
         // ReincarnationHealFraction: HP fraction (0-1) restored on reincarnation. Default 0.5 (50% MaxHP).
         public float ReincarnationHealFraction { get; set; } = 0.5f;
     }

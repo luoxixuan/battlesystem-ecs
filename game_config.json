@@ -4302,6 +4302,7 @@
                    }
                ],
     "Player":  {
+                   "MaxTargetsPerFrame":  64,
                    "AttackInterval":  1,
                    "Type":  "Tower",
                    "AttackRange":  3,

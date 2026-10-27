@@ -1194,6 +1194,7 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             player.UpgradeThreshold = ExtractFloat(json, "UpgradeThreshold");
             player.MaxHealth = ExtractFloat(json, "MaxHealth");
             player.StartingLives = ExtractInt(json, "StartingLives");
+            player.MaxTargetsPerFrame = Math.Max(0, ExtractInt(json, "MaxTargetsPerFrame", 0));
             player.StartingSkills = ParseStringArray(json, "StartingSkills");
 
             return player;

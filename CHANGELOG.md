@@ -1,5 +1,13 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（玩家每帧目标上限 MaxTargetsPerFrame=64：mode 4 93→225 FPS）
+- **规则**：`Player.MaxTargetsPerFrame`（`game_config.json`，0 = 不限，缺省 0 保持旧行为）。超出上限时只命中沿进攻轴（`enemyY - playerY`）最近的目标，同距按敌人 id，保证确定性；保留的命中按原收集顺序结算。大小为上限的最大堆选取，O(n log k)，缓冲复用无分配。
+- **原因**：玩家攻击此前无攻速门控与目标上限，每帧命中 X 带内全部敌人；mode 4 每帧约 10K 命中走完整伤害请求→提交→事实→触发器管线，且每 10 次命中施加一次连击效果（每帧约 1000 次）。
+- **取值证据**（mode 5 完整局）：不限 / 64 → Victory 457 帧（结局与帧数不变）；32 → Victory 467 帧；16 → BaseDestroyed 115 帧。取不改变完整局结局的最大收益值 64。
+- `Player.AttackInterval` 仍只解析、未接入（接入会把玩家从每帧一击降为每秒一击，属平衡改动，未做）。
+- 新测试：上限保留最近目标且同距按 id；上限 0 命中带内全部敌人。
+- 对照（同 cwd 交替运行，对比上一条提交）：mode 4 **94–95→204–228 FPS**（valid=true、0 拒绝、0 中止；`combat.player-attack.update` 降至 0.22 ms/帧，触发器节点退出热点前列，最大节点变为 `combat.tower-attack.update`）；mode 2 持平（~328，测量不受玩家命中数主导）；mode 5 Victory 457 帧一致。
+
 ### 2026-10-26（触发器预算只计订阅事件并按 Resolver 容量定界：mode 4 中止 1514→0）
 - **问题**：`MaxEventsPerFrame=8192` 计入每条事实（含无触发器订阅的 `DamageApplied`），mode 4 每帧约 20K 事实撞上防护，约一半玩家命中从未进入触发器评估——EveryN 连击加成的计数随敌人数量失真。
 - **只计订阅事件**：`Consume` 先算订阅类型位图，无定义订阅的事件不进去重、不占帧预算（事件仍照常发布，digest 与 Rally 等读者不受影响）。

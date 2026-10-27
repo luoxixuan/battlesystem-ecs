@@ -43,6 +43,13 @@ namespace BattleSystemECS.Systems
         private List<int> _activeEnemyList;
         private bool _turnCached;
         private int _rangeSq;
+        // 每帧最多命中目标数（Player.MaxTargetsPerFrame，0 = 不限）。超出时只保留沿进攻轴最近的目标，
+        // 同距按敌人 id，保证确定性；保留下来的命中仍按原收集顺序结算。
+        private int _maxTargetsPerFrame;
+        private float[] _heapDistance = Array.Empty<float>();
+        private int[] _heapEnemy = Array.Empty<int>();
+        private int[] _heapIndex = Array.Empty<int>();
+        private bool[] _keepTarget = Array.Empty<bool>();
 
         // Cached tech tree attack damage multiplier (updated on SetTurn)
         private float _attackDamageMult = 1f;
@@ -125,6 +132,7 @@ namespace BattleSystemECS.Systems
             _activeEnemyList = store.GetCachedActiveEnemyIds();  // zero allocation — frame cache
             _turnCached = true;
             _rangeSq = (int)(_attackRange * _attackRange);
+            _maxTargetsPerFrame = gameConfig != null && gameConfig.Player != null ? gameConfig.Player.MaxTargetsPerFrame : 0;
 
             // Cache crit bonuses from tech tree (avoid per-enemy calls in hot path)
             _critRateBonus = techTreeSystem != null ? techTreeSystem.GetCritRateBonus() : 0f;
@@ -258,6 +266,9 @@ public void SetWaveNumber(int waveNumber)
                 }
             }
 
+            if (_maxTargetsPerFrame > 0 && merged.Count > _maxTargetsPerFrame)
+                KeepNearestTargets(merged, _maxTargetsPerFrame);
+
             // Phase 2 (serial): drain the merged damage list (deterministic index order)
             foreach (var (enemyId, damage, wasCrit, damageType) in merged)
             {
@@ -384,6 +395,69 @@ public void SetWaveNumber(int waveNumber)
         /// 只读 SOA 字段 + 写入调用方独占的 sink 缓冲 —— 无共享写、无锁、无结构变更。
         /// sink 在串行路径是 _mergedDamage，在并行路径是本批独占缓冲。
         /// </summary>
+        /// <summary>
+        /// 用大小为 limit 的最大堆选出沿进攻轴（enemyY - playerY）最近的 limit 个目标，
+        /// 同距按敌人 id；随后按原顺序原地压缩 merged。O(n log limit)，缓冲复用、无分配。
+        /// </summary>
+        private void KeepNearestTargets(List<(int enemyId, float damage, bool wasCrit, DamageType damageType)> merged, int limit)
+        {
+            if (_heapIndex.Length < limit)
+            {
+                _heapDistance = new float[limit];
+                _heapEnemy = new int[limit];
+                _heapIndex = new int[limit];
+            }
+            int count = 0;
+            for (int i = 0; i < merged.Count; i++)
+            {
+                int enemyId = merged[i].enemyId;
+                float distance = store.PositionY[enemyId] - _playerY;
+                if (count < limit)
+                {
+                    // 上浮：堆顶为当前入选中最远者
+                    int child = count++;
+                    while (child > 0)
+                    {
+                        int parent = (child - 1) >> 1;
+                        if (!IsFarther(distance, enemyId, _heapDistance[parent], _heapEnemy[parent])) break;
+                        _heapDistance[child] = _heapDistance[parent]; _heapEnemy[child] = _heapEnemy[parent]; _heapIndex[child] = _heapIndex[parent];
+                        child = parent;
+                    }
+                    _heapDistance[child] = distance; _heapEnemy[child] = enemyId; _heapIndex[child] = i;
+                    continue;
+                }
+                if (!IsFarther(_heapDistance[0], _heapEnemy[0], distance, enemyId)) continue;
+                // 替换堆顶并下沉
+                int node = 0;
+                while (true)
+                {
+                    int left = node * 2 + 1;
+                    if (left >= count) break;
+                    int right = left + 1;
+                    int farther = right < count && IsFarther(_heapDistance[right], _heapEnemy[right], _heapDistance[left], _heapEnemy[left]) ? right : left;
+                    if (!IsFarther(_heapDistance[farther], _heapEnemy[farther], distance, enemyId)) break;
+                    _heapDistance[node] = _heapDistance[farther]; _heapEnemy[node] = _heapEnemy[farther]; _heapIndex[node] = _heapIndex[farther];
+                    node = farther;
+                }
+                _heapDistance[node] = distance; _heapEnemy[node] = enemyId; _heapIndex[node] = i;
+            }
+
+            if (_keepTarget.Length < merged.Count) _keepTarget = new bool[Math.Max(merged.Count, _keepTarget.Length * 2)];
+            Array.Clear(_keepTarget, 0, merged.Count);
+            for (int h = 0; h < count; h++) _keepTarget[_heapIndex[h]] = true;
+            int write = 0;
+            for (int i = 0; i < merged.Count; i++)
+            {
+                if (!_keepTarget[i]) continue;
+                if (write != i) merged[write] = merged[i];
+                write++;
+            }
+            merged.RemoveRange(write, merged.Count - write);
+        }
+
+        private static bool IsFarther(float distanceA, int enemyA, float distanceB, int enemyB)
+            => distanceA > distanceB || (distanceA == distanceB && enemyA > enemyB);
+
         private void CollectEnemyDamage(List<int> activeEnemyIds, int index, float baseDamage,
             List<(int enemyId, float damage, bool wasCrit, DamageType damageType)> sink)
         {
