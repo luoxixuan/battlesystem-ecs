@@ -684,7 +684,7 @@ namespace BattleSystemECS.Systems
                 float baseDamage = store.EnemyDamage[enemyId];
                 store.EnemyHealth[minionId] = baseHealth * healthMult;
                 store.EnemyMaxHealth[minionId] = baseHealth * healthMult;
-                store.EnemyDamage[minionId] = baseDamage * damageMult;
+                store.SetEnemyAttackDamage(minionId, baseDamage * damageMult);
                 store.EnemyMoveSpeed[minionId] = store.EnemyMoveSpeed[enemyId];
                 store.EnemyGoldReward[minionId] = Math.Max(1, store.EnemyGoldReward[enemyId] / 3);
                 store.EnemyWaveNumber[minionId] = store.EnemyWaveNumber[enemyId];

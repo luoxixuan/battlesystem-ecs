@@ -129,7 +129,7 @@ namespace BattleSystemECS.Systems
             float newMaxHealth = Math.Max(1f, maxHealth * def.HealthMultOnMorph);
 
             store.EnemyMoveSpeed[enemyId] = newMoveSpeed;
-            store.EnemyDamage[enemyId] = newDamage;
+            store.SetEnemyAttackDamage(enemyId, newDamage);
             store.SetEnemyResourceAuthority(enemyId, enemyId, new Core.GAS.AttributeKey(3), newHealth);
             store.SetEnemyResourceAuthority(enemyId, enemyId, new Core.GAS.AttributeKey(2), newMaxHealth);
 

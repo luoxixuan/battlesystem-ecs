@@ -33,5 +33,41 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(7f, Store.GetEnemyAttackDamageProjection(enemyId), 3);
             Assert.Equal(12f, Store.GetPlayerAttackDamageProjection(playerId), 3);
         }
+
+        [Fact]
+        public void EnemyAttackBaseSyncsOnlyAfterSetterAndAtSyncBoundary()
+        {
+            int enemyId = Enemy(e => e.Damage = 7f);
+            Store.UseComputedAttributes = true;
+            Store.ApplyComputedAttributeModeAtFrameBoundary();
+            Store.SyncComputedAttributeBases();
+            Assert.Equal(7f, Store.AttributeAggregator.GetComputed(enemyId, CatalogRegistries.AttackDamage, -1f), 3);
+
+            // 写入点标脏，但聚合器仍是上次同步的快照，直到下一次同步边界
+            Store.SetEnemyAttackDamage(enemyId, 11f);
+            Assert.Equal(7f, Store.AttributeAggregator.GetComputed(enemyId, CatalogRegistries.AttackDamage, -1f), 3);
+            Store.SyncComputedAttributeBases();
+            Assert.Equal(11f, Store.AttributeAggregator.GetComputed(enemyId, CatalogRegistries.AttackDamage, -1f), 3);
+
+            // 清空聚合器条目后，即使值未变，下次同步也会重新推入基值
+            Store.ClearComputedAttributes(enemyId);
+            Store.SyncComputedAttributeBases();
+            Assert.Equal(11f, Store.AttributeAggregator.GetComputed(enemyId, CatalogRegistries.AttackDamage, -1f), 3);
+        }
+
+#if DEBUG
+        [Fact]
+        public void DirectEnemyDamageWriteIsCaughtByDebugSyncCheck()
+        {
+            int enemyId = Enemy(e => e.Damage = 7f);
+            Store.UseComputedAttributes = true;
+            Store.ApplyComputedAttributeModeAtFrameBoundary();
+            Store.SyncComputedAttributeBases();
+
+            // 绕过 SetEnemyAttackDamage 的直接写入不会标脏：Debug 构建同步时必须报错而非静默陈旧
+            Store.EnemyDamage[enemyId] = 13f;
+            Assert.Throws<System.InvalidOperationException>(() => Store.SyncComputedAttributeBases());
+        }
+#endif
     }
 }

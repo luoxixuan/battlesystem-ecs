@@ -306,7 +306,7 @@ namespace BattleSystemECS.Systems
             store.EnemyHealth[unitId] = def.Health;
             store.EnemyMaxHealth[unitId] = def.Health;
             store.EnemyMoveSpeed[unitId] = def.MoveSpeed;
-            store.EnemyDamage[unitId] = def.Damage;
+            store.SetEnemyAttackDamage(unitId, def.Damage);
             store.EnemyTypeName[unitId] = $"Summon_{def.Name}";
 
             store.AddActiveEnemyId(unitId);

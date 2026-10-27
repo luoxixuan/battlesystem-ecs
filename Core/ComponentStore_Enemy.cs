@@ -1326,7 +1326,7 @@ namespace BattleSystemECS.Core
             EnemyMaxHealth[entityId] = maxHealth;
             EnemyMoveSpeed[entityId] = moveSpeed;
             EnemyMoveSpeedBase[entityId] = moveSpeed;
-            EnemyDamage[entityId] = damage;
+            SetEnemyAttackDamage(entityId, damage);
             EnemyGoldReward[entityId] = goldReward;
             EnemyWaveNumber[entityId] = waveNumber;
             EnemyActive[entityId] = true;

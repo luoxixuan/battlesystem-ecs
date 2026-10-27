@@ -367,6 +367,7 @@ dotnet run -- 5       # mode 5：必须走命令行参数路径；stdin 输入 "
 | 修改配置格式 | `Core/GameConfig.cs` + `Core/GameConfigLoader.cs` + `Data/Configs/*.json` |
 | 修改技能/效果 | `Core/GAS/*.cs` + `Systems/SkillSystem.cs` + `game_config.json` Skills 数组（玩家技能栏）；共享技能表（SkillDefs）= `Data/Configs/skills.json`（精选）+ `Data/Skills/*.json`（静态）。技能 id/name 互解析统一走 `GameConfig.GetSkillIdByName / TryGetSkillById / GetSkillDisplayName`（归一化索引空间：[0, SkillDefs.Count) 索引共享表，其后偏移索引 Skills），消费方禁止各自手写遍历 |
 | 模拟随机领号 | `Core/DeterminismContext.cs`（挂在 `ComponentStore.Determinism`）；开局由 `GameManager.Initialize` `Reset` 一次；生产 Tick 由 `FrameGraph.Execute` 按节点语义在 CommitSerial 取数 |
+| 敌人攻击力基值写入 | 只走 `ComponentStore.SetEnemyAttackDamage`（写 `EnemyDamage` 并标脏，Parallel.For 内按敌人槽写安全）；`attribute.aggregate` 只同步标脏敌人，Debug 构建同步后核对、直接写数组会抛 `InvalidOperationException` |
 | 玩家伤害写入 | 生产路径只走 `ComponentStore.ApplyPlayerDamageAuthority`（`ResourceResolver.TryApply(PlayerDamageRequest)`）；`DecreasePlayerHealth` 仅允许 `ResourceResolver` 调用 |
 | 修改科技树 | `Core/TechTreeDef.cs` + `Systems/TechTreeSystem.cs` + `Data/Configs/tech_tree.json` |
 | 修改行为树 | `Data/Configs/behavior_trees.json` + `Systems/BehaviorTreeEvaluator.cs` |

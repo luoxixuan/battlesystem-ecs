@@ -950,7 +950,7 @@ namespace BattleSystemECS.Core
                 EnemyHealth[entityId] = 0f;
                 EnemyMaxHealth[entityId] = 0f;
                 EnemyMoveSpeed[entityId] = 0f;
-                EnemyDamage[entityId] = 0f;
+                SetEnemyAttackDamage(entityId, 0f);
                 EnemyGoldReward[entityId] = 0;
                 EnemyWaveNumber[entityId] = 0;
                 EnemyChargeParam[entityId] = 0f;

@@ -171,7 +171,7 @@ namespace BattleSystemECS.Systems
             store.EnemyHealth[minionId] = monsterDef.Health;
             store.EnemyMaxHealth[minionId] = monsterDef.Health;
             store.EnemyMoveSpeed[minionId] = monsterDef.MoveSpeed;
-            store.EnemyDamage[minionId] = monsterDef.Damage;
+            store.SetEnemyAttackDamage(minionId, monsterDef.Damage);
             store.EnemyGoldReward[minionId] = Math.Max(1, monsterDef.GoldReward / 3);
             store.EnemyWaveNumber[minionId] = store.PlayerWaveIndex[playerId];
             store.EnemyActive[minionId] = true;

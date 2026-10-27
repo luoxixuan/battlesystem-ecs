@@ -88,7 +88,26 @@ namespace BattleSystemECS.Core
             if (_useComputedAttributes == _requestedComputedAttributes) return;
             _useComputedAttributes = _requestedComputedAttributes;
             if (!_useComputedAttributes) AttributeAggregator.ClearAllComputed();
-            else AttributeAggregator.MarkAllDirty();
+            else { AttributeAggregator.MarkAllDirty(); MarkAllEnemyAttackBasesDirty(); }
+        }
+
+        /// <summary>
+        /// 敌人 AttackDamage 基值写入点标脏：写入点经 <see cref="SetEnemyAttackDamage"/> 置位本敌人槽
+        /// （按槽独占写，Parallel.For 内同样安全）；attribute.aggregate 只把标脏敌人的基值推入聚合器，
+        /// 仍在该节点统一快照，帧内可见时序与旧的全量同步一致。Debug 构建在同步后逐个核对基值，漏标即抛出。
+        /// </summary>
+        internal bool[] EnemyAttackBaseDirty = new bool[MAX_ENTITIES];
+
+        /// <summary>写入敌人攻击力基值并标脏（生产代码不得直接写 EnemyDamage 数组）。</summary>
+        public void SetEnemyAttackDamage(int enemyId, float damage)
+        {
+            EnemyDamage[enemyId] = damage;
+            EnemyAttackBaseDirty[enemyId] = true;
+        }
+
+        private void MarkAllEnemyAttackBasesDirty()
+        {
+            for (int i = 0; i < ActiveEnemyIds.Count; i++) EnemyAttackBaseDirty[ActiveEnemyIds[i]] = true;
         }
 
         public AttributeModifierHandle AddAttributeModifier(int entityId, ModifierDefinition definition, float capturedMagnitude = float.NaN)
@@ -105,8 +124,11 @@ namespace BattleSystemECS.Core
             for (int i = 0; i < ActiveEnemyIds.Count; i++)
             {
                 int enemyId = ActiveEnemyIds[i];
+                if (!EnemyAttackBaseDirty[enemyId]) continue;
+                EnemyAttackBaseDirty[enemyId] = false;
                 AttributeAggregator.SetBase(enemyId, CatalogRegistries.AttackDamage, EnemyDamage[enemyId]);
             }
+            VerifyEnemyAttackBasesSynced();
             int playerId = PlayerEntityId;
             if ((uint)playerId < MAX_PLAYERS && PositionActive[playerId] && !EnemyActive[playerId])
             {
@@ -116,7 +138,24 @@ namespace BattleSystemECS.Core
                 AttributeAggregator.SetBase(playerId, new AttributeKey(10), PlayerArmor[playerId]);
             }
         }
-        internal void ClearComputedAttributes(int entityId) => AttributeAggregator.ClearEntity(entityId);
+        internal void ClearComputedAttributes(int entityId)
+        {
+            AttributeAggregator.ClearEntity(entityId);
+            // 聚合器基值已清空：若该槽仍是/将是敌人，下次同步需重新推入
+            if (IsValidEntity(entityId)) EnemyAttackBaseDirty[entityId] = true;
+        }
+
+        /// <summary>Debug 构建：同步后核对每个活跃敌人的聚合器基值与 EnemyDamage 一致，捕获绕过 SetEnemyAttackDamage 的写入。</summary>
+        [System.Diagnostics.Conditional("DEBUG")]
+        private void VerifyEnemyAttackBasesSynced()
+        {
+            for (int i = 0; i < ActiveEnemyIds.Count; i++)
+            {
+                int enemyId = ActiveEnemyIds[i];
+                if (!AttributeAggregator.BaseMatches(enemyId, CatalogRegistries.AttackDamage, EnemyDamage[enemyId]))
+                    throw new InvalidOperationException($"EnemyDamage[{enemyId}] 被直接写入且未标脏；请改用 SetEnemyAttackDamage");
+            }
+        }
         public float GetTowerAttackDamage(int towerId)
         {
             var baseValue = TowerAttackDamage[towerId];

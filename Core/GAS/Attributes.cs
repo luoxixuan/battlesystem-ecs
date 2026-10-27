@@ -163,6 +163,9 @@ namespace BattleSystemECS.Core.GAS
         public bool RefreshModifier(int entityId, AttributeModifierHandle handle, float magnitude, float capturedMagnitude)
         { foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) { var modifier = pair.Value.Find(m => m.Handle.Equals(handle)); if (modifier != null) { modifier.Magnitude = magnitude; modifier.Captured = float.IsNaN(capturedMagnitude) ? magnitude : capturedMagnitude; _dirty.Add(pair.Key); return true; } } return false; }
         public void MarkDirty(int entityId, AttributeKey key) => _dirty.Add((entityId, key));
+        /// <summary>基值是否等于 Clamp(value)（含存在性）；供 Debug 同步核对使用。</summary>
+        internal bool BaseMatches(int entityId, AttributeKey key, float value)
+            => _base.TryGetValue((entityId, key), out var current) && current.Equals(_schema.Get(key).Clamp(value));
         public void AggregateDirty() { _pending.Clear(); foreach (var slot in _dirty) _pending.Add(slot); _dirty.Clear(); for (int i = 0; i < _pending.Count; i++) Aggregate(_pending[i].Item1, _pending[i].Item2); }
         public void ClearEntity(int entityId) { var keys = new List<(int, AttributeKey)>(); foreach (var pair in _base) if (pair.Key.Item1 == entityId) keys.Add(pair.Key); foreach (var pair in _computed) if (pair.Key.Item1 == entityId && !keys.Contains(pair.Key)) keys.Add(pair.Key); foreach (var pair in _dirty) if (pair.Item1 == entityId && !keys.Contains(pair)) keys.Add(pair); foreach (var key in keys) { _base.Remove(key); _computed.Remove(key); _dirty.Remove(key); } ClearMirror(entityId); foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) pair.Value.Clear(); }
         public void ClearAllComputed() { _computed.Clear(); }

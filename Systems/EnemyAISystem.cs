@@ -293,7 +293,7 @@ namespace BattleSystemECS.Systems
                                 float dmgMult = store.EnemyPhaseDamageMults[phIdx];
                                 if (dmgMult > 0f && dmgMult != 1f)
                                 {
-                                    store.EnemyDamage[enemyId] = store.EnemyDamage[enemyId] * dmgMult;
+                                    store.SetEnemyAttackDamage(enemyId, store.EnemyDamage[enemyId] * dmgMult);
                                 }
                                 // Trigger phase ability — push to bag for end-of-Update serial drain.
                                 // 避免在 Parallel.For 中调用非线程安全的 IEnemyAbilityCommandPort.EnqueueAbility。
@@ -344,7 +344,7 @@ namespace BattleSystemECS.Systems
                         // Apply damage multiplier — one-shot multiplication on the current damage value
                         float lsDmgMult = store.EnemyLastStandDamageMult[enemyId];
                         if (lsDmgMult > 0f && lsDmgMult != 1f)
-                            store.EnemyDamage[enemyId] = store.EnemyDamage[enemyId] * lsDmgMult;
+                            store.SetEnemyAttackDamage(enemyId, store.EnemyDamage[enemyId] * lsDmgMult);
                     }
 
                     if (_enemyHealthCache[enemyId] == enemyHealth &&
@@ -596,7 +596,7 @@ namespace BattleSystemECS.Systems
                                         float dmgMult = store.EnemyPhaseDamageMults[phIdx];
                                         if (dmgMult > 0f && dmgMult != 1f)
                                         {
-                                            store.EnemyDamage[enemyId] = store.EnemyDamage[enemyId] * dmgMult;
+                                            store.SetEnemyAttackDamage(enemyId, store.EnemyDamage[enemyId] * dmgMult);
                                         }
                                         // Direct 2D array read — no per-frame string.Split (perf fix).
                                         string abId = store.EnemyPhaseAbilityIdsFlat[ph, enemyId];
@@ -637,7 +637,7 @@ namespace BattleSystemECS.Systems
                                 store.EnemyMoveSpeed[enemyId] = baseSpeed * lsSpeedMult;
                             float lsDmgMult = store.EnemyLastStandDamageMult[enemyId];
                             if (lsDmgMult > 0f && lsDmgMult != 1f)
-                                store.EnemyDamage[enemyId] = store.EnemyDamage[enemyId] * lsDmgMult;
+                                store.SetEnemyAttackDamage(enemyId, store.EnemyDamage[enemyId] * lsDmgMult);
                         }
 
                         if (_enemyHealthCache[enemyId] == enemyHealth &&

@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（敌人攻击力基值写入点标脏：attribute.aggregate 0.36→0.07 ms/帧）
+- **设计**：`SyncComputedAttributeBases` 原先每帧对全部活跃敌人 `SetBase(EnemyDamage)`（镜像优化后已免字典，但仍逐个读写 10K 槽）。现在所有生产写入点改走 `ComponentStore.SetEnemyAttackDamage`（写数组并置 `EnemyAttackBaseDirty[id]`，按敌人槽独占写，EnemyAISystem 的 Parallel.For 内同样安全），同步时只推入标脏敌人；仍在 `attribute.aggregate` 节点统一快照，帧内可见时序与旧全量同步一致。
+- **补漏**：`ClearComputedAttributes`（聚合器条目被清空）与开启计算属性模式时整体标脏，覆盖旧全量同步隐式处理的情形。塔（≤150，Unity 端存在直接写 `TowerAttackDamage`）与玩家仍每帧全量同步。
+- **防漏标**：Debug 构建在同步后逐个核对活跃敌人的聚合器基值与 `EnemyDamage`，绕过 setter 直接写数组即抛 `InvalidOperationException`；全量测试在此核对下通过。新测试覆盖：setter 写入在下一次同步边界前不可见、清空条目后重新推入、Debug 下直接写数组被捕获。
+- 对照（同 cwd 交替运行）：mode 4 `attribute.aggregate` 172–193→32–33 ms/500 帧，**254–256→276–277 FPS**（valid=true）；mode 2 持平（~389–396，另有一次 234 的双峰噪声）；mode 5 Victory 457 帧一致，10 对交替平均 808 vs 795 FPS。
+
 ### 2026-10-26（堆叠减速稠密计数：movement.enemy.update 0.46→0.27 ms/帧）
 - **定位**：探针显示 `movement.enemy.update` 约 65% 时间在串行 `UpdateStackingPenalty`——每帧对 10K 敌人做 3 次 `Dictionary<long,int>` 操作（计数读写 + 回读），并行移动本体仅约 0.12 ms/帧。
 - **稠密计数**：键保持 `gx*1000+gy`（`(int)` 截断，与旧实现逐位一致，含越界坐标的键碰撞语义）；键在两阶段间复用，键跨度 < max(2^14, 4×敌人数) 时按 `key-minKey` 用 int 数组直接计数，否则退回原字典路径。
