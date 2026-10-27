@@ -7,11 +7,9 @@ namespace BattleSystemECS.Core
     internal sealed class BuildGroup : IBuildPhaseGroup
     {
         public object? Gold { get; set; }
-        public object? TowerIncome { get; set; }
         public object? Upgrade { get; set; }
         public object? Skill { get; set; }
         public object? AutoSkill { get; set; }
-        public object? TowerRelocate { get; set; }
         public object? Interest { get; set; }
         public object? Mana { get; set; }
         // Round175 Direction1 — Mana Shield: also runs in BuildPhase so the
@@ -50,9 +48,9 @@ namespace BattleSystemECS.Core
         }
         internal bool HasSlot(string id) => id switch
         {
-            "build.gold.update" => Gold != null, "build.tower-income.update" => TowerIncome != null,
+            "build.gold.update" => Gold != null,
             "build.upgrade.update" => Upgrade != null, "build.skill.update" or "build.skill.reject-pending" => Skill != null,
-            "build.auto-skill.update" => AutoSkill != null, "build.tower-relocate.update" => TowerRelocate != null,
+            "build.auto-skill.update" => AutoSkill != null,
             "build.interest.update" => Interest != null, "build.mana.update" => Mana != null,
             "build.mana-shield.update" => ManaShield != null, "build.pre-fight-buff.update" => PreFightBuff != null,
             "build.resource-node.update" => ResourceNode != null, "build.objective.update" => Objective != null,

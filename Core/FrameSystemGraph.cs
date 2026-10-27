@@ -91,11 +91,9 @@ namespace BattleSystemECS.Core
         {
             BuildGroup g=s.Build;
             r.AddBuild(g,"build.gold.update",FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PlayerResources},new[]{FrameResource.PlayerResources});
-            r.AddBuild(g,"build.tower-income.update",FrameExecutionSemantics.SerialUpdate,EconomyRead,EconomyWrite);
             r.AddBuild(g,"build.upgrade.update",FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PlayerResources,FrameResource.PlayerAttributes},new[]{FrameResource.PlayerAttributes});
             r.AddBuild(g,"build.skill.update",FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PlayerResources,FrameResource.PlayerAttributes,FrameResource.PlayerSnapshotState,FrameResource.EntityLifecycle},new[]{FrameResource.PlayerResources,FrameResource.PlayerSnapshotState,FrameResource.AbilityRequests});
             r.AddBuild(g,"build.auto-skill.update",FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PlayerResources,FrameResource.PlayerAttributes,FrameResource.PlayerSnapshotState,FrameResource.EntityLifecycle},new[]{FrameResource.PlayerSnapshotState,FrameResource.AbilityRequests});
-            r.AddBuild(g,"build.tower-relocate.update",FrameExecutionSemantics.SerialUpdate,TowerState,TowerState);
             r.AddBuild(g,"build.interest.update",FrameExecutionSemantics.SerialUpdate,Empty,Empty);
             r.AddBuild(g,"build.mana.update",FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PlayerResources},new[]{FrameResource.PlayerResources,FrameResource.ResourceRequests});
             r.AddBuild(g,"build.mana-shield.update",FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PlayerResources},new[]{FrameResource.PlayerResources,FrameResource.ResourceRequests});
@@ -142,7 +140,6 @@ namespace BattleSystemECS.Core
             r.AddWaveBinding(s,"pregame.weather.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.WeatherState,FrameResource.EntityLifecycle,FrameResource.EnemyHealth},new[]{FrameResource.WeatherState,FrameResource.DamageRequests});
             r.AddWaveBinding(s,"pregame.day-night.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.WeatherState,FrameResource.PlayerResources},new[]{FrameResource.WeatherState});
             r.AddWaveBinding(s,"pregame.adaptive-difficulty.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PlayerResources},Empty);
-            r.AddWaveBinding(s,"pregame.construction.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialUpdate,TowerState,TowerState);
             r.AddWaveBinding(s,"pregame.desperation.update",FrameTimeDomain.None,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PlayerResources},Empty);
             r.AddWaveBinding(s,"pregame.time-rewind.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PlayerSnapshotState,FrameResource.PlayerResources},new[]{FrameResource.PlayerSnapshotState});
             r.AddWaveBinding(s,"pregame.wave.read-current-wave",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,new[]{FrameResource.WaveState},new[]{FrameResource.FrameRuntimeState});
@@ -182,7 +179,6 @@ namespace BattleSystemECS.Core
             r.AddWaveBinding(s,"ai.life-link.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,new[]{FrameResource.EntityLifecycle},Empty);
             r.AddWaveBinding(s,"ai.life-link.update",FrameTimeDomain.None,FrameExecutionSemantics.InternalParallelCollectSerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.EnemyPosition},new[]{FrameResource.EnemyControl,FrameResource.LifeLinkPrepared});
             r.AddWaveBinding(s,"ai.life-link.cooldowns",FrameTimeDomain.Enemy,FrameExecutionSemantics.ParallelDisjointWrite,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyControl},new[]{FrameResource.EnemyControl});
-            r.AddWaveBinding(s,"ai.enemy-affix.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialUpdate,EnemyState,new[]{FrameResource.EnemyControl});
             r.AddWaveBinding(s,"ai.mana-burn.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,Empty,Empty);
             r.AddWaveBinding(s,"ai.mana-burn.update",FrameTimeDomain.None,FrameExecutionSemantics.InternalParallelCollectSerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyControl,FrameResource.PlayerResources},new[]{FrameResource.PlayerResources,FrameResource.ManaBurnPrepared});
             r.AddWaveBinding(s,"ai.lifesteal.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,EnemyState,new[]{FrameResource.EnemyControl});
@@ -196,8 +192,6 @@ namespace BattleSystemECS.Core
 
         private static void RegisterMovement(Registrar r,FrameScheduler s)
         {
-            r.AddWaveBinding(s,"movement.wound.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,EnemyState,new[]{FrameResource.EnemyControl});
-            r.AddWaveBinding(s,"movement.wound.update",FrameTimeDomain.None,FrameExecutionSemantics.InternalParallelCollectSerialCommit,EnemyState,new[]{FrameResource.DamageRequests,FrameResource.EnemyControl});
             r.AddWaveBinding(s,"movement.pathfinding.prepare",FrameTimeDomain.None,FrameExecutionSemantics.ParallelDisjointWrite,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.EnemyMovement},new[]{FrameResource.EnemyMovement});
             r.AddWaveBinding(s,"movement.enemy.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.TowerState},Empty);
             r.AddWaveBinding(s,"movement.path-block.update",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyPosition,FrameResource.TerrainState},new[]{FrameResource.TerrainState});
@@ -207,11 +201,6 @@ namespace BattleSystemECS.Core
             r.AddWaveBinding(s,"movement.path-modifier.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.TerrainState,FrameResource.PathModifierPrepared},new[]{FrameResource.EnemyMovement,FrameResource.TerrainState});
             r.AddWaveBinding(s,"movement.pull.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,Empty,Empty);
             r.AddWaveBinding(s,"movement.pull.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.ParallelDisjointWrite,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.PlayerAttributes,FrameResource.TerrainState},new[]{FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.PlayerAttributes,FrameResource.TerrainState});
-            r.AddWaveBinding(s,"movement.enemy-healer.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,EnemyState,new[]{FrameResource.EnemyControl});
-            r.AddWaveBinding(s,"movement.enemy-healer.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialCommit,EnemyState,new[]{FrameResource.ResourceRequests});
-            r.AddWaveBinding(s,"movement.steal-gold.update",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EnemyPosition,FrameResource.PlayerResources},new[]{FrameResource.ResourceRequests});
-            r.AddWaveBinding(s,"movement.summon.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyPosition},new[]{FrameResource.EnemyMovement});
-            r.AddWaveBinding(s,"movement.summon.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.EnemyMovement},new[]{FrameResource.DamageRequests,FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyPosition,FrameResource.EnemyMovement});
         }
 
         private static void RegisterTerrain(Registrar r,FrameScheduler s)
@@ -228,11 +217,8 @@ namespace BattleSystemECS.Core
             r.AddWaveBinding(s,"combat-setup.player-attack.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.PlayerAttributes,FrameResource.ComputedAttributes},new[]{FrameResource.PlayerAttackPrepared});
             r.AddWaveBinding(s,"combat-setup.hero.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,Empty,Empty);
             r.AddWaveBinding(s,"combat-setup.tower-attack.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.EnemyMovement,FrameResource.TowerState,FrameResource.PlayerAttributes,FrameResource.ComputedAttributes,FrameResource.WaveState,FrameResource.WeatherState},new[]{FrameResource.TowerAttackPrepared,FrameResource.TowerState});
-            r.AddWaveBinding(s,"combat-setup.overcharge.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,Empty,new[]{FrameResource.TowerAttackPrepared});
-            r.AddWaveBinding(s,"combat-setup.heat.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,Empty,new[]{FrameResource.TowerAttackPrepared});
             r.AddWaveBinding(s,"combat-setup.synergy.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.TowerAttackPrepared});
             r.AddWaveBinding(s,"combat-setup.fortress.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition},new[]{FrameResource.TowerCombatCache});
-            r.AddWaveBinding(s,"combat-setup.link.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition},new[]{FrameResource.TowerState});
             r.AddWaveBinding(s,"combat-setup.skill.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,new[]{FrameResource.EntityLifecycle,FrameResource.PlayerAttributes,FrameResource.ComputedAttributes},new[]{FrameResource.SkillPrepared});
             r.AddWaveBinding(s,"combat-setup.aura.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.AuraPrepared});
             r.AddWaveBinding(s,"combat-setup.curse.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.CursePrepared});
@@ -253,14 +239,8 @@ namespace BattleSystemECS.Core
         private static void RegisterSpatial(Registrar r,FrameScheduler s)
         {
             r.AddWaveAction("spatial.index.rebuild",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EnemyPosition,FrameResource.EntityLifecycle},new[]{FrameResource.SpatialIndex},s.GraphRebuildSpatialIndex);
-            r.AddWaveBinding(s,"spatial.patrol.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,Empty,new[]{FrameResource.TowerAttackPrepared});
-            r.AddWaveBinding(s,"spatial.patrol.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition},new[]{FrameResource.TowerState,FrameResource.EnemyPosition});
             r.AddWaveBinding(s,"spatial.chrono.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.ChronoPrepared});
             r.AddWaveBinding(s,"spatial.chrono.update",FrameTimeDomain.None,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.EnemyControl,FrameResource.ChronoPrepared},new[]{FrameResource.EnemyControl});
-            r.AddWaveBinding(s,"spatial.fog.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,Empty,Empty);
-            r.AddWaveBinding(s,"spatial.fog.update",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.SpatialIndex},new[]{FrameResource.TowerCombatCache});
-            r.AddWaveBinding(s,"spatial.point-defense.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,Empty,Empty);
-            r.AddWaveBinding(s,"spatial.point-defense.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.EnemyProjectileState},new[]{FrameResource.EnemyProjectileState});
             r.AddWaveBinding(s,"spatial.telegraph.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.TelegraphState,FrameResource.PlayerResources},new[]{FrameResource.TelegraphState,FrameResource.PlayerResources,FrameResource.GameplayEvents});
             r.AddWaveBinding(s,"spatial.mine.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.TowerState});
             r.AddWaveBinding(s,"spatial.mine.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.EnemyHealth},new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.DamageRequests,FrameResource.DeathQueue});
@@ -281,17 +261,12 @@ namespace BattleSystemECS.Core
         {
             CombatGroup g=s.Combat;
             r.AddWaveBinding(s,"combat.player-attack.update",FrameTimeDomain.None,FrameExecutionSemantics.InternalParallelCollectSerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.EnemyPosition,FrameResource.PlayerAttributes,FrameResource.PlayerResources,FrameResource.ComputedAttributes,FrameResource.PlayerAttackPrepared},new[]{FrameResource.EnemyControl,FrameResource.PlayerAttributes,FrameResource.PlayerResources,FrameResource.DamageRequests,FrameResource.ResourceRequests,FrameResource.DeathQueue,FrameResource.GameplayEvents,FrameResource.PresentationEvents});
-            r.AddWaveBinding(s,"combat.overcharge.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.TowerState});
-            r.AddWaveBinding(s,"combat.heat.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.TowerState});
-            r.AddWaveBinding(s,"combat.energy.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition},new[]{FrameResource.TowerState});
-            r.AddWaveBinding(s,"combat.demolish.update",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.EnemyHealth,FrameResource.SpatialIndex},new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyControl,FrameResource.DamageRequests,FrameResource.DeathQueue,FrameResource.EffectRequests});
             r.AddWaveBinding(s,"combat.hit-shield.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyControl,FrameResource.HitShieldPrepared},new[]{FrameResource.EnemyControl});
             r.AddWaveBinding(s,"combat.sabotage.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.EnemyControl,FrameResource.TowerState},new[]{FrameResource.EnemyControl,FrameResource.TowerState});
             r.AddWaveBinding(s,"combat.synergy.resolve-buff-shares",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition},new[]{FrameResource.TowerState});
             r.AddWaveAction("combat.rally.consume",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.ResourceEvents,FrameResource.PlayerAttributes,FrameResource.TowerState},new[]{FrameResource.PlayerAttributes,FrameResource.TowerState},s.GraphConsumeRally);
             r.AddWaveBinding(s,"combat.tower-attack.update",FrameTimeDomain.Combat,FrameExecutionSemantics.InternalParallelCollectSerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.TowerState,FrameResource.TowerCombatCache,FrameResource.PlayerAttributes,FrameResource.PlayerResources,FrameResource.ComputedAttributes,FrameResource.SpatialIndex,FrameResource.WeatherState,FrameResource.ProjectileState,FrameResource.TowerAttackPrepared},new[]{FrameResource.TowerState,FrameResource.EnemyControl,FrameResource.PlayerResources,FrameResource.DamageRequests,FrameResource.ResourceRequests,FrameResource.DeathQueue,FrameResource.ProjectileState,FrameResource.GameplayEvents,FrameResource.PresentationEvents,FrameResource.DodgePrepared,FrameResource.EffectRequests});
             r.AddWaveBinding(s,"combat.synergy.update",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.TowerState,FrameResource.TowerCombatCache});
-            r.AddWaveBinding(s,"combat.link.update",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.EnemyControl},new[]{FrameResource.TowerState,FrameResource.EnemyControl});
             r.AddWaveBinding(s,"combat.aura.resolve",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.AuraPrepared},new[]{FrameResource.TowerState});
             r.AddWaveBinding(s,"combat.shrine.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.ShrinePrepared});
             r.AddWaveBinding(s,"combat.shrine.resolve",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.ShrinePrepared},new[]{FrameResource.TowerCombatCache});
@@ -299,14 +274,10 @@ namespace BattleSystemECS.Core
             r.AddWaveBinding(s,"combat.beacon.resolve",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.BeaconPrepared},new[]{FrameResource.TowerCombatCache});
             r.AddWaveBinding(s,"combat.curse.resolve",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.EnemyControl,FrameResource.CursePrepared},new[]{FrameResource.EnemyControl});
             r.AddWaveBinding(s,"combat.pull-tower.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.EnemyControl,FrameResource.PullTowerPrepared},new[]{FrameResource.TowerState,FrameResource.EnemyControl});
-            r.AddWaveBinding(s,"combat.silence.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.TowerState});
-            r.AddWaveBinding(s,"combat.dispel.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.TowerState},new[]{FrameResource.TowerState});
             r.AddWaveBinding(s,"combat.projectile.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.ProjectileState,FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.EnemyControl,FrameResource.PlayerResources},new[]{FrameResource.ProjectileState,FrameResource.DamageRequests,FrameResource.PlayerResources});
-            r.AddWaveBinding(s,"combat.enemy-projectile.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EnemyProjectileState,FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.PlayerResources},new[]{FrameResource.EnemyProjectileState,FrameResource.PlayerResources});
             r.AddWaveBinding(s,"combat.pickup.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.PickupState,FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.PlayerAttributes,FrameResource.PlayerResources},new[]{FrameResource.PickupState,FrameResource.PlayerAttributes,FrameResource.PlayerResources,FrameResource.ResourceRequests});
             r.AddWaveBinding(s,"combat.mana.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.PlayerAttributes,FrameResource.PlayerResources},new[]{FrameResource.PlayerResources,FrameResource.ResourceRequests});
             r.AddWaveBinding(s,"combat.mana-shield.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.PlayerAttributes,FrameResource.PlayerResources},new[]{FrameResource.PlayerResources,FrameResource.ResourceRequests});
-            r.AddWaveBinding(s,"combat.beam.update",FrameTimeDomain.Combat,FrameExecutionSemantics.InternalParallelCollectSerialCommit,new[]{FrameResource.BeamState,FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition,FrameResource.EnemyControl,FrameResource.SpatialIndex},new[]{FrameResource.BeamDamageRequests});
             r.AddWaveBinding(s,"combat.hero.update",FrameTimeDomain.Combat,FrameExecutionSemantics.InternalParallelCollectSerialCommit,new[]{FrameResource.HeroState,FrameResource.EntityLifecycle,FrameResource.EnemyPosition,FrameResource.SpatialIndex},new[]{FrameResource.HeroState,FrameResource.DamageRequests,FrameResource.HeroAttackPrepared});
             r.AddWaveBinding(s,"combat.reflect.resolve",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.ReflectRequests,FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyPosition},new[]{FrameResource.ReflectPrepared});
             r.AddWaveBinding(s,"combat.reflect.apply",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.ReflectPrepared,FrameResource.EntityLifecycle,FrameResource.TowerState,FrameResource.EnemyHealth},new[]{FrameResource.DamageRequests});
@@ -368,7 +339,6 @@ namespace BattleSystemECS.Core
             r.AddWaveBinding(s,"post-death.life-link.resolve",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.PrimaryDeathsResolved,FrameResource.EnemyControl},new[]{FrameResource.DamageRequests});
             r.AddWaveBinding(s,"post-death.objective.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PrimaryDeathsResolved,FrameResource.ObjectiveState},new[]{FrameResource.ObjectiveState});
             r.AddWaveBinding(s,"post-death.resource-node.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.ObjectiveState,FrameResource.PlayerResources},new[]{FrameResource.PlayerResources,FrameResource.ObjectiveState});
-            r.AddWaveBinding(s,"post-death.tower-income.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,EconomyRead,EconomyWrite);
             r.AddWaveBinding(s,"post-death.corpse.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PrimaryDeathsResolved,FrameResource.CorpseState,FrameResource.EnemyPosition,FrameResource.EnemyControl,FrameResource.TowerState},new[]{FrameResource.CorpseState,FrameResource.DamageRequests,FrameResource.EffectRequests,FrameResource.EnemyControl,FrameResource.EnemyMovement,FrameResource.TowerState});
             r.AddWaveAction("post-death.effect.commit",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.EffectRequests,FrameResource.EntityLifecycle},new[]{FrameResource.EffectRequests,FrameResource.ActiveEffects,FrameResource.AttributeModifiers,FrameResource.EffectEvents},s.GraphCommitQueuedEffects);
             r.AddWaveBinding(s,"post-death.combo.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PrimaryDeathsResolved,FrameResource.ComboState},new[]{FrameResource.ComboState,FrameResource.PlayerAttributes});
@@ -419,7 +389,7 @@ namespace BattleSystemECS.Core
                         _lastBuild = metadata.Id;
                         return;
                     }
-                    if (_strict && id != "build.tower-income.update" && id != "build.tower-relocate.update")
+                    if (_strict)
                         throw new FrameGraphValidationException($"Required production build binding '{id}' is not configured.");
                     _builder.DeclareDisabled(metadata, disabledReason ?? "content build binding missing; policy=Disabled");
                     return;
@@ -499,28 +469,8 @@ namespace BattleSystemECS.Core
 
             private static string? ReviewedDisabledReason(string id) => id switch
             {
-                "ai.enemy-affix.update" => "Registry explicitly disables the inactive enemy-affix update slot; source reviewed.",
                 "ai.lifesteal.prepare" or "ai.lifesteal.update" => "Registry has no LifestealSystem instance; paired prepare/update slots are reviewed disabled.",
                 "post-death.life-link.resolve" => "Life-link break damage is disabled because its destroyed-source policy is undefined; current behavior remains no-op.",
-                "build.tower-income.update" or "post-death.tower-income.update" => "TowerIncomeSystem is not configured in the current Registry composition; reviewed disabled.",
-                "build.tower-relocate.update" => "TowerRelocateSystem is not configured in the current Registry composition; reviewed disabled.",
-                "pregame.construction.update" => "TowerConstructionSystem is not configured in the current Registry composition; reviewed disabled.",
-                "movement.wound.prepare" or "movement.wound.update" => "EnemyWoundSystem is intentionally absent from Registry composition; reviewed disabled pair.",
-                "movement.enemy-healer.prepare" or "movement.enemy-healer.update" => "EnemyHealerSystem is intentionally absent from Registry composition; reviewed disabled pair.",
-                "movement.steal-gold.update" => "StealGoldSystem is intentionally absent from Registry composition; reviewed disabled.",
-                "movement.summon.prepare" or "movement.summon.update" => "SummonSystem is intentionally absent from Registry composition; reviewed disabled pair.",
-                "combat-setup.overcharge.prepare" or "combat.overcharge.update" => "TowerOverchargeSystem is intentionally absent from Registry composition; reviewed disabled pair.",
-                "combat-setup.heat.prepare" or "combat.heat.update" => "HeatSystem is intentionally absent from Registry composition; reviewed disabled pair.",
-                "combat-setup.link.prepare" or "combat.link.update" => "TowerLinkSystem is intentionally absent from Registry composition; reviewed disabled pair.",
-                "spatial.patrol.prepare" or "spatial.patrol.update" => "PatrolTowerSystem is intentionally absent from Registry composition; reviewed disabled pair.",
-                "spatial.fog.prepare" or "spatial.fog.update" => "FogSystem is intentionally absent from Registry composition; reviewed disabled pair.",
-                "spatial.point-defense.prepare" or "spatial.point-defense.update" => "PointDefenseSystem is intentionally absent from Registry composition; reviewed disabled pair.",
-                "combat.energy.update" => "TowerEnergySystem is intentionally absent from Registry composition; reviewed disabled.",
-                "combat.beam.update" => "BeamTowerSystem is intentionally absent from Registry composition; reviewed disabled.",
-                "combat.demolish.update" => "TowerDemolishSystem is intentionally absent from Registry composition; reviewed disabled.",
-                "combat.silence.update" => "TowerSilenceSystem is intentionally absent from Registry composition; reviewed disabled.",
-                "combat.dispel.update" => "TowerDispelSystem is intentionally absent from Registry composition; reviewed disabled.",
-                "combat.enemy-projectile.update" => "EnemyProjectileSystem is intentionally absent from Registry composition; reviewed disabled.",
                 _ => null
             };
 

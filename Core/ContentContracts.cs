@@ -138,11 +138,6 @@ namespace BattleSystemECS.Content.Contracts
     public interface ILinkDamageResolver
     { (float primaryDamage, float linkedDamage, int linkedEnemyId) ComputeLinkedDamage(int enemyId, float totalDamage); }
     public interface IHitShieldResolver { bool ConsumeHitShield(int enemyId); }
-    public interface IEnemyProjectilePort
-    {
-        void GetProjectilesInRange(float cx, float cy, int rangeSq, List<int> result);
-        void DestroyProjectile(int projId);
-    }
     public interface IProjectileCommandPort
     {
         void Fire(int towerId, int targetId, float damage, int playerId, float speed,
@@ -193,15 +188,6 @@ namespace BattleSystemECS.Content.Contracts
     }
     public interface IFireTrailCommandPort
     { int SpawnTrail(float x, float y, float radius = 1.5f, float dps = 8f, float duration = 2f, float tickInterval = 0.5f); }
-    public interface ITowerHeatPort
-    {
-        bool IsOverheated(int towerId);
-        void AccumulateHeat(int towerId);
-    }
-    public interface ITowerEnergyPort
-    {
-        bool TryConsumeEnergy(int towerId);
-    }
     public interface ITowerModifierRoller
     {
         int RollAtPlacement(int towerId);

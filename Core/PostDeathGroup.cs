@@ -9,7 +9,6 @@ namespace BattleSystemECS.Core
         public Systems.EnemyLifeLinkSystem? LifeLink { get; set; }
         public Systems.ObjectiveSystem? Objective { get; set; }
         public Systems.ResourceNodeSystem? ResourceNode { get; set; }
-        public Systems.TowerIncomeSystem? TowerIncome { get; set; }
         public Systems.CorpseEffectSystem? CorpseEffect { get; set; }
         public Systems.WaveBranchSystem? WaveBranch { get; set; }
         public Systems.ComboSystem? Combo { get; set; }
@@ -33,7 +32,6 @@ namespace BattleSystemECS.Core
             if(LifeLink!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.life-link.resolve"),c=>LifeLink?.ResolveBreakPenalties());
             if(Objective!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.objective.update"),c=>Objective?.Update(c.Delta,GameState.WavePhase));
             if(ResourceNode!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.resource-node.update"),c=>ResourceNode?.Update(c.Delta,GameState.WavePhase));
-            if(TowerIncome!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.tower-income.update"),c=>TowerIncome?.Update(c.Delta));
             if(CorpseEffect!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.corpse.update"),c=>CorpseEffect?.Update(c.Delta));
             if(Combo!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.combo.update"),c=>Combo?.Update(c.Delta));
             if(DoomClock!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.doom-clock.update"),c=>DoomClock?.Update(c.Delta,GameState.WavePhase));
@@ -56,7 +54,6 @@ namespace BattleSystemECS.Core
             LifeLink?.ResolveBreakPenalties();
             Objective?.Update(deltaTime, phase);
             ResourceNode?.Update(deltaTime, phase);
-            TowerIncome?.Update(deltaTime);
             CorpseEffect?.Update(deltaTime);
             Combo?.Update(deltaTime);
             // DoomClock countdown runs in PostDeath so it ticks on the same cadence

@@ -59,7 +59,6 @@ namespace BattleSystemECS.Tests.Framework
             Assert.NotNull(registry.Skill);
             Assert.NotNull(registry.EnemyAI);
             Assert.Contains(installer.LastDescriptors, d => d.Id.IndexOf("Skill", StringComparison.Ordinal) >= 0 && d.State == SystemRegistrationState.Registered);
-            Assert.Contains(installer.LastDescriptors, d => d.State == SystemRegistrationState.Disabled && d.Reason.Length > 0);
             Assert.Equal(installer.LastDescriptors.Count, System.Linq.Enumerable.Select(installer.LastDescriptors, d => d.Id).Distinct(StringComparer.Ordinal).Count());
         }
 
@@ -230,7 +229,6 @@ namespace BattleSystemECS.Tests.Framework
             var enabled = entries.Where(e => !string.Equals(e.Type, "disabled", StringComparison.Ordinal)).ToArray();
             var disabled = entries.Where(e => string.Equals(e.Type, "disabled", StringComparison.Ordinal)).ToArray();
             Assert.NotEmpty(enabled);
-            Assert.NotEmpty(disabled);
             Assert.All(entries, entry =>
             {
                 Assert.False(string.IsNullOrWhiteSpace(entry.Id));

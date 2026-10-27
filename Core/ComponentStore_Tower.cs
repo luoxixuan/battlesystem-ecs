@@ -27,9 +27,6 @@ namespace BattleSystemECS.Core
         public float[] TowerElementalAffinityBonus = new float[MAX_ENTITIES];
         // Tower projectile homing: if true, this tower's projectiles track targets mid-flight
         public bool[] TowerProjectileHoming = new bool[MAX_ENTITIES];
-        // Tower intercept rate: probability of intercepting enemy projectiles (for PointDefense towers)
-        // Stored separately from TowerCritChance to keep concerns isolated (reuse CritChance as intercept rate when needed)
-        public float[] TowerInterceptRate = new float[MAX_ENTITIES];
         // Tower damage type: determines which resistance the target uses for mitigation.
         public DamageType[] TowerDamageType = new DamageType[MAX_ENTITIES];
         // Round 100 — Palisade Tower Fields ─────────────────────────────────────────
@@ -447,14 +444,6 @@ namespace BattleSystemECS.Core
         public bool[] TowerIsReloading = new bool[MAX_ENTITIES];
 
         // ==================== 塔超载/过载系统（Overcharge）====================
-        // TowerIsOvercharged: true if tower is currently in overcharged (boosted) state
-        public bool[] TowerIsOvercharged = new bool[MAX_ENTITIES];
-        // TowerOverchargeDuration: remaining overcharge duration in seconds (0 = inactive)
-        public float[] TowerOverchargeDuration = new float[MAX_ENTITIES];
-        // TowerOverchargeCooldown: remaining cooldown before overcharge can be activated again (seconds)
-        public float[] TowerOverchargeCooldown = new float[MAX_ENTITIES];
-        // TowerCanOvercharge: true if this tower type supports overcharge (from config)
-        public bool[] TowerCanOvercharge = new bool[MAX_ENTITIES];
 
         // ==================== 塔协同增益组件 (Tower Synergy) ====================
         // 每个塔的协同 ID 索引，-1 表示无协同
@@ -506,10 +495,6 @@ namespace BattleSystemECS.Core
         // ==================== 敌人驱散/净化塔增益 (Tower Dispel) ====================
         // TowerIsDispelled: true if this tower's aura/synergy buffs are currently removed by enemy dispel
         public bool[] TowerIsDispelled = new bool[MAX_ENTITIES];
-        // TowerDispelTimer: remaining dispel duration in turns (decremented each turn). 0 = not dispelled.
-        public float[] TowerDispelTimer = new float[MAX_ENTITIES];
-        // TowerDispelImmunityTimer: immunity duration in turns after dispel expires (prevents rapid re-dispel)
-        public float[] TowerDispelImmunityTimer = new float[MAX_ENTITIES];
 
         // ==================== 诅咒/削弱光环塔 (Curse Tower) ====================
         // TowerIsCurseTower: true if this tower is a curse aura tower that debuffs nearby enemies
@@ -744,12 +729,6 @@ namespace BattleSystemECS.Core
         // ==================== 塔联动/组合攻击 (Tower Link Combo) ====================
         // TowerLinkPartnerId: the tower ID of the partner tower in an active link combo (-1 = none)
         public int[] TowerLinkPartnerId = new int[MAX_ENTITIES];
-        // TowerLinkComboType: the combo identifier string from tower_links.json (null = no active combo)
-        public string[] TowerLinkComboType = new string[MAX_ENTITIES];
-        // TowerLinkCooldown: remaining cooldown in seconds before the link combo can activate again (0 = ready)
-        public float[] TowerLinkCooldown = new float[MAX_ENTITIES];
-        // TowerLinkDamageBonus: additive damage bonus from link combo (applied as damage mult)
-        public float[] TowerLinkDamageBonus = new float[MAX_ENTITIES];
 
         // ==================== 塔连锁攻击伤害倍率 (Tower Chain / Link Attack) ====================
         // TowerChainDmgRatio: damage multiplier for chain-attacks from linked partner tower
@@ -827,24 +806,6 @@ namespace BattleSystemECS.Core
         // ==================== 迫击炮/弧线弹道 (Mortar / Arc Projectiles) ====================
 
         // ==================== 塔过热/热量系统 (Tower Heat / Overheat) ====================
-        // TowerHeat: current accumulated heat level for each tower (0 = cold, max = overheated)
-        public float[] TowerHeat = new float[MAX_ENTITIES];
-        // TowerMaxHeat: maximum heat capacity before overheat triggers
-        public float[] TowerMaxHeat = new float[MAX_ENTITIES];
-        // TowerHeatPerShot: heat generated per attack shot
-        public float[] TowerHeatPerShot = new float[MAX_ENTITIES];
-        // TowerHeatCooldownRate: heat dissipation rate in heat units per second (passive cooling)
-        public float[] TowerHeatCooldownRate = new float[MAX_ENTITIES];
-        // TowerIsOverheated: true if tower is currently overheated (reduced performance)
-        public bool[] TowerIsOverheated = new bool[MAX_ENTITIES];
-        // TowerOverheatTimer: remaining cooldown/lockout after overheat clears (seconds)
-        public float[] TowerOverheatTimer = new float[MAX_ENTITIES];
-        // TowerOverheatBonus: attack speed multiplier when overheated (e.g., 2.0 = double speed)
-        public float[] TowerOverheatBonus = new float[MAX_ENTITIES];
-        // TowerOverheatPenalty: damage penalty when overheated (0.0-1.0, e.g., 0.5 = -50% damage)
-        public float[] TowerOverheatPenalty = new float[MAX_ENTITIES];
-        // TowerCanOverheat: true if this tower type supports overheat (from config)
-        public bool[] TowerCanOverheat = new bool[MAX_ENTITIES];
 
         // ==================== 塔幸运/掉落稀有度加成 (Tower Luck) ====================
         // TowerLuck: flat bonus added to Rare/Epic/Legendary pickup tier weight (per tower).
@@ -921,28 +882,8 @@ namespace BattleSystemECS.Core
         public int[] TowerEnchantExpiresAtTurn = new int[MAX_ENTITIES];
 
         // ==================== 塔能量/法力资源系统 (Tower Energy) ====================
-        // TowerEnergy: current energy level for each tower (0 = depleted, cannot fire if below TowerEnergyPerShot)
-        public float[] TowerEnergy = new float[MAX_ENTITIES];
-        // TowerMaxEnergy: maximum energy capacity (0 = no energy system)
-        public float[] TowerMaxEnergy = new float[MAX_ENTITIES];
-        // TowerEnergyPerShot: energy consumed per attack shot (0 = no energy cost)
-        public float[] TowerEnergyPerShot = new float[MAX_ENTITIES];
-        // TowerEnergyRegen: energy regeneration rate per second (passive recharge)
-        public float[] TowerEnergyRegen = new float[MAX_ENTITIES];
-        // TowerIsEnergyTower: true if this tower is an energy source that regenerates nearby towers' energy
-        public bool[] TowerIsEnergyTower = new bool[MAX_ENTITIES];
-        // TowerEnergyRegenRadius: radius within which this energy tower regenerates nearby towers
-        public float[] TowerEnergyRegenRadius = new float[MAX_ENTITIES];
 
         // ==================== 塔光束/激光连续攻击系统 (Beam Tower) ====================
-        // TowerIsBeam: true if this tower fires a continuous beam (DPS-based, not projectile)
-        public bool[] TowerIsBeam = new bool[MAX_ENTITIES];
-        // TowerBeamDPS: damage per second for beam towers (continuous damage applied per frame)
-        public float[] TowerBeamDPS = new float[MAX_ENTITIES];
-        // TowerBeamChainCount: number of chain targets for beam towers (0 = no chain, max 3)
-        public int[] TowerBeamChainCount = new int[MAX_ENTITIES];
-        // TowerBeamChainDecay: damage decay per chain hop (0.7 = 70% of previous link's damage)
-        public float[] TowerBeamChainDecay = new float[MAX_ENTITIES];
         // ==================== 塔瘫痪/破坏系统（Sabotage / Tower Disable）====================
         // TowerIsDisabled: true if tower is currently disabled/sabotaged by enemy ability
         public bool[] TowerIsDisabled = new bool[MAX_ENTITIES];
@@ -972,8 +913,6 @@ namespace BattleSystemECS.Core
         // at the moment of release" — upgrades during drain are kept in the snapshot.
         public float[] TowerDamageAtDrainStart = new float[MAX_ENTITIES];
 
-        // TowerBeamMaxRange: maximum range for beam targeting and chaining
-        public float[] TowerBeamMaxRange = new float[MAX_ENTITIES];
 
         // ==================== 塔爆发射击/齐射模式 (Burst Fire / Salvo Mode) ====================
         // TowerBurstCount: number of shots fired per burst cycle (0 = no burst fire, standard single-shot)
@@ -1253,10 +1192,6 @@ namespace BattleSystemECS.Core
             TowerEchoDuration[entityId] = 0f;
             TowerEchoMaxCooldown[entityId] = 0f;
             // Overcharge fields: default to inactive (no overcharge, cooldown=0)
-            TowerIsOvercharged[entityId] = false;
-            TowerOverchargeDuration[entityId] = 0f;
-            TowerOverchargeCooldown[entityId] = 0f;
-            TowerCanOvercharge[entityId] = false;
             // Knockback fields: default to no knockback (0 force = no effect)
             TowerKnockbackForce[entityId] = 0f;
             // LoS fields: default to no LoS requirement, no LoS blocking (backward compatible)
@@ -1331,15 +1266,6 @@ namespace BattleSystemECS.Core
             // Fog of War: default to no fog restriction (visionRadius=0 means see all)
             TowerVisionRadius[entityId] = 0f;
             // Heat/overheat fields: default to no heat, no overheat
-            TowerHeat[entityId] = 0f;
-            TowerMaxHeat[entityId] = 0f;
-            TowerHeatPerShot[entityId] = 0f;
-            TowerHeatCooldownRate[entityId] = 0f;
-            TowerIsOverheated[entityId] = false;
-            TowerOverheatTimer[entityId] = 0f;
-            TowerOverheatBonus[entityId] = 1f;
-            TowerOverheatPenalty[entityId] = 0f;
-            TowerCanOverheat[entityId] = false;
             // Tower Luck field: default to 0 (no luck contribution, zero-overhead)
             TowerLuck[entityId] = 0f;
             // Path-Hug filter: default to false (no path restriction, backward compatible)
@@ -1357,18 +1283,7 @@ namespace BattleSystemECS.Core
             TowerEnchantDuration[entityId] = 0f;
             TowerEnchantExpiresAtTurn[entityId] = -1;
             // Tower energy fields: default to no energy (0 capacity = no energy system)
-            TowerEnergy[entityId] = 0f;
-            TowerMaxEnergy[entityId] = 0f;
-            TowerEnergyPerShot[entityId] = 0f;
-            TowerEnergyRegen[entityId] = 0f;
-            TowerIsEnergyTower[entityId] = false;
-            TowerEnergyRegenRadius[entityId] = 0f;
             // Beam tower fields: default to no beam (not a beam tower)
-            TowerIsBeam[entityId] = false;
-            TowerBeamDPS[entityId] = 0f;
-            TowerBeamChainCount[entityId] = 0;
-            TowerBeamChainDecay[entityId] = 1f;
-            TowerBeamMaxRange[entityId] = 0f;
             // Sabotage/tower disable fields: default to not disabled
             TowerIsDisabled[entityId] = false;
             TowerDisabledTimer[entityId] = 0f;
@@ -1533,8 +1448,6 @@ namespace BattleSystemECS.Core
             TowerAuraDamageBonus[entityId] = 0f;
             // Dispel fields reset
             TowerIsDispelled[entityId] = false;
-            TowerDispelTimer[entityId] = 0f;
-            TowerDispelImmunityTimer[entityId] = 0f;
             // Curse tower fields reset
             TowerIsCurseTower[entityId] = false;
             TowerCurseRadius[entityId] = 0f;
@@ -1666,15 +1579,6 @@ namespace BattleSystemECS.Core
             TowerBeaconCachedDmgBonus[entityId] = 0f;
             TowerBeaconCachedAtkSpdBonus[entityId] = 0f;
             // Heat/overheat fields reset
-            TowerHeat[entityId] = 0f;
-            TowerMaxHeat[entityId] = 0f;
-            TowerHeatPerShot[entityId] = 0f;
-            TowerHeatCooldownRate[entityId] = 0f;
-            TowerIsOverheated[entityId] = false;
-            TowerOverheatTimer[entityId] = 0f;
-            TowerOverheatBonus[entityId] = 1f;
-            TowerOverheatPenalty[entityId] = 0f;
-            TowerCanOverheat[entityId] = false;
             // Tower Luck field reset
             TowerLuck[entityId] = 0f;
             // Lock-On fields reset (no lock-on, no cached target — recycled slot starts inert)
@@ -1692,18 +1596,7 @@ namespace BattleSystemECS.Core
             // Path-Hug filter reset
             TowerPathHugOnly[entityId] = false;
             // Tower energy fields reset
-            TowerEnergy[entityId] = 0f;
-            TowerMaxEnergy[entityId] = 0f;
-            TowerEnergyPerShot[entityId] = 0f;
-            TowerEnergyRegen[entityId] = 0f;
-            TowerIsEnergyTower[entityId] = false;
-            TowerEnergyRegenRadius[entityId] = 0f;
             // Beam tower fields reset
-            TowerIsBeam[entityId] = false;
-            TowerBeamDPS[entityId] = 0f;
-            TowerBeamChainCount[entityId] = 0;
-            TowerBeamChainDecay[entityId] = 1f;
-            TowerBeamMaxRange[entityId] = 0f;
             // Chain attack field reset
             TowerChainDmgRatio[entityId] = 0f;
             // Overkill / excess damage field reset
@@ -2043,13 +1936,6 @@ namespace BattleSystemECS.Core
             return d < 0f ? 0f : d;
         }
 
-        /// <summary>Sets the intercept rate for a PointDefense tower.</summary>
-        public void SetTowerInterceptRate(int towerId, float rate)
-        {
-            if (!IsValidEntity(towerId)) return;
-            TowerInterceptRate[towerId] = rate;
-        }
-
         // ==================== 塔联动/组合攻击 (Tower Link Combo) ====================
         /// <summary>Gets the link combo partner tower ID (-1 = no partner).</summary>
         public int GetTowerLinkPartnerId(int towerId)
@@ -2063,34 +1949,6 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(towerId)) return;
             TowerLinkPartnerId[towerId] = partnerId;
-        }
-
-        /// <summary>Gets the link combo cooldown in seconds.</summary>
-        public float GetTowerLinkCooldown(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return 0f;
-            return TowerLinkCooldown[towerId];
-        }
-
-        /// <summary>Sets the link combo cooldown in seconds.</summary>
-        public void SetTowerLinkCooldown(int towerId, float cooldown)
-        {
-            if (!IsValidEntity(towerId)) return;
-            TowerLinkCooldown[towerId] = cooldown;
-        }
-
-        /// <summary>Gets the link combo damage bonus multiplier.</summary>
-        public float GetTowerLinkDamageBonus(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return 0f;
-            return TowerLinkDamageBonus[towerId];
-        }
-
-        /// <summary>Sets the link combo damage bonus multiplier.</summary>
-        public void SetTowerLinkDamageBonus(int towerId, float bonus)
-        {
-            if (!IsValidEntity(towerId)) return;
-            TowerLinkDamageBonus[towerId] = bonus;
         }
 
         // ===== Round 138 — Per-Tower Active Skill helpers =====

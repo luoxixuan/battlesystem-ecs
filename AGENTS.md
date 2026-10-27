@@ -34,7 +34,7 @@
 | `Data/Configs/*.json` | 子配置：行为树、技能（skills.json = 精选技能表，加载进 `GameConfig.SkillDefs`）、科技树、塔位规则、波次生成、阶段行为等。注意：`auto_skill` / `backstab` / `beacon_towers` / `damage_conversion` / `path_terrain` / `player` / `projectile_deflection` / `shop_reroll` / `shrine_towers` / `wave_gold_decay` / `wave_skip` 这 11 个文件当前没有任何加载器读取（见 `docs/2026-10-27-cleanup-audit.md` E-09） |
 | `Data/Monsters/*.json` | 怪物静态定义（238 个文件）；**Core 不加载**，运行时怪物类型来自 `game_config.json` 的 `MonsterTypes` |
 | `Data/Skills/*.json` | 150 种技能静态定义（按名去重合并进 `GameConfig.SkillDefs`，精选条目优先） |
-| `Data/Towers/*.json` | 塔静态定义（176 个文件）；Core 只读取 `tower_synergy.json` 和 `tower_links.json`（后者仅被未装配的 `TowerLinkSystem` 读取），其余不加载 |
+| `Data/Towers/*.json` | 塔静态定义（176 个文件）；Core 只读取 `tower_synergy.json`，其余不加载（`tower_links.json` 的唯一读取方 `TowerLinkSystem` 已随 B4c 退役） |
 | `Data/Levels/*.json` | 关卡文件（`level_1`–`level_5` + `doom_clock`）；**Core 不加载**（关卡来自 `game_config.json` 的 `Levels`），Unity 从自身 `StreamingAssets/level_1.json` 读取 |
 
 **注意**：没有 `.sln` 解决方案文件，直接使用 `dotnet build` / `dotnet test` 对单个 `.csproj` 操作。Core 库使用 Linked Files 方式编译，不会重复存储源码。
@@ -97,7 +97,7 @@ BattleSystem-ECS/
 │   ├── 枚举                          # BuffType / DamageType / ElementType / EnemyActionType / GameState / TowerTargetingMode / TowerType
 │   ├── Polyfill                     # IsExternalInit / Rng / PolyfillExtensions（netstandard2.1 兼容）
 │   └── 配置 / 日志 / 工具            # GameConfig(+Loader) / SpatialGrid / TechTreeDef / CurveTable / *Logger / StateMachine / Entity(+Manager) 等
-├── Systems/                         # 游戏系统（132 个，编译到 Core 库）
+├── Systems/                         # 游戏系统（112 个，编译到 Core 库）
 │   └── 按职责拆分（生成 / AI / 移动 / 攻击 / 塔 / 技能 / Buff / 经济 / 天气 / 地形 …），逐一举列无意义，统一经 SystemRegistry 装配
 ├── Data/                            # 静态数据与运行时配置
 │   ├── Configs/                     # 行为树、技能、科技树、塔位、波次、阶段、自动技能

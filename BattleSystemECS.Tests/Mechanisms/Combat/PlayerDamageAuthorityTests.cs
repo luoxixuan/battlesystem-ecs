@@ -132,43 +132,6 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
         }
 
         [Fact]
-        public void EnemyProjectile_HitsPlayerEntityIdNotHardcodedSlotOne()
-        {
-            // 默认 PlayerEntityId=1；本测把玩家放在槽位 0，证明命中走 PlayerEntityId。
-            int pid = Player(p =>
-            {
-                p.EntityId = 0;
-                p.Health = 100f;
-                p.X = 5f;
-                p.Y = 5f;
-            });
-            Assert.Equal(0, pid);
-            Assert.Equal(0, Store.PlayerEntityId);
-
-            // 槽位 1 保持空闲且无血量，防止硬编码 1 误伤后仍看起来像“打中了”。
-            Assert.False(Store.PositionActive[1]);
-
-            int eid = Enemy(e =>
-            {
-                e.X = 5f;
-                e.Y = 5.4f;
-                e.Health = 50f;
-                e.Damage = 0f;
-            });
-
-            var projectiles = new EnemyProjectileSystem(Store);
-            projectiles.Fire(eid, 5f, 5.4f, -1, 5f, 5f, damage: 17f, speed: 0.01f);
-            projectiles.Update(1f);
-
-            Assert.Equal(83f, Store.PlayerCurrentHealth[pid], 3);
-            Assert.True(Store.ResourceResolver.Events.Count >= 1);
-            var damageEvt = Store.ResourceResolver.Events.Get(0);
-            Assert.Equal(GameplayEventType.DamageApplied, damageEvt.Type);
-            Assert.Equal(pid, damageEvt.Target.Index);
-            Assert.Equal(eid, damageEvt.Source.Index);
-        }
-
-        [Fact]
         public void AttackInterval_GatesMeleeUntilCooldownExpires()
         {
             Player(p =>

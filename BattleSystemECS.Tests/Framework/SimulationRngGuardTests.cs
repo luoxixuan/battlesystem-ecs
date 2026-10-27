@@ -45,14 +45,12 @@ namespace BattleSystemECS.Tests.Framework
             string[] systems =
             {
                 "EchoCloneSystem.cs",
-                "PointDefenseSystem.cs",
                 "SkillSystem.cs",
                 "UpgradeSystem.cs",
                 "WeatherSystem.cs",
                 "EnemyFissionSystem.cs",
                 "AutoSkillSystem.cs",
                 "PickupSystem.cs",
-                "EnemyAffixSystem.cs",
                 "RandomEventSystem.cs",
                 "WaveSpawningSystem.cs",
                 "CraftingSystem.cs",

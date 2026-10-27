@@ -5,7 +5,7 @@ namespace BattleSystemECS.Core
     /// <summary>生产 group binder 的独立 typed 合同事实，运行期不读取 manifest 或 catalog。</summary>
     internal static class FrameBindingFacts
     {
-        private static readonly string[] DisabledNodeIds = new[] { "ai.enemy-affix.update", "ai.lifesteal.prepare", "ai.lifesteal.update", "build.tower-income.update", "build.tower-relocate.update", "combat-setup.heat.prepare", "combat-setup.link.prepare", "combat-setup.overcharge.prepare", "combat.beam.update", "combat.demolish.update", "combat.dispel.update", "combat.enemy-projectile.update", "combat.energy.update", "combat.heat.update", "combat.link.update", "combat.overcharge.update", "combat.silence.update", "movement.enemy-healer.prepare", "movement.enemy-healer.update", "movement.steal-gold.update", "movement.summon.prepare", "movement.summon.update", "movement.wound.prepare", "movement.wound.update", "post-death.life-link.resolve", "post-death.tower-income.update", "pregame.construction.update", "spatial.fog.prepare", "spatial.fog.update", "spatial.patrol.prepare", "spatial.patrol.update", "spatial.point-defense.prepare", "spatial.point-defense.update" };
+        private static readonly string[] DisabledNodeIds = new[] { "ai.lifesteal.prepare", "ai.lifesteal.update", "post-death.life-link.resolve" };
         internal static FrameBindingRegistration Get(string nodeId)
         {
             if (!TryGet(nodeId, out var registration))

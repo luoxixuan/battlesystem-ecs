@@ -429,25 +429,6 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(99.875f, Store.EnemyHealth[enemyId], 3);
         }
 
-        [Fact]
-        public void BulletTime_WoundTransitionIsDtFree_AndDoesNotShareWeatherClock()
-        {
-            Player(p => { p.Health = 1000f; });
-            Config.Levels.Clear();
-            int enemyId = Enemy(e => { e.Health = 10f; e.MaxHealth = 100f; e.MoveSpeed = 2f; });
-            Store.EnemyWoundThreshold[enemyId] = 0.5f;
-            Store.EnemyWoundSlowRatio[enemyId] = 0.5f;
-            var wound = new Systems.EnemyWoundSystem(Store, 0);
-            var scheduler = new FrameScheduler(Store, Config);
-            scheduler.Movement.Wound = wound;
-            Store.PlayerBulletTimeTurnsLeft[0] = 2f;
-            Store.PlayerBulletTimeScale[0] = 0.25f;
-            SealDirect(scheduler);
-            scheduler.Tick(1f, 0);
-            Assert.True(Store.EnemyIsWounded[enemyId]);
-            Assert.Equal(1f, Store.EnemyMoveSpeed[enemyId]);
-        }
-
         private ReplaySnapshot RunWaveFrameOnFreshWorld()
         {
             using var world = new TestWorld();

@@ -655,17 +655,6 @@ PlayerCrestActiveId[entityId] = "";
             PlayerGold[playerId] = gold;
         }
 
-        /// <summary>
-        /// Remove gold from player (thief steal, penalty, etc.). Clamps to 0.
-        /// </summary>
-        public void LoseGold(int playerId, float amount)
-        {
-            if (!IsValidPlayer(playerId) || amount <= 0f) return;
-            float current = PlayerGold[playerId];
-            float newGold = Math.Max(0f, current - amount);
-            PlayerGold[playerId] = newGold;
-        }
-
         public int GetPlayerLevel(int playerId)
         {
             if (!IsValidPlayer(playerId)) return 0;

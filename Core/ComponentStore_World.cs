@@ -133,9 +133,7 @@ namespace BattleSystemECS.Core
         // RandomEventTimer: countdown for the current event in turns (0 = immediate/one-shot event)
         public float[] RandomEventTimer = new float[MAX_PLAYERS];
 
-        // GlobalFogDensity: global fog density multiplier applied to all tower vision radii (1.0 = normal, <1.0 = reduced visibility)
         // WeatherSystem / DayNightSystem can modify this to simulate fog/night effects
-        public float[] GlobalFogDensity = new float[MAX_PLAYERS];
         // RandomEventParam: event-specific parameter (e.g. gold amount for SupplyDrop, spawn count for Ambush)
         public float[] RandomEventParam = new float[MAX_PLAYERS];
         // RandomEventParam2: second event-specific parameter

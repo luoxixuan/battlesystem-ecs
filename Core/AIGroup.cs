@@ -9,7 +9,6 @@ namespace BattleSystemECS.Core
         public Systems.EnemyBurrowSystem? Burrow { get; set; }
         public Systems.NecromancerSystem? Necromancer { get; set; }
         public Systems.EnemyLifeLinkSystem? LifeLink { get; set; }
-        public Systems.EnemyAffixSystem? EnemyAffix { get; set; }
         public Systems.ManaBurnSystem? ManaBurn { get; set; }
         public Systems.EnemyLifestealSystem? Lifesteal { get; set; }
         public Systems.PhaseSystem? Phase { get; set; }
@@ -38,7 +37,6 @@ namespace BattleSystemECS.Core
             if (Burrow != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.burrow.prepare"), c => Burrow?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.burrow.update"), c => Burrow?.Update(c.Delta)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.burrow.apply"), c => Burrow?.ApplyBurrowEffects()); }
             if (Necromancer != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.necromancer.prepare"), c => Necromancer?.SetTurn(c.Turn, c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.necromancer.update"), c => Necromancer?.Update(c.Delta)); }
             if (LifeLink != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.life-link.prepare"), c => LifeLink?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.life-link.update"), c => LifeLink?.Update()); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.life-link.cooldowns"), c => LifeLink?.DecrementCooldowns(c.Delta)); }
-            if (EnemyAffix != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.enemy-affix.update"), c => EnemyAffix?.Update(c.Delta));
             if (ManaBurn != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.mana-burn.prepare"), c => ManaBurn?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.mana-burn.update"), c => ManaBurn?.Update()); }
             if (Lifesteal != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.lifesteal.prepare"), c => Lifesteal?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.lifesteal.update"), c => Lifesteal?.Update()); }
             if (Phase != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.phase.prepare"), c => Phase?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.phase.update"), c => Phase?.Update(c.Delta)); }
@@ -83,7 +81,6 @@ namespace BattleSystemECS.Core
             LifeLink?.Update();
             LifeLink?.DecrementCooldowns(deltaTime);
 
-            EnemyAffix?.Update(deltaTime);
 
             ManaBurn?.SetTurn(turn);
             ManaBurn?.Update();

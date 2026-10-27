@@ -557,7 +557,7 @@ namespace BattleSystemECS.Core
                 var entry = batch[i];
                 int enemyId = entry.EnemyId;
                 int playerId = entry.PlayerId;
-                float gold = (EnemyHasStolenGold[enemyId] ? EnemyGoldOnReturn[enemyId] : EnemyGoldReward[enemyId]) * _goldKillMultiplier * _allIncomeMultKill * PlayerComboGoldMult[playerId];
+                float gold = EnemyGoldReward[enemyId] * _goldKillMultiplier * _allIncomeMultKill * PlayerComboGoldMult[playerId];
                 if (EnemyIsBounty[enemyId]) gold *= EnemyBountyGoldMult[enemyId];
                 int kills = PlayerWaveKillCount[playerId];
                 gold *= Math.Max(_waveGoldDecayFloor, 1f - kills * _waveGoldDecayRate);
@@ -694,15 +694,7 @@ namespace BattleSystemECS.Core
                 {
                     if (amount != 0f) ResourceResolver.StageLifecycleGold(playerId, amount, oldSource, killSequence, playerId, _deathReservation);
                 }
-                if (EnemyHasStolenGold[enemyId])
-                {
-                    // Thief was caught AFTER escaping — award GoldOnReturn bonus instead of normal reward
-                    goldReward = EnemyGoldOnReturn[enemyId] * _goldKillMultiplier * _allIncomeMultKill;
-                }
-                else
-                {
-                    goldReward = EnemyGoldReward[enemyId] * _goldKillMultiplier * _allIncomeMultKill;
-                }
+                goldReward = EnemyGoldReward[enemyId] * _goldKillMultiplier * _allIncomeMultKill;
                 goldReward *= PlayerComboGoldMult[playerId];
                 // Bounty enemies (IsBounty=true) pay EnemyBountyGoldMult × base reward. Multiplied
                 // on top of _goldKillMultiplier / _allIncomeMultKill / PlayerComboGoldMult (commutative
@@ -864,7 +856,6 @@ namespace BattleSystemECS.Core
                 EnemiesLeakedThisWave[i] = 0;
                 AdaptiveDifficultyLevel[i] = 1.0f;
                 AdaptiveDifficultyScore[i] = 0f;
-                GlobalFogDensity[i] = 1f; // default fog density (no visibility reduction)
             }
         }
 
@@ -1071,10 +1062,6 @@ namespace BattleSystemECS.Core
                 EnemyBossTrailLastTriggerProgress[entityId] = 0f;
                 EnemyPathSegmentStartIndex[entityId] = 0;
                 // Teleport / portal fields
-                EnemyTeleportCooldown[entityId] = 0f;
-                EnemyTeleportDestinationX[entityId] = 0f;
-                EnemyTeleportDestinationY[entityId] = 0f;
-                EnemyTeleportType[entityId] = 0;
                 // Leap / Jump Attack fields (0/-1 = no leap ability, zero-overhead default)
                 EnemyLeaperArchetype[entityId] = 0;
                 EnemyLeapDistance[entityId] = 0f;
@@ -1344,8 +1331,6 @@ namespace BattleSystemECS.Core
                 TowerBuffShareMask[entityId] = 0;
                 // Dispel fields
                 TowerIsDispelled[entityId] = false;
-                TowerDispelTimer[entityId] = 0f;
-                TowerDispelImmunityTimer[entityId] = 0f;
                 // Curse tower fields
                 TowerIsCurseTower[entityId] = false;
                 TowerCurseRadius[entityId] = 0f;
@@ -1382,10 +1367,6 @@ namespace BattleSystemECS.Core
                 TowerMultiStrikeRange[entityId] = 0f;
                 TowerMultiStrikeDamageMult[entityId] = 1f;
                 // Overcharge fields
-                TowerIsOvercharged[entityId] = false;
-                TowerOverchargeDuration[entityId] = 0f;
-                TowerOverchargeCooldown[entityId] = 0f;
-                TowerCanOvercharge[entityId] = false;
                 // Player-disabled flag: false (active) on entity recycle so stale 'true' from a
                 // previous owner doesn't carry over. ToggleTower() flips it back if needed.
                 TowerPlayerDisabled[entityId] = false;
@@ -1664,7 +1645,7 @@ namespace BattleSystemECS.Core
             GlobalTimeScale = null!; GlobalTimeScaleDuration = null!;
             RandomEventCooldown = null!; RandomEventActiveType = null!; RandomEventTimer = null!;
             RandomEventParam = null!; RandomEventParam2 = null!;
-            TowerVisionRadius = null!; GlobalFogDensity = null!;
+            TowerVisionRadius = null!;
             AscensionModifierStacks = null!;
             PlayerResearchPoints = null!;
             PickupX = null!; PickupY = null!; PickupType = null!; PickupValue = null!;
@@ -1692,7 +1673,6 @@ namespace BattleSystemECS.Core
             EnemyTerrainMoveSpeedMult = null!; EnemyMoveSpeedBase = null!; EnemySlowDurationLeft = null!;
             EnemyFrostZoneSlowMultiplier = null!;
             EnemyIsPolymorphed = null!; EnemyPolymorphDurationLeft = null!; EnemyPolymorphDamageTakenMultiplier = null!;
-            EnemyWoundThreshold = null!; EnemyWoundSlowRatio = null!; EnemyIsWounded = null!;
             EnemyKnockbackForceLeft = null!; EnemyIsElite = null!; EnemyIsFlying = null!;
             EnemyFlightHeight = null!; EnemyCanLand = null!; EnemyStealthMultiplier = null!;
             EnemyIsBurrowed = null!; EnemyBurrowTimer = null!; EnemyBurrowCooldown = default;
@@ -1703,12 +1683,8 @@ namespace BattleSystemECS.Core
             EnemyMaxResurrectCount = null!; EnemyResurrectCorpseAgeLimit = null!;
             EnemyIsReanimated = null!; EnemyOwnerId = null!;
             EnemyInSummonCircleX = null!; EnemyInSummonCircleY = null!; EnemyInSummonCircleRadius = null!;
-            SummonedUnitActive = null!; SummonedUnitType = null!;
+            SummonedUnitActive = null!;
             SummonedUnitHealth = null!; SummonedUnitMaxHealth = null!;
-            SummonedUnitDamage = null!; SummonedUnitMoveSpeed = null!;
-            SummonedUnitAttackRange = null!; SummonedUnitAttackSpeed = null!; SummonedUnitAttackTimer = null!;
-            SummonedUnitDuration = null!; SummonedUnitOwnerId = null!;
-            SummonedUnitTargetId = null!; SummonedUnitGoldReward = null!;
             EnemyBossPhase = null!; EnemyPhaseThresholds = null!;
             EnemyEnrageTimer = null!; EnemyIsEnraged = null!;
             // Round 134 Direction 3 — Boss HP regen arrays
@@ -1726,13 +1702,9 @@ namespace BattleSystemECS.Core
             EnemyIsInvulnerable = null!;
             EnemyFissionDefId = null!; EnemyFissionGeneration = null!;
             EnemyMorphDefId = null!; EnemyIsMorphed = null!; EnemyMorphTriggered = null!;
-            EnemyCloneDefId = null!; EnemyCloneCooldown = null!; EnemyCloneTimer = null!;
-            EnemyCloneCount = null!; EnemyIsClone = null!; EnemyCloneMasterId = null!;
             EnemyIsLifeLinker = null!; EnemyLifeLinkDefId = null!; EnemyLinkedEnemyId = null!;
             EnemyLifeLinkRatio = null!; EnemyLifeLinkCooldownLeft = null!; EnemyIsLinked = null!;
             EnemyPathId = null!; EnemyPathNodeIndex = null!;
-            EnemyTeleportCooldown = null!; EnemyTeleportDestinationX = null!;
-            EnemyTeleportDestinationY = null!; EnemyTeleportType = null!;
             EnemyLeaperArchetype = null!; EnemyLeapDistance = null!;
             EnemyLeapCooldown = default; EnemyLeapCooldownRef = null!;
             EnemyLeapDuration = null!; EnemyLeapStartX = null!; EnemyLeapStartY = null!;
@@ -1741,9 +1713,8 @@ namespace BattleSystemECS.Core
             EnemyStunResistance = null!; EnemyFreezeResistance = null!; EnemySlowResistance = null!;
             EnemyKnockbackResistance = null!; EnemyDamageResistance = null!;
             EnemyIsVanguard = null!; EnemyVanguardCoverRange = null!; EnemyVanguardDmgTransfer = null!;
-            EnemyHealerHealAmount = null!; EnemyHealerHealInterval = null!;
-            EnemyCanStealGold = null!; EnemyStealAmount = null!; EnemyStolenGold = null!;
-            EnemyGoldOnReturn = null!; EnemyHasStolenGold = null!;
+            EnemyCanStealGold = null!; EnemyStealAmount = null!;
+            EnemyGoldOnReturn = null!;
             EnemyAffixFlags = null!; EnemyElementStatus = null!; EnemyElementTimer = null!;
             EnemyExposureMask = null!; EnemyExposureTimer = null!;
             NestDefId = null!; NestHealth = null!; NestMaxHealth = null!;
@@ -1765,7 +1736,7 @@ namespace BattleSystemECS.Core
             // WaveSpawningSystem flips to 1 when any spawned enemy has FactionId > 0.
             // We use a single int (not bool[]) so it's a 1-byte check, not 100K cache-line read.
             FactionInfightEnabled = 0;
-            TowerTargetingMode = null!; TowerProjectileHoming = null!; TowerInterceptRate = null!;
+            TowerTargetingMode = null!; TowerProjectileHoming = null!;
             TowerDamageType = null!; TowerSelected = null!; TowerType = null!;
             TowerAttackDamage = null!; TowerRange = null!; TowerAttackSpeed = null!;
             TowerLevel = null!; TowerUpgradeCost = null!; TowerTotalUpgradeSpent = null!; TowerUpgradePathId = null!;
@@ -1794,8 +1765,6 @@ namespace BattleSystemECS.Core
             TowerProjectileFragmentDmgMult = null!;
             TowerCurrentAmmo = null!; TowerMaxAmmo = null!; TowerReloadTime = null!;
             TowerReloadProgress = null!; TowerIsReloading = null!;
-            TowerIsOvercharged = null!; TowerOverchargeDuration = null!;
-            TowerOverchargeCooldown = null!; TowerCanOvercharge = null!;
             TowerSynergyId = null!; TowerSynergyMultiplier = null!;
             TowerSynergyTier = null!;
             TowerIsChronoTower = null!; TowerTimeFieldRadius = null!; TowerTimeScale = null!;
@@ -1803,7 +1772,7 @@ namespace BattleSystemECS.Core
             TowerIsAuraTower = null!; TowerAuraRadius = null!;
             TowerAuraAttackSpeedBonus = null!; TowerAuraDamageBonus = null!;
             TowerIsSilenced = null!; TowerSilenceTimer = null!; TowerSilenceSourceId = null!;
-            TowerIsDispelled = null!; TowerDispelTimer = null!; TowerDispelImmunityTimer = null!;
+            TowerIsDispelled = null!;
             TowerIsCurseTower = null!; TowerCurseRadius = null!;
             TowerCurseDmgReduction = null!; TowerCurseSpeedReduction = null!;
             TowerCurseArmorReduction = null!; TowerCurseDmgTakenIncrease = null!;
@@ -1820,8 +1789,7 @@ namespace BattleSystemECS.Core
             TowerIsMarkedForDemolish = null!;
             TowerDemolishDotDamage = null!; TowerDemolishDotDuration = null!; TowerDemolishDotInterval = null!;
             TowerDemolishStunDuration = null!;
-            TowerLinkPartnerId = null!; TowerLinkComboType = null!;
-            TowerLinkCooldown = null!; TowerLinkDamageBonus = null!;
+            TowerLinkPartnerId = null!;
             TowerFacingAngle = null!; TowerTurnRate = null!;
             TowerExperience = null!; TowerMasteryLevel = null!; TowerKillCount = null!;
             TowerIsMobile = null!; TowerMoveSpeed = null!; TowerPatrolPathId = null!;

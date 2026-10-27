@@ -13,9 +13,9 @@ namespace BattleSystemECS.Core
         internal const string CommitArtifactSha256 = "3E38DB03DF92438283631D554E7D61B14B4624C129E67876522CB62D6D8421C1";
         internal const string SupplementalArtifactSha256 = "EA9FA8D9563DD0AEE189B6873573659C8C9CB3EE6E057873EDBD0932754A11FE";
         internal static int ReviewedNodeCount => Reviews.Count;
-        internal const int ReportedEarlyNodeCount = 90;
-        internal const int ReportedCombatNodeCount = 82;
-        internal const int ReportedPostDeathNodeCount = 52;
+        internal const int ReportedEarlyNodeCount = 79;
+        internal const int ReportedCombatNodeCount = 64;
+        internal const int ReportedPostDeathNodeCount = 51;
         internal const int ReportedEarlyCombatOverlap = 0;
         internal const int ReportedEarlyPostDeathOverlap = 12;
         internal const int ReportedCombatPostDeathOverlap = 4;
@@ -45,7 +45,6 @@ namespace BattleSystemECS.Core
                 { "ai.enemy-ability.execute", "FG-ACCESS-20260901/ai.enemy-ability.execute" },
                 { "ai.enemy-ability.prepare", "FG-ACCESS-20260901/ai.enemy-ability.prepare" },
                 { "ai.enemy-ability.update", "FG-ACCESS-20260901/ai.enemy-ability.update" },
-                { "ai.enemy-affix.update", "FG-ACCESS-20260901/ai.enemy-affix.update" },
                 { "ai.enemy-strafe.prepare", "FG-ACCESS-20260901/ai.enemy-strafe.prepare" },
                 { "ai.enemy-strafe.update", "FG-ACCESS-20260901/ai.enemy-strafe.update" },
                 { "ai.enemy.prepare", "FG-ACCESS-20260901/ai.enemy.prepare" },
@@ -89,8 +88,6 @@ namespace BattleSystemECS.Core
                 { "build.shop-reroll.update", "FG-ACCESS-20260901/build.shop-reroll.update" },
                 { "build.skill.reject-pending", "FG-ACCESS-20260901/build.skill.reject-pending" },
                 { "build.skill.update", "FG-ACCESS-20260901/build.skill.update" },
-                { "build.tower-income.update", "FG-ACCESS-20260901/build.tower-income.update" },
-                { "build.tower-relocate.update", "FG-ACCESS-20260901/build.tower-relocate.update" },
                 { "build.upgrade.update", "FG-ACCESS-20260901/build.upgrade.update" },
                 { "cascade-death.callback-dispatch", "FG-ACCESS-20260901/cascade-death.callback-dispatch" },
                 { "cascade-death.resolve", "FG-ACCESS-20260901/cascade-death.resolve" },
@@ -102,13 +99,10 @@ namespace BattleSystemECS.Core
                 { "combat-setup.frost-zone.prepare", "FG-ACCESS-20260901/combat-setup.frost-zone.prepare" },
                 { "combat-setup.frost-zone.update", "FG-ACCESS-20260901/combat-setup.frost-zone.update" },
                 { "combat-setup.global-skill.prepare", "FG-ACCESS-20260901/combat-setup.global-skill.prepare" },
-                { "combat-setup.heat.prepare", "FG-ACCESS-20260901/combat-setup.heat.prepare" },
                 { "combat-setup.hero.prepare", "FG-ACCESS-20260901/combat-setup.hero.prepare" },
                 { "combat-setup.hit-shield.prepare", "FG-ACCESS-20260901/combat-setup.hit-shield.prepare" },
                 { "combat-setup.hot-zone.prepare", "FG-ACCESS-20260901/combat-setup.hot-zone.prepare" },
-                { "combat-setup.link.prepare", "FG-ACCESS-20260901/combat-setup.link.prepare" },
                 { "combat-setup.mana.prepare", "FG-ACCESS-20260901/combat-setup.mana.prepare" },
-                { "combat-setup.overcharge.prepare", "FG-ACCESS-20260901/combat-setup.overcharge.prepare" },
                 { "combat-setup.player-attack.prepare", "FG-ACCESS-20260901/combat-setup.player-attack.prepare" },
                 { "combat-setup.pull-tower.prepare", "FG-ACCESS-20260901/combat-setup.pull-tower.prepare" },
                 { "combat-setup.skill.prepare", "FG-ACCESS-20260901/combat-setup.skill.prepare" },
@@ -124,26 +118,18 @@ namespace BattleSystemECS.Core
                 { "combat.aura.resolve", "FG-ACCESS-20260901/combat.aura.resolve" },
                 { "combat.beacon.prepare", "FG-ACCESS-20260901/combat.beacon.prepare" },
                 { "combat.beacon.resolve", "FG-ACCESS-20260901/combat.beacon.resolve" },
-                { "combat.beam.update", "FG-ACCESS-20260901/combat.beam.update" },
                 { "combat.bloodlust.update", "FG-ACCESS-20260901/combat.bloodlust.update" },
                 { "combat.crest.update", "FG-ACCESS-20260901/combat.crest.update" },
                 { "combat.culling.update", "FG-ACCESS-20260901/combat.culling.update" },
                 { "combat.curse.resolve", "FG-ACCESS-20260901/combat.curse.resolve" },
-                { "combat.demolish.update", "FG-ACCESS-20260901/combat.demolish.update" },
-                { "combat.dispel.update", "FG-ACCESS-20260901/combat.dispel.update" },
                 { "combat.echo-clone.update", "FG-ACCESS-20260901/combat.echo-clone.update" },
-                { "combat.enemy-projectile.update", "FG-ACCESS-20260901/combat.enemy-projectile.update" },
-                { "combat.energy.update", "FG-ACCESS-20260901/combat.energy.update" },
                 { "combat.global-skill.update", "FG-ACCESS-20260901/combat.global-skill.update" },
-                { "combat.heat.update", "FG-ACCESS-20260901/combat.heat.update" },
                 { "combat.hero-skill.update", "FG-ACCESS-20260901/combat.hero-skill.update" },
                 { "combat.hero.update", "FG-ACCESS-20260901/combat.hero.update" },
                 { "combat.hit-shield.update", "FG-ACCESS-20260901/combat.hit-shield.update" },
-                { "combat.link.update", "FG-ACCESS-20260901/combat.link.update" },
                 { "combat.mana-shield.update", "FG-ACCESS-20260901/combat.mana-shield.update" },
                 { "combat.mana.update", "FG-ACCESS-20260901/combat.mana.update" },
                 { "combat.momentum.update", "FG-ACCESS-20260901/combat.momentum.update" },
-                { "combat.overcharge.update", "FG-ACCESS-20260901/combat.overcharge.update" },
                 { "combat.pickup.update", "FG-ACCESS-20260901/combat.pickup.update" },
                 { "combat.player-attack.update", "FG-ACCESS-20260901/combat.player-attack.update" },
                 { "combat.projectile.update", "FG-ACCESS-20260901/combat.projectile.update" },
@@ -154,7 +140,6 @@ namespace BattleSystemECS.Core
                 { "combat.sabotage.update", "FG-ACCESS-20260901/combat.sabotage.update" },
                 { "combat.shrine.prepare", "FG-ACCESS-20260901/combat.shrine.prepare" },
                 { "combat.shrine.resolve", "FG-ACCESS-20260901/combat.shrine.resolve" },
-                { "combat.silence.update", "FG-ACCESS-20260901/combat.silence.update" },
                 { "combat.synergy.resolve-buff-shares", "FG-ACCESS-20260901/combat.synergy.resolve-buff-shares" },
                 { "combat.synergy.update", "FG-ACCESS-20260901/combat.synergy.update" },
                 { "combat.taunt.resolve", "FG-ACCESS-20260901/combat.taunt.resolve" },
@@ -178,8 +163,6 @@ namespace BattleSystemECS.Core
                 { "frame.time.freeze", "FG-ACCESS-20260901/frame.time.freeze" },
                 { "gameplay-event.commit", "FG-ACCESS-20260901/gameplay-event.commit" },
                 { "movement.deployable-trap.update", "FG-ACCESS-20260901/movement.deployable-trap.update" },
-                { "movement.enemy-healer.prepare", "FG-ACCESS-20260901/movement.enemy-healer.prepare" },
-                { "movement.enemy-healer.update", "FG-ACCESS-20260901/movement.enemy-healer.update" },
                 { "movement.enemy.prepare", "FG-ACCESS-20260901/movement.enemy.prepare" },
                 { "movement.enemy.update", "FG-ACCESS-20260901/movement.enemy.update" },
                 { "movement.path-block.update", "FG-ACCESS-20260901/movement.path-block.update" },
@@ -189,11 +172,6 @@ namespace BattleSystemECS.Core
                 { "movement.presentation.commit", "FG-ACCESS-20260901/movement.presentation.commit" },
                 { "movement.pull.prepare", "FG-ACCESS-20260901/movement.pull.prepare" },
                 { "movement.pull.update", "FG-ACCESS-20260901/movement.pull.update" },
-                { "movement.steal-gold.update", "FG-ACCESS-20260901/movement.steal-gold.update" },
-                { "movement.summon.prepare", "FG-ACCESS-20260901/movement.summon.prepare" },
-                { "movement.summon.update", "FG-ACCESS-20260901/movement.summon.update" },
-                { "movement.wound.prepare", "FG-ACCESS-20260901/movement.wound.prepare" },
-                { "movement.wound.update", "FG-ACCESS-20260901/movement.wound.update" },
                 { "non-wave.ability.reject", "FG-ACCESS-20260901/non-wave.ability.reject" },
                 { "non-wave.damage.reject", "FG-ACCESS-20260901/non-wave.damage.reject" },
                 { "non-wave.frame.close", "FG-ACCESS-20260901/non-wave.frame.close" },
@@ -207,9 +185,7 @@ namespace BattleSystemECS.Core
                 { "post-death.objective.update", "FG-ACCESS-20260901/post-death.objective.update" },
                 { "post-death.resource-node.update", "FG-ACCESS-20260901/post-death.resource-node.update" },
                 { "post-death.soul-harvest.update", "FG-ACCESS-20260901/post-death.soul-harvest.update" },
-                { "post-death.tower-income.update", "FG-ACCESS-20260901/post-death.tower-income.update" },
                 { "pregame.adaptive-difficulty.update", "FG-ACCESS-20260901/pregame.adaptive-difficulty.update" },
-                { "pregame.construction.update", "FG-ACCESS-20260901/pregame.construction.update" },
                 { "pregame.day-night.update", "FG-ACCESS-20260901/pregame.day-night.update" },
                 { "pregame.desperation.update", "FG-ACCESS-20260901/pregame.desperation.update" },
                 { "pregame.random-event.update", "FG-ACCESS-20260901/pregame.random-event.update" },
@@ -241,15 +217,9 @@ namespace BattleSystemECS.Core
                 { "skill-buff.wisp.update", "FG-ACCESS-20260901/skill-buff.wisp.update" },
                 { "spatial.chrono.prepare", "FG-ACCESS-20260901/spatial.chrono.prepare" },
                 { "spatial.chrono.update", "FG-ACCESS-20260901/spatial.chrono.update" },
-                { "spatial.fog.prepare", "FG-ACCESS-20260901/spatial.fog.prepare" },
-                { "spatial.fog.update", "FG-ACCESS-20260901/spatial.fog.update" },
                 { "spatial.index.rebuild", "FG-ACCESS-20260901/spatial.index.rebuild" },
                 { "spatial.mine.prepare", "FG-ACCESS-20260901/spatial.mine.prepare" },
                 { "spatial.mine.update", "FG-ACCESS-20260901/spatial.mine.update" },
-                { "spatial.patrol.prepare", "FG-ACCESS-20260901/spatial.patrol.prepare" },
-                { "spatial.patrol.update", "FG-ACCESS-20260901/spatial.patrol.update" },
-                { "spatial.point-defense.prepare", "FG-ACCESS-20260901/spatial.point-defense.prepare" },
-                { "spatial.point-defense.update", "FG-ACCESS-20260901/spatial.point-defense.update" },
                 { "spatial.telegraph.update", "FG-ACCESS-20260901/spatial.telegraph.update" },
                 { "spawning.nest.prepare", "FG-ACCESS-20260901/spawning.nest.prepare" },
                 { "spawning.nest.update", "FG-ACCESS-20260901/spawning.nest.update" },
@@ -265,15 +235,14 @@ namespace BattleSystemECS.Core
             };
 
         // 生产 profile 按 NodeId 排序后的完整根指纹；任何节点或元数据变化都必须重新审阅。
-        internal const string ApprovedFingerprintRootGameplay = "e57d1ea02e40b81f3362f3bed270c9495ad8f5d19eee1c4ae8fde710f8fb45ce";
-        internal const string ApprovedFingerprintRootFixedPopulation = "14ba39e2c615c386b203c250a4663bcbfa95a6b3eb4fe4a6003f9944d1754d23";
+        internal const string ApprovedFingerprintRootGameplay = "0edfae707e40ad707aee18b1113b657d5b30c77f8085c763e3d89d937dae6324";
+        internal const string ApprovedFingerprintRootFixedPopulation = "e8d294eeb3d8ea6ba1a3f895299c212e4cc186e8fa9e277c204da93a4e0c3433";
 
         public static bool TryGet(string nodeId, out FrameAccessReviewId reviewId) =>
             Reviews.TryGetValue(nodeId, out reviewId);
 
         public static FrameAccessEvidence EvidenceFor(string nodeId) => nodeId switch
         {
-            "combat.beam.update" => FrameAccessEvidence.DisabledUnsafe,
             "post-death.life-link.resolve" => FrameAccessEvidence.DisabledUnsafe,
             _ => FrameAccessEvidence.SourceReviewed
         };
@@ -424,7 +393,7 @@ namespace BattleSystemECS.Core
         {
             "early-groups.md" => ReportedEarlyNodeCount,
             "combat-groups.md" => ReportedCombatNodeCount,
-            "commit-postdeath.md" => 36,
+            "commit-postdeath.md" => 35,
             "supplemental-production-nodes.md" => SupplementalNodeIds.Count,
             _ => throw new ArgumentOutOfRangeException(nameof(artifactId),artifactId,"Unknown review artifact.")
         };
@@ -438,7 +407,7 @@ namespace BattleSystemECS.Core
 
         private static FrameAccessReviewDisposition DispositionFor(string nodeId) => nodeId switch
         {
-            "combat.beam.update" or "post-death.life-link.resolve" => FrameAccessReviewDisposition.DisabledUnsafe,
+            "post-death.life-link.resolve" => FrameAccessReviewDisposition.DisabledUnsafe,
             "primary-death.resolve" or "primary-death.callback-dispatch" or "cascade-death.resolve" or
                 "cascade-death.callback-dispatch" or "pregame.random-event.update" or
                 "pregame.random-event.callback-dispatch" or "spawning.wave.update" or

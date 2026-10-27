@@ -327,8 +327,6 @@ namespace BattleSystemECS.Systems
                     // (default), > 0 = lead target based on its current motion. Capped
                     // at [0, 2] inside the accessor.
                     store.SetTowerLeadAimFactor(towerId, tc.LeadAimFactor);
-                    // Apply intercept rate for PointDefense towers
-                    store.SetTowerInterceptRate(towerId, tc.InterceptRate);
                     // Apply bounce projectile settings
                     store.TowerBouncesRemaining[towerId] = tc.Bounces;
                     store.TowerBounceRange[towerId] = tc.BounceRange;

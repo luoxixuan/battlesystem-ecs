@@ -427,7 +427,7 @@ namespace BattleSystemECS.Tests.Framework
             // Bug 回归：删除或绕过任一真实生产节点时，composition 快照必须失败。
             Assert.Equal(FrameAccessReviewCatalog.ReviewedNodeCount-scheduler.FrameGraphDiagnostics.Count,
                 scheduler.FrameGraphPlan.Count);
-            Assert.Equal("f6c62a95e632b568e2ac01bf5234aad47ea1aea9a3fe843edc0124630b60994c",scheduler.FrameGraphTopologyHash);
+            Assert.Equal("4a5ad7652071bbfd468fa12a67612a6baaac3ba0caf7273993d2ecca18282675",scheduler.FrameGraphTopologyHash);
             Assert.Contains(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="frame.input.publish");
             FrameNodeAdapter publisher=Assert.Single(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="frame.input.publish");
             Assert.Contains(FrameResource.EnemyHealth,publisher.Metadata.Reads);
@@ -500,7 +500,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.All(scheduler.FrameGraphDiagnostics,d=>
             {
                 Assert.False(string.IsNullOrWhiteSpace(d.Reason));
-                if(d.NodeId.Value=="combat.beam.update"||d.NodeId.Value=="post-death.life-link.resolve")
+                if(d.NodeId.Value=="post-death.life-link.resolve")
                     Assert.Equal(FrameAccessEvidence.DisabledUnsafe,d.Evidence);
                 else
                     Assert.Equal(FrameAccessEvidence.SourceReviewed,d.Evidence);
@@ -519,7 +519,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(FrameAccessReviewCatalog.ExpectedArtifactNodeCount("commit-postdeath.md"),reviewScopes["commit-postdeath.md"]);
             Assert.Equal(FrameAccessReviewCatalog.ExpectedArtifactNodeCount("supplemental-production-nodes.md"),reviewScopes["supplemental-production-nodes.md"]);
             Assert.Equal(FrameAccessReviewCatalog.ReviewedNodeCount,reviewScopes.Values.Sum());
-            Assert.Equal(208,FrameAccessReviewCatalog.ReportedUnionNodeCount);
+            Assert.Equal(178,FrameAccessReviewCatalog.ReportedUnionNodeCount);
             Assert.Equal(FrameAccessReviewCatalog.ReviewedNodeCount,
                 FrameAccessReviewCatalog.ReportedUnionNodeCount+FrameAccessReviewCatalog.SupplementalNodeIds.Count);
             var allProfiles=scheduler.FrameGraphPlan.Select(n=>(NodeId:n.Metadata.Id.Value,Review:n.Metadata.AccessProfile.Review!))
@@ -584,18 +584,16 @@ namespace BattleSystemECS.Tests.Framework
             AssertProfileResources(scheduler,"ai.enemy-ability.execute",
                 new[]{FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyControl,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.TowerState,FrameResource.PlayerResources},
                 new[]{FrameResource.AbilityRequests});
-            Assert.Contains(scheduler.FrameGraphDiagnostics,d=>d.NodeId.Value=="combat.energy.update"&&d.Policy==OptionalDependencyPolicy.Disabled);
             Assert.Contains(scheduler.FrameGraphDiagnostics,d=>d.NodeId.Value=="ai.lifesteal.update"&&d.Policy==OptionalDependencyPolicy.Disabled);
             Assert.Same(registry.Sapper,scheduler.AI.Sapper);
         }
 
         [Fact]
-        public void DisabledUnsafeBeamAndLifeLinkCannotBeEnabledInProduction()
+        public void DisabledUnsafeLifeLinkCannotBeEnabledInProduction()
         {
-            // Bug 回归：未修复的 Beam race 与 LifeLink destroyed-source 合同不得被标成安全并启用。
+            // Bug 回归：未修复的 LifeLink destroyed-source 合同不得被标成安全并启用。
             var enableActions=new (Action<FrameScheduler,SystemRegistry> enable,string nodeId)[]
             {
-                ((scheduler,_)=>scheduler.Combat.BeamTower=new Systems.BeamTowerSystem(scheduler.Store),"combat.beam.update"),
                 ((scheduler,registry)=>scheduler.PostDeath.LifeLink=registry.LifeLink,"post-death.life-link.resolve")
             };
             foreach(var item in enableActions)
@@ -809,8 +807,6 @@ namespace BattleSystemECS.Tests.Framework
             Assert.NotNull(runtime.Registry.WaveSpawning);
             Assert.NotNull(runtime.Registry.Skill);
             Assert.Contains(runtime.Scheduler.FrameGraphDiagnostics,d=>
-                d.NodeId.Value=="combat.beam.update"&&d.Evidence==FrameAccessEvidence.DisabledUnsafe);
-            Assert.Contains(runtime.Scheduler.FrameGraphDiagnostics,d=>
                 d.NodeId.Value=="post-death.life-link.resolve"&&d.Evidence==FrameAccessEvidence.DisabledUnsafe);
         }
 
@@ -843,7 +839,7 @@ namespace BattleSystemECS.Tests.Framework
                 mode4.CompositionFingerprint,StringComparison.Ordinal);
             Assert.Equal(64,mode4.PopulationEnd);
             Assert.Equal(64,mode4.PopulationMin);
-            Assert.StartsWith("ProductionRegistry:035d953b172040689e78c8acbf49d23ec131e46e768fa04920c2fd817557cb29",
+            Assert.StartsWith("ProductionRegistry:d1bc6bb4a548b96327b0b51fc71c17a4299b01c8c03b020bec0dfe54950986d2",
                 mode4.CompositionFingerprint,StringComparison.Ordinal);
             Assert.Equal(Systems.BenchmarkCompositionContract.ProductionRegistryGraph,mode5.Composition);
             Assert.Equal(4,mode5.FramesExecuted);
@@ -880,9 +876,9 @@ namespace BattleSystemECS.Tests.Framework
             var fixedPopulation=Systems.BenchmarkCompositionFactory.Create(fixedWorld.Store,fixedWorld.Config,
                 fixedWorld.Renderer,fixedPlayer,scenarioKind:FrameScenarioKind.FixedPopulationBenchmark);
             Assert.NotEqual(gameplay.Scheduler.FrameGraphTopologyHash,fixedPopulation.Scheduler.FrameGraphTopologyHash);
-            Assert.Equal("f6c62a95e632b568e2ac01bf5234aad47ea1aea9a3fe843edc0124630b60994c",
+            Assert.Equal("4a5ad7652071bbfd468fa12a67612a6baaac3ba0caf7273993d2ecca18282675",
                 gameplay.Scheduler.FrameGraphTopologyHash);
-            Assert.Equal("035d953b172040689e78c8acbf49d23ec131e46e768fa04920c2fd817557cb29",
+            Assert.Equal("d1bc6bb4a548b96327b0b51fc71c17a4299b01c8c03b020bec0dfe54950986d2",
                 fixedPopulation.Scheduler.FrameGraphTopologyHash);
             Assert.NotEqual(gameplay.Scheduler.FrameGraphReviewRoot,fixedPopulation.Scheduler.FrameGraphReviewRoot);
             Assert.Equal(FrameAccessReviewCatalog.ApprovedFingerprintRootGameplay,gameplay.Scheduler.FrameGraphReviewRoot);

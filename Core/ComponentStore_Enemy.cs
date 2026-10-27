@@ -292,13 +292,7 @@ namespace BattleSystemECS.Core
         // Default null = no entries (no cooldowns active). Allocated on first trigger.
         public System.Collections.Generic.Dictionary<int, int[]> EnemyTrapCooldownTick = new System.Collections.Generic.Dictionary<int, int[]>(64);
         // ==================== Enemy Wound / Cripple (HP-Threshold Slow) ====================
-        // EnemyWoundThreshold: HP fraction threshold that triggers wound slow (e.g. 0.3 = 30% HP)
         // Default 0f = no wound mechanic. When HP drops below this ratio, wound slow activates.
-        public float[] EnemyWoundThreshold = new float[MAX_ENTITIES];
-        // EnemyWoundSlowRatio: speed multiplier when wounded (e.g. 0.5 = 50% speed)
-        public float[] EnemyWoundSlowRatio = new float[MAX_ENTITIES];
-        // EnemyIsWounded: true when HP is below wound threshold and wound mechanic is active
-        public bool[] EnemyIsWounded = new bool[MAX_ENTITIES];
         // EnemyKnockbackForceLeft: remaining knockback force applied this frame (decays to 0)
         public float[] EnemyKnockbackForceLeft = new float[MAX_ENTITIES];
         // ==================== 敌人侧移/闪避移动 (Enemy Strafe / Dodge) ====================
@@ -513,29 +507,9 @@ namespace BattleSystemECS.Core
         // ==================== 玩家召唤单位组件 (Player-Summoned Units, SOA) ====================
         // SummonedUnitActive: true if this entity is a player-summoned combat unit
         public bool[] SummonedUnitActive = new bool[MAX_ENTITIES];
-        // SummonedUnitType: 0=Melee, 1=Ranged, 2=Bomber
-        public int[] SummonedUnitType = new int[MAX_ENTITIES];
         // SummonedUnitHealth / SummonedUnitMaxHealth: current and max HP
         public float[] SummonedUnitHealth = new float[MAX_ENTITIES];
         public float[] SummonedUnitMaxHealth = new float[MAX_ENTITIES];
-        // SummonedUnitDamage: attack damage per hit
-        public float[] SummonedUnitDamage = new float[MAX_ENTITIES];
-        // SummonedUnitMoveSpeed: movement speed (tiles/sec)
-        public float[] SummonedUnitMoveSpeed = new float[MAX_ENTITIES];
-        // SummonedUnitAttackRange: attack range (tiles)
-        public int[] SummonedUnitAttackRange = new int[MAX_ENTITIES];
-        // SummonedUnitAttackSpeed: attacks per second
-        public float[] SummonedUnitAttackSpeed = new float[MAX_ENTITIES];
-        // SummonedUnitAttackTimer: cooldown accumulator for attack timing
-        public float[] SummonedUnitAttackTimer = new float[MAX_ENTITIES];
-        // SummonedUnitDuration: remaining lifetime in seconds (0 = permanent until killed)
-        public float[] SummonedUnitDuration = new float[MAX_ENTITIES];
-        // SummonedUnitOwnerId: player who summoned this unit
-        public int[] SummonedUnitOwnerId = new int[MAX_ENTITIES];
-        // SummonedUnitTargetId: current attack target entity id (-1 = none)
-        public int[] SummonedUnitTargetId = new int[MAX_ENTITIES];
-        // SummonedUnitGoldReward: gold awarded when this unit kills an enemy
-        public int[] SummonedUnitGoldReward = new int[MAX_ENTITIES];
 
         // ==================== Boss Phase / Enrage 字段（SOA） ====================
         // EnemyBossPhase: current phase index for boss enemies (0 = phase 1, 1 = phase 2, etc.)
@@ -641,20 +615,8 @@ namespace BattleSystemECS.Core
         public bool[] EnemyMorphTriggered = new bool[MAX_ENTITIES];
 
         // ==================== Enemy Clone (Duplicate Mid-Wave, SOA) ====================
-        // EnemyCloneDefId: index into GameConfig.CloneDefs for this enemy's clone definition (-1 = none)
-        public int[] EnemyCloneDefId = new int[MAX_ENTITIES];
-        // EnemyCloneCooldown: remaining cooldown in seconds before this enemy can clone again
-        public float[] EnemyCloneCooldown = new float[MAX_ENTITIES];
-        // EnemyCloneTimer: clone duration in seconds (0 = permanent clone, -1 = no duration tracking)
         // When CloneDuration > 0 and timer expires, clone is killed (optional mechanic)
-        public float[] EnemyCloneTimer = new float[MAX_ENTITIES];
-        // EnemyCloneCount: number of active clones this enemy has currently spawned
         // Enforced against CloneDef.MaxClones
-        public int[] EnemyCloneCount = new int[MAX_ENTITIES];
-        // EnemyIsClone: true if this entity is a clone (cannot clone further, lower tower priority)
-        public bool[] EnemyIsClone = new bool[MAX_ENTITIES];
-        // EnemyCloneMasterId: the entity ID of the master that this clone was spawned from (-1 = none)
-        public int[] EnemyCloneMasterId = new int[MAX_ENTITIES];
         // EnemyHasTrueSight: true if this enemy can detect and target stealthed towers
         public bool[] EnemyHasTrueSight = new bool[MAX_ENTITIES];
 
@@ -704,13 +666,6 @@ namespace BattleSystemECS.Core
         public float[] EnemyBossTrailProgressInterval = new float[MAX_ENTITIES];
         public float[] EnemyBossTrailLastTriggerProgress = new float[MAX_ENTITIES];
 
-        // EnemyTeleportCooldown: turns remaining until teleport is ready (0 = ready / no cooldown)
-        public float[] EnemyTeleportCooldown = new float[MAX_ENTITIES];
-        // EnemyTeleportDestinationX/Y: target position for teleport/blink destination
-        public float[] EnemyTeleportDestinationX = new float[MAX_ENTITIES];
-        public float[] EnemyTeleportDestinationY = new float[MAX_ENTITIES];
-        // EnemyTeleportType: 0=none, 1=blink_to_destination, 2=portal_entry, 3=random_phase_ahead, 4=retreat_to_player
-        public int[] EnemyTeleportType = new int[MAX_ENTITIES];
 
         // ==================== 敌人抗性字段（SOA） ====================
         // EnemyStunResistance: 0-1, reduces stun duration and chance
@@ -832,22 +787,14 @@ namespace BattleSystemECS.Core
         public float[] EnemyVanguardDmgTransfer = new float[MAX_ENTITIES];
 
         // ==================== 敌人治疗单位组件（SOA）====================
-        // EnemyHealerHealAmount: flat HP restored per heal tick (0 = not a healer)
-        public float[] EnemyHealerHealAmount = new float[MAX_ENTITIES];
-        // EnemyHealerHealInterval: heal cooldown / interval in seconds (also used as range for heal check)
-        public float[] EnemyHealerHealInterval = new float[MAX_ENTITIES];
 
         // ==================== 金币窃取敌人组件（SOA）====================
         // EnemyCanStealGold: true if this enemy is a thief that steals gold instead of damaging base
         public bool[] EnemyCanStealGold = new bool[MAX_ENTITIES];
         // EnemyStealAmount: amount of gold this enemy steals when reaching the end
         public float[] EnemyStealAmount = new float[MAX_ENTITIES];
-        // EnemyStolenGold: total gold this enemy has stolen (for tracking/debugging)
-        public float[] EnemyStolenGold = new float[MAX_ENTITIES];
         // EnemyGoldOnReturn: bonus gold awarded when player kills a thief after it escapes
         public float[] EnemyGoldOnReturn = new float[MAX_ENTITIES];
-        // EnemyHasStolenGold: set to true when thief escapes with stolen gold (skips gold reward on death)
-        public bool[] EnemyHasStolenGold = new bool[MAX_ENTITIES];
 
         // ==================== 法力燃烧敌人组件（SOA）====================
         // EnemyManaBurnAmount: amount of mana this enemy burns per attack (0 = no mana burn)
@@ -1240,13 +1187,6 @@ namespace BattleSystemECS.Core
 
         // ==================== 敌人组件访问 ====================
 
-        // ── O(1) enemy affix flag helpers ─────────────────────────────────
-        public bool HasAffix(int enemyId, BuffType affix)
-        {
-            if (!IsValidEntity(enemyId)) return false;
-            return (EnemyAffixFlags[enemyId] & affix) != 0;
-        }
-
         public int AddEnemy(float startX, float startY, float moveSpeed, float health, float maxHealth, float damage, int goldReward, int waveNumber, string fullName = null, float armor = 0f, float shield = 0f, float magicResist = 0f, float fireResist = 0f, float iceResist = 0f, float lightningResist = 0f, float holyResist = 0f)
         {
             int entityId = CreateEntity();
@@ -1410,14 +1350,8 @@ namespace BattleSystemECS.Core
             // Thief: default not a gold thief
             EnemyCanStealGold[entityId] = false;
             EnemyStealAmount[entityId] = 0f;
-            EnemyStolenGold[entityId] = 0f;
             EnemyGoldOnReturn[entityId] = 0f;
-            EnemyHasStolenGold[entityId] = false;
             // Teleport: default no cooldown (ready), no destination, type=0 (none)
-            EnemyTeleportCooldown[entityId] = 0f;
-            EnemyTeleportDestinationX[entityId] = 0f;
-            EnemyTeleportDestinationY[entityId] = 0f;
-            EnemyTeleportType[entityId] = 0;
             // Path deviation: default 0/0/0/0 = no lateral drift. WaveSpawningSystem overrides
             // per archetype if the monster config specifies deviation type/amplitude.
             EnemyPathDeviationType[entityId] = 0;
@@ -2472,18 +2406,6 @@ namespace BattleSystemECS.Core
             if (baseSpeed > 0f)
                 EnemyMoveSpeed[enemyId] = baseSpeed;
             EnemySlowFactor[enemyId] = 0f;
-        }
-
-        /// <summary>Clears wound slow effect on enemy and restores speed from wound state.</summary>
-        public void ClearEnemyWound(int enemyId)
-        {
-            if (!IsValidEntity(enemyId)) return;
-            if (!EnemyIsWounded[enemyId]) return;
-            EnemyIsWounded[enemyId] = false;
-            // Restore from base speed (wound applied additional multiplier on top of base)
-            float baseSpeed = EnemyMoveSpeedBase[enemyId];
-            if (baseSpeed > 0f)
-                EnemyMoveSpeed[enemyId] = baseSpeed;
         }
 
         /// <summary>Applies knockback force to an enemy. Force is applied instantly and consumed in ResolveKnockback.</summary>

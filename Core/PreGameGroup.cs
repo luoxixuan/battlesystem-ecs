@@ -7,7 +7,6 @@ namespace BattleSystemECS.Core
         public Systems.WeatherSystem? Weather { get; set; }
         public Systems.DayNightSystem? DayNight { get; set; }
         public Systems.AdaptiveDifficultySystem? AdaptiveDifficulty { get; set; }
-        public Systems.TowerConstructionSystem? Construction { get; set; }
         public Systems.RandomEventSystem? RandomEvent { get; set; }
         public Systems.DesperationSystem? Desperation { get; set; }
         public Systems.WaveSpawningSystem? WaveSpawning { get; set; }
@@ -21,7 +20,6 @@ namespace BattleSystemECS.Core
             if (Weather != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("pregame.weather.update"), c => Weather.Update(c.Delta));
             if (DayNight != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("pregame.day-night.update"), c => DayNight.Update(c.Delta));
             if (AdaptiveDifficulty != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("pregame.adaptive-difficulty.update"), c => AdaptiveDifficulty.Update(c.Delta));
-            if (Construction != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("pregame.construction.update"), c => Construction.Update(c.Delta));
             if (Desperation != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("pregame.desperation.update"), c => Desperation.Update());
             if (TimeRewind != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("pregame.time-rewind.update"), c => TimeRewind.Update(c.Delta));
             if (WaveSpawning != null)
@@ -41,7 +39,6 @@ namespace BattleSystemECS.Core
             Weather?.Update(deltaTime);
             DayNight?.Update(deltaTime);
             AdaptiveDifficulty?.Update(deltaTime);
-            Construction?.Update(deltaTime);
             Desperation?.Update();
             TimeRewind?.Update(deltaTime);
 

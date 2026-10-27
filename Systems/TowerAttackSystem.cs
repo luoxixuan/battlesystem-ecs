@@ -24,8 +24,6 @@ namespace BattleSystemECS.Systems
         private global::BattleSystemECS.Content.Contracts.IProjectileCommandPort projectileSystem;
         private global::BattleSystemECS.Content.Contracts.ITowerEnvironmentView _weatherSystem; // 天气修饰
         private global::BattleSystemECS.Content.Contracts.ITowerRangeModifierView _dayNightSystem; // 昼夜射程修饰
-        private global::BattleSystemECS.Content.Contracts.ITowerHeatPort _heatSystem; // 热量命令端口
-        private global::BattleSystemECS.Content.Contracts.ITowerEnergyPort _energySystem; // 能量命令端口
         private global::BattleSystemECS.Content.Contracts.IHitShieldResolver _hitShieldSystem; // 次数盾结算
         private global::BattleSystemECS.Content.Contracts.IDodgeResolver _enemyStrafeSystem; // 闪避结算
         private global::BattleSystemECS.Content.Contracts.IDesperationView _desperationSystem; // 背水加成视图
@@ -397,14 +395,6 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// 注入塔热量命令端口。
-        /// </summary>
-        public void SetHeatSystem(global::BattleSystemECS.Content.Contracts.ITowerHeatPort heatSystem)
-        {
-            _heatSystem = heatSystem;
-        }
-
-        /// <summary>
         /// 注入背水伤害与攻速加成视图。
         /// </summary>
         public void SetDesperationSystem(global::BattleSystemECS.Content.Contracts.IDesperationView desperationSystem)
@@ -418,14 +408,6 @@ namespace BattleSystemECS.Systems
         public void SetFireTrailSystem(global::BattleSystemECS.Content.Contracts.IFireTrailCommandPort fireTrailSystem)
         {
             _fireTrailSystem = fireTrailSystem;
-        }
-
-        /// <summary>
-        /// 注入塔能量命令端口。
-        /// </summary>
-        public void SetEnergySystem(global::BattleSystemECS.Content.Contracts.ITowerEnergyPort energySystem)
-        {
-            _energySystem = energySystem;
         }
 
         /// <summary>
@@ -668,10 +650,6 @@ namespace BattleSystemECS.Systems
                 // Income tower check: skip attack logic for income-generating towers
                 if (store.TowerIsIncomeTower[towerId]) return;
 
-                // Beam tower check: reserved for BeamTowerSystem, which the production composition never
-                // constructs (reviewed-disabled node combat.beam.update); TowerIsBeam is never set true today.
-                if (store.TowerIsBeam[towerId]) return;
-
                 // Construction check: skip towers that are still under construction
                 if (store.TowerIsConstructing[towerId]) return;
 
@@ -692,9 +670,6 @@ namespace BattleSystemECS.Systems
                 // until BOTH clear. ToggleTower() in TowerPlacementSystem flips this flag.
                 // Round 98: player toggle does NOT cancel in-flight windup (player intent: pause — shot resumes on enable).
                 if (store.TowerPlayerDisabled[towerId]) return;
-
-                // Overheat check: skip if tower is overheated (cannot fire)
-                if (_heatSystem != null && _heatSystem.IsOverheated(towerId)) return;
 
                 float tx = store.PositionX[towerId];
                 float ty = store.PositionY[towerId];
@@ -947,9 +922,6 @@ namespace BattleSystemECS.Systems
                         return;
                     }
 
-                    // 所有只读拒绝完成后，原子验证并消费本次射击能量。
-                    if (_energySystem != null && !_energySystem.TryConsumeEnergy(towerId)) return;
-
                     store.TowerLastAttackTime[towerId] = 0f;
 
                     // Burst fire: increment shot counter — resets to 0 in the burst cooldown check above
@@ -968,12 +940,6 @@ namespace BattleSystemECS.Systems
                             store.TowerIsReloading[towerId] = true;
                             store.TowerReloadProgress[towerId] = 0f;
                         }
-                    }
-
-                    // Accumulate heat for towers that generate heat on each shot
-                    if (_heatSystem != null)
-                    {
-                        _heatSystem.AccumulateHeat(towerId);
                     }
 
                     float baseDmg = store.GetTowerAttackDamage(towerId);

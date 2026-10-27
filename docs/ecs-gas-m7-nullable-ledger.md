@@ -113,21 +113,3 @@ Generated from explicit spec `tools/system-registration-spec.json` and verified 
 | EventBus | EventBus |  | production-service | CreateEventBus / WireEventBus / BindEventBus |
 | ProductionEvents | composition | Combo,Crest,Culling,Gold,Interest,Momentum,PlayerTowerAttack,PreFightBuff,Save,Skill,TechTree,TowerAttack,WaveBranch,WaveMutator,WavePreview,WaveSpawning | production-event-wiring | CreateProductionEvents / WireProductionEvents / BindProductionEvents |
 | FrameScheduler | composition |  | production-frame-orchestration | CreateFrameSchedulerContract / WireFrameSchedulerContract / BindFrameSchedulerContract |
-| TowerIncome | disabled |  | feature-disabled | disabled: no executable recipe |
-| TowerRelocate | disabled |  | feature-disabled | disabled: no executable recipe |
-| Construction | disabled |  | feature-disabled | disabled: no executable recipe |
-| EnemyAffix | disabled |  | feature-disabled | disabled: no executable recipe |
-| Wound | disabled |  | feature-disabled | disabled: no executable recipe |
-| EnemyHealer | disabled |  | feature-disabled | disabled: no executable recipe |
-| StealGold | disabled |  | feature-disabled | disabled: no executable recipe |
-| Summon | disabled |  | feature-disabled | disabled: no executable recipe |
-| TowerOvercharge | disabled |  | feature-disabled | disabled: no executable recipe |
-| TowerLink | disabled |  | feature-disabled | disabled: no executable recipe |
-| PatrolTower | disabled |  | feature-disabled | disabled: no executable recipe |
-| Fog | disabled |  | feature-disabled | disabled: no executable recipe |
-| PointDefense | disabled |  | feature-disabled | disabled: no executable recipe |
-| Heat | disabled |  | feature-disabled | disabled: no executable recipe |
-| Demolish | disabled |  | feature-disabled | disabled: no executable recipe |
-| TowerSilence | disabled |  | feature-disabled | disabled: no executable recipe |
-| Dispel | disabled |  | feature-disabled | disabled: no executable recipe |
-| EnemyProjectile | disabled |  | feature-disabled | disabled: no executable recipe |

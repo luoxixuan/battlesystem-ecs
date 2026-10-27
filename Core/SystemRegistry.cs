@@ -405,12 +405,9 @@ namespace BattleSystemECS.Core
             scheduler.Build.Register("build.shop-reroll.update", () => scheduler.Build.ShopReroll, (st, dt) => ShopReroll!.Update());
             scheduler.Build.Register("build.skill.reject-pending", () => scheduler.Build.Skill, (st, dt) => Skill!.RejectPendingSkillDamage());
             scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.gold.update"));
-            if (FrameBindingFacts.TryGet("build.tower-income.update", out var towerIncomeFact))
-                scheduler.RegisterBuildFrameBinding(towerIncomeFact);
             scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.upgrade.update"));
             scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.skill.update"));
             scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.auto-skill.update"));
-            scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.tower-relocate.update"));
             scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.interest.update"));
             scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.mana.update"));
             scheduler.RegisterBuildFrameBinding(FrameBindingFacts.Get("build.mana-shield.update"));
