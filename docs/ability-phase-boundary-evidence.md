@@ -73,9 +73,9 @@ mode2 均值 `44690`，相对最近可比窗口 `46903` 为 `-4.7%`；mode4 均�
 
 ## 原始日志摘要
 
-完整原始日志的稳定审计副本位于 `C:\WorkSpace\AI\battlesystem-ecs-gate-logs\ability-phase-boundary-20260901-000559`，不属于 Git 工作树，也不进入业务提交。每条命令都有独立日志，包含开始/结束时间、cwd、原命令、完整 stdout/stderr 和退出码；`provenance.log` 保存 HEAD、dirty manifest、配置与最终 DLL hash。工作树内 ignored artifact 保留为原始镜像，但不是唯一 provenance。
+完整原始日志的稳定审计副本位于 `F:\AI\battlesystem-ecs-gate-logs\ability-phase-boundary-20260901-000559`，不属于 Git 工作树，也不进入业务提交。每条命令都有独立日志，包含开始/结束时间、cwd、原命令、完整 stdout/stderr 和退出码；`provenance.log` 保存 HEAD、dirty manifest、配置与最终 DLL hash。工作树内 ignored artifact 保留为原始镜像，但不是唯一 provenance。
 
-- 每个日志/原 manifest 的 SHA-256 清单：`C:\WorkSpace\AI\battlesystem-ecs-gate-logs\ability-phase-boundary-20260901-000559\audit-files.sha256`
+- 每个日志/原 manifest 的 SHA-256 清单：`F:\AI\battlesystem-ecs-gate-logs\ability-phase-boundary-20260901-000559\audit-files.sha256`
 - `audit-files.sha256` 自身 SHA-256：`A7BD08A35BF7FC9D49E8723ED55A80FAD6771B520093E823A10302F22147728E`
 - 23 条命令日志的退出码均为 0，另有 1 条 provenance 日志；完整样本没有删减或按中位数替换。
 

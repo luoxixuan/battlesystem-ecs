@@ -31,11 +31,11 @@
 | `BattleSystemECS.csproj` | 主 EXE — net6.0，引用 Core 库，仅含 Program.cs |
 | `BattleSystemECS.Tests/BattleSystemECS.Tests.csproj` | 测试项目 — net9.0，仅项目引用 Core（不含 EXE；Core 内部消费 Engine） |
 | `game_config.json` | 运行时游戏主配置（怪物类型、关卡、波次、玩家属性、连击/TowerOvercharge/PositionalDamage 参数），`CopyToOutputDirectory=PreserveNewest` |
-| `Data/Configs/*.json` | 子配置：行为树、技能（skills.json = 精选技能表，加载进 `GameConfig.SkillDefs`）、科技树、塔位规则、波次生成、阶段行为、自动技能 |
-| `Data/Monsters/*.json` | 200 种怪物静态定义 |
+| `Data/Configs/*.json` | 子配置：行为树、技能（skills.json = 精选技能表，加载进 `GameConfig.SkillDefs`）、科技树、塔位规则、波次生成、阶段行为等。注意：`auto_skill` / `backstab` / `beacon_towers` / `damage_conversion` / `path_terrain` / `player` / `projectile_deflection` / `shop_reroll` / `shrine_towers` / `wave_gold_decay` / `wave_skip` 这 11 个文件当前没有任何加载器读取（见 `docs/2026-10-27-cleanup-audit.md` E-09） |
+| `Data/Monsters/*.json` | 怪物静态定义（238 个文件）；**Core 不加载**，运行时怪物类型来自 `game_config.json` 的 `MonsterTypes` |
 | `Data/Skills/*.json` | 150 种技能静态定义（按名去重合并进 `GameConfig.SkillDefs`，精选条目优先） |
-| `Data/Towers/*.json` | 150 种塔静态定义 |
-| `Data/Levels/*.json` | 5 个关卡配置 |
+| `Data/Towers/*.json` | 塔静态定义（176 个文件）；Core 只读取 `tower_synergy.json` 和 `tower_links.json`（后者仅被未装配的 `TowerLinkSystem` 读取），其余不加载 |
+| `Data/Levels/*.json` | 关卡文件（`level_1`–`level_5` + `doom_clock`）；**Core 不加载**（关卡来自 `game_config.json` 的 `Levels`），Unity 从自身 `StreamingAssets/level_1.json` 读取 |
 
 **注意**：没有 `.sln` 解决方案文件，直接使用 `dotnet build` / `dotnet test` 对单个 `.csproj` 操作。Core 库使用 Linked Files 方式编译，不会重复存储源码。
 
@@ -101,10 +101,10 @@ BattleSystem-ECS/
 │   └── 按职责拆分（生成 / AI / 移动 / 攻击 / 塔 / 技能 / Buff / 经济 / 天气 / 地形 …），逐一举列无意义，统一经 SystemRegistry 装配
 ├── Data/                            # 静态数据与运行时配置
 │   ├── Configs/                     # 行为树、技能、科技树、塔位、波次、阶段、自动技能
-│   ├── Levels/                      # 5 个关卡
-│   ├── Monsters/                    # 200 种怪物
+│   ├── Levels/                      # 关卡文件（Core 不加载；Unity 读 level_1）
+│   ├── Monsters/                    # 怪物定义（Core 不加载）
 │   ├── Skills/                      # 150 种技能
-│   └── Towers/                      # 150 种塔
+│   └── Towers/                      # 塔定义（Core 仅读 tower_synergy / tower_links）
 ├── docs/ / Research/                # 架构文档、研究日志；迁移计划在 docs/plan/
 ├── Program.cs                       # 入口（游戏 / 压测 / 微基准）
 └── game_config.json                 # 运行时主配置
@@ -287,7 +287,9 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 ### 7.1 性能门禁
 
 性能压测结果、相对门禁和延期状态以最新 fresh evidence 为准；当前迁移轮次暂不运行
-mode2/mode4/mode5，未运行项不得标记为通过。mode 2/4 合同是固定人口吞吐：测量帧内目标数量必须钉住
+mode2/mode4/mode5，未运行项不得标记为通过。压测（`BenchmarkSystem` 各 mode）与 `Program.cs`、Unity `BattleDriver` 一样经
+`GameConfigLoader.LoadConfig`（兼容/legacy 解析器）加载配置；交互局 `GameManager` 走 `LoadStrictCatalog`（严格解析 +
+catalog 校验）。两者 FrameGraph 组装相同，但配置加载路径不同。mode 2/4 合同是固定人口吞吐：测量帧内目标数量必须钉住
 （开局高 HP、移速 0、不补波、铺满 20 座开火塔；玩家每帧最多命中 `Player.MaxTargetsPerFrame` 个目标）；人口漂移则 `valid=FALSE`，该次 FPS 不能当 10K 负载。测量帧内 Damage/Resource Resolver 有任何容量拒绝（`Capacity:` 行 `damageDropped`/`resourceDropped` >0）同样 `valid=FALSE`；`triggerAborts` 是触发器循环防护（`MaxEventsPerFrame`）中止次数，仅报告、不计入有效性；预算默认 = 两个 Resolver 事件容量 + 链式队列容量，且只计入有定义订阅的事件，正常战斗应为 0，非 0 说明触发链失控或容量合同被突破。Resolver 容量合同：事件容量 = 单请求最多事实数 × `MaxPendingRequests` + 关键预留，改任一常量须在同一 commit 附 mode 4/5 证据。mode 5 是完整局观察（8 座塔，每波 EnemyCount ×3）。
 
 mode 4 报告末尾按耗时降序打印生产 FrameGraph 逐节点耗时（`node <id> ms (%) calls=`，<0.1% 合并为一行），用于定位热点；计时仅在压测中经 `FrameScheduler.EnableFrameGraphNodeTiming()` 开启。

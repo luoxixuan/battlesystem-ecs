@@ -46,7 +46,7 @@ benchmark 入口不直接组装三段 registry facade。
 ## M7 复核
 
 本轮唯一 fresh evidence 位于仓外目录：
-`C:\WorkSpace\AI\battlesystem-ecs-gate-logs\m7-installer-registration-final-20260902T231500Z`。
+`F:\AI\battlesystem-ecs-gate-logs\m7-installer-registration-final-20260902T231500Z`。
 该目录包含真实命令 manifest、原始 stdout/stderr、退出码、UTC/local 时间、工作目录、
 结果与逐条可复核 hash、HEAD/index/status、tracked patch 与 untracked inventory，以及所有扫描结果。
 `dirty-inventory.txt` 在固定的 `STATUS_BEGIN`/`STATUS_END` 行之间保存
@@ -78,7 +78,7 @@ M8 当前只完成稳定观察、profile 支持的 Effect handle 分页，以及
   `ResourceChanged` 与 `KillConfirmed`，重入生产者不能偷取已预留槽位。
 - prepared read bag 提交后单独清理，回调重入的 alternate write bag 保留；生命周期订阅者
   逐个执行，异常在整批销毁和事实提交后重抛。1/2/3-fact queue overload 保持 resolver 成功热路径零分配。
-- 最近一次完整验证证据：`C:\WorkSpace\AI\battlesystem-ecs-gate-logs\m8-player-damage-concurrency-20260903T031142Z`，
+- 最近一次完整验证证据：`F:\AI\battlesystem-ecs-gate-logs\m8-player-damage-concurrency-20260903T031142Z`，
   当时 full tests 为 1805/1805、focused tests 为 29/29。该证据早于本次跨 resolver 共享提交锁修复；
   本次修复后按用户要求未重跑门禁，不能将该目录冒充为 post-fix fresh PASS。更早的
   `m8-observation-*` / `m8-death-*` 目录只作历史参考。

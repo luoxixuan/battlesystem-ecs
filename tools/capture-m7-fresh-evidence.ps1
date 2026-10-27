@@ -1,4 +1,4 @@
-param([string]$EvidenceRoot = 'C:\WorkSpace\AI\battlesystem-ecs-gate-logs\m7-installer-registration-final-20260902T231500Z')
+param([string]$EvidenceRoot = 'F:\AI\battlesystem-ecs-gate-logs\m7-installer-registration-final-20260902T231500Z')
 $ErrorActionPreference = 'Continue'
 New-Item -ItemType Directory -Force $EvidenceRoot, (Join-Path $EvidenceRoot 'attempt-failures') | Out-Null
 Get-ChildItem (Join-Path $EvidenceRoot 'attempt-failures') -File -ErrorAction SilentlyContinue | Remove-Item -Force

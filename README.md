@@ -14,7 +14,7 @@ BattleSystem-ECS/
 ├── BattleSystemECS.Tests/    # xUnit 单元测试（net9.0，四分层；数量以最新门禁日志为准）
 ├── Systems/                  # 游戏系统（144 个，全部编译到 Core）
 ├── Core/                     # ECS 核心（ComponentStore×5、FrameScheduler、GAS、EventBus）
-├── Data/                     # 静态数据（Monsters×200、Towers×150、Skills×150、Levels×5）
+├── Data/                     # 静态数据（Skills×150 由 Core 加载；Monsters/Towers/Levels 目录 Core 基本不加载，见 AGENTS.md §2.1）
 └── docs/ / Research/         # 架构文档、知识库
 ```
 
@@ -26,7 +26,7 @@ BattleSystem-ECS/
 
 性能门禁和压测结果以最新一次完整门禁证据为准；易变化的性能指标、帧数和数据规模不在 README 中固化。当前迁移轮次暂不运行 mode2/mode4/mode5，详见 [迁移编排](docs/plan/ecs-gas-migration-orchestration.md)。
 
-最近一次 M8 完整验证证据：`C:\WorkSpace\AI\battlesystem-ecs-gate-logs\m8-player-damage-concurrency-20260903T031142Z`
+最近一次 M8 完整验证证据：`F:\AI\battlesystem-ecs-gate-logs\m8-player-damage-concurrency-20260903T031142Z`
 （full tests 1805/1805、focused tests 29/29）。该证据早于本次跨 resolver 共享提交锁修复；修复后按用户要求未重跑门禁，不能视为 post-fix fresh PASS。
 mode 2/4/5 仍为 `DEFERRED`，Unity smoke 为 `UNAVAILABLE/BLOCKED`，均不属于 PASS。
 

@@ -16,7 +16,7 @@ typed `FrameBindingRegistration` 入口保留其受控 disabled 兼容策略；�
 合同中的 legacy 与 unknown-no-op 均为零。
 
 本轮唯一 fresh evidence 目录为：
-`C:\WorkSpace\AI\battlesystem-ecs-gate-logs\m7-installer-registration-final-20260902T231500Z`。
+`F:\AI\battlesystem-ecs-gate-logs\m7-installer-registration-final-20260902T231500Z`。
 目录中的 `dirty-inventory.txt` 按行包含 `HEAD=<sha>`、`INDEX_SHA256=<sha>`、
 `INDEX_STATUS=<状态>`、`TRACKED_PATCH_SHA256=<sha>`，随后是 `STATUS_BEGIN` 与 `STATUS_END` 标记；
 两标记之间逐行保存 `git status --short` 原文（空状态时两行相邻），以及每个

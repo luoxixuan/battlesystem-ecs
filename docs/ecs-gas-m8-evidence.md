@@ -92,7 +92,7 @@ prototype。动态 Buff、层数和周期计时没有变成结构组件。
 ## 最近完整验证证据与本次修复状态
 
 最近一次完整验证证据目录：
-`C:\WorkSpace\AI\battlesystem-ecs-gate-logs\m8-player-damage-concurrency-20260903T031142Z`。
+`F:\AI\battlesystem-ecs-gate-logs\m8-player-damage-concurrency-20260903T031142Z`。
 该目录记录 full tests 1805/1805、focused tests 29/29，但生成时间早于本次跨 resolver
 共享提交锁修复。本次修复后按用户要求未重跑任何门禁，因此该目录不是 post-fix fresh PASS。
 

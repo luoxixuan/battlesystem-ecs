@@ -8,7 +8,7 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repoRoot)) {
 Set-Location -LiteralPath $repoRoot
 if ([string]::IsNullOrWhiteSpace($EvidenceRoot)) {
     $stamp = [DateTimeOffset]::UtcNow.ToString('yyyyMMddTHHmmssZ')
-    $EvidenceRoot = "C:\WorkSpace\AI\battlesystem-ecs-gate-logs\m8-observation-$stamp"
+    $EvidenceRoot = "F:\AI\battlesystem-ecs-gate-logs\m8-observation-$stamp"
 }
 $EvidenceRoot = [IO.Path]::GetFullPath($EvidenceRoot)
 $repoPrefix = [IO.Path]::GetFullPath($repoRoot).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar

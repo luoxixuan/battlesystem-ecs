@@ -12,7 +12,7 @@ composition 验证，不再依赖复制 callback 或手工装配的替代测试�
 证据仍是历史基线，其中 mode 5 只有观察豁免，不能改写为规范性能 PASS。
 
 当前树已经包含后续 M1-M8 工作，不能把当前生产实现冒充 M0 当时的 baseline。最近完整门禁
-证据目录为 `C:\WorkSpace\AI\battlesystem-ecs-gate-logs\m8-player-damage-concurrency-20260903T031142Z`，
+证据目录为 `F:\AI\battlesystem-ecs-gate-logs\m8-player-damage-concurrency-20260903T031142Z`，
 记录 1805/1805 full tests 和 29/29 focused tests，但它早于 `715f9a2` 的跨 resolver
 共享提交锁修复。按本次用户要求，`715f9a2` 之后没有重新运行 build、test、rules、soak、
 capture、code review 或 diff-check，因此本文不声称当前 HEAD 获得 fresh PASS。mode 2/4/5
@@ -22,7 +22,7 @@ capture、code review 或 diff-check，因此本文不声称当前 HEAD 获得 f
 
 文档旧引用的 `artifacts/m0-baseline-20260830-031715/`、`artifacts/m0-final-gates-20260830-0715/` 和 `artifacts/benchmark-final-20260831.log` 在当前树不可复核；整个 `artifacts/` 被 `.gitignore` 排除且 `git ls-files artifacts` 为空。这些路径仅是历史引用，不再声称本机仍存在或由仓库交付。
 
-本轮稳定原始证据位于工作树外：`C:\WorkSpace\AI\battlesystem-ecs-gate-logs\baseline-evidence-gates-20260831T170634542Z`。环境记录 `environment.txt` 的 SHA-256 为 `8854B37166EB4095946905EDB631E88C8C13B204BA2E842147229CB83D7CF417`；记录 commit `e0bb4f4d2439c8773f4823a03ce2d87b62512429`、Windows `10.0.19045`、dotnet SDK `9.0.311`、Core/EXE/Tests TFM 分别为 `netstandard2.1`/`net6.0`/`net9.0`。当前机器上 `F:\AI\BattleSystem-ECS-Unity` 不可用，因此 Unity 版本、`BattleDriver.cs` 和 Core DLL 版本/hash 均明确记录为 `unavailable`，没有以文档值代替实测。
+本轮稳定原始证据位于工作树外：`F:\AI\battlesystem-ecs-gate-logs\baseline-evidence-gates-20260831T170634542Z`。环境记录 `environment.txt` 的 SHA-256 为 `8854B37166EB4095946905EDB631E88C8C13B204BA2E842147229CB83D7CF417`；记录 commit `e0bb4f4d2439c8773f4823a03ce2d87b62512429`、Windows `10.0.19045`、dotnet SDK `9.0.311`、Core/EXE/Tests TFM 分别为 `netstandard2.1`/`net6.0`/`net9.0`。当前机器上 `F:\AI\BattleSystem-ECS-Unity` 不可用，因此 Unity 版本、`BattleDriver.cs` 和 Core DLL 版本/hash 均明确记录为 `unavailable`，没有以文档值代替实测。
 
 历史日志中的 `d2d3b61` 数据保留如下，仅用于趋势背景：
 
@@ -74,10 +74,10 @@ capture、code review 或 diff-check，因此本文不声称当前 HEAD 获得 f
 
 四份 canonical 原始文件的稳定绝对路径如下，hash 均为上一段所列值：
 
-- `C:\WorkSpace\AI\battlesystem-ecs-gate-logs\baseline-evidence-gates-20260831T170634542Z\inventory-final\windows-powershell-1.json`
-- `C:\WorkSpace\AI\battlesystem-ecs-gate-logs\baseline-evidence-gates-20260831T170634542Z\inventory-final\windows-powershell-2.json`
-- `C:\WorkSpace\AI\battlesystem-ecs-gate-logs\baseline-evidence-gates-20260831T170634542Z\inventory-final\pwsh-1.json`
-- `C:\WorkSpace\AI\battlesystem-ecs-gate-logs\baseline-evidence-gates-20260831T170634542Z\inventory-final\pwsh-2.json`
+- `F:\AI\battlesystem-ecs-gate-logs\baseline-evidence-gates-20260831T170634542Z\inventory-final\windows-powershell-1.json`
+- `F:\AI\battlesystem-ecs-gate-logs\baseline-evidence-gates-20260831T170634542Z\inventory-final\windows-powershell-2.json`
+- `F:\AI\battlesystem-ecs-gate-logs\baseline-evidence-gates-20260831T170634542Z\inventory-final\pwsh-1.json`
+- `F:\AI\battlesystem-ecs-gate-logs\baseline-evidence-gates-20260831T170634542Z\inventory-final\pwsh-2.json`
 
 安全负向验证位于 `inventory-safety-final/`：已有输出未带 `-Force`、tracked `BattleSystemECS.csproj` 即使带 `-Force`、以及非 Git 根目录缺失 commit 元数据三种情况均 exit 1；tracked 文件前后 SHA-256 不变，失败时没有生成输出。脚本只扫描并写调用者指定的单一输出文件。
 
@@ -122,7 +122,7 @@ ActiveEffect、context source/target/ability/effect/clock/sequence/owner/snapsho
 rejected item 不替换 accepted item、overflow 精确 +1。另锁定触发器递归预算的
 reason/remaining/sequence、持久 abort 与下一帧恢复；单测不写文件。
 
-完整容量证据位于 `C:\WorkSpace\AI\battlesystem-ecs-gate-logs\capacity-evidence-20260831T175006511Z`，汇总 `capacity-telemetry.json` SHA-256 为 `710164FBE9CD0F4844ACF76EE4526996ADC6D8EA976258E61A8407457CF24AE7`。真实 mode 5 完整局为 Victory 5/5、410 帧、5,303 FPS；当前 benchmark 不输出 Effect/Trigger/command/event/resolver pending 峰值，因此这些完整局字段明确为 `unavailable`，没有写成 0。仓外固定压力 harness 输入 SHA-256 `0196F1007118771F5C638434329C33DAEC8B4E7D4F93262B713578C8B811E66F`，观察到 Effect active peak 2,048（pool 800,000）、Effect event peak 2,048/8,192、Trigger input/seen peak 4,096（seen cap 8,192）、Command peak 4,096/4,096、GameplayEvent peak 8,192/8,192；后两者额外请求均拒绝且 overflow 精确为 1。压力值只表示固定合成输入，不冒充完整局峰值；resolver deferred 模式不是 public seam，pending peak 只观察为 0，不声称完成饱和测量。
+完整容量证据位于 `F:\AI\battlesystem-ecs-gate-logs\capacity-evidence-20260831T175006511Z`，汇总 `capacity-telemetry.json` SHA-256 为 `710164FBE9CD0F4844ACF76EE4526996ADC6D8EA976258E61A8407457CF24AE7`。真实 mode 5 完整局为 Victory 5/5、410 帧、5,303 FPS；当前 benchmark 不输出 Effect/Trigger/command/event/resolver pending 峰值，因此这些完整局字段明确为 `unavailable`，没有写成 0。仓外固定压力 harness 输入 SHA-256 `0196F1007118771F5C638434329C33DAEC8B4E7D4F93262B713578C8B811E66F`，观察到 Effect active peak 2,048（pool 800,000）、Effect event peak 2,048/8,192、Trigger input/seen peak 4,096（seen cap 8,192）、Command peak 4,096/4,096、GameplayEvent peak 8,192/8,192；后两者额外请求均拒绝且 overflow 精确为 1。压力值只表示固定合成输入，不冒充完整局峰值；resolver deferred 模式不是 public seam，pending peak 只观察为 0，不声称完成饱和测量。
 
 ## 语义决策表
 
