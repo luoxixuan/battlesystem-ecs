@@ -29,14 +29,6 @@ namespace BattleSystemECS.Core
         public float Damage;
     }
 
-    public class ElementalReactionEvent
-    {
-        public int EnemyId;
-        public int SourceEntityId;
-        public ElementalReactionType ReactionType;
-        public float Damage;
-    }
-
     // On-Hit / On-Crit event DTOs (Round 67 — OnCrit/OnHitTaken trigger infrastructure)
     // EnemyHit fires for every successful damage instance applied to an enemy.
     // EnemyCrit is a *companion* event that ALSO fires when the hit was a crit

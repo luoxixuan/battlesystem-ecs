@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（清理死代码）
+- 删除从未注册进 `SystemRegistry`/spec 的 `WindSystem`、`TowerMergeSystem`，以及仅被 `WindSystem` 使用的 `ComponentStore_World` 风力 SOA 字段与 Add/Remove/SetGlobal/ClearGlobal 方法。`TowerFusionTier` 属于存档格式，保留。
+- 删除无引用的 `FileLogger`（Unity 用 `UnityLogger`）、`ElementalReactionEvent` DTO、过期且不完整的 `CorpseEffectTypeEnum`（代码全用整型码，枚举只到 8）。
+- 删除无调用方的包装/旧路径：`ApplyEnemyDamageLegacy`（且忽略 `ignoreShield`）、`BehaviorTreeEvaluator.EvaluateWithEnum`、字符串版 `EnemyAISystem.InvokeExecuteAction`（枚举版保留）、`FrameScheduler.ClearFrameBindings`、`DamageResolver.MarkBoundary`、`CommandBuffer.ResetOverflowCount`、`TimeContext.EffectDeltaFor`、wave builder 的 `AddWave`/`AddWaveAt`。
+- 判定依据：Core/Systems/Engine/Tests/Program/tools 与 Unity `Assets` 全量引用扫描 + git 历史；被删代码均不在帧图可达路径上。
+
 ### 2026-10-26（收窄 GameplayTriggerRuntime 公开面）
 - 删除 `[Obsolete] GetCounter(TriggerId, ...)`：恒返回 0，调用方会静默得到错误计数；精确读取走 `GetCounter(TriggerDefinition, ...)`。
 - 删除无调用方的 `ConsumeFrame`。

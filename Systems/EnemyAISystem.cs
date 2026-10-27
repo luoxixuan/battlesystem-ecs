@@ -1021,47 +1021,6 @@ namespace BattleSystemECS.Systems
             }
         }
 
-        public void InvokeExecuteAction(int enemyId, string action)
-        {
-            if (string.IsNullOrEmpty(action))
-                return;
-
-            string baseAction = action;
-            float param = 0f;
-
-            int underscoreIdx = action.LastIndexOf('_');
-            if (underscoreIdx > 0 && underscoreIdx < action.Length - 1)
-            {
-                string suffix = action.Substring(underscoreIdx + 1);
-                if (float.TryParse(suffix, out float parsed))
-                {
-                    baseAction = action.Substring(0, underscoreIdx);
-                    param = parsed;
-                }
-            }
-
-            switch (baseAction)
-            {
-                case "move_to_target":
-                    break;
-                case "attack_melee":
-                    ExecuteMeleeAttack(enemyId);
-                    break;
-                case "ranged_attack":
-                    ExecuteRangedAttack(enemyId);
-                    break;
-                case "charge_attack":
-                    ExecuteChargeAttack(enemyId, param);
-                    break;
-                case "dodge":
-                    break;
-                case "retreat":
-                    break;
-                default:
-                    break;
-            }
-        }
-
         private void ExecuteMeleeAttack(int enemyId)
         {
             if (!store.IsEnemyAttackReady(enemyId)) return;

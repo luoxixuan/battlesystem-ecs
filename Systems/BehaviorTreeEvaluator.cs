@@ -111,21 +111,6 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Evaluate behavior tree and return both action string and precomputed enum.
-        /// Eliminates the need for StringToActionEnum() in the hot path.
-        /// </summary>
-        public static string EvaluateWithEnum(
-            BTCachedTree bt,
-            int enemyId,
-            ComponentStore store,
-            int playerId,
-            int turn,
-            out EnemyActionType precomputedEnum)
-        {
-            return EvaluateWithEnumAndAbility(bt, enemyId, store, playerId, turn, out precomputedEnum, out _);
-        }
-
-        /// <summary>
         /// Evaluate behavior tree and return action string, enum, and ability ID.
         /// Used by EnemyAISystem for enemy_cast_* action nodes.
         /// </summary>

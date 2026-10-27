@@ -63,7 +63,6 @@ namespace BattleSystemECS.Core
         public TimeContext(float rawDelta,float realDelta,float enemyDelta,float combatDelta,float effectDelta,float buildDelta,float globalDelta,int turn,int frame,PhaseContext phase,ClockId effectClock=ClockId.Combat)
         { RawDelta=rawDelta;RealDelta=realDelta;EnemyDelta=enemyDelta;CombatDelta=combatDelta;EffectDelta=effectDelta;BuildDelta=buildDelta;GlobalDelta=globalDelta;Turn=turn;Frame=frame;Phase=phase;EffectClock=effectClock; }
         public float DeltaFor(FrameTimeDomain domain) => domain switch { FrameTimeDomain.None=>0f,FrameTimeDomain.Real=>RealDelta,FrameTimeDomain.Enemy=>EnemyDelta,FrameTimeDomain.Combat=>CombatDelta,FrameTimeDomain.Effect=>EffectDelta,FrameTimeDomain.Build=>BuildDelta,FrameTimeDomain.Global=>GlobalDelta,_=>throw new ArgumentOutOfRangeException(nameof(domain),domain,"A node must declare exactly one time domain.") };
-        public float EffectDeltaFor(ClockId clock) => clock switch { ClockId.Build=>BuildDelta,ClockId.Enemy=>EnemyDelta,ClockId.Combat=>CombatDelta,ClockId.RealTime=>RealDelta,ClockId.Global=>GlobalDelta,_=>throw new ArgumentOutOfRangeException(nameof(clock)) };
     }
 
     public sealed class FrameExecutionContext

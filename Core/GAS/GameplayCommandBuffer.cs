@@ -87,7 +87,6 @@ namespace BattleSystemECS.Core.GAS
             Array.Clear(_items, count, _count - count);
             _count = count;
         }
-        public void ResetOverflowCount() { OverflowCount = 0; }
         public void ResetDiagnostics() { PeakCount = _count; OverflowCount = 0; }
     }
 

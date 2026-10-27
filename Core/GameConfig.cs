@@ -3790,28 +3790,6 @@ namespace BattleSystemECS.Config
         public float StartingGoldBonus { get; set; } = 0f;
     }
 
-    public enum CorpseEffectTypeEnum
-    {
-        Poison = 0,
-        Slow = 1,
-        Ice = 2,
-        Fire = 3,
-        Healing = 4,
-        DamageBoost = 5,
-        // Round 168 Direction 3 — Hallowed Ground: positive-feedback ground zone.
-        // Damages enemies in range every tick. (Friendly-tower buff is a planned v2 extension.)
-        HallowedGround = 6,
-        // Round 169 Direction 10 — Thorny Bramble: DoT + slow combo zone.
-        ThornyBramble = 7,
-        // Round 171 Direction 4 — Blighted Ground: continuous DoT + armor/speed debuff zone.
-        // Reuses EnemyCurseArmorReduction / EnemyCurseSpeedReduction fields set by
-        // CurseAuraSystem (Round 77). Note: these values are accumulated in the SOA arrays
-        // and are *not* reset when the enemy leaves the zone — this matches existing
-        // CurseAuraSystem semantics (zone debuffs persist for a short window until the
-        // next full reset). For v2, decay-timer fields can be added to time-bound the buff.
-        BlightedGround = 8
-    }
-
     // ── Meta Progression / Prestige Node Definition ─────────────────────
     /// <summary>
     /// One upgradeable node in the meta-progression (prestige) tree.
