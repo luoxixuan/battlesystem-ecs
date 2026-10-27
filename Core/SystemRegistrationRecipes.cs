@@ -770,7 +770,9 @@ internal static void CreateAdaptiveDifficulty(SystemRegistry registry, Component
 registry.AdaptiveDifficulty = new AdaptiveDifficultySystem(store, config);
 }
 internal static void WireAdaptiveDifficulty(SystemRegistry registry, ComponentStore store, int playerId) {
+registry.WaveSpawning!.SetAdaptiveDifficulty(registry.AdaptiveDifficulty, playerId);
 registry.AdaptiveDifficulty!.SetWaveSpawningSystem(registry.WaveSpawning!);
+store.OnEnemyKilled += (enemyId, pid) => registry.AdaptiveDifficulty!.RecordKill(pid);
 }
 internal static void BindAdaptiveDifficulty(SystemRegistry registry, FrameScheduler scheduler) {
 scheduler.PreGame.AdaptiveDifficulty = registry.AdaptiveDifficulty;

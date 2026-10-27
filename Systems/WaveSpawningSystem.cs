@@ -163,9 +163,11 @@ namespace BattleSystemECS.Systems
         }
 
         private global::BattleSystemECS.Content.Contracts.IWaveScalingState _adaptiveDifficulty;
-        public void SetAdaptiveDifficulty(global::BattleSystemECS.Content.Contracts.IWaveScalingState adaptiveDifficulty)
+        private int _adaptivePlayerId; // 难度信号归属玩家（击杀/漏怪按此 playerId 记录）
+        public void SetAdaptiveDifficulty(global::BattleSystemECS.Content.Contracts.IWaveScalingState adaptiveDifficulty, int playerId = 0)
         {
             _adaptiveDifficulty = adaptiveDifficulty;
+            _adaptivePlayerId = playerId;
         }
 
         // ── Round 120 Direction 3 — Adaptive Spawn Count (Rubber-band Spawn Pacing) ──
@@ -709,7 +711,7 @@ namespace BattleSystemECS.Systems
                     // Apply adaptive difficulty multiplier to enemy stats
                     if (_adaptiveDifficulty != null)
                     {
-                        float adaptMult = _adaptiveDifficulty.GetDifficultyMult(0); // player 0
+                        float adaptMult = _adaptiveDifficulty.GetDifficultyMult(_adaptivePlayerId);
                         scaledHealth *= adaptMult;
                         scaledMaxHealth *= adaptMult;
                         scaledDamage *= adaptMult;
@@ -1146,7 +1148,7 @@ namespace BattleSystemECS.Systems
             _pendingWaveStartCount = 0;
 
             if (!_pendingWaveComplete) return;
-            _adaptiveDifficulty?.OnWaveComplete(0, _pendingExpectedKills);
+            _adaptiveDifficulty?.OnWaveComplete(_adaptivePlayerId, _pendingExpectedKills);
             if (_pendingBreatherWaveComplete)
                 OnBreatherWaveComplete?.Invoke(_pendingCompletedWaveNumber);
             OnWaveComplete?.Invoke();

@@ -1,5 +1,17 @@
 # 更新记录 (Changelog)
 
+### 2026-10-27（击杀信号接入自适应难度）
+- **问题**：`AdaptiveDifficultySystem.RecordKill` 无调用方，难度只升不降；交互局 `GameManager` 漏怪不计 `EnemiesLeakedThisWave`（只有 BenchmarkSystem 计）；`WaveSpawningSystem` 硬编码 player 0 读写难度，压测 playerId=1 时整条回路对其无效。
+- **修复**：`WireAdaptiveDifficulty` 订阅 `store.OnEnemyKilled → RecordKill(pid)`；漏怪同样经死亡队列触发该事件，`OnWaveComplete` 以 `max(0, 死亡数 − 漏怪数)` 只计真实击杀；`GameManager.CheckEnemiesAtBottom` 递增漏怪数；`SetAdaptiveDifficulty(adaptive, playerId)` 由 installer 传入组装 playerId。
+- 测试（playerId=1）：漏怪提高难度且下一波按比例变强；经死亡队列的击杀降低难度且下一波变弱；漏怪经死亡队列移除不被计为击杀。负对照：去掉订阅 / 去掉扣除 / 恢复硬编码 0 各自使对应测试失败。
+- **行为变化**：mode 5 结局 Victory/457 → Victory/445 帧（击杀降低难度，敌人更早被清）。对照（`tools/ab-bench.ps1 -Modes 5 -Mode5Pairs 10`，两轮）：A 769.5 / B 736.0（−4.4%），A 777.5 / B 755.0（−2.9%）FPS 中位数；两侧工作负载已不同，FPS 不是同口径性能对比。mode 2/4 未运行（固定人口，不跑 WaveSpawning）。
+
+### 2026-10-26（恢复 WaveSpawning → AdaptiveDifficulty 接线）
+- **问题**：4bebc43（typed installer 迁移）丢失 `WaveSpawning.SetAdaptiveDifficulty`，`WireWaveSpawning` 为空：波次结束不再回调 `OnWaveComplete`，难度等级永不更新，出怪属性也不乘难度倍率——整条自适应难度回路在生产中失效。
+- **修复**：在 `WireAdaptiveDifficulty` 内补回反向接线（与 `WireAscension` 设置 `WaveSpawning` 的方式一致）。spec 已声明 `AdaptiveDifficulty → WaveSpawning` 依赖，反向依赖会成环，无需改 spec；重新生成 manifest/ledger 内容无变化。
+- 新测试 `AdaptiveDifficultyProductionWiringTests`：两份相同生产组装仅第 1 波漏怪数不同，断言漏怪提高难度且第 2 波出怪 MaxHealth 按难度比例放大；去掉接线时该测试失败。
+- 对照（`tools/ab-bench.ps1 -Modes 5 -Mode5Pairs 10`）：mode 5 A 788.5 / B 799.0 FPS 中位数（噪声内），结局 Victory/457 帧一致——当前配置无 `ExpectedKillCount`、mode 5 无漏怪，难度保持 1.0。
+
 ### 2026-10-26（清理死代码）
 - 删除从未注册进 `SystemRegistry`/spec 的 `WindSystem`、`TowerMergeSystem`，以及仅被 `WindSystem` 使用的 `ComponentStore_World` 风力 SOA 字段与 Add/Remove/SetGlobal/ClearGlobal 方法。`TowerFusionTier` 属于存档格式，保留。
 - 删除无引用的 `FileLogger`（Unity 用 `UnityLogger`）、`ElementalReactionEvent` DTO、过期且不完整的 `CorpseEffectTypeEnum`（代码全用整型码，枚举只到 8）。

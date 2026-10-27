@@ -506,6 +506,7 @@ namespace BattleSystemECS.Core
                 if (store.EnemyActive[enemyId] && y <= 0f)
                 {
                     store.DecrementPlayerBaseLives(playerId);
+                    store.EnemiesLeakedThisWave[playerId]++; // 自适应难度漏怪信号（与 BenchmarkSystem 一致）
                     int remaining = store.GetPlayerBaseLives(playerId);
                     logger.Log("[INFO] Enemy reached bottom! Base lives: " + remaining + " remaining.");
 

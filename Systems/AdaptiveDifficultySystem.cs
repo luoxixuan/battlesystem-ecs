@@ -97,7 +97,8 @@ namespace BattleSystemECS.Systems
             if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) return;
 
             int leaks = _store.EnemiesLeakedThisWave[playerId];
-            int kills = _killsThisWave[playerId];
+            // 漏怪同样经死亡队列触发 OnEnemyKilled（即 RecordKill），这里扣除以只计真实击杀。
+            int kills = Math.Max(0, _killsThisWave[playerId] - leaks);
 
             // 计算表现分差值：漏怪少且击杀多时降低难度，反之提高难度。
             float currentLevel = _store.AdaptiveDifficultyLevel[playerId];
