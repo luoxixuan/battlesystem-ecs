@@ -1,5 +1,13 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（触发器消费提速：gameplay-event.commit 1.5→1.07、post-death 0.85→0.41 ms/帧）
+- **去重键**：`GameplayTriggerRuntime._seen` 由 6 元 `ValueTuple` 改为 `SeenKey`（`IEquatable` + 手写哈希）；未触及帧预算与去重容量时一次 `Add` 代替 `Contains`→`Add`，触及后仍走原顺序（已见跳过 → 预算中止 → 容量中止）。
+- **类型位图**：每次 `Consume` 先算定义事件类型位图，无定义命中的事件仍占预算、进去重集合，但跳过定义循环（原循环对每个定义经接口拷贝结构体）。
+- **计数器/重置策略**：`_counters` 由 ContainsKey+TryGetValue+写入 3 次哈希减为 2 次；`_resetPolicies` 值不变时不再重写。
+- **免锁读取**：`GameplayEventQueue.GetSerialRef`（internal，仅串行提交段消费者使用）按引用读取，类型过滤不命中的事件不加锁、不拷贝；post-death 的击杀类过滤需扫全部约 20K 伤害事实，收益最大。全部调用点均在 `FrameScheduler` 串行段。
+- 新测试：无定义事件仍占帧预算；预算耗尽后已见事件跳过不中止、新事件中止一次。
+- 对照（同 cwd 交替运行）：mode 4 `gameplay-event.commit` 743–795→532–536 ms/500 帧，`post-death.gameplay-event.commit` 413–470→203–204 ms，**91–95→101–102 FPS**；`triggerAborts` 一致（1514），valid=true、0 拒绝。mode 2 噪声内持平（新 335–336 vs 旧 340–345）；mode 5 Victory 457 帧一致，FPS 持平（新 778–814 vs 旧 800–807）。
+
 ### 2026-10-26（damage.commit 去拷贝：2.3→1.7 ms/帧）
 - **事件发布按 `in` 传参**：`GameplayEventQueue.TryPublishBatch`（1/2/3 参）→ `AppendOneLocked` → `CommandBuffer.TryAdd` 全链 `in`，每个约 88 B 的 `GameplayEvent` 只在写入缓冲时拷贝一次。
 - **批次互换**：`CommitBoundary` 在全部 pending 同一边界（生产常态）时互换 `_pending` / `_commitBatch` 引用，省去约 10K 个请求的逐元素拷贝；混合边界仍走原分区循环。

@@ -42,6 +42,12 @@ namespace BattleSystemECS.Core.GAS
                 (limit == Capacity ? CommandRejection.Capacity : CommandRejection.ReservedExhausted);
         }
         public T Get(int index) => index >= 0 && index < _count ? _items[index] : throw new ArgumentOutOfRangeException(nameof(index));
+        /// <summary>按引用读取元素（不拷贝）；调用方须保证读取期间无并发写入，引用在 Remove*/Clear 后失效。</summary>
+        internal ref readonly T GetRef(int index)
+        {
+            if ((uint)index >= (uint)_count) throw new ArgumentOutOfRangeException(nameof(index));
+            return ref _items[index];
+        }
         public void Sort(Comparison<T> comparison) { if (comparison == null) throw new ArgumentNullException(nameof(comparison)); Array.Sort(_items, 0, _count, Comparer<T>.Create(comparison)); }
         public bool TryMerge(CommandBuffer<T> source, Comparison<T> comparison, bool critical = false) {
             if (source == null) throw new ArgumentNullException(nameof(source));

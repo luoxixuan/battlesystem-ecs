@@ -237,6 +237,11 @@ namespace BattleSystemECS.Core.GAS
         }
         public bool CanPublish(int count, bool critical = false) { lock (_sync) return _buffer.CanAdd(count + _reservedCriticalSlots, critical); }
         public GameplayEvent Get(int index) { lock (_sync) return _buffer.Get(index); }
+        /// <summary>
+        /// 串行提交段免锁读取：仅供无并发发布者的 SerialCommit 消费路径（触发器运行时）使用。
+        /// 引用在 Remove*/Clear 后失效，调用方读完类型过滤后应立即拷贝。
+        /// </summary>
+        internal ref readonly GameplayEvent GetSerialRef(int index) => ref _buffer.GetRef(index);
         public void Sort(System.Comparison<GameplayEvent> comparison) { lock (_sync) _buffer.Sort(comparison); }
         public bool TryMerge(GameplayEventQueue source, System.Comparison<GameplayEvent> comparison, bool critical = false)
         {

@@ -897,7 +897,7 @@ namespace BattleSystemECS.Core.GAS
         private readonly ComponentStore _store;
         private readonly GameplayEffectRuntime _effects;
         private readonly Dictionary<(int id, int source, int sourceGen, int target, int targetGen, int player, int playerGen), int> _counters = new Dictionary<(int, int, int, int, int, int, int), int>(4096);
-        private readonly HashSet<(GameplayEventType, long, int, int, int, int)> _seen = new HashSet<(GameplayEventType, long, int, int, int, int)>(8192);
+        private readonly HashSet<SeenKey> _seen = new HashSet<SeenKey>(8192);
         private readonly Dictionary<EffectId, GameplayEffectDefinition> _definitions = new Dictionary<EffectId, GameplayEffectDefinition>(4096);
         private readonly Dictionary<int, TriggerResetPolicy> _resetPolicies = new Dictionary<int, TriggerResetPolicy>(4096);
         private readonly List<(int, int, int, int, int, int, int)> _staleCounters = new List<(int, int, int, int, int, int, int)>(256);
@@ -905,6 +905,24 @@ namespace BattleSystemECS.Core.GAS
         private static readonly GameplayEventType[] _hitTypes = { GameplayEventType.HitConfirmed, GameplayEventType.DamageApplied, GameplayEventType.EffectApplied };
         private static readonly GameplayEventType[] _resourceTypes = { GameplayEventType.HealApplied, GameplayEventType.ShieldChanged, GameplayEventType.ResourceChanged };
         private static readonly GameplayEventType[] _killTypes = { GameplayEventType.KillConfirmed, GameplayEventType.ResourceChanged, GameplayEventType.DeathQueued };
+        /// <summary>去重键：替代 6 元 ValueTuple，避免逐元素 EqualityComparer 哈希组合。</summary>
+        private readonly struct SeenKey : IEquatable<SeenKey>
+        {
+            private readonly long _sequence;
+            private readonly int _type, _source, _target, _sourceGen, _targetGen;
+            public SeenKey(in GameplayEvent e) { _sequence = e.Sequence; _type = (int)e.Type; _source = e.Source.Index; _target = e.Target.Index; _sourceGen = e.Source.Generation; _targetGen = e.Target.Generation; }
+            public bool Equals(SeenKey o) => _sequence == o._sequence && _type == o._type && _source == o._source && _target == o._target && _sourceGen == o._sourceGen && _targetGen == o._targetGen;
+            public override bool Equals(object obj) => obj is SeenKey o && Equals(o);
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int h = (int)_sequence ^ (int)(_sequence >> 32);
+                    h = h * 31 + _type; h = h * 31 + _source; h = h * 31 + _target;
+                    h = h * 31 + _sourceGen; return h * 31 + _targetGen;
+                }
+            }
+        }
         public GameplayEventQueue NextEvents { get; }
         /// <summary>当前帧的持久诊断；与 NextEvents 不同，不会被触发器轮次消费。</summary>
         public GameplayEventQueue AbortEvents { get; }
@@ -981,19 +999,39 @@ namespace BattleSystemECS.Core.GAS
             if (TriggerDefinitionCount > PeakTriggerDefinitionCount)
                 PeakTriggerDefinitionCount = TriggerDefinitionCount;
             int fired = 0;
+            int definitionCount = definitions.Count;
+            // 本次调用的定义事件类型位图：无定义命中的事件只做去重/计数，跳过定义循环（结果不变）
+            uint definedTypes = 0u;
+            for (int t = 0; t < definitionCount; t++)
+            {
+                int bit = (int)definitions[t].EventType;
+                definedTypes |= (uint)bit < 32u ? 1u << bit : uint.MaxValue;
+            }
             int inputCount = events.Count;
             for (int i = 0; i < inputCount; i++)
             {
-                var e = events.Get(i);
-                if (_allowedTypes != null) { bool allowed = false; for (int a = 0; a < _allowedTypes.Length; a++) if (e.Type == _allowedTypes[a]) { allowed = true; break; } if (!allowed) continue; }
-                var dedupe = (e.Type, e.Sequence, e.Source.Index, e.Target.Index, e.Source.Generation, e.Target.Generation);
-                if (_seen.Contains(dedupe)) continue;
-                if (_frameEventsConsumed >= MaxEventsPerFrame) { Abort(e, 1, inputCount - i); break; }
-                if (_seen.Count >= SeenCapacity && !_seen.Contains(dedupe)) { Abort(e, 2, inputCount - i); continue; }
-                if (!_seen.Add(dedupe)) continue;
+                // 消费只在串行提交段运行：免锁按引用读取，类型过滤不命中的事件不拷贝
+                ref readonly var slot = ref events.GetSerialRef(i);
+                if (_allowedTypes != null) { var type = slot.Type; bool allowed = false; for (int a = 0; a < _allowedTypes.Length; a++) if (type == _allowedTypes[a]) { allowed = true; break; } if (!allowed) continue; }
+                var e = slot;
+                var dedupe = new SeenKey(e);
+                if (_frameEventsConsumed < MaxEventsPerFrame && _seen.Count < SeenCapacity)
+                {
+                    // 未触及帧上限与去重容量：一次 Add 等价于 Contains→Add
+                    if (!_seen.Add(dedupe)) continue;
+                }
+                else
+                {
+                    if (_seen.Contains(dedupe)) continue;
+                    if (_frameEventsConsumed >= MaxEventsPerFrame) { Abort(e, 1, inputCount - i); break; }
+                    if (_seen.Count >= SeenCapacity) { Abort(e, 2, inputCount - i); continue; }
+                    if (!_seen.Add(dedupe)) continue;
+                }
                 if (_seen.Count > PeakSeenCount) PeakSeenCount = _seen.Count;
                 _frameEventsConsumed++;
-                for (int t = 0; t < definitions.Count; t++)
+                int typeBit = (int)e.Type;
+                if ((uint)typeBit < 32u && (definedTypes & (1u << typeBit)) == 0u) continue;
+                for (int t = 0; t < definitionCount; t++)
                 {
                     var d = definitions[t]; if (d.EventType != e.Type) continue;
                     if (d.Threshold <= 0 || d.EffectStackDelta <= 0)
@@ -1002,12 +1040,16 @@ namespace BattleSystemECS.Core.GAS
                         PublishNext(new GameplayEvent(GameplayEventType.EffectRejected, e.Source, e.Target, NextSequence(e.Source, e.Target), reason: 7));
                         continue;
                     }
-                    if (!_resetPolicies.ContainsKey(d.Id.Value) && _resetPolicies.Count >= DefinitionCapacity)
+                    if (_resetPolicies.TryGetValue(d.Id.Value, out var knownPolicy))
+                    {
+                        if (knownPolicy != d.ResetPolicy) _resetPolicies[d.Id.Value] = d.ResetPolicy;
+                    }
+                    else if (_resetPolicies.Count >= DefinitionCapacity)
                     {
                         Abort(e, 4, inputCount - i);
                         continue;
                     }
-                    _resetPolicies[d.Id.Value] = d.ResetPolicy;
+                    else _resetPolicies[d.Id.Value] = d.ResetPolicy;
                     bool tagMatch = d.FilterTags.Count == 0;
                     for (int ft = 0; ft < d.FilterTags.Count; ft++) if (d.FilterTags[ft].Equals(e.Tag)) { tagMatch = true; break; }
                     if (!tagMatch || (!d.EffectTag.Equals(default(TagId)) && !d.EffectTag.Equals(e.Tag))) { PublishNext(new GameplayEvent(GameplayEventType.EffectRejected, e.Source, e.Target, NextSequence(e.Source, e.Target), 1)); continue; }
@@ -1033,8 +1075,7 @@ namespace BattleSystemECS.Core.GAS
                     }
                     int playerGen = d.Scope == TriggerScope.PerPlayer ? _store.GetEntityHandle(player).Generation : 0;
                     var key = (id: d.Id.Value, source, sourceGen, target, targetGen, player, playerGen);
-                    if (!_counters.ContainsKey(key) && _counters.Count >= MaxCounterEntries) { Abort(e, 3, events.Count - i); continue; }
-                    _counters.TryGetValue(key, out int old); int total = old + 1; int crossings = d.Mode == TriggerMode.EveryN ? (total / d.Threshold) - (old / d.Threshold) : (old < d.Threshold && total >= d.Threshold ? 1 : 0);
+                    if (!_counters.TryGetValue(key, out int old) && _counters.Count >= MaxCounterEntries) { Abort(e, 3, events.Count - i); continue; } int total = old + 1; int crossings = d.Mode == TriggerMode.EveryN ? (total / d.Threshold) - (old / d.Threshold) : (old < d.Threshold && total >= d.Threshold ? 1 : 0);
                     _counters[key] = d.Mode == TriggerMode.EveryN && crossings > 0 && !d.PreserveRemainder ? 0 : (d.Mode == TriggerMode.EveryN && d.PreserveRemainder ? total % d.Threshold : total);
                     if (_counters.Count > PeakCounterCount) PeakCounterCount = _counters.Count;
                     for (int k = 0; k < crossings; k++) { if (!_definitions.TryGetValue(d.Effect, out var effect)) { Rejections++; PublishNext(new GameplayEvent(GameplayEventType.EffectRejected, e.Source, e.Target, NextSequence(e.Source, e.Target), 3)); continue; } var effectTarget = d.EffectTarget == EffectTargetPolicy.Target ? e.Target : e.Source; int effectEventIndex = _effects.Events.Count; bool applied = _effects.TryApply(d.Effect, effect, e.Source, effectTarget, out _, d.EffectStackDelta, float.NaN, float.NaN, e.OwnerPlayerId, e.ProvenanceId); if (applied) fired++; if (_effects.Events.Count > effectEventIndex) { var generated = _effects.Events.Get(effectEventIndex); PublishNext(generated); _effects.Events.RemoveAt(effectEventIndex); } }

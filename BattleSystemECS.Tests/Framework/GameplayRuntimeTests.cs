@@ -751,6 +751,33 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
+        public void UnmatchedEventsSpendBudgetAndSeenEventsSkipWithoutAbortAfterBudget()
+        {
+            var store = new ComponentStore();
+            int sourceId = store.AddEnemy(0f, 0f, 1f, 10f, 10f, 1f, 1, 1);
+            int targetId = store.AddEnemy(1f, 0f, 1f, 10f, 10f, 1f, 1, 1);
+            var runtime = new GameplayTriggerRuntime(store, store.GameplayEffectsRuntime, 8, 2);
+            var source = store.GetEntityHandle(sourceId);
+            var target = store.GetEntityHandle(targetId);
+            var definitions = new[] { new TriggerDefinition(new TriggerId(0), GameplayEventType.HitConfirmed, new EffectId(0), new ConsumerId(0)) };
+            var queue = new GameplayEventQueue(4);
+            // DamageApplied 没有对应定义，但仍占用帧预算并进入去重集合
+            Assert.True(queue.TryPublish(new GameplayEvent(GameplayEventType.DamageApplied, source, target, 1L)));
+            Assert.True(queue.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, source, target, 1L)));
+            runtime.Consume(queue, definitions);
+            Assert.Equal(2, runtime.SeenCount);
+            Assert.Equal(0, runtime.LoopAborts);
+
+            // 预算耗尽后：已见事件跳过且不中止；新事件触发一次中止
+            runtime.Consume(queue, definitions);
+            Assert.Equal(0, runtime.LoopAborts);
+            Assert.True(queue.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, source, target, 2L)));
+            runtime.Consume(queue, definitions);
+            Assert.Equal(1, runtime.LoopAborts);
+            Assert.Equal(2, runtime.SeenCount);
+        }
+
+        [Fact]
         public void InvalidEffectDefinitionIsRejectedAtRegistration()
         {
             var store = new ComponentStore();
