@@ -241,7 +241,23 @@ namespace BattleSystemECS.Core.GAS
         /// 串行提交段免锁读取：仅供无并发发布者的 SerialCommit 消费路径（触发器运行时）使用。
         /// 引用在 Remove*/Clear 后失效，调用方读完类型过滤后应立即拷贝。
         /// </summary>
-        internal ref readonly GameplayEvent GetSerialRef(int index) => ref _buffer.GetRef(index);
+        internal ref readonly GameplayEvent GetSerialRef(int index)
+        {
+            AssertNoConcurrentPublisher();
+            return ref _buffer.GetRef(index);
+        }
+
+        /// <summary>
+        /// Debug 构建的串行前提检查：免锁读取时若其他线程正持有队列锁，说明存在并发发布者，立即抛出。
+        /// 只能捕获读写实际重叠的瞬间（不是静态证明），但足以让测试中误把串行读放进并行段的改动失败。
+        /// </summary>
+        [System.Diagnostics.Conditional("DEBUG")]
+        private void AssertNoConcurrentPublisher()
+        {
+            if (!System.Threading.Monitor.TryEnter(_sync))
+                throw new System.InvalidOperationException("GameplayEventQueue.GetSerialRef 与并发发布者重叠：只能在无并发写入的串行提交段调用");
+            System.Threading.Monitor.Exit(_sync);
+        }
         public void Sort(System.Comparison<GameplayEvent> comparison) { lock (_sync) _buffer.Sort(comparison); }
         public bool TryMerge(GameplayEventQueue source, System.Comparison<GameplayEvent> comparison, bool critical = false)
         {

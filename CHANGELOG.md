@@ -1,5 +1,10 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（串行免锁读取的 Debug 前提检查）
+- `GameplayEventQueue.GetSerialRef`（触发器运行时在 SerialCommit 段免锁按引用读取）在 Debug 构建下先 `Monitor.TryEnter` 队列锁：若另一线程正持有（存在并发发布者）立即抛出 `InvalidOperationException`。只能捕获读写实际重叠的瞬间而非静态证明，但足以让把串行读误放进并行段的改动在测试中失败；Release 构建经 `[Conditional("DEBUG")]` 移除，零开销。
+- 新测试：无并发时按引用读出发布的事件；Debug 下另一线程持有队列锁时调用抛出，释放后恢复正常。
+- 对照（`tools/ab-bench.ps1`）：mode 2/4 持平；mode 5 Victory 457 帧一致，12 对交替中位数 809.5 vs 787.5 FPS（噪声内，6 对时方向相反）。
+
 ### 2026-10-26（容量丢弃在压测之外可见：[CAPACITY] 日志）
 - **问题**：Resolver 请求溢出拒绝、事件队列溢出与触发器循环中止只在 mode 2/4 的 `Capacity:` 行或显式 `GameplayObservation.Capture` 中可见，正常游戏丢弃战斗工作时无任何提示。
 - **改动**：`FrameScheduler.Tick` 帧末经 `CapacityDropWatch` 读取上述单调计数并与上一帧比较（几次字段读取、无分配，不改帧图拓扑），有新增时发出 `CapacityDropped(CapacityDropReport)`；`GameManager` 订阅并以 `[CAPACITY]` 前缀限频记录（首次立即，之后每 600 帧最多一条，汇总期间累计值）。
