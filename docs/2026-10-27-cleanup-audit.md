@@ -327,6 +327,56 @@ The 16 properties that App. C excluded because of in-class mentions were inspect
 - **B3** adds V-07 (`TowerStealthSystem`); retiring it must happen together with or after V-04 (`SuicideBombSystem` is its only consumer).
 - **B1-doc follow-up:** `HeroSystem.DeployHero` comment ("Called from TowerPlacementSystem") is misleading (F-07).
 
+## 10. Unity consumer audit (2026-10-27, read-only)
+
+Scope: `F:\AI\BattleSystem-ECS-Unity` (own git repo, HEAD `14bb123`), read-only. The Unity Editor was not opened (another session was running Unity tests/builds). No file in the Unity project was changed. Core under test: `master` at `485cd29`.
+
+### 10.1 Static compile check of Unity runtime scripts against current Core
+
+Method: the 30 scripts under `Assets/Scripts` (assembly `BattleSystemECS.Unity`) were compiled with the .NET SDK's Roslyn `csc` against Unity's own reference set (`Editor/Data/NetStandard/ref/2.1.0/netstandard.dll`, the 87 `Managed/UnityEngine/*.dll` modules, and `Library/ScriptAssemblies/{UnityEngine.UI, Unity.RenderPipelines.Core.Runtime, Unity.RenderPipelines.Universal.Runtime}.dll`), defines `UNITY_2022_3_OR_NEWER;UNITY_STANDALONE;UNITY_STANDALONE_WIN`.
+
+| Run | Core reference | Result |
+|---|---|---|
+| Control | `Assets/Plugins/BattleSystemECS.Core.dll` (2026-06-10) | **0 errors** — the harness reproduces the Unity runtime build |
+| Current | `BattleSystemECS.Core.dll` + `BattleSystemECS.Engine.dll` built from `master` | **3 errors**, all `CS1061 'FrameScheduler' does not contain a definition for 'Spawning'` at `Assets/Scripts/BattleDriver.cs:246, 473, 484` |
+
+- `FrameScheduler.Spawning` became `internal` in `4bebc43`. Unity uses it to detach/re-attach `WaveSpawning` between waves (its wave-pacing takeover).
+- **No other Core API used by Unity runtime scripts is missing**; in particular none of the removals in `0a7f21a`/`6621ab3` and none of the V-candidates in this report is referenced by Unity runtime code.
+- Not covered: `Assets/Tests/PlayMode` (21 files; needs NUnit/Test Framework references) and `Assets/Editor` (needs UnityEditor). Their Core usage was checked by identifier only (e.g. `TowerInfoPanelLifecycleTests.cs:187` writes `TowerKillCount`).
+
+### 10.2 Runtime compatibility (static reading)
+
+| Finding | Evidence | Consequence |
+|---|---|---|
+| Unity composes the game through the registry facades, not the installer | `BattleDriver.cs:96-107`: `new SystemRegistry()`, `CreateAll(…, 1, …)`, `WireDependencies(_store, 1)`, `new FrameScheduler(_store, _config, _eventBus)`, `AssignToGroups(_scheduler)`; then `_scheduler.Tick` at :215 | With current Core the first `Tick` throws `InvalidOperationException("Frame graph composition must be built, validated, and sealed before the first Tick.")` (`FrameScheduler.RequireFrameGraph`). `SealGraphComposition` is `internal`; only `ProductionSystemInstaller.Install` seals. Unity must move to `new ProductionSystemInstaller().Install(...)` |
+| Plugin assembly reference list | `Assets/Scripts/BattleSystemECS.Unity.asmdef`: `overrideReferences: true`, `precompiledReferences: ["BattleSystemECS.Core.dll"]` | A post-split Core needs `BattleSystemECS.Engine.dll` copied to `Assets/Plugins` **and** added to `precompiledReferences` |
+| Reflection on Core field/property names | `UnityEventBus.cs:118-…` looks up `ComponentStore` fields `EnemyTypeName`, `EnemyType`, `EnemyMonsterType`, `EnemyClass`, `EnemyName`; `BattleDriver.cs:537-548` looks up `GameConfig.Levels`, `LevelConfig.WaveCount`, `LevelConfig.Waves` | These names are part of the Unity contract even though no compiler checks them → R-17 |
+| Enum surfaced in UI | `TowerBuildMenu.cs:147` builds the tower menu from `Enum.GetValues(typeof(TowerType))` | Every `TowerType` member is user-visible in Unity; removing or reordering members changes the UI → R-18 |
+| Config loading path | `BattleDriver.cs:88` `GameConfigLoader.LoadConfig` (legacy parser) | Paths are resolved against the process working directory (Unity project root in the Editor), see 10.3 |
+
+### 10.3 Data distribution chain
+
+| Location (Unity repo) | Content | Relation to this repository |
+|---|---|---|
+| `game_config.json` (project root) | 169,800 bytes, mtime 2026-06-20 | **Stale** copy of this repo's `game_config.json` (269,625 bytes). This is what Core's loader reads in the Editor |
+| `Data/Configs/` | 473 files | Flattened copy of this repo's whole `Data/` tree: 51 files identical to `Data/Configs`, `skills.json` differs, 421 files are Unity-only names that correspond to this repo's `Data/Monsters`, `Data/Towers`, `Data/Levels` and `game_config.json`. There is no `Data/Skills` directory |
+| `Data/Saves/checkpoint.json` | Written by `SaveSystem` (E-08) in the Editor working directory | Confirms the checkpoint write also happens in Unity |
+| `Assets/StreamingAssets/` | 473 data files (+ .meta) | Read directly by Unity scripts: `level_1.json` (`BattleDriver.cs:560, 622`, `NextWavePreview.cs:163`, `WaveProgressOverlay.cs:159`) and `game_config.json` MonsterTypes (`SyncMonsterTypesFromJson`; Unity's own AGENTS.md notes 763 bytes of trailing garbage in that file) |
+
+No sync script exists in either repository (`Tools/` contains only `check_braces.py`); the DLL and data copies are manual and stale. This resolves part of E-09: `Data/Monsters`/`Data/Towers` files reach Unity only as flattened copies that **no Unity script and no Core loader reads**; their authoring purpose (if any) is still unknown.
+
+### 10.4 Effect on classifications
+
+| ID | Change |
+|---|---|
+| R-01 | Strengthened: the registry facades are also Unity's (current) composition path |
+| R-17 (new) | Keep the reflected names `ComponentStore.EnemyTypeName` and `GameConfig.Levels` / `LevelConfig.WaveCount` / `LevelConfig.Waves` |
+| R-18 (new) | Keep `TowerType` members and order (Unity tower menu) |
+| F-04 | Expanded: Unity is not runnable on current Core — 3 compile errors (`FrameScheduler.Spawning`) and an unsealed-graph exception on the first `Tick`; needs Engine DLL + asmdef change, `ProductionSystemInstaller.Install`, and a supported API for pausing wave spawning |
+| E-01, V-02, V-05, V-08 | Unity runtime-script consumer check is now compile-verified (not just identifier search); external consumers other than Unity remain unknown |
+| E-09 | Partially resolved (10.3) |
+| E-14 (new) | Legacy execution path: `FrameSchedulerExecutionMode.Legacy` → `FrameScheduler.TickLegacy` (`Core/FrameScheduler.cs:281`, 79 lines) plus the 11 `*Group.Execute` methods. Production and Unity default to `Graph`; only `FrameGraphTests.cs:332-364` select `Legacy`, as graph-vs-legacy equivalence checks (M5 verification tooling). Exit condition (M5 declared complete) unmet → insufficient evidence |
+
 ## Appendices
 
 Appendix tables are generated from the scan outputs at HEAD `3b10ebc`; Appendix B2 from the working tree. File paths are relative to the repository root.
