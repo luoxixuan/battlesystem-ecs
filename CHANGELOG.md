@@ -1,5 +1,9 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（A/B 压测脚本 tools/ab-bench.ps1）
+- 新增 `tools/ab-bench.ps1`：以 `-Base`（默认 HEAD）经临时 git worktree 构建 Release 产物 A、当前工作树构建 B，均从仓库根目录（同一 cwd、同一 `game_config.json`）按 A,B / B,A 交替运行 mode 2/4/5；输出各 mode FPS 中位数与逐次值、mode 2/4 `valid=FALSE` 标注、mode 5 结局/帧数、mode 4 逐节点耗时中位数及差值。结束时移除临时 worktree。
+- 把此前每轮手工执行的交替对照固化为一条命令，`AGENTS.md` §7.1 记录用法与 mode 5 噪声判断口径（≥8 对中位数）。
+
 ### 2026-10-26（串行免锁读取的 Debug 前提检查）
 - `GameplayEventQueue.GetSerialRef`（触发器运行时在 SerialCommit 段免锁按引用读取）在 Debug 构建下先 `Monitor.TryEnter` 队列锁：若另一线程正持有（存在并发发布者）立即抛出 `InvalidOperationException`。只能捕获读写实际重叠的瞬间而非静态证明，但足以让把串行读误放进并行段的改动在测试中失败；Release 构建经 `[Conditional("DEBUG")]` 移除，零开销。
 - 新测试：无并发时按引用读出发布的事件；Debug 下另一线程持有队列锁时调用抛出，释放后恢复正常。

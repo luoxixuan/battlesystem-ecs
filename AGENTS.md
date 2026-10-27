@@ -291,7 +291,7 @@ mode2/mode4/mode5，未运行项不得标记为通过。mode 2/4 合同是固定
 （开局高 HP、移速 0、不补波、铺满 20 座开火塔；玩家每帧最多命中 `Player.MaxTargetsPerFrame` 个目标）；人口漂移则 `valid=FALSE`，该次 FPS 不能当 10K 负载。测量帧内 Damage/Resource Resolver 有任何容量拒绝（`Capacity:` 行 `damageDropped`/`resourceDropped` >0）同样 `valid=FALSE`；`triggerAborts` 是触发器循环防护（`MaxEventsPerFrame`）中止次数，仅报告、不计入有效性；预算默认 = 两个 Resolver 事件容量 + 链式队列容量，且只计入有定义订阅的事件，正常战斗应为 0，非 0 说明触发链失控或容量合同被突破。Resolver 容量合同：事件容量 = 单请求最多事实数 × `MaxPendingRequests` + 关键预留，改任一常量须在同一 commit 附 mode 4/5 证据。mode 5 是完整局观察（8 座塔，每波 EnemyCount ×3）。
 
 mode 4 报告末尾按耗时降序打印生产 FrameGraph 逐节点耗时（`node <id> ms (%) calls=`，<0.1% 合并为一行），用于定位热点；计时仅在压测中经 `FrameScheduler.EnableFrameGraphNodeTiming()` 开启。
-mode 5 墙钟很短（~0.5s），FPS 对工作目录所在磁盘与机器负载敏感：新旧对比须用同一 cwd 交替运行两份构建产物。
+mode 5 墙钟很短（~0.5s），FPS 对工作目录所在磁盘与机器负载敏感：新旧对比须用同一 cwd 交替运行两份构建产物。`pwsh -File tools/ab-bench.ps1 [-Base <ref>] [-Modes 2,4,5] [-Pairs N] [-Mode5Pairs N]` 自动完成：临时 worktree 构建基线、按 A,B/B,A 交替运行、输出各 mode FPS 中位数、valid=FALSE 标注、mode 5 结局/帧数与 mode 4 逐节点中位数对比；mode 5 单次差异 ±4% 以内属常见噪声，应以 ≥8 对的中位数判断。
 
 M8 fresh evidence 必须在 evidence 首写前捕获 HEAD/branch/index/patch/status/untracked hashes，
 并在全部命令后复核仓库状态未漂移。mode 2/4/5 的 `DEFERRED` 和 Unity 的
