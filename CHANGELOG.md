@@ -1,5 +1,10 @@
 # 更新记录 (Changelog)
 
+### 2026-10-27（退役从未构造的独立系统 B4a）
+- 产品决策为退役：`HitTriggerSystem`、`EnemyCloneSystem`、`EnemyTeleportSystem`、`PortalSystem` 无任何构造点、`SystemRegistry` 属性、recipe、spec 条目或 Unity 引用（`TowerMergeSystem` 此前已随 `6621ab3` 删除）。删除 4 个源文件（641 行）；`SimulationRngGuardTests` 的文件名列表去掉对应 3 项（未放宽）。审计 V-05 S-a。
+- 保留（后续）：`EnemyClone*` / `EnemyIsClone` / `EnemyTeleportCooldown` 等仅这些系统使用的 store 数组本批未动，留待 store 清理批次；未改 `game_config.json`/`GameConfig`。
+- 验证：Engine/Core/EXE/Tests 构建 0 warning 0 error；聚焦 `--filter` 测试（Golden/Replay/DeterminismSoak/FrameGraph/SystemRegistry/GameplayStorageProfile/Installer/FrameScheduler/ParallelCollect 等）通过，摘要未变；Unity 运行时脚本 Roslyn 编译检查仍为基线 3 个 `FrameScheduler.Spawning` 错误。完整测试套件（门禁 4）因内存限制未运行；mode 2/4/5 压测按计划延期。
+
 ### 2026-10-27（退役无效果的 Fear / SuicideBomb / TowerStealth 系统 B3）
 - 产品决策为退役而非接线：`FearSystem`、`SuicideBombSystem`、`TowerStealthSystem` 每帧运行但输入（`TowerFear*`、`EnemyIsSuicide`/`EnemySuicide*`、`TowerStealthType`）无任何生产写入方、无配置字段、无 JSON 键，永远不可能产生效果；`FearSystem` 另有每帧 100,000 槽串行扫描。审计 V-03 / V-04 / V-07。
 - 走注册链删除：spec 3 个条目、`SystemRegistrationRecipes` 的 Create/Wire/Bind、`SystemRegistry` 属性、`AIGroup`/`CombatGroup` 槽位与帧绑定、`FrameSystemGraph` 4 个节点（`ai.fear.prepare`/`ai.fear.update`/`combat.suicide-bomb.update`/`combat.stealth.update`）及 `FrameBindingFacts`/`FrameAccessReviewCatalog`/`FrameAdapterBindingCatalog` 条目；重新生成 manifest 与 nullable ledger；删除 3 个系统源文件（659 行）与仅它们使用的 `ITowerTargetingView` 接口、`FrameResource.SuicideExplosionPrepared`。
