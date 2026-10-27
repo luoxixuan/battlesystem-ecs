@@ -995,8 +995,6 @@ namespace BattleSystemECS.Core.GAS
             int generation = _store.GetEntityHandle(ownerPlayerId).Generation;
             return _counters.TryGetValue((definition.Id.Value, 0, 0, 0, 0, ownerPlayerId, generation), out int value) ? value : 0;
         }
-        [Obsolete("请使用带 TriggerDefinition 的精确读取重载")]
-        public int GetCounter(TriggerId trigger, EntityHandle source, EntityHandle target = default(EntityHandle)) => 0;
 
         public int Consume(GameplayEventQueue events, IReadOnlyList<TriggerDefinition> definitions, bool clear = false)
         {
@@ -1089,7 +1087,8 @@ namespace BattleSystemECS.Core.GAS
             }
             if (clear) events.RemovePrefix(inputCount); return fired;
         }
-        public int ConsumeOnly(GameplayEventQueue events, IReadOnlyList<TriggerDefinition> definitions, bool clear, params GameplayEventType[] allowed)
+        /// <summary>任意类型集合的过滤消费（params 每次调用分配数组）；生产路径只用下方缓存数组的 2/3 类型重载。</summary>
+        internal int ConsumeOnly(GameplayEventQueue events, IReadOnlyList<TriggerDefinition> definitions, bool clear, params GameplayEventType[] allowed)
         {
             if (events == null) return 0;
             var previous = _allowedTypes; _allowedTypes = allowed;
@@ -1140,20 +1139,6 @@ namespace BattleSystemECS.Core.GAS
             if (_counters.Count == 0) return;
             _staleCounters.Clear(); foreach (var pair in _counters) if (pair.Key.source == entityId || pair.Key.target == entityId || pair.Key.player == entityId) _staleCounters.Add(pair.Key);
             for (int i = 0; i < _staleCounters.Count; i++) _counters.Remove(_staleCounters[i]);
-        }
-        public int ConsumeFrame(GameplayEventQueue damageEvents, GameplayEventQueue resourceEvents, IReadOnlyList<TriggerDefinition> definitions)
-        {
-            int total = 0;
-            for (int round = 0; round < 8; round++)
-            {
-                int before = NextEvents.Count;
-                total += Consume(damageEvents, definitions);
-                total += Consume(resourceEvents, definitions);
-                total += Consume(NextEvents, definitions, true);
-                if (before == 0 && NextEvents.Count == 0) break;
-            }
-            if (NextEvents.Count > 0) { var trigger = NextEvents.Get(NextEvents.Count - 1); Abort(trigger, 4, NextEvents.Count); NextEvents.Clear(); }
-            return total;
         }
         public int ConsumeNextRounds(IReadOnlyList<TriggerDefinition> definitions)
         {

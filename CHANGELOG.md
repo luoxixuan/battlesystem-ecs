@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（收窄 GameplayTriggerRuntime 公开面）
+- 删除 `[Obsolete] GetCounter(TriggerId, ...)`：恒返回 0，调用方会静默得到错误计数；精确读取走 `GetCounter(TriggerDefinition, ...)`。
+- 删除无调用方的 `ConsumeFrame`。
+- `ConsumeOnly(..., params GameplayEventType[])`（每次调用分配数组）由 public 改为 internal；生产与外部调用走缓存过滤数组的 2/3 类型重载，测试经 InternalsVisibleTo 仍可用单类型形式。
+- `GameplayEvent` 多构造器合并未做：涉及大量调用点、收益有限。Unity 工程不引用 GAS 命名空间，不受影响。
+
 ### 2026-10-26（修复 TowerSynergySystem 经静态事件泄漏 store：测试宿主峰值 ~47→39 GB）
 - **问题**：`ComponentStore.OnTowerEntityInvalidated` 是静态事件，`TowerSynergySystem` 构造时订阅且从不退订——静态事件永久根引用每个协同系统及其 store（约 250 MB：数百个 MAX_ENTITIES 大小的数组）。每个构建生产组合的测试都泄漏一个 store，测试宿主私有内存峰值约 47 GB，逼近本机约 65 GB 提交上限，其他进程占内存时触发 CLR 致命错误。同时一个 store 销毁塔会误清其他 store 中协同系统的缓存。
 - **修复**：改为 store 实例事件，`TowerSynergySystem` 订阅自身 store；system 与 store 同生命周期，可一并回收。
