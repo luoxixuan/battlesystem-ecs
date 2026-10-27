@@ -234,9 +234,11 @@ namespace BattleSystemECS.Tests.Framework
             {
                 var source = new EntityHandle(1, 1);
                 var target = new EntityHandle(2, 1);
-                for (int i = 0; i < 8192; i++)
+                int capacity = store.DamageResolver.Events.Capacity;
+                Assert.Equal(DamageResolver.MaxPendingRequests * DamageResolver.MaxEventsPerRequest + DamageResolver.ReservedCriticalEvents, capacity);
+                for (int i = 0; i < capacity; i++)
                     Assert.True(store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.DamageApplied, source, target, i), true));
-                Assert.False(store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.DamageApplied, source, target, 8193), true));
+                Assert.False(store.DamageResolver.Events.TryPublish(new GameplayEvent(GameplayEventType.DamageApplied, source, target, capacity + 1), true));
                 Assert.Equal(1, store.DamageResolver.EventOverflowCount);
                 Assert.Equal(CommandRejection.CriticalCapacity, store.DamageResolver.LastEventRejection);
             }

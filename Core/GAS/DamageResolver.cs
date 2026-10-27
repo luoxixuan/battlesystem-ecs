@@ -17,9 +17,14 @@ namespace BattleSystemECS.Core.GAS
     public sealed class DamageResolver
     {
         public const int MaxProvenanceDepth = 4;
-        public const int MaxPendingRequests = 4096;
+        // 容量合同：事件容量 = 单请求最多事实数 × pending 上限 + 关键预留，满 pending 批次提交不会吃掉死亡结算预留。
+        // 证据：mode 4（10K 全在玩家射程）每帧约 10,020 个伤害请求；4096 时每帧溢出 5924。
+        public const int MaxPendingRequests = 16384;
+        public const int MaxEventsPerRequest = 3; // HitConfirmed + DamageApplied + 致死 DeathQueued
+        public const int ReservedCriticalEvents = 64;
+        public const int EventCapacity = MaxPendingRequests * MaxEventsPerRequest + ReservedCriticalEvents;
         private readonly ComponentStore _store;
-        public GameplayEventQueue Events { get; } = new GameplayEventQueue(8192, 64);
+        public GameplayEventQueue Events { get; } = new GameplayEventQueue(EventCapacity, ReservedCriticalEvents);
         public int EventOverflowCount => Events.OverflowCount;
         public CommandRejection LastEventRejection => Events.LastRejection;
         private int _eventPublicationFailed;

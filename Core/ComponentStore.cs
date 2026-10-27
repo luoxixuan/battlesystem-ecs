@@ -599,7 +599,7 @@ namespace BattleSystemECS.Core
         }
 
         /// <summary>
-        /// 死亡预留按当前事件槽能装下的最大前缀切分。10K 击杀超过 8192 槽时先抽干能装下的，其余留到下一帧。
+        /// 死亡预留按当前事件槽能装下的最大前缀切分。一帧击杀超过剩余事件槽时先抽干能装下的，其余留到下一帧。
         /// 整批失败会让敌人永远活着，压测 FPS 从数千掉到一两百。
         /// </summary>
         private bool TryPrepareDeathBatch()

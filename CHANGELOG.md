@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（Damage/Resource Resolver 容量按证据提升）
+- **容量合同**：`MaxPendingRequests` 4096→16384（两个 Resolver）；事件容量 = 单请求最多事实数 × pending + 64 关键预留：Damage 3×16384+64=**49216**（Hit+Damage+致死 DeathQueued），Resource 2×16384+64=**32832**（资源事实+致死）。满 pending 批次提交不会吃掉死亡结算预留。常量 `MaxEventsPerRequest` / `ReservedCriticalEvents` / `EventCapacity` 公开；`ResolverEventCapacityIsObservable` 改按公式断言。
+- **证据**（同 cwd 交替运行新旧产物）：mode 4 旧容量 `damageDropped=5924.4/帧`、`resourceDropped=82678`、`valid=FALSE`（100–105 FPS 未完成全部战斗工作）；新容量 0 拒绝、`valid=true`、**86–87 FPS**（`damage.commit` 0.9→2.3 ms/帧，提交约 10K 次命中）。mode 2 持平（~334 vs ~347 FPS）；mode 5 Victory 457 帧一致，FPS 噪声内持平（~770 vs ~760）。
+- **内存**：每个 `ComponentStore` 的 Resolver 事件数组约 1.4 MB→7.2 MB（每事件约 88 B）；测试总时长 3.18→3.33 min。
+- **mode 2/4 `triggerAborts`（仅报告）**：`GameplayTriggerRuntime.MaxEventsPerFrame=8192` 是触发器循环防护；mode 4 每帧约 3 次中止，旧容量下同样存在（1500 vs 1514），不计入 `valid`，未改动，需单独决策。
+
 ### 2026-10-26（mode 2/4 容量拒绝计入有效性）
 - **Capacity 行**：mode 2/4 报告测量窗口内（不含预热）Damage/Resource Resolver 的 `RequestQueueOverflow` 拒绝数（覆盖 deferred pending 溢出与事件队列满回滚）及事件队列溢出数；任一拒绝 >0 即 `valid=FALSE`。
 - **证据（旧容量 pending 4096 / events 8192）**：mode 4 `damageDropped=5924.4/帧`（玩家 5904 + 塔全部约 20），`resourceDropped=82678`（随机事件对 10K 敌人群体治疗的帧，每帧约 5904）→ `valid=FALSE`；mode 2 无拒绝、`valid=true`。mode 5 完整局 damage pending 峰值 65。

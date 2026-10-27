@@ -230,7 +230,7 @@ namespace BattleSystemECS.Systems
         // 测量窗口起点的容量拒绝计数（预热帧不计入）。RequestQueueOverflow 同时覆盖
         // deferred pending 溢出与事件队列满导致的回滚拒绝。
         private long _damageCapacityRejections0, _resourceCapacityRejections0;
-        private int _damageEventOverflow0, _resourceEventOverflow0;
+        private int _damageEventOverflow0, _resourceEventOverflow0, _triggerAborts0;
 
         private void BeginCapacityWindow()
         {
@@ -238,6 +238,7 @@ namespace BattleSystemECS.Systems
             _resourceCapacityRejections0 = store.ResourceResolver.GetRejectionCount(ResourceRejectionReason.RequestQueueOverflow);
             _damageEventOverflow0 = store.DamageResolver.EventOverflowCount;
             _resourceEventOverflow0 = store.ResourceResolver.EventOverflowCount;
+            _triggerAborts0 = store.GameplayTriggersRuntime.LoopAborts;
         }
 
         private void WriteFixedPopulationReport(int expected, int frames, double msTotal)
@@ -249,11 +250,13 @@ namespace BattleSystemECS.Systems
             long resourceDropped = store.ResourceResolver.GetRejectionCount(ResourceRejectionReason.RequestQueueOverflow) - _resourceCapacityRejections0;
             int damageEventOverflow = store.DamageResolver.EventOverflowCount - _damageEventOverflow0;
             int resourceEventOverflow = store.ResourceResolver.EventOverflowCount - _resourceEventOverflow0;
+            int triggerAborts = store.GameplayTriggersRuntime.LoopAborts - _triggerAborts0;
+            // triggerAborts 是触发器循环防护（MaxEventsPerFrame）的中止次数，仅报告，不计入有效性。
             bool capacityValid = damageDropped == 0 && resourceDropped == 0;
             bool valid = populationValid && capacityValid;
             double fps = 1000.0 / (msTotal / frames);
             Console.WriteLine($"[BENCHMARK] Contract: fixed-population {expected} alive × {frames} frames (high-HP, speed 0, no extra waves)");
-            Console.WriteLine($"[BENCHMARK] Capacity: damageDropped={damageDropped} ({damageDropped / (double)frames:F1}/frame) resourceDropped={resourceDropped} damageEventOverflow={damageEventOverflow} resourceEventOverflow={resourceEventOverflow} pendingCap={DamageResolver.MaxPendingRequests} eventCap={store.DamageResolver.Events.Capacity}");
+            Console.WriteLine($"[BENCHMARK] Capacity: damageDropped={damageDropped} ({damageDropped / (double)frames:F1}/frame) resourceDropped={resourceDropped} damageEventOverflow={damageEventOverflow} resourceEventOverflow={resourceEventOverflow} triggerAborts={triggerAborts}(loop-guard, info) pendingCap={DamageResolver.MaxPendingRequests} eventCap={store.DamageResolver.Events.Capacity}");
             Console.WriteLine($"[BENCHMARK] Population: min={_populationMin} max={_populationMax} end={_populationEnd} kills={store.TotalKills} DeathResolve={store.DeathResolveCount} valid={(valid ? "true" : "FALSE")}");
             Console.WriteLine($"[BENCHMARK] Throughput: {fps:F0} FPS  ({msTotal/frames:F2} ms/frame)");
             if (!populationValid)

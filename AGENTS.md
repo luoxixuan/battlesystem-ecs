@@ -288,7 +288,7 @@ Init → BuildPhase → WavePhase → Intermission → WavePhase → ... → Lev
 
 性能压测结果、相对门禁和延期状态以最新 fresh evidence 为准；当前迁移轮次暂不运行
 mode2/mode4/mode5，未运行项不得标记为通过。mode 2/4 合同是固定人口吞吐：测量帧内目标数量必须钉住
-（开局高 HP、移速 0、不补波、铺满 20 座开火塔）；人口漂移则 `valid=FALSE`，该次 FPS 不能当 10K 负载。测量帧内 Damage/Resource Resolver 有任何容量拒绝（`Capacity:` 行 `damageDropped`/`resourceDropped` >0）同样 `valid=FALSE`。mode 5 是完整局观察（8 座塔，每波 EnemyCount ×3）。
+（开局高 HP、移速 0、不补波、铺满 20 座开火塔）；人口漂移则 `valid=FALSE`，该次 FPS 不能当 10K 负载。测量帧内 Damage/Resource Resolver 有任何容量拒绝（`Capacity:` 行 `damageDropped`/`resourceDropped` >0）同样 `valid=FALSE`；`triggerAborts` 是触发器循环防护（`MaxEventsPerFrame`）中止次数，仅报告、不计入有效性。Resolver 容量合同：事件容量 = 单请求最多事实数 × `MaxPendingRequests` + 关键预留，改任一常量须在同一 commit 附 mode 4/5 证据。mode 5 是完整局观察（8 座塔，每波 EnemyCount ×3）。
 
 mode 4 报告末尾按耗时降序打印生产 FrameGraph 逐节点耗时（`node <id> ms (%) calls=`，<0.1% 合并为一行），用于定位热点；计时仅在压测中经 `FrameScheduler.EnableFrameGraphNodeTiming()` 开启。
 mode 5 墙钟很短（~0.5s），FPS 对工作目录所在磁盘与机器负载敏感：新旧对比须用同一 cwd 交替运行两份构建产物。

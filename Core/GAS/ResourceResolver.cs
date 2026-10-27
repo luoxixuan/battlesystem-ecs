@@ -28,7 +28,12 @@ namespace BattleSystemECS.Core.GAS
     /// <summary>唯一可变资源写入边界。普通属性聚合器不会写资源列。</summary>
     public sealed class ResourceResolver
     {
-        public const int MaxPendingRequests = 4096;
+        // 容量合同同 DamageResolver：事件容量 = 单请求最多事实数 × pending 上限 + 关键预留。
+        // 证据：mode 4 随机事件对 10K 敌人群体治疗，4096 时该帧溢出 5904。
+        public const int MaxPendingRequests = 16384;
+        public const int MaxEventsPerRequest = 2; // 资源事实 + 致死 DeathQueued
+        public const int ReservedCriticalEvents = 64;
+        public const int EventCapacity = MaxPendingRequests * MaxEventsPerRequest + ReservedCriticalEvents;
         private readonly ComponentStore _store;
         private ResourceRejectionReason _lastRejectionReason;
         public ResourceRejectionReason LastRejectionReason { get { lock (_diagnosticsLock) return _lastRejectionReason; } }
@@ -45,7 +50,7 @@ namespace BattleSystemECS.Core.GAS
                 ? Volatile.Read(ref _rejectionsByReason[index])
                 : 0;
         }
-        public GameplayEventQueue Events { get; } = new GameplayEventQueue(8192, 64);
+        public GameplayEventQueue Events { get; } = new GameplayEventQueue(EventCapacity, ReservedCriticalEvents);
         internal Action<long, bool> BeforeStateCommit { get; set; }
         public int EventOverflowCount => Events.OverflowCount;
         public CommandRejection LastEventRejection => Events.LastRejection;
