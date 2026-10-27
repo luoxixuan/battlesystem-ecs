@@ -62,7 +62,7 @@ namespace BattleSystemECS.Core.GAS
             }
         }
 
-        internal bool TryPublishBatch(GameplayEvent first, bool critical)
+        internal bool TryPublishBatch(in GameplayEvent first, bool critical)
         {
             BeforeBatchPublish?.Invoke();
             lock (_sync)
@@ -73,7 +73,7 @@ namespace BattleSystemECS.Core.GAS
             }
         }
 
-        internal bool TryPublishBatch(GameplayEvent first, GameplayEvent second, bool critical)
+        internal bool TryPublishBatch(in GameplayEvent first, in GameplayEvent second, bool critical)
         {
             BeforeBatchPublish?.Invoke();
             lock (_sync)
@@ -85,7 +85,7 @@ namespace BattleSystemECS.Core.GAS
             }
         }
 
-        internal bool TryPublishBatch(GameplayEvent first, GameplayEvent second, GameplayEvent third, bool critical)
+        internal bool TryPublishBatch(in GameplayEvent first, in GameplayEvent second, in GameplayEvent third, bool critical)
         {
             BeforeBatchPublish?.Invoke();
             lock (_sync)
@@ -218,7 +218,7 @@ namespace BattleSystemECS.Core.GAS
                 if (DigestEnabled) AddToDigest(values[i]);
             }
         }
-        private void AppendOneLocked(GameplayEvent value, bool critical)
+        private void AppendOneLocked(in GameplayEvent value, bool critical)
         {
             if (!_buffer.TryAdd(value, critical)) throw new InvalidOperationException("queue capacity check violated");
             _publishedCount++;
@@ -269,7 +269,7 @@ namespace BattleSystemECS.Core.GAS
         public void RemoveAt(int index) { lock (_sync) _buffer.RemoveAt(index); }
         public void ResetDiagnostics() { lock (_sync) _buffer.ResetDiagnostics(); }
 
-        private void AddToDigest(GameplayEvent value)
+        private void AddToDigest(in GameplayEvent value)
         {
             // 只有 Mutation 进 sequence digest；Initial/Replay 不得被当成又一次变化。
             if (value.Cause != GameplayEventCause.Mutation) return;

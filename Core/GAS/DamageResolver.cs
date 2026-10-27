@@ -75,9 +75,10 @@ namespace BattleSystemECS.Core.GAS
         private readonly object _pendingLock = new object();
         // 与 ResourceResolver 共用 store 级提交锁；提交区内保持状态与关键事实原子一致。
         private readonly object _eventCommitLock;
-        private readonly List<DamageRequest> _pending = new List<DamageRequest>(256);
+        // _pending 与 _commitBatch 在整批同边界时互换引用（免逐元素拷贝），故不是 readonly；均只在 _pendingLock 内改动。
+        private List<DamageRequest> _pending = new List<DamageRequest>(256);
         // 边界提交批次复用缓冲；CommitBoundary 由 _isCommitting 防重入，单缓冲安全。
-        private readonly List<DamageRequest> _commitBatch = new List<DamageRequest>(256);
+        private List<DamageRequest> _commitBatch = new List<DamageRequest>(256);
         private sealed class CommitOrderComparer : IComparer<DamageRequest>
         {
             public static readonly CommitOrderComparer Instance = new CommitOrderComparer();
@@ -90,6 +91,12 @@ namespace BattleSystemECS.Core.GAS
             c = left.Target.Index.CompareTo(right.Target.Index);
             if (c != 0) return c;
             return left.Source.Index.CompareTo(right.Source.Index);
+        }
+        private bool AllPendingAt(DamageCommitBoundary boundary)
+        {
+            for (int i = 0; i < _pending.Count; i++)
+                if (_pending[i].CommitBoundary != boundary) return false;
+            return true;
         }
         // 严格递增（无相等键）时排序结果唯一，跳过排序不改变提交顺序；有相等键仍走原排序。
         private static bool IsStrictlyCommitOrdered(List<DamageRequest> batch)
@@ -191,13 +198,23 @@ namespace BattleSystemECS.Core.GAS
             // 先摘出当前批次再提交；提交期间产生的新请求继续延迟到下一边界，避免递归执行。
             List<DamageRequest> batch = _commitBatch;
             batch.Clear();
-            int write = 0;
-            for (int i = 0; i < _pending.Count; i++)
+            if (AllPendingAt(boundary))
             {
-                if (_pending[i].CommitBoundary == boundary) batch.Add(_pending[i]);
-                else _pending[write++] = _pending[i];
+                // 生产常态：全部请求同一边界，直接互换列表，_pending 变为空的旧批次缓冲。
+                _commitBatch = _pending;
+                _pending = batch;
+                batch = _commitBatch;
             }
-            if (write < _pending.Count) _pending.RemoveRange(write, _pending.Count - write);
+            else
+            {
+                int write = 0;
+                for (int i = 0; i < _pending.Count; i++)
+                {
+                    if (_pending[i].CommitBoundary == boundary) batch.Add(_pending[i]);
+                    else _pending[write++] = _pending[i];
+                }
+                if (write < _pending.Count) _pending.RemoveRange(write, _pending.Count - write);
+            }
             if (!IsStrictlyCommitOrdered(batch)) batch.Sort(CommitOrderComparer.Instance);
             _isCommitting = true;
             try
@@ -306,7 +323,7 @@ namespace BattleSystemECS.Core.GAS
                         damage *= 1f - Clamp01(_store.EnemyDamageResistance[target]);
                     }
                 }
-                _store.ResourceResolver.ApplyEnemyDamageResources(target, damage, request.ElementType, (request.Flags & DamageFlags.IgnoreShield) != 0, (request.Flags & DamageFlags.Execute) != 0);
+                _store.ResourceResolver.ApplyEnemyDamageResourcesUnderCommitLock(target, damage, request.ElementType, (request.Flags & DamageFlags.IgnoreShield) != 0, (request.Flags & DamageFlags.Execute) != 0);
                 float applied = Math.Max(0f, beforeHealth - _store.EnemyHealth[target]);
                 float absorbed = Math.Max(0f, beforeShield - _store.EnemyShield[target]);
                 bool death = _store.EnemyHealth[target] <= 0f;

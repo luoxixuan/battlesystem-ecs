@@ -551,6 +551,42 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
+        public void MixedBoundaryCommitKeepsOtherBoundaryPendingAndSingleBoundaryCommitDrainsAll()
+        {
+            using (var store = new ComponentStore())
+            {
+                store.AddPlayer(0, 3f, 1f, 1f, 1);
+                int early = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+                int late = store.AddEnemy(0, 0, 1f, 10f, 10f, 1f, 1, 1);
+                var source = store.GetEntityHandle(0);
+                DamageRequest Hit(int target, DamageCommitBoundary boundary, long sequence) => new DamageRequest(source,
+                    store.GetEntityHandle(target), 1f, DamageType.True, ElementType.None, DamageFlags.None,
+                    DamageAmountStage.Raw, boundary, sequence, ownerPlayerId: 0);
+                store.DamageResolver.EnableDeferred(true);
+                Assert.True(store.DamageResolver.TryApply(Hit(late, DamageCommitBoundary.GameplayResolve, 20L)).Deferred);
+                Assert.True(store.DamageResolver.TryApply(Hit(early, DamageCommitBoundary.EarlyResolve, 21L)).Deferred);
+                Assert.True(store.DamageResolver.TryApply(Hit(late, DamageCommitBoundary.GameplayResolve, 22L)).Deferred);
+
+                // 混合边界：只提交 EarlyResolve，GameplayResolve 两条留在队列
+                store.DamageResolver.CommitBoundary(DamageCommitBoundary.EarlyResolve);
+                Assert.Equal(9f, store.EnemyHealth[early]);
+                Assert.Equal(10f, store.EnemyHealth[late]);
+                Assert.Equal(2, store.DamageResolver.PendingRequestCount);
+
+                // 单一边界：整批提交（互换路径），队列清空且两条都生效
+                store.DamageResolver.CommitBoundary(DamageCommitBoundary.GameplayResolve);
+                Assert.Equal(8f, store.EnemyHealth[late]);
+                Assert.Equal(0, store.DamageResolver.PendingRequestCount);
+
+                // 互换后的缓冲继续可用：再入队一条并提交
+                Assert.True(store.DamageResolver.TryApply(Hit(late, DamageCommitBoundary.GameplayResolve, 23L)).Deferred);
+                store.DamageResolver.CommitBoundary(DamageCommitBoundary.GameplayResolve);
+                Assert.Equal(7f, store.EnemyHealth[late]);
+                Assert.Equal(9f, store.EnemyHealth[early]);
+            }
+        }
+
+        [Fact]
         public void ReflectProvenanceIsAcceptedAndSameChainRecursionIsRejected()
         {
             using (var store = new ComponentStore())

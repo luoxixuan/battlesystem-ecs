@@ -1,5 +1,12 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（damage.commit 去拷贝：2.3→1.7 ms/帧）
+- **事件发布按 `in` 传参**：`GameplayEventQueue.TryPublishBatch`（1/2/3 参）→ `AppendOneLocked` → `CommandBuffer.TryAdd` 全链 `in`，每个约 88 B 的 `GameplayEvent` 只在写入缓冲时拷贝一次。
+- **批次互换**：`CommitBoundary` 在全部 pending 同一边界（生产常态）时互换 `_pending` / `_commitBatch` 引用，省去约 10K 个请求的逐元素拷贝；混合边界仍走原分区循环。
+- **免重入加锁**：`CommitLocked` 已持有 store 提交锁，直接调 `ResourceResolver.ApplyEnemyDamageResourcesUnderCommitLock`（与原入口同一把锁对象）。
+- 新测试覆盖混合边界分区 + 单边界互换 + 互换后缓冲复用。
+- 对照（同 cwd 交替运行）：mode 4 `damage.commit` 1145–1198→867–896 ms/500 帧，85→90–93 FPS（valid=true、0 拒绝）；mode 2 持平（~330）；mode 5 Victory 457 帧一致，FPS 持平（交换先后顺序后 ~762 vs ~765，先跑者偏快）。
+
 ### 2026-10-26（Damage/Resource Resolver 容量按证据提升）
 - **容量合同**：`MaxPendingRequests` 4096→16384（两个 Resolver）；事件容量 = 单请求最多事实数 × pending + 64 关键预留：Damage 3×16384+64=**49216**（Hit+Damage+致死 DeathQueued），Resource 2×16384+64=**32832**（资源事实+致死）。满 pending 批次提交不会吃掉死亡结算预留。常量 `MaxEventsPerRequest` / `ReservedCriticalEvents` / `EventCapacity` 公开；`ResolverEventCapacityIsObservable` 改按公式断言。
 - **证据**（同 cwd 交替运行新旧产物）：mode 4 旧容量 `damageDropped=5924.4/帧`、`resourceDropped=82678`、`valid=FALSE`（100–105 FPS 未完成全部战斗工作）；新容量 0 拒绝、`valid=true`、**86–87 FPS**（`damage.commit` 0.9→2.3 ms/帧，提交约 10K 次命中）。mode 2 持平（~334 vs ~347 FPS）；mode 5 Victory 457 帧一致，FPS 噪声内持平（~770 vs ~760）。

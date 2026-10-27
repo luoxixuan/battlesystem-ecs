@@ -493,6 +493,9 @@ namespace BattleSystemECS.Core.GAS
             lock (_eventCommitLock)
                 ApplyEnemyDamageResourcesLocked(id, damage, element, ignoreShield, execute);
         }
+        /// <summary>调用方已持有 store 提交锁（DamageResolver.CommitLocked），省去重入加锁。</summary>
+        internal void ApplyEnemyDamageResourcesUnderCommitLock(int id, float damage, ElementType element, bool ignoreShield, bool execute)
+            => ApplyEnemyDamageResourcesLocked(id, damage, element, ignoreShield, execute);
         private void ApplyEnemyDamageResourcesLocked(int id, float damage, ElementType element, bool ignoreShield, bool execute)
         {
             if (!ComponentStore.IsValidEntity(id) || !_store.EnemyActive[id] || !Finite(damage) || damage <= 0f) return;

@@ -16,7 +16,7 @@ namespace BattleSystemECS.Core.GAS
         public CommandRejection LastRejection { get; private set; }
         public int Reserved { get; }
         public CommandBuffer(int capacity, int reserved = 0) { if (capacity < 1 || reserved < 0 || reserved > capacity) throw new ArgumentOutOfRangeException(); _items = new T[capacity]; Reserved = reserved; }
-        public bool TryAdd(T value, bool critical = false) {
+        public bool TryAdd(in T value, bool critical = false) {
             int limit = critical ? Capacity : Capacity - Reserved;
             if (_count >= limit) {
                 OverflowCount++;
