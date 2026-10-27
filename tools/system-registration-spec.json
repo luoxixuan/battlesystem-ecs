@@ -2124,7 +2124,7 @@
           "nodeId": "ai.enemy-ability.cooldowns",
           "registrationId": "EnemyAbility",
           "phase": "Wave",
-          "executionPolicy": "SerialUpdate",
+          "executionPolicy": "InternalParallelCollectSerialCommit",
           "requiredTokens": [
             "ComponentStore",
             "registration.EnemyAbility"

@@ -181,18 +181,65 @@ namespace BattleSystemECS.Systems
         public void UpdateCooldowns(float deltaTime)
         {
             var activeEnemyIds = store.GetCachedActiveEnemyIds();
-            foreach (var enemyId in activeEnemyIds)
-            {
-                EnsureAbilitySlot(enemyId);
-                GameplayAbilityRuntime.TickCooldown(store, enemyId, EnemyAbilitySlot, deltaTime);
+            int count = activeEnemyIds.Count;
 
-                // Round 124: tick down per-enemy disarm duration (independent of ability cooldowns)
-                float disarmLeft = store.EnemyDisarmDurationLeft[enemyId];
-                if (disarmLeft > 0f)
-                {
-                    disarmLeft -= deltaTime;
-                    store.EnemyDisarmDurationLeft[enemyId] = disarmLeft > 0f ? disarmLeft : 0f;
-                }
+            // 串行预处理：缺槽敌人在池中分配能力（池分配非线程安全，必须在并行段之前完成）
+            for (int i = 0; i < count; i++) EnsureAbilitySlot(activeEnemyIds[i]);
+
+            if (count < CooldownParallelMinEnemies)
+            {
+                for (int i = 0; i < count; i++) TickEnemyCooldown(activeEnemyIds[i], deltaTime, null);
+                return;
+            }
+
+            // 并行段：每个敌人只写自己的能力池实例、投影槽与缴械计时；handle 失效需走池写回退的敌人
+            // 记入本批缓冲，屏障后按批序串行处理（每个敌人的结果与串行逐个处理一致）。
+            int batches = (count + CooldownBatchSize - 1) / CooldownBatchSize;
+            if (_cooldownFallbacks.Length < batches)
+            {
+                var grown = new List<int>[batches];
+                Array.Copy(_cooldownFallbacks, grown, _cooldownFallbacks.Length);
+                for (int b = _cooldownFallbacks.Length; b < batches; b++) grown[b] = new List<int>(4);
+                _cooldownFallbacks = grown;
+            }
+            Parallel.For(0, batches, ParallelOptionsCache.HotPath, b =>
+            {
+                var fallback = _cooldownFallbacks[b];
+                fallback.Clear();
+                int end = Math.Min(count, (b + 1) * CooldownBatchSize);
+                for (int i = b * CooldownBatchSize; i < end; i++) TickEnemyCooldown(activeEnemyIds[i], deltaTime, fallback);
+            });
+            for (int b = 0; b < batches; b++)
+            {
+                var fallback = _cooldownFallbacks[b];
+                for (int k = 0; k < fallback.Count; k++)
+                    GameplayAbilityRuntime.TickCooldown(store, fallback[k], EnemyAbilitySlot, deltaTime);
+            }
+        }
+
+        private const int CooldownBatchSize = 1024;
+        private const int CooldownParallelMinEnemies = 2048;
+        private List<int>[] _cooldownFallbacks = Array.Empty<List<int>>();
+
+        /// <summary>
+        /// 单个敌人的冷却与缴械计时推进。fallback 为 null 时（串行路径）handle 失效直接走池写回退；
+        /// 否则只登记，由调用方在并行屏障后串行处理。
+        /// </summary>
+        private void TickEnemyCooldown(int enemyId, float deltaTime, List<int> fallback)
+        {
+            if (deltaTime > 0f && store.AbilityCount[enemyId] > EnemyAbilitySlot
+                && !store.TryTickAbilityCooldown(enemyId, EnemyAbilitySlot, deltaTime))
+            {
+                if (fallback == null) GameplayAbilityRuntime.TickCooldown(store, enemyId, EnemyAbilitySlot, deltaTime);
+                else fallback.Add(enemyId);
+            }
+
+            // Round 124: tick down per-enemy disarm duration (independent of ability cooldowns)
+            float disarmLeft = store.EnemyDisarmDurationLeft[enemyId];
+            if (disarmLeft > 0f)
+            {
+                disarmLeft -= deltaTime;
+                store.EnemyDisarmDurationLeft[enemyId] = disarmLeft > 0f ? disarmLeft : 0f;
             }
         }
 

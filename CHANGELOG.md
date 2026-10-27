@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（敌人能力冷却批量并行：ai.enemy-ability.cooldowns 0.31→0.13 ms/帧）
+- **改动**：`EnemyAbilitySystem.UpdateCooldowns` 先串行为缺槽敌人分配能力（池分配非线程安全），再按 1024 个一批 `Parallel.For` 推进冷却与缴械计时（≥2048 敌人时；以下仍串行）。每个敌人只写自己的能力池实例、投影槽与缴械计时；handle 失效需走池写回退的敌人登记到本批缓冲，屏障后按批序串行处理，逐敌人结果与串行一致。
+- **合同同步**：节点 `ai.enemy-ability.cooldowns` 执行语义 `SerialUpdate`→`InternalParallelCollectSerialCommit`（`tools/system-registration-spec.json` + 生成器重建 manifest、`FrameBindingFacts`、`FrameSystemGraph`）；生产访问审阅根指纹（Gameplay / FixedPopulation）与 `FrameGraphTests` 钉住的拓扑哈希按新拓扑重新审阅更新，并把该节点加入并行语义断言。
+- 新测试：200（串行）与 5000（并行）敌人下各不相同的冷却/缴械推进后逐敌人与期望值一致。
+- 对照（同 cwd 交替运行）：mode 4 节点 150–161→65–66 ms/500 帧，**278–284→294–299 FPS**（valid=true）；mode 2 持平（387–407，另有一次 234 的双峰噪声）；mode 5 Victory 457 帧一致，8 对交替平均 810 vs 788 FPS。
+
 ### 2026-10-26（敌人攻击力基值写入点标脏：attribute.aggregate 0.36→0.07 ms/帧）
 - **设计**：`SyncComputedAttributeBases` 原先每帧对全部活跃敌人 `SetBase(EnemyDamage)`（镜像优化后已免字典，但仍逐个读写 10K 槽）。现在所有生产写入点改走 `ComponentStore.SetEnemyAttackDamage`（写数组并置 `EnemyAttackBaseDirty[id]`，按敌人槽独占写，EnemyAISystem 的 Parallel.For 内同样安全），同步时只推入标脏敌人；仍在 `attribute.aggregate` 节点统一快照，帧内可见时序与旧全量同步一致。
 - **补漏**：`ClearComputedAttributes`（聚合器条目被清空）与开启计算属性模式时整体标脏，覆盖旧全量同步隐式处理的情形。塔（≤150，Unity 端存在直接写 `TowerAttackDamage`）与玩家仍每帧全量同步。
