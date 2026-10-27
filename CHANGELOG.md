@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（attribute.aggregate 0.87→0.31 ms/帧）
+- **定位**：探针显示节点 98% 时间在 `SyncComputedAttributeBases`——每帧对 10K 敌人逐个 `SetBase`，几乎全部值未变（每帧仅约 21 个 dirty 槽），却各付一次 schema 接口字典查询 + `(int, AttributeKey)` 元组键字典查询。
+- **稠密镜像**：`AttributeAggregator` 按 key 数组缓存 schema 定义，并维护 `_base` 的稠密镜像（entity × key，值 + 存在位，按需倍增扩容）；值未变的 `SetBase` 免字典直接返回。`_base` 仍是唯一事实源，镜像只在其两处写入（`SetBase` / `ClearEntity`）同步；key ≥64、entity ≥2^20 或未知 key 走原路径（未知 key 仍抛 `KeyNotFoundException`）。
+- 新测试：未变化/Clamp 后相同值不标脏；`ClearEntity` 后同值重新写入并标脏；超范围实体与未知 key 保持原语义。
+- 对照（同 cwd 交替运行）：mode 4 `attribute.aggregate` 429–437→155–157 ms/500 帧，**100–101→106–107 FPS**（valid=true、0 拒绝、`triggerAborts` 一致）。mode 2 噪声内持平（328–345，先后顺序决定快慢）；mode 5 Victory 457 帧一致，FPS 持平（新 776–806 vs 旧 755–788）。
+
 ### 2026-10-26（触发器消费提速：gameplay-event.commit 1.5→1.07、post-death 0.85→0.41 ms/帧）
 - **去重键**：`GameplayTriggerRuntime._seen` 由 6 元 `ValueTuple` 改为 `SeenKey`（`IEquatable` + 手写哈希）；未触及帧预算与去重容量时一次 `Add` 代替 `Contains`→`Add`，触及后仍走原顺序（已见跳过 → 预算中止 → 容量中止）。
 - **类型位图**：每次 `Consume` 先算定义事件类型位图，无定义命中的事件仍占预算、进去重集合，但跳过定义循环（原循环对每个定义经接口拷贝结构体）。

@@ -83,9 +83,66 @@ namespace BattleSystemECS.Core.GAS
         private readonly HashSet<(int, AttributeKey)> _dirty = new HashSet<(int, AttributeKey)>();
         private readonly List<(int, AttributeKey)> _pending = new List<(int, AttributeKey)>();
         private long _nextId, _sequence;
-        public AttributeAggregator(AttributeSchema schema = null) { _schema = schema ?? AttributeSchema.Default; }
+        // 热路径镜像：schema 定义按 key 数组缓存；_base 的稠密镜像（entity × key，值 + 存在位），
+        // 每帧对全部实体的 SetBase 在值未变时免字典查询直接返回。_base 仍是唯一事实源，
+        // 镜像只在 SetBase / ClearEntity（_base 仅有的两处写入）随之同步；超出范围的 key/entity 走原路径。
+        private const int MaxMirroredKeys = 64;
+        private const int MaxMirroredEntities = 1 << 20;
+        private readonly AttributeDefinition[] _definitionByKey;
+        private readonly bool[] _hasDefinition;
+        private readonly int _keyStride;
+        private float[] _mirrorBase = Array.Empty<float>();
+        private bool[] _mirrorPresent = Array.Empty<bool>();
+        public AttributeAggregator(AttributeSchema schema = null)
+        {
+            _schema = schema ?? AttributeSchema.Default;
+            int stride = 0;
+            foreach (var pair in _schema.Definitions)
+                if ((uint)pair.Key.Value < MaxMirroredKeys && pair.Key.Value + 1 > stride) stride = pair.Key.Value + 1;
+            _keyStride = stride;
+            _definitionByKey = new AttributeDefinition[stride];
+            _hasDefinition = new bool[stride];
+            foreach (var pair in _schema.Definitions)
+                if ((uint)pair.Key.Value < (uint)stride) { _definitionByKey[pair.Key.Value] = pair.Value; _hasDefinition[pair.Key.Value] = true; }
+        }
         public int DirtyCount => _dirty.Count;
-        public void SetBase(int entityId, AttributeKey key, float value) { var d = _schema.Get(key); var slot = (entityId, key); var next = d.Clamp(value); if (_base.TryGetValue(slot, out var previous) && previous.Equals(next)) return; _base[slot] = next; _dirty.Add(slot); }
+        public void SetBase(int entityId, AttributeKey key, float value)
+        {
+            int mirror = MirrorIndex(entityId, key);
+            if (mirror >= 0)
+            {
+                var next = _definitionByKey[key.Value].Clamp(value);
+                if (mirror < _mirrorPresent.Length && _mirrorPresent[mirror] && _mirrorBase[mirror].Equals(next)) return;
+                var mirroredSlot = (entityId, key);
+                _base[mirroredSlot] = next; _dirty.Add(mirroredSlot);
+                WriteMirror(mirror, next);
+                return;
+            }
+            var d = _schema.Get(key); var slot = (entityId, key); var clamped = d.Clamp(value); if (_base.TryGetValue(slot, out var previous) && previous.Equals(clamped)) return; _base[slot] = clamped; _dirty.Add(slot);
+        }
+        private int MirrorIndex(int entityId, AttributeKey key)
+        {
+            if ((uint)key.Value >= (uint)_keyStride || !_hasDefinition[key.Value] || (uint)entityId >= MaxMirroredEntities) return -1;
+            return entityId * _keyStride + key.Value;
+        }
+        private void WriteMirror(int index, float value)
+        {
+            if (index >= _mirrorPresent.Length)
+            {
+                int size = Math.Max(index + 1, Math.Max(256, _mirrorPresent.Length * 2));
+                Array.Resize(ref _mirrorBase, size);
+                Array.Resize(ref _mirrorPresent, size);
+            }
+            _mirrorBase[index] = value;
+            _mirrorPresent[index] = true;
+        }
+        private void ClearMirror(int entityId)
+        {
+            if ((uint)entityId >= MaxMirroredEntities) return;
+            int start = entityId * _keyStride;
+            int end = Math.Min(start + _keyStride, _mirrorPresent.Length);
+            for (int i = start; i < end; i++) _mirrorPresent[i] = false;
+        }
         public AttributeModifierHandle AddModifier(int entityId, ModifierDefinition definition, float capturedMagnitude = float.NaN)
         {
             var d = _schema.Get(definition.Attribute); if (!d.AllowsModifiers) throw new InvalidOperationException("Attribute does not allow modifiers");
@@ -107,7 +164,7 @@ namespace BattleSystemECS.Core.GAS
         { foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) { var modifier = pair.Value.Find(m => m.Handle.Equals(handle)); if (modifier != null) { modifier.Magnitude = magnitude; modifier.Captured = float.IsNaN(capturedMagnitude) ? magnitude : capturedMagnitude; _dirty.Add(pair.Key); return true; } } return false; }
         public void MarkDirty(int entityId, AttributeKey key) => _dirty.Add((entityId, key));
         public void AggregateDirty() { _pending.Clear(); foreach (var slot in _dirty) _pending.Add(slot); _dirty.Clear(); for (int i = 0; i < _pending.Count; i++) Aggregate(_pending[i].Item1, _pending[i].Item2); }
-        public void ClearEntity(int entityId) { var keys = new List<(int, AttributeKey)>(); foreach (var pair in _base) if (pair.Key.Item1 == entityId) keys.Add(pair.Key); foreach (var pair in _computed) if (pair.Key.Item1 == entityId && !keys.Contains(pair.Key)) keys.Add(pair.Key); foreach (var pair in _dirty) if (pair.Item1 == entityId && !keys.Contains(pair)) keys.Add(pair); foreach (var key in keys) { _base.Remove(key); _computed.Remove(key); _dirty.Remove(key); } foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) pair.Value.Clear(); }
+        public void ClearEntity(int entityId) { var keys = new List<(int, AttributeKey)>(); foreach (var pair in _base) if (pair.Key.Item1 == entityId) keys.Add(pair.Key); foreach (var pair in _computed) if (pair.Key.Item1 == entityId && !keys.Contains(pair.Key)) keys.Add(pair.Key); foreach (var pair in _dirty) if (pair.Item1 == entityId && !keys.Contains(pair)) keys.Add(pair); foreach (var key in keys) { _base.Remove(key); _computed.Remove(key); _dirty.Remove(key); } ClearMirror(entityId); foreach (var pair in _modifiers) if (pair.Key.Item1 == entityId) pair.Value.Clear(); }
         public void ClearAllComputed() { _computed.Clear(); }
         public void MarkAllDirty() { foreach (var pair in _base) _dirty.Add(pair.Key); foreach (var pair in _modifiers) _dirty.Add(pair.Key); }
         public float GetComputed(int entityId, AttributeKey key, float fallback = 0f) { if (_dirty.Contains((entityId, key))) AggregateDirty(); return _computed.TryGetValue((entityId, key), out var value) ? value : fallback; }

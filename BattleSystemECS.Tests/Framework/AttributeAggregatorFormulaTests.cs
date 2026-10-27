@@ -19,6 +19,41 @@ namespace BattleSystemECS.Tests.Framework
             => new ModifierDefinition(key, op, value, priority);
 
         [Fact]
+        public void UnchangedBaseStaysCleanAndClearEntityForgetsMirroredBase()
+        {
+            var a = new AttributeAggregator();
+            a.SetBase(7, Attack, 12f);
+            Assert.Equal(12f, a.GetComputed(7, Attack), 5);
+            a.SetBase(7, Attack, 12f);
+            Assert.Equal(0, a.DirtyCount);
+            // Clamp 后相同的值同样视为未变化（CritRate 上限 1）
+            var crit = new AttributeKey(5);
+            a.SetBase(7, crit, 3f);
+            a.AggregateDirty();
+            a.SetBase(7, crit, 2f);
+            Assert.Equal(0, a.DirtyCount);
+
+            a.ClearEntity(7);
+            Assert.Equal(-1f, a.GetComputed(7, Attack, -1f), 5);
+            // 清除后同值必须重新写入并标脏
+            a.SetBase(7, Attack, 12f);
+            Assert.Equal(1, a.DirtyCount);
+            Assert.Equal(12f, a.GetComputed(7, Attack), 5);
+        }
+
+        [Fact]
+        public void BaseOutsideMirrorRangeKeepsDictionaryPathSemantics()
+        {
+            var a = new AttributeAggregator();
+            int farEntity = 1 << 21;
+            a.SetBase(farEntity, Attack, 5f);
+            Assert.Equal(5f, a.GetComputed(farEntity, Attack), 5);
+            a.SetBase(farEntity, Attack, 5f);
+            Assert.Equal(0, a.DirtyCount);
+            Assert.Throws<System.Collections.Generic.KeyNotFoundException>(() => a.SetBase(1, new AttributeKey(999), 1f));
+        }
+
+        [Fact]
         public void TwoPercentBonusesSumToOnePointSixtyNotProduct()
         {
             var a = new AttributeAggregator();
