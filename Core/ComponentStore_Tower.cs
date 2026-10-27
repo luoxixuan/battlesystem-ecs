@@ -212,23 +212,6 @@ namespace BattleSystemECS.Core
         public string[] TowerUpgradePathId = new string[MAX_ENTITIES];
         // Tower fusion tier: incremented each time this tower is merged (0 = never merged)
         public int[] TowerFusionTier = new int[MAX_ENTITIES];
-        // ── Tower Form / Stance Switch (Round 203 Direction 4) ──────────────
-        // TowerActiveForm: 0-based index into the configured forms[] array on TowerConfig.
-        // Default 0 = first form (always valid). -1 sentinel = "no forms configured" (use base config).
-        // Sentinel-gated: if FormCount == 0, the form switch path is zero-overhead.
-        public int[] TowerActiveForm = new int[MAX_ENTITIES];
-        // TowerFormSwitchCooldown: configured cooldown in seconds between consecutive
-        // form switches. 0 = no cooldown (instant switch). Default 0 = backward compatible.
-        public float[] TowerFormSwitchCooldown = new float[MAX_ENTITIES];
-        // TowerFormLastSwitchTurn: turn count when the tower last switched forms. -1 = never.
-        // Used together with TowerFormSwitchCooldown + a turn source to gate rapid switching.
-        public int[] TowerFormLastSwitchTurn = new int[MAX_ENTITIES];
-        // TowerFormCount: number of forms configured for this tower (snapshot from config).
-        // 0 = no forms configured, the form switch path is zero-overhead fast path.
-        public int[] TowerFormCount = new int[MAX_ENTITIES];
-        // TowerFormSwitchCooldownRemaining: remaining cooldown in seconds until the tower
-        // may switch forms again. Decremented each tick; floors at 0 (no drift negative).
-        public float[] TowerFormSwitchCooldownRemaining = new float[MAX_ENTITIES];
         // ── Tower Morph / Mode Switch ──────────────────────────────────────
         // TowerCurrentMorph: index of the currently active morph (0 = first form, 1 = second form, ...)
         public int[] TowerCurrentMorph = new int[MAX_ENTITIES];
@@ -318,24 +301,6 @@ namespace BattleSystemECS.Core
         public float[] TowerSpecialAbilityDamageMult = new float[MAX_ENTITIES];
         public float[] TowerSpecialAbilityDotDamage = new float[MAX_ENTITIES];
         public float[] TowerSpecialAbilityDotInterval = new float[MAX_ENTITIES];
-
-        // ==================== 塔词缀槽位 (Tower Affix Slots — Reforge Split A) ====================
-        // TowerAffixSlotCount: how many affix slots this tower has (0 = no affixes, 1-3 = enabled)
-        // Default 0 keeps backward compatibility for existing towers that haven't been reforged.
-        public int[] TowerAffixSlotCount = new int[MAX_ENTITIES];
-        // TowerAffixIds: [slotIndex][towerId] = index into GameConfig.TowerAffixes[] (-1 = empty slot)
-        // Jagged array pattern matches TowerMorphDamage etc. — avoids MAX_AFFIX_SLOTS × MAX_ENTITIES
-        // flat allocation (100K × 3 = 300K ints but only towers with slots pay the per-slot cost).
-        public int[][] TowerAffixIds = new int[3][];
-        // TowerAffixStackCount: [slotIndex][towerId] = number of times this slot's affix is stacked
-        // (1 = single, N = up to TowerAffixDef.MaxStack). Default 0 = no affix assigned.
-        public int[][] TowerAffixStackCount = new int[3][];
-        // TowerAffixLockMask: bitmask of which slots are locked against reroll (bit 0 = slot 0, bit 1 = slot 1, bit 2 = slot 2)
-        // 0 = no locks. Reforge Split B: locked slots retain their affix during RerollAffix. Default 0.
-        public int[] TowerAffixLockMask = new int[MAX_ENTITIES];
-        // TowerReforgeCount: how many times this tower has been reforged (RerollAffix calls). Drives cost curve.
-        // Used by Reforge Split B to compute RerollCost(base + count * increment). Default 0.
-        public int[] TowerReforgeCount = new int[MAX_ENTITIES];
 
         // ==================== 塔击退/位移效果 (Knockback) ====================
         // TowerKnockbackForce: strength of knockback applied to enemies on hit (0 = no knockback)
@@ -1379,13 +1344,6 @@ namespace BattleSystemECS.Core
             TowerLuck[entityId] = 0f;
             // Path-Hug filter: default to false (no path restriction, backward compatible)
             TowerPathHugOnly[entityId] = false;
-            // Round 203 Direction 4 — Form Switch: defaults to no forms configured.
-            // FormCount=0 is the opt-out sentinel: the form switch fast path stays zero-overhead.
-            TowerActiveForm[entityId] = 0;
-            TowerFormSwitchCooldown[entityId] = 0f;
-            TowerFormLastSwitchTurn[entityId] = -1;
-            TowerFormCount[entityId] = 0;
-            TowerFormSwitchCooldownRemaining[entityId] = 0f;
             // Lock-On filter: default to false (no lock-on, backward compatible) + -1 = no cached target
             TowerIsLockOn[entityId] = false;
             TowerLockedTargetId[entityId] = -1;
@@ -1733,13 +1691,6 @@ namespace BattleSystemECS.Core
             TowerEnchantExpiresAtTurn[entityId] = -1;
             // Path-Hug filter reset
             TowerPathHugOnly[entityId] = false;
-            // Round 203 Direction 4 — Form Switch: recycled slot must not leak form state.
-            // FormCount=0 → opt-out sentinel (zero-overhead fast path).
-            TowerActiveForm[entityId] = 0;
-            TowerFormSwitchCooldown[entityId] = 0f;
-            TowerFormLastSwitchTurn[entityId] = -1;
-            TowerFormCount[entityId] = 0;
-            TowerFormSwitchCooldownRemaining[entityId] = 0f;
             // Tower energy fields reset
             TowerEnergy[entityId] = 0f;
             TowerMaxEnergy[entityId] = 0f;
@@ -2142,152 +2093,6 @@ namespace BattleSystemECS.Core
             TowerLinkDamageBonus[towerId] = bonus;
         }
 
-        // ==================== 塔词缀槽位 (Tower Affix Slots — Reforge Split A) ====================
-        // Lazy-initializes the jagged slot arrays on first use. Called from accessor methods below.
-        private const int TOWER_AFFIX_SLOT_COUNT = 3;
-
-        private void EnsureAffixArrays(int slotIndex)
-        {
-            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return;
-            if (TowerAffixIds[slotIndex] == null)
-                TowerAffixIds[slotIndex] = new int[MAX_ENTITIES];
-            if (TowerAffixStackCount[slotIndex] == null)
-                TowerAffixStackCount[slotIndex] = new int[MAX_ENTITIES];
-        }
-
-        /// <summary>Gets the number of affix slots this tower has (0 = no affixes).</summary>
-        public int GetTowerAffixSlotCount(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return 0;
-            return TowerAffixSlotCount[towerId];
-        }
-
-        /// <summary>Sets the number of affix slots for a tower (1-3, 0 to disable).</summary>
-        public void SetTowerAffixSlotCount(int towerId, int slotCount)
-        {
-            if (!IsValidEntity(towerId)) return;
-            if (slotCount < 0) slotCount = 0;
-            if (slotCount > TOWER_AFFIX_SLOT_COUNT) slotCount = TOWER_AFFIX_SLOT_COUNT;
-            // Pre-warm all slot arrays up to slotCount so reads are safe
-            for (int s = 0; s < slotCount; s++)
-                EnsureAffixArrays(s);
-            TowerAffixSlotCount[towerId] = slotCount;
-        }
-
-        /// <summary>Gets the affix def index assigned to a given slot (returns -1 if empty).</summary>
-        public int GetTowerAffixId(int towerId, int slotIndex)
-        {
-            if (!IsValidEntity(towerId)) return -1;
-            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return -1;
-            if (TowerAffixIds[slotIndex] == null) return -1;
-            return TowerAffixIds[slotIndex][towerId];
-        }
-
-        /// <summary>Assigns an affix def index to a slot. Pass -1 to clear.</summary>
-        public void SetTowerAffixId(int towerId, int slotIndex, int affixIndex)
-        {
-            if (!IsValidEntity(towerId)) return;
-            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return;
-            EnsureAffixArrays(slotIndex);
-            TowerAffixIds[slotIndex][towerId] = affixIndex;
-        }
-
-        /// <summary>Gets the stack count for a slot (0 = no affix, 1+ = stacked).</summary>
-        public int GetTowerAffixStackCount(int towerId, int slotIndex)
-        {
-            if (!IsValidEntity(towerId)) return 0;
-            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return 0;
-            if (TowerAffixStackCount[slotIndex] == null) return 0;
-            return TowerAffixStackCount[slotIndex][towerId];
-        }
-
-        /// <summary>Sets the stack count for a slot (1 = single, 2+ = stacked up to MaxStack).</summary>
-        public void SetTowerAffixStackCount(int towerId, int slotIndex, int stackCount)
-        {
-            if (!IsValidEntity(towerId)) return;
-            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return;
-            if (stackCount < 0) stackCount = 0;
-            EnsureAffixArrays(slotIndex);
-            TowerAffixStackCount[slotIndex][towerId] = stackCount;
-        }
-
-        /// <summary>
-        /// Clears all affix data for a tower (used in DestroyEntity and when resetting a slot).
-        /// Resets slot count to 0 and all 3 slot assignments to -1/0.
-        /// Also resets the lock mask and reforge count (Reforge Split B).
-        /// </summary>
-        public void ClearTowerAffixes(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return;
-            TowerAffixSlotCount[towerId] = 0;
-            for (int s = 0; s < TOWER_AFFIX_SLOT_COUNT; s++)
-            {
-                if (TowerAffixIds[s] != null) TowerAffixIds[s][towerId] = -1;
-                if (TowerAffixStackCount[s] != null) TowerAffixStackCount[s][towerId] = 0;
-            }
-            // Reforge Split B: clear lock mask + reforge count too so reset is total
-            TowerAffixLockMask[towerId] = 0;
-            TowerReforgeCount[towerId] = 0;
-        }
-
-        // ==================== 词缀锁定/重洗 (Affix Lock + Reforge Count — Reforge Split B) ====================
-
-        /// <summary>Gets the affix lock bitmask for a tower (bit s = slot s locked).</summary>
-        public int GetTowerAffixLockMask(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return 0;
-            return TowerAffixLockMask[towerId];
-        }
-
-        /// <summary>Sets the affix lock bitmask for a tower. Out-of-range bits are masked off (bits 0-2 only).</summary>
-        public void SetTowerAffixLockMask(int towerId, int mask)
-        {
-            if (!IsValidEntity(towerId)) return;
-            // Only the low 3 bits are valid (we have TOWER_AFFIX_SLOT_COUNT=3 slots)
-            TowerAffixLockMask[towerId] = mask & 0b0111;
-        }
-
-        /// <summary>Returns true if the given slot is locked against reroll.</summary>
-        public bool IsTowerAffixSlotLocked(int towerId, int slotIndex)
-        {
-            if (!IsValidEntity(towerId)) return false;
-            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return false;
-            return (TowerAffixLockMask[towerId] & (1 << slotIndex)) != 0;
-        }
-
-        /// <summary>Sets whether a single slot is locked. Returns true on success.</summary>
-        public bool SetTowerAffixSlotLocked(int towerId, int slotIndex, bool locked)
-        {
-            if (!IsValidEntity(towerId)) return false;
-            if (slotIndex < 0 || slotIndex >= TOWER_AFFIX_SLOT_COUNT) return false;
-            if (locked) TowerAffixLockMask[towerId] |= (1 << slotIndex);
-            else TowerAffixLockMask[towerId] &= ~(1 << slotIndex);
-            return true;
-        }
-
-        /// <summary>Gets the number of reforges performed on this tower.</summary>
-        public int GetTowerReforgeCount(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return 0;
-            return TowerReforgeCount[towerId];
-        }
-
-        /// <summary>Sets the reforge count (used by tests and by ReforgeSystem to increment).</summary>
-        public void SetTowerReforgeCount(int towerId, int count)
-        {
-            if (!IsValidEntity(towerId)) return;
-            if (count < 0) count = 0;
-            TowerReforgeCount[towerId] = count;
-        }
-
-        /// <summary>Increments the reforge count by 1 (returns the new value).</summary>
-        public int IncrementTowerReforgeCount(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return 0;
-            TowerReforgeCount[towerId]++;
-            return TowerReforgeCount[towerId];
-        }
-
         // ===== Round 138 — Per-Tower Active Skill helpers =====
 
         /// <summary>Configures a tower's per-tower active skill. -1 disables, ≥0 enables.
@@ -2439,104 +2244,6 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(towerId)) return;
             TowerFortressCachedAtkSpdBonus[towerId] = bonus < 0f ? 0f : (bonus > 1f ? 1f : bonus);
-        }
-
-        // ════════════════════════════════════════════════════════════════════════
-        // Round 203 Direction 4 — Tower Form / Stance Switch accessors.
-        // Sentinel-gated: if TowerFormCount[towerId] == 0, no forms are configured
-        // (zero-overhead fast path). Switching returns false on cooldown or out-of-range.
-        // ════════════════════════════════════════════════════════════════════════
-
-        /// <summary>Returns the currently active form index (0..FormCount-1). Returns 0 if no forms are configured.</summary>
-        public int GetTowerActiveForm(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return 0;
-            int active = TowerActiveForm[towerId];
-            int count = TowerFormCount[towerId];
-            if (count <= 0) return 0;
-            // Clamp to valid range in case the active index was left out-of-range by config drift
-            return active < 0 ? 0 : (active >= count ? count - 1 : active);
-        }
-
-        /// <summary>Returns the configured form count (0 = no forms, fast path).</summary>
-        public int GetTowerFormCount(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return 0;
-            return TowerFormCount[towerId];
-        }
-
-        /// <summary>Returns true if the tower has any forms configured (i.e. opt-in path is live).</summary>
-        public bool HasTowerForms(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return false;
-            return TowerFormCount[towerId] > 0;
-        }
-
-        /// <summary>Returns the remaining cooldown in seconds before the tower may switch forms again (0 = ready).</summary>
-        public float GetTowerFormSwitchCooldownRemaining(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return 0f;
-            float cd = TowerFormSwitchCooldownRemaining[towerId];
-            return cd < 0f ? 0f : cd;
-        }
-
-        /// <summary>Returns true when the tower is currently allowed to switch forms (count > 0 and cooldown == 0).</summary>
-        public bool CanTowerSwitchForm(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return false;
-            if (TowerFormCount[towerId] <= 0) return false;
-            return TowerFormSwitchCooldownRemaining[towerId] <= 0f;
-        }
-
-        /// <summary>
-        /// Try to switch the tower to the requested form index. Returns true on success.
-        /// Failure modes: towerId invalid, tower inactive, no forms configured, target index out of range,
-        /// cooldown not yet expired.
-        /// </summary>
-        public bool TrySwitchTowerForm(int towerId, int targetForm)
-        {
-            if (!IsValidEntity(towerId)) return false;
-            if (!TowerActive[towerId]) return false;
-            int count = TowerFormCount[towerId];
-            if (count <= 0) return false;
-            if (targetForm < 0 || targetForm >= count) return false;
-            // Same-form is a no-op: succeeds without cooldown tick.
-            // Same-form is checked BEFORE cooldown so it stays available even mid-cooldown.
-            if (TowerActiveForm[towerId] == targetForm) return true;
-            // Cross-form switch: gated by cooldown
-            if (TowerFormSwitchCooldownRemaining[towerId] > 0f) return false;
-            TowerActiveForm[towerId] = targetForm;
-            // Reset cooldown to configured value (0 = no cooldown, so no-op)
-            float cd = TowerFormSwitchCooldown[towerId];
-            if (cd > 0f) TowerFormSwitchCooldownRemaining[towerId] = cd;
-            // Track turn of switch (-1 sentinel for "never switched before")
-            if (TowerFormLastSwitchTurn[towerId] < 0)
-                TowerFormLastSwitchTurn[towerId] = 0;
-            return true;
-        }
-
-        /// <summary>Tick the cooldown remaining toward 0 (called by TowerFormSwitchSystem each frame).</summary>
-        public void TickTowerFormSwitchCooldown(int towerId, float dt)
-        {
-            if (!IsValidEntity(towerId)) return;
-            if (TowerFormSwitchCooldownRemaining[towerId] <= 0f) return;
-            TowerFormSwitchCooldownRemaining[towerId] -= dt;
-            if (TowerFormSwitchCooldownRemaining[towerId] < 0f) TowerFormSwitchCooldownRemaining[towerId] = 0f;
-        }
-
-        /// <summary>Configure the form array for a tower (PlaceTower helper). count must be in [0, 8].
-        /// If count == 0, the form switch path is opt-out (zero-overhead fast path).
-        /// cooldown: seconds between switches (0 = no cooldown).</summary>
-        public void SetTowerForms(int towerId, int count, float cooldown, int currentTurn)
-        {
-            if (!IsValidEntity(towerId)) return;
-            int clamped = count < 0 ? 0 : (count > 8 ? 8 : count);
-            TowerFormCount[towerId] = clamped;
-            TowerFormSwitchCooldown[towerId] = cooldown < 0f ? 0f : cooldown;
-            TowerFormSwitchCooldownRemaining[towerId] = 0f;
-            // Default active form is 0 (first form) when at least one form is configured
-            TowerActiveForm[towerId] = clamped > 0 ? 0 : 0;
-            TowerFormLastSwitchTurn[towerId] = currentTurn;
         }
     }
 }

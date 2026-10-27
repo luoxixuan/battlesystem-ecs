@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-27（退役从未构造的 store 耦合系统 B4b）
+- 产品决策为退役：`TotemSystem`、`ReforgeSystem`、`WaveSkipSystem`、`TowerFormSwitchSystem`、`ObstacleSystem` 无构造点 / registry 属性 / recipe / spec 条目 / Unity 引用（`WindSystem` 此前已随 `6621ab3` 删除）。删除 5 个源文件（1,169 行）与仅测 `TowerFormSwitchSystem` 的 `TowerFormSwitchSystemTests`；`SimulationRngGuardTests` 文件名列表去掉 `ReforgeSystem.cs`（未放宽）。审计 V-05 S-d。
+- 删除仅这些系统使用的 store 成员：图腾池 9 项（`TotemActive/OwnerId/Type/PosX/PosY/DurationLeft/ChargesLeft`、`TotemCooldown`、`PlayerTotemCooldown`，`MAX_TOTEMS`，`AddTotem`/`RemoveTotem`，`MechanismAbilityIds.TotemPulse/TotemSummon`）、跳波 2 项（`PlayerWaveSkipsUsed`、`PlayerSkipBonusDamagePct` 及访问器；`GetPlayerAttackDamage` 的加成分支因值恒为 0 而移除，结果不变）、塔形态 5 项（`TowerActiveForm/FormSwitchCooldown/FormLastSwitchTurn/FormCount/FormSwitchCooldownRemaining` 及访问器 / `SetTowerForms`）、塔词缀 / 重铸 5 项（`TowerAffixSlotCount/Ids/StackCount/LockMask`、`TowerReforgeCount` 及访问器）、`ObstacleType`（`AddObstacle` 签名不变，参数忽略）。每个 store 约少 3.2 MB（静态估算，未实测）。
+- 保留：`WaveSkipConfig` 迁入 `Core/GameConfig.cs`（同命名空间）以维持 `GameConfig.WaveSkip` 配置结构；障碍物其余 store 数组仍被 `TowerAttackSystem`/`PathBlockSystem` 读取；枚举成员未动；未改 `game_config.json`/`GameConfig` 字段。已成孤儿的配置：`WaveSkip`、`Reforge`、`TowerAffixes`、塔 `forms`（原由 `SetTowerForms` 应用）、`ObstacleDefs`（仅 `ObstacleSystem` 读取）。
+- 验证：见提交信息；完整测试套件（门禁 4）因内存限制未运行，mode 2/4/5 压测按计划延期。
+
 ### 2026-10-27（退役从未构造的独立系统 B4a）
 - 产品决策为退役：`HitTriggerSystem`、`EnemyCloneSystem`、`EnemyTeleportSystem`、`PortalSystem` 无任何构造点、`SystemRegistry` 属性、recipe、spec 条目或 Unity 引用（`TowerMergeSystem` 此前已随 `6621ab3` 删除）。删除 4 个源文件（641 行）；`SimulationRngGuardTests` 的文件名列表去掉对应 3 项（未放宽）。审计 V-05 S-a。
 - 保留（后续）：`EnemyClone*` / `EnemyIsClone` / `EnemyTeleportCooldown` 等仅这些系统使用的 store 数组本批未动，留待 store 清理批次；未改 `game_config.json`/`GameConfig`。

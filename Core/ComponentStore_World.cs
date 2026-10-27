@@ -200,7 +200,6 @@ namespace BattleSystemECS.Core
         public float[] ObstacleHealth = new float[MAX_OBSTACLES];
         public float[] ObstacleX = new float[MAX_OBSTACLES];
         public float[] ObstacleY = new float[MAX_OBSTACLES];
-        public int[] ObstacleType = new int[MAX_OBSTACLES];  // index into ObstacleDefs[]
         // Destructible on-destroy hook (Round 95 Direction 5): 0=None, 1=Gold, 2=Explosion
         public int[] ObstacleOnDestroyEffect = new int[MAX_OBSTACLES];
         // Magnitude of the on-destroy effect: Gold=gold amount, Explosion=% maxHp as damage
@@ -371,7 +370,6 @@ namespace BattleSystemECS.Core
         {
             if (obstacleId < 0 || obstacleId >= MAX_OBSTACLES) return;
             ObstacleActive[obstacleId] = true;
-            ObstacleType[obstacleId] = typeId;
             ObstacleX[obstacleId] = x;
             ObstacleY[obstacleId] = y;
             ObstacleHealth[obstacleId] = maxHealth;
@@ -388,7 +386,6 @@ namespace BattleSystemECS.Core
             ObstacleHealth[obstacleId] = 0f;
             ObstacleX[obstacleId] = 0f;
             ObstacleY[obstacleId] = 0f;
-            ObstacleType[obstacleId] = -1;
             ObstacleOnDestroyEffect[obstacleId] = 0;
             ObstacleOnDestroyValue[obstacleId] = 0f;
             _activeObstacleIds.Remove(obstacleId);

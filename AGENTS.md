@@ -97,7 +97,7 @@ BattleSystem-ECS/
 │   ├── 枚举                          # BuffType / DamageType / ElementType / EnemyActionType / GameState / TowerTargetingMode / TowerType
 │   ├── Polyfill                     # IsExternalInit / Rng / PolyfillExtensions（netstandard2.1 兼容）
 │   └── 配置 / 日志 / 工具            # GameConfig(+Loader) / SpatialGrid / TechTreeDef / CurveTable / *Logger / StateMachine / Entity(+Manager) 等
-├── Systems/                         # 游戏系统（137 个，编译到 Core 库）
+├── Systems/                         # 游戏系统（132 个，编译到 Core 库）
 │   └── 按职责拆分（生成 / AI / 移动 / 攻击 / 塔 / 技能 / Buff / 经济 / 天气 / 地形 …），逐一举列无意义，统一经 SystemRegistry 装配
 ├── Data/                            # 静态数据与运行时配置
 │   ├── Configs/                     # 行为树、技能、科技树、塔位、波次、阶段、自动技能

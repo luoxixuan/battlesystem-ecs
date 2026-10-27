@@ -414,17 +414,6 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // ShopRerollMaxSlots: cap for offer slot storage (matches ShopRerollConfig.OfferSlotCount, default 3)
         public const int MAX_SHOP_OFFER_SLOTS = 8;
 
-        // ==================== Wave Skip Reward System (SOA) ====================
-        // PlayerWaveSkipsUsed: number of times this player has used a "skip wave" reward
-        // option in the current level. Capped at WaveSkipConfig.MaxSkipsPerLevel (default 3).
-        // Default 0 = no skips used yet. Reset on AddPlayer (fresh game).
-        public int[] PlayerWaveSkipsUsed = new int[MAX_PLAYERS];
-        // PlayerSkipBonusDamagePct: additive damage multiplier bonus accumulated from all
-        // wave-skip purchases this level (e.g. 0.30f = +30% damage for the rest of the level).
-        // Stacks additively: 3 skips @ 0.10 each = 0.30. Default 0 = no bonus.
-        // Applied multiplicatively at damage apply time via GetPlayerAttackDamage().
-        public float[] PlayerSkipBonusDamagePct = new float[MAX_PLAYERS];
-
         // ==================== Combo Chain Bonus (SOA) ====================
         // PlayerChainKillCount: consecutive kill count within the chain window (resets when window expires).
         // Increments on each OnEnemyKilled event; when count >= ChainKillThreshold, fires a global
@@ -535,14 +524,11 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             // Reset both fields to avoid leaking prior slot occupant's active bullet-time into a new game.
             PlayerBulletTimeTurnsLeft[entityId] = 0f;
             PlayerBulletTimeScale[entityId] = 1f;
-            // Wave Skip Reward: reset both counters to 0 so each new game starts fresh.
-            PlayerWaveSkipsUsed[entityId] = 0;
             // Time Rewind snapshot ring: reset head/filled/tick so the new game starts with an empty buffer.
             // Existing snapshot HP/Mana/Shield are simply overwritten on the first tick.
             PlayerSnapshotHead[entityId] = 0;
             PlayerSnapshotFilled[entityId] = 0;
             PlayerSnapshotTick[entityId] = 0f;
-            PlayerSkipBonusDamagePct[entityId] = 0f;
             // Combo Chain: reset both fields to 0 so a new game starts with no chain active.
             PlayerChainKillCount[entityId] = 0;
             PlayerChainKillBuffTimer[entityId] = 0f;
@@ -643,46 +629,13 @@ PlayerCrestActiveId[entityId] = "";
         public float GetPlayerAttackDamage(int playerId)
         {
             if (!IsValidPlayer(playerId)) return 0f;
-            // Wave-skip reward: apply additive bonus (default 0 = no-op, backward compatible).
-            // Skip-purchased bonus stacks additively so 3 skips @ 0.10 each = 0.30 (i.e. +30% dmg).
-            float baseDmg = PlayerAttackDamage[playerId];
-            float bonus = PlayerSkipBonusDamagePct[playerId];
-            return bonus > 0f ? baseDmg * (1f + bonus) : baseDmg;
+            return PlayerAttackDamage[playerId];
         }
 
         public void SetPlayerAttackDamage(int playerId, float damage)
         {
             if (!IsValidPlayer(playerId)) return;
             PlayerAttackDamage[playerId] = damage;
-        }
-
-        // ==================== Wave Skip Reward accessors ====================
-        /// <summary>Returns how many wave-skip rewards this player has purchased this level.</summary>
-        public int GetPlayerWaveSkipsUsed(int playerId)
-        {
-            if (!IsValidPlayer(playerId)) return 0;
-            return PlayerWaveSkipsUsed[playerId];
-        }
-
-        /// <summary>Sets the wave-skip purchase count (used by WaveSkipSystem at purchase time).</summary>
-        public void SetPlayerWaveSkipsUsed(int playerId, int count)
-        {
-            if (!IsValidPlayer(playerId)) return;
-            PlayerWaveSkipsUsed[playerId] = Math.Max(0, count);
-        }
-
-        /// <summary>Returns the cumulative additive damage bonus from wave-skip purchases (0 = none).</summary>
-        public float GetPlayerSkipBonusDamagePct(int playerId)
-        {
-            if (!IsValidPlayer(playerId)) return 0f;
-            return PlayerSkipBonusDamagePct[playerId];
-        }
-
-        /// <summary>Sets the cumulative skip damage bonus (used by WaveSkipSystem at purchase time).</summary>
-        public void SetPlayerSkipBonusDamagePct(int playerId, float pct)
-        {
-            if (!IsValidPlayer(playerId)) return;
-            PlayerSkipBonusDamagePct[playerId] = Math.Max(0f, pct);
         }
 
         public float GetPlayerGold(int playerId)
@@ -1149,63 +1102,6 @@ PlayerCrestActiveId[entityId] = "";
         public float[] HeroAttackSpeed = new float[MAX_HEROES];
         // HeroCooldown: remaining cooldown in seconds (0 = ready to attack)
         public float[] HeroCooldown = new float[MAX_HEROES];
-
-        // ==================== Totem System (SOA, pool-based) ====================
-        // MAX_TOTEMS: global pool size shared across all players. A totem is a
-        // placed stationary object (healing/mana/fire/stun) — small pool because
-        // they're expensive and short-lived (10-15s).
-        public const int MAX_TOTEMS = 32;
-        // TotemActive: whether this pool slot currently has a live totem.
-        public bool[] TotemActive = new bool[MAX_TOTEMS];
-        // TotemOwnerId: which player placed this totem (-1 = none).
-        public int[] TotemOwnerId = new int[MAX_TOTEMS];
-        // TotemType: 0=None, 1=Healing, 2=Mana, 3=Searing (fire DoT), 4=Tremor (stun).
-        public int[] TotemType = new int[MAX_TOTEMS];
-        // TotemPosX/Y: world position the totem was placed at.
-        public float[] TotemPosX = new float[MAX_TOTEMS];
-        public float[] TotemPosY = new float[MAX_TOTEMS];
-        // TotemDurationLeft: seconds remaining before auto-expire.
-        public float[] TotemDurationLeft = new float[MAX_TOTEMS];
-        // TotemChargesLeft: remaining trigger count (0 = unlimited time-based only).
-        public int[] TotemChargesLeft = new int[MAX_TOTEMS];
-        // TotemCooldown: AbilityState 冷却投影（图腾脉冲间隔，单位秒）。
-        public MechanismCooldownColumn TotemCooldown =
-            new MechanismCooldownColumn(new AbilityState[MAX_TOTEMS], MechanismAbilityIds.TotemPulse);
-        // TotemPlayerCooldown: 玩家再召唤冷却。
-        public MechanismCooldownColumn PlayerTotemCooldown =
-            new MechanismCooldownColumn(new AbilityState[MAX_PLAYERS], MechanismAbilityIds.TotemSummon);
-
-        // ── Totem accessors (called by TotemSystem) ───────────────────────
-        /// <summary>Allocate a totem slot from the pool. Returns -1 if full.</summary>
-        public int AddTotem(int ownerId, int totemType, float x, float y, float duration, int charges, float triggerInterval)
-        {
-            for (int i = 0; i < MAX_TOTEMS; i++)
-            {
-                if (TotemActive[i]) continue;
-                TotemActive[i] = true;
-                TotemOwnerId[i] = ownerId;
-                TotemType[i] = totemType;
-                TotemPosX[i] = x;
-                TotemPosY[i] = y;
-                TotemDurationLeft[i] = duration;
-                TotemChargesLeft[i] = charges;
-                TotemCooldown[i] = triggerInterval; // first trigger after this many seconds
-                return i;
-            }
-            return -1; // pool full
-        }
-
-        /// <summary>Remove a totem by slot id. No-op if already inactive.</summary>
-        public void RemoveTotem(int totemId)
-        {
-            if (totemId < 0 || totemId >= MAX_TOTEMS) return;
-            TotemActive[totemId] = false;
-            TotemOwnerId[totemId] = -1;
-            TotemType[totemId] = 0;
-            TotemDurationLeft[totemId] = 0f;
-            TotemChargesLeft[totemId] = 0;
-            TotemCooldown[totemId] = 0f;
-        }
 
         // ── Round 130 Inventory accessors ─────────────────────────────────────
         // Compute flat index into per-player inventory arrays.

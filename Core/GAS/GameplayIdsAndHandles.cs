@@ -91,8 +91,6 @@ namespace BattleSystemECS.Core.GAS
     {
         public static readonly AbilityId Burrow = new AbilityId(1000001);
         public static readonly AbilityId Leap = new AbilityId(1000002);
-        public static readonly AbilityId TotemPulse = new AbilityId(1000003);
-        public static readonly AbilityId TotemSummon = new AbilityId(1000004);
     }
 
     public readonly struct ExecutionContext

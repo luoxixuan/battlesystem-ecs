@@ -22,7 +22,7 @@ namespace BattleSystemECS.Systems
         // 0 = ready, >0 = frames remaining. Decremented per frame in Tick.
         private const int TRAP_COOLDOWN_FRAMES = 5; // 5 frames between re-triggers per enemy-trap pair
         // Reused damage queue to apply trap damage to enemies — no per-frame allocation.
-        // Same pattern as ObstacleSystem._trapDamageQueue.
+        // 同类缓冲（原 ObstacleSystem 已退役）。
         private readonly System.Collections.Generic.List<(int enemyId, float damage)> _damageQueue
             = new System.Collections.Generic.List<(int, float)>(64);
         private int[] _cooldownEnemyIds = Array.Empty<int>();

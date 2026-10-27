@@ -4262,3 +4262,24 @@ namespace BattleSystemECS.Config
         public const float RallyCooldown = 5.0f;
     }
 }
+
+// WaveSkipConfig 保留在 Systems 命名空间以维持 GameConfig.WaveSkip 的类型名与 JSON 配置结构；
+// 其消费方 WaveSkipSystem 已退役（从未构造），该配置段目前无任何读取方。
+namespace BattleSystemECS.Systems
+{
+    /// <summary>
+    /// Wave Skip Reward configuration — controls the cost, bonus magnitude, and per-level cap
+    /// for BuildPhase "skip wave → gain bonus" purchases.
+    /// </summary>
+    public class WaveSkipConfig
+    {
+        /// <summary>Master switch. Default: true</summary>
+        public bool Enabled { get; set; } = true;
+        /// <summary>Gold cost per skip purchase. Default: 50</summary>
+        public float SkipCost { get; set; } = 50f;
+        /// <summary>Additive damage bonus granted per skip (0.10 = +10% dmg). Default: 0.10</summary>
+        public float SkipDamageBonusPct { get; set; } = 0.10f;
+        /// <summary>Hard cap on skips per level. Default: 3</summary>
+        public int MaxSkipsPerLevel { get; set; } = 3;
+    }
+}

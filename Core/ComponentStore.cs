@@ -1828,7 +1828,7 @@ namespace BattleSystemECS.Core
             TowerPatrolWaypointIndex = null!; TowerPatrolDirection = null!;
             TowerPatrolAttackSpeedPenalty = null!;
             ObstacleActive = null!; ObstacleHealth = null!;
-            ObstacleX = null!; ObstacleY = null!; ObstacleType = null!;
+            ObstacleX = null!; ObstacleY = null!;
             HazardZoneActive = null!; HazardZoneX = null!; HazardZoneY = null!;
             HazardZoneRadius = null!; HazardZoneMaxRadius = null!;
             HazardZoneType = null!; HazardZoneDuration = null!;

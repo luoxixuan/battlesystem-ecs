@@ -57,7 +57,6 @@ namespace BattleSystemECS.Tests.Framework
                 "WaveSpawningSystem.cs",
                 "CraftingSystem.cs",
                 "PreFightBuffSystem.cs",
-                "ReforgeSystem.cs",
                 "TowerModifierSystem.cs"
             };
             foreach (string name in systems)
