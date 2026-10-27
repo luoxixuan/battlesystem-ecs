@@ -1,5 +1,14 @@
 # 更新记录 (Changelog)
 
+### 2026-10-27（退役无效果的 Fear / SuicideBomb / TowerStealth 系统 B3）
+- 产品决策为退役而非接线：`FearSystem`、`SuicideBombSystem`、`TowerStealthSystem` 每帧运行但输入（`TowerFear*`、`EnemyIsSuicide`/`EnemySuicide*`、`TowerStealthType`）无任何生产写入方、无配置字段、无 JSON 键，永远不可能产生效果；`FearSystem` 另有每帧 100,000 槽串行扫描。审计 V-03 / V-04 / V-07。
+- 走注册链删除：spec 3 个条目、`SystemRegistrationRecipes` 的 Create/Wire/Bind、`SystemRegistry` 属性、`AIGroup`/`CombatGroup` 槽位与帧绑定、`FrameSystemGraph` 4 个节点（`ai.fear.prepare`/`ai.fear.update`/`combat.suicide-bomb.update`/`combat.stealth.update`）及 `FrameBindingFacts`/`FrameAccessReviewCatalog`/`FrameAdapterBindingCatalog` 条目；重新生成 manifest 与 nullable ledger；删除 3 个系统源文件（659 行）与仅它们使用的 `ITowerTargetingView` 接口、`FrameResource.SuicideExplosionPrepared`。
+- 删除仅这些系统使用的 15 个 SOA 数组（敌人 7：`EnemyFearDurationLeft/IsFeared/FearResistance`、`EnemyIsSuicide`、`EnemySuicideTriggerRange/DmgRadius/DmgAmount`；塔 8：`TowerFearRadius/Duration/Chance`、`TowerIsStealthed/StealthType/DecloakOnFire/StealthTimer/StealthDuration`），每个 store 约少 4.8 MB（静态估算，未实测）。
+- 拓扑变化（节点相对顺序不变）：生产节点 198 → 194；Gameplay 拓扑 hash `f8e73222…` → `f6c62a95…`，FixedPopulation 拓扑 hash `80587fa0…` → `035d953b…`；访问审阅根指纹 Gameplay `3ebc0929…` → `e57d1ea0…`、FixedPopulation `e3a1058d…` → `14ba39e2…`；`ReportedEarlyNodeCount` 92 → 90、`ReportedCombatNodeCount` 84 → 82、`ReportedUnionNodeCount` 212 → 208。原因：仅为删除 4 个节点，无其他语义变化。
+- 测试：删除仅测这些系统的 `SuicideExplosionsDrainByActiveIndexAcrossRounds`、`Assembly_SuicideBomb_ReceivesNonNullReflectAndStealth`；`TurnBasedTimersIgnoreDeltaMagnitude`、`BulletTimeDoesNotScaleTurnBasedAiTimers` 去掉 fear 部分，其余保留。Golden/Replay/DeterminismSoak 摘要未变（这些系统本就是 no-op）。
+- 保留（后续）：`EnemyActionType.Fear` 枚举与 `EnemyMovementSystem` 中对应分支（现已不可达）、`TowerType.Stealth` 等枚举成员；本批未改 `game_config.json`/`GameConfig`（没有仅供这三个系统读取的配置字段）。
+- 验证：Engine/Core/EXE/Tests 构建 0 warning 0 error；聚焦 `--filter` 测试（FrameScheduler/FrameGraph/SystemRegistry/Installer/Golden/Replay/DeterminismSoak/ParallelCollect 等 493 个）通过；Unity 运行时脚本 Roslyn 编译检查仍为基线 3 个 `FrameScheduler.Spawning` 错误，无新增。完整测试套件（门禁 4）因内存限制未运行；mode 2/4/5 压测按计划延期。
+
 ### 2026-10-27（删除死 SOA 数组 B2）
 - 删除 `ComponentStore*` 中 35 个无读取方的 SOA 数组：审计 V-02（6 个无任何访问）+ V-08（29 个只在生命周期 / 重置中写入、从无读取）；同时删除声明、分配、`Dispose` 置空、重置与纯写入赋值，以及只触碰这些字段的测试断言（`SiegeEnemyTests`、`TerrainZoneSystemTests`、`CorpseEffectSystemTests`、`CatalogEntryBehaviorMatrixTests`、`FrameSchedulerTests` 的相应行）。
 - 估算每个 store 少分配约 8.7 MB（静态：元素大小 × 长度，未实测）。`TowerKillCount`（Unity 读取）保留；本批无其他保留项：35 个数组在 Core/Systems/Tests/Program/tools 与 Unity `Assets` 全量重扫后均无读取方。

@@ -13,8 +13,8 @@ namespace BattleSystemECS.Core
         internal const string CommitArtifactSha256 = "3E38DB03DF92438283631D554E7D61B14B4624C129E67876522CB62D6D8421C1";
         internal const string SupplementalArtifactSha256 = "EA9FA8D9563DD0AEE189B6873573659C8C9CB3EE6E057873EDBD0932754A11FE";
         internal static int ReviewedNodeCount => Reviews.Count;
-        internal const int ReportedEarlyNodeCount = 92;
-        internal const int ReportedCombatNodeCount = 84;
+        internal const int ReportedEarlyNodeCount = 90;
+        internal const int ReportedCombatNodeCount = 82;
         internal const int ReportedPostDeathNodeCount = 52;
         internal const int ReportedEarlyCombatOverlap = 0;
         internal const int ReportedEarlyPostDeathOverlap = 12;
@@ -50,8 +50,6 @@ namespace BattleSystemECS.Core
                 { "ai.enemy-strafe.update", "FG-ACCESS-20260901/ai.enemy-strafe.update" },
                 { "ai.enemy.prepare", "FG-ACCESS-20260901/ai.enemy.prepare" },
                 { "ai.enemy.update", "FG-ACCESS-20260901/ai.enemy.update" },
-                { "ai.fear.prepare", "FG-ACCESS-20260901/ai.fear.prepare" },
-                { "ai.fear.update", "FG-ACCESS-20260901/ai.fear.update" },
                 { "ai.life-link.cooldowns", "FG-ACCESS-20260901/ai.life-link.cooldowns" },
                 { "ai.life-link.prepare", "FG-ACCESS-20260901/ai.life-link.prepare" },
                 { "ai.life-link.update", "FG-ACCESS-20260901/ai.life-link.update" },
@@ -157,8 +155,6 @@ namespace BattleSystemECS.Core
                 { "combat.shrine.prepare", "FG-ACCESS-20260901/combat.shrine.prepare" },
                 { "combat.shrine.resolve", "FG-ACCESS-20260901/combat.shrine.resolve" },
                 { "combat.silence.update", "FG-ACCESS-20260901/combat.silence.update" },
-                { "combat.stealth.update", "FG-ACCESS-20260901/combat.stealth.update" },
-                { "combat.suicide-bomb.update", "FG-ACCESS-20260901/combat.suicide-bomb.update" },
                 { "combat.synergy.resolve-buff-shares", "FG-ACCESS-20260901/combat.synergy.resolve-buff-shares" },
                 { "combat.synergy.update", "FG-ACCESS-20260901/combat.synergy.update" },
                 { "combat.taunt.resolve", "FG-ACCESS-20260901/combat.taunt.resolve" },
@@ -269,8 +265,8 @@ namespace BattleSystemECS.Core
             };
 
         // 生产 profile 按 NodeId 排序后的完整根指纹；任何节点或元数据变化都必须重新审阅。
-        internal const string ApprovedFingerprintRootGameplay = "3ebc09292753d686abf21465d835c12139961f09771c4ce2b05bdd971f31854a";
-        internal const string ApprovedFingerprintRootFixedPopulation = "e3a1058d9e25420c285903f22d564056ff5ecc8c4e2e3b97e1101e851866a266";
+        internal const string ApprovedFingerprintRootGameplay = "e57d1ea02e40b81f3362f3bed270c9495ad8f5d19eee1c4ae8fde710f8fb45ce";
+        internal const string ApprovedFingerprintRootFixedPopulation = "14ba39e2c615c386b203c250a4663bcbfa95a6b3eb4fe4a6003f9944d1754d23";
 
         public static bool TryGet(string nodeId, out FrameAccessReviewId reviewId) =>
             Reviews.TryGetValue(nodeId, out reviewId);

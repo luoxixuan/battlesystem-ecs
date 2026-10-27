@@ -39,7 +39,7 @@ namespace BattleSystemECS.Core
         ElementalReactionPrepared, HealAuraPrepared, ThornsAuraPrepared, HealingZonePrepared,
         RandomEventCallbacks, WaveCallbacks, PersistentStatePublished, EnemyAiPrepared,
         BurrowEmergePrepared, LifeLinkPrepared, LifeLinkBreakPenaltyPrepared,
-        SuicideExplosionPrepared, HeroAttackPrepared, BleedPrepared, FrostbitePrepared,
+        HeroAttackPrepared, BleedPrepared, FrostbitePrepared,
         EnemyAiDeathFacts, BossTrailPrepared, ManaBurnPrepared, DodgePrepared
     }
 

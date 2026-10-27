@@ -10,8 +10,8 @@ namespace BattleSystemECS.Systems
     /// path as they advance. When the boss's path progress (EnemyPathNodeIndex / waypoint
     /// count) advances by BossTrailProgressInterval, a trail AoE event is queued at the
     /// boss's current position. At end-of-frame the events are drained serially:
-    ///   (a) Damage to the player (matches codebase convention — see SuicideBombSystem
-    ///       ApplyDamageToTowers, where "enemy AoE damaging towers" reduces PlayerHealth).
+    ///   (a) Damage to the player（沿用 enemy AoE 的既有约定：
+    ///       "enemy AoE damaging towers" 会扣减 PlayerHealth）。
     ///   (b) Slow to all nearby enemies in the trail radius.
     ///
     /// This system holds NO per-frame state of its own beyond the event queue. The actual
@@ -128,7 +128,7 @@ namespace BattleSystemECS.Systems
                     BossTrailEvent evt=_events[eventIndex];
 
                     // (a) Damage to player if within radius. No "is player alive" gate —
-                    // matches SuicideBombSystem convention (always apply damage if in range;
+                    // 与其他 enemy AoE 系统约定一致 (always apply damage if in range;
                     // dead players naturally clamp at 0). The trail damage respects the
                     // same convention as other enemy-AoE systems.
                     float r2 = evt.Radius * evt.Radius;

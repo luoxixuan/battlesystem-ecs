@@ -178,11 +178,6 @@ namespace BattleSystemECS.Content.Contracts
         void QueueReflect(int towerId, int attackingEnemyId, float damageReceived);
         void QueueRetaliate(int towerId, int attackingEnemyId, float damage);
     }
-    public interface ITowerTargetingView
-    {
-        bool CanTargetTower(int towerId, int enemyId);
-        float GetStealthDamageMultiplier(int towerId);
-    }
     public interface IBleedCommandPort
     { void ApplyBleedFromTower(int towerId, int targetId, float stacksToApply, float dmgPerStack, float duration); }
     public interface ICullingPass { void ScanAndCull(); }

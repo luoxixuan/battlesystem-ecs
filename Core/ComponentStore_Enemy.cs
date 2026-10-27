@@ -689,7 +689,7 @@ namespace BattleSystemECS.Core
         // the path, drops periodic damaging AoE at its current position. Default 0/false = no trail.
         // EnemyBossTrailRadius: world-unit radius of each trail AoE.
         // EnemyBossTrailDamage: damage dealt to player per trail tick (matches codebase convention
-        // for "AoE damages player when enemies attack towers" — see SuicideBombSystem.ApplyDamageToTowers).
+        // for "AoE damages player when enemies attack towers").
         // EnemyBossTrailSlow: slow factor (0.5 = 50% slow) applied to nearby enemies for 1 frame.
         // 0 = no slow applied.
         // EnemyBossTrailProgressInterval: how much path progress (0-1) the boss must advance
@@ -711,12 +711,6 @@ namespace BattleSystemECS.Core
         public float[] EnemyTeleportDestinationY = new float[MAX_ENTITIES];
         // EnemyTeleportType: 0=none, 1=blink_to_destination, 2=portal_entry, 3=random_phase_ahead, 4=retreat_to_player
         public int[] EnemyTeleportType = new int[MAX_ENTITIES];
-
-        // ==================== Fear / Taunt / Charm 行为控制字段（SOA） ====================
-        // EnemyFearDurationLeft: turns remaining for fear effect. When > 0, enemy runs away (direction = +1).
-        public float[] EnemyFearDurationLeft = new float[MAX_ENTITIES];
-        // EnemyIsFeared: bool flag set when enemy is currently under fear effect (synced from fear duration)
-        public bool[] EnemyIsFeared = new bool[MAX_ENTITIES];
 
         // ==================== 敌人抗性字段（SOA） ====================
         // EnemyStunResistance: 0-1, reduces stun duration and chance
@@ -768,8 +762,6 @@ namespace BattleSystemECS.Core
         // monsters typically set 3-10 (= 0.3-1.0s @ 10Hz tick rate) to throttle high-frequency
         // DoT and multishot-tower bursts.
         public int[] EnemyInvulnOnHitFrames = new int[MAX_ENTITIES];
-        // EnemyFearResistance: 0-1, reduces fear duration fraction (1 = complete fear immunity)
-        public float[] EnemyFearResistance = new float[MAX_ENTITIES];
 
         // ==================== 穿透抗性 (Pierce Resistance — anti-pierce-tower) ====================
         // EnemyPierceResist: 0-1, fraction of piercing damage that is ignored (0 = no resist, 0.75 = 75% pierce damage blocked).
@@ -797,16 +789,6 @@ namespace BattleSystemECS.Core
         // EnemyRecentDamageFrame: last frame at which EnemyRecentDamageSum was touched (set/added). Combined
         // with CurrentFrame, used to lazily expire the rolling window. 0 = uninitialized (no recent damage).
         public int[] EnemyRecentDamageFrame = new int[MAX_ENTITIES];
-
-        // ==================== 自爆/殉爆敌人 (Suicide Bomber / Kamikaze, SOA) ====================
-        // EnemyIsSuicide: true if this enemy is a suicide bomber that explodes near towers
-        public bool[] EnemyIsSuicide = new bool[MAX_ENTITIES];
-        // EnemySuicideTriggerRange: radius within which a suicide enemy triggers its explosion (distance to nearest tower)
-        public float[] EnemySuicideTriggerRange = new float[MAX_ENTITIES];
-        // EnemySuicideDmgRadius: AoE explosion radius when the suicide enemy detonates
-        public float[] EnemySuicideDmgRadius = new float[MAX_ENTITIES];
-        // EnemySuicideDmgAmount: raw damage of the suicide explosion (before falloff)
-        public float[] EnemySuicideDmgAmount = new float[MAX_ENTITIES];
 
         // ==================== 敌人移动方向（背刺系统 SOA）====================
         // EnemyMoveDirX: normalized X component of enemy's current movement direction

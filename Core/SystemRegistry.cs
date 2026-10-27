@@ -201,11 +201,8 @@ namespace BattleSystemECS.Core
         public TowerSabotageSystem? TowerSabotage { get; private set; }
         public ManaBurnSystem? ManaBurn { get; private set; }
         public PhaseSystem? Phase { get; private set; }
-        public FearSystem? Fear { get; private set; }
         public EnemyStrafeSystem? EnemyStrafe { get; private set; }
-        public SuicideBombSystem? SuicideBomb { get; private set; }
         public ReflectTowerSystem? ReflectTower { get; private set; }
-        public TowerStealthSystem? TowerStealth { get; private set; }
         public PathBlockSystem? PathBlock { get; private set; }
 
         // ── Desperation / Last Stand ──

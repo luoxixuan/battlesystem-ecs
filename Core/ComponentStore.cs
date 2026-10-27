@@ -1048,8 +1048,6 @@ namespace BattleSystemECS.Core
                 EnemySapperRange[entityId] = 0f;
                 EnemyArmorShredStacks[entityId] = 0f;
                 EnemyArmorShredDuration[entityId] = 0f;
-                // Fear / Taunt / Charm fields
-                EnemyFearDurationLeft[entityId] = 0f;
                 // Nest / spawner fields
                 NestDefId[entityId] = -1;
                 NestHealth[entityId] = 0f;
@@ -1105,7 +1103,6 @@ namespace BattleSystemECS.Core
                 // I-frames (Round 118): reset remaining invuln frames and per-monster config
                 EnemyInvulnFramesLeft[entityId] = 0;
                 EnemyInvulnOnHitFrames[entityId] = 0;
-                EnemyFearResistance[entityId] = 0f;
                 // Curse debuff fields (applied by curse towers)
                 EnemyCurseDmgReduction[entityId] = 0f;
                 // Round 83: Elemental Exposure — reset to default (no exposure, no timer)
@@ -1741,7 +1738,6 @@ namespace BattleSystemECS.Core
             EnemyLeapDuration = null!; EnemyLeapStartX = null!; EnemyLeapStartY = null!;
             EnemyLeapTargetX = null!; EnemyLeapTargetY = null!; EnemyLeapElapsed = null!;
             EnemyLeapDamage = null!; EnemyLeapRadius = null!; EnemyLeapStunDuration = null!;
-            EnemyFearDurationLeft = null!;
             EnemyStunResistance = null!; EnemyFreezeResistance = null!; EnemySlowResistance = null!;
             EnemyKnockbackResistance = null!; EnemyDamageResistance = null!;
             EnemyIsVanguard = null!; EnemyVanguardCoverRange = null!; EnemyVanguardDmgTransfer = null!;

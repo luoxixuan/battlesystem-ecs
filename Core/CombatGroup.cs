@@ -49,10 +49,8 @@ namespace BattleSystemECS.Core
         public Systems.HitShieldSystem? HitShield { get; set; }
         public Systems.TowerSabotageSystem? TowerSabotage { get; set; }
         public Systems.HeroSystem? Hero { get; set; }
-        public Systems.SuicideBombSystem? SuicideBomb { get; set; }
         public Systems.ReflectTowerSystem? ReflectTower { get; set; }
         public Systems.TowerMorphSystem? TowerMorph { get; set; }
-        public Systems.TowerStealthSystem? TowerStealth { get; set; }
         public Systems.TauntSystem? Taunt { get; set; }
         // Round 138 — Per-Tower Active Skill (manual cast, cooldown-tick). Wired after
         //   TowerAttack so its per-frame cooldown tick happens alongside other tower
@@ -120,7 +118,6 @@ namespace BattleSystemECS.Core
             if(Demolish!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.demolish.update"),c=>Demolish?.Update());
             if(HitShield!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.hit-shield.update"),c=>HitShield?.Update(c.Delta));
             if(TowerSabotage!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.sabotage.update"),c=>TowerSabotage?.Update(c.Delta));
-            if(TowerStealth!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.stealth.update"),c=>TowerStealth?.Update(c.Delta));
             if(TowerSynergy!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("combat.synergy.resolve-buff-shares"),c=>TowerSynergy?.ResolveBuffShares());s.RegisterFrameBinding(FrameBindingFacts.Get("combat.synergy.update"),c=>TowerSynergy?.Update());}
             if(TowerAttack!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.tower-attack.update"),c=>TowerAttack?.Update(c.Delta));
             if(TowerLink!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.link.update"),c=>TowerLink?.Update());
@@ -139,7 +136,6 @@ namespace BattleSystemECS.Core
             if(GlobalSkill!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.global-skill.update"),c=>GlobalSkill?.Update(c.Delta,false));
             if(BeamTower!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.beam.update"),c=>BeamTower?.Update(c.Delta));
             if(Hero!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.hero.update"),c=>Hero?.Update(c.Delta));
-            if(SuicideBomb!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.suicide-bomb.update"),c=>SuicideBomb?.Update());
             if(ReflectTower!=null){s.RegisterFrameBinding(FrameBindingFacts.Get("combat.reflect.resolve"),c=>ReflectTower?.ResolveReflect());s.RegisterFrameBinding(FrameBindingFacts.Get("combat.reflect.apply"),c=>ReflectTower?.ApplyReflectDamage());}
             if(TowerMorph!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.tower-morph.update"),c=>TowerMorph?.Update(c.Delta));
             if(Taunt!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.taunt.resolve"),c=>Taunt?.ResolveTauntAssignments());
@@ -163,7 +159,6 @@ namespace BattleSystemECS.Core
             Demolish?.Update();
             HitShield?.Update(deltaTime);
             TowerSabotage?.Update(deltaTime);
-            TowerStealth?.Update(deltaTime);
             // Round 103 — Buff Share: apply attack-speed sharing bonuses from sharing towers
             // onto nearby friendly towers. Must run BEFORE TowerAttack because TowerAttack
             // reads TowerAttackSpeed for cooldown / windup math.
@@ -199,7 +194,6 @@ namespace BattleSystemECS.Core
             GlobalSkill?.Update(deltaTime, isBuildPhase: false);
             BeamTower?.Update(deltaTime);
             Hero?.Update(deltaTime);
-            SuicideBomb?.Update();
             ReflectTower?.ResolveReflect();
             ReflectTower?.ApplyReflectDamage();
             TowerMorph?.Update(deltaTime);

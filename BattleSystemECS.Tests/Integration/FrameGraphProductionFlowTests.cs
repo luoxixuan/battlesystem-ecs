@@ -220,7 +220,7 @@ namespace BattleSystemECS.Tests.Integration
         [Fact]
         public void BulletTimeDoesNotScaleTurnBasedAiTimers()
         {
-            // Bug 回归：bullet-time 只缩放 EnemyDelta，不得改变按 Tick 计数的 burrow/fear/channel 持续回合数。
+            // Bug 回归：bullet-time 只缩放 EnemyDelta，不得改变按 Tick 计数的 burrow/channel 持续回合数。
             Config.EnemyAbilities=new List<EnemyAbilityDef>{new EnemyAbilityDef
             {Id="turn-cast",Name="turn-cast",AbilityType="self_heal",CastTime=2f,HealAmount=0f}};
             int playerId=Player(p=>p.Health=10000f);
@@ -228,8 +228,6 @@ namespace BattleSystemECS.Tests.Integration
                 scenarioKind:FrameScenarioKind.FixedPopulationBenchmark);
             int enemyId=Enemy(e=>{e.Health=100f;e.MaxHealth=100f;});
             runtime.Registry.EnemyBurrow!.TriggerBurrow(enemyId,2f,0f,0f,0f);
-            Store.EnemyIsFeared[enemyId]=true;
-            Store.EnemyFearDurationLeft[enemyId]=2f;
             runtime.Registry.EnemyAbility!.EnqueueAbility(enemyId,"turn-cast");
             Store.ActivateBulletTime(playerId,2f,0.1f);
             runtime.StateMachine.TransitionTo(GameState.BuildPhase);
@@ -239,16 +237,12 @@ namespace BattleSystemECS.Tests.Integration
 
             Assert.Equal(0.0016f,runtime.Scheduler.LastTimeContext.EnemyDelta,5);
             Assert.Equal(1f,Store.EnemyBurrowTimer[enemyId]);
-            Assert.Equal(1f,Store.EnemyFearDurationLeft[enemyId]);
             Assert.Equal(1f,Store.EnemyChannelTimer[enemyId]);
             FrameNodeAdapter burrow=Assert.Single(runtime.Scheduler.FrameGraphPlan,
                 n=>n.Metadata.Id.Value=="ai.burrow.update");
-            FrameNodeAdapter fear=Assert.Single(runtime.Scheduler.FrameGraphPlan,
-                n=>n.Metadata.Id.Value=="ai.fear.update");
             FrameNodeAdapter channel=Assert.Single(runtime.Scheduler.FrameGraphPlan,
                 n=>n.Metadata.Id.Value=="ai.enemy-ability.cast-timers");
             Assert.Equal(FrameTimeDomain.None,burrow.Metadata.TimeDomain);
-            Assert.Equal(FrameTimeDomain.None,fear.Metadata.TimeDomain);
             Assert.Equal(FrameTimeDomain.None,channel.Metadata.TimeDomain);
         }
 

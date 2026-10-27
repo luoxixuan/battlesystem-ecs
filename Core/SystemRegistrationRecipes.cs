@@ -613,14 +613,6 @@ internal static void WirePhase(SystemRegistry registry, ComponentStore store, in
 internal static void BindPhase(SystemRegistry registry, FrameScheduler scheduler) {
 scheduler.AI.Phase = registry.Phase;
 }
-internal static void CreateFear(SystemRegistry registry, ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus) {
-registry.Fear = new FearSystem(store, playerId);
-}
-internal static void WireFear(SystemRegistry registry, ComponentStore store, int playerId) {
-}
-internal static void BindFear(SystemRegistry registry, FrameScheduler scheduler) {
-scheduler.AI.Fear = registry.Fear;
-}
 internal static void CreateEnemyStrafe(SystemRegistry registry, ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus) {
 registry.EnemyStrafe = new EnemyStrafeSystem(store, logger);
 }
@@ -630,14 +622,6 @@ registry.TowerAttack!.SetEnemyStrafeSystem(registry.EnemyStrafe);
 internal static void BindEnemyStrafe(SystemRegistry registry, FrameScheduler scheduler) {
 scheduler.AI.EnemyStrafe = registry.EnemyStrafe;
 }
-internal static void CreateSuicideBomb(SystemRegistry registry, ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus) {
-registry.SuicideBomb = new SuicideBombSystem(store, playerId, registry.ReflectTower, registry.TowerStealth);
-}
-internal static void WireSuicideBomb(SystemRegistry registry, ComponentStore store, int playerId) {
-}
-internal static void BindSuicideBomb(SystemRegistry registry, FrameScheduler scheduler) {
-scheduler.Combat.SuicideBomb = registry.SuicideBomb;
-}
 internal static void CreateReflectTower(SystemRegistry registry, ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus) {
 registry.ReflectTower = new ReflectTowerSystem(store, playerId);
 }
@@ -646,14 +630,6 @@ internal static void WireReflectTower(SystemRegistry registry, ComponentStore st
 internal static void BindReflectTower(SystemRegistry registry, FrameScheduler scheduler) {
 scheduler.AI.ReflectTower = registry.ReflectTower;
 scheduler.Combat.ReflectTower = registry.ReflectTower;
-}
-internal static void CreateTowerStealth(SystemRegistry registry, ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus) {
-registry.TowerStealth = new TowerStealthSystem(store, playerId);
-}
-internal static void WireTowerStealth(SystemRegistry registry, ComponentStore store, int playerId) {
-}
-internal static void BindTowerStealth(SystemRegistry registry, FrameScheduler scheduler) {
-scheduler.Combat.TowerStealth = registry.TowerStealth;
 }
 internal static void CreatePathBlock(SystemRegistry registry, ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus) {
 registry.PathBlock = new PathBlockSystem(store);

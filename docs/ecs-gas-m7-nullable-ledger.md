@@ -71,11 +71,8 @@ Generated from explicit spec `tools/system-registration-spec.json` and verified 
 | TowerSabotage | TowerSabotageSystem |  | production-frame-binding | CreateTowerSabotage / WireTowerSabotage / BindTowerSabotage |
 | ManaBurn | ManaBurnSystem |  | production-frame-binding | CreateManaBurn / WireManaBurn / BindManaBurn |
 | Phase | PhaseSystem |  | production-frame-binding | CreatePhase / WirePhase / BindPhase |
-| Fear | FearSystem |  | production-frame-binding | CreateFear / WireFear / BindFear |
 | EnemyStrafe | EnemyStrafeSystem | TowerAttack | production-frame-binding | CreateEnemyStrafe / WireEnemyStrafe / BindEnemyStrafe |
-| SuicideBomb | SuicideBombSystem | ReflectTower,TowerStealth | production-frame-binding | CreateSuicideBomb / WireSuicideBomb / BindSuicideBomb |
 | ReflectTower | ReflectTowerSystem |  | production-frame-binding | CreateReflectTower / WireReflectTower / BindReflectTower |
-| TowerStealth | TowerStealthSystem |  | production-frame-binding | CreateTowerStealth / WireTowerStealth / BindTowerStealth |
 | PathBlock | PathBlockSystem |  | production-frame-binding | CreatePathBlock / WirePathBlock / BindPathBlock |
 | Desperation | DesperationSystem |  | production-frame-binding | CreateDesperation / WireDesperation / BindDesperation |
 | ShopReroll | ShopRerollSystem |  | production-frame-binding | CreateShopReroll / WireShopReroll / BindShopReroll |

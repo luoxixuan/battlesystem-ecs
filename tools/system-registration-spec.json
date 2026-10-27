@@ -2542,48 +2542,6 @@
       }
     },
     {
-      "id": "Fear",
-      "property": "Fear",
-      "serviceType": "FearSystem",
-      "enabled": true,
-      "featurePolicy": "production-frame-binding",
-      "reason": "",
-      "dependencies": [],
-      "ownerToken": "registration.Fear",
-      "frameBindings": [
-        {
-          "nodeId": "ai.fear.prepare",
-          "registrationId": "Fear",
-          "phase": "Wave",
-          "executionPolicy": "SerialPrepare",
-          "requiredTokens": [
-            "ComponentStore",
-            "registration.Fear"
-          ],
-          "providedTokens": []
-        },
-        {
-          "nodeId": "ai.fear.update",
-          "registrationId": "Fear",
-          "phase": "Wave",
-          "executionPolicy": "ParallelDisjointWrite",
-          "requiredTokens": [
-            "ComponentStore",
-            "registration.Fear"
-          ],
-          "providedTokens": []
-        }
-      ],
-      "providedTokens": [
-        "registration.Fear"
-      ],
-      "recipe": {
-        "factory": "CreateFear",
-        "wire": "WireFear",
-        "bind": "BindFear"
-      }
-    },
-    {
       "id": "EnemyStrafe",
       "property": "EnemyStrafe",
       "serviceType": "EnemyStrafeSystem",
@@ -2628,40 +2586,6 @@
       }
     },
     {
-      "id": "SuicideBomb",
-      "property": "SuicideBomb",
-      "serviceType": "SuicideBombSystem",
-      "enabled": true,
-      "featurePolicy": "production-frame-binding",
-      "reason": "",
-      "dependencies": [
-        "ReflectTower",
-        "TowerStealth"
-      ],
-      "ownerToken": "registration.SuicideBomb",
-      "frameBindings": [
-        {
-          "nodeId": "combat.suicide-bomb.update",
-          "registrationId": "SuicideBomb",
-          "phase": "Wave",
-          "executionPolicy": "InternalParallelCollectSerialCommit",
-          "requiredTokens": [
-            "ComponentStore",
-            "registration.SuicideBomb"
-          ],
-          "providedTokens": []
-        }
-      ],
-      "providedTokens": [
-        "registration.SuicideBomb"
-      ],
-      "recipe": {
-        "factory": "CreateSuicideBomb",
-        "wire": "WireSuicideBomb",
-        "bind": "BindSuicideBomb"
-      }
-    },
-    {
       "id": "ReflectTower",
       "property": "ReflectTower",
       "serviceType": "ReflectTowerSystem",
@@ -2701,37 +2625,6 @@
         "factory": "CreateReflectTower",
         "wire": "WireReflectTower",
         "bind": "BindReflectTower"
-      }
-    },
-    {
-      "id": "TowerStealth",
-      "property": "TowerStealth",
-      "serviceType": "TowerStealthSystem",
-      "enabled": true,
-      "featurePolicy": "production-frame-binding",
-      "reason": "",
-      "dependencies": [],
-      "ownerToken": "registration.TowerStealth",
-      "frameBindings": [
-        {
-          "nodeId": "combat.stealth.update",
-          "registrationId": "TowerStealth",
-          "phase": "Wave",
-          "executionPolicy": "SerialUpdate",
-          "requiredTokens": [
-            "ComponentStore",
-            "registration.TowerStealth"
-          ],
-          "providedTokens": []
-        }
-      ],
-      "providedTokens": [
-        "registration.TowerStealth"
-      ],
-      "recipe": {
-        "factory": "CreateTowerStealth",
-        "wire": "WireTowerStealth",
-        "bind": "BindTowerStealth"
       }
     },
     {

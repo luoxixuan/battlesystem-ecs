@@ -150,31 +150,6 @@ namespace BattleSystemECS.Tests.Features.Enemies
         }
 
         [Fact]
-        public void SuicideExplosionsDrainByActiveIndexAcrossRounds()
-        {
-            // Bug 回归：同塔多自爆敌不得用共享 bag 或共享随机数决定提交顺序。
-            int playerId=Player(p=>p.Health=100000f);
-            int towerId=RawTower(0,0,damage:0f);
-            const int enemyCount=64;
-            for(int i=0;i<enemyCount;i++)
-            {
-                int enemyId=Enemy(e=>{e.X=0f;e.Y=0f;e.Health=1000f;e.MaxHealth=1000f;});
-                Store.EnemyIsSuicide[enemyId]=true;
-                Store.EnemySuicideTriggerRange[enemyId]=1f;
-                Store.EnemySuicideDmgRadius[enemyId]=0.1f;
-                Store.EnemySuicideDmgAmount[enemyId]=10f;
-            }
-            Assert.True(Store.TowerActive[towerId]);
-            var system=new SuicideBombSystem(Store,playerId);
-            system.SetTurn(7);
-            system.Update();
-
-            Assert.Equal(100000f-enemyCount*10f,Store.PlayerCurrentHealth[playerId]);
-            Store.ResolveEnemiesKilledThisFrame();
-            Assert.Equal(0,Store.GetActiveEnemyCount());
-        }
-
-        [Fact]
         public void BleedAndFrostbitePreparedEventsDrainInEnemyIndexOrder()
         {
             // Bug 回归：DoT tick collect 必须按敌人槽独占写入并在屏障后稳定提交。
@@ -243,7 +218,7 @@ namespace BattleSystemECS.Tests.Features.Enemies
         [Fact]
         public void TurnBasedTimersIgnoreDeltaMagnitude()
         {
-            // Bug 回归：burrow/fear/channel 配置单位是 turn，0.016 不得把持续时间放大约 60 倍。
+            // Bug 回归：burrow/channel 配置单位是 turn，0.016 不得把持续时间放大约 60 倍。
             int playerId=Player();
             int burrowEnemy=Enemy();
             var burrow=new EnemyBurrowSystem(Store,playerId);
@@ -253,16 +228,6 @@ namespace BattleSystemECS.Tests.Features.Enemies
             burrow.TriggerBurrow(burrowEnemy,2f,0f,0f,0f);
             burrow.Update(1f);
             Assert.Equal(1f,Store.EnemyBurrowTimer[burrowEnemy]);
-
-            int fearEnemy=Enemy();
-            var fear=new FearSystem(Store,playerId);
-            Store.EnemyIsFeared[fearEnemy]=true;
-            Store.EnemyFearDurationLeft[fearEnemy]=2f;
-            fear.Update(0.016f);
-            Assert.Equal(1f,Store.EnemyFearDurationLeft[fearEnemy]);
-            Store.EnemyFearDurationLeft[fearEnemy]=2f;
-            fear.Update(1f);
-            Assert.Equal(1f,Store.EnemyFearDurationLeft[fearEnemy]);
 
             Config.EnemyAbilities=new System.Collections.Generic.List<EnemyAbilityDef>{new EnemyAbilityDef
             {Id="turn-cast",Name="turn-cast",AbilityType="self_heal",CastTime=2f,HealAmount=0f}};

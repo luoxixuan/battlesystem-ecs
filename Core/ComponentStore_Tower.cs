@@ -699,14 +699,6 @@ namespace BattleSystemECS.Core
         // EnemyIsBeingPulled: true if this enemy is currently affected by a pull effect
         public bool[] EnemyIsBeingPulled = new bool[MAX_ENTITIES];
 
-        // ==================== 恐惧光环塔 (Fear Aura Towers) ====================
-        // TowerFearRadius: radius within which enemies are affected by fear (0 = no fear aura)
-        public float[] TowerFearRadius = new float[MAX_ENTITIES];
-        // TowerFearDuration: duration of fear applied to enemies in the aura (in frames)
-        public float[] TowerFearDuration = new float[MAX_ENTITIES];
-        // TowerFearChance: probability (0-1) that fear is applied each frame an enemy is in range
-        public float[] TowerFearChance = new float[MAX_ENTITIES];
-
         // ==================== 流血/撕裂塔 (Bleed / Hemorrhage Towers) ====================
         // TowerIsBleedTower: true if this tower applies stacking bleed on hit (Slash/Pierce type)
         public bool[] TowerIsBleedTower = new bool[MAX_ENTITIES];
@@ -841,18 +833,6 @@ namespace BattleSystemECS.Core
         public int[] TowerPatrolDirection = new int[MAX_ENTITIES];
         // TowerPatrolAttackSpeedPenalty: attack speed multiplier while moving (e.g. 0.7 = 30% slower)
         public float[] TowerPatrolAttackSpeedPenalty = new float[MAX_ENTITIES];
-
-        // ==================== 塔隐形/伪装 (Tower Stealth) ====================
-        // TowerIsStealthed: true if this tower is currently hidden from enemies (True Sight penetrates)
-        public bool[] TowerIsStealthed = new bool[MAX_ENTITIES];
-        // TowerStealthType: 0=none, 1=Passive (always stealthed), 2=Active (decloak on attack), 3=SemiStealth (takes partial damage while stealthed)
-        public int[] TowerStealthType = new int[MAX_ENTITIES];
-        // TowerDecloakOnFire: true if this tower reveals itself when it attacks (type2: active)
-        public bool[] TowerDecloakOnFire = new bool[MAX_ENTITIES];
-        // TowerStealthTimer: countdown timer for temporary stealth (type 2 active, seconds remaining)
-        public float[] TowerStealthTimer = new float[MAX_ENTITIES];
-        // TowerStealthDuration: total duration for temporary stealth (type 2 active)
-        public float[] TowerStealthDuration = new float[MAX_ENTITIES];
 
         // ==================== 地图热区加成 (Hot Zone Terrain Bonus) ====================
         // TowerHotZoneDamageBonus: cached damage multiplier bonus from hot zone placement (e.g. 0.15 = +15%)

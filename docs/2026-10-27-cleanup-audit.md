@@ -12,7 +12,7 @@
 |---|---|---|
 | 34 `Systems/` classes (6,009 LOC) are never constructed by any production path; 18 of them are recorded `feature-disabled` in the registration spec, 2 more are reviewed-disabled FrameGraph nodes without spec entries | §3 V-05, App. S | V (product decision required) |
 | 88 SOA arrays are referenced only by those never-constructed systems — **≥ 21.8 MB per `ComponentStore`** (static estimate, lower bound) | §3 V-05, App. D | V |
-| `FearSystem` and `SuicideBombSystem` are registered, run every Wave frame, and can never have an effect (inputs have no writer, no config field, no JSON key). `FearSystem` does a 100,000-slot serial scan per frame | §3 V-03/V-04 | V (product decision: wire vs retire) |
+| `FearSystem` and `SuicideBombSystem` are registered, run every Wave frame, and can never have an effect (inputs have no writer, no config field, no JSON key). `FearSystem` does a 100,000-slot serial scan per frame | §3 V-03/V-04 | V — **DONE in B3 (2026-10-27): retired** |
 | 6 SOA arrays with zero indexed access anywhere (≈1.0 MB/store) | §3 V-02 | V |
 | Internal zero-reference members (4 symbols) | §3 V-01 | V |
 | Misleading comments/docs that contradict code or the Unity consumer | §3 V-06 | V (docs only) |
@@ -125,7 +125,7 @@ Common to all V items: **none is ready to commit** (mode 2/4/5 DEFERRED, Unity U
 - Blocking: public fields — external-consumer sign-off; Unity source verified 0 references.
 - Change boundary: declaration + `Dispose` null-out line only.
 
-### V-03 `FearSystem` — registered per-frame work with no possible effect
+### V-03 `FearSystem` — registered per-frame work with no possible effect — DONE (B3)
 
 | Field | Content |
 |---|---|
@@ -138,7 +138,7 @@ Common to all V items: **none is ready to commit** (mode 2/4/5 DEFERRED, Unity U
 | Benefit | Static: removes a 100k-iteration serial loop and two parallel dispatches per Wave frame. **Not measured** (mode 4 node timing DEFERRED) |
 | Blocking | Product decision (wire vs retire); topology-hash approval; mode 4/5 evidence |
 
-### V-04 `SuicideBombSystem` — registered per-frame work with no possible effect
+### V-04 `SuicideBombSystem` — registered per-frame work with no possible effect — DONE (B3)
 
 | Field | Content |
 |---|---|
@@ -248,7 +248,7 @@ Risk: none functional. Required checks: `git diff --check`; build for the two `.
 | **B0** Split pending tree | Three commits: (a) V-01 internal removals; (b) public-surface removals from §1.3; (c) F-06 adaptive fixes + test + CHANGELOG | (a) none; (b) external API; (c) gameplay | Clarity of history | (b) external sign-off; (c) mode 5 outcome change accepted by owner | Gates 1–6 per commit; 7–9 DEFERRED |
 | **B1** Docs | V-06 | None | Maintenance | — | `git diff --check`; build for `.cs` comment edits |
 | **B2** Dead SOA | V-02 | Low (public fields) | ≈1.0 MB/store | External sign-off | Gates 1–6; `GameplayStorageProfileTests`; determinism soak digests unchanged |
-| **B3** No-op registered systems | V-03, V-04 (and E-11 once traced) | Medium (FrameGraph topology, public types) | Per-frame CPU (not measured) | Product decision; topology-hash approval; mode 4 node timing + mode 5 A/B when un-deferred | Spec edit → regenerate manifest/ledger → Seal validation; `FrameGraphProductionFlowTests`, `CombatGoldenReplayTests`, `DeterminismSoakTests` (state and event-sequence digests must be identical) |
+| **B3 — DONE (2026-10-27)** No-op registered systems | V-03, V-04 (and E-11 once traced) | Medium (FrameGraph topology, public types) | Per-frame CPU (not measured) | Product decision; topology-hash approval; mode 4 node timing + mode 5 A/B when un-deferred | Spec edit → regenerate manifest/ledger → Seal validation; `FrameGraphProductionFlowTests`, `CombatGoldenReplayTests`, `DeterminismSoakTests` (state and event-sequence digests must be identical) |
 | **B4** Never-constructed systems | V-05 S-a, then S-d, then S-b; S-c only as an F proposal | Medium (public types, tests retired with features) | 6,009 LOC; ≥21.8 MB/store memory | Per-feature retire decision; external sign-off; Unity compile with refreshed Core **and** Engine DLLs | As B3; RNG guard file lists updated to remove deleted files (not weakened) |
 | **B5** Data provenance | E-09, E-10 | Unknown until provenance known | Repository size / confusion | Owner confirmation | Strict + legacy load tests; Unity StreamingAssets sync check |
 
@@ -289,7 +289,7 @@ Scope: read-only against the `F:\AI\BattleSystem-ECS` working tree (HEAD `3b10eb
 | System | Result | Evidence |
 |---|---|---|
 | `TowerSabotageSystem` | **Must retain (R-15)** | Three phases (`Update` :35): disable-timer decay, sabotage (`EnemyCanSabotage` gate :74 — no writer, no config field), drain (`EnemyDrainRatio` gate in `ApplyDrainEffects` :128 — written from `MonsterConfig.DrainRatio` at `WaveSpawningSystem.cs:994`). Drain is reachable for any config that sets `DrainRatio` even though shipped JSON does not — "not currently triggered" ≠ unnecessary |
-| `TowerStealthSystem` | **V-07 verified no-op** | Every effect is gated on `TowerStealthType != 0` / `TowerIsStealthed`. `TowerStealthType` has no writer anywhere (store, systems, Unity) and no config field; `TowerIsStealthed` is set true only by `ActivateStealth`, which has no caller (repo, Unity). Its only consumer, `CanTargetTower`, is called only by `SuicideBombSystem` (itself V-04). No RNG. Retirement shares the B3 boundary (spec/FrameGraph/group slot) |
+| `TowerStealthSystem` | **V-07 verified no-op — DONE (B3, retired)** | Every effect is gated on `TowerStealthType != 0` / `TowerIsStealthed`. `TowerStealthType` has no writer anywhere (store, systems, Unity) and no config field; `TowerIsStealthed` is set true only by `ActivateStealth`, which has no caller (repo, Unity). Its only consumer, `CanTargetTower`, is called only by `SuicideBombSystem` (itself V-04). No RNG. Retirement shares the B3 boundary (spec/FrameGraph/group slot) |
 | `HeroSystem`, `HeroSkillSystem` | **F-07 unwired UI entry** | All work is gated on `HeroIsDeployed` (`HeroSystem` move/attack loops; `HeroSkillSystem.cs:150, 192`), set only by `DeployHero` (`HeroSystem.cs:216`) whose doc comment claims it is "Called from TowerPlacementSystem" — there is no caller anywhere (repo, `GameManager`, Unity). Cost per frame: a `Parallel.For` over `MAX_HEROES`=5 slots. Decision: wire `DeployHero` to input, or retire |
 
 ### 9.2 SOA candidate confirmation (App. B)
@@ -326,7 +326,7 @@ The 16 properties that App. C excluded because of in-class mentions were inspect
 ### 9.6 Batch impact
 
 - **B2 — DONE (2026-10-27, `refactor: remove dead ComponentStore SOA arrays (B2)`)**: V-02 + V-08, all 35 arrays removed (≈ 8.7 MB / store, static). Re-verified across Core/Systems/Tests/Program/tools and Unity `Assets` before removal; **kept list: none** (`TowerKillCount` is R-14 and was never in the candidate set). Tests touching removed fields had only those assertion lines deleted (`SiegeEnemyTests`, `TerrainZoneSystemTests`, `CorpseEffectSystemTests`, `CatalogEntryBehaviorMatrixTests`, `FrameSchedulerTests`). Originally: B2 grows to V-02 + V-08 (35 arrays, ≥ 8.3 MB / store, static). Same blocking conditions; owned by WS-2 (ComponentStore files).
-- **B3** adds V-07 (`TowerStealthSystem`); retiring it must happen together with or after V-04 (`SuicideBombSystem` is its only consumer).
+- **B3 — DONE (2026-10-27, `refactor: retire no-op Fear/SuicideBomb/TowerStealth systems (B3)`)**: V-03, V-04, V-07 retired (3 systems, 659 LOC, 15 SOA arrays ≈ 4.8 MB/store static, 4 frame nodes; graph nodes 198 → 194, topology and review-root hashes re-pinned, golden/replay/determinism digests unchanged). Follow-up: `EnemyActionType.Fear` and its `EnemyMovementSystem` branch are now unreachable. Original note: B3 adds V-07 (`TowerStealthSystem`); retiring it must happen together with or after V-04 (`SuicideBombSystem` is its only consumer).
 - **B1-doc follow-up:** `HeroSystem.DeployHero` comment ("Called from TowerPlacementSystem") is misleading (F-07).
 
 ## 10. Unity consumer audit (2026-10-27, read-only)

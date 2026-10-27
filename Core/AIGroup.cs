@@ -13,7 +13,6 @@ namespace BattleSystemECS.Core
         public Systems.ManaBurnSystem? ManaBurn { get; set; }
         public Systems.EnemyLifestealSystem? Lifesteal { get; set; }
         public Systems.PhaseSystem? Phase { get; set; }
-        public Systems.FearSystem? Fear { get; set; }
         public Systems.ZoneControlSystem? ZoneControl { get; set; }
         public Systems.EnemyStrafeSystem? EnemyStrafe { get; set; }
         public Systems.ReflectTowerSystem? ReflectTower { get; set; }
@@ -43,7 +42,6 @@ namespace BattleSystemECS.Core
             if (ManaBurn != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.mana-burn.prepare"), c => ManaBurn?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.mana-burn.update"), c => ManaBurn?.Update()); }
             if (Lifesteal != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.lifesteal.prepare"), c => Lifesteal?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.lifesteal.update"), c => Lifesteal?.Update()); }
             if (Phase != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.phase.prepare"), c => Phase?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.phase.update"), c => Phase?.Update(c.Delta)); }
-            if (Fear != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.fear.prepare"), c => Fear?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.fear.update"), c => Fear?.Update(c.Delta)); }
             if (Sapper != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.sapper.prepare"), c => Sapper?.SetTurn(c.Turn, c.Delta)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.sapper.update"), c => Sapper?.Update(c.Delta)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.sapper.recompute"), c => Sapper?.RecomputeTowerSlows()); }
         }
 
@@ -95,9 +93,6 @@ namespace BattleSystemECS.Core
 
             Phase?.SetTurn(turn);
             Phase?.Update(deltaTime);
-
-            Fear?.SetTurn(turn);
-            Fear?.Update(deltaTime);
 
             // Round 186 Direction 2 — Sapper attacks (tower-damage + slow stacks).
             // Runs at the end of the AI group, AFTER all enemy-side abilities have
