@@ -2403,8 +2403,23 @@ namespace BattleSystemECS.Systems
 
         private const int TESLA_MAX_CHAIN_HOPS = 3;        // primary + 3 hops
         private const float TESLA_CHAIN_DAMAGE_DECAY = 0.70f; // each hop deals 70% of previous
-        private bool[] _teslaChainHitBuffer = new bool[0];
-        private int _teslaChainHitBufferSize = 0;
+        // 跳链命中标记：按活跃列表下标记 stamp，免去每次跳链 O(N) 清零与主目标下标查找。
+        private int[] _chainHitStamp = Array.Empty<int>();
+        private int _chainStamp;
+        // 跳链邻域索引：每次结算对活跃敌人按 1×1 格做稳定计数排序（不丢敌、保持列表顺序），
+        // 每跳只扫射程内的格；选取规则与线性扫描一致（最小 distSq，同距取最小列表下标）。
+        // 坐标跨度过大（格数超限或远多于敌人数）或存在非有限坐标时退回线性扫描。
+        private const int ChainIndexMaxCells = 1 << 20;
+        private int[] _chainCellStart = Array.Empty<int>();
+        private int[] _chainCellItems = Array.Empty<int>();
+        private int[] _chainItemCell = Array.Empty<int>();
+        private int[] _chainEnemyIndex = Array.Empty<int>();
+        private int[] _chainEnemyStamp = Array.Empty<int>();
+        private int _chainBuildStamp;
+        private int _chainMinX, _chainMinY, _chainCellsX, _chainCellsY;
+        private bool _chainIndexBuilt, _chainIndexUsable;
+        /// <summary>差分测试用：强制跳链走线性扫描，用于校验索引路径与原实现选取一致。</summary>
+        internal bool ForceLinearChainScan;
 
         /// <summary>
         /// Resolve Tesla chain lightning: two-phase.
@@ -2417,6 +2432,7 @@ namespace BattleSystemECS.Systems
             int writeIdx = 1 - _chainDamageQueueIdx;
             _chainDamageQueue[writeIdx].Clear();
             _chainDamageQueueIdx = writeIdx;
+            _chainIndexBuilt = false;
 
             foreach (var (chainId, enemyId, damage, playerId, towerId) in _chainDamageQueue[readIdx])
             {
@@ -2438,38 +2454,114 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
+        /// 按活跃列表构建跳链邻域索引（每次结算至多一次，首个主目标时惰性构建）。
+        /// 同时记录 enemyId → 首次出现的列表下标，替代逐主目标的线性下标查找。
+        /// </summary>
+        private void BuildChainIndex(List<int> activeEnemyIds)
+        {
+            _chainIndexBuilt = true;
+            int count = activeEnemyIds.Count;
+            if (_chainItemCell.Length < count)
+            {
+                int size = Math.Max(count, _chainItemCell.Length * 2);
+                _chainItemCell = new int[size];
+                _chainCellItems = new int[size];
+            }
+            if (++_chainBuildStamp == int.MaxValue) { Array.Clear(_chainEnemyStamp, 0, _chainEnemyStamp.Length); _chainBuildStamp = 1; }
+
+            int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
+            bool allCellCoordinates = true;
+            for (int i = 0; i < count; i++)
+            {
+                int enemyId = activeEnemyIds[i];
+                if (enemyId >= _chainEnemyStamp.Length)
+                {
+                    // 按实际出现的最大 enemyId 倍增扩容，避免一次性分配 MAX_ENTITIES 大小的数组
+                    int size = Math.Max(enemyId + 1, Math.Max(256, _chainEnemyStamp.Length * 2));
+                    Array.Resize(ref _chainEnemyStamp, size);
+                    Array.Resize(ref _chainEnemyIndex, size);
+                }
+                if (_chainEnemyStamp[enemyId] != _chainBuildStamp) { _chainEnemyStamp[enemyId] = _chainBuildStamp; _chainEnemyIndex[enemyId] = i; }
+                float x = store.PositionX[enemyId], y = store.PositionY[enemyId];
+                if (!IsCellCoordinate(x) || !IsCellCoordinate(y)) { allCellCoordinates = false; continue; }
+                int cx = (int)Math.Floor(x), cy = (int)Math.Floor(y);
+                if (cx < minX) minX = cx;
+                if (cx > maxX) maxX = cx;
+                if (cy < minY) minY = cy;
+                if (cy > maxY) maxY = cy;
+            }
+            _chainIndexUsable = false;
+            // 存在非格坐标（NaN/∞/极大值）时整轮退回线性扫描，保证候选集合与原实现完全一致
+            if (ForceLinearChainScan || !allCellCoordinates || minX > maxX) return;
+            long cellsX = (long)maxX - minX + 1, cellsY = (long)maxY - minY + 1;
+            // 稀疏布局（格数远多于敌人数）时清零/扫格的开销超过线性扫描，直接走线性路径
+            if (cellsX * cellsY > ChainIndexMaxCells || cellsX * cellsY > 4L * count + 1024) return;
+            _chainMinX = minX; _chainMinY = minY; _chainCellsX = (int)cellsX; _chainCellsY = (int)cellsY;
+            int cells = _chainCellsX * _chainCellsY;
+            if (_chainCellStart.Length < cells + 1) _chainCellStart = new int[Math.Max(cells + 1, _chainCellStart.Length * 2)];
+            Array.Clear(_chainCellStart, 0, cells + 1);
+            for (int i = 0; i < count; i++)
+            {
+                int enemyId = activeEnemyIds[i];
+                float x = store.PositionX[enemyId], y = store.PositionY[enemyId];
+                int cell = ((int)Math.Floor(y) - minY) * _chainCellsX + ((int)Math.Floor(x) - minX);
+                _chainCellStart[cell + 1]++;
+                _chainItemCell[i] = cell;
+            }
+            for (int c = 0; c < cells; c++) _chainCellStart[c + 1] += _chainCellStart[c];
+            // 稳定分桶：借用 _chainCellStart[c] 作写游标，填完后整体右移一格还原起点
+            for (int i = 0; i < count; i++)
+            {
+                _chainCellItems[_chainCellStart[_chainItemCell[i]]++] = i;
+            }
+            for (int c = cells; c > 0; c--) _chainCellStart[c] = _chainCellStart[c - 1];
+            _chainCellStart[0] = 0;
+            _chainIndexUsable = true;
+        }
+
+        /// <summary>扫描索引中的一个格：未命中、存活、非玩家且在射程内，按 (distSq, 列表下标) 取最小。</summary>
+        private void ScanChainCell(int cell, int stamp, int playerId, float originX, float originY, int rangeSq,
+            List<int> activeEnemyIds, ref float bestDistSq, ref int bestIdx)
+        {
+            for (int k = _chainCellStart[cell], kEnd = _chainCellStart[cell + 1]; k < kEnd; k++)
+            {
+                int i = _chainCellItems[k];
+                if (_chainHitStamp[i] == stamp) continue;
+                int enemyId = activeEnemyIds[i];
+                if (!store.EnemyActive[enemyId]) continue;
+                if (enemyId == playerId) continue;
+                float dx = store.PositionX[enemyId] - originX;
+                float dy = store.PositionY[enemyId] - originY;
+                float distSq = dx * dx + dy * dy;
+                if (distSq <= rangeSq && (distSq < bestDistSq || (distSq == bestDistSq && i < bestIdx)))
+                {
+                    bestDistSq = distSq;
+                    bestIdx = i;
+                }
+            }
+        }
+
+        // 可安全转为 int 的格坐标（排除 NaN/∞/极大值）
+        private static bool IsCellCoordinate(float v) => v > -1e9f && v < 1e9f;
+
+        /// <summary>
         /// Find nearest neighbors from the primary target and add chain hops to _chainDamageQueue.
-        /// O(N) scan for each hop, up to TESLA_MAX_CHAIN_HOPS hops at TESLA_CHAIN_DAMAGE_DECAY decay.
+        /// 每跳选射程内最近的未命中敌人（同距取最小列表下标），至多 TESLA_MAX_CHAIN_HOPS 跳，每跳衰减 TESLA_CHAIN_DAMAGE_DECAY。
         /// </summary>
         private void ResolveChainHops(int primaryEnemyId, float primaryDamage, int playerId, int towerId)
         {
             if (_activeEnemyList == null || _activeEnemyList.Count == 0) return;
             var activeEnemyIds = _activeEnemyList;
             int count = activeEnemyIds.Count;
+            if (!_chainIndexBuilt) BuildChainIndex(activeEnemyIds);
 
-            // Ensure pooled hit buffer is large enough
-            if (_teslaChainHitBufferSize < count)
-            {
-                _teslaChainHitBuffer = new bool[count];
-                _teslaChainHitBufferSize = count;
-            }
-            else
-            {
-                Array.Clear(_teslaChainHitBuffer, 0, _teslaChainHitBufferSize);
-                _teslaChainHitBufferSize = count;
-            }
+            if (_chainHitStamp.Length < count) _chainHitStamp = new int[Math.Max(count, _chainHitStamp.Length * 2)];
+            if (++_chainStamp == int.MaxValue) { Array.Clear(_chainHitStamp, 0, _chainHitStamp.Length); _chainStamp = 1; }
+            int stamp = _chainStamp;
 
             // Mark primary as hit so it doesn't chain to itself
-            int primaryIdx = -1;
-            for (int i = 0; i < count; i++)
-            {
-                if (activeEnemyIds[i] == primaryEnemyId)
-                {
-                    primaryIdx = i;
-                    break;
-                }
-            }
-            if (primaryIdx >= 0) _teslaChainHitBuffer[primaryIdx] = true;
+            if ((uint)primaryEnemyId < (uint)_chainEnemyStamp.Length && _chainEnemyStamp[primaryEnemyId] == _chainBuildStamp)
+                _chainHitStamp[_chainEnemyIndex[primaryEnemyId]] = stamp;
 
             float currentDamage = primaryDamage * TESLA_CHAIN_DAMAGE_DECAY;
             float originX = store.PositionX[primaryEnemyId];
@@ -2484,29 +2576,59 @@ namespace BattleSystemECS.Systems
                 int bestIdx = -1;
                 float bestDistSq = float.MaxValue;
 
-                for (int i = 0; i < count; i++)
+                if (_chainIndexUsable && IsCellCoordinate(originX) && IsCellCoordinate(originY))
                 {
-                    if (_teslaChainHitBuffer[i]) continue;
-                    int enemyId = activeEnemyIds[i];
-                    if (!store.EnemyActive[enemyId]) continue;
-                    if (enemyId == playerId) continue;
-
-                    float ex = store.PositionX[enemyId];
-                    float ey = store.PositionY[enemyId];
-                    float dx = ex - originX;
-                    float dy = ey - originY;
-                    float distSq = dx * dx + dy * dy;
-
-                    if (distSq <= rangeSq && distSq < bestDistSq)
+                    // 由内向外按切比雪夫环扫格：环 k 内任一点与原点真实距离 ≥ k-1；
+                    // 当 (k-2)² > 当前最优 distSq 时，环 k 及更外的候选（含浮点舍入）不可能更近或同距，停止。
+                    // 最远只扫到射程 +1 格（超大射程钳到索引格数）。
+                    long absRange = chainRange < 0 ? -(long)chainRange : chainRange;
+                    int reach = (int)Math.Min(absRange + 1, ChainIndexMaxCells);
+                    int ocx = (int)Math.Floor(originX) - _chainMinX;
+                    int ocy = (int)Math.Floor(originY) - _chainMinY;
+                    for (int ring = 0; ring <= reach; ring++)
                     {
-                        bestDistSq = distSq;
-                        bestIdx = i;
+                        if (ring >= 2 && bestIdx >= 0 && (float)(ring - 2) * (ring - 2) > bestDistSq) break;
+                        int x0 = ocx - ring, x1 = ocx + ring, y0 = ocy - ring, y1 = ocy + ring;
+                        // 原点在索引外时，环与索引尚未相交则继续外扩（受 reach 上限约束）
+                        if (x1 < 0 || y1 < 0 || x0 >= _chainCellsX || y0 >= _chainCellsY) continue;
+                        int cx0 = Math.Max(0, x0), cx1 = Math.Min(_chainCellsX - 1, x1);
+                        if (y0 >= 0)
+                            for (int cx = cx0; cx <= cx1; cx++) ScanChainCell(y0 * _chainCellsX + cx, stamp, playerId, originX, originY, rangeSq, activeEnemyIds, ref bestDistSq, ref bestIdx);
+                        if (ring > 0 && y1 < _chainCellsY)
+                            for (int cx = cx0; cx <= cx1; cx++) ScanChainCell(y1 * _chainCellsX + cx, stamp, playerId, originX, originY, rangeSq, activeEnemyIds, ref bestDistSq, ref bestIdx);
+                        int cy0 = Math.Max(0, y0 + 1), cy1 = Math.Min(_chainCellsY - 1, y1 - 1);
+                        if (ring > 0 && x0 >= 0)
+                            for (int cy = cy0; cy <= cy1; cy++) ScanChainCell(cy * _chainCellsX + x0, stamp, playerId, originX, originY, rangeSq, activeEnemyIds, ref bestDistSq, ref bestIdx);
+                        if (ring > 0 && x1 < _chainCellsX)
+                            for (int cy = cy0; cy <= cy1; cy++) ScanChainCell(cy * _chainCellsX + x1, stamp, playerId, originX, originY, rangeSq, activeEnemyIds, ref bestDistSq, ref bestIdx);
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < count; i++)
+                    {
+                        if (_chainHitStamp[i] == stamp) continue;
+                        int enemyId = activeEnemyIds[i];
+                        if (!store.EnemyActive[enemyId]) continue;
+                        if (enemyId == playerId) continue;
+
+                        float ex = store.PositionX[enemyId];
+                        float ey = store.PositionY[enemyId];
+                        float dx = ex - originX;
+                        float dy = ey - originY;
+                        float distSq = dx * dx + dy * dy;
+
+                        if (distSq <= rangeSq && distSq < bestDistSq)
+                        {
+                            bestDistSq = distSq;
+                            bestIdx = i;
+                        }
                     }
                 }
 
                 if (bestIdx == -1) break;
 
-                _teslaChainHitBuffer[bestIdx] = true;
+                _chainHitStamp[bestIdx] = stamp;
                 int hopEnemyId = activeEnemyIds[bestIdx];
 
                 // Queue chain hop damage: chainId > 0 means apply damage
