@@ -41,6 +41,10 @@ namespace BattleSystemECS.Systems
         // Reused dictionary for stack counting — allocated once, cleared per frame.
         // Key = packed (gx * 1000 + gy), value = count. Serial pass, no allocation.
         private readonly Dictionary<long, int> _stackCountDict = new Dictionary<long, int>(1024);
+        // 堆叠计数稠密路径：键跨度 < max(StackDenseMinSpan, 4×敌人数) 时按 key-minKey 直接计数
+        private const long StackDenseMinSpan = 1 << 14;
+        private long[] _stackKeys = Array.Empty<long>();
+        private int[] _stackDenseCounts = Array.Empty<int>();
         // 并行阶段按活跃敌人索引独占写入，串行阶段再按稳定顺序合并到塔。
         private readonly int[] _palisadeContactTowerByEnemyIndex = new int[ComponentStore.MAX_ENTITIES];
         private readonly int[] _palisadeTouchedTowerOrder = new int[ComponentStore.MAX_ENTITIES];
@@ -860,10 +864,12 @@ switch (actionEnum)
             var stacking = _gameConfig.Stacking;
             if (stacking == null || stacking.PenaltyPerStack <= 0f) return;
 
-            _stackCountDict.Clear();
-
             // Phase 1: count enemies per cell (gx, gy) using fresh post-move positions.
+            // 键仍为 gx*1000+gy（与旧实现逐位一致，含越界坐标的键碰撞语义）；键跨度不大时用稠密计数数组，
+            // 否则退回字典。键在两阶段间复用（位置与存活状态在本函数内不变）。
             int count = _activeEnemyList.Count;
+            if (_stackKeys.Length < count) _stackKeys = new long[Math.Max(count, _stackKeys.Length * 2)];
+            long minKey = long.MaxValue, maxKey = long.MinValue;
             for (int i = 0; i < count; i++)
             {
                 int eid = _activeEnemyList[i];
@@ -872,10 +878,34 @@ switch (actionEnum)
                 int gx = (int)store.PositionX[eid];
                 int gy = (int)store.PositionY[eid];
                 long key = (long)gx * 1000L + (long)gy;
-                if (_stackCountDict.TryGetValue(key, out int c))
-                    _stackCountDict[key] = c + 1;
-                else
-                    _stackCountDict[key] = 1;
+                _stackKeys[i] = key;
+                if (key < minKey) minKey = key;
+                if (key > maxKey) maxKey = key;
+            }
+            bool dense = minKey <= maxKey && maxKey - minKey < Math.Max(StackDenseMinSpan, 4L * count);
+            if (dense)
+            {
+                int span = (int)(maxKey - minKey + 1);
+                if (_stackDenseCounts.Length < span) _stackDenseCounts = new int[Math.Max(span, _stackDenseCounts.Length * 2)];
+                Array.Clear(_stackDenseCounts, 0, span);
+                for (int i = 0; i < count; i++)
+                {
+                    if (!store.EnemyActive[_activeEnemyList[i]]) continue;
+                    _stackDenseCounts[_stackKeys[i] - minKey]++;
+                }
+            }
+            else
+            {
+                _stackCountDict.Clear();
+                for (int i = 0; i < count; i++)
+                {
+                    if (!store.EnemyActive[_activeEnemyList[i]]) continue;
+                    long key = _stackKeys[i];
+                    if (_stackCountDict.TryGetValue(key, out int c))
+                        _stackCountDict[key] = c + 1;
+                    else
+                        _stackCountDict[key] = 1;
+                }
             }
 
             // Phase 2: write per-enemy slow ratio and stack count.
@@ -885,10 +915,7 @@ switch (actionEnum)
             {
                 int eid = _activeEnemyList[i];
                 if (!store.EnemyActive[eid]) continue;
-                int gx = (int)store.PositionX[eid];
-                int gy = (int)store.PositionY[eid];
-                long key = (long)gx * 1000L + (long)gy;
-                int stackCount = _stackCountDict[key];
+                int stackCount = dense ? _stackDenseCounts[_stackKeys[i] - minKey] : _stackCountDict[_stackKeys[i]];
                 // stackCount-1 = number of OTHER enemies in same cell (0 if alone).
                 int effectiveStack = stackCount - 1;
                 store.EnemyStackCount[eid] = effectiveStack;
