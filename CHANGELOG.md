@@ -1,5 +1,10 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（ProductionDotCatalog 名称映射并发安全）
+- **问题**：`ProductionDotCatalog` 用静态 `Dictionary` 记录 DoT 模板名→EffectId，每次 `CatalogCompiler.Compile` 先 `Clear()` 再逐个写入；并行测试类同时编译目录时字典被并发改写，`CatalogCompilerTests.KnownHierarchyTagNameCompilesIntoRequiredTags` 偶发抛出 "concurrent update ... corrupted its state"。生产只编译一次，但运行时 `TryGetId` 与重编译之间同样无保护。
+- **修复**：每次编译构建新字典，完成后 `Volatile.Write` 原子发布引用，`TryGetId` 经 `Volatile.Read` 读取；"以最近一次编译为准"的语义不变，读者不会看到清空或写入中途的字典。
+- 对照（`tools/ab-bench.ps1`）：mode 2/4 持平；mode 5 Victory 457 帧一致。
+
 ### 2026-10-26（A/B 压测脚本 tools/ab-bench.ps1）
 - 新增 `tools/ab-bench.ps1`：以 `-Base`（默认 HEAD）经临时 git worktree 构建 Release 产物 A、当前工作树构建 B，均从仓库根目录（同一 cwd、同一 `game_config.json`）按 A,B / B,A 交替运行 mode 2/4/5；输出各 mode FPS 中位数与逐次值、mode 2/4 `valid=FALSE` 标注、mode 5 结局/帧数、mode 4 逐节点耗时中位数及差值。结束时移除临时 worktree。
 - 把此前每轮手工执行的交替对照固化为一条命令，`AGENTS.md` §7.1 记录用法与 mode 5 噪声判断口径（≥8 对中位数）。

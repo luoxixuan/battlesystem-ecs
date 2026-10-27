@@ -11,25 +11,28 @@ namespace BattleSystemECS.Core.GAS
     /// </summary>
     public static class ProductionDotCatalog
     {
-        private static readonly Dictionary<string, EffectId> _byName =
+        // 名称→Id 映射按"最近一次 Compile"整体替换：每次构建新字典后原子发布引用，
+        // 并发编译（如并行测试）与运行时读取不会看到被 Clear/写入中途的字典。
+        private static Dictionary<string, EffectId> _byName =
             new Dictionary<string, EffectId>(StringComparer.Ordinal);
 
         public static void AppendTo(List<GameplayEffectDefinition> effects)
         {
             if (effects == null) throw new ArgumentNullException(nameof(effects));
-            _byName.Clear();
-            Append(effects, "Firewall_Burn");
-            Append(effects, "prod.dot.lava");
-            Append(effects, "DemolishBurn");
-            Append(effects, "DemolishPoison");
+            var byName = new Dictionary<string, EffectId>(StringComparer.Ordinal);
+            Append(effects, byName, "Firewall_Burn");
+            Append(effects, byName, "prod.dot.lava");
+            Append(effects, byName, "DemolishBurn");
+            Append(effects, byName, "DemolishPoison");
             for (int t = 0; t <= 10; t++)
-                Append(effects, "corpse_zone_tick_" + t);
+                Append(effects, byName, "corpse_zone_tick_" + t);
+            System.Threading.Volatile.Write(ref _byName, byName);
         }
 
         public static bool TryGetId(string name, out EffectId id)
         {
             if (string.IsNullOrEmpty(name)) { id = default(EffectId); return false; }
-            return _byName.TryGetValue(name, out id);
+            return System.Threading.Volatile.Read(ref _byName).TryGetValue(name, out id);
         }
 
         public static bool TryMaterialize(GameplayCatalog catalog, string name, float duration, float period,
@@ -54,7 +57,7 @@ namespace BattleSystemECS.Core.GAS
             return true;
         }
 
-        private static void Append(List<GameplayEffectDefinition> effects, string name)
+        private static void Append(List<GameplayEffectDefinition> effects, Dictionary<string, EffectId> byName, string name)
         {
             int id = effects.Count;
             var spec = new PeriodicSpec(1f, FirstTickPolicy.NextInterval, CatchUpPolicy.CatchUpAll,
@@ -63,7 +66,7 @@ namespace BattleSystemECS.Core.GAS
                 Array.Empty<ModifierDefinition>(), 1f, ClockId.Combat, StackingBehavior.None, 1,
                 RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.Damage,
                 CatalogRegistries.SkillTag, spec, Array.Empty<ExecutionId>()));
-            _byName[name] = new EffectId(id);
+            byName[name] = new EffectId(id);
         }
     }
 }
