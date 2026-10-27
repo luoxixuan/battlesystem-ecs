@@ -157,8 +157,6 @@ namespace BattleSystemECS.Core
         public float[] PullSourceRadius = new float[MAX_PULL_SOURCES];
         public float[] PullSourceStrength = new float[MAX_PULL_SOURCES];
         public float[] PullSourceDuration = new float[MAX_PULL_SOURCES];
-        public int[] PullSourceOwnerPlayer = new int[MAX_PULL_SOURCES];
-        public int[] PullSourceTowerId = new int[MAX_PULL_SOURCES];
         private int _nextPullSourceId = 0;
         private int _activePullSourceCount = 0;
         // ==================== Ascension/Difficulty Modifier 组件 ====================
@@ -189,10 +187,6 @@ namespace BattleSystemECS.Core
         public int[] PlayerWaveIndex = new int[MAX_PLAYERS];
         // EnemiesRemaining: alive enemies in the current wave (updated when enemies die)
         public int[] PlayerEnemiesRemaining = new int[MAX_PLAYERS];
-        // IsWaveActive: true when a wave is in progress (enemies spawned, not yet cleared)
-        public bool[] PlayerIsWaveActive = new bool[MAX_PLAYERS];
-        // WaveTimer: frames remaining before next wave auto-starts (-1 = waiting for manual start)
-        public float[] PlayerWaveTimer = new float[MAX_PLAYERS];
         // WaveCompleteGold: gold awarded when wave was completed (for tech tree bonus calculation)
         public float[] PlayerWaveCompleteGold = new float[MAX_PLAYERS];
 
@@ -204,7 +198,6 @@ namespace BattleSystemECS.Core
         public const int MAX_OBSTACLES = 5000;
         public bool[] ObstacleActive = new bool[MAX_OBSTACLES];
         public float[] ObstacleHealth = new float[MAX_OBSTACLES];
-        public float[] ObstacleMaxHealth = new float[MAX_OBSTACLES];
         public float[] ObstacleX = new float[MAX_OBSTACLES];
         public float[] ObstacleY = new float[MAX_OBSTACLES];
         public int[] ObstacleType = new int[MAX_OBSTACLES];  // index into ObstacleDefs[]
@@ -254,9 +247,8 @@ namespace BattleSystemECS.Core
         // Round 175 Direction 9 — Smokescreen enemy move-speed boost (per-zone, multiplicative
         // into EnemyTerrainMoveSpeedMult[]; 1.0 = no boost, 1.2 = +20% speed).
         public float[] CorpseEffectEnemySpeedBoost = new float[MAX_CORPSE_EFFECTS];
-        // Round 183 Direction 8 — Scorched Earth (CorpseEffectType=10) DoT + tower vision
-        // reduction. DamageType: 0=Physical, 1=Fire (default 0 keeps all other zones unchanged).
-        public int[] CorpseEffectDamageType = new int[MAX_CORPSE_EFFECTS];
+        // Round 183 Direction 8 — Scorched Earth (CorpseEffectType=10) tower vision
+        // reduction (default 0 keeps all other zones unchanged).
         // Vision reduction applied to towers inside the zone (0..1, e.g. 0.5 = -50% range).
         // Mirrored into TowerVisionReduction[] (tower-side per-frame cache, max-merge across
         // overlapping zones) and consumed by TowerAttackSystem. Default 0 = inert.
@@ -278,7 +270,6 @@ namespace BattleSystemECS.Core
         public float[] TerrainZoneMaxRadius = new float[MAX_TERRAIN_ZONES];
         public float[] TerrainZoneBaseRadius = new float[MAX_TERRAIN_ZONES];  // starting radius (used for expand calc)
         public float[] TerrainZoneLifetime = new float[MAX_TERRAIN_ZONES];  // seconds remaining
-        public float[] TerrainZoneTotalLifetime = new float[MAX_TERRAIN_ZONES];  // initial lifetime (for end-of-life scaling)
         public float[] TerrainZoneTickInterval = new float[MAX_TERRAIN_ZONES];
         public float[] TerrainZoneTickTimer = new float[MAX_TERRAIN_ZONES];  // accumulator
         public int[] TerrainZoneElement = new int[MAX_TERRAIN_ZONES];  // 0=Fire, 1=Ice, 2=Toxic, 3=Holy
@@ -287,7 +278,6 @@ namespace BattleSystemECS.Core
         public int[] TerrainZoneMaxStacks = new int[MAX_TERRAIN_ZONES];
         public int[] TerrainZoneOwnerPlayerId = new int[MAX_TERRAIN_ZONES];  // -1 = none
         public bool[] TerrainZoneExpandOverTime = new bool[MAX_TERRAIN_ZONES];
-        public string[] TerrainZoneId = new string[MAX_TERRAIN_ZONES];  // for tooltips / logs
         private List<int> _activeTerrainZoneIds = new List<int>();
         private int _nextTerrainZoneId = 0;
 
@@ -385,7 +375,6 @@ namespace BattleSystemECS.Core
             ObstacleX[obstacleId] = x;
             ObstacleY[obstacleId] = y;
             ObstacleHealth[obstacleId] = maxHealth;
-            ObstacleMaxHealth[obstacleId] = maxHealth;
             // Destructible on-destroy effect (Round 95 Direction 5): 0=None, 1=Gold, 2=Explosion
             ObstacleOnDestroyEffect[obstacleId] = onDestroyEffect;
             ObstacleOnDestroyValue[obstacleId] = onDestroyValue;
@@ -397,7 +386,6 @@ namespace BattleSystemECS.Core
             if (obstacleId < 0 || obstacleId >= MAX_OBSTACLES) return;
             ObstacleActive[obstacleId] = false;
             ObstacleHealth[obstacleId] = 0f;
-            ObstacleMaxHealth[obstacleId] = 0f;
             ObstacleX[obstacleId] = 0f;
             ObstacleY[obstacleId] = 0f;
             ObstacleType[obstacleId] = -1;
@@ -497,7 +485,6 @@ namespace BattleSystemECS.Core
             TerrainZoneMaxRadius[zoneId] = radius * 1.5f;  // hard cap (expand-over-time ceiling)
             TerrainZoneBaseRadius[zoneId] = radius;
             TerrainZoneLifetime[zoneId] = lifetime;
-            TerrainZoneTotalLifetime[zoneId] = lifetime;
             TerrainZoneTickInterval[zoneId] = tickInterval;
             TerrainZoneTickTimer[zoneId] = 0f;
             TerrainZoneElement[zoneId] = element;
@@ -506,7 +493,6 @@ namespace BattleSystemECS.Core
             TerrainZoneMaxStacks[zoneId] = maxStacks;
             TerrainZoneOwnerPlayerId[zoneId] = ownerPlayerId;
             TerrainZoneExpandOverTime[zoneId] = expandOverTime;
-            TerrainZoneId[zoneId] = id;
             _activeTerrainZoneIds.Add(zoneId);
             return zoneId;
         }
@@ -523,7 +509,6 @@ namespace BattleSystemECS.Core
             TerrainZoneMaxRadius[zoneId] = 0f;
             TerrainZoneBaseRadius[zoneId] = 0f;
             TerrainZoneLifetime[zoneId] = 0f;
-            TerrainZoneTotalLifetime[zoneId] = 0f;
             TerrainZoneTickInterval[zoneId] = 0f;
             TerrainZoneTickTimer[zoneId] = 0f;
             TerrainZoneElement[zoneId] = 0;
@@ -532,7 +517,6 @@ namespace BattleSystemECS.Core
             TerrainZoneMaxStacks[zoneId] = 0;
             TerrainZoneOwnerPlayerId[zoneId] = -1;
             TerrainZoneExpandOverTime[zoneId] = false;
-            TerrainZoneId[zoneId] = null;
             _activeTerrainZoneIds.Remove(zoneId);
         }
 
@@ -581,9 +565,6 @@ namespace BattleSystemECS.Core
             // because their MissChance/EnemySpeedBoost default to 0/1f respectively).
             CorpseEffectMissChance[zoneId] = missChance;
             CorpseEffectEnemySpeedBoost[zoneId] = enemySpeedBoost;
-            // Round 183 Direction 8 — Scorched Earth (damageType 0=Physical / 1=Fire,
-            // visionReduction 0..1, both default 0 so existing zone types are inert).
-            CorpseEffectDamageType[zoneId] = damageType;
             CorpseEffectVisionReduction[zoneId] = visionReduction;
             _activeCorpseEffectIds.Add(zoneId);
             return zoneId;
@@ -610,8 +591,6 @@ namespace BattleSystemECS.Core
             // Round 175 Direction 9 — Smokescreen fields
             CorpseEffectMissChance[zoneId] = 0f;
             CorpseEffectEnemySpeedBoost[zoneId] = 1f;
-            // Round 183 Direction 8 — Scorched Earth fields (default 0 / 0 = inert)
-            CorpseEffectDamageType[zoneId] = 0;
             CorpseEffectVisionReduction[zoneId] = 0f;
             _activeCorpseEffectIds.Remove(zoneId);
         }
@@ -1189,8 +1168,6 @@ namespace BattleSystemECS.Core
             PullSourceRadius[sourceId] = radius;
             PullSourceStrength[sourceId] = strength;
             PullSourceDuration[sourceId] = duration;
-            PullSourceOwnerPlayer[sourceId] = ownerPlayer;
-            PullSourceTowerId[sourceId] = towerId;
             PullSourceActive[sourceId] = true;
             _activePullSourceCount++;
             return sourceId;
@@ -1207,8 +1184,6 @@ namespace BattleSystemECS.Core
             PullSourceRadius[sourceId] = 0f;
             PullSourceStrength[sourceId] = 0f;
             PullSourceDuration[sourceId] = 0f;
-            PullSourceOwnerPlayer[sourceId] = 0;
-            PullSourceTowerId[sourceId] = -1;
             _activePullSourceCount--;
         }
 

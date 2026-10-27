@@ -386,7 +386,6 @@ namespace BattleSystemECS.Tests.Mechanisms.World
             Assert.Equal(0f, Store.TerrainZoneRadius[zid]);
             Assert.Equal(0, Store.TerrainZoneElement[zid]);
             Assert.Equal(0f, Store.TerrainZoneBaseDps[zid]);
-            Assert.Null(Store.TerrainZoneId[zid]);
         }
     }
 }

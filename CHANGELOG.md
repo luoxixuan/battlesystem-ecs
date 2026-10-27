@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-27（删除死 SOA 数组 B2）
+- 删除 `ComponentStore*` 中 35 个无读取方的 SOA 数组：审计 V-02（6 个无任何访问）+ V-08（29 个只在生命周期 / 重置中写入、从无读取）；同时删除声明、分配、`Dispose` 置空、重置与纯写入赋值，以及只触碰这些字段的测试断言（`SiegeEnemyTests`、`TerrainZoneSystemTests`、`CorpseEffectSystemTests`、`CatalogEntryBehaviorMatrixTests`、`FrameSchedulerTests` 的相应行）。
+- 估算每个 store 少分配约 8.7 MB（静态：元素大小 × 长度，未实测）。`TowerKillCount`（Unity 读取）保留；本批无其他保留项：35 个数组在 Core/Systems/Tests/Program/tools 与 Unity `Assets` 全量重扫后均无读取方。
+- 公共方法签名不变（如 `AddCorpseEffect` 的 `damageType`、`AddTerrainZone` 的 `id`、`AddPullSource` 的 `ownerPlayer/towerId` 参数仍保留，只是不再落存储）。
+- 验证：Engine/Core/EXE/Tests 构建 0 warning 0 error；聚焦 `--filter` 测试通过；Unity 运行时脚本 Roslyn 编译检查仍为基线 3 个 `FrameScheduler.Spawning` 错误，无新增。完整测试套件（gate 4）因内存限制未运行；mode 2/4/5 延期。
+
 ### 2026-10-27（击杀信号接入自适应难度）
 - **问题**：`AdaptiveDifficultySystem.RecordKill` 无调用方，难度只升不降；交互局 `GameManager` 漏怪不计 `EnemiesLeakedThisWave`（只有 BenchmarkSystem 计）；`WaveSpawningSystem` 硬编码 player 0 读写难度，压测 playerId=1 时整条回路对其无效。
 - **修复**：`WireAdaptiveDifficulty` 订阅 `store.OnEnemyKilled → RecordKill(pid)`；漏怪同样经死亡队列触发该事件，`OnWaveComplete` 以 `max(0, 死亡数 − 漏怪数)` 只计真实击杀；`GameManager.CheckEnemiesAtBottom` 递增漏怪数；`SetAdaptiveDifficulty(adaptive, playerId)` 由 installer 传入组装 playerId。

@@ -19,8 +19,6 @@ namespace BattleSystemECS.Core
         public float[] PathModifierRadius = new float[MAX_ENTITIES];
         // PathModifierActive: true if this path modifier is currently active
         public bool[] PathModifierActive = new bool[MAX_ENTITIES];
-        // PathModifierOwnerId: player who placed this modifier (-1 = neutral/none)
-        public int[] PathModifierOwnerId = new int[MAX_ENTITIES];
         // PathModifierTargetPathId: the path ID enemies should follow when inside the influence zone
         public int[] PathModifierTargetPathId = new int[MAX_ENTITIES];
         // PathModifierTurnsRemaining: countdown until the modifier expires (0 = permanent)
@@ -44,10 +42,6 @@ namespace BattleSystemECS.Core
         // SoulHarvestSystem.HandleEnemyKilled() and added to PlayerSoulCount.
         public float[] EnemySoulValue = new float[MAX_ENTITIES];
         public float[] EnemyChargeParam = new float[MAX_ENTITIES]; // SOA: replaces ConcurrentDictionary in EnemyAISystem
-        // EnemyBuffDamageBonus: tracks buff damage bonus applied by buff_allies ability — separate from EnemyChargeParam
-        public float[] EnemyBuffDamageBonus = new float[MAX_ENTITIES];
-        // EnemyBuffDurationLeft: tracks remaining duration for buff_allies ability (in turns). 0 = no active buff.
-        public float[] EnemyBuffDurationLeft = new float[MAX_ENTITIES];
         public int[] EnemySpawnFrame = new int[MAX_ENTITIES];
         // Armor: reduces incoming damage. Affected by attacker's armor penetration.
         public float[] EnemyArmor = new float[MAX_ENTITIES];
@@ -140,13 +134,6 @@ namespace BattleSystemECS.Core
         // Applied after damage is dealt, in the same frame's serial phase.
         public float[] EnemyThornsRatio = new float[MAX_ENTITIES];
         // Round 176 Direction 7 — Siege Enemy Fields ────────────────────────
-        // EnemyIsSiege: true if this enemy is a "Siege" (heavy armored tank) — has bonus
-        // armor (EnemySiegeArmorBonus adds to EnemyArmor with 0.95 clamp) and a base
-        // move-speed multiplier (EnemySiegeSpeedMult applied to EnemyMoveSpeedBase at
-        // MovementSystem). Default false = inert zero-overhead fast path. Set at AddEnemy
-        // + SetEnemySiege() when MonsterDef.IsSiege. Stays false for normal enemies so
-        // the MovementSystem + damage hot paths pay one bool read + branch.
-        public bool[] EnemyIsSiege = new bool[MAX_ENTITIES];
         // EnemySiegeArmorBonus: ADDITIONAL armor reduction fraction contributed by being
         // a Siege enemy. Applied ON TOP of EnemyArmor and clamped to 0.95 max combined
         // reduction (so no enemy is unkillable). Example: 0.8 = Siege gets 80% damage
@@ -408,11 +395,6 @@ namespace BattleSystemECS.Core
         // MonsterDef.IsSapper. Stays false for normal enemies so the Sapper system hot
         // path pays one bool read + branch.
         public bool[] EnemyIsSapper = new bool[MAX_ENTITIES];
-        // EnemySapperTargetTowerId: cached target tower id the sapper is currently
-        // attacking (-1 = no target / searching). Set/cleared by SapperSystem during
-        // target selection. -1 sentinel keeps the attack loop's `if (target < 0) skip`
-        // check trivially cheap. Default -1 = no-target inert fast path.
-        public int[] EnemySapperTargetTowerId = new int[MAX_ENTITIES];
         // EnemySapperAttackTimer: seconds elapsed in the current "between attacks" gap.
         // When it reaches EnemySapperAttackInterval, the sapper deals EnemySapperDamage
         // to its target tower, applies EnemySapperAtkSpdSlow stacks (up to
@@ -642,9 +624,6 @@ namespace BattleSystemECS.Core
         // EnemyIsInvulnerable: true when the enemy is in an invulnerable phase (e.g. Boss skill animation).
         // When true, the enemy takes 0 damage from all sources.
         public bool[] EnemyIsInvulnerable = new bool[MAX_ENTITIES];
-        // EnemyInvulnerablePhaseName: name of the active invulnerable phase (e.g. "shield", "teleport", "rage").
-        // Used for UI/feedback. Empty = not in invulnerable phase.
-        public string[] EnemyInvulnerablePhaseName = new string[MAX_ENTITIES];
 
         // ==================== Enemy Fission (Split on Death) ====================
         // EnemyFissionDefId: index into GameConfig.FissionDefs for this enemy's fission definition (-1 = none)
@@ -738,10 +717,6 @@ namespace BattleSystemECS.Core
         public float[] EnemyFearDurationLeft = new float[MAX_ENTITIES];
         // EnemyIsFeared: bool flag set when enemy is currently under fear effect (synced from fear duration)
         public bool[] EnemyIsFeared = new bool[MAX_ENTITIES];
-        // EnemyTauntTargetId: entity ID that this enemy is forced to attack (taunt effect). -1 = no taunt.
-        public int[] EnemyTauntTargetId = new int[MAX_ENTITIES];
-        // EnemyCharmDurationLeft: turns remaining for charm effect. When > 0, enemy attacks other enemies.
-        public float[] EnemyCharmDurationLeft = new float[MAX_ENTITIES];
 
         // ==================== 敌人抗性字段（SOA） ====================
         // EnemyStunResistance: 0-1, reduces stun duration and chance
@@ -873,16 +848,12 @@ namespace BattleSystemECS.Core
         public float[] EnemyVanguardCoverRange = new float[MAX_ENTITIES];
         // EnemyVanguardDmgTransfer: fraction of damage taken by protected enemies that transfers to vanguard (0-1)
         public float[] EnemyVanguardDmgTransfer = new float[MAX_ENTITIES];
-        // EnemyVanguardCoverCount: number of allies currently protected by this vanguard (computed each frame)
-        public int[] EnemyVanguardCoverCount = new int[MAX_ENTITIES];
 
         // ==================== 敌人治疗单位组件（SOA）====================
         // EnemyHealerHealAmount: flat HP restored per heal tick (0 = not a healer)
         public float[] EnemyHealerHealAmount = new float[MAX_ENTITIES];
         // EnemyHealerHealInterval: heal cooldown / interval in seconds (also used as range for heal check)
         public float[] EnemyHealerHealInterval = new float[MAX_ENTITIES];
-        // EnemyHealerHealTargetPriority: 0=lowest_health, 1=highest_threat (future extension)
-        public int[] EnemyHealerHealTargetPriority = new int[MAX_ENTITIES];
 
         // ==================== 金币窃取敌人组件（SOA）====================
         // EnemyCanStealGold: true if this enemy is a thief that steals gold instead of damaging base
@@ -899,10 +870,6 @@ namespace BattleSystemECS.Core
         // ==================== 法力燃烧敌人组件（SOA）====================
         // EnemyManaBurnAmount: amount of mana this enemy burns per attack (0 = no mana burn)
         public float[] EnemyManaBurnAmount = new float[MAX_ENTITIES];
-        // EnemyManaBurnRadius: range within which mana burn is effective (0 = global effect)
-        public float[] EnemyManaBurnRadius = new float[MAX_ENTITIES];
-        // EnemyManaBurnCooldown: seconds until mana burn can be used again (0 = ready)
-        public float[] EnemyManaBurnCooldown = new float[MAX_ENTITIES];
         // EnemyManaBurnType: 0=flat, 1=percent_current, 2=percent_max (default 0=flat)
         public int[] EnemyManaBurnType = new int[MAX_ENTITIES];
 
@@ -1136,13 +1103,10 @@ namespace BattleSystemECS.Core
         // EnemyIsDecoy: when true, this enemy is a non-aggressive target dummy spawned by the player
         //   (e.g. a Hologram Decoy tower). Decoys do not move, do not attack, and cannot use abilities.
         //   They exist solely to draw enemy aggro and absorb damage. Lifetime is finite
-        //   (EnemyDecoyLifetime) so the field doesn't stay forever.
-        // EnemyDecoyLifetime: configured maximum lifetime in seconds when this enemy is a decoy.
-        //   0 = no decoy (default; normal enemy). WaveSpawningSystem / Hologram-tower spawn sets this.
+        //   (EnemyDecoyLifetimeLeft) so the field doesn't stay forever.
         // EnemyDecoyLifetimeLeft: remaining lifetime in seconds. Decremented each frame in
         //   EnemyAISystem; when <= 0 the enemy is auto-queued for death (no gold reward).
         public bool[] EnemyIsDecoy = new bool[MAX_ENTITIES];
-        public float[] EnemyDecoyLifetime = new float[MAX_ENTITIES];
         public float[] EnemyDecoyLifetimeLeft = new float[MAX_ENTITIES];
 
         // ==================== 仇恨脱战范围 (Aggro Leash / Disengage Range) ====================
@@ -1207,12 +1171,8 @@ namespace BattleSystemECS.Core
         //   0 = disabled (default). Towers/skills that apply banish set this to true and
         //   the duration to N frames. MovementSystem decrements the timer and clears the flag.
         // EnemyBanishDurationLeft: remaining banish frames. Default 0 = not banished.
-        // EnemyBanishOriginalX/Y: the position captured at the moment banish was applied
-        //   (frozen position; reserved for future "return-to-origin" semantics).
         public bool[] EnemyIsBanished = new bool[MAX_ENTITIES];
         public float[] EnemyBanishDurationLeft = new float[MAX_ENTITIES];
-        public float[] EnemyBanishOriginalX = new float[MAX_ENTITIES];
-        public float[] EnemyBanishOriginalY = new float[MAX_ENTITIES];
 
         // ==================== 失衡条 / 破防 (Stagger / Posture) ====================
         // EnemyStaggerMeter: 失衡值累加器。受到重击/暴击/特定伤害类型时按权重增加；
@@ -1234,12 +1194,8 @@ namespace BattleSystemECS.Core
         //   0 = 不踩踏（默认小怪）。大型 Boss 典型 2.5-4。
         // EnemyTrampleDamagePerStep: 每帧移动对范围内塔造成的伤害。
         //   0 = 不开 Trample。反相关：走得越慢踩得越重。
-        // EnemyTrampleKnockback: 步伤是否附带击退。true = 目标塔被推 0.5 格（仅做位移标志，
-        //   实际塔位置不变以便不让其下墙；表示为施加一个 -1HP "knockback event" 给塔）。
-        //   简化：本轮只对塔造成伤害，knockback 留扩展位。
         public float[] EnemyTrampleRadius = new float[MAX_ENTITIES];
         public float[] EnemyTrampleDamagePerStep = new float[MAX_ENTITIES];
-        public bool[] EnemyTrampleKnockback = new bool[MAX_ENTITIES];
 
         // ==================== 锁链 / 链接 (Tether — 敌人之间互相绑定) ====================
         // EnemyTetherPartnerId: 锁链另一端的敌人 id（0 = 无锁链，因为 default(int) = 0，
@@ -1369,7 +1325,6 @@ namespace BattleSystemECS.Core
             // Round 176 Direction 7 — Siege default state at AddEnemy. Each new spawn
             // starts as a non-siege enemy (zero-overhead fast path). Callers that want
             // the Siege behavior must invoke SetEnemySiege() right after AddEnemy.
-            EnemyIsSiege[entityId] = false;
             EnemySiegeArmorBonus[entityId] = 0f;
             EnemySiegeSpeedMult[entityId] = 1f;
             // Round 179 Direction 3 — Bounty default state at AddEnemy. Each new spawn
@@ -1412,7 +1367,6 @@ namespace BattleSystemECS.Core
             // Default state: no target (-1), no damage, no slow — the SapperSystem hot
             // path short-circuits on EnemyIsSapper==false so non-sappers pay zero overhead.
             EnemyIsSapper[entityId] = false;
-            EnemySapperTargetTowerId[entityId] = -1;
             EnemySapperAttackTimer[entityId] = 0f;
             EnemySapperDamage[entityId] = 0f;
             EnemySapperAttackInterval[entityId] = 0f;
@@ -1471,7 +1425,6 @@ namespace BattleSystemECS.Core
             EnemyIsVanguard[entityId] = false;
             EnemyVanguardCoverRange[entityId] = 0f;
             EnemyVanguardDmgTransfer[entityId] = 0f;
-            EnemyVanguardCoverCount[entityId] = 0;
             // Thief: default not a gold thief
             EnemyCanStealGold[entityId] = false;
             EnemyStealAmount[entityId] = 0f;
@@ -1549,8 +1502,6 @@ namespace BattleSystemECS.Core
 
             // Mana Burn: default 0 (no mana burn ability)
             EnemyManaBurnAmount[entityId] = 0f;
-            EnemyManaBurnRadius[entityId] = 0f;
-            EnemyManaBurnCooldown[entityId] = 0f;
             EnemyManaBurnType[entityId] = 0;
             // Mana Pool (Round 101 Direction 10): default 0 (no mana, drain no-ops)
             // Designers can populate via EnemyTypeEntry.MaxMana in the wave spawn config.
@@ -1594,9 +1545,8 @@ namespace BattleSystemECS.Core
             EnemyMarkDecayTimer[entityId] = 0f;
             EnemyMarkMaxThreshold[entityId] = 0;
             // Decoy: default not a decoy. WaveSpawningSystem / Hologram-tower spawn opts in by
-            // setting EnemyIsDecoy = true and EnemyDecoyLifetime = N (seconds).
+            // setting EnemyIsDecoy = true and EnemyDecoyLifetimeLeft = N (seconds).
             EnemyIsDecoy[entityId] = false;
-            EnemyDecoyLifetime[entityId] = 0f;
             EnemyDecoyLifetimeLeft[entityId] = 0f;
 
             // Aggro Leash: default 0 range = opt-out. Monster configs that want aggro behavior
@@ -1623,8 +1573,6 @@ namespace BattleSystemECS.Core
             // Banish fields (default: not banished)
             EnemyIsBanished[entityId] = false;
             EnemyBanishDurationLeft[entityId] = 0f;
-            EnemyBanishOriginalX[entityId] = 0f;
-            EnemyBanishOriginalY[entityId] = 0f;
             // Channeling fields (default: not channeling, 0 timer, no ability, interruptible=true)
             EnemyIsChanneling[entityId] = false;
             EnemyChannelTimer[entityId] = 0f;
@@ -1860,7 +1808,6 @@ namespace BattleSystemECS.Core
         public void SetEnemySiege(int enemyId, float armorBonus, float speedMult)
         {
             if (!IsValidEntity(enemyId)) return;
-            EnemyIsSiege[enemyId] = true;
             EnemySiegeArmorBonus[enemyId] = System.Math.Clamp(armorBonus, 0f, 0.95f);
             EnemySiegeSpeedMult[enemyId] = System.Math.Clamp(speedMult, 0.1f, 1.0f);
         }
@@ -1996,7 +1943,6 @@ namespace BattleSystemECS.Core
             // The first attack fires after the first EnemySapperAttackInterval elapses
             // (SapperSystem will pick a target on the first eligible tick).
             EnemySapperAttackTimer[enemyId] = 0f;
-            EnemySapperTargetTowerId[enemyId] = -1;
             EnemySapperAtkSpdSlow[enemyId] = 0f;
         }
 
@@ -2679,7 +2625,6 @@ namespace BattleSystemECS.Core
             PathModifierY[modifierId] = y;
             PathModifierRadius[modifierId] = radius;
             PathModifierTargetPathId[modifierId] = targetPathId;
-            PathModifierOwnerId[modifierId] = ownerId;
             PathModifierTurnsRemaining[modifierId] = turnsRemaining;
             if (!PathModifierActive[modifierId])
             {

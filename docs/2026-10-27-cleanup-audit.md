@@ -109,6 +109,8 @@ Common to all V items: **none is ready to commit** (mode 2/4/5 DEFERRED, Unity U
 
 ### V-02 SOA arrays with no indexed access anywhere
 
+> **Done (B2, 2026-10-27)**: all 6 arrays removed (declaration, `Dispose` null-out, comments). Kept list: none.
+
 | Array | Declaration | Size |
 |---|---|---|
 | `EnemyHealerHealTargetPriority` | `Core/ComponentStore_Enemy.cs:885` `int[MAX_ENTITIES]` | 400,000 B |
@@ -323,7 +325,7 @@ The 16 properties that App. C excluded because of in-class mentions were inspect
 
 ### 9.6 Batch impact
 
-- **B2** grows to V-02 + V-08 (35 arrays, ≥ 8.3 MB / store, static). Same blocking conditions; owned by WS-2 (ComponentStore files).
+- **B2 — DONE (2026-10-27, `refactor: remove dead ComponentStore SOA arrays (B2)`)**: V-02 + V-08, all 35 arrays removed (≈ 8.7 MB / store, static). Re-verified across Core/Systems/Tests/Program/tools and Unity `Assets` before removal; **kept list: none** (`TowerKillCount` is R-14 and was never in the candidate set). Tests touching removed fields had only those assertion lines deleted (`SiegeEnemyTests`, `TerrainZoneSystemTests`, `CorpseEffectSystemTests`, `CatalogEntryBehaviorMatrixTests`, `FrameSchedulerTests`). Originally: B2 grows to V-02 + V-08 (35 arrays, ≥ 8.3 MB / store, static). Same blocking conditions; owned by WS-2 (ComponentStore files).
 - **B3** adds V-07 (`TowerStealthSystem`); retiring it must happen together with or after V-04 (`SuicideBombSystem` is its only consumer).
 - **B1-doc follow-up:** `HeroSystem.DeployHero` comment ("Called from TowerPlacementSystem") is misleading (F-07).
 
@@ -1083,7 +1085,7 @@ CorpseEffectTypeEnum members are integer codes documented by an enum that is its
 | `TargetMagnitudeMode.RequireEnemy` | `Core/GAS/GameplayAbilityRuntime.cs:197` | 0 |
 | `TargetMagnitudeMode.RequireHealExecutions` | `Core/GAS/GameplayAbilityRuntime.cs:198` | 0 |
 
-### Appendix B2 — RESET_ONLY SOA arrays (V-08; 29)
+### Appendix B2 — RESET_ONLY SOA arrays (V-08; 29) — all removed 2026-10-27 (B2); kept: none
 
 | Array | Location (working tree) | Type[len] | Est. bytes | Test files | Writers |
 |---|---|---|---|---|---|

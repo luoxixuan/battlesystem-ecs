@@ -199,9 +199,6 @@ namespace BattleSystemECS.Core
         public float[] TowerVisionReduction = new float[MAX_ENTITIES];
         // Tower selection state — O(1) read/write, no GC
         public bool[] TowerSelected = new bool[MAX_ENTITIES];
-        // Tower cooldown reduction: per-tower CDR (0 = no reduction, 0.3 = 30% faster cooldowns)
-        // Multiplicative: effectiveCooldown = baseCooldown * (1 - cdr), capped at 60% (0.6)
-        public float[] TowerCooldownReduction = new float[MAX_ENTITIES];
         public TowerType[] TowerType = new TowerType[MAX_ENTITIES];
         public float[] TowerAttackDamage = new float[MAX_ENTITIES];
         public int[] TowerRange = new int[MAX_ENTITIES];
@@ -344,8 +341,6 @@ namespace BattleSystemECS.Core
         // TowerKnockbackForce: strength of knockback applied to enemies on hit (0 = no knockback)
         // Positive values push enemies backward along the path direction
         public float[] TowerKnockbackForce = new float[MAX_ENTITIES];
-        // TowerKnockbackRadius: radius within which knockback force is fully applied (beyond it, no effect)
-        public float[] TowerKnockbackRadius = new float[MAX_ENTITIES];
 
         // ==================== 视线系统 (Line of Sight / LoS Blocker) ====================
         // TowerRequiresLOS: when true, the tower can only target enemies with an unobstructed
@@ -401,10 +396,8 @@ namespace BattleSystemECS.Core
         // ==================== 塔穿透弹道系统（Piercing Projectile）====================
         // TowerProjectilePierceCount: number of enemies the projectile can pierce through (0 = no pierce)
         // TowerProjectilePierceDmgFalloff: damage multiplier after each pierce (1.0 = full damage, 0.7 = 70%)
-        // TowerPierceHitsRemaining: per-attack counter — tracks pierce consumed in current attack
         public int[] TowerProjectilePierceCount = new int[MAX_ENTITIES];
         public float[] TowerProjectilePierceDmgFalloff = new float[MAX_ENTITIES];
-        public int[] TowerPierceHitsRemaining = new int[MAX_ENTITIES];
 
         // ==================== 塔弹道分裂/子母弹系统（Projectile Fragmentation）====================
         // TowerProjectileFragmentCount: number of child projectiles spawned on impact (0 = no fragmentation)
@@ -860,8 +853,6 @@ namespace BattleSystemECS.Core
         public float[] TowerStealthTimer = new float[MAX_ENTITIES];
         // TowerStealthDuration: total duration for temporary stealth (type 2 active)
         public float[] TowerStealthDuration = new float[MAX_ENTITIES];
-        // TowerWasStealthedLastFrame: true if tower was stealthed last frame (used for decloak-on-attack tracking)
-        public bool[] TowerWasStealthedLastFrame = new bool[MAX_ENTITIES];
 
         // ==================== 地图热区加成 (Hot Zone Terrain Bonus) ====================
         // TowerHotZoneDamageBonus: cached damage multiplier bonus from hot zone placement (e.g. 0.15 = +15%)
@@ -889,14 +880,6 @@ namespace BattleSystemECS.Core
         public float[] TowerFrostZoneDuration = new float[MAX_ENTITIES];
 
         // ==================== 迫击炮/弧线弹道 (Mortar / Arc Projectiles) ====================
-        // TowerProjectileArcType: 0=直线（默认）, 1=跟踪, 2=弧线（抛物线）
-        // Affects how the projectile moves through the air — arc uses gravity simulation
-        public int[] TowerProjectileArcType = new int[MAX_ENTITIES];
-        // TowerProjectileArcPeakHeight: peak height for arc-type projectiles (grid units)
-        // Only used when TowerProjectileArcType == 2 (Arc)
-        public float[] TowerProjectileArcPeakHeight = new float[MAX_ENTITIES];
-        // TowerProjectileGravityScale: gravity multiplier for arc projectiles (default 1.0)
-        public float[] TowerProjectileGravityScale = new float[MAX_ENTITIES];
 
         // ==================== 塔过热/热量系统 (Tower Heat / Overheat) ====================
         // TowerHeat: current accumulated heat level for each tower (0 = cold, max = overheated)
@@ -1310,7 +1293,6 @@ namespace BattleSystemECS.Core
             // Piercing projectile fields: default to no pierce
             TowerProjectilePierceCount[entityId] = 0;
             TowerProjectilePierceDmgFalloff[entityId] = 1f;
-            TowerPierceHitsRemaining[entityId] = 0;
             // Fragmentation/projectile split fields: default to no fragmentation
             TowerProjectileFragmentCount[entityId] = 0;
             TowerProjectileFragmentRange[entityId] = 0f;
@@ -1332,7 +1314,6 @@ namespace BattleSystemECS.Core
             TowerCanOvercharge[entityId] = false;
             // Knockback fields: default to no knockback (0 force = no effect)
             TowerKnockbackForce[entityId] = 0f;
-            TowerKnockbackRadius[entityId] = 0f;
             // LoS fields: default to no LoS requirement, no LoS blocking (backward compatible)
             TowerRequiresLOS[entityId] = false;
             TowerBlocksLOS[entityId] = false;
@@ -1404,10 +1385,6 @@ namespace BattleSystemECS.Core
             TowerBeaconCachedAtkSpdBonus[entityId] = 0f;
             // Fog of War: default to no fog restriction (visionRadius=0 means see all)
             TowerVisionRadius[entityId] = 0f;
-            // Arc projectile fields: default to straight trajectory (0=straight, 1=homing, 2=arc)
-            TowerProjectileArcType[entityId] = 0;
-            TowerProjectileArcPeakHeight[entityId] = 0f;
-            TowerProjectileGravityScale[entityId] = 1f;
             // Heat/overheat fields: default to no heat, no overheat
             TowerHeat[entityId] = 0f;
             TowerMaxHeat[entityId] = 0f;
@@ -1714,10 +1691,6 @@ namespace BattleSystemECS.Core
             TowerPatrolWaypointIndex[entityId] = 0;
             TowerPatrolDirection[entityId] = 1;
             TowerPatrolAttackSpeedPenalty[entityId] = 1f;
-            // Arc projectile fields reset
-            TowerProjectileArcType[entityId] = 0;
-            TowerProjectileArcPeakHeight[entityId] = 0f;
-            TowerProjectileGravityScale[entityId] = 1f;
             // Round 103 — Buff Share fields reset
             TowerBuffShareRadius[entityId] = 0f;
             TowerBuffShareMask[entityId] = 0;

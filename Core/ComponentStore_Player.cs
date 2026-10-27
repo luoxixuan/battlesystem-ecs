@@ -38,8 +38,6 @@ namespace BattleSystemECS.Core
         // Player shield: absorbs damage before health, independent of armor
         public float[] PlayerShield = new float[MAX_PLAYERS];
         public float[] PlayerShieldDuration = new float[MAX_PLAYERS]; // seconds remaining
-        // Player thorns: reflects a fraction of damage taken back to the attacking enemy.
-        public float[] PlayerThornsRatio = new float[MAX_PLAYERS];
 public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         // Player damage type: determines which resistance enemies use for mitigation.
         public DamageType[] PlayerDamageType = new DamageType[MAX_PLAYERS];
@@ -212,8 +210,6 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             new AbilityCooldownColumn(new AbilityState[MAX_HEROES * 4]);
         // PlayerGlobalSkillPressed: hotkey pressed signal this frame (consumed by GlobalSkillSystem)
         public bool[] PlayerGlobalSkillPressed = new bool[MAX_PLAYERS];
-        // PlayerGlobalSkillHotkey: hotkey string per skill for UI display
-        public string[] PlayerGlobalSkillHotkey = new string[MAX_PLAYERS * 8];
         // ── Kill-Triggered Skill Cooldown Reset ───────────────────────────────
         // PlayerSkillResetOnKill: 0=None, 1=Full (reset all skill cooldowns to 0), 2=Partial (reduce by PlayerSkillResetAmount seconds).
         // Default 0 = disabled (backward compatible).
@@ -250,7 +246,6 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
         public int[] PlayerSlowDuration = new int[MAX_PLAYERS];
 // Base lives: number of leaks allowed before game over (independent of health)
         public int[] PlayerBaseLives = new int[MAX_PLAYERS];
-        public int[] PlayerMaxBaseLives = new int[MAX_PLAYERS];
 
         // ==================== 塔部署数量限制 (Tower Placement Cap, SOA) ====================
         // PlayerMaxTowers: maximum number of towers player can place (configurable, can be expanded via tech tree)
@@ -529,7 +524,6 @@ public int[] PlayerCurrentLevel = new int[MAX_PLAYERS];
             PlayerBuffs[entityId] = new List<string>();
             PlayerBuffFlags[entityId] = BuffType.None;
             PlayerBaseLives[entityId] = baseLives;
-            PlayerMaxBaseLives[entityId] = baseLives;
             // Weather: default to clear (type 0), intensity 0
             CurrentWeather[entityId] = 0;
             WeatherIntensity[entityId] = 0f;
@@ -1155,8 +1149,6 @@ PlayerCrestActiveId[entityId] = "";
         public float[] HeroAttackSpeed = new float[MAX_HEROES];
         // HeroCooldown: remaining cooldown in seconds (0 = ready to attack)
         public float[] HeroCooldown = new float[MAX_HEROES];
-        // HeroTypeId: which hero definition (index into heroes.json config)
-        public int[] HeroTypeId = new int[MAX_HEROES];
 
         // ==================== Totem System (SOA, pool-based) ====================
         // MAX_TOTEMS: global pool size shared across all players. A totem is a

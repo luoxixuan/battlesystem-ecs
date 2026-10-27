@@ -104,7 +104,6 @@ namespace BattleSystemECS.Tests.Framework
             Store.EnemyPathId[enemyId] = -1;
             Store.EnemyHealth[enemyId] = 100f; Store.EnemyMaxHealth[enemyId] = 100f; Store.EnemyArmor[enemyId] = 0f;
             Store.PlayerPreFightCritBonus[0] = 0f;
-            Store.PlayerIsWaveActive[0] = true;
             Store.PlayerArmor[0] = 0.2f;
             Store.UseComputedAttributes = true;
             Store.AddAttributeModifier(0, new BattleSystemECS.Core.GAS.ModifierDefinition(new BattleSystemECS.Core.GAS.AttributeKey(0), BattleSystemECS.Core.GAS.AttributeModifierOp.Percent, 1f));

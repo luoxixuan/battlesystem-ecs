@@ -850,12 +850,9 @@ namespace BattleSystemECS.Core
                 PlayerSlowDuration[i] = 0;
                 PlayerWaveIndex[i] = -1;
                 PlayerEnemiesRemaining[i] = 0;
-                PlayerIsWaveActive[i] = false;
-                PlayerWaveTimer[i] = -1f;
                 PlayerWaveCompleteGold[i] = 0f;
                 PlayerShield[i] = 0f;
                 PlayerShieldDuration[i] = 0f;
-                PlayerThornsRatio[i] = 0f;
                 PlayerComboGoldMult[i] = 1f;
                 PlayerComboDamageMult[i] = 1f;
                 PlayerComboKillStreak[i] = 0f;
@@ -956,8 +953,6 @@ namespace BattleSystemECS.Core
                 EnemyGoldReward[entityId] = 0;
                 EnemyWaveNumber[entityId] = 0;
                 EnemyChargeParam[entityId] = 0f;
-                EnemyBuffDamageBonus[entityId] = 0f;
-                EnemyBuffDurationLeft[entityId] = 0f;
                 EnemyBehaviorTree[entityId] = null;
                 EnemyTypeName[entityId] = null;
                 EnemyAIAction[entityId] = null;
@@ -1011,7 +1006,6 @@ namespace BattleSystemECS.Core
                 // Round 176 Direction 7 — Siege reset (recycled slot must not leak siege
                 // armor/slow state — a freshly-spawned enemy must start as a normal enemy,
                 // never inherit +80% damage reduction / 50% slow from a prior slot occupant)
-                EnemyIsSiege[entityId] = false;
                 EnemySiegeArmorBonus[entityId] = 0f;
                 EnemySiegeSpeedMult[entityId] = 1f;
                 // Round 174 Direction 8 — Stalker reset (recycled slot must not leak stealth
@@ -1045,7 +1039,6 @@ namespace BattleSystemECS.Core
                 // state — a freshly-spawned enemy must start as a non-sapper, never inherit
                 // a target tower id or accumulated slow stacks from the prior slot occupant)
                 EnemyIsSapper[entityId] = false;
-                EnemySapperTargetTowerId[entityId] = -1;
                 EnemySapperAttackTimer[entityId] = 0f;
                 EnemySapperDamage[entityId] = 0f;
                 EnemySapperAttackInterval[entityId] = 0f;
@@ -1057,8 +1050,6 @@ namespace BattleSystemECS.Core
                 EnemyArmorShredDuration[entityId] = 0f;
                 // Fear / Taunt / Charm fields
                 EnemyFearDurationLeft[entityId] = 0f;
-                EnemyTauntTargetId[entityId] = -1;
-                EnemyCharmDurationLeft[entityId] = 0f;
                 // Nest / spawner fields
                 NestDefId[entityId] = -1;
                 NestHealth[entityId] = 0f;
@@ -1197,7 +1188,6 @@ namespace BattleSystemECS.Core
                 EnemyLastStandDamageMult[entityId] = 1f;
                 // Invulnerable phase fields
                 EnemyIsInvulnerable[entityId] = false;
-                EnemyInvulnerablePhaseName[entityId] = null;
 // Freeze fields (shared with stun — no separate fields needed, cleanup via StunDurationLeft/StunFlag above)
                 // Life Link fields (shared damage link)
                 EnemyIsLifeLinker[entityId] = false;
@@ -1251,7 +1241,6 @@ namespace BattleSystemECS.Core
                 EnemyFocusDurationLeft[entityId] = 0f;
                 // Decoy fields (reset on entity destruction)
                 EnemyIsDecoy[entityId] = false;
-                EnemyDecoyLifetime[entityId] = 0f;
                 EnemyDecoyLifetimeLeft[entityId] = 0f;
                 // Free-Roam fields (Round 84): reset on entity destruction
                 EnemyIsFreeRoam[entityId] = false;
@@ -1261,8 +1250,6 @@ namespace BattleSystemECS.Core
                 // Banish fields (reset on entity destruction)
                 EnemyIsBanished[entityId] = false;
                 EnemyBanishDurationLeft[entityId] = 0f;
-                EnemyBanishOriginalX[entityId] = 0f;
-                EnemyBanishOriginalY[entityId] = 0f;
                 // Stagger / Posture fields (reset on entity destruction)
                 EnemyStaggerMeter[entityId] = 0f;
                 EnemyStaggerMax[entityId] = 0f;
@@ -1649,16 +1636,16 @@ namespace BattleSystemECS.Core
             PositionX = null!; PositionY = null!; PositionActive = null!;
             PlayerAttackRange = null!; PlayerAttackSpeed = null!; PlayerAttackDamage = null!;
             PlayerMaxHealth = null!; PlayerCurrentHealth = null!; PlayerArmor = null!;
-            PlayerShield = null!; PlayerShieldDuration = null!; PlayerThornsRatio = null!;
+            PlayerShield = null!; PlayerShieldDuration = null!;
             PlayerCurrentLevel = null!; PlayerDamageType = null!;
             PlayerGold = null!; PlayerUpgradeThreshold = null!;
             PlayerMana = null!; PlayerMaxMana = null!; PlayerManaRegen = null!; PlayerManaCost = null!;
             PlayerGlobalSkillUnlocked = null!; PlayerGlobalSkillCooldown = default;
-            PlayerGlobalSkillPressed = null!; PlayerGlobalSkillHotkey = null!;
+            PlayerGlobalSkillPressed = null!;
             PlayerSkillResetOnKill = null!; PlayerSkillResetAmount = null!;
             PlayerBuffFlags = null!; PlayerStunDuration = null!;
             PlayerSlowFactor = null!; PlayerSlowDuration = null!;
-            PlayerBaseLives = null!; PlayerMaxBaseLives = null!;
+            PlayerBaseLives = null!;
             CurrentWeather = null!; WeatherIntensity = null!; WeatherTimer = null!;
             GlobalDayNightPhase = null!; GlobalDayNightTimer = null!; GlobalDayNightCycleCount = null!;
             CurrentObjectiveType = null!;
@@ -1675,7 +1662,7 @@ namespace BattleSystemECS.Core
             ResourceNodeAccumulated = null!; ResourceNodeCaptureProgress = null!; ResourceNodeTowerId = null!;
             ResourceNodeRegenTimer = null!; ResourceNodeRegenDelay = null!; ResourceNodeDepleted = null!;
             PathModifierX = null!; PathModifierY = null!; PathModifierRadius = null!;
-            PathModifierActive = null!; PathModifierOwnerId = null!; PathModifierTargetPathId = null!;
+            PathModifierActive = null!; PathModifierTargetPathId = null!;
             PathModifierTurnsRemaining = null!;
             GlobalTimeScale = null!; GlobalTimeScaleDuration = null!;
             RandomEventCooldown = null!; RandomEventActiveType = null!; RandomEventTimer = null!;
@@ -1685,15 +1672,15 @@ namespace BattleSystemECS.Core
             PlayerResearchPoints = null!;
             PickupX = null!; PickupY = null!; PickupType = null!; PickupValue = null!;
             PickupOwnerId = null!; PickupActive = null!; PickupLifetime = null!; PickupRarity = null!;
-            PlayerWaveIndex = null!; PlayerEnemiesRemaining = null!; PlayerIsWaveActive = null!;
-            PlayerWaveTimer = null!; PlayerWaveCompleteGold = null!;
+            PlayerWaveIndex = null!; PlayerEnemiesRemaining = null!;
+            PlayerWaveCompleteGold = null!;
             CurrentWaveMutatorId = null!;
             PlayerComboCount = null!; PlayerComboTimer = null!; PlayerComboDamageMult = null!;
             PlayerComboKillStreak = null!; PlayerComboGoldMult = null!;
             PlayerBankedGold = null!; PlayerInterestRate = null!;
             EnemyHealth = null!; EnemyMaxHealth = null!; EnemyMoveSpeed = null!; EnemyDamage = null!;
             EnemyGoldReward = null!; EnemyWaveNumber = null!; EnemyActive = null!;
-            EnemyChargeParam = null!; EnemyBuffDamageBonus = null!; EnemyBuffDurationLeft = null!;
+            EnemyChargeParam = null!;
             EnemySpawnFrame = null!; EnemyArmor = null!; EnemyMagicResist = null!; EnemyEvasion = null!;
             EnemyShield = null!; EnemyThornsRatio = null!;
             EnemyArmorShredStacks = null!; EnemyArmorShredDuration = null!;
@@ -1739,7 +1726,7 @@ namespace BattleSystemECS.Core
             // Round 200 Direction 5 — Death Mark Clear registration
             EnemyDeathMarkStacks = null!; EnemyDeathMarkTimer = null!; EnemyDeathMarkMaxStacks = null!;
             EnemyDeathMarkBonusPerStack = null!;
-            EnemyIsInvulnerable = null!; EnemyInvulnerablePhaseName = null!;
+            EnemyIsInvulnerable = null!;
             EnemyFissionDefId = null!; EnemyFissionGeneration = null!;
             EnemyMorphDefId = null!; EnemyIsMorphed = null!; EnemyMorphTriggered = null!;
             EnemyCloneDefId = null!; EnemyCloneCooldown = null!; EnemyCloneTimer = null!;
@@ -1754,12 +1741,11 @@ namespace BattleSystemECS.Core
             EnemyLeapDuration = null!; EnemyLeapStartX = null!; EnemyLeapStartY = null!;
             EnemyLeapTargetX = null!; EnemyLeapTargetY = null!; EnemyLeapElapsed = null!;
             EnemyLeapDamage = null!; EnemyLeapRadius = null!; EnemyLeapStunDuration = null!;
-            EnemyFearDurationLeft = null!; EnemyTauntTargetId = null!; EnemyCharmDurationLeft = null!;
+            EnemyFearDurationLeft = null!;
             EnemyStunResistance = null!; EnemyFreezeResistance = null!; EnemySlowResistance = null!;
             EnemyKnockbackResistance = null!; EnemyDamageResistance = null!;
             EnemyIsVanguard = null!; EnemyVanguardCoverRange = null!; EnemyVanguardDmgTransfer = null!;
-            EnemyVanguardCoverCount = null!;
-            EnemyHealerHealAmount = null!; EnemyHealerHealInterval = null!; EnemyHealerHealTargetPriority = null!;
+            EnemyHealerHealAmount = null!; EnemyHealerHealInterval = null!;
             EnemyCanStealGold = null!; EnemyStealAmount = null!; EnemyStolenGold = null!;
             EnemyGoldOnReturn = null!; EnemyHasStolenGold = null!;
             EnemyAffixFlags = null!; EnemyElementStatus = null!; EnemyElementTimer = null!;
@@ -1772,7 +1758,7 @@ namespace BattleSystemECS.Core
             EnemyTypeName = null!; EnemyBehaviorTree = null!; EnemyActionEnum = null!;
             EnemyCastAbilityId = null!;
             EnemyMarked = null!; EnemyMarkedThreshold = null!; EnemyMarkedDamageBonus = null!;
-            EnemyIsDecoy = null!; EnemyDecoyLifetime = null!; EnemyDecoyLifetimeLeft = null!;
+            EnemyIsDecoy = null!; EnemyDecoyLifetimeLeft = null!;
             // Round 84 Direction 6: Free-Roam Enemies — opt-in via monsterConfig.Type == "FreeRoam"
             EnemyIsFreeRoam = null!; EnemyWanderTargetX = null!; EnemyWanderTargetY = null!;
             EnemyWanderRerollTimer = null!;
@@ -1799,7 +1785,7 @@ namespace BattleSystemECS.Core
             TowerCanHitAir = null!; TowerCanHitGround = null!;
             TowerSpecialAbilityRadius = null!; TowerSpecialAbilityDamageMult = null!;
             TowerSpecialAbilityDotDamage = null!; TowerSpecialAbilityDotInterval = null!;
-            TowerKnockbackForce = null!; TowerKnockbackRadius = null!;
+            TowerKnockbackForce = null!;
             TowerPathHugOnly = null!;
             TowerIsLockOn = null!; TowerLockedTargetId = null!;
             TowerRequiresLOS = null!; TowerBlocksLOS = null!;
@@ -1808,7 +1794,6 @@ namespace BattleSystemECS.Core
             TowerBouncesRemaining = null!; TowerBounceRange = null!;
             TowerBounceDamageFalloff = null!; TowerBounceHitsRemaining = null!;
             TowerProjectilePierceCount = null!; TowerProjectilePierceDmgFalloff = null!;
-            TowerPierceHitsRemaining = null!;
             TowerProjectileFragmentCount = null!; TowerProjectileFragmentRange = null!;
             TowerProjectileFragmentDmgMult = null!;
             TowerCurrentAmmo = null!; TowerMaxAmmo = null!; TowerReloadTime = null!;
@@ -1846,7 +1831,7 @@ namespace BattleSystemECS.Core
             TowerIsMobile = null!; TowerMoveSpeed = null!; TowerPatrolPathId = null!;
             TowerPatrolWaypointIndex = null!; TowerPatrolDirection = null!;
             TowerPatrolAttackSpeedPenalty = null!;
-            ObstacleActive = null!; ObstacleHealth = null!; ObstacleMaxHealth = null!;
+            ObstacleActive = null!; ObstacleHealth = null!;
             ObstacleX = null!; ObstacleY = null!; ObstacleType = null!;
             HazardZoneActive = null!; HazardZoneX = null!; HazardZoneY = null!;
             HazardZoneRadius = null!; HazardZoneMaxRadius = null!;

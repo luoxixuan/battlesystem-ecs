@@ -19,7 +19,6 @@ namespace BattleSystemECS.Tests.Features.Enemies
         {
             int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
             // All 3 siege fields should be in inert defaults — hot path fast-returns
-            Assert.False(Store.EnemyIsSiege[eid]);
             Assert.Equal(0f, Store.EnemySiegeArmorBonus[eid]);
             Assert.Equal(1f, Store.EnemySiegeSpeedMult[eid]);
         }
@@ -29,7 +28,6 @@ namespace BattleSystemECS.Tests.Features.Enemies
         {
             int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
             Store.SetEnemySiege(eid, armorBonus: 0.8f, speedMult: 0.5f);
-            Assert.True(Store.EnemyIsSiege[eid]);
             Assert.Equal(0.8f, Store.EnemySiegeArmorBonus[eid]);
             Assert.Equal(0.5f, Store.EnemySiegeSpeedMult[eid]);
         }
@@ -64,14 +62,12 @@ namespace BattleSystemECS.Tests.Features.Enemies
             // 先写入合法实体的已知值作为对照，再用无效 id 调用并断言合法槽位不变。
             int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
             Store.SetEnemySiege(eid, 0.8f, 0.5f);
-            Assert.True(Store.EnemyIsSiege[eid]);
             Assert.Equal(0.8f, Store.EnemySiegeArmorBonus[eid]);
             Assert.Equal(0.5f, Store.EnemySiegeSpeedMult[eid]);
 
             Store.SetEnemySiege(-1, 0.9f, 0.4f);
             Store.SetEnemySiege(99999, 0.9f, 0.4f);
 
-            Assert.True(Store.EnemyIsSiege[eid]);
             Assert.Equal(0.8f, Store.EnemySiegeArmorBonus[eid]);
             Assert.Equal(0.5f, Store.EnemySiegeSpeedMult[eid]);
         }
@@ -89,7 +85,6 @@ namespace BattleSystemECS.Tests.Features.Enemies
             Store.DestroyEntity(eid);
             int newEid = Store.AddEnemy(0f, 0f, 1f, 100f, 10f, 1f, 1, 1);
             // Slot must be reset to inert defaults — NOT carry over old siege state
-            Assert.False(Store.EnemyIsSiege[newEid]);
             Assert.Equal(0f, Store.EnemySiegeArmorBonus[newEid]);
             Assert.Equal(1f, Store.EnemySiegeSpeedMult[newEid]);
         }

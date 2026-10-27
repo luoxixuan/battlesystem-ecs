@@ -555,7 +555,6 @@ namespace BattleSystemECS.Tests.Features.Buffs
             );
             Assert.True(zoneId >= 0);
             Assert.Equal(10, Store.CorpseEffectType[zoneId]);
-            Assert.Equal(1, Store.CorpseEffectDamageType[zoneId]);
             Assert.Equal(0.5f, Store.CorpseEffectVisionReduction[zoneId]);
 
             // Tower at (1, 0) — inside radius 2.5
