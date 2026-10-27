@@ -929,6 +929,12 @@ namespace BattleSystemECS.Core.GAS
         public long LastAbortSequence { get; private set; }
         public int LastAbortReason { get; private set; }
         public int LastAbortRemaining { get; private set; }
+        /// <summary>
+        /// 帧预算默认值：按 Resolver 事件容量 + 链式队列容量推导，使正常战斗事实不会撞上循环防护；
+        /// 防护仍兜底失控的触发链（另有 8 轮上限与 NextEvents 容量）。只计入有定义订阅的事件。
+        /// </summary>
+        public const int DefaultMaxEventsPerFrame = DamageResolver.EventCapacity + ResourceResolver.EventCapacity + DefaultCapacity;
+        public const int DefaultCapacity = 8192;
         public int MaxEventsPerFrame { get; }
         public int LoopAborts { get; private set; }
         public int PublicationFailures { get; private set; }
@@ -945,9 +951,9 @@ namespace BattleSystemECS.Core.GAS
         public int PeakDefinitionCount { get; private set; }
         public int PeakTriggerDefinitionCount { get; private set; }
         public int DefinitionCapacity { get; } = 4096;
-        public int SeenCapacity { get; } = 8192;
+        public int SeenCapacity { get; }
         public int MaxCounterEntries { get; } = 4096;
-        public GameplayTriggerRuntime(ComponentStore store, GameplayEffectRuntime effects, int capacity = 8192, int maxEventsPerFrame = 8192) { _store = store ?? throw new ArgumentNullException(nameof(store)); _effects = effects ?? throw new ArgumentNullException(nameof(effects)); NextEvents = new GameplayEventQueue(Math.Max(1, capacity), Math.Min(64, Math.Max(0, capacity / 8))); AbortEvents = new GameplayEventQueue(Math.Max(4, Math.Min(64, Math.Max(1, capacity))), 1); MaxEventsPerFrame = Math.Max(1, maxEventsPerFrame); }
+        public GameplayTriggerRuntime(ComponentStore store, GameplayEffectRuntime effects, int capacity = DefaultCapacity, int maxEventsPerFrame = DefaultMaxEventsPerFrame) { _store = store ?? throw new ArgumentNullException(nameof(store)); _effects = effects ?? throw new ArgumentNullException(nameof(effects)); NextEvents = new GameplayEventQueue(Math.Max(1, capacity), Math.Min(64, Math.Max(0, capacity / 8))); AbortEvents = new GameplayEventQueue(Math.Max(4, Math.Min(64, Math.Max(1, capacity))), 1); MaxEventsPerFrame = Math.Max(1, maxEventsPerFrame); SeenCapacity = Math.Max(DefaultCapacity, MaxEventsPerFrame); }
         public bool RegisterEffect(GameplayEffectDefinition definition)
         {
             if (definition.Id.Value < 0 || !GameplayEffectRuntime.IsDurationContractValid(definition) || (definition.Type == EffectType.Periodic && (!definition.Periodic.HasValue || (definition.Periodic.Value.MagnitudeSource != MagnitudeSource.Constant && definition.Periodic.Value.MagnitudeSource != MagnitudeSource.Attribute) || definition.Periodic.Value.Period <= 0f || float.IsNaN(definition.Periodic.Value.Period) || float.IsInfinity(definition.Periodic.Value.Period) || definition.Duration <= 0f || float.IsNaN(definition.Duration) || float.IsInfinity(definition.Duration) || (definition.Periodic.Value.Payload != EffectPayloadKind.GameplayEvent && definition.Periodic.Value.MagnitudeSource == MagnitudeSource.Constant && (definition.Periodic.Value.Magnitude <= 0f || float.IsNaN(definition.Periodic.Value.Magnitude) || float.IsInfinity(definition.Periodic.Value.Magnitude))))))
@@ -1000,7 +1006,7 @@ namespace BattleSystemECS.Core.GAS
                 PeakTriggerDefinitionCount = TriggerDefinitionCount;
             int fired = 0;
             int definitionCount = definitions.Count;
-            // 本次调用的定义事件类型位图：无定义命中的事件只做去重/计数，跳过定义循环（结果不变）
+            // 本次调用的订阅事件类型位图：无定义订阅的事件不进去重、不占帧预算，直接跳过
             uint definedTypes = 0u;
             for (int t = 0; t < definitionCount; t++)
             {
@@ -1013,6 +1019,8 @@ namespace BattleSystemECS.Core.GAS
                 // 消费只在串行提交段运行：免锁按引用读取，类型过滤不命中的事件不拷贝
                 ref readonly var slot = ref events.GetSerialRef(i);
                 if (_allowedTypes != null) { var type = slot.Type; bool allowed = false; for (int a = 0; a < _allowedTypes.Length; a++) if (type == _allowedTypes[a]) { allowed = true; break; } if (!allowed) continue; }
+                int typeBit = (int)slot.Type;
+                if ((uint)typeBit < 32u && (definedTypes & (1u << typeBit)) == 0u) continue;
                 var e = slot;
                 var dedupe = new SeenKey(e);
                 if (_frameEventsConsumed < MaxEventsPerFrame && _seen.Count < SeenCapacity)
@@ -1029,8 +1037,6 @@ namespace BattleSystemECS.Core.GAS
                 }
                 if (_seen.Count > PeakSeenCount) PeakSeenCount = _seen.Count;
                 _frameEventsConsumed++;
-                int typeBit = (int)e.Type;
-                if ((uint)typeBit < 32u && (definedTypes & (1u << typeBit)) == 0u) continue;
                 for (int t = 0; t < definitionCount; t++)
                 {
                     var d = definitions[t]; if (d.EventType != e.Type) continue;

@@ -7,6 +7,15 @@ namespace BattleSystemECS.Tests.Framework
 {
     public sealed class GameplayCapacityContractTests
     {
+        // 只订阅指定类型、阈值永不越过的观察定义：事件计入触发器帧预算但不产生效果
+        private static TriggerDefinition[] Observe(params GameplayEventType[] types)
+        {
+            var definitions = new TriggerDefinition[types.Length];
+            for (int i = 0; i < types.Length; i++)
+                definitions[i] = new TriggerDefinition(new TriggerId(i), types[i], new EffectId(0), new ConsumerId(0), threshold: int.MaxValue);
+            return definitions;
+        }
+
         [Fact]
         public void EventQueueReportsCriticalOverflowWithoutDroppingAcceptedEvent()
         {
@@ -104,7 +113,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.True(events.TryPublish(overflow));
 
             int abortsBefore = runtime.LoopAborts;
-            runtime.Consume(events, Array.Empty<TriggerDefinition>());
+            runtime.Consume(events, Observe(GameplayEventType.HitConfirmed, GameplayEventType.DamageApplied));
 
             Assert.Equal(abortsBefore + 1, runtime.LoopAborts);
             Assert.Equal(202L, runtime.LastAbortSequence);
@@ -120,7 +129,7 @@ namespace BattleSystemECS.Tests.Framework
             var recovered = new GameplayEventQueue(1);
             Assert.True(recovered.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed,
                 default(EntityHandle), default(EntityHandle), 303L)));
-            Assert.Equal(0, runtime.Consume(recovered, Array.Empty<TriggerDefinition>()));
+            Assert.Equal(0, runtime.Consume(recovered, Observe(GameplayEventType.HitConfirmed, GameplayEventType.DamageApplied)));
             Assert.Equal(abortsBefore + 1, runtime.LoopAborts);
             Assert.Equal(0, runtime.LastAbortReason);
             Assert.Equal(0, runtime.LastAbortRemaining);

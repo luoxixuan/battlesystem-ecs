@@ -1,5 +1,12 @@
 # 更新记录 (Changelog)
 
+### 2026-10-26（触发器预算只计订阅事件并按 Resolver 容量定界：mode 4 中止 1514→0）
+- **问题**：`MaxEventsPerFrame=8192` 计入每条事实（含无触发器订阅的 `DamageApplied`），mode 4 每帧约 20K 事实撞上防护，约一半玩家命中从未进入触发器评估——EveryN 连击加成的计数随敌人数量失真。
+- **只计订阅事件**：`Consume` 先算订阅类型位图，无定义订阅的事件不进去重、不占帧预算（事件仍照常发布，digest 与 Rally 等读者不受影响）。
+- **预算定界**：`DefaultMaxEventsPerFrame = DamageResolver.EventCapacity + ResourceResolver.EventCapacity + DefaultCapacity`（90240）；`SeenCapacity = max(8192, MaxEventsPerFrame)`。防护仍兜底失控触发链（另有 8 轮上限与 NextEvents 容量）。
+- 测试：预算类测试改为订阅所测事件类型（`Observe` 观察定义，阈值永不越过）；新测试覆盖无订阅事件免费、预算耗尽后已见事件跳过不中止。
+- 对照（同 cwd 交替运行）：mode 4 `triggerAborts` 1514→**0**；全部约 10K 命中进入评估，`gameplay-event.commit` 535–546→1141–1198 ms/500 帧（其中约 1/3 为每 10 次命中一次的连击效果施加，每帧约 1000 次），**105–108→92–94 FPS**——这是触发器正确处理全部命中的代价，下一条（玩家目标上限）消除其根源。mode 2 两份产物同样在 230–240 / 340–344 FPS 两档间跳动，持平；mode 5 Victory 457 帧一致。
+
 ### 2026-10-26（attribute.aggregate 0.87→0.31 ms/帧）
 - **定位**：探针显示节点 98% 时间在 `SyncComputedAttributeBases`——每帧对 10K 敌人逐个 `SetBase`，几乎全部值未变（每帧仅约 21 个 dirty 槽），却各付一次 schema 接口字典查询 + `(int, AttributeKey)` 元组键字典查询。
 - **稠密镜像**：`AttributeAggregator` 按 key 数组缓存 schema 定义，并维护 `_base` 的稠密镜像（entity × key，值 + 存在位，按需倍增扩容）；值未变的 `SetBase` 免字典直接返回。`_base` 仍是唯一事实源，镜像只在其两处写入（`SetBase` / `ClearEntity`）同步；key ≥64、entity ≥2^20 或未知 key 走原路径（未知 key 仍抛 `KeyNotFoundException`）。

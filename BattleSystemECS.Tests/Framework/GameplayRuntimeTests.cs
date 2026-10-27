@@ -10,6 +10,15 @@ namespace BattleSystemECS.Tests.Framework
 {
     public sealed class GameplayRuntimeTests
     {
+        // 只订阅指定类型、阈值永不越过的观察定义：事件计入触发器帧预算但不产生效果
+        private static TriggerDefinition[] Observe(params GameplayEventType[] types)
+        {
+            var definitions = new TriggerDefinition[types.Length];
+            for (int i = 0; i < types.Length; i++)
+                definitions[i] = new TriggerDefinition(new TriggerId(i), types[i], new EffectId(0), new ConsumerId(0), threshold: int.MaxValue);
+            return definitions;
+        }
+
         [Fact]
         public void PeriodicRuntimeSubmitsNonZeroDamageWithOwnerAndProvenance()
         {
@@ -245,7 +254,7 @@ namespace BattleSystemECS.Tests.Framework
         [Fact]
         public void TriggerOverflowPublishesAbortAndNextFrameRecovers()
         {
-            var store = new ComponentStore(); var runtime = new GameplayTriggerRuntime(store, store.GameplayEffectsRuntime, 1, 1); var q = new GameplayEventQueue(2); Assert.True(q.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, default(EntityHandle), default(EntityHandle), 1))); Assert.True(q.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, default(EntityHandle), default(EntityHandle), 2))); runtime.Consume(q, Array.Empty<TriggerDefinition>()); Assert.True(runtime.LoopAborts > 0); int aborts = runtime.LoopAborts; runtime.ResetFrame(); var recovered = new GameplayEventQueue(1); Assert.True(recovered.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, default(EntityHandle), default(EntityHandle), 3))); Assert.Equal(0, runtime.Consume(recovered, Array.Empty<TriggerDefinition>(), clear: true)); Assert.Equal(aborts, runtime.LoopAborts); Assert.Equal(0, runtime.NextEvents.Count);
+            var store = new ComponentStore(); var source = store.GetEntityHandle(store.AddEnemy(0f, 0f, 1f, 10f, 10f, 1f, 1, 1)); var target = store.GetEntityHandle(store.AddEnemy(1f, 0f, 1f, 10f, 10f, 1f, 1, 1)); var runtime = new GameplayTriggerRuntime(store, store.GameplayEffectsRuntime, 1, 1); var q = new GameplayEventQueue(2); Assert.True(q.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, source, target, 1))); Assert.True(q.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, source, target, 2))); runtime.Consume(q, Observe(GameplayEventType.HitConfirmed)); Assert.True(runtime.LoopAborts > 0); int aborts = runtime.LoopAborts; runtime.ResetFrame(); var recovered = new GameplayEventQueue(1); Assert.True(recovered.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, source, target, 3))); Assert.Equal(0, runtime.Consume(recovered, Observe(GameplayEventType.HitConfirmed), clear: true)); Assert.Equal(aborts, runtime.LoopAborts); Assert.Equal(0, runtime.NextEvents.Count);
         }
 
         [Fact]
@@ -398,7 +407,7 @@ namespace BattleSystemECS.Tests.Framework
             var runtime = new GameplayTriggerRuntime(store, store.GameplayEffectsRuntime, 4, 1);
             Assert.True(runtime.NextEvents.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, default(EntityHandle), default(EntityHandle), 1L)));
             Assert.True(runtime.NextEvents.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, default(EntityHandle), default(EntityHandle), 2L)));
-            runtime.ConsumeNextRounds(Array.Empty<TriggerDefinition>());
+            runtime.ConsumeNextRounds(Observe(GameplayEventType.HitConfirmed));
             Assert.True(runtime.LoopAborts > 0);
             Assert.True(runtime.AbortEvents.Count > 0);
             runtime.ResetFrame();
@@ -737,35 +746,35 @@ namespace BattleSystemECS.Tests.Framework
             var source = store.GetEntityHandle(sourceId);
             var target = store.GetEntityHandle(targetId);
             Assert.True(queue.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, source, target, 1L)));
-            runtime.Consume(queue, Array.Empty<TriggerDefinition>());
+            runtime.Consume(queue, Observe(GameplayEventType.HitConfirmed));
             var secondQueue = new GameplayEventQueue(1);
             Assert.True(secondQueue.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, source, target, 2L)));
-            runtime.Consume(secondQueue, Array.Empty<TriggerDefinition>());
+            runtime.Consume(secondQueue, Observe(GameplayEventType.HitConfirmed));
 
             Assert.Equal(1, runtime.LoopAborts);
             runtime.ResetFrame();
             var recovered = new GameplayEventQueue(1);
             Assert.True(recovered.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, source, target, 3L)));
-            runtime.Consume(recovered, Array.Empty<TriggerDefinition>());
+            runtime.Consume(recovered, Observe(GameplayEventType.HitConfirmed));
             Assert.Equal(1, runtime.LoopAborts);
         }
 
         [Fact]
-        public void UnmatchedEventsSpendBudgetAndSeenEventsSkipWithoutAbortAfterBudget()
+        public void UnsubscribedEventsAreFreeAndSeenEventsSkipWithoutAbortAfterBudget()
         {
             var store = new ComponentStore();
             int sourceId = store.AddEnemy(0f, 0f, 1f, 10f, 10f, 1f, 1, 1);
             int targetId = store.AddEnemy(1f, 0f, 1f, 10f, 10f, 1f, 1, 1);
-            var runtime = new GameplayTriggerRuntime(store, store.GameplayEffectsRuntime, 8, 2);
+            var runtime = new GameplayTriggerRuntime(store, store.GameplayEffectsRuntime, 8, 1);
             var source = store.GetEntityHandle(sourceId);
             var target = store.GetEntityHandle(targetId);
-            var definitions = new[] { new TriggerDefinition(new TriggerId(0), GameplayEventType.HitConfirmed, new EffectId(0), new ConsumerId(0)) };
+            var definitions = Observe(GameplayEventType.HitConfirmed);
             var queue = new GameplayEventQueue(4);
-            // DamageApplied 没有对应定义，但仍占用帧预算并进入去重集合
+            // DamageApplied 无定义订阅：不进去重集合、不占帧预算（预算 1 只够 HitConfirmed）
             Assert.True(queue.TryPublish(new GameplayEvent(GameplayEventType.DamageApplied, source, target, 1L)));
             Assert.True(queue.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, source, target, 1L)));
             runtime.Consume(queue, definitions);
-            Assert.Equal(2, runtime.SeenCount);
+            Assert.Equal(1, runtime.SeenCount);
             Assert.Equal(0, runtime.LoopAborts);
 
             // 预算耗尽后：已见事件跳过且不中止；新事件触发一次中止
@@ -774,7 +783,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.True(queue.TryPublish(new GameplayEvent(GameplayEventType.HitConfirmed, source, target, 2L)));
             runtime.Consume(queue, definitions);
             Assert.Equal(1, runtime.LoopAborts);
-            Assert.Equal(2, runtime.SeenCount);
+            Assert.Equal(1, runtime.SeenCount);
         }
 
         [Fact]
