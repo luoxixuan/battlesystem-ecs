@@ -50,10 +50,6 @@ namespace BattleSystemECS.Systems
         private readonly GameConfig gameConfig;
         private readonly IRenderer renderer;
 
-        // Round 199 方向 6：可选的 ICraftingService 依赖。设置后 TryCraft() 转发给它；
-        // 使用延迟绑定，使没有制作支持时仍可构造 InventorySystem，兼容现有测试基建和 GameManager 接线。
-        private global::BattleSystemECS.Content.Contracts.ICraftingService craftingSystem;
-
         // O(1) 遥测计数器。
         public int TotalAddCalls = 0;
         public int TotalUseCalls = 0;
@@ -65,15 +61,6 @@ namespace BattleSystemECS.Systems
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this.gameConfig = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));
             this.renderer = renderer;
-        }
-
-        /// <summary>
-        /// Round 199 方向 6：绑定 ICraftingService，供 TryCraft() 转发。
-        /// 绑定可重复执行，后一次调用会替换前一次；未绑定时 TryCraft() 返回 BadRecipe，不会空引用崩溃。
-        /// </summary>
-        public void BindCraftingSystem(global::BattleSystemECS.Content.Contracts.ICraftingService crafting)
-        {
-            craftingSystem = crafting;
         }
 
         /// <summary>
@@ -203,16 +190,6 @@ namespace BattleSystemECS.Systems
         {
             if (playerId < 0 || playerId >= ComponentStore.MAX_PLAYERS) return 0;
             return store.PlayerInventoryUsedTotal[playerId];
-        }
-
-        /// <summary>
-        /// 第 199 轮方向 6：制作入口转发到已绑定的 ICraftingService；未接线时返回 BadRecipe。
-        /// 通过单层间接调用，使界面、快捷键和任务处理器无需持有具体制作系统引用。
-        /// </summary>
-        public CraftingResult TryCraft(int playerId, int recipeId)
-        {
-            if (craftingSystem == null) return CraftingResult.BadRecipe;
-            return craftingSystem.TryCraft(playerId, recipeId);
         }
 
         // ── internal dispatch ────────────────────────────────────────────

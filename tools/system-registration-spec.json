@@ -3819,25 +3819,6 @@
       }
     },
     {
-      "id": "Save",
-      "property": "Save",
-      "serviceType": "SaveSystem",
-      "enabled": true,
-      "featurePolicy": "production-service",
-      "reason": "",
-      "dependencies": [],
-      "ownerToken": "registration.Save",
-      "frameBindings": [],
-      "providedTokens": [
-        "registration.Save"
-      ],
-      "recipe": {
-        "factory": "CreateSave",
-        "wire": "WireSave",
-        "bind": "BindSave"
-      }
-    },
-    {
       "id": "EventBus",
       "property": "EventBus",
       "serviceType": "EventBus",
@@ -3872,7 +3853,6 @@
         "Momentum",
         "PlayerTowerAttack",
         "PreFightBuff",
-        "Save",
         "Skill",
         "TechTree",
         "TowerAttack",

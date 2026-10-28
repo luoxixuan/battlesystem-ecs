@@ -7,7 +7,6 @@ using BattleSystemECS.Core.GAS;
 namespace BattleSystemECS.Content.Contracts
 {
     public enum SkillDamageRejectReason { None, PhaseNotAllowed, UnsupportedCommitBoundary, NoPending }
-    public enum CraftingResult { Success, SuccessRareBonus, Failure, MissingInputs, BadRecipe, FullInventory }
 
     public readonly struct DodgeFact
     {
@@ -129,7 +128,6 @@ namespace BattleSystemECS.Content.Contracts
         int GetPathWaypointCount(int pathId);
         JunctionDef GetJunction(int sourcePathId, int nodeIndex);
     }
-    public interface ICraftingService { CraftingResult TryCraft(int playerId, int recipeId); }
     public interface IResourcePort
     {
         bool TryConsumeMana(float baseCost);

@@ -29,7 +29,6 @@
     <None Include="..\Data\Towers\*.json" Link="Data\Towers\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Data\Monsters\*.json" Link="Data\Monsters\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Data\Levels\*.json" Link="Data\Levels\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\Data\Saves\*.json" Link="Data\Saves\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -53,7 +53,6 @@ namespace BattleSystemECS.Tests.Framework
                 "PickupSystem.cs",
                 "RandomEventSystem.cs",
                 "WaveSpawningSystem.cs",
-                "CraftingSystem.cs",
                 "PreFightBuffSystem.cs",
                 "TowerModifierSystem.cs"
             };

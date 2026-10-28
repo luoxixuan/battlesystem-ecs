@@ -273,7 +273,6 @@ namespace BattleSystemECS.Core
         // Round 130 — Inventory / Item system (per-player slot-based consumables).
         public InventorySystem? Inventory { get; private set; }
         public AscensionSystem? Ascension { get; private set; }
-        public SaveSystem? Save { get; private set; }
 
         // ── EventBus ──
         public EventBus? EventBus { get; private set; }

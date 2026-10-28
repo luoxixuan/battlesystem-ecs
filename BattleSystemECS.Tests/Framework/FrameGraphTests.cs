@@ -427,7 +427,7 @@ namespace BattleSystemECS.Tests.Framework
             // Bug 回归：删除或绕过任一真实生产节点时，composition 快照必须失败。
             Assert.Equal(FrameAccessReviewCatalog.ReviewedNodeCount-scheduler.FrameGraphDiagnostics.Count,
                 scheduler.FrameGraphPlan.Count);
-            Assert.Equal("1dc61516074919c0cfdec2e93cdd7a2a010435caae04b6620ed299c8a7f1c8cd",scheduler.FrameGraphTopologyHash);
+            Assert.Equal("5adf1c0b0da005f1ebb5f75b51c63980150a179837135e689b81e99c6f20f724",scheduler.FrameGraphTopologyHash);
             Assert.Contains(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="frame.input.publish");
             FrameNodeAdapter publisher=Assert.Single(scheduler.FrameGraphPlan,n=>n.Metadata.Id.Value=="frame.input.publish");
             Assert.Contains(FrameResource.EnemyHealth,publisher.Metadata.Reads);
@@ -808,7 +808,7 @@ namespace BattleSystemECS.Tests.Framework
                 mode4.CompositionFingerprint,StringComparison.Ordinal);
             Assert.Equal(64,mode4.PopulationEnd);
             Assert.Equal(64,mode4.PopulationMin);
-            Assert.StartsWith("ProductionRegistry:b653e8ee699c45289c66ad66b33012c116b79af5da827513073968decfe75c9a",
+            Assert.StartsWith("ProductionRegistry:d881ab4e76de8a5a349e763d2e4e3dc97ee566c7367b030917e167bb217cfdc1",
                 mode4.CompositionFingerprint,StringComparison.Ordinal);
             Assert.Equal(Systems.BenchmarkCompositionContract.ProductionRegistryGraph,mode5.Composition);
             Assert.Equal(4,mode5.FramesExecuted);
@@ -845,9 +845,9 @@ namespace BattleSystemECS.Tests.Framework
             var fixedPopulation=Systems.BenchmarkCompositionFactory.Create(fixedWorld.Store,fixedWorld.Config,
                 fixedWorld.Renderer,fixedPlayer,scenarioKind:FrameScenarioKind.FixedPopulationBenchmark);
             Assert.NotEqual(gameplay.Scheduler.FrameGraphTopologyHash,fixedPopulation.Scheduler.FrameGraphTopologyHash);
-            Assert.Equal("1dc61516074919c0cfdec2e93cdd7a2a010435caae04b6620ed299c8a7f1c8cd",
+            Assert.Equal("5adf1c0b0da005f1ebb5f75b51c63980150a179837135e689b81e99c6f20f724",
                 gameplay.Scheduler.FrameGraphTopologyHash);
-            Assert.Equal("b653e8ee699c45289c66ad66b33012c116b79af5da827513073968decfe75c9a",
+            Assert.Equal("d881ab4e76de8a5a349e763d2e4e3dc97ee566c7367b030917e167bb217cfdc1",
                 fixedPopulation.Scheduler.FrameGraphTopologyHash);
             Assert.NotEqual(gameplay.Scheduler.FrameGraphReviewRoot,fixedPopulation.Scheduler.FrameGraphReviewRoot);
             Assert.Equal(FrameAccessReviewCatalog.ApprovedFingerprintRootGameplay,gameplay.Scheduler.FrameGraphReviewRoot);

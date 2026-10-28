@@ -931,13 +931,6 @@ registry.WaveSpawning!.SetAscensionSystem(registry.Ascension);
 }
 internal static void BindAscension(SystemRegistry registry, FrameScheduler scheduler) {
 }
-internal static void CreateSave(SystemRegistry registry, ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus) {
-registry.Save = new SaveSystem(store, playerId);
-}
-internal static void WireSave(SystemRegistry registry, ComponentStore store, int playerId) {
-}
-internal static void BindSave(SystemRegistry registry, FrameScheduler scheduler) {
-}
 internal static void CreateEventBus(SystemRegistry registry, ComponentStore store, GameConfig config, IRenderer logger, int playerId, StateMachine stateMachine, IBattleEventBus? battleEventBus) {
 registry.EventBus = new EventBus();
 }
@@ -951,7 +944,6 @@ internal static void CreateProductionEvents(SystemRegistry registry, ComponentSt
 internal static void WireProductionEvents(SystemRegistry registry, ComponentStore store, int playerId) {
 registry.WaveSpawning!.OnWaveComplete += () => registry.TechTree!.OnWaveComplete();
 registry.WaveSpawning.OnWaveComplete += () => registry.Interest!.OnWaveComplete();
-registry.WaveSpawning.OnWaveComplete += () => registry.Save!.SaveCheckpoint();
 registry.WaveSpawning.OnWaveComplete += () => registry.WaveBranch!.CheckAndActivateBranch(
     registry.WaveSpawning.GetCurrentWave() - 1, registry.WaveSpawning.GetCurrentLevel());
 registry.WaveSpawning.OnWaveStart += () =>

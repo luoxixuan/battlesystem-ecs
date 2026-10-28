@@ -232,8 +232,8 @@ namespace BattleSystemECS.Core
             };
 
         // 生产 profile 按 NodeId 排序后的完整根指纹；任何节点或元数据变化都必须重新审阅。
-        internal const string ApprovedFingerprintRootGameplay = "edd85cd7d9ae44041748eb02c613daccc1f13b5752a92b7856fe3f41fbd71383";
-        internal const string ApprovedFingerprintRootFixedPopulation = "68a9ed2242ccabec17294150a40752a85a5dcec2d8bfb12c3175d49d6a9bd056";
+        internal const string ApprovedFingerprintRootGameplay = "c3c654d5fb46695f25dcfacb9447f54d1ab5adf0dedef8e77b236074d56b90df";
+        internal const string ApprovedFingerprintRootFixedPopulation = "18431bd98b0b7719998167feabc4ea53d1acc4f175b55dc4b52a22d8c0d115ca";
 
         public static bool TryGet(string nodeId, out FrameAccessReviewId reviewId) =>
             Reviews.TryGetValue(nodeId, out reviewId);

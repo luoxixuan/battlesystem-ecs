@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-28（退役 CraftingSystem 与无人读取的存档文件 C2）
+- 删除 `CraftingSystem`（从未被任何生产路径构造，S-c）及其测试 `CraftingSystemTests`、`SimulationRngGuardTests` 文件名列表中的 `CraftingSystem.cs`；`ICraftingService`、`CraftingResult`、`InventorySystem.BindCraftingSystem/TryCraft`；配置 `GameConfig.CraftingRecipes`、`CraftingRecipeDef`、`CraftingItemStack`，`GameConfigLoader.LoadCraftingRecipes/ParseCraftingStacks/Clamp01`，以及 `Data/Configs/crafting_recipes.json`（`game_config.json` 中本无 crafting 键，无需改动）。`ItemDefs`/`items.json` 属于 `InventorySystem`，保留。该功能无 SOA 数组。
+- 删除每波写入、从未被读取的检查点文件：`SaveSystem`（整类，`LoadCheckpoint`/`HasCheckpoint`/元进度读写均无调用方）、`SystemRegistry.Save`、spec 条目 `Save`（`ProductionEvents` 依赖列表同步移除）、`CreateSave/WireSave/BindSave` recipe、`WireProductionEvents` 中的 `OnWaveComplete += SaveCheckpoint`，以及 Core csproj 的 `Data\Saves\*.json` 拷贝项。manifest/ledger 经 `generate-system-registry-ledger.ps1` 重新生成（注册数 -1）。`Data/Saves/checkpoint.json` 仍在 `.gitignore`（本地遗留文件不再产生）；`PrestigeSystem` 自带的 `meta_progression.json` 读写不受影响。
+- 图/hash：无帧节点变化（Save 与 Crafting 均无节点，活动节点仍为 194），但 `registration.Save` 属于被哈希的 available-dependency 集合，故 Gameplay 拓扑 `1dc61516…` → `5adf1c0b…`，FixedPopulation `b653e8ee…` → `d881ab4e…`；访问审阅根 Gameplay `edd85cd7…` → `c3c654d5…`，FixedPopulation `68a9ed22…` → `18431bd9…`。Golden / Replay / DeterminismSoak 摘要未变。Systems/ 111 → 110。
+- 验证：分块完整套件结果见提交信息；mode 2/4/5 延期未运行。
+
 ### 2026-10-28（删除死接缝与恒默认值塔数组 C1）
 - 删除 `ComponentStore.TowerProjectilePierceCount/TowerProjectilePierceDmgFalloff/TowerFalloffType/TowerFalloffStartRatio/TowerFalloffMinRatio`（仅有默认值写入，B6c 已删除其配置来源）；`TowerAttackSystem` 的射程衰减块（`falloffType` 恒为 0 → 跳过）整段移除，碎片弹发射处的 pierce 参数折叠为字面值 `0, 1f`，行为不变。
 - 删除 `EnemyMovementSystem` 中不可达的 `EnemyActionType.Fear` 分支（B3 起无写入方；枚举值本身保留）。

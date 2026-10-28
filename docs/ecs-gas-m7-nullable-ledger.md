@@ -109,7 +109,6 @@ Generated from explicit spec `tools/system-registration-spec.json` and verified 
 | Pickup | PickupSystem |  | production-frame-binding | CreatePickup / WirePickup / BindPickup |
 | Inventory | InventorySystem |  | production-service | CreateInventory / WireInventory / BindInventory |
 | Ascension | AscensionSystem | WaveSpawning | production-service | CreateAscension / WireAscension / BindAscension |
-| Save | SaveSystem |  | production-service | CreateSave / WireSave / BindSave |
 | EventBus | EventBus |  | production-service | CreateEventBus / WireEventBus / BindEventBus |
-| ProductionEvents | composition | Combo,Crest,Culling,Gold,Interest,Momentum,PlayerTowerAttack,PreFightBuff,Save,Skill,TechTree,TowerAttack,WaveBranch,WaveMutator,WavePreview,WaveSpawning | production-event-wiring | CreateProductionEvents / WireProductionEvents / BindProductionEvents |
+| ProductionEvents | composition | Combo,Crest,Culling,Gold,Interest,Momentum,PlayerTowerAttack,PreFightBuff,Skill,TechTree,TowerAttack,WaveBranch,WaveMutator,WavePreview,WaveSpawning | production-event-wiring | CreateProductionEvents / WireProductionEvents / BindProductionEvents |
 | FrameScheduler | composition |  | production-frame-orchestration | CreateFrameSchedulerContract / WireFrameSchedulerContract / BindFrameSchedulerContract |
