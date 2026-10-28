@@ -2,11 +2,10 @@
 using System;
 namespace BattleSystemECS.Core
 {
-    /// <summary>Post-death resolution: fission, life link penalties, objective, resources, income, corpses, combo.</summary>
+    /// <summary>Post-death resolution: fission, objective, resources, income, corpses, combo.</summary>
     internal sealed class PostDeathGroup : ISystemGroup
     {
         public Systems.EnemyFissionSystem? EnemyFission { get; set; }
-        public Systems.EnemyLifeLinkSystem? LifeLink { get; set; }
         public Systems.ObjectiveSystem? Objective { get; set; }
         public Systems.ResourceNodeSystem? ResourceNode { get; set; }
         public Systems.CorpseEffectSystem? CorpseEffect { get; set; }
@@ -29,7 +28,6 @@ namespace BattleSystemECS.Core
         internal void RegisterFrameBindings(FrameScheduler s)
         {
             if(EnemyFission!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.fission.update"),c=>EnemyFission?.Update());
-            if(LifeLink!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.life-link.resolve"),c=>LifeLink?.ResolveBreakPenalties());
             if(Objective!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.objective.update"),c=>Objective?.Update(c.Delta,GameState.WavePhase));
             if(ResourceNode!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.resource-node.update"),c=>ResourceNode?.Update(c.Delta,GameState.WavePhase));
             if(CorpseEffect!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.corpse.update"),c=>CorpseEffect?.Update(c.Delta));
@@ -51,7 +49,6 @@ namespace BattleSystemECS.Core
         private void ExecuteCore(ComponentStore store, float deltaTime, GameState phase)
         {
             EnemyFission?.Update();
-            LifeLink?.ResolveBreakPenalties();
             Objective?.Update(deltaTime, phase);
             ResourceNode?.Update(deltaTime, phase);
             CorpseEffect?.Update(deltaTime);

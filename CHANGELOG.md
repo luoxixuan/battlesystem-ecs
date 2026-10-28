@@ -1,5 +1,14 @@
 # 更新记录 (Changelog)
 
+### 2026-10-28（删除死接缝与恒默认值塔数组 C1）
+- 删除 `ComponentStore.TowerProjectilePierceCount/TowerProjectilePierceDmgFalloff/TowerFalloffType/TowerFalloffStartRatio/TowerFalloffMinRatio`（仅有默认值写入，B6c 已删除其配置来源）；`TowerAttackSystem` 的射程衰减块（`falloffType` 恒为 0 → 跳过）整段移除，碎片弹发射处的 pierce 参数折叠为字面值 `0, 1f`，行为不变。
+- 删除 `EnemyMovementSystem` 中不可达的 `EnemyActionType.Fear` 分支（B3 起无写入方；枚举值本身保留）。
+- 删除 `ISummonCommandPort`、`SkillSystem.InjectSummonSystem` 与 `summonSystem` 字段；`CastSummon` 折叠为原先生产中唯一出现的“不可用”日志（输出字符串逐字保持）。删除 `IEnemyAffixDecorator` 与 `WaveSpawningSystem` 构造参数/`AssignAffixesAtSpawn` 调用（生产中恒为 null）。
+- 删除 `EnemyLifestealSystem`（`Update` 为空操作，从未构造；敌人吸血仍由 `EnemyAISystem` 内联实现）及 `ai.lifesteal.prepare/update` 两个 reviewed-disabled 节点；删除 `post-death.life-link.resolve`（`PostDeath.LifeLink` 生产中从未赋值，且 `SetBreakPenaltyDispatchEnabled(false)` 使断链事件不入队）及 `PostDeathGroup.LifeLink` 槽位。`EnemyLifeLinkSystem` 本体与 `ResolveBreakPenalties()` 方法保留（链接逻辑仍在 AI 组运行）。
+- 图/hash 变化（活动节点数 194 不变，被删的 3 个节点均为 disabled 诊断）：Gameplay 拓扑 `4a5ad765…` → `1dc61516…`，FixedPopulation `d1bc6bb4…` → `b653e8ee…`；访问审阅根 Gameplay `0edfae70…` → `edd85cd7…`，FixedPopulation `e8d294ee…` → `68a9ed22…`；Reported Early/PostDeath 79/51 → 77/50，Union 178 → 175，commit-postdeath 35 → 34；reviewed 节点 197 → 194，诊断 3 → 0。Systems/ 112 → 111。Golden / Replay / DeterminismSoak 摘要未变。
+- 测试：删除仅验证 `post-death.life-link.resolve` 不可启用的 `DisabledUnsafeLifeLinkCannotBeEnabledInProduction`，并去掉对应 disabled 诊断断言。
+- 验证：分块完整套件结果见提交信息；mode 2/4/5 延期未运行。
+
 ### 2026-10-27（公开波次生成暂停 API，供 Unity 消费端使用）
 - 新增 `FrameScheduler.SetSpawningPaused(bool)` / `IsSpawningPaused`：暂停期间跳过 `WaveSpawningSystem.Update`（图节点 `spawning.wave.update` 与 legacy `SpawningGroup.Execute` 均遵守），已排队的波次回调与巢穴不受影响；可在 `OnWaveComplete` 回调内调用。`FrameScheduler.Spawning` 保持 `internal`。
 - 背景：Unity `BattleDriver` 原通过 `scheduler.Spawning.WaveSpawning = null/系统` 摘挂来接管波次节奏，`Spawning` 自 `4bebc43` 起为 internal（审计 §10）。

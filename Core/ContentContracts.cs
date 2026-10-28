@@ -161,7 +161,6 @@ namespace BattleSystemECS.Content.Contracts
         bool CanMassResurrect(float centerX, float centerY, float radius);
         int MassResurrect(int playerId, float centerX, float centerY, float radius, float hpFraction);
     }
-    public interface ISummonCommandPort { int SummonUnit(int playerId, SummonDef def); }
     public interface ISnapshotRestorePort
     {
         int GetSampleCount(int playerId);
@@ -202,5 +201,4 @@ namespace BattleSystemECS.Content.Contracts
         float GetDifficultyMult(int playerId);
     }
     public interface IAscensionDecorator { void ApplyEnemyScaling(int enemyId); }
-    public interface IEnemyAffixDecorator { void AssignAffixesAtSpawn(int enemyId, float maxHealth); }
 }

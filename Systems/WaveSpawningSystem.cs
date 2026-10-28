@@ -72,7 +72,6 @@ namespace BattleSystemECS.Systems
         private int currentLevel = 1;
         private int enemiesSpawnedInWave = 0;
         private int totalEnemiesSpawned = 0;
-        private readonly global::BattleSystemECS.Content.Contracts.IEnemyAffixDecorator _enemyAffixSystem;
 
         // Multi-type support
         private string[] _multiTypes = Array.Empty<string>();
@@ -103,14 +102,12 @@ namespace BattleSystemECS.Systems
         private int _pendingExpectedKills;
 
         public WaveSpawningSystem(Core.ComponentStore store, IRenderer renderer, GameConfig gameConfig,
-            global::BattleSystemECS.Content.Contracts.IEnemyAffixDecorator enemyAffixSystem = null,
             IBattleEventBus eventBus = null)
         {
             this.store = store;
             this.renderer = renderer;
             this.gameConfig = gameConfig;
             this.spawnConfig = LoadWaveSpawnConfig();
-            this._enemyAffixSystem = enemyAffixSystem;
             _eventBus = eventBus ?? NullEventBus.Instance;
             // 第 127 轮方向 1：延迟加载全局曲线注册表。该操作幂等且线程安全；
             // curves.json 缺失时记录日志但不抛异常，生成循环回退到旧线性公式。
@@ -950,9 +947,6 @@ namespace BattleSystemECS.Systems
                         store.EnemyIsReanimated[enemyId] = false;
                         store.EnemyOwnerId[enemyId] = -1;
                     }
-
-                    // 为每个敌人分配词缀（由 IEnemyAffixDecorator 提供）。
-                    _enemyAffixSystem?.AssignAffixesAtSpawn(enemyId, scaledMaxHealth);
 
                     // Apply ascension/difficulty modifier scaling
                     _ascensionSystem?.ApplyEnemyScaling(enemyId);

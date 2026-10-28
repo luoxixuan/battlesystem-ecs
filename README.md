@@ -12,7 +12,7 @@ BattleSystem-ECS/
 ├── BattleSystemECS.Core/     # 战斗逻辑核心库（netstandard2.1，引用 Engine）
 ├── BattleSystemECS.csproj    # 控制台 EXE（net6.0，引用 Core）
 ├── BattleSystemECS.Tests/    # xUnit 单元测试（net9.0，四分层；数量以最新门禁日志为准）
-├── Systems/                  # 游戏系统（112 个，全部编译到 Core）
+├── Systems/                  # 游戏系统（111 个，全部编译到 Core）
 ├── Core/                     # ECS 核心（ComponentStore×5、FrameScheduler、GAS、EventBus）
 ├── Data/                     # 静态数据（Skills×150 由 Core 加载；Monsters/Towers/Levels 目录 Core 基本不加载，见 AGENTS.md §2.1）
 └── docs/ / Research/         # 架构文档、知识库

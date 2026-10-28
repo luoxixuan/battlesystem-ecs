@@ -555,11 +555,6 @@ switch (actionEnum)
                         // Here we still apply forward Y movement toward player.
                         break;
 
-                    case EnemyActionType.Fear:
-                        // Fear: run away from player (direction = +1, toward y=max)
-                        dirEnum = 1;
-                        break;
-
                     case EnemyActionType.Taunt:
                         // Taunt: attack the forced target instead of moving.
                         // Skip movement this frame. TowerAttackSystem handles the taunt target attack.

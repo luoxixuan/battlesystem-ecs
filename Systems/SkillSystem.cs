@@ -25,7 +25,6 @@ namespace BattleSystemECS.Systems
         private global::BattleSystemECS.Content.Contracts.ICombatTuningView techTreeSystem;
         private global::BattleSystemECS.Content.Contracts.IEffectCommandPort dotSystem;
         private global::BattleSystemECS.Content.Contracts.IResourcePort manaSystem; // 可选，法力系统未初始化时为空。
-        private global::BattleSystemECS.Content.Contracts.ISummonCommandPort summonSystem; // 可选，召唤系统未初始化时为空。
         private global::BattleSystemECS.Content.Contracts.IHealingZoneCommandPort healingZoneSystem; // 可选，治疗区域系统未初始化时为空。
         private global::BattleSystemECS.Content.Contracts.ISnapshotRestorePort timeRewindSystem; // 可选，快照系统未初始化时为空。
         private global::BattleSystemECS.Content.Contracts.IResurrectionPort necromancerSystem; // 可选，复活系统未初始化时为空（第 133 轮 MassResurrect）。
@@ -218,14 +217,6 @@ namespace BattleSystemECS.Systems
         public void InjectManaSystem(global::BattleSystemECS.Content.Contracts.IResourcePort manaSystem)
         {
             this.manaSystem = manaSystem;
-        }
-
-        /// <summary>
-        /// 注入召唤命令端口；由 ProductionSystemInstaller 的 Skill typed recipe 在 Wiring 阶段调用。
-        /// </summary>
-        public void InjectSummonSystem(global::BattleSystemECS.Content.Contracts.ISummonCommandPort summonSystem)
-        {
-            this.summonSystem = summonSystem;
         }
 
         public void InjectHealingZoneSystem(global::BattleSystemECS.Content.Contracts.IHealingZoneCommandPort healingZoneSystem)
@@ -1293,37 +1284,12 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Summon AreaShape: spawns a player-summoned combat unit at the player's position.
-        /// The SummonDef ID is carried in def.SummonDefId.
+        /// Summon AreaShape: 召唤命令端口（ISummonCommandPort）已随 C1 移除，生产中从未注入，
+        /// 该技能一直只记录“不可用”日志；这里保持同样的可观察结果。
         /// </summary>
         private void CastSummon(GameplayAbilityDef def)
         {
-            if (summonSystem == null)
-            {
-                renderer.Log($"[SUMMON] global::BattleSystemECS.Content.Contracts.ISummonCommandPort not available — cannot cast '{def.Name}'");
-                return;
-            }
-
-            string summonDefId = def.SummonDefId;
-            if (string.IsNullOrEmpty(summonDefId))
-            {
-                renderer.Log($"[SUMMON] Summon ability '{def.Name}' has no SummonDefId configured");
-                return;
-            }
-
-            // Find the summon definition in gameConfig
-            var summonDef = gameConfig.Summons.Find(s => s.Id == summonDefId);
-            if (summonDef == null)
-            {
-                renderer.Log($"[SUMMON] SummonDef '{summonDefId}' not found in game config");
-                return;
-            }
-
-            int unitId = summonSystem.SummonUnit(playerId, summonDef);
-            if (unitId >= 0)
-            {
-                renderer.Log($"[SUMMON] {def.Name} cast — spawned unit (ID: {unitId})");
-            }
+            renderer.Log($"[SUMMON] global::BattleSystemECS.Content.Contracts.ISummonCommandPort not available — cannot cast '{def.Name}'");
         }
 
         /// <summary>

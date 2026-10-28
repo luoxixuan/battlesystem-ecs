@@ -1752,7 +1752,6 @@ namespace BattleSystemECS.Core
             TowerProjectileCount = null!; TowerScatterAngle = null!;
             TowerBouncesRemaining = null!; TowerBounceRange = null!;
             TowerBounceDamageFalloff = null!; TowerBounceHitsRemaining = null!;
-            TowerProjectilePierceCount = null!; TowerProjectilePierceDmgFalloff = null!;
             TowerProjectileFragmentCount = null!; TowerProjectileFragmentRange = null!;
             TowerProjectileFragmentDmgMult = null!;
             TowerCurrentAmmo = null!; TowerMaxAmmo = null!; TowerReloadTime = null!;

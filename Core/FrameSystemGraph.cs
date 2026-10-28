@@ -181,8 +181,6 @@ namespace BattleSystemECS.Core
             r.AddWaveBinding(s,"ai.life-link.cooldowns",FrameTimeDomain.Enemy,FrameExecutionSemantics.ParallelDisjointWrite,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyControl},new[]{FrameResource.EnemyControl});
             r.AddWaveBinding(s,"ai.mana-burn.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,Empty,Empty);
             r.AddWaveBinding(s,"ai.mana-burn.update",FrameTimeDomain.None,FrameExecutionSemantics.InternalParallelCollectSerialCommit,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyControl,FrameResource.PlayerResources},new[]{FrameResource.PlayerResources,FrameResource.ManaBurnPrepared});
-            r.AddWaveBinding(s,"ai.lifesteal.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,EnemyState,new[]{FrameResource.EnemyControl});
-            r.AddWaveBinding(s,"ai.lifesteal.update",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,EnemyState,new[]{FrameResource.EnemyHealth});
             r.AddWaveBinding(s,"ai.phase.prepare",FrameTimeDomain.None,FrameExecutionSemantics.SerialPrepare,new[]{FrameResource.EntityLifecycle},Empty);
             r.AddWaveBinding(s,"ai.phase.update",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.EntityLifecycle,FrameResource.EnemyControl},new[]{FrameResource.EnemyControl});
             r.AddWaveBinding(s,"ai.sapper.prepare",FrameTimeDomain.Enemy,FrameExecutionSemantics.SerialPrepare,Empty,Empty);
@@ -336,7 +334,6 @@ namespace BattleSystemECS.Core
         {
             PostDeathGroup g=s.PostDeath;
             r.AddWaveBinding(s,"post-death.fission.update",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.PrimaryDeathsResolved,FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyMovement,FrameResource.EnemyControl},new[]{FrameResource.EntityLifecycle,FrameResource.EnemyHealth,FrameResource.EnemyPosition,FrameResource.EnemyMovement,FrameResource.EnemyControl});
-            r.AddWaveBinding(s,"post-death.life-link.resolve",FrameTimeDomain.None,FrameExecutionSemantics.SerialCommit,new[]{FrameResource.PrimaryDeathsResolved,FrameResource.EnemyControl},new[]{FrameResource.DamageRequests});
             r.AddWaveBinding(s,"post-death.objective.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PrimaryDeathsResolved,FrameResource.ObjectiveState},new[]{FrameResource.ObjectiveState});
             r.AddWaveBinding(s,"post-death.resource-node.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.ObjectiveState,FrameResource.PlayerResources},new[]{FrameResource.PlayerResources,FrameResource.ObjectiveState});
             r.AddWaveBinding(s,"post-death.corpse.update",FrameTimeDomain.Combat,FrameExecutionSemantics.SerialUpdate,new[]{FrameResource.PrimaryDeathsResolved,FrameResource.CorpseState,FrameResource.EnemyPosition,FrameResource.EnemyControl,FrameResource.TowerState},new[]{FrameResource.CorpseState,FrameResource.DamageRequests,FrameResource.EffectRequests,FrameResource.EnemyControl,FrameResource.EnemyMovement,FrameResource.TowerState});
@@ -469,9 +466,7 @@ namespace BattleSystemECS.Core
 
             private static string? ReviewedDisabledReason(string id) => id switch
             {
-                "ai.lifesteal.prepare" or "ai.lifesteal.update" => "Registry has no LifestealSystem instance; paired prepare/update slots are reviewed disabled.",
-                "post-death.life-link.resolve" => "Life-link break damage is disabled because its destroyed-source policy is undefined; current behavior remains no-op.",
-                _ => null
+                _ => null // 当前没有 reviewed-disabled 节点（lifesteal / life-link.resolve 已随 C1 移除）
             };
 
         }

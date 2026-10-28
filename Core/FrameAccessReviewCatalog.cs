@@ -13,9 +13,9 @@ namespace BattleSystemECS.Core
         internal const string CommitArtifactSha256 = "3E38DB03DF92438283631D554E7D61B14B4624C129E67876522CB62D6D8421C1";
         internal const string SupplementalArtifactSha256 = "EA9FA8D9563DD0AEE189B6873573659C8C9CB3EE6E057873EDBD0932754A11FE";
         internal static int ReviewedNodeCount => Reviews.Count;
-        internal const int ReportedEarlyNodeCount = 79;
+        internal const int ReportedEarlyNodeCount = 77;
         internal const int ReportedCombatNodeCount = 64;
-        internal const int ReportedPostDeathNodeCount = 51;
+        internal const int ReportedPostDeathNodeCount = 50;
         internal const int ReportedEarlyCombatOverlap = 0;
         internal const int ReportedEarlyPostDeathOverlap = 12;
         internal const int ReportedCombatPostDeathOverlap = 4;
@@ -52,8 +52,6 @@ namespace BattleSystemECS.Core
                 { "ai.life-link.cooldowns", "FG-ACCESS-20260901/ai.life-link.cooldowns" },
                 { "ai.life-link.prepare", "FG-ACCESS-20260901/ai.life-link.prepare" },
                 { "ai.life-link.update", "FG-ACCESS-20260901/ai.life-link.update" },
-                { "ai.lifesteal.prepare", "FG-ACCESS-20260901/ai.lifesteal.prepare" },
-                { "ai.lifesteal.update", "FG-ACCESS-20260901/ai.lifesteal.update" },
                 { "ai.magnetize.update", "FG-ACCESS-20260901/ai.magnetize.update" },
                 { "ai.mana-burn.prepare", "FG-ACCESS-20260901/ai.mana-burn.prepare" },
                 { "ai.mana-burn.update", "FG-ACCESS-20260901/ai.mana-burn.update" },
@@ -181,7 +179,6 @@ namespace BattleSystemECS.Core
                 { "post-death.effect.commit", "FG-ACCESS-20260901/post-death.effect.commit" },
                 { "post-death.fission.update", "FG-ACCESS-20260901/post-death.fission.update" },
                 { "post-death.gameplay-event.commit", "FG-ACCESS-20260901/post-death.gameplay-event.commit" },
-                { "post-death.life-link.resolve", "FG-ACCESS-20260901/post-death.life-link.resolve" },
                 { "post-death.objective.update", "FG-ACCESS-20260901/post-death.objective.update" },
                 { "post-death.resource-node.update", "FG-ACCESS-20260901/post-death.resource-node.update" },
                 { "post-death.soul-harvest.update", "FG-ACCESS-20260901/post-death.soul-harvest.update" },
@@ -235,15 +232,14 @@ namespace BattleSystemECS.Core
             };
 
         // 生产 profile 按 NodeId 排序后的完整根指纹；任何节点或元数据变化都必须重新审阅。
-        internal const string ApprovedFingerprintRootGameplay = "0edfae707e40ad707aee18b1113b657d5b30c77f8085c763e3d89d937dae6324";
-        internal const string ApprovedFingerprintRootFixedPopulation = "e8d294eeb3d8ea6ba1a3f895299c212e4cc186e8fa9e277c204da93a4e0c3433";
+        internal const string ApprovedFingerprintRootGameplay = "edd85cd7d9ae44041748eb02c613daccc1f13b5752a92b7856fe3f41fbd71383";
+        internal const string ApprovedFingerprintRootFixedPopulation = "68a9ed2242ccabec17294150a40752a85a5dcec2d8bfb12c3175d49d6a9bd056";
 
         public static bool TryGet(string nodeId, out FrameAccessReviewId reviewId) =>
             Reviews.TryGetValue(nodeId, out reviewId);
 
         public static FrameAccessEvidence EvidenceFor(string nodeId) => nodeId switch
         {
-            "post-death.life-link.resolve" => FrameAccessEvidence.DisabledUnsafe,
             _ => FrameAccessEvidence.SourceReviewed
         };
 
@@ -393,7 +389,7 @@ namespace BattleSystemECS.Core
         {
             "early-groups.md" => ReportedEarlyNodeCount,
             "combat-groups.md" => ReportedCombatNodeCount,
-            "commit-postdeath.md" => 35,
+            "commit-postdeath.md" => 34,
             "supplemental-production-nodes.md" => SupplementalNodeIds.Count,
             _ => throw new ArgumentOutOfRangeException(nameof(artifactId),artifactId,"Unknown review artifact.")
         };
@@ -407,7 +403,6 @@ namespace BattleSystemECS.Core
 
         private static FrameAccessReviewDisposition DispositionFor(string nodeId) => nodeId switch
         {
-            "post-death.life-link.resolve" => FrameAccessReviewDisposition.DisabledUnsafe,
             "primary-death.resolve" or "primary-death.callback-dispatch" or "cascade-death.resolve" or
                 "cascade-death.callback-dispatch" or "pregame.random-event.update" or
                 "pregame.random-event.callback-dispatch" or "spawning.wave.update" or

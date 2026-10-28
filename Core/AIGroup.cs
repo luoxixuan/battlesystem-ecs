@@ -10,7 +10,6 @@ namespace BattleSystemECS.Core
         public Systems.NecromancerSystem? Necromancer { get; set; }
         public Systems.EnemyLifeLinkSystem? LifeLink { get; set; }
         public Systems.ManaBurnSystem? ManaBurn { get; set; }
-        public Systems.EnemyLifestealSystem? Lifesteal { get; set; }
         public Systems.PhaseSystem? Phase { get; set; }
         public Systems.ZoneControlSystem? ZoneControl { get; set; }
         public Systems.EnemyStrafeSystem? EnemyStrafe { get; set; }
@@ -38,7 +37,6 @@ namespace BattleSystemECS.Core
             if (Necromancer != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.necromancer.prepare"), c => Necromancer?.SetTurn(c.Turn, c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.necromancer.update"), c => Necromancer?.Update(c.Delta)); }
             if (LifeLink != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.life-link.prepare"), c => LifeLink?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.life-link.update"), c => LifeLink?.Update()); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.life-link.cooldowns"), c => LifeLink?.DecrementCooldowns(c.Delta)); }
             if (ManaBurn != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.mana-burn.prepare"), c => ManaBurn?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.mana-burn.update"), c => ManaBurn?.Update()); }
-            if (Lifesteal != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.lifesteal.prepare"), c => Lifesteal?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.lifesteal.update"), c => Lifesteal?.Update()); }
             if (Phase != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.phase.prepare"), c => Phase?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.phase.update"), c => Phase?.Update(c.Delta)); }
             if (Sapper != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.sapper.prepare"), c => Sapper?.SetTurn(c.Turn, c.Delta)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.sapper.update"), c => Sapper?.Update(c.Delta)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.sapper.recompute"), c => Sapper?.RecomputeTowerSlows()); }
         }
@@ -85,8 +83,6 @@ namespace BattleSystemECS.Core
             ManaBurn?.SetTurn(turn);
             ManaBurn?.Update();
 
-            Lifesteal?.SetTurn(turn);
-            Lifesteal?.Update();
 
             Phase?.SetTurn(turn);
             Phase?.Update(deltaTime);

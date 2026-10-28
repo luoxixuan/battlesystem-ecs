@@ -353,12 +353,6 @@ namespace BattleSystemECS.Core
         // Default 1f = backward compatible (multi-strike deals full damage when this field is unconfigured).
         public float[] TowerMultiStrikeDamageMult = new float[MAX_ENTITIES];
 
-        // ==================== 塔穿透弹道系统（Piercing Projectile）====================
-        // TowerProjectilePierceCount: number of enemies the projectile can pierce through (0 = no pierce)
-        // TowerProjectilePierceDmgFalloff: damage multiplier after each pierce (1.0 = full damage, 0.7 = 70%)
-        public int[] TowerProjectilePierceCount = new int[MAX_ENTITIES];
-        public float[] TowerProjectilePierceDmgFalloff = new float[MAX_ENTITIES];
-
         // ==================== 塔弹道分裂/子母弹系统（Projectile Fragmentation）====================
         // TowerProjectileFragmentCount: number of child projectiles spawned on impact (0 = no fragmentation)
         // TowerProjectileFragmentRange: search radius in tiles for finding fragment targets
@@ -942,14 +936,6 @@ namespace BattleSystemECS.Core
         // TowerTrapEffectValue: stun duration (sec) / damage (flat HP) / slow amount (0-1) per trigger
         public float[] TowerTrapEffectValue = new float[MAX_ENTITIES];
 
-        // ── 射程伤害衰减 (Range-Based Damage Falloff) ====================
-        // TowerFalloffType: 0=None, 1=Standard (closer=more dmg), 2=Reverse (sniper: farther=more dmg)
-        public int[] TowerFalloffType = new int[MAX_ENTITIES];
-        // TowerFalloffStartRatio: fraction of max range where falloff begins
-        public float[] TowerFalloffStartRatio = new float[MAX_ENTITIES];
-        // TowerFalloffMinRatio: minimum damage multiplier at max range (Standard) or min range (Reverse)
-        public float[] TowerFalloffMinRatio = new float[MAX_ENTITIES];
-
         // ==================== 随机伤害范围（Damage Variance / Gambling）====================
         // TowerDamageVariance: fraction of damage that can randomly vary (0 = no variance, fixed damage)
         // baseDmg = TowerAttackDamage * (1 ± variance), uniformly distributed
@@ -1170,9 +1156,6 @@ namespace BattleSystemECS.Core
             TowerMultiStrikeCount[entityId] = 0;
             TowerMultiStrikeRange[entityId] = 0f;
             TowerMultiStrikeDamageMult[entityId] = 1f;
-            // Piercing projectile fields: default to no pierce
-            TowerProjectilePierceCount[entityId] = 0;
-            TowerProjectilePierceDmgFalloff[entityId] = 1f;
             // Fragmentation/projectile split fields: default to no fragmentation
             TowerProjectileFragmentCount[entityId] = 0;
             TowerProjectileFragmentRange[entityId] = 0f;
@@ -1297,10 +1280,6 @@ namespace BattleSystemECS.Core
             TowerReflectRatio[entityId] = 0f;
             TowerReflectCap[entityId] = 0f;
             TowerReflectAuraRadius[entityId] = 0f;
-            // Falloff fields: default to no falloff
-            TowerFalloffType[entityId] = 0;
-            TowerFalloffStartRatio[entityId] = 1f;
-            TowerFalloffMinRatio[entityId] = 1f;
             // Chain attack: default to no chain (0 ratio = inactive)
             TowerChainDmgRatio[entityId] = 0f;
             // Overkill / excess damage: default to no overkill effect (type=0, ratio=0, radius=0)
@@ -1619,10 +1598,6 @@ namespace BattleSystemECS.Core
             TowerTrapCharges[entityId] = 0;
             TowerTrapEffectType[entityId] = 0;
             TowerTrapEffectValue[entityId] = 0f;
-            // Falloff fields reset
-            TowerFalloffType[entityId] = 0;
-            TowerFalloffStartRatio[entityId] = 1f;
-            TowerFalloffMinRatio[entityId] = 1f;
             // Ramp-Up fields reset
             TowerRampUpRate[entityId] = 0f;
             TowerRampUpMax[entityId] = 1f;

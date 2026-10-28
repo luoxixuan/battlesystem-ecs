@@ -5,7 +5,7 @@ namespace BattleSystemECS.Core
     /// <summary>生产 group binder 的独立 typed 合同事实，运行期不读取 manifest 或 catalog。</summary>
     internal static class FrameBindingFacts
     {
-        private static readonly string[] DisabledNodeIds = new[] { "ai.lifesteal.prepare", "ai.lifesteal.update", "post-death.life-link.resolve" };
+        private static readonly string[] DisabledNodeIds = Array.Empty<string>();
         internal static FrameBindingRegistration Get(string nodeId)
         {
             if (!TryGet(nodeId, out var registration))
