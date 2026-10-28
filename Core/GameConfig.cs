@@ -129,8 +129,6 @@ namespace BattleSystemECS.Config
         public bool CanLand { get; set; } = false;
         // CanBurrow: true if this enemy can dive underground and become untargetable
         public bool CanBurrow { get; set; } = false;
-        // BurrowDuration: how many turns the enemy stays underground
-        public float BurrowDuration { get; set; } = 0f;
         // BurrowSpeedMult: movement speed multiplier while underground
         public float BurrowSpeedMult { get; set; } = 1f;
         // BurrowEmergeDamage: AoE damage dealt when emerging from ground (0 = no damage)
@@ -341,10 +339,6 @@ namespace BattleSystemECS.Config
         // saturating the entity pool. 0 = no cooldown (echo on every successful attack that
         // passes the SpawnsEcho roll). Typical: 3-8 seconds.
         public float EchoSpawnCooldown { get; set; } = 5f;
-        // Piercing projectile: number of enemies the projectile can pierce through (0 = no pierce)
-        public int PierceCount { get; set; } = 0;
-        // PierceDmgFalloff: damage multiplier after each pierce (1.0 = full damage, 0.7 = 70%)
-        public float PierceDmgFalloff { get; set; } = 1f;
         // Tower demolish (sacrifice): if non-null, tower can be detonated for AoE damage
         public TowerDemolishConfig Demolish { get; set; }
         // Income tower: if true, tower generates gold passively instead of attacking
@@ -478,14 +472,6 @@ namespace BattleSystemECS.Config
         public float BurstInterval { get; set; } = 0f;
         // BurstCooldown: total cooldown time in seconds for one full burst cycle
         public float BurstCooldown { get; set; } = 0f;
-        // ── Range-Based Damage Falloff ──────────────────────────────────────────────
-        // FalloffType: 0=None (no falloff), 1=Standard (closer=more dmg), 2=Reverse (sniper: farther=more dmg)
-        public int FalloffType { get; set; } = 0;
-        // FalloffStartRatio: fraction of max range where falloff begins (0 = starts at tower, 1 = never)
-        public float FalloffStartRatio { get; set; } = 1f;
-        // FalloffMinRatio: minimum damage multiplier at max range (only for Standard falloff)
-        // For Reverse falloff, this is the minimum damage at min range
-        public float FalloffMinRatio { get; set; } = 1f;
         // ── Ramp-Up / Spool-Up Damage ───────────────────────────────────────────────
         // RampUpRate: damage increase per consecutive hit on same target (0 = no ramp-up)
         // E.g. 0.05 = +5% damage per hit, up to RampUpMax cap

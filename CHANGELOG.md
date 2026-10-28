@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-27（删除仅 loader 触碰的塔/怪配置字段 B6c）
+- 重新核验（Core/Systems/Tests/Program.cs/tools/Unity Assets，含按名访问）无生产读取方后删除：`TowerConfig.PierceCount/PierceDmgFalloff/FalloffType/FalloffStartRatio/FalloffMinRatio`、`MonsterConfig.BurrowDuration`，及 legacy `GameConfigLoader` 中对应 5 行提取。严格解析器由 POCO 属性驱动，无需额外改动。
+- JSON 键：`game_config.json` 与仓库其余 JSON 中本就无这些键，无需删除。
+- 保留：`ComponentStore.TowerProjectilePierceCount/PierceDmgFalloff/TowerFalloffType/StartRatio/MinRatio` 数组（`TowerAttackSystem` 有读取方，且无任何写入方、恒为默认值；清理属系统逻辑改动，超出本批）。无 falloff 枚举类型（均为 int）。`Data/Configs/tower_affixes.json` 中 `"stat": "PierceCount"` 为未加载文件内的字符串，不动。
+- 验证：见提交信息；完整测试套件（门禁 4）因内存限制未运行，mode 2/4/5 按计划延期。
+
 ### 2026-10-27（删除孤儿配置字段与 JSON 键 B6b）
 - 重新核验无任何生产读取方（仅 parser / loader / 测试触碰）后删除：`GameConfig.WaveSkip` + `WaveSkipConfig`、`GameConfig.Reforge` + `ReforgeConfig`、`GameConfig.TowerAffixes` + `TowerAffixDef` + 两个查找方法 + `GameConfigLoader.LoadTowerAffixDefs`、`GameConfig.ObstacleDefs` + `ObstacleDef`、`GameConfig.TowerOvercharge` + `TowerOverchargeConfig` + `GameConfigLoader.ParseTowerOverchargeConfig` + 严格解析器 `GameConfigSource.TowerOvercharge`、`TowerConfig.InterceptRate`（含 legacy 解析行）、`TowerConfig.Forms` / `FormSwitchCooldown` + `TowerFormDef`、`MonsterConfig.IsThief` / `StealAmount` / `GoldOnReturn`（B6a 已删对应 store 数组）、从未被加载的 `GameConfig.ThiefDefs` / `GetThiefDef` + `ThiefDef`、`TowerLinkDef` / `TowerLinkEffect` 与 `Data/Towers/tower_links.json`。
 - JSON 键：`game_config.json` 顶层 `TowerOvercharge` 段（其余被删字段在 `game_config.json` 中本就无键，严格解析仍通过）。热量 / 能量 / 光束相关配置字段在 B4c 之后已不存在于 `GameConfig`，无需再删。
