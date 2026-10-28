@@ -1038,7 +1038,6 @@ namespace BattleSystemECS.Systems
                 RemainingHealth = remaining,
                 AttackerId = enemyId
             });
-            store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
             logger.Log($"[AI] Enemy {enemyId} attacks player for {applied} damage (HP: {remaining})");
 
             // Lifesteal: collect event for serial apply (two-phase pattern)
@@ -1085,7 +1084,6 @@ namespace BattleSystemECS.Systems
                 RemainingHealth = remaining,
                 AttackerId = enemyId
             });
-            store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
             logger.Log($"[AI] Enemy {enemyId} ranged attacks player for {applied} damage (HP: {remaining})");
 
             // Lifesteal: collect event for serial apply (two-phase pattern)
@@ -1151,8 +1149,7 @@ namespace BattleSystemECS.Systems
                 });
                 store.SetEnemyAIChargeCounter(enemyId, 0);
                 store.EnemyChargeParam[enemyId] = 0f;
-                store.SetEnemyAILastAttackTurn(enemyId, currentTurn);
-                logger.Log($"[AI] Enemy {enemyId} releases CHARGE for {applied} damage (3x)! HP: {remaining}");
+                    logger.Log($"[AI] Enemy {enemyId} releases CHARGE for {applied} damage (3x)! HP: {remaining}");
 
                 // Lifesteal: collect event for serial apply (two-phase pattern)
                 if (store.EnemyLifestealActive[enemyId])

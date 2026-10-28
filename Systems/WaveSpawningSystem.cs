@@ -808,14 +808,6 @@ namespace BattleSystemECS.Systems
                     store.EnemyIsMorphed[enemyId] = false;
                     store.EnemyMorphTriggered[enemyId] = false;
 
-                    // Initialize gold-stealing thief properties
-                    if (monsterConfig.IsThief)
-                    {
-                        store.EnemyCanStealGold[enemyId] = true;
-                        store.EnemyStealAmount[enemyId] = monsterConfig.StealAmount;
-                        store.EnemyGoldOnReturn[enemyId] = monsterConfig.GoldOnReturn;
-                    }
-
                     // Initialize Bounty enemy properties (Round 179 Direction 3) — high-value
                     // high-risk target that pays BountyGoldMult × gold on death. The risk is
                     // the player's attention being diverted from the wave while chasing the

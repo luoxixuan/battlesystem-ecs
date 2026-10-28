@@ -950,7 +950,6 @@ namespace BattleSystemECS.Core
                 EnemyCastAbilityId[entityId] = null;
                 EnemyActionEnum[entityId] = EnemyActionType.None;
                 EnemyAIChargeCounter[entityId] = 0;
-                EnemyAILastAttackTurn[entityId] = 0;
                 EnemyAttackInterval[entityId] = 0f;
                 EnemyAttackCooldownLeft[entityId] = 0f;
                 EnemyArmor[entityId] = 0f;
@@ -1305,8 +1304,7 @@ namespace BattleSystemECS.Core
                 // tc.IsChronoTower / tc.IsMobile, and no shipped Data/Towers/*.json sets either
                 // key, so they are never written non-default in production yet. Clearing them
                 // now means wiring a chrono or patrol tower later cannot resurrect stale state
-                // on a recycled slot. TowerSelected's SelectTower/DeselectTower likewise have
-                // no production callers.
+                // on a recycled slot.
                 TowerIsChronoTower[entityId] = false;
                 TowerTimeFieldRadius[entityId] = 0f;
                 TowerTimeScale[entityId] = 0f;
@@ -1319,7 +1317,6 @@ namespace BattleSystemECS.Core
                 // defaults it to 0.75 = 75% speed for patrol towers). Zeroing it would leave a
                 // recycled slot unable to attack. Matches RemoveTower's value.
                 TowerPatrolAttackSpeedPenalty[entityId] = 1f;
-                TowerSelected[entityId] = false;
                 // Round 98 — Windup fields reset (recycled slot must start with no windup)
                 TowerWindupFrames[entityId] = 0;
                 TowerWindupCountdown[entityId] = 0;
@@ -1713,14 +1710,12 @@ namespace BattleSystemECS.Core
             EnemyStunResistance = null!; EnemyFreezeResistance = null!; EnemySlowResistance = null!;
             EnemyKnockbackResistance = null!; EnemyDamageResistance = null!;
             EnemyIsVanguard = null!; EnemyVanguardCoverRange = null!; EnemyVanguardDmgTransfer = null!;
-            EnemyCanStealGold = null!; EnemyStealAmount = null!;
-            EnemyGoldOnReturn = null!;
             EnemyAffixFlags = null!; EnemyElementStatus = null!; EnemyElementTimer = null!;
             EnemyExposureMask = null!; EnemyExposureTimer = null!;
             NestDefId = null!; NestHealth = null!; NestMaxHealth = null!;
             NestSpawnTimer = null!; NestSpawnInterval = null!; NestMonsterTypeStr = null!;
             NestMaxAlive = null!; NestActiveCount = null!; NestOriginId = null!;
-            EnemyAIAction = null!; EnemyAIChargeCounter = null!; EnemyAILastAttackTurn = null!;
+            EnemyAIAction = null!; EnemyAIChargeCounter = null!;
             EnemyAttackInterval = null!; EnemyAttackCooldownLeft = null!;
             EnemyTypeName = null!; EnemyBehaviorTree = null!; EnemyActionEnum = null!;
             EnemyCastAbilityId = null!;
@@ -1737,7 +1732,7 @@ namespace BattleSystemECS.Core
             // We use a single int (not bool[]) so it's a 1-byte check, not 100K cache-line read.
             FactionInfightEnabled = 0;
             TowerTargetingMode = null!; TowerProjectileHoming = null!;
-            TowerDamageType = null!; TowerSelected = null!; TowerType = null!;
+            TowerDamageType = null!; TowerType = null!;
             TowerAttackDamage = null!; TowerRange = null!; TowerAttackSpeed = null!;
             TowerLevel = null!; TowerUpgradeCost = null!; TowerTotalUpgradeSpent = null!; TowerUpgradePathId = null!;
             TowerFusionTier = null!; TowerActive = null!; TowerLastAttackTime = null!;
@@ -1765,7 +1760,7 @@ namespace BattleSystemECS.Core
             TowerProjectileFragmentDmgMult = null!;
             TowerCurrentAmmo = null!; TowerMaxAmmo = null!; TowerReloadTime = null!;
             TowerReloadProgress = null!; TowerIsReloading = null!;
-            TowerSynergyId = null!; TowerSynergyMultiplier = null!;
+            TowerSynergyMultiplier = null!;
             TowerSynergyTier = null!;
             TowerIsChronoTower = null!; TowerTimeFieldRadius = null!; TowerTimeScale = null!;
             EnemyTimeScale = null!;
@@ -1808,9 +1803,6 @@ namespace BattleSystemECS.Core
             CorpseX = null!; CorpseY = null!; CorpseMonsterType = null!;
             CorpseOwnerId = null!; CorpseHealth = null!; CorpseDeathTime = null!;
             CorpseActive = null!; CorpseReanimated = null!;
-            SkillName = null!; SkillDamageMultiplier = null!;
-            SkillAreaWidth = null!; SkillAreaHeight = null!;
-            SkillAttackRange = null!; SkillCooldown = null!; SkillCurrentCooldown = null!;
             AbilityInstances = null!; AbilityCount = null!;
             ActiveEffects = null!; ActiveEffectCount = null!;
             _enemyIndexInList = null!; _towerIndexInList = null!;

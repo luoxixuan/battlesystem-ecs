@@ -292,7 +292,7 @@ namespace BattleSystemECS.Tests.Framework
         // ─── Bug 回归：塔的时空 / 巡逻 / 选中字段必须在销毁时重置 ─────────────
         // RemoveTower 清 208 个塔字段，DestroyEntity 的塔分支只清 89 个，差集 150。
         // 其中 140 个由 AddTower 重新初始化（照抄 RemoveTower 会白写 140 次），
-        // 真正的 ID 复用面就是下面这 10 个：既不在此清、也不在 AddTower 初始化。
+        // 真正的 ID 复用面就是下面这 9 个：既不在此清、也不在 AddTower 初始化。
         // 目前是防御性修复 —— 它们的写入者被 tc.IsChronoTower / tc.IsMobile 门控，
         // 而 shipped Data/Towers/*.json 没有任何一个设这两个键。
         // 关键点：默认值必须与 RemoveTower 一致，尤其
@@ -313,7 +313,6 @@ namespace BattleSystemECS.Tests.Framework
             Store.TowerPatrolWaypointIndex[tid] = 5;
             Store.TowerPatrolDirection[tid] = -1;
             Store.TowerPatrolAttackSpeedPenalty[tid] = 0.75f;
-            Store.TowerSelected[tid] = true;
 
             Store.DestroyEntity(tid);
 
@@ -325,7 +324,6 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(-1, Store.TowerPatrolPathId[tid]);
             Assert.Equal(0, Store.TowerPatrolWaypointIndex[tid]);
             Assert.Equal(1, Store.TowerPatrolDirection[tid]);
-            Assert.False(Store.TowerSelected[tid]);
         }
 
         /// <summary>攻速惩罚是乘数：重置值必须为 1f（中性），0f 会让回收塔无法攻击。</summary>
@@ -340,7 +338,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(1f, Store.TowerPatrolAttackSpeedPenalty[tid]);
         }
 
-        /// <summary>DestroyEntity 与 RemoveTower 对这 10 个字段的重置值必须一致。</summary>
+        /// <summary>DestroyEntity 与 RemoveTower 对这 9 个字段的重置值必须一致。</summary>
         [Fact]
         public void DestroyEntity_And_RemoveTower_AgreeOnRecycleDefaults()
         {
@@ -358,7 +356,6 @@ namespace BattleSystemECS.Tests.Framework
                 Store.TowerPatrolWaypointIndex[t] = 5;
                 Store.TowerPatrolDirection[t] = -1;
                 Store.TowerPatrolAttackSpeedPenalty[t] = 0.75f;
-                Store.TowerSelected[t] = true;
             }
 
             Store.DestroyEntity(viaDestroy);
@@ -373,7 +370,6 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(Store.TowerPatrolWaypointIndex[viaRemove], Store.TowerPatrolWaypointIndex[viaDestroy]);
             Assert.Equal(Store.TowerPatrolDirection[viaRemove], Store.TowerPatrolDirection[viaDestroy]);
             Assert.Equal(Store.TowerPatrolAttackSpeedPenalty[viaRemove], Store.TowerPatrolAttackSpeedPenalty[viaDestroy]);
-            Assert.Equal(Store.TowerSelected[viaRemove], Store.TowerSelected[viaDestroy]);
         }
     }
 }

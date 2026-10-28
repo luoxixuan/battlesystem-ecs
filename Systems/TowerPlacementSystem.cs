@@ -1146,31 +1146,6 @@ namespace BattleSystemECS.Systems
         }
 
         /// <summary>
-        /// Sell all currently selected towers in a batch.
-        /// </summary>
-        /// <returns>Total gold refunded.</returns>
-        public float SellSelectedTowers(int playerId = 1)
-        {
-            int[] selected = store.GetSelectedTowerIds();
-            if (selected.Length == 0)
-            {
-                logger.Log("[TOWER] 批量出售: 没有选中的塔");
-                return 0f;
-            }
-
-            // Lock around ActiveTowerIds modifications for batch safety
-            float totalRefunded = 0f;
-            foreach (int tid in selected)
-            {
-                // SellTower internally calls DestroyEntity which locks activeIdsLock
-                totalRefunded += SellTower(tid, playerId);
-            }
-
-            logger.Log($"[TOWER] 批量出售完成: {selected.Length} 塔，共返还 {(int)totalRefunded} 金币");
-            return totalRefunded;
-        }
-
-        /// <summary>
         /// Relocate an active tower to a new position without changing its upgrade level.
         /// </summary>
         /// <param name="towerId">Tower entity ID</param>

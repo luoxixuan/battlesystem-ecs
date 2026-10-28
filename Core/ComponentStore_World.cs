@@ -299,15 +299,6 @@ namespace BattleSystemECS.Core
         public bool[] CorpseReanimated = new bool[MAX_CORPSE_QUEUE];  // true = already reanimated, cannot be resurrected again
         private int _nextCorpseId = 0;
 
-        // ==================== 技能组件的 SOA 存储 ====================
-        public string[] SkillName = new string[MAX_PLAYERS];
-        public float[] SkillDamageMultiplier = new float[MAX_PLAYERS];
-        public int[] SkillAreaWidth = new int[MAX_PLAYERS];
-        public int[] SkillAreaHeight = new int[MAX_PLAYERS];
-        public int[] SkillAttackRange = new int[MAX_PLAYERS];
-        public float[] SkillCooldown = new float[MAX_PLAYERS];
-        public float[] SkillCurrentCooldown = new float[MAX_PLAYERS];
-
         // ==================== GAS 组件的 SOA 存储 ====================
         public const int MAX_ABILITIES_PER_ENTITY = 5;
         public const int MAX_ACTIVE_EFFECTS_PER_ENTITY = 8;
@@ -704,92 +695,6 @@ namespace BattleSystemECS.Core
             CorpseHealth[corpseId] = 0f;
             CorpseDeathTime[corpseId] = 0f;
             CorpseReanimated[corpseId] = false;
-        }
-
-        // ==================== 技能组件 SOA 访问方法 ====================
-
-        public string GetSkillName(int playerId)
-        {
-            if (!IsValidPlayer(playerId)) return "";
-            return SkillName[playerId];
-        }
-
-        public void SetSkillName(int playerId, string name)
-        {
-            if (!IsValidPlayer(playerId)) return;
-            SkillName[playerId] = name;
-        }
-
-        public float GetSkillDamageMultiplier(int playerId)
-        {
-            if (!IsValidPlayer(playerId)) return 1f;
-            return SkillDamageMultiplier[playerId];
-        }
-
-        public void SetSkillDamageMultiplier(int playerId, float multiplier)
-        {
-            if (!IsValidPlayer(playerId)) return;
-            SkillDamageMultiplier[playerId] = multiplier;
-        }
-
-        public int GetSkillAreaWidth(int playerId)
-        {
-            if (!IsValidPlayer(playerId)) return 1;
-            return SkillAreaWidth[playerId];
-        }
-
-        public void SetSkillAreaWidth(int playerId, int width)
-        {
-            if (!IsValidPlayer(playerId)) return;
-            SkillAreaWidth[playerId] = width;
-        }
-
-        public int GetSkillAreaHeight(int playerId)
-        {
-            if (!IsValidPlayer(playerId)) return 1;
-            return SkillAreaHeight[playerId];
-        }
-
-        public void SetSkillAreaHeight(int playerId, int height)
-        {
-            if (!IsValidPlayer(playerId)) return;
-            SkillAreaHeight[playerId] = height;
-        }
-
-        public int GetSkillAttackRange(int playerId)
-        {
-            if (!IsValidPlayer(playerId)) return 1;
-            return SkillAttackRange[playerId];
-        }
-
-        public void SetSkillAttackRange(int playerId, int range)
-        {
-            if (!IsValidPlayer(playerId)) return;
-            SkillAttackRange[playerId] = range;
-        }
-
-        public float GetSkillCooldown(int playerId)
-        {
-            if (!IsValidPlayer(playerId)) return 0f;
-            return SkillCooldown[playerId];
-        }
-
-        public void SetSkillCooldown(int playerId, float cooldown)
-        {
-            if (!IsValidPlayer(playerId)) return;
-            SkillCooldown[playerId] = cooldown;
-        }
-
-        public float GetSkillCurrentCooldown(int playerId)
-        {
-            if (!IsValidPlayer(playerId)) return 0f;
-            return SkillCurrentCooldown[playerId];
-        }
-
-        public void SetSkillCurrentCooldown(int playerId, float currentCooldown)
-        {
-            if (!IsValidPlayer(playerId)) return;
-            SkillCurrentCooldown[playerId] = currentCooldown;
         }
 
         // ==================== GAS 组件访问方法 ====================

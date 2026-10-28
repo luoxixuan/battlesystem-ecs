@@ -617,8 +617,6 @@ namespace BattleSystemECS.Core
         // ==================== Enemy Clone (Duplicate Mid-Wave, SOA) ====================
         // When CloneDuration > 0 and timer expires, clone is killed (optional mechanic)
         // Enforced against CloneDef.MaxClones
-        // EnemyHasTrueSight: true if this enemy can detect and target stealthed towers
-        public bool[] EnemyHasTrueSight = new bool[MAX_ENTITIES];
 
         // ==================== 敌人生命链接 / Life Link (Damage Sharing, SOA) ====================
         // EnemyIsLifeLinker: true if this enemy is a Life Link master (can establish links with others)
@@ -788,14 +786,6 @@ namespace BattleSystemECS.Core
 
         // ==================== 敌人治疗单位组件（SOA）====================
 
-        // ==================== 金币窃取敌人组件（SOA）====================
-        // EnemyCanStealGold: true if this enemy is a thief that steals gold instead of damaging base
-        public bool[] EnemyCanStealGold = new bool[MAX_ENTITIES];
-        // EnemyStealAmount: amount of gold this enemy steals when reaching the end
-        public float[] EnemyStealAmount = new float[MAX_ENTITIES];
-        // EnemyGoldOnReturn: bonus gold awarded when player kills a thief after it escapes
-        public float[] EnemyGoldOnReturn = new float[MAX_ENTITIES];
-
         // ==================== 法力燃烧敌人组件（SOA）====================
         // EnemyManaBurnAmount: amount of mana this enemy burns per attack (0 = no mana burn)
         public float[] EnemyManaBurnAmount = new float[MAX_ENTITIES];
@@ -897,7 +887,6 @@ namespace BattleSystemECS.Core
         // ==================== 敌人 AI 组件的 SOA 存储 ====================
         public string[] EnemyAIAction = new string[MAX_ENTITIES];
         public int[] EnemyAIChargeCounter = new int[MAX_ENTITIES];
-        public int[] EnemyAILastAttackTurn = new int[MAX_ENTITIES];
         /// <summary>怪物配置 AttackInterval（秒）。≤0 表示不门控（AddEnemy 默认 / 测试路径）。</summary>
         public float[] EnemyAttackInterval = new float[MAX_ENTITIES];
         /// <summary>距下次允许攻击玩家的剩余秒数；accept 后重置为 EnemyAttackInterval。</summary>
@@ -1347,10 +1336,6 @@ namespace BattleSystemECS.Core
             EnemyIsVanguard[entityId] = false;
             EnemyVanguardCoverRange[entityId] = 0f;
             EnemyVanguardDmgTransfer[entityId] = 0f;
-            // Thief: default not a gold thief
-            EnemyCanStealGold[entityId] = false;
-            EnemyStealAmount[entityId] = 0f;
-            EnemyGoldOnReturn[entityId] = 0f;
             // Teleport: default no cooldown (ready), no destination, type=0 (none)
             // Path deviation: default 0/0/0/0 = no lateral drift. WaveSpawningSystem overrides
             // per archetype if the monster config specifies deviation type/amplitude.
@@ -2470,18 +2455,6 @@ namespace BattleSystemECS.Core
         {
             if (!IsValidEntity(enemyId)) return;
             EnemyAIChargeCounter[enemyId] = counter;
-        }
-
-        public int GetEnemyAILastAttackTurn(int enemyId)
-        {
-            if (!IsValidEntity(enemyId)) return 0;
-            return EnemyAILastAttackTurn[enemyId];
-        }
-
-        public void SetEnemyAILastAttackTurn(int enemyId, int turn)
-        {
-            if (!IsValidEntity(enemyId)) return;
-            EnemyAILastAttackTurn[enemyId] = turn;
         }
 
         public void SetEnemyAttackInterval(int enemyId, float intervalSeconds)

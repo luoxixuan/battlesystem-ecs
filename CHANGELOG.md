@@ -1,5 +1,12 @@
 # 更新记录 (Changelog)
 
+### 2026-10-27（删除残留无读取方 SOA 数组 B6a）
+- 重新全量检索 Core/Systems/Tests/Program/tools 与 Unity `Assets`（含按名反射）后，删除 14 个无生产读取方的数组：敌人 `EnemyAILastAttackTurn`（仅被 `EnemyAISystem` 3 处写入）、`EnemyHasTrueSight`（零引用）、`EnemyCanStealGold`/`EnemyStealAmount`/`EnemyGoldOnReturn`（仅 `WaveSpawningSystem` 写入）；塔 `TowerSelected`、`TowerSynergyId`；玩家侧技能槽 `SkillName/DamageMultiplier/AreaWidth/AreaHeight/AttackRange/Cooldown/CurrentCooldown`（7 个，访问器无调用方）。同时删除声明、重置、`Dispose` 置空、纯写入赋值与仅它们使用的访问器（`Get/SetEnemyAILastAttackTurn`、`Get/SetTowerSynergyId`、`Get/SetSkill*`、`SelectTower`/`DeselectTower`/`DeselectAllTowers`/`GetSelectedTowerIds`，以及无调用方的 `TowerPlacementSystem.SellSelectedTowers`）。
+- 每个 store 约少 1.9 MB（7 个 `MAX_ENTITIES` 数组共 19 字节/实体，静态估算，未实测；技能槽数组仅 `MAX_PLAYERS` 长度，可忽略）。
+- 保留（有真实读取方）：`EnemyAIChargeCounter`（`BehaviorTreeEvaluator`/`EnemyAISystem`）、`EnemyStaggerDurationLeft`（`TickStagger` 决定硬直何时结束）、`GlobalDayNight*`（`DayNightSystem`）、`PathNodeTerrain`（`EnemyMovementSystem`）、`PlayerBuffs`（`UpgradeSystem`/`BenchmarkSystem`）、`PlayerUnlockedTechs`（`TechTreeSystem`）；`TowerKillCount`（Unity 读取）与 `FrameResource` 序号未动。Unity `Assets` 对上述 14 个名称零引用。
+- 测试：`ComponentStoreTests` 去掉 `TowerSelected` 的两处重置断言；其余不变。Golden/Replay/DeterminismSoak 摘要未变。
+- 验证：见提交信息；Unity 运行时脚本 Roslyn 编译检查仍为基线 3 个 `FrameScheduler.Spawning` 错误。完整测试套件（门禁 4）因内存限制未运行；mode 2/4/5 按计划延期。
+
 ### 2026-10-27（退役 spec 禁用且从未构造的系统 B4c）
 - 判定规则：禁用原因 / feature policy 为“not enabled by production composition”或“intentionally absent”且不挂靠迁移里程碑 → 退役。删除 20 个系统（3,233 行）：`TowerIncome`、`TowerRelocate`、`TowerConstruction`、`EnemyAffix`、`EnemyWound`、`EnemyHealer`、`EnemyStealGold`、`PlayerSummon`、`TowerOvercharge`、`TowerLink`、`PatrolTower`、`FogOfWar`、`PointDefense`、`Heat`、`TowerDemolish`、`TowerSilence`、`TowerDispel`、`EnemyProjectile`、`BeamTower`、`TowerEnergy`（均为 `*System.cs`）。
 - 走注册链删除：spec 18 个 `feature-disabled` 条目（现无禁用条目）、30 个 reviewed-disabled 帧节点及其 `ReviewedDisabledReason` / `FrameAccessReviewCatalog` / `FrameAdapterBindingCatalog` / `FrameBindingFacts` 条目、各 Group 槽位、`TowerAttackSystem` 的热量/能量/光束接缝、`ITowerHeatPort`/`ITowerEnergyPort`/`IEnemyProjectilePort`；manifest 与 nullable ledger 由生成器重生成。

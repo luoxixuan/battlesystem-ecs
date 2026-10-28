@@ -194,8 +194,6 @@ namespace BattleSystemECS.Core
         // fast path). Multiple overlapping scorched-earth zones use max() so the penalty
         // doesn't compound into 100% blind.
         public float[] TowerVisionReduction = new float[MAX_ENTITIES];
-        // Tower selection state — O(1) read/write, no GC
-        public bool[] TowerSelected = new bool[MAX_ENTITIES];
         public TowerType[] TowerType = new TowerType[MAX_ENTITIES];
         public float[] TowerAttackDamage = new float[MAX_ENTITIES];
         public int[] TowerRange = new int[MAX_ENTITIES];
@@ -446,8 +444,6 @@ namespace BattleSystemECS.Core
         // ==================== 塔超载/过载系统（Overcharge）====================
 
         // ==================== 塔协同增益组件 (Tower Synergy) ====================
-        // 每个塔的协同 ID 索引，-1 表示无协同
-        public int[] TowerSynergyId = new int[MAX_ENTITIES];
         // 协同增益倍率（从 JSON config 读取并应用，如 bonusChainCount, dotDamageBonus）
         public float[] TowerSynergyMultiplier = new float[MAX_ENTITIES];
         // Round 91 同类塔聚集 tier：0=无 tier / 1=tier1 (3 塔聚集) / 2=tier2 (5 塔) / 3=tier3 (8 塔)
@@ -1436,7 +1432,6 @@ namespace BattleSystemECS.Core
             TowerActive[entityId] = false;
             TowerUpgradePathId[entityId] = null;
             TowerFusionTier[entityId] = 0;
-            TowerSelected[entityId] = false;
             // Chrono tower fields
             TowerIsChronoTower[entityId] = false;
             TowerTimeFieldRadius[entityId] = 0f;
@@ -1719,66 +1714,7 @@ namespace BattleSystemECS.Core
         }
         #endregion
 
-        // ==================== 塔选中状态管理 ====================
-        /// <summary>Select a tower for build-phase operations.</summary>
-        public void SelectTower(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return;
-            if (!TowerActive[towerId]) return;
-            TowerSelected[towerId] = true;
-        }
-
-        /// <summary>Deselect a specific tower.</summary>
-        public void DeselectTower(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return;
-            TowerSelected[towerId] = false;
-        }
-
-        /// <summary>Deselect all currently selected towers.</summary>
-        public void DeselectAllTowers()
-        {
-            lock (activeIdsLock)
-            {
-                foreach (int tid in _activeTowerIds)
-                    TowerSelected[tid] = false;
-            }
-        }
-
-        /// <summary>Returns all selected tower IDs. O(n) over active towers, zero GC.</summary>
-        public int[] GetSelectedTowerIds()
-        {
-            int count = 0;
-            lock (activeIdsLock)
-            {
-                foreach (int tid in _activeTowerIds)
-                    if (TowerSelected[tid]) count++;
-            }
-            int[] result = new int[count];
-            int idx = 0;
-            lock (activeIdsLock)
-            {
-                foreach (int tid in _activeTowerIds)
-                    if (TowerSelected[tid]) result[idx++] = tid;
-            }
-            return result;
-        }
-
         // ==================== 塔协同增益 (Tower Synergy) ====================
-        /// <summary>Gets the synergy ID for a tower (-1 = no synergy).</summary>
-        public int GetTowerSynergyId(int towerId)
-        {
-            if (!IsValidEntity(towerId)) return -1;
-            return TowerSynergyId[towerId];
-        }
-
-        /// <summary>Sets the synergy ID for a tower.</summary>
-        public void SetTowerSynergyId(int towerId, int synergyId)
-        {
-            if (!IsValidEntity(towerId)) return;
-            TowerSynergyId[towerId] = synergyId;
-        }
-
         /// <summary>Gets the synergy multiplier for a tower (1.0 = no bonus).</summary>
         public float GetTowerSynergyMultiplier(int towerId)
         {
