@@ -385,6 +385,22 @@ No sync script exists in either repository (`Tools/` contains only `check_braces
 | E-09 | Partially resolved (10.3) |
 | E-14 (new) | Legacy execution path: `FrameSchedulerExecutionMode.Legacy` → `FrameScheduler.TickLegacy` (`Core/FrameScheduler.cs:281`, 79 lines) plus the 11 `*Group.Execute` methods. Production and Unity default to `Graph`; only `FrameGraphTests.cs:332-364` select `Legacy`, as graph-vs-legacy equivalence checks (M5 verification tooling). Exit condition (M5 declared complete) unmet → insufficient evidence |
 
+### 10.5 Resolution (2026-10-27)
+
+F-04 resolved by Core `8cc986a` (public `FrameScheduler.SetSpawningPaused(bool)` / `IsSpawningPaused`; `Spawning` stays internal) and Unity `261def0`:
+- `BattleDriver` assembles through `ProductionSystemInstaller.Install` + `BindStateMachine`.
+- The three `Spawning.WaveSpawning` call sites use `SetSpawningPaused`.
+- Fresh Release `BattleSystemECS.Core.dll` + `BattleSystemECS.Engine.dll` (new `.meta`) are in `Assets/Plugins`; both asmdefs reference the Engine DLL.
+- `StreamingAssets/game_config.json` is trimmed of its 763-byte trailing tail.
+
+Verification:
+- The §10.1 csc check gives 0 errors (was 3).
+- Unity 2022.3.62f2c1 batchmode compile passes.
+- PlayMode: 184/185 passed, 1 Explicit skip; EditMode has no tests.
+- The reflected names R-17 and the `TowerType` members R-18 are unchanged.
+
+Still stale and untouched: Unity's project-root `game_config.json` and `Data/` copies; the DLL sync is still manual (10.3).
+
 ## Appendices
 
 Appendix tables are generated from the scan outputs at HEAD `3b10ebc`; Appendix B2 from the working tree. File paths are relative to the repository root.
