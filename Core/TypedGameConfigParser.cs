@@ -44,7 +44,6 @@ namespace BattleSystemECS.Config
                 Levels = source.Levels,
                 GlobalSkills = source.GlobalSkills ?? new List<GlobalSkillDef>(),
                 Combo = source.Combo ?? new ComboConfig(),
-                TowerOvercharge = source.TowerOvercharge ?? new TowerOverchargeConfig(),
                 PositionalDamage = source.PositionalDamage ?? new PositionalDamageConfig()
             };
             config.CurrentLevel = config.Levels[0];
@@ -362,7 +361,6 @@ namespace BattleSystemECS.Config
             public List<GlobalSkillDef> GlobalSkills { get; set; }
             public List<TowerConfig> Towers { get; set; }
             public ComboConfig Combo { get; set; }
-            public TowerOverchargeConfig TowerOvercharge { get; set; }
             public PositionalDamageConfig PositionalDamage { get; set; }
         }
 

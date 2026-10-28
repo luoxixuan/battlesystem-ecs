@@ -26,7 +26,6 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(legacy.Skills.Count, typed.Skills.Count);
             Assert.Equal(legacy.Levels.Count, typed.Levels.Count);
             Assert.Equal(legacy.Combo.TriggerThreshold, typed.Combo.TriggerThreshold);
-            Assert.Equal(legacy.TowerOvercharge.ManaCost, typed.TowerOvercharge.ManaCost);
             Assert.Equal(legacy.PositionalDamage.Enabled, typed.PositionalDamage.Enabled);
             Assert.Equal(legacy.Skills[0].HealPercent, typed.Skills[0].HealPercent);
             for (int i = 0; i < legacy.Skills.Count; i++)

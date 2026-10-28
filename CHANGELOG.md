@@ -1,5 +1,13 @@
 # 更新记录 (Changelog)
 
+### 2026-10-27（删除孤儿配置字段与 JSON 键 B6b）
+- 重新核验无任何生产读取方（仅 parser / loader / 测试触碰）后删除：`GameConfig.WaveSkip` + `WaveSkipConfig`、`GameConfig.Reforge` + `ReforgeConfig`、`GameConfig.TowerAffixes` + `TowerAffixDef` + 两个查找方法 + `GameConfigLoader.LoadTowerAffixDefs`、`GameConfig.ObstacleDefs` + `ObstacleDef`、`GameConfig.TowerOvercharge` + `TowerOverchargeConfig` + `GameConfigLoader.ParseTowerOverchargeConfig` + 严格解析器 `GameConfigSource.TowerOvercharge`、`TowerConfig.InterceptRate`（含 legacy 解析行）、`TowerConfig.Forms` / `FormSwitchCooldown` + `TowerFormDef`、`MonsterConfig.IsThief` / `StealAmount` / `GoldOnReturn`（B6a 已删对应 store 数组）、从未被加载的 `GameConfig.ThiefDefs` / `GetThiefDef` + `ThiefDef`、`TowerLinkDef` / `TowerLinkEffect` 与 `Data/Towers/tower_links.json`。
+- JSON 键：`game_config.json` 顶层 `TowerOvercharge` 段（其余被删字段在 `game_config.json` 中本就无键，严格解析仍通过）。热量 / 能量 / 光束相关配置字段在 B4c 之后已不存在于 `GameConfig`，无需再删。
+- Unity 兼容：Unity 经 legacy `GameConfigLoader.LoadConfig`（基于文本提取，不拒绝未知键）读取自己的旧 JSON；用 Unity 项目根 `game_config.json`（含 206 怪物 / 153 塔 / 5 关）与本仓旧版含 `TowerOvercharge` 键的 `game_config.json` 以 B6b 代码做冒烟加载，均成功。Unity 的 `StreamingAssets/game_config.json` 末尾自带垃圾字节，加载失败属既有问题，与本批无关（裁掉尾部后可正常加载）。
+- 测试：删除仅测 `TowerOvercharge` 的 `ParseTowerOverchargeConfig_InjectedJson_FieldsLoaded`、`TowerOvercharge_LoadedFromJson_StructurallyConsistent`，并去掉 `ParseSections_MissingSection_KeepsCodedDefaults` 与 `TypedConfigParserTests` 中对应断言。
+- 保留：`Data/Configs/tower_affixes.json`、`wave_skip.json` 等已成未加载文件（超出本批范围）；`TowerConfig.PierceCount/PierceDmgFalloff/FalloffType/FalloffStartRatio/FalloffMinRatio`、`MonsterConfig.BurrowDuration` 仅被 loader 引用，未列入本批，留待后续核验；枚举成员未动。
+- 验证：见提交信息；完整测试套件（门禁 4）因内存限制未运行，mode 2/4/5 按计划延期。
+
 ### 2026-10-27（删除残留无读取方 SOA 数组 B6a）
 - 重新全量检索 Core/Systems/Tests/Program/tools 与 Unity `Assets`（含按名反射）后，删除 14 个无生产读取方的数组：敌人 `EnemyAILastAttackTurn`（仅被 `EnemyAISystem` 3 处写入）、`EnemyHasTrueSight`（零引用）、`EnemyCanStealGold`/`EnemyStealAmount`/`EnemyGoldOnReturn`（仅 `WaveSpawningSystem` 写入）；塔 `TowerSelected`、`TowerSynergyId`；玩家侧技能槽 `SkillName/DamageMultiplier/AreaWidth/AreaHeight/AttackRange/Cooldown/CurrentCooldown`（7 个，访问器无调用方）。同时删除声明、重置、`Dispose` 置空、纯写入赋值与仅它们使用的访问器（`Get/SetEnemyAILastAttackTurn`、`Get/SetTowerSynergyId`、`Get/SetSkill*`、`SelectTower`/`DeselectTower`/`DeselectAllTowers`/`GetSelectedTowerIds`，以及无调用方的 `TowerPlacementSystem.SellSelectedTowers`）。
 - 每个 store 约少 1.9 MB（7 个 `MAX_ENTITIES` 数组共 19 字节/实体，静态估算，未实测；技能槽数组仅 `MAX_PLAYERS` 长度，可忽略）。

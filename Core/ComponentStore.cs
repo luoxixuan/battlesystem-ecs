@@ -684,10 +684,7 @@ namespace BattleSystemECS.Core
                 TotalKills++;
                 DeathResolveCount++;
 
-                // Gold reward logic:
-                // - Thief that escaped (HasStolenGold): no gold reward, but if killed later -> GoldOnReturn bonus
-                // - Thief killed before escaping: normal gold reward (IsThief but HasStolenGold=false)
-                // - Normal enemy: normal gold reward
+                // Gold reward logic: normal gold reward（Bounty / Combo 等倍率在下方叠加）
                 float goldReward;
                 long killSequence = entry.Sequence == 0L ? ((long)CurrentFrame << 32) | (uint)enemyId : entry.Sequence;
                 void AddLifecycleGold(float amount)

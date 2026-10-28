@@ -30,11 +30,11 @@
 | `BattleSystemECS.Core/BattleSystemECS.Core.csproj` | **核心库** — netstandard2.1，LangVersion=9.0，引用 Engine，编译 Core/ + Systems/ 全部代码。含 polyfill（IsExternalInit、Rng、PolyfillExtensions）、事件总线（IBattleEventBus/ConsoleEventBus + EventBus/GameEvents） |
 | `BattleSystemECS.csproj` | 主 EXE — net6.0，引用 Core 库，仅含 Program.cs |
 | `BattleSystemECS.Tests/BattleSystemECS.Tests.csproj` | 测试项目 — net9.0，仅项目引用 Core（不含 EXE；Core 内部消费 Engine） |
-| `game_config.json` | 运行时游戏主配置（怪物类型、关卡、波次、玩家属性、连击/TowerOvercharge/PositionalDamage 参数），`CopyToOutputDirectory=PreserveNewest` |
+| `game_config.json` | 运行时游戏主配置（怪物类型、关卡、波次、玩家属性、连击/PositionalDamage 参数），`CopyToOutputDirectory=PreserveNewest` |
 | `Data/Configs/*.json` | 子配置：行为树、技能（skills.json = 精选技能表，加载进 `GameConfig.SkillDefs`）、科技树、塔位规则、波次生成、阶段行为等。注意：`auto_skill` / `backstab` / `beacon_towers` / `damage_conversion` / `path_terrain` / `player` / `projectile_deflection` / `shop_reroll` / `shrine_towers` / `wave_gold_decay` / `wave_skip` 这 11 个文件当前没有任何加载器读取（见 `docs/2026-10-27-cleanup-audit.md` E-09） |
 | `Data/Monsters/*.json` | 怪物静态定义（238 个文件）；**Core 不加载**，运行时怪物类型来自 `game_config.json` 的 `MonsterTypes` |
 | `Data/Skills/*.json` | 150 种技能静态定义（按名去重合并进 `GameConfig.SkillDefs`，精选条目优先） |
-| `Data/Towers/*.json` | 塔静态定义（176 个文件）；Core 只读取 `tower_synergy.json`，其余不加载（`tower_links.json` 的唯一读取方 `TowerLinkSystem` 已随 B4c 退役） |
+| `Data/Towers/*.json` | 塔静态定义（175 个文件）；Core 只读取 `tower_synergy.json`，其余不加载（`tower_links.json` 及其 `TowerLinkDef` 已随 B6b 删除） |
 | `Data/Levels/*.json` | 关卡文件（`level_1`–`level_5` + `doom_clock`）；**Core 不加载**（关卡来自 `game_config.json` 的 `Levels`），Unity 从自身 `StreamingAssets/level_1.json` 读取 |
 
 **注意**：没有 `.sln` 解决方案文件，直接使用 `dotnet build` / `dotnet test` 对单个 `.csproj` 操作。Core 库使用 Linked Files 方式编译，不会重复存储源码。
@@ -104,7 +104,7 @@ BattleSystem-ECS/
 │   ├── Levels/                      # 关卡文件（Core 不加载；Unity 读 level_1）
 │   ├── Monsters/                    # 怪物定义（Core 不加载）
 │   ├── Skills/                      # 150 种技能
-│   └── Towers/                      # 塔定义（Core 仅读 tower_synergy / tower_links）
+│   └── Towers/                      # 塔定义（Core 仅读 tower_synergy）
 ├── docs/ / Research/                # 架构文档、研究日志；迁移计划在 docs/plan/
 ├── Program.cs                       # 入口（游戏 / 压测 / 微基准）
 └── game_config.json                 # 运行时主配置

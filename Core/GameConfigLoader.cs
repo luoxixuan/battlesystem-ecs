@@ -147,9 +147,6 @@ namespace BattleSystemECS.Config
                 // Load elemental terrain zone definitions (Direction 2 — Round 200)
                 LoadTerrainZoneDefs(gameConfig, renderer, strict);
 
-                // Load tower affix (reforge) definitions (Round 34, Reforge — Split A)
-                LoadTowerAffixDefs(gameConfig, renderer, strict);
-
                 // Load tower-vs-enemy type effectiveness matrix (Round 143 Direction 1)
                 LoadTowerEffectiveness(gameConfig, renderer, strict);
 
@@ -956,10 +953,8 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             // Parse Combo config from JSON (fills GameConfig.Combo)
             ParseComboConfig(gameConfig, jsonContent);
 
-            // Parse TowerOvercharge / PositionalDamage sections (previously present in
-            // game_config.json but silently ignored — TowerOvercharge ran on coded defaults,
-            // PositionalDamage had no model at all)
-            ParseTowerOverchargeConfig(gameConfig, jsonContent);
+            // Parse PositionalDamage section (previously present in game_config.json
+            // but silently ignored — it had no model at all)
             ParsePositionalDamageConfig(gameConfig, jsonContent);
 
             return gameConfig;
@@ -984,35 +979,6 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
                 ComboGoldBonusPerKill = ExtractFloat(comboJson, "comboGoldBonusPerKill"),
                 ComboMaxMultiplier = ExtractFloat(comboJson, "comboMaxMultiplier"),
                 TriggerThreshold = ExtractInt(comboJson, "triggerThreshold", 10)
-            };
-        }
-
-        /// <summary>
-        /// 解析 game_config.json 的 "TowerOvercharge" 段。此前该段存在于 JSON 但无解析代码，
-        /// TowerOverchargeSystem 一直跑 TowerOverchargeConfig 代码默认值（两处值恰好一致）。
-        /// public static：供 loader 单测注入 JSON 片段驱动（HeroSkillsConfigLoader.Parse 先例）。
-        /// </summary>
-        public static void ParseTowerOverchargeConfig(GameConfig gameConfig, string jsonContent)
-        {
-            int sectionStart = jsonContent.IndexOf("\"TowerOvercharge\"");
-            if (sectionStart == -1) return;
-
-            int braceStart = jsonContent.IndexOf('{', sectionStart);
-            if (braceStart == -1) return;
-            int braceEnd = FindMatchingBrace(jsonContent, braceStart);
-            if (braceEnd == -1) return;
-
-            string sectionJson = jsonContent.Substring(braceStart + 1, braceEnd - braceStart - 1);
-
-            gameConfig.TowerOvercharge = new TowerOverchargeConfig
-            {
-                DamageMultiplier = ExtractFloat(sectionJson, "DamageMultiplier"),
-                AttackSpeedMultiplier = ExtractFloat(sectionJson, "AttackSpeedMultiplier"),
-                RangeMultiplier = ExtractFloat(sectionJson, "RangeMultiplier"),
-                Duration = ExtractFloat(sectionJson, "Duration"),
-                Cooldown = ExtractFloat(sectionJson, "Cooldown"),
-                ManaCost = ExtractFloat(sectionJson, "ManaCost"),
-                MinManaRequired = ExtractFloat(sectionJson, "MinManaRequired")
             };
         }
 
@@ -1090,7 +1056,6 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             tower.LeadAimFactor = ExtractFloat(json, "LeadAimFactor");
             tower.TurnRate = ExtractFloat(json, "TurnRate");
             tower.DamageType = (DamageType)ExtractInt(json, "DamageType");
-            tower.InterceptRate = ExtractFloat(json, "InterceptRate");
             tower.Bounces = ExtractInt(json, "Bounces");
             tower.BounceRange = ExtractFloat(json, "BounceRange");
             tower.BounceDamageFalloff = ExtractFloat(json, "BounceDamageFalloff");
@@ -2639,59 +2604,6 @@ LoadAdrenalineConfig(gameConfig, renderer, strict);
             {
                 ThrowIfStrict(strict, file, ex);
                 renderer.Log("[TERRAIN_ZONE] Failed to load terrain zone defs: " + ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// Load tower affix (Reforge) definitions from Data/Configs/tower_affixes.json.
-        /// Reforge — Split A: data layer + affix slot infrastructure. The actual reroll
-        /// API is implemented in Split B.
-        /// </summary>
-        private static void LoadTowerAffixDefs(GameConfig gameConfig, IRenderer renderer, bool strict)
-        {
-            const string affixFile = "Data/Configs/tower_affixes.json";
-            try
-            {
-                if (!File.Exists(affixFile))
-                {
-                    renderer.Log("[AFFIX] Tower affix defs file not found: " + affixFile + ", reforge pool empty");
-                    return;
-                }
-                string json = File.ReadAllText(affixFile);
-                if (string.IsNullOrWhiteSpace(json))
-                {
-                    RequireStrictInput(strict, affixFile, "tower affix configuration is empty");
-                    renderer.Log("[AFFIX] Tower affix defs file is empty: " + affixFile);
-                    return;
-                }
-                var doc = System.Text.Json.JsonDocument.Parse(json);
-                var root = doc.RootElement;
-                RequireJsonKind(strict, affixFile, root, System.Text.Json.JsonValueKind.Array, "an array");
-
-                if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    var defs = new List<GameConfig.TowerAffixDef>();
-                    foreach (var elem in root.EnumerateArray())
-                    {
-                        var a = new GameConfig.TowerAffixDef();
-                        a.AffixId = elem.TryGetProperty("affixId", out var aid) ? aid.GetString() ?? "" : "";
-                        a.Name = elem.TryGetProperty("name", out var name) ? name.GetString() ?? "" : "";
-                        a.Stat = elem.TryGetProperty("stat", out var stat) ? stat.GetString() ?? "" : "";
-                        a.Magnitude = elem.TryGetProperty("magnitude", out var mag) ? (float)mag.GetDouble() : 0f;
-                        a.Rarity = elem.TryGetProperty("rarity", out var rar) ? rar.GetInt32() : 0;
-                        a.MinLevel = elem.TryGetProperty("minLevel", out var ml) ? ml.GetInt32() : 0;
-                        a.MaxStack = elem.TryGetProperty("maxStack", out var ms) ? ms.GetInt32() : 1;
-                        a.Description = elem.TryGetProperty("description", out var desc) ? desc.GetString() ?? "" : "";
-                        defs.Add(a);
-                    }
-                    gameConfig.TowerAffixes = defs.ToArray();
-                    renderer.Log("[AFFIX] Loaded " + defs.Count + " tower affix defs from " + affixFile);
-                }
-            }
-            catch (Exception ex)
-            {
-                ThrowIfStrict(strict, affixFile, ex);
-                renderer.Log("[AFFIX] Failed to load tower affix defs: " + ex.Message);
             }
         }
 

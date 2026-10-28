@@ -66,20 +66,7 @@ namespace BattleSystemECS.Tests.Framework
                 Assert.True(m.Health > 0, $"Monster {m.Name} must have Health > 0");
         }
 
-        // ── 死配置接线：TowerOvercharge / PositionalDamage / SkillDefs 解析（注入 JSON 驱动）──
-
-        [Fact]
-        public void ParseTowerOverchargeConfig_InjectedJson_FieldsLoaded()
-        {
-            var config = new GameConfig();
-            // 期望值全部由测试注入的 JSON 推导，不钉任何仓库配置文件数值。
-            const string json = "{\"TowerOvercharge\":{\"DamageMultiplier\":3.0,\"AttackSpeedMultiplier\":1.7,\"RangeMultiplier\":1.3,\"Duration\":8.0,\"Cooldown\":40.0,\"ManaCost\":33.0,\"MinManaRequired\":12.0}}";
-            GameConfigLoader.ParseTowerOverchargeConfig(config, json);
-            Assert.Equal(3.0f, config.TowerOvercharge.DamageMultiplier);
-            Assert.Equal(40.0f, config.TowerOvercharge.Cooldown);
-            Assert.Equal(33.0f, config.TowerOvercharge.ManaCost);
-            Assert.Equal(12.0f, config.TowerOvercharge.MinManaRequired);
-        }
+        // ── 死配置接线：PositionalDamage / SkillDefs 解析（注入 JSON 驱动）──
 
         [Fact]
         public void ParsePositionalDamageConfig_MissingEnabledKey_StaysDisabled()
@@ -106,13 +93,8 @@ namespace BattleSystemECS.Tests.Framework
         public void ParseSections_MissingSection_KeepsCodedDefaults()
         {
             var config = new GameConfig();
-            GameConfigLoader.ParseTowerOverchargeConfig(config, "{\"OtherSection\":{}}");
             GameConfigLoader.ParsePositionalDamageConfig(config, "{\"OtherSection\":{}}");
-            Assert.NotNull(config.TowerOvercharge);
             Assert.False(config.PositionalDamage.Enabled);
-            // 段缺失 → 代码默认原样保留（不被清零）
-            Assert.True(config.TowerOvercharge.DamageMultiplier > 1f);
-            Assert.True(config.TowerOvercharge.Cooldown > 0f);
         }
 
         [Fact]

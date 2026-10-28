@@ -218,7 +218,7 @@ namespace BattleSystemECS.Tests.Integration
             }
         }
 
-        // ── 死配置接线：SkillDefs 共享技能表 + TowerOvercharge / PositionalDamage 段 ──
+        // ── 死配置接线：SkillDefs 共享技能表 + PositionalDamage 段 ──
 
         [Fact]
         public void SkillDefs_LoadedFromStaticFiles_WithUniqueNames()
@@ -253,17 +253,6 @@ namespace BattleSystemECS.Tests.Integration
                 Assert.Equal(abilityId.Value, sys.GetHeroSkillId(0, binding.SlotIndex));
                 Assert.Equal(ability.Cooldown, sys.GetHeroSkillCooldownMax(0, binding.SlotIndex));
             }
-        }
-
-        [Fact]
-        public void TowerOvercharge_LoadedFromJson_StructurallyConsistent()
-        {
-            var config = GameConfigLoader.LoadConfig(Renderer);
-            var t = config.TowerOvercharge;
-            Assert.True(t.Cooldown >= t.Duration, "Overcharge 冷却应覆盖增益持续时间");
-            Assert.True(t.DamageMultiplier >= 1f);
-            Assert.True(t.AttackSpeedMultiplier >= 1f);
-            Assert.True(t.ManaCost >= t.MinManaRequired, "激活门槛（MinManaRequired）不应高于实际消耗（ManaCost）");
         }
 
         [Fact]

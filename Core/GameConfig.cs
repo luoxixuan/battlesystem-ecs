@@ -153,16 +153,10 @@ namespace BattleSystemECS.Config
         public float ResurrectCorpseAgeLimit { get; set; } = 0f;
         // Boss: true if this monster type is a boss (participates in phase/enrage system).
         public bool IsBoss { get; set; } = false;
-        // IsThief: true if this enemy steals gold instead of damaging base (GoldStealing direction)
-        public bool IsThief { get; set; } = false;
-        // StealAmount: gold stolen when thief reaches player base
-        public float StealAmount { get; set; } = 0f;
         // PathDeviationType: 0=none (default deterministic Y-axis), 1=sine, 2=random per turn
         public int PathDeviationType { get; set; } = 0;
         // PathDeviationAmplitude: max lateral X offset in world units (e.g. 0.3 = ±0.3 cells)
         public float PathDeviationAmplitude { get; set; } = 0f;
-        // GoldOnReturn: bonus gold awarded when player kills thief after it escapes
-        public float GoldOnReturn { get; set; } = 0f;
         // Round 179 Direction 3 — Bounty Enemy Marker ────────────────────────
         // IsBounty: true if this enemy pays EnemyBountyGoldMult × gold on death (high-value
         // high-risk target). When true, WaveSpawningSystem calls SetEnemyBounty() to wire
@@ -312,8 +306,6 @@ namespace BattleSystemECS.Config
         public float TurnRate { get; set; } = 0f;
         // Damage type: determines which resistance the target uses for mitigation.
         public DamageType DamageType { get; set; } = DamageType.Physical;
-        // InterceptRate: for PointDefense towers (TargetingMode=6), probability of intercepting enemy projectiles (0.0-1.0)
-        public float InterceptRate { get; set; } = 0.5f;
         // Bouncing projectile: number of bounces after initial hit (0 = no bounce)
         public int Bounces { get; set; } = 0;
         // BounceRange: search radius in tiles for finding next bounce target
@@ -349,17 +341,6 @@ namespace BattleSystemECS.Config
         // saturating the entity pool. 0 = no cooldown (echo on every successful attack that
         // passes the SpawnsEcho roll). Typical: 3-8 seconds.
         public float EchoSpawnCooldown { get; set; } = 5f;
-        // Round 203 Direction 4 — Tower Form / Stance Switch.
-        // A tower may expose 1..8 optional "forms" (e.g. Frost → Frostbite / Blizzard) that the
-        // player can switch between during combat. Each form overrides one or more stats
-        // (damage / range / attackSpeed / multiStrikeCount / bounceCount) and may apply a
-        // unique effect (e.g. slow chance). When Forms is null/empty the tower is single-form
-        // (backward compatible — zero-overhead fast path). When non-empty, the first entry
-        // is the default form and indices 1..N are alternate stances.
-        public List<TowerFormDef> Forms { get; set; } = new List<TowerFormDef>();
-        // FormSwitchCooldown: seconds between consecutive form switches (0 = no cooldown).
-        // Applied per-tower via SetTowerForms when the tower is placed.
-        public float FormSwitchCooldown { get; set; } = 0f;
         // Piercing projectile: number of enemies the projectile can pierce through (0 = no pierce)
         public int PierceCount { get; set; } = 0;
         // PierceDmgFalloff: damage multiplier after each pierce (1.0 = full damage, 0.7 = 70%)
@@ -649,36 +630,6 @@ namespace BattleSystemECS.Config
         public float DemolishDotInterval { get; set; } = 1f;
         /// <summary>Stun duration in turns for ice/lightning demolish effects (0 = no stun).</summary>
         public int DemolishStunDuration { get; set; } = 0;
-    }
-
-    /// <summary>
-    /// Round 203 Direction 4 — Tower Form / Stance configuration.
-    /// Each entry represents one stance the tower can switch into. When the player
-    /// switches forms, the indexed fields below override the base TowerConfig values.
-    /// Leave fields at default (0) to use the base tower value for that stat.
-    /// </summary>
-    public class TowerFormDef
-    {
-        /// <summary>Display name shown in UI when the player selects this form (e.g. "Frostbite", "Blizzard").</summary>
-        public string Name { get; set; }
-        /// <summary>Damage override for this form. 0 = use TowerConfig.Damage (no override).</summary>
-        public float Damage { get; set; } = 0f;
-        /// <summary>Range override in tiles. 0 = use TowerConfig.Range.</summary>
-        public int Range { get; set; } = 0;
-        /// <summary>Attack-speed override (shots/sec). 0 = use TowerConfig.AttackSpeed.</summary>
-        public float AttackSpeed { get; set; } = 0f;
-        /// <summary>Multi-strike count override. -1 = use TowerConfig.MultiStrikeCount (no override).</summary>
-        public int MultiStrikeCount { get; set; } = -1;
-        /// <summary>Bounce count override. -1 = use TowerConfig.Bounces.</summary>
-        public int BounceCount { get; set; } = -1;
-        /// <summary>Slow chance override per hit. -1 = use TowerConfig.SlowChance.</summary>
-        public float SlowChance { get; set; } = -1f;
-        /// <summary>Slow amount override. -1 = use TowerConfig.SlowAmount.</summary>
-        public float SlowAmount { get; set; } = -1f;
-        /// <summary>Stun chance override. -1 = use TowerConfig.StunChance.</summary>
-        public float StunChance { get; set; } = -1f;
-        /// <summary>Optional flavor tag for analytics (e.g. "frost", "fire"). Empty = none.</summary>
-        public string ElementTag { get; set; } = "";
     }
 
     public class EnemyTypeEntry
@@ -1273,21 +1224,6 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
-    /// Defines a gold-stealing thief enemy type.
-    /// Thieves skip base damage and instead steal gold when reaching the end.
-    /// </summary>
-    public class ThiefDef
-    {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        // Gold amount stolen when thief reaches the player's base
-        public float StealAmount { get; set; }
-        // Bonus gold awarded when player kills the thief after it escapes
-        public float GoldOnReturn { get; set; }
-    }
-
-    /// <summary>
     /// Defines an enemy that can dispel (remove) tower aura/synergy buffs.
     /// Dispel enemies release a purification wave that clears all tower增益 within radius.
     /// </summary>
@@ -1305,26 +1241,8 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
-    /// Defines a placeable obstacle type (wooden barricade, ice wall, spike trap).
-    /// </summary>
-    public class ObstacleDef
-    {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        // Gold cost to place
-        public float Cost { get; set; }
-        // Max health of the obstacle
-        public float MaxHealth { get; set; }
-        // Whether enemies attack this obstacle when in range
-        public bool CanBeAttacked { get; set; } = true;
-        // Damage dealt to enemies when they walk over (spike trap)
-        public float TrapDamage { get; set; } = 0f;
-    }
-
-    /// <summary>
     /// Defines a destructible object type (wooden crate, oil barrel, altar). Round 95 Direction 5.
-    /// Unlike ObstacleDef, destructibles are static loot/utility objects placed on the level
+    /// Destructibles are static loot/utility objects placed on the level
     /// map at level load time (not built by players) and can be destroyed by tower attacks.
     /// </summary>
     public class DestructibleDef
@@ -1630,28 +1548,6 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
-    /// Reforge configuration — controls tower affix reroll cost, lock-slot cost, and rarity weights.
-    /// Inspired by Diablo / ARPG Reforge: spend gold to re-roll a tower's affix slot, with
-    /// escalating cost and an optional per-slot lock (paying extra gold to preserve the current affix).
-    /// Hot-path impact: zero (BuildPhase only).
-    /// </summary>
-    public class ReforgeConfig
-    {
-        /// <summary>Master switch for the Reforge system. Default: true</summary>
-        public bool Enabled { get; set; } = true;
-        /// <summary>Base gold cost of the first reroll on a tower. Default: 50</summary>
-        public float BaseCost { get; set; } = 50f;
-        /// <summary>Cost increment per subsequent reroll on the same tower (cost = base + count * increment). Default: 50</summary>
-        public float IncrementPerReroll { get; set; } = 50f;
-        /// <summary>Hard cap on rerolls per tower. Default: 10</summary>
-        public int MaxRerollsPerTower { get; set; } = 10;
-        /// <summary>Flat gold cost to lock (or unlock) a single slot. Default: 25</summary>
-        public float LockSlotCost { get; set; } = 25f;
-        /// <summary>Rarity weights for affix picks (Common, Uncommon, Rare, Epic, Legendary). Default: [60, 25, 10, 4, 1]</summary>
-        public float[] RarityWeights { get; set; } = new float[] { 60f, 25f, 10f, 4f, 1f };
-    }
-
-    /// <summary>
     /// Tower Mastery Level definition — XP threshold and bonuses granted at each level.
     /// </summary>
     public class TowerMasteryLevelConfig
@@ -1871,14 +1767,6 @@ namespace BattleSystemECS.Config
         // Shop Reroll configuration (BuildPhase offer pool refresh)
         public ShopRerollConfig ShopReroll { get; set; } = new ShopRerollConfig();
 
-        // Reforge configuration (tower affix reroll — Split B)
-        public ReforgeConfig Reforge { get; set; } = new ReforgeConfig();
-
-        // Wave Skip Reward configuration (BuildPhase "skip wave → gain dmg bonus" option)
-        public WaveSkipConfig WaveSkip { get; set; } = new WaveSkipConfig();
-
-        // Tower Overcharge configuration
-        public TowerOverchargeConfig TowerOvercharge { get; set; } = new TowerOverchargeConfig();
         // 全局朝向伤害层（game_config.json "PositionalDamage" 段，此前无解析代码）。
         // Enabled 总开关：JSON 未提供该键时保持 false —— 接线后默认零行为变化。
         public PositionalDamageConfig PositionalDamage { get; set; } = new PositionalDamageConfig();
@@ -1914,9 +1802,6 @@ namespace BattleSystemECS.Config
         // Nest / spawner structure definitions (loaded from nests.json)
         public NestDef[] NestDefs { get; set; } = Array.Empty<NestDef>();
 
-        // Gold-stealing thief definitions (inline with monster configs)
-        public ThiefDef[] ThiefDefs { get; set; } = Array.Empty<ThiefDef>();
-
         // Heal-over-time healer unit definitions
         public HealerDef[] HealerDefs { get; set; } = Array.Empty<HealerDef>();
 
@@ -1925,38 +1810,6 @@ namespace BattleSystemECS.Config
         {
             return HealerDefs.FirstOrDefault(h => h.Id == healerId);
         }
-
-        // ==================== 塔词缀系统 (Tower Affix — Reforge Split A) ====================
-        // Defines a single tower affix (prefix/suffix mod) usable in the Reforge system.
-        // Each affix modifies a single stat by a multiplier (Multiplicative) or flat add (Additive).
-        // Loaded from Data/Configs/tower_affixes.json; the Reforge system will pick from this pool
-        // (Round 35, Reforge — Split B).
-        public class TowerAffixDef
-        {
-            // Unique affix identifier (e.g., "damage_pct", "crit_chance", "chain_targets").
-            public string AffixId { get; set; } = "";
-            // Human-readable name for UI display (e.g., "Sharpened", "Piercing", "Vampiric").
-            public string Name { get; set; } = "";
-            // Stat this affix modifies: "Damage" | "Range" | "AttackSpeed" | "CritChance" |
-            // "CritMultiplier" | "ChainTargets" | "PierceCount" | "ArmorPenetration" |
-            // "KnockbackChance" | "ExecuteThreshold" | "LifeOnKill" | "ManaOnHit" | "GoldOnHit" |
-            // "CooldownReduction" | "MultishotCount" | "SplashRadius" | "Accuracy".
-            public string Stat { get; set; } = "";
-            // Magnitude: percent (0.15 = +15%) for multiplicative stats, or flat add for additive stats.
-            // Sign convention: positive = buff, negative = debuff (e.g., "-0.1" CooldownReduction is invalid).
-            public float Magnitude { get; set; } = 0f;
-            // Rarity tier: 0=Common, 1=Uncommon, 2=Rare, 3=Epic, 4=Legendary. Drives weighted random in Reforge.
-            public int Rarity { get; set; } = 0;
-            // Min tower level required for this affix to roll (0 = any level).
-            public int MinLevel { get; set; } = 0;
-            // Max stack count on a single slot (1 = no stacking, N = up to N of this affix on one slot).
-            public int MaxStack { get; set; } = 1;
-            // Optional description for tooltips/UI.
-            public string Description { get; set; } = "";
-        }
-
-        // Tower affix pool (loaded from Data/Configs/tower_affixes.json).
-        public TowerAffixDef[] TowerAffixes { get; set; } = Array.Empty<TowerAffixDef>();
 
         // ==================== 塔类型专精 (Tower Modifier — Round 145 方向3) ====================
         // Per-tower passive modifier — distinct from the stackable affix system.
@@ -2018,18 +1871,6 @@ namespace BattleSystemECS.Config
         // Total entries loaded (informational; for log messages and tests).
         public int TowerEffectivenessEntryCount { get; set; } = 0;
 
-        // Look up a tower affix def by its AffixId (returns null if not found).
-        public TowerAffixDef GetTowerAffixDef(string affixId)
-        {
-            return Array.Find(TowerAffixes, a => a.AffixId == affixId);
-        }
-
-        // Get the index of a tower affix in TowerAffixes[] by AffixId (returns -1 if not found).
-        public int GetTowerAffixIndex(string affixId)
-        {
-            return Array.FindIndex(TowerAffixes, a => a.AffixId == affixId);
-        }
-
         // Look up a fission def by its FissionId
         public FissionDef GetFissionDef(string fissionId)
         {
@@ -2046,12 +1887,6 @@ namespace BattleSystemECS.Config
         public int GetFissionDefIdBySourceType(string monsterType)
         {
             return Array.FindIndex(FissionDefs, f => f.SourceMonsterType == monsterType);
-        }
-
-        // Look up a thief def by its Id
-        public ThiefDef GetThiefDef(string thiefId)
-        {
-            return ThiefDefs.FirstOrDefault(t => t.Id == thiefId);
         }
 
         // Enemy morph definitions (loaded from enemy_morphs.json)
@@ -2200,9 +2035,6 @@ namespace BattleSystemECS.Config
         // double-yield (rare bonus) on top of base outputs. CraftingSystem.TryCraft() is the
         // single entry point and is reachable from InventorySystem.TryCraft().
         public CraftingRecipeDef[] CraftingRecipes { get; set; } = Array.Empty<CraftingRecipeDef>();
-
-        // Obstacle definitions (loaded from obstacles.json)
-        public ObstacleDef[] ObstacleDefs { get; set; } = Array.Empty<ObstacleDef>();
 
         // Destructible object definitions (loaded from destructibles.json). Round 95 Direction 5.
         // Indexed by type id; level JSON references destructible defs by their Id string and
@@ -3412,28 +3244,6 @@ namespace BattleSystemECS.Config
     }
 
     /// <summary>
-    /// Tower overcharge (overdrive/boost) configuration.
-    /// Allows players to temporarily boost tower damage/attack speed at the cost of mana.
-    /// </summary>
-    public class TowerOverchargeConfig
-    {
-        /// <summary>Damage multiplier while overcharge is active (e.g. 2.0 = double damage)</summary>
-        public float DamageMultiplier { get; set; } = 2.0f;
-        /// <summary>Attack speed multiplier while overcharge is active (e.g. 1.5 = 50% faster)</summary>
-        public float AttackSpeedMultiplier { get; set; } = 1.5f;
-        /// <summary>Range bonus multiplier while overcharge is active (e.g. 1.2 = +20% range)</summary>
-        public float RangeMultiplier { get; set; } = 1.2f;
-        /// <summary>Duration of the overcharge boost in seconds</summary>
-        public float Duration { get; set; } = 5.0f;
-        /// <summary>Cooldown before the same tower can be overcharged again (seconds)</summary>
-        public float Cooldown { get; set; } = 30.0f;
-        /// <summary>Mana cost to activate overcharge per tower</summary>
-        public float ManaCost { get; set; } = 20f;
-        /// <summary>Player must have at least this much mana to activate overcharge</summary>
-        public float MinManaRequired { get; set; } = 10f;
-    }
-
-    /// <summary>
     /// Positional damage（game_config.json "PositionalDamage" 段）—— 全局朝向伤害分层：
     /// 塔从敌人背刺锥（以正后方为轴、总张角 BackstabAngleDegrees）内命中时伤害
     /// ×BackstabDamageMultiplier；其外侧袭带（总张角 BackstabAngleDegrees+FlankAngleDegrees
@@ -3594,55 +3404,6 @@ namespace BattleSystemECS.Config
         GoldMine = 0,
         ManaSpring = 1,
         TechRelic = 2
-    }
-
-    /// <summary>
-    /// Tower link combo definition — loaded from Data/Towers/tower_links.json.
-    /// Defines behavior when two specific tower types are placed adjacent to each other.
-    /// </summary>
-    public class TowerLinkDef
-    {
-        public string Id { get; set; } = "";
-        public string Name { get; set; } = "";
-        /// <summary>
-        /// Ordered pair of tower types that trigger this link combo.
-        /// For bidirectional checks, both orderings are tried.
-        /// </summary>
-        public string[] RequiredTowerTypes { get; set; } = Array.Empty<string>();
-        public string Description { get; set; } = "";
-        public TowerLinkEffect ComboEffect { get; set; } = new();
-        /// <summary>Cooldown in seconds between combo activations (0 = no cooldown).</summary>
-        public float Cooldown { get; set; } = 0f;
-        /// <summary>Minimum grid distance between linked towers (inclusive).</summary>
-        public int MinDistance { get; set; } = 1;
-        /// <summary>Maximum grid distance between linked towers (inclusive).</summary>
-        public int MaxDistance { get; set; } = 2;
-    }
-
-    public class TowerLinkEffect
-    {
-        /// <summary>Flat damage per second for lightning-style combo attacks.</summary>
-        public float DamagePerSecond { get; set; } = 0f;
-        /// <summary>Slow multiplier applied to enemies in the combo area.</summary>
-        public float SlowAmount { get; set; } = 0f;
-        /// <summary>Slow duration in turns.</summary>
-        public float SlowDuration { get; set; } = 0f;
-        /// <summary>Chain lightning range in grid cells.</summary>
-        public int ChainRange { get; set; } = 0;
-        /// <summary>Additional chain lightning hops.</summary>
-        public int ChainCount { get; set; } = 0;
-        /// <summary>Lifesteal fraction (0.3 = 30% of damage as heal).</summary>
-        public float LifestealPercent { get; set; } = 0f;
-        /// <summary>DoT damage bonus multiplier.</summary>
-        public float DotDamageBonus { get; set; } = 0f;
-        /// <summary>Damage multiplier for the link tower's primary attack.</summary>
-        public float DamageMultiplier { get; set; } = 1f;
-        /// <summary>Radius for AOE effects.</summary>
-        public int AoeRadius { get; set; } = 0;
-        /// <summary>Damage multiplier vs enemies above health threshold.</summary>
-        public float DamageVsHighHealthMult { get; set; } = 1f;
-        /// <summary>Enemy health fraction threshold (e.g. 0.5 = 50% max HP).</summary>
-        public float HealthThreshold { get; set; } = 0.5f;
     }
 
     /// <summary>
@@ -4260,26 +4021,5 @@ namespace BattleSystemECS.Config
         /// rally can be triggered. Default 5.0f = prevents continuous re-trigger
         /// on multi-hit waves.</summary>
         public const float RallyCooldown = 5.0f;
-    }
-}
-
-// WaveSkipConfig 保留在 Systems 命名空间以维持 GameConfig.WaveSkip 的类型名与 JSON 配置结构；
-// 其消费方 WaveSkipSystem 已退役（从未构造），该配置段目前无任何读取方。
-namespace BattleSystemECS.Systems
-{
-    /// <summary>
-    /// Wave Skip Reward configuration — controls the cost, bonus magnitude, and per-level cap
-    /// for BuildPhase "skip wave → gain bonus" purchases.
-    /// </summary>
-    public class WaveSkipConfig
-    {
-        /// <summary>Master switch. Default: true</summary>
-        public bool Enabled { get; set; } = true;
-        /// <summary>Gold cost per skip purchase. Default: 50</summary>
-        public float SkipCost { get; set; } = 50f;
-        /// <summary>Additive damage bonus granted per skip (0.10 = +10% dmg). Default: 0.10</summary>
-        public float SkipDamageBonusPct { get; set; } = 0.10f;
-        /// <summary>Hard cap on skips per level. Default: 3</summary>
-        public int MaxSkipsPerLevel { get; set; } = 3;
     }
 }
