@@ -195,3 +195,4 @@ sparse/paged GAS pool + active lists。详见 [M8 evidence](../ecs-gas-m8-eviden
 - C4.2 `Multiply` 效果路径：已退役（`AttributeModifierOp.Multiply`、adapter 的 Multiply→Percent 映射、validator 的 residual-Multiply 检查）；`SkillSystem` 改为 `Percent(1.1f - 1f)`，与旧映射逐位相同。`LegacyEffectAdapter` 保留：它仍是 BuffSystem/ElementalReaction/SkillSystem 的 live 转换点、TryRestack 的名称键载体和 `ActiveEffects` 投影（E-07）的来源，不是死代码。
 - C4.3 `ApplyEnemyDamage` 兼容入口：已退役（含 `DamageResolver.ApplyLegacy`/`LegacyApplyCount`、`ResourceResolver.ApplyEnemyDamageResources`、观测字段 `DamageLegacyApplied`）。测试改走 `DamageResolver.TryApply`（`BattleTestBase.DamageEnemy`）；生产本无调用方。
 - C4.4 `AbilityInstances` 稠密回退：已退役（生产中恒等于 `default`，`GetAbility` 只读稀疏池；`MAX_ENTITIES × MAX_ABILITIES_PER_ENTITY` 数组删除）。
+- C4.5 Engine 占位接口：已退役（`IWorldView`/`IAttributeView`/`ISpatialQuery`/`ICatalog`/`ICommandSink<T>`/`IDamageResolver`/`IResourceResolver`/`IFrameGraph`/`IDiagnostics` 均无实现方与消费者，Core/Systems/测试/Unity 零引用）。

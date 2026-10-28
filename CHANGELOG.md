@@ -1,5 +1,10 @@
 # 更新记录 (Changelog)
 
+### 2026-10-28（删除 9 个 Engine 占位接口 C4.5）
+- 架构 owner 于 2026-10-28 豁免“目标态占位”的保留理由：按“清理退役”处理。逐一 grep Core / Systems / 测试 / tools / Unity `Assets`，`IWorldView`、`IAttributeView`、`ISpatialQuery`、`ICatalog`、`ICommandSink<T>`、`IDamageResolver`、`IResourceResolver`、`IFrameGraph`、`IDiagnostics` 均无实现方与消费者，已从 `BattleSystemECS.Engine/Contracts.cs` 删除。`EntityHandle`/`AbilityId`/`EffectId`、`IFrameContext`/`IFrameNode`/`IFrameExecutionPlan`、`ISystemInstaller` 保留。
+- 无图/hash 变化；Golden / Replay / DeterminismSoak 摘要不变。
+- 验证：分块完整套件结果见提交信息；mode 2/4/5 延期未运行。
+
 ### 2026-10-28（退役 AbilityInstances 稠密回退 C4.4）
 - 退出条件（M8 存储决策与外部消费者确认）未满足，由 owner 于 2026-10-28 豁免：按“清理退役”处理，非迁移完成。golden / replay / determinism-soak 摘要不变；Unity 对 `AbilityInstances` 零引用。
 - 依据：槽位 handle 仅在 `SetAbility`/`TryAddAbility` 变为有效（同时写稠密槽），仅在 `ReleaseEntityAbilities` 失效（同时清为 default），因此池查询失败时稠密槽恒为 `default`，回退分支在生产中等价于返回 `default`。
