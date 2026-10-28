@@ -116,12 +116,11 @@ namespace BattleSystemECS.Tests.Framework
             var offenders = new SortedSet<string>(StringComparer.Ordinal);
             var visited = new HashSet<Type>();
             Type[] roots = typeof(FrameScheduler).Assembly.GetTypes()
-                .Where(type => type == typeof(FrameScheduler) ||
-                    typeof(ISystemGroup).IsAssignableFrom(type) && type != typeof(ISystemGroup))
+                .Where(type => type == typeof(FrameScheduler) || IsSystemGroupType(type))
                 .ToArray();
-            Assert.All(roots.Where(type => typeof(ISystemGroup).IsAssignableFrom(type)),
+            Assert.All(roots.Where(IsSystemGroupType),
                 type => Assert.False(type.IsPublic || type.IsNestedPublic,
-                    "Legacy group facade must remain assembly-internal: " + type.FullName));
+                    "System group must remain assembly-internal: " + type.FullName));
             VisitPublicSurface(typeof(FrameScheduler), typeof(FrameScheduler).FullName!, visited, offenders);
 
             Assert.True(offenders.Count == 0,
@@ -153,9 +152,13 @@ namespace BattleSystemECS.Tests.Framework
                     VisitPublicSurface(parameter.ParameterType, source + ".ctor:" + parameter.Name, visited, offenders);
         }
 
+        private static bool IsSystemGroupType(Type type) =>
+            type.Namespace == typeof(FrameScheduler).Namespace && type.IsClass &&
+            type.Name.EndsWith("Group", StringComparison.Ordinal) && !type.IsNested;
+
         private static bool IsOrchestrationType(Type type) =>
             type == typeof(FrameScheduler) ||
-            typeof(ISystemGroup).IsAssignableFrom(type) ||
+            IsSystemGroupType(type) ||
             type.Name.IndexOf("FrameGraph", StringComparison.Ordinal) >= 0 ||
             type.Name.IndexOf("FrameExecution", StringComparison.Ordinal) >= 0;
 

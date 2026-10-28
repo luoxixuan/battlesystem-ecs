@@ -2,7 +2,7 @@
 namespace BattleSystemECS.Core
 {
     /// <summary>Wave spawning and nest/spawner systems.</summary>
-    internal sealed class SpawningGroup : ISystemGroup
+    internal sealed class SpawningGroup
     {
         public Systems.WaveSpawningSystem? WaveSpawning { get; set; }
         public Systems.NestSystem? Nest { get; set; }
@@ -26,12 +26,5 @@ namespace BattleSystemECS.Core
             }
         }
 
-        public void Execute(ComponentStore store, float deltaTime, int turn)
-        {
-            if (!WavePaused) WaveSpawning?.Update();
-            WaveSpawning?.DispatchPendingCallbacks();
-            Nest?.SetTurn(turn);
-            Nest?.Update(deltaTime);
-        }
     }
 }

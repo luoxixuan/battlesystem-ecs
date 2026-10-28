@@ -2,7 +2,7 @@
 namespace BattleSystemECS.Core
 {
     /// <summary>Pre-game setup: weather, day/night, difficulty, construction, random events.</summary>
-    internal sealed class PreGameGroup : ISystemGroup
+    internal sealed class PreGameGroup
     {
         public Systems.WeatherSystem? Weather { get; set; }
         public Systems.DayNightSystem? DayNight { get; set; }
@@ -34,18 +34,5 @@ namespace BattleSystemECS.Core
             }
         }
 
-        public void Execute(ComponentStore store, float deltaTime, int turn)
-        {
-            Weather?.Update(deltaTime);
-            DayNight?.Update(deltaTime);
-            AdaptiveDifficulty?.Update(deltaTime);
-            Desperation?.Update();
-            TimeRewind?.Update(deltaTime);
-
-            int waveNum = WaveSpawning?.GetCurrentWave() ?? 1;
-            int levelNum = WaveSpawning?.GetCurrentLevel() ?? 1;
-            RandomEvent?.Update(deltaTime, waveNum, levelNum);
-            RandomEvent?.DispatchPendingCallbacks();
-        }
     }
 }

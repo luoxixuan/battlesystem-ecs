@@ -2,7 +2,7 @@
 namespace BattleSystemECS.Core
 {
     /// <summary>Terrain effects, wave mutators, enemy morphing.</summary>
-    internal sealed class TerrainGroup : ISystemGroup
+    internal sealed class TerrainGroup
     {
         public Systems.TerrainSystem? Terrain { get; set; }
         public Systems.WaveMutatorSystem? WaveMutator { get; set; }
@@ -15,13 +15,5 @@ namespace BattleSystemECS.Core
             if (EnemyMorph != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("terrain.enemy-morph.update"), c => EnemyMorph?.Update(c.Delta));
         }
 
-        public void Execute(ComponentStore store, float deltaTime, int turn)
-        {
-            Terrain?.SetTurn();
-            Terrain?.Update(deltaTime);
-            WaveMutator?.SetTurn(turn);
-            WaveMutator?.Update(deltaTime);
-            EnemyMorph?.Update(deltaTime);
-        }
     }
 }

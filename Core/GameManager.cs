@@ -34,7 +34,6 @@ namespace BattleSystemECS.Core
 
         // 统一帧调度器（所有帧路径统一入口）
         private FrameScheduler scheduler;
-        private readonly FrameSchedulerExecutionMode _schedulerExecutionMode;
         private readonly Core.GAS.ClockId _effectClock;
         private readonly int? _matchSeedOverride;
 
@@ -44,7 +43,6 @@ namespace BattleSystemECS.Core
         internal FrameScheduler SchedulerDiagnostics => scheduler;
         internal StateMachine StateMachineDiagnostics => stateMachine;
         internal SystemRegistry RegistryDiagnostics => registry;
-        internal FrameSchedulerExecutionMode ConfiguredExecutionMode => _schedulerExecutionMode;
         /// <summary>本局比赛种子。Initialize 时 Reset 一次并写日志；系统构造器不得改种。</summary>
         public int MatchSeed { get; private set; }
 
@@ -93,14 +91,10 @@ namespace BattleSystemECS.Core
         /// <summary>
         /// 初始化游戏管理器
         /// </summary>
-        public GameManager(FrameSchedulerExecutionMode schedulerExecutionMode = FrameSchedulerExecutionMode.Graph,
-            Core.GAS.ClockId effectClock = Core.GAS.ClockId.Combat, int? matchSeed = null)
+        public GameManager(Core.GAS.ClockId effectClock = Core.GAS.ClockId.Combat, int? matchSeed = null)
         {
-            if (!Enum.IsDefined(typeof(FrameSchedulerExecutionMode), schedulerExecutionMode))
-                throw new ArgumentOutOfRangeException(nameof(schedulerExecutionMode), schedulerExecutionMode, "Unknown scheduler execution mode.");
             if (!Enum.IsDefined(typeof(Core.GAS.ClockId), effectClock))
                 throw new ArgumentOutOfRangeException(nameof(effectClock), effectClock, "Unknown effect clock.");
-            _schedulerExecutionMode = schedulerExecutionMode;
             _effectClock = effectClock;
             _matchSeedOverride = matchSeed;
             // 初始化 SOA 组件存储
@@ -164,7 +158,7 @@ namespace BattleSystemECS.Core
             // ══════════════════════════════════════════════════════════
             registry = new SystemRegistry();
 
-            scheduler = new FrameScheduler(store, gameConfig, _eventBus, _schedulerExecutionMode, _effectClock);
+            scheduler = new FrameScheduler(store, gameConfig, _eventBus, _effectClock);
             scheduler.CapacityDropped += LogCapacityDrop;
             new ProductionSystemInstaller().Install(registry, store, gameConfig, logger,
                 playerId, stateMachine, scheduler, _eventBus);

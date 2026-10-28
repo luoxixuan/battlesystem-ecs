@@ -2,7 +2,7 @@
 namespace BattleSystemECS.Core
 {
     /// <summary>Enemy AI, abilities, burrow, necromancer, life link, affixes, mana burn, fear, zone control.</summary>
-    internal sealed class AIGroup : ISystemGroup
+    internal sealed class AIGroup
     {
         public Systems.EnemyAISystem? EnemyAI { get; set; }
         public Systems.EnemyAbilitySystem? EnemyAbility { get; set; }
@@ -41,61 +41,5 @@ namespace BattleSystemECS.Core
             if (Sapper != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.sapper.prepare"), c => Sapper?.SetTurn(c.Turn, c.Delta)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.sapper.update"), c => Sapper?.Update(c.Delta)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("ai.sapper.recompute"), c => Sapper?.RecomputeTowerSlows()); }
         }
 
-        public void Execute(ComponentStore store, float deltaTime, int turn)
-        {
-            // Zone control (CC zones: Slow/Stun/Freeze/Root) — runs before AI so CC is applied this turn
-            ZoneControl?.Update(deltaTime);
-
-            // Magnetize zones (displacement fields) — apply pull/repel force BEFORE
-            // enemy AI/movement so the force is layered into the same frame's motion
-            // as a pre-step (no double-iteration over enemy positions).
-            Magnetize?.Update(deltaTime);
-
-            // Enemy strafe/dodge: decrement timers and cooldowns before AI evaluates
-            EnemyStrafe?.SetTurn();
-            EnemyStrafe?.Update();
-
-            EnemyAI?.SetTurn(turn, deltaTime);
-            EnemyAI?.Update();
-
-            EnemyAbility?.SetTurn(turn);
-            EnemyAbility?.UpdateCooldowns(deltaTime);
-            EnemyAbility?.ExecuteAbilities();
-            // Tick cast timers right after ExecuteAbilities so any newly-started casts in this
-            // frame (via EnqueueAbility) are visible to Movement and TowerAttack in the same
-            // frame. Casts that resolve this frame will be enqueued above and executed next
-            // turn (we don't re-enter ExecuteAbilities to keep the frame's resolve order stable).
-            EnemyAbility?.TickCastTimers(deltaTime);
-            EnemyAbility?.Update();
-
-            Burrow?.SetTurn(turn);
-            Burrow?.Update(deltaTime);
-            Burrow?.ApplyBurrowEffects();
-
-            Necromancer?.SetTurn(turn, turn);
-            Necromancer?.Update(deltaTime);
-
-            LifeLink?.SetTurn(turn);
-            LifeLink?.Update();
-            LifeLink?.DecrementCooldowns(deltaTime);
-
-
-            ManaBurn?.SetTurn(turn);
-            ManaBurn?.Update();
-
-
-            Phase?.SetTurn(turn);
-            Phase?.Update(deltaTime);
-
-            // Round 186 Direction 2 — Sapper attacks (tower-damage + slow stacks).
-            // Runs at the end of the AI group, AFTER all enemy-side abilities have
-            // queued their effects but BEFORE movement applies path-derivative
-            // damage. The two-phase split (Update = decide & damage, RecomputeTowerSlows
-            // = roll up TowerSapperSlowMult) keeps the per-tower slow multiplier
-            // consistent with the same frame's swing decisions.
-            Sapper?.SetTurn(turn, deltaTime);
-            Sapper?.Update(deltaTime);
-            Sapper?.RecomputeTowerSlows();
-        }
     }
 }

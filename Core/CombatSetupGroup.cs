@@ -2,7 +2,7 @@
 namespace BattleSystemECS.Core
 {
     /// <summary>Pre-combat SetTurn calls for all combat systems.</summary>
-    internal sealed class CombatSetupGroup : ISystemGroup
+    internal sealed class CombatSetupGroup
     {
         public Systems.PlayerTowerAttackSystem? PlayerTowerAttack { get; set; }
         public Systems.HeroSystem? Hero { get; set; }
@@ -47,43 +47,5 @@ namespace BattleSystemECS.Core
             if (Taunt != null) scheduler.RegisterFrameBinding(FrameBindingFacts.Get("combat-setup.taunt.prepare"), c => Taunt?.SetTurn());
         }
 
-        public void Execute(ComponentStore store, float deltaTime, int turn)
-        {
-            PlayerTowerAttack?.SetTurn(turn);
-            Hero?.SetTurn(turn);
-            TowerAttack?.SetTurn(turn);
-            TowerSynergy?.SetTurn();
-            // Round 180 Direction 5 — Fortress cluster scan. Runs after Synergy
-            //   (independent; both only read ActiveTowerIds) so the cached bonuses
-            //   are visible to TowerAttackSystem the same frame.
-            TowerFortress?.SetTurn();
-            Skill?.SetTurn(turn);
-            AuraTower?.SetTurn();
-            Curse?.SetTurn();
-            PullTower?.SetTurn();
-            Mana?.SetTurn();
-            GlobalSkill?.SetTurn(turn);
-            HitShield?.SetTurn(turn);
-            HotZone?.SetTurn(turn);
-            // Frost Zone: writes EnemyFrostZoneSlowMultiplier per enemy for this frame.
-            // Runs after HotZone (placement pre-computed) and before Taunt (independent).
-            FrostZone?.SetTurn(turn);
-            FrostZone?.Update();
-            // Round 200 Direction 2 — Elemental Terrain Zone: per-frame tick (lifetime decay +
-            // radius expansion + DoT/slow application). Sentinel-gated fast path when no zone is
-            // active. Runs after Frost Zone (independent — both write per-enemy slow arrays).
-            TerrainZone?.SetTurn(turn);
-            TerrainZone?.Update(deltaTime);
-            // Wander Roam (Round 84 Direction 6): resolves per-free-roam-enemy target
-            // cell. Writes EnemyWanderTargetX/Y which EnemyMovementSystem reads in its
-            // Wandering branch. Must run BEFORE Movement (which happens in a later phase),
-            // not before Combat. Cost: O(N_active_enemies) with O(1) fast-exit when
-            // no free-roam enemies exist.
-            WanderRoam?.SetTurn(turn);
-            WanderRoam?.Update();
-            // Taunt tower: pre-compute taunt tower list (O(n_active_towers)) before Combat
-            // assigns EnemyTauntedByTowerId. Cheap when no taunt towers exist.
-            Taunt?.SetTurn();
-        }
     }
 }

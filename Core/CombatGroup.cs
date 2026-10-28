@@ -2,7 +2,7 @@
 namespace BattleSystemECS.Core
 {
     /// <summary>Main combat phase: attacks, synergy, auras, curses, projectiles, mana, skills.</summary>
-    internal sealed class CombatGroup : ISystemGroup
+    internal sealed class CombatGroup
     {
         public Systems.PlayerTowerAttackSystem? PlayerTowerAttack { get; set; }
         public Systems.TowerAttackSystem? TowerAttack { get; set; }
@@ -132,99 +132,5 @@ namespace BattleSystemECS.Core
             if(Culling!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("combat.culling.update"),c=>Culling?.Update(c.Delta));
         }
 
-        public void Execute(ComponentStore store, float deltaTime, int turn)
-        {
-            PlayerTowerAttack?.Update();
-            HitShield?.Update(deltaTime);
-            TowerSabotage?.Update(deltaTime);
-            // Round 103 — Buff Share: apply attack-speed sharing bonuses from sharing towers
-            // onto nearby friendly towers. Must run BEFORE TowerAttack because TowerAttack
-            // reads TowerAttackSpeed for cooldown / windup math.
-            TowerSynergy?.ResolveBuffShares();
-            TowerAttack?.Update(deltaTime);
-            TowerSynergy?.Update();
-            AuraTower?.ResolveAuraBuffs();
-            // Round 173 Direction 1 — Shrine aura resolve. SetTurn/Resolve pair mirrors
-            //   AuraTower's pattern: SetTurn collects shrine IDs, Resolve accumulates
-            //   the per-frame cache for downstream consumers.
-            TowerShrine?.SetTurn();
-            TowerShrine?.ResolveShrineBuffs();
-            // Round 177 Direction 2 — Beacon aura resolve. SetTurn/Resolve pair mirrors
-            //   Shrine's pattern: SetTurn collects beacon IDs, Resolve accumulates the
-            //   per-frame damage + atk-spd cache for downstream consumers. Same wiring
-            //   cost as Shrine (one SetTurn + one Resolve per frame, sentinel-gated).
-            TowerBeacon?.SetTurn();
-            TowerBeacon?.ResolveBeaconBuffs();
-            Curse?.ResolveCurseDebuffs();
-            PullTower?.Update(deltaTime);
-            Projectile?.Update(deltaTime);
-            Pickup?.Update(deltaTime);
-            Mana?.Update(deltaTime, isBuildPhase: false);
-            // Round 175 Direction 1 — Mana Shield per-frame tick. Runs after Mana
-            //   regen so it can read the just-clamped PlayerMana. Per-player system,
-            //   one instance per player slot, so each frame the Combat scheduler
-            //   drives at most 4 Update() calls (MAX_PLAYERS).
-            ManaShield?.Update(deltaTime);
-            GlobalSkill?.Update(deltaTime, isBuildPhase: false);
-            Hero?.Update(deltaTime);
-            ReflectTower?.ResolveReflect();
-            ReflectTower?.ApplyReflectDamage();
-            TowerMorph?.Update(deltaTime);
-            // Taunt tower: assign EnemyTauntedByTowerId for enemies in range of any
-            // TowerIsTaunt tower. Runs after tower attacks (closest semantic — enemies are
-            // already locked-on to the taunt tower for the *next* frame's targeting).
-            Taunt?.ResolveTauntAssignments();
-            // Round 138 — Per-tower active skill cooldown tick. Runs last in the
-            //   combat phase so the cooldown we tick is the one the player sees
-            //   in the HUD this frame (no half-frame drift). TriggerTowerActive()
-            //   is event-driven by the player; it can be called from anywhere.
-            TowerActiveSkill?.Update(deltaTime);
-            // Round 142 方向5 — Aggro / Focus Fire per-frame duration tick. Runs
-            //   after TowerActiveSkill (also a post-attack-phase tick) and after
-            //   Taunt (which writes EnemyTauntedByTowerId for the next frame's
-            //   targeting). Aggro's Update() is O(1) when no focus is active.
-            Aggro?.Update(deltaTime);
-            // Round 144 方向4 — Hero Active Skill per-frame cooldown tick. Runs
-            //   last in the combat phase so the cooldown we tick is the one the
-            //   player sees in the HUD this frame (no half-frame drift). HeroSkill
-            //   is O(1) when no skill is configured (sentinel _anySkillConfigured).
-            HeroSkill?.Update(deltaTime);
-            // Round 201 Direction 8 — Echo Clone per-frame tick. Runs last in
-            // the combat phase so the spawn roll sees parent's current damage
-            // (aura caches resolved above). O(1) when no echo-capable parent
-            // is on the field (sentinel _hasAnyEchoCapableParent).
-            EchoClone?.Update(deltaTime);
-            // Round 176 Direction 2 — Bloodlust per-frame tick. Runs last in
-            // the combat phase so the cached damage / speed mults are visible
-            // to TowerAttackSystem on the *next* frame (the same-frame kill
-            // already produced its damage this turn, so the mult lift applies
-            // to the *next* shot). O(activeTowers) when Enabled = true,
-            // O(activeTowers) clear-pass when Enabled = false.
-            Bloodlust?.Update(turn);
-            // Round174+ Direction3 — Momentum per-frame tick. Runs last in
-            // the combat phase (after Bloodlust) so the freshly-computed
-            // tier-derived damage / speed bonuses are visible to
-            // TowerAttackSystem on the *next* frame. O(MAX_PLAYERS +
-            // activeTowers) per tick. Sentinel fast path: disabled or
-            // degenerate config → single O(activeTowers) clear-pass.
-            Momentum?.Update(deltaTime);
-            // Round 207 Direction 2 — Adrenaline per-frame tick. Runs after
-            // Momentum (and before Crest / Culling) so the freshly-computed
-            // tier-derived attack-speed bonus and rush-frame count are visible
-            // to PlayerTowerAttackSystem on the *next* frame. O(MAX_PLAYERS) per
-            // tick. Sentinel fast path: disabled or degenerate thresholds →
-            // single O(MAX_PLAYERS) clear-pass.
-            Adrenaline?.Update(deltaTime);
-            // Round 178+ Direction 5 — Crest per-frame tick. Event-driven
-            // (no work done here), so Update() is a no-op. Exposed in
-            // CombatGroup so the scheduler can call it uniformly. Real
-            // work happens in HandleWaveStart / HandleWaveComplete.
-            Crest?.Update(deltaTime);
-            // Round 206 Direction 1 — Culling per-frame tick. No-op (event-driven;
-            // the per-hit hot path is invoked from TowerAttackSystem via the
-            // injected CullingSystem reference). Exposed in CombatGroup so the
-            // scheduler can call it uniformly.
-            Culling?.Update(deltaTime);
-        }
     }
 }

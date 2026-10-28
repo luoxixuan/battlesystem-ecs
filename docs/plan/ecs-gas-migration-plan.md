@@ -186,3 +186,9 @@ sparse/paged GAS pool + active lists。详见 [M8 evidence](../ecs-gas-m8-eviden
 
 后续先完成 M8 evidence 双轴复审并保持观察；只有 mode 2/4/5 延期解除且 Unity 环境可用后，
 才评估完整 M8 退出。公开 dense 候选必须先确认外部调用兼容，不能从内存数字直接推导删除。
+
+## 11. 清理退役记录（C4，2026-10-28）
+
+下列 legacy 路径的退出条件（M5/M8 未完成）已由 owner 于 2026-10-28 豁免，按“清理退役”处理，**不是迁移完成**；仅在 golden / replay / determinism-soak 摘要不变时才删除。
+
+- C4.1 legacy 执行模式：已退役。删除 `FrameSchedulerExecutionMode`、`FrameScheduler.TickLegacy` 与全部 `*Group.Execute` / `ExecuteLegacy`（M5 的 graph/legacy replay 对照随之取消，改为 graph-only 断言）。FrameGraph 成为唯一执行路径，图/hash 不变。

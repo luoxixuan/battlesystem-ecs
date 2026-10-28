@@ -1,5 +1,12 @@
 # 更新记录 (Changelog)
 
+### 2026-10-28（退役 legacy 执行模式 C4.1）
+- 退出条件（M5 declared complete）未满足，由 owner 于 2026-10-28 豁免：按“清理退役”处理，非迁移完成。仅因 golden / replay / determinism-soak 摘要不变而删除。
+- 删除 `FrameSchedulerExecutionMode`（`Graph`/`Legacy` 枚举）及 `FrameScheduler` / `GameManager` 构造参数与 `ExecutionMode` / `ConfiguredExecutionMode`；删除 `FrameScheduler.TickLegacy`、`RunWavePhaseLegacy`、`FreezeTimeContextCore`、`_externalDeltaTime`；删除全部 `*Group.Execute`、`SkillBuffGroup/PostDeathGroup.ExecuteLegacy` 及其私有辅助，以及空壳 `ISystemGroup` / `IBuildPhaseGroup`（`ISystemGroup.cs`）。`GameManager` 构造函数首参数改为 `effectClock`（Program.cs / Unity 均无传参调用）。
+- 测试：graph-vs-legacy 对照测试转为 graph-only（子弹时间 delta 拆分与 frame identity、Enemy effect clock 单次推进 =95、未定义 effect clock 被拒绝、group 不持有可变时间状态）；删除仅验证 legacy facade 可调用的测试；`ArchitectureNamingTests` 改为断言 Core 不再含 legacy 路径符号。
+- 图/hash：无节点变化，Gameplay/FixedPopulation 拓扑与访问审阅根 hash 不变；Golden / Replay / DeterminismSoak 摘要不变。
+- 验证：分块完整套件结果见提交信息；mode 2/4/5 延期未运行。
+
 ### 2026-10-28（删除无加载器读取的 Data 文件 C3）
 - 删除前对 `Core/`、`Systems/`、测试、`tools/`、`Program.cs`、csproj（`CopyToOutputDirectory`/`Content`/`None`）与脚本逐一 grep 文件名与路径，并枚举全部 `.json` 字面量与目录枚举（仅 `Data/Skills/*.json`、`skill_*.json` 两处）。确认无加载/拷贝/引用后删除：`Data/Monsters/*`（238）、`Data/Levels/*`（6）、`Data/Towers/` 下除 `tower_synergy.json` 外的 174 个文件，以及 18 个 `Data/Configs` 文件：`auto_skill`、`backstab`、`beacon_towers`、`culling`、`damage_conversion`、`day_night`、`obstacles`、`path_junctions`、`path_terrain`、`patrol_paths`、`player`、`projectile_deflection`、`shop_reroll`、`shrine_towers`、`totems`、`tower_affixes`、`wave_gold_decay`、`wave_skip`（审计 E-09 的 11 个 + `tower_affixes`/`obstacles`/`totems` + 仅存在于注释中的 `culling`/`day_night`/`path_junctions`/`patrol_paths`）。
 - csproj：`BattleSystemECS.csproj` 去掉 `wave_gold_decay.json` / `path_terrain.json` 的 `None Update` 项；Core csproj 去掉 `Data\Monsters` / `Data\Levels` 通配拷贝项（`Data\Towers` 通配保留，用于 `tower_synergy.json`）。

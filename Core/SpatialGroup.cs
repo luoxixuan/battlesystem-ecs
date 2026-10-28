@@ -2,7 +2,7 @@
 namespace BattleSystemECS.Core
 {
     /// <summary>Spatial grid rebuild + post-rebuild systems: patrol, chrono, fog, point defense, telegraph.</summary>
-    internal sealed class SpatialGroup : ISystemGroup
+    internal sealed class SpatialGroup
     {
         public Systems.ChronoTowerSystem? ChronoTower { get; set; }
         public Systems.TelegraphSystem? Telegraph { get; set; }
@@ -18,20 +18,5 @@ namespace BattleSystemECS.Core
             if (Mine != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("spatial.mine.prepare"), c => Mine?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("spatial.mine.update"), c => Mine?.Update(c.Delta)); }
         }
 
-        public void Execute(ComponentStore store, float deltaTime, int turn)
-        {
-            store.RebuildSpatialGrid();
-
-
-            ChronoTower?.SetTurn();
-            ChronoTower?.Update();
-
-
-
-            Telegraph?.Update(deltaTime);
-
-            Mine?.SetTurn(turn);
-            Mine?.Update(deltaTime);
-        }
     }
 }

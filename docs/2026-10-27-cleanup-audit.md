@@ -404,6 +404,12 @@ Verification:
 
 Still stale and untouched: Unity's project-root `game_config.json` and `Data/` copies; the DLL sync is still manual (10.3).
 
+## 11. C4 retirements (2026-10-28; exit conditions waived by owner)
+
+The owner decided on 2026-10-28 to retire the legacy paths below although their migration exit conditions (M5/M8) were not met. Each item is **retired by cleanup (exit condition waived by owner on 2026-10-28), not completed by migration**, and was removed only because golden / replay / determinism-soak digests stayed unchanged.
+
+- **E-14 / C4.1 — legacy execution mode: RETIRED.** Removed `FrameSchedulerExecutionMode` (enum and the `FrameScheduler` / `GameManager` constructor parameter plus `ExecutionMode` / `ConfiguredExecutionMode`), `FrameScheduler.TickLegacy` / `RunWavePhaseLegacy` / `FreezeTimeContextCore`, every `*Group.Execute` / `ExecuteLegacy` / `ExecuteSystems` / `ExecuteCore` body, and the empty `ISystemGroup` / `IBuildPhaseGroup` interfaces. The graph-vs-legacy equivalence tests became graph-only tests. Graph topology / review-root hashes are unchanged (no node changed). `GameManager`'s first constructor parameter is now `effectClock` (no caller in Program.cs, Systems or Unity passed the old first parameter).
+
 ## Appendices
 
 Appendix tables are generated from the scan outputs at HEAD `3b10ebc`; Appendix B2 from the working tree. File paths are relative to the repository root.

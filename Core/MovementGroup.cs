@@ -187,7 +187,7 @@ namespace BattleSystemECS.Systems
 namespace BattleSystemECS.Core
 {
     /// <summary>Enemy movement, pathfinding, wound, path modifiers, healer, summons, steal gold, pull, path blocks, deployable traps.</summary>
-    internal sealed class MovementGroup : ISystemGroup
+    internal sealed class MovementGroup
     {
         public Systems.PathfindingSystem? Pathfinding { get; set; }
         public Systems.EnemyMovementSystem? EnemyMovement { get; set; }
@@ -207,27 +207,5 @@ namespace BattleSystemECS.Core
             if (Pull != null) { scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.pull.prepare"), c => Pull?.SetTurn(c.Turn)); scheduler.RegisterFrameBinding(FrameBindingFacts.Get("movement.pull.update"), c => Pull?.Update(c.Delta)); }
         }
 
-        public void Execute(ComponentStore store, float deltaTime, int turn)
-        {
-            Pathfinding?.SetTurn(turn);
-            EnemyMovement?.SetTurn(turn);
-
-            // Path blocks: enemies on block cells damage them (runs before movement so frame damage is applied)
-            PathBlock?.Update();
-
-            EnemyMovement?.Update();
-
-            // 可部署陷阱在移动后执行，使本帧新踏入的格子能立即触发。
-            DeployableTrap?.Update();
-
-            PathModifier?.SetTurn();
-            PathModifier?.Update(deltaTime);
-
-            Pull?.SetTurn(turn);
-            Pull?.Update(deltaTime);
-
-
-
-        }
     }
 }

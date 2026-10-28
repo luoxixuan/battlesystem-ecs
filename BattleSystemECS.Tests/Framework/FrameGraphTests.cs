@@ -317,99 +317,58 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void SchedulerModesAreFixedAndAdvanceTheSameTimeIdentity()
+        public void GraphSchedulerAdvancesFrameIdentityAndBulletTimeSplit()
         {
-            // Bug 回归：启动时选择的 graph/legacy 模式不能破坏 frame identity 连续性。
-            using var graphWorld=new TestWorld();
-            using var legacyWorld=new TestWorld();
-            graphWorld.Player();
-            legacyWorld.Player();
-            graphWorld.Store.PlayerBulletTimeTurnsLeft[0]=2f;
-            legacyWorld.Store.PlayerBulletTimeTurnsLeft[0]=2f;
-            graphWorld.Store.PlayerBulletTimeScale[0]=0.25f;
-            legacyWorld.Store.PlayerBulletTimeScale[0]=0.25f;
-            var graph=new FrameScheduler(graphWorld.Store,graphWorld.Config,null,FrameSchedulerExecutionMode.Graph);
-            var legacy=new FrameScheduler(legacyWorld.Store,legacyWorld.Config,null,FrameSchedulerExecutionMode.Legacy);
-            graph.SealGraphComposition();
-            legacy.SealGraphComposition();
+            // Bug 回归：frame identity 连续推进，子弹时间只缩放 enemy 侧 delta（graph 为唯一执行路径）。
+            using var world=new TestWorld();
+            world.Player();
+            world.Store.PlayerBulletTimeTurnsLeft[0]=2f;
+            world.Store.PlayerBulletTimeScale[0]=0.25f;
+            var scheduler=new FrameScheduler(world.Store,world.Config);
+            scheduler.Phase=GameState.WavePhase;
+            scheduler.SealGraphComposition();
 
-            graph.Tick(1f,7);
-            legacy.Tick(1f,7);
-            AssertTimeIdentity(graph.LastTimeContext,legacy.LastTimeContext);
-            graph.Tick(0.5f,8);
-            legacy.Tick(0.5f,8);
-            AssertTimeIdentity(graph.LastTimeContext,legacy.LastTimeContext);
-            Assert.Equal(FrameSchedulerExecutionMode.Graph,graph.ExecutionMode);
-            Assert.Equal(FrameSchedulerExecutionMode.Legacy,legacy.ExecutionMode);
+            scheduler.Tick(1f,7);
+            Assert.Equal(1f,scheduler.LastTimeContext.RawDelta);
+            Assert.Equal(0.25f,scheduler.LastTimeContext.EnemyDelta);
+            Assert.Equal(1f,scheduler.LastTimeContext.CombatDelta);
+            Assert.Equal(7,scheduler.LastTimeContext.Turn);
+            Assert.Equal(0,scheduler.LastTimeContext.Frame);
+            scheduler.Tick(0.5f,8);
+            Assert.Equal(0.125f,scheduler.LastTimeContext.EnemyDelta);
+            Assert.Equal(0.5f,scheduler.LastTimeContext.CombatDelta);
+            Assert.Equal(8,scheduler.LastTimeContext.Turn);
+            Assert.Equal(1,scheduler.LastTimeContext.Frame);
             Assert.Null(typeof(FrameScheduler).GetProperty("UseLegacyExecutionForValidation",BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic));
         }
 
         [Fact]
-        public void EnemyEffectClockGraphAndLegacyTickEveryClockOnceWithSameDelta()
+        public void EnemyEffectClockGraphTicksEveryClockOnceWithSameDelta()
         {
-            // Bug 回归：非 Combat effect clock 在 graph/legacy 中必须只推进一次。
-            float graphHealth=RunEffectClockScenario(FrameSchedulerExecutionMode.Graph);
-            float legacyHealth=RunEffectClockScenario(FrameSchedulerExecutionMode.Legacy);
-            Assert.Equal(legacyHealth,graphHealth);
+            // Bug 回归：非 Combat effect clock 在 graph 中必须只推进一次。
+            float graphHealth=RunEffectClockScenario();
             Assert.Equal(95f,graphHealth,3);
         }
 
         [Fact]
-        public void GameManagerExposesStartupOnlyRollbackSelectionWithGraphDefault()
+        public void UndefinedEffectClockIsRejectedByManagerAndScheduler()
         {
-            // Bug 回归：回滚模式只能在启动 composition 时选择且默认使用 graph。
-            var defaultManager=new GameManager();
-            var legacyManager=new GameManager(FrameSchedulerExecutionMode.Legacy);
-            Assert.Equal(FrameSchedulerExecutionMode.Graph,defaultManager.ConfiguredExecutionMode);
-            Assert.Equal(FrameSchedulerExecutionMode.Legacy,legacyManager.ConfiguredExecutionMode);
-            Assert.Throws<ArgumentOutOfRangeException>(()=>new GameManager((FrameSchedulerExecutionMode)99));
-            Assert.Throws<ArgumentOutOfRangeException>(()=>new FrameScheduler(Store,Config,null,(FrameSchedulerExecutionMode)99));
+            // Bug 回归：未定义的 effect clock 在启动 composition 时必须被拒绝。
+            Assert.Throws<ArgumentOutOfRangeException>(()=>new GameManager((Core.GAS.ClockId)99));
+            Assert.Throws<ArgumentOutOfRangeException>(()=>new FrameScheduler(Store,Config,null,(Core.GAS.ClockId)99));
         }
 
         [Fact]
-        public void LegacyCompatibilityGroupsCannotOwnMutableTimeOrPhaseState()
+        public void CompatibilityGroupsCannotOwnMutableTimeOrPhaseState()
         {
-            // Bug 回归：legacy facade 不得重新持有可变时间或阶段真相源。
+            // Bug 回归：group 不得重新持有可变时间或阶段真相源。
             string[] removedSkillBuffProperties={"GameplayEnemyDeltaTime","GameplayRealTimeDeltaTime","GameplayGlobalDeltaTime","GameplayClock"};
             Assert.All(removedSkillBuffProperties,name=>Assert.Null(typeof(SkillBuffGroup).GetProperty(name,BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic)));
             Assert.Null(typeof(PostDeathGroup).GetProperty("Phase",BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic));
-            MethodInfo? skillLegacy=typeof(SkillBuffGroup).GetMethod("ExecuteLegacy",BindingFlags.Instance|BindingFlags.NonPublic);
-            MethodInfo? postDeathLegacy=typeof(PostDeathGroup).GetMethod("ExecuteLegacy",BindingFlags.Instance|BindingFlags.NonPublic);
-            Assert.NotNull(skillLegacy);
-            Assert.NotNull(postDeathLegacy);
-            Assert.False(skillLegacy!.IsPublic);
-            Assert.False(postDeathLegacy!.IsPublic);
             Assert.Null(typeof(FrameScheduler).GetProperty("GameplayClock",BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic));
             PropertyInfo? effectClock=typeof(FrameScheduler).GetProperty("EffectClock",BindingFlags.Instance|BindingFlags.Public);
             Assert.NotNull(effectClock);
             Assert.False(effectClock!.CanWrite);
-        }
-
-        [Fact]
-        public void LegacyGroupFacadesRemainCallableWithoutOwningSchedulerState()
-        {
-            // Bug 回归：旧 ISystemGroup facade 必须可调用，不能以异常代替兼容合同。
-            int playerId=Player();
-            int enemyId=Enemy(e=>{e.Health=20f;e.MaxHealth=20f;});
-            var effect=new Core.GAS.GameplayEffectDefinition(new Core.GAS.EffectId(8190),
-                Core.GAS.EffectType.Periodic,Array.Empty<Core.GAS.ModifierDefinition>(),2f,1f,
-                Core.GAS.ClockId.Combat,Core.GAS.StackingBehavior.None,1,Core.GAS.RefreshPolicy.None,
-                Core.GAS.SourceDeathPolicy.Persist,Core.GAS.EffectPayloadKind.Damage,default(Core.GAS.TagId),
-                Array.Empty<Core.GAS.ExecutionId>(),periodicMagnitude:2f);
-            Assert.True(Store.GameplayEffectsRuntime.TryApply(effect.Id,effect,Store.GetEntityHandle(playerId),
-                Store.GetEntityHandle(enemyId),out _,ownerPlayerId:playerId));
-            ((ISystemGroup)new SkillBuffGroup()).Execute(Store,1f,0);
-            Assert.Equal(18f,Store.EnemyHealth[enemyId],3);
-
-            Store.PlayerSoulCount[playerId]=0f;
-            Store.PlayerSoulCap[playerId]=10f;
-            Store.PlayerSoulRegen[playerId]=4f;
-            var postDeath=new PostDeathGroup
-            {
-                SoulHarvest=new Systems.SoulHarvestSystem(Store,new Config.SoulHarvestConfig())
-            };
-            ((ISystemGroup)postDeath).Execute(Store,0.5f,0);
-            Assert.Equal(2f,Store.PlayerSoulCount[playerId]);
         }
 
         [Fact]
@@ -873,20 +832,7 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(0,allocated);
         }
 
-        private static void AssertTimeIdentity(TimeContext expected,TimeContext actual)
-        {
-            Assert.Equal(expected.RawDelta,actual.RawDelta);
-            Assert.Equal(expected.RealDelta,actual.RealDelta);
-            Assert.Equal(expected.EnemyDelta,actual.EnemyDelta);
-            Assert.Equal(expected.CombatDelta,actual.CombatDelta);
-            Assert.Equal(expected.EffectDelta,actual.EffectDelta);
-            Assert.Equal(expected.Turn,actual.Turn);
-            Assert.Equal(expected.Frame,actual.Frame);
-            Assert.Equal(expected.Phase.Kind,actual.Phase.Kind);
-            Assert.Equal(expected.EffectClock,actual.EffectClock);
-        }
-
-        private static float RunEffectClockScenario(FrameSchedulerExecutionMode mode)
+        private static float RunEffectClockScenario()
         {
             using var world=new TestWorld();
             int playerId=world.Player();
@@ -909,7 +855,7 @@ namespace BattleSystemECS.Tests.Framework
                 world.Store.GetEntityHandle(playerId),world.Store.GetEntityHandle(enemyId),out _,ownerPlayerId:playerId));
             world.Store.PlayerBulletTimeTurnsLeft[playerId]=1f;
             world.Store.PlayerBulletTimeScale[playerId]=0.25f;
-            var scheduler=new FrameScheduler(world.Store,world.Config,null,mode,Core.GAS.ClockId.Enemy);
+            var scheduler=new FrameScheduler(world.Store,world.Config,null,Core.GAS.ClockId.Enemy);
             scheduler.SealGraphComposition();
             scheduler.Tick(1f,0);
             Assert.Equal(Core.GAS.ClockId.Enemy,scheduler.EffectClock);

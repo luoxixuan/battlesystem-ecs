@@ -91,7 +91,6 @@ BattleSystem-ECS/
 │   ├── GameEvents.cs                # 系统间事件 DTO 定义
 │   ├── GAS/                         # Gameplay Ability System（Attributes / GameplayEffect / GameplayAbility）
 │   ├── *Group.cs（11 个）           # SystemGroup 定义（对应帧调度各阶段）
-│   ├── ISystemGroup.cs              # SystemGroup 接口
 │   ├── 枚举                          # BuffType / DamageType / ElementType / EnemyActionType / GameState / TowerTargetingMode / TowerType
 │   ├── Polyfill                     # IsExternalInit / Rng / PolyfillExtensions（netstandard2.1 兼容）
 │   └── 配置 / 日志 / 工具            # GameConfig(+Loader) / SpatialGrid / TechTreeDef / CurveTable / *Logger / StateMachine / Entity(+Manager) 等
@@ -110,7 +109,7 @@ BattleSystem-ECS/
 
 `FrameScheduler` 不直接持有 system，而是通过 **SystemGroup 模式**解耦调度与 system 实现：
 
-- 11 个 `*Group.cs` 位于 `Core/`（`BuildGroup` / `PreGameGroup` / `SpawningGroup` / `AIGroup` / `MovementGroup` / `TerrainGroup` / `CombatSetupGroup` / `SpatialGroup` / `CombatGroup` / `SkillBuffGroup` / `PostDeathGroup`），另加 `ISystemGroup.cs` 接口。
+- 11 个 `*Group.cs` 位于 `Core/`（`BuildGroup` / `PreGameGroup` / `SpawningGroup` / `AIGroup` / `MovementGroup` / `TerrainGroup` / `CombatSetupGroup` / `SpatialGroup` / `CombatGroup` / `SkillBuffGroup` / `PostDeathGroup`）。Group 只持有 system 槽位与帧节点绑定（`RegisterFrameBindings`），不再有 `Execute`；FrameGraph 是唯一执行路径。
 - 每个 group 是一组相关 system + 固定执行顺序（对应 §4.2 的帧调度各阶段）。
 - `ProductionSystemInstaller` 是生产组装唯一入口；`SystemRegistry` 的 `CreateAll` / `WireDependencies` / `AssignToGroups` 仅保留为受 session guard 约束的兼容 facade。
 - 添加新 system 的标准流程：

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace BattleSystemECS.Core
 {
     /// <summary>BuildPhase systems: economy, upgrades, auto-skills.</summary>
-    internal sealed class BuildGroup : IBuildPhaseGroup
+    internal sealed class BuildGroup
     {
         public object? Gold { get; set; }
         public object? Upgrade { get; set; }
@@ -57,11 +57,6 @@ namespace BattleSystemECS.Core
             "build.global-skill.update" => GlobalSkill != null, "build.desperation.update" => Desperation != null,
             "build.shop-reroll.update" => ShopReroll != null, _ => false
         };
-
-        public void Execute(ComponentStore store, float deltaTime)
-        {
-            for (int i = 0; i < _bindings.Count; i++) if (_bindings[i].Slot() != null) _bindings[i].Execute(store, deltaTime);
-        }
 
         private sealed class Binding
         {

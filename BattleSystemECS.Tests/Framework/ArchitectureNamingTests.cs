@@ -61,16 +61,17 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void LegacyGroupAdaptersHaveNoProductionGraphCallers()
+        public void NoLegacyExecutionPathRemainsInCore()
         {
             string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
-            string scheduler = File.ReadAllText(Path.Combine(root, "Core", "FrameScheduler.cs"));
-            Assert.True(Regex.Matches(scheduler, @"SkillBuff\.ExecuteLegacy\(", RegexOptions.CultureInvariant).Count == 1);
-            Assert.True(Regex.Matches(scheduler, @"PostDeath\.ExecuteLegacy\(", RegexOptions.CultureInvariant).Count == 1);
-
-            // Bug 回归：生产 composition 和 Registry 不得回调 legacy Group facade。
-            foreach (string file in new[] { "FrameSystemGraph.cs", "SystemRegistry.cs", "GameManager.cs" })
-                Assert.DoesNotContain("ExecuteLegacy(", File.ReadAllText(Path.Combine(root, "Core", file)), StringComparison.Ordinal);
+            // Bug 回归：legacy 执行路径已退役，Core 不得再出现 TickLegacy / ExecuteLegacy / 执行模式枚举。
+            foreach (string file in Directory.GetFiles(Path.Combine(root, "Core"), "*.cs", SearchOption.AllDirectories))
+            {
+                string text = File.ReadAllText(file);
+                Assert.DoesNotContain("TickLegacy", text, StringComparison.Ordinal);
+                Assert.DoesNotContain("ExecuteLegacy", text, StringComparison.Ordinal);
+                Assert.DoesNotContain("FrameSchedulerExecutionMode", text, StringComparison.Ordinal);
+            }
         }
 
     }

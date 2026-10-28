@@ -3,7 +3,7 @@ using System;
 namespace BattleSystemECS.Core
 {
     /// <summary>Skill resolution, buff DoT, bleed damage.</summary>
-    internal sealed class SkillBuffGroup : ISystemGroup
+    internal sealed class SkillBuffGroup
     {
         public Systems.BuffSystem? Buff { get; set; }
         public Systems.SkillSystem? Skill { get; set; }
@@ -64,74 +64,5 @@ namespace BattleSystemECS.Core
             Rally?.ConsumePlayerDamageFacts();
             Rally?.ApplyActiveBonuses();
         }
-        internal void ExecuteLegacy(ComponentStore store, TimeContext time, int turn)
-        {
-            store.GameplayEffectsRuntime.Tick(time.EffectDelta, time.EffectClock);
-            TickSupplemental(store, time, Core.GAS.ClockId.Combat, time.CombatDelta);
-            TickSupplemental(store, time, Core.GAS.ClockId.Enemy, time.EnemyDelta);
-            TickSupplemental(store, time, Core.GAS.ClockId.RealTime, time.RealDelta);
-            TickSupplemental(store, time, Core.GAS.ClockId.Global, time.GlobalDelta);
-            ExecuteSystems(store, time.CombatDelta);
-        }
-
-        private static void TickSupplemental(ComponentStore store, TimeContext time, Core.GAS.ClockId clock, float delta)
-        {
-            if (clock != time.EffectClock)
-                store.GameplayEffectsRuntime.Tick(delta, clock);
-        }
-
-        private void ExecuteSystems(ComponentStore store, float deltaTime)
-        {
-            Buff?.Update(deltaTime);
-            Skill?.ResolveSkillDamage();
-            Buff?.ResolveDotDamage();
-            // Elemental reactions: drain this frame's shield breaks, decay element timers,
-            // maintain the exposure window, then settle any reaction damage. Ordered before
-            // the other DoT sources below only so its own queued damage lands in the same
-            // frame it was generated; the hard constraint is that ResolveReactionDamage runs
-            // before the Phase 10 death resolve, which this position satisfies.
-            ElementalReaction?.Update(deltaTime);
-            ElementalReaction?.ResolveReactionDamage();
-            Bleed?.Update(deltaTime);
-            Bleed?.ResolveBleedDamage();
-            // Round 170 Direction 6 — Frostbite (non-stacking %-of-maxHP DoT)
-            Frostbite?.Update(deltaTime);
-            Frostbite?.ResolveFrostbiteDamage();
-            HealingZone?.Update(deltaTime);
-            Mark?.Update(deltaTime);
-            // Round 200 Direction 5 — Death Mark decay (after Mark). Auto-execute payoff
-            // queues enemy death in the same frame as the final stack hit, which the
-            // death-resolution pass handles cleanly at frame boundary.
-            DeathMark?.Update(deltaTime);
-            // Heal aura: cache healer tower IDs first, then fire heal ticks. Both calls
-            // are zero-cost when no heal-aura tower is on the field (SetTurn filter early
-            // returns, Update early returns on empty healer cache).
-            HealAura?.SetTurn();
-            HealAura?.Update(deltaTime);
-            // Thorns aura: cache thorns-emitter tower IDs first, then fire thorns ticks.
-            // Same zero-overhead contract as HealAura. SetTurn early-returns on no
-            // IsThornsTower flag set; Update early-returns on empty cache or empty
-            // active-enemy set. The thorns damage write happens in serial Phase 9,
-            // before ResolveEnemiesKilledThisFrame in Phase 10, so any deaths
-            // queued here are resolved cleanly at the frame boundary.
-            ThornsAura?.SetTurn();
-            ThornsAura?.Update(deltaTime, ThornsAuraPlayerId);
-            Skill?.Update(deltaTime);
-            Wisp?.Update(deltaTime);
-            // Rally：combat.rally.consume 已在 tower-attack 前写过加成；这里 tick 时长/CD，
-            // 并再消费战斗段 DamageApplied，供下一帧 consume 使用。
-            Rally?.Update(deltaTime);
-        }
-        public void Execute(ComponentStore store, float deltaTime, int turn)
-        {
-            // 兼容 facade 只有一个 delta；四个时钟使用同值，不保存可变时间状态。
-            store.GameplayEffectsRuntime.Tick(deltaTime, Core.GAS.ClockId.Combat);
-            store.GameplayEffectsRuntime.Tick(deltaTime, Core.GAS.ClockId.Enemy);
-            store.GameplayEffectsRuntime.Tick(deltaTime, Core.GAS.ClockId.RealTime);
-            store.GameplayEffectsRuntime.Tick(deltaTime, Core.GAS.ClockId.Global);
-            ExecuteSystems(store, deltaTime);
-        }
-
-        void ISystemGroup.Execute(ComponentStore store, float deltaTime, int turn) => Execute(store, deltaTime, turn);
     }
 }

@@ -194,7 +194,7 @@ namespace BattleSystemECS.Systems
         public void Update(float deltaTime)
         {
             // Intentionally empty — CrestSystem is event-driven.
-            // The signature matches ISystemGroup convention so the
+            // The signature follows the former group convention so the
             // scheduler can call it without a null check.
         }
 

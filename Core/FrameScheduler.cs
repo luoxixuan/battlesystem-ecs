@@ -19,11 +19,9 @@ namespace BattleSystemECS.Core
         public ComponentStore Store => store;
         private readonly IBattleEventBus _eventBus;
         private IReadOnlyList<Core.GAS.TriggerDefinition> _gameplayTriggers = Array.Empty<Core.GAS.TriggerDefinition>();
-        private float _externalDeltaTime;
         private FrameGraph? _frameGraph;
         private readonly FrameExecutionContext _executionContext;
         private int _frameNumber;
-        private readonly FrameSchedulerExecutionMode _executionMode;
         private readonly Core.GAS.ClockId _effectClock;
         private readonly FrameScenarioKind _scenarioKind;
         private FrameGraphCompositionKind _compositionKind = FrameGraphCompositionKind.Direct;
@@ -35,7 +33,6 @@ namespace BattleSystemECS.Core
         private Func<int, int>? _pathWaypointCountQuery;
 
         public FrameGraphCompositionKind CompositionKind => _compositionKind;
-        public FrameSchedulerExecutionMode ExecutionMode => _executionMode;
         public bool IsCompositionSealed => _frameGraph != null;
         internal bool RemoveFrameBinding(string id) => _frameBindings.Remove(id) || Build.RemoveBinding(id);
         internal void RegisterFrameBinding(string id, Action<NodeExecutionContext> execute)
@@ -188,7 +185,6 @@ namespace BattleSystemECS.Core
         public void SetSpawningPaused(bool paused) => Spawning.WavePaused = paused;
 
         public FrameScheduler(ComponentStore store, GameConfig gameConfig, IBattleEventBus? eventBus = null,
-            FrameSchedulerExecutionMode executionMode = FrameSchedulerExecutionMode.Graph,
             Core.GAS.ClockId effectClock = Core.GAS.ClockId.Combat,
             FrameScenarioKind scenarioKind = FrameScenarioKind.Gameplay)
         {
@@ -196,14 +192,11 @@ namespace BattleSystemECS.Core
             _capacityWatch = new CapacityDropWatch(store);
             store.GameplayPhaseContext = PhaseContext.FromGameState(_phase);
             _ = gameConfig ?? throw new ArgumentNullException(nameof(gameConfig));
-            if (!Enum.IsDefined(typeof(FrameSchedulerExecutionMode), executionMode))
-                throw new ArgumentOutOfRangeException(nameof(executionMode), executionMode, "Unknown scheduler execution mode.");
             if (!Enum.IsDefined(typeof(Core.GAS.ClockId), effectClock))
                 throw new ArgumentOutOfRangeException(nameof(effectClock), effectClock, "Unknown effect clock.");
             if (!Enum.IsDefined(typeof(FrameScenarioKind), scenarioKind))
                 throw new ArgumentOutOfRangeException(nameof(scenarioKind), scenarioKind, "Unknown frame scenario kind.");
             _eventBus = eventBus ?? NullEventBus.Instance;
-            _executionMode = executionMode;
             _effectClock = effectClock;
             _scenarioKind = scenarioKind;
             _executionContext = new FrameExecutionContext(store, 0f, 0, 0, PhaseContext.FromGameState(_phase));
@@ -274,10 +267,7 @@ namespace BattleSystemECS.Core
         {
             FrameGraph graph = RequireFrameGraph();
             _executionContext.Reset(deltaTime, turn, _frameNumber++, PhaseContext.FromGameState(Phase));
-            if (_executionMode == FrameSchedulerExecutionMode.Graph)
-                graph.Execute(_executionContext);
-            else
-                TickLegacy(deltaTime, turn);
+            graph.Execute(_executionContext);
             LastTimeContext = _executionContext.Time;
             // 每帧推进基线（几次计数读取），保证订阅前后的增量都按帧归属
             if (_capacityWatch.TryCollect(_executionContext.Frame, out var report)) CapacityDropped?.Invoke(report);
@@ -289,86 +279,6 @@ namespace BattleSystemECS.Core
         /// </summary>
         public event Action<CapacityDropReport>? CapacityDropped;
         private readonly CapacityDropWatch _capacityWatch;
-
-        private void TickLegacy(float deltaTime, int turn)
-        {
-            _externalDeltaTime = deltaTime;
-            store.ApplyComputedAttributeModeAtFrameBoundary();
-            store.BeginFrame();
-            store.GameplayEffectsRuntime.ResetFrame();
-            store.GameplayTriggersRuntime.ResetFrame();
-            store.DamageResolver.EnableDeferred(true);
-            store.ResourceResolver.EnableDeferred(true);
-            // Attribute modifiers become visible at the scheduler's aggregate boundary.
-            store.SyncComputedAttributeBases();
-            store.AttributeAggregator.AggregateDirty();
-            store.SetTurnCCFlags();
-
-            // ── I-frames countdown (Round 118) ───────────────────────────────────
-            // Decrement EnemyInvulnFramesLeft for every active enemy. Runs once per tick
-            // (both BuildPhase and WavePhase) at the top of Tick so the countdown is
-            // frame-rate independent and uniform regardless of phase. Hits floor at 0
-            // (no negative). O(MAX_ENEMIES) per tick but cheap (1 int cmp/sub per slot).
-            DecrementInvulnFramesLeft();
-
-            // ── Phaser cycle ticker (Round 181 Direction 9) ──────────────────────
-            // Advances each phaser's phase→vulnerable→phase state machine. Runs once
-            // per tick (both BuildPhase and WavePhase) right after the I-frames
-            // countdown so the phase windows stay frame-rate independent. Phasers
-            // remain ticking even during BuildPhase so the visual phase state and
-            // damage immunity stay continuous across phases.
-            TickPhaserCycle(deltaTime);
-
-            // ── Blinker cycle ticker (Round 182 Direction 6) ─────────────────────
-            // Advances each blinker's "between blinks" timer; when the timer reaches
-            // EnemyBlinkInterval, snap the enemy forward along its current path by
-            // EnemyBlinkDistance tiles and grant 0.2s of i-frames. Decrement
-            // EnemyBlinkIFramesLeft each frame so towers can re-target after the brief
-            // i-frame window expires. Sentinel-gated on EnemyIsBlinker (non-blinkers
-            // pay zero overhead).
-            TickBlinkerCycle(deltaTime);
-
-            TimeContext time = FreezeTimeContextCore(deltaTime);
-
-            if (Phase == GameState.BuildPhase)
-            {
-                Build.Execute(store, time.BuildDelta);
-                // BuildPhase has no combat/death commit. Reject any combat requests
-                // emitted by compatibility systems instead of carrying them into Wave.
-                store.DamageResolver.RejectPending(Core.GAS.DamageCommitBoundary.GameplayResolve);
-                store.ResourceResolver.RejectPendingEnemyDamage();
-                // Build 阶段继续推进 RealTime/Global/Build effect；Combat/Enemy 伤害在本帧明确拒绝。
-                store.GameplayEffectsRuntime.Tick(_externalDeltaTime, Core.GAS.ClockId.RealTime);
-                store.GameplayEffectsRuntime.Tick(time.GlobalDelta, Core.GAS.ClockId.Global);
-                store.GameplayEffectsRuntime.Tick(time.BuildDelta, Core.GAS.ClockId.Build);
-                store.DamageResolver.RejectPendingEnemyDamage();
-                store.DamageResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
-                store.ResourceResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
-                if (_gameplayTriggers.Count > 0)
-                {
-                    store.GameplayTriggersRuntime.ConsumeOnly(store.DamageResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.HitConfirmed, Core.GAS.GameplayEventType.DamageApplied, Core.GAS.GameplayEventType.EffectApplied);
-                    store.GameplayTriggersRuntime.ConsumeOnly(store.ResourceResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.HealApplied, Core.GAS.GameplayEventType.ShieldChanged, Core.GAS.GameplayEventType.ResourceChanged);
-                    store.GameplayTriggersRuntime.Consume(store.GameplayEffectsRuntime.Events, _gameplayTriggers, true);
-                    store.GameplayTriggersRuntime.ConsumeNextRounds(_gameplayTriggers);
-                }
-                store.DamageResolver.EnableDeferred(false);
-                store.ResourceResolver.EnableDeferred(false);
-                RejectNonWaveAbilityWork();
-                return;
-            }
-
-            if (Phase != GameState.WavePhase)
-            {
-                store.DamageResolver.RejectPending(Core.GAS.DamageCommitBoundary.GameplayResolve);
-                store.ResourceResolver.RejectPendingEnemyDamage();
-                store.DamageResolver.EnableDeferred(false);
-                store.ResourceResolver.EnableDeferred(false);
-                RejectNonWaveAbilityWork();
-                return;
-            }
-
-            RunWavePhaseLegacy(time, turn);
-        }
 
         private void RejectNonWaveAbilityWork()
         {
@@ -410,7 +320,6 @@ namespace BattleSystemECS.Core
 
         internal void GraphBeginFrame(NodeExecutionContext context)
         {
-            _externalDeltaTime = context.Delta;
             store.ApplyComputedAttributeModeAtFrameBoundary();
             store.BeginFrame();
             store.GameplayEffectsRuntime.ResetFrame();
@@ -434,13 +343,6 @@ namespace BattleSystemECS.Core
         {
             TimeContext time = CreateTimeContext(context.Time.RawDelta, context.Turn, context.Frame, context.Phase);
             context.FreezeTime(time);
-        }
-
-        private TimeContext FreezeTimeContextCore(float rawDelta)
-        {
-            TimeContext time = CreateTimeContext(rawDelta, _executionContext.Turn, _executionContext.Frame, _executionContext.Time.Phase);
-            _executionContext.FreezeTime(time);
-            return time;
         }
 
         private TimeContext CreateTimeContext(float rawDelta, int turn, int frame, PhaseContext phase)
@@ -577,100 +479,6 @@ namespace BattleSystemECS.Core
                 }
             }
             deltaTime *= store.GlobalTimeScale[0];
-        }
-
-        /// <summary>
-        /// WavePhase pipeline — 13 logical phases executed in strict order.
-        /// Each phase is encapsulated in a SystemGroup — add/remove systems inside the group, not here.
-        /// 
-        /// Bullet-time dt split (direction 10): when PlayerBulletTimeTurnsLeft[0] > 0, "enemyDt" (used by
-        /// PreGame/Spawning/AI/Movement/Terrain/CombatSetup/Spatial) is scaled down by PlayerBulletTimeScale[0],
-        /// while "combatDt" (used by Combat/SkillBuff/PostDeath) stays at full speed. This makes enemies + their
-        /// movement + projectiles crawl while the player's tower/attack systems continue at normal rate — the
-        /// classic "tactical pause" effect. Inactive (turns <= 0) → both dts equal the input dt (zero overhead).
-        /// </summary>
-        private void RunWavePhaseLegacy(TimeContext time, int turn)
-        {
-            float deltaTime = time.GlobalDelta;
-            float enemyDt = time.EnemyDelta;
-            float combatDt = time.CombatDelta;
-
-            // Phase 1: Pre-game (weather, day/night, difficulty, events) — ENEMY side
-            PreGame.Execute(store, enemyDt, turn);
-            // Weather and other pre-game producers commit at the explicit early boundary.
-            store.DamageResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.EarlyResolve);
-            store.ResourceResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.EarlyResolve);
-
-            // Phase 2: Spawning (waves, nests) — ENEMY side
-            Spawning.Execute(store, enemyDt, turn);
-
-            // Phase 3: AI (behavior trees, abilities, burrow, necromancer, life link, affixes) — ENEMY side
-            AI.Execute(store, enemyDt, turn);
-
-            // Phase 4: Movement (wound, pathfinding, modifiers, healer, summons) — ENEMY side
-            Movement.Execute(store, enemyDt, turn);
-
-            // ── Emit position events after movement ──
-            EmitPositionEvents();
-
-            // Phase 5: Terrain + Mutators + Morph — ENEMY side
-            Terrain.Execute(store, enemyDt, turn);
-
-            // Phase 6: Pre-combat setup (SetTurn on all combat systems) — ENEMY side
-            CombatSetup.Execute(store, enemyDt, turn);
-
-            // Phase 7: Spatial Grid rebuild + patrol/chrono/fog/telegraph — ENEMY side
-            Spatial.Execute(store, enemyDt, turn);
-
-            // Phase 8: Main combat (attacks, synergy, auras, projectiles) — COMBAT side (full speed)
-            Combat.Execute(store, combatDt, turn);
-
-            // Phase 9: Skill resolution + Buff DoT + Bleed — COMBAT side (full speed)
-            SkillBuff.ExecuteLegacy(store, time, turn);
-
-            // 战斗与技能阶段产生的资源/伤害请求在此提交边界统一可见。
-            store.DamageResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
-            store.ResourceResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
-            if (_gameplayTriggers.Count > 0)
-                store.GameplayTriggersRuntime.ConsumeOnly(store.ResourceResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.HealApplied, Core.GAS.GameplayEventType.ShieldChanged, Core.GAS.GameplayEventType.ResourceChanged);
-            if (_gameplayTriggers.Count > 0)
-                store.GameplayTriggersRuntime.ConsumeOnly(store.DamageResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.HitConfirmed, Core.GAS.GameplayEventType.DamageApplied, Core.GAS.GameplayEventType.EffectApplied);
-            if (_gameplayTriggers.Count > 0)
-                store.GameplayTriggersRuntime.Consume(store.GameplayEffectsRuntime.Events, _gameplayTriggers, true);
-            if (_gameplayTriggers.Count > 0)
-                store.GameplayTriggersRuntime.ConsumeNextRounds(_gameplayTriggers);
-            store.AttributeAggregator.AggregateDirty();
-
-            // Phase 10: Death resolve (uses queued damage, dt-free)
-            store.ResolveEnemiesKilledThisFrame();
-
-            // Phase 11: Post-death (fission, life link, objective, resources, corpses, combo) — COMBAT side
-            PostDeath.ExecuteLegacy(store, time, turn);
-            // 死亡后奖励、治疗与尸体效果沿用同一 Gameplay 提交边界。
-            store.DamageResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
-            store.ResourceResolver.CommitBoundary(Core.GAS.DamageCommitBoundary.GameplayResolve);
-            // PostDeath 可能产生致死 deferred damage；在同一帧闭合第二次死亡解析。
-            store.ResolveEnemiesKilledThisFrame();
-            if (_gameplayTriggers.Count > 0)
-                store.GameplayTriggersRuntime.ConsumeOnly(store.ResourceResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.HealApplied, Core.GAS.GameplayEventType.ShieldChanged, Core.GAS.GameplayEventType.ResourceChanged);
-            if (_gameplayTriggers.Count > 0)
-                store.GameplayTriggersRuntime.Consume(store.GameplayEffectsRuntime.Events, _gameplayTriggers, true);
-            // PostDeath 产生的生命链接/惩罚伤害也在本边界交给 Trigger，避免下一帧清空事实。
-            if (_gameplayTriggers.Count > 0)
-                store.GameplayTriggersRuntime.ConsumeOnly(store.DamageResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.HitConfirmed, Core.GAS.GameplayEventType.DamageApplied, Core.GAS.GameplayEventType.EffectApplied);
-            // 死亡/击杀事实只在生命周期和 PostDeath 提交完成后消费。
-            if (_gameplayTriggers.Count > 0)
-                store.GameplayTriggersRuntime.ConsumeOnly(store.DamageResolver.Events, _gameplayTriggers, false, Core.GAS.GameplayEventType.KillConfirmed, Core.GAS.GameplayEventType.ResourceChanged, Core.GAS.GameplayEventType.DeathQueued);
-            if (_gameplayTriggers.Count > 0)
-                store.GameplayTriggersRuntime.ConsumeNextRounds(_gameplayTriggers);
-            store.DamageResolver.EnableDeferred(false);
-            store.ResourceResolver.EnableDeferred(false);
-
-            // Phase 12: Threat Score EMA update (Round 99 Direction 5)
-            // O(MAX_PLAYERS) per-tick: decay the running average using an exponential moving
-            // average with half-life ThreatScoreConfig.DPSWindowSec, then add this frame's
-            // PlayerDPSAccumulator (which is reset to 0 below). Hot-path cost: ~10 float ops.
-            DecayAndAccumulateThreatScore(combatDt);
         }
 
         /// <summary>

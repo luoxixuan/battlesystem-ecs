@@ -3,7 +3,7 @@ using System;
 namespace BattleSystemECS.Core
 {
     /// <summary>Post-death resolution: fission, objective, resources, income, corpses, combo.</summary>
-    internal sealed class PostDeathGroup : ISystemGroup
+    internal sealed class PostDeathGroup
     {
         public Systems.EnemyFissionSystem? EnemyFission { get; set; }
         public Systems.ObjectiveSystem? Objective { get; set; }
@@ -36,49 +36,5 @@ namespace BattleSystemECS.Core
             if(SoulHarvest!=null)s.RegisterFrameBinding(FrameBindingFacts.Get("post-death.soul-harvest.update"),c=>SoulHarvest?.Update(c.Delta));
         }
 
-        internal void ExecuteLegacy(ComponentStore store, TimeContext time, int turn)
-        {
-            ExecuteCore(store, time.CombatDelta, ToGameState(time.Phase.Kind));
-        }
-
-        public void Execute(ComponentStore store, float deltaTime, int turn) =>
-            ExecuteCore(store, deltaTime, GameState.WavePhase);
-
-        void ISystemGroup.Execute(ComponentStore store, float deltaTime, int turn) => Execute(store, deltaTime, turn);
-
-        private void ExecuteCore(ComponentStore store, float deltaTime, GameState phase)
-        {
-            EnemyFission?.Update();
-            Objective?.Update(deltaTime, phase);
-            ResourceNode?.Update(deltaTime, phase);
-            CorpseEffect?.Update(deltaTime);
-            Combo?.Update(deltaTime);
-            // DoomClock countdown runs in PostDeath so it ticks on the same cadence
-            // as the objective score / wave completion bookkeeping. The timer
-            // short-circuits to 0 in Update when the run ends.
-            DoomClock?.Update(deltaTime, phase);
-
-            // Round 196 Direction 3 — Soul Harvest per-frame regen tick. Sentinels
-            // short-circuit on PlayerSoulRegen == 0, so cost is O(MAX_PLAYERS) with
-            // a single float compare per slot when no player has regen configured.
-            SoulHarvest?.Update(deltaTime);
-
-            // Wave branch: pause combat if branch selection is active
-            if (WaveBranch?.IsBranchActive == true)
-                return;
-        }
-
-        private static GameState ToGameState(PhaseContextKind phase) => phase switch
-        {
-            PhaseContextKind.Init => GameState.Init,
-            PhaseContextKind.Build => GameState.BuildPhase,
-            PhaseContextKind.Wave => GameState.WavePhase,
-            PhaseContextKind.Intermission => GameState.Intermission,
-            PhaseContextKind.BranchSelection => GameState.BranchSelection,
-            PhaseContextKind.LevelComplete => GameState.LevelComplete,
-            PhaseContextKind.GameOver => GameState.GameOver,
-            PhaseContextKind.Victory => GameState.Victory,
-            _ => GameState.Init
-        };
     }
 }

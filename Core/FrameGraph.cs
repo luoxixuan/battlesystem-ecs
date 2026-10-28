@@ -15,7 +15,6 @@ namespace BattleSystemECS.Core
     public enum FrameExecutionSemantics { SerialPrepare, SerialUpdate, ParallelDisjointWrite, InternalParallelCollectSerialCommit, SerialCommit, PresentationCommit }
     public enum OptionalDependencyPolicy { Disabled, NoOp, Fail }
     public enum FrameGraphCompositionKind { Direct, ProductionRegistry, ManualBenchmark }
-    public enum FrameSchedulerExecutionMode { Graph, Legacy }
     public enum FrameScenarioKind { Gameplay, FixedPopulationBenchmark }
     public enum FrameResourceOrigin { ExternalInput, PersistentState, FrameProduced }
     public enum FrameResource
