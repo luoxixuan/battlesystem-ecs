@@ -9,11 +9,14 @@ using Xunit;
 
 namespace BattleSystemECS.Tests.Framework
 {
-    /// <summary>P3 Lumio 属性公式：Percent 加项、Override 最终覆盖、Multiply 守卫。</summary>
+    /// <summary>P3 Lumio 属性公式：Percent 加项、Override 最终覆盖、未定义运算守卫。</summary>
     public sealed class AttributeAggregatorFormulaTests : BattleTestBase
     {
         private static readonly AttributeKey Damage = CatalogRegistries.DamageOutputMultiplier;
         private static readonly AttributeKey Attack = CatalogRegistries.AttackDamage;
+
+        // 已退役的旧 Multiply 数值（1）；枚举不再有该成员，用强转模拟遗留数据。
+        private const AttributeModifierOp RetiredMultiply = (AttributeModifierOp)1;
 
         private static ModifierDefinition Mod(AttributeKey key, AttributeModifierOp op, float value, int priority = 0)
             => new ModifierDefinition(key, op, value, priority);
@@ -157,16 +160,18 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void SkillSystemAttackBoostAdapterMapsMultiplyToPercent()
+        public void SkillSystemAttackBoostAdapterKeepsPercentOffsetBitIdentical()
         {
             var attackBoost = new GameplayEffectDef("Attack+10%", EffectType.Instant,
-                AttributeSetDefinitions.ATTACK_DAMAGE, AttributeModifierOp.Multiply, 1.1f);
+                AttributeSetDefinitions.ATTACK_DAMAGE, AttributeModifierOp.Percent, 1.1f - 1f);
             var source = Store.GetEntityHandle(Player());
             var application = LegacyEffectAdapter.CreateApplication(attackBoost, source, source);
             var mapped = Assert.Single(application.Definition.Modifiers);
             Assert.Equal(Attack, mapped.Attribute);
             Assert.Equal(AttributeModifierOp.Percent, mapped.Operation);
-            Assert.Equal(0.1f, mapped.Magnitude, 5);
+            float legacyOffset = 1.1f;
+            legacyOffset -= 1f; // 旧 Multiply(1.1f) 经 adapter 的运行时换算
+            Assert.Equal(BitConverter.SingleToInt32Bits(legacyOffset), BitConverter.SingleToInt32Bits(mapped.Magnitude));
             Assert.Equal(SnapshotPolicy.CaptureOnApply, mapped.Snapshot);
 
             const float baseline = 10f;
@@ -198,20 +203,20 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void AddModifier_RejectsResidualMultiplyAtRuntime()
+        public void AddModifier_RejectsRetiredMultiplyOperationAtRuntime()
         {
             var a = new AttributeAggregator();
             a.SetBase(1, Damage, 1f);
             var error = Assert.Throws<InvalidOperationException>(
-                () => a.AddModifier(1, Mod(Damage, AttributeModifierOp.Multiply, 1.1f)));
-            Assert.Contains("Multiply", error.Message, StringComparison.Ordinal);
+                () => a.AddModifier(1, Mod(Damage, RetiredMultiply, 1.1f)));
+            Assert.Contains("Unsupported", error.Message, StringComparison.Ordinal);
             Assert.Equal(1f, a.GetComputed(1, Damage), 5);
 
             using (var store = new ComponentStore())
             {
                 store.AddPlayer(0, 10f, 1f, 1f, 1);
                 Assert.Throws<InvalidOperationException>(() =>
-                    store.AddAttributeModifier(0, new ModifierDefinition(Attack, AttributeModifierOp.Multiply, 2f)));
+                    store.AddAttributeModifier(0, new ModifierDefinition(Attack, RetiredMultiply, 2f)));
             }
         }
 

@@ -146,10 +146,10 @@ namespace BattleSystemECS.Core.GAS
         public AttributeModifierHandle AddModifier(int entityId, ModifierDefinition definition, float capturedMagnitude = float.NaN)
         {
             var d = _schema.Get(definition.Attribute); if (!d.AllowsModifiers) throw new InvalidOperationException("Attribute does not allow modifiers");
-            // 残留 Multiply 不得进账本：Catalog 校验看不到 SkillSystem 等运行时构造的 legacy def。
+            // 未定义运算（含已退役的旧 Multiply=1）不得进账本。
             if (definition.Operation != AttributeModifierOp.Add && definition.Operation != AttributeModifierOp.Percent
                 && definition.Operation != AttributeModifierOp.Override)
-                throw new InvalidOperationException("Multiply cannot enter the aggregator; map to Percent");
+                throw new InvalidOperationException("Unsupported modifier operation " + (int)definition.Operation + "; use Add/Percent/Override");
             var id = new AttributeModifierHandle(++_nextId); var value = definition.Snapshot == SnapshotPolicy.CaptureOnApply && !float.IsNaN(capturedMagnitude) ? capturedMagnitude : definition.Magnitude;
             var m = new Modifier { Handle = id, Key = definition.Attribute, Op = definition.Operation, Magnitude = definition.Magnitude, Captured = value, Snapshot = definition.Snapshot, Priority = definition.Priority, Sequence = ++_sequence };
             var slot = (entityId, definition.Attribute); if (!_modifiers.TryGetValue(slot, out var list)) _modifiers[slot] = list = new List<Modifier>(); list.Add(m); _dirty.Add(slot); return id;
@@ -207,7 +207,7 @@ namespace BattleSystemECS.Core.GAS
                     else if (m.Op == AttributeModifierOp.Percent)
                         percent += magnitude;
                     else
-                        throw new InvalidOperationException("Multiply cannot enter Aggregate; use Percent");
+                        throw new InvalidOperationException("Unsupported modifier operation in Aggregate");
                 }
             }
             float value = hasOverride

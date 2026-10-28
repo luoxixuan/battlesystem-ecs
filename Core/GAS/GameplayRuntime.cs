@@ -430,14 +430,9 @@ namespace BattleSystemECS.Core.GAS
             for (int i = 0; i < definition.Modifiers.Count; i++)
                 if (definition.Modifiers[i].Snapshot == SnapshotPolicy.CaptureOnApply) { captureOnApply = true; break; }
             if (!captureOnApply) return float.NaN;
-            // CaptureOnApply 与 adapter 同一套映射：Multiply(m) → Percent(m−1)，禁止用未映射的 legacy m。
+            // CaptureOnApply 取 legacy 快照里的 modifier 幅度（与 adapter 映射一致，无额外换算）。
             if (application.LegacySnapshot.AttributeIndex >= 0)
-            {
-                float magnitude = application.LegacySnapshot.Magnitude;
-                if (application.LegacySnapshot.ModifierOp == AttributeModifierOp.Multiply)
-                    magnitude -= 1f;
-                return magnitude;
-            }
+                return application.LegacySnapshot.Magnitude;
             return float.NaN;
         }
 

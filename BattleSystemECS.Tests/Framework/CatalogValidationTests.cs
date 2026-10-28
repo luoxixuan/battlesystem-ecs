@@ -35,14 +35,14 @@ namespace BattleSystemECS.Tests.Framework
         [Fact] public void RejectsAliasWithoutAbility() => AssertInvalid(new GameplayCatalog(new[] { Ability() }, new[] { Ability().Targeting }, Array.Empty<GameplayEffectDefinition>(), Array.Empty<ExecutionDefinition>(), Array.Empty<TriggerDefinition>(), Array.Empty<ModifierDefinition>(), new Dictionary<string, AbilityId> { ["orphan"] = new AbilityId(4) }), "alias");
 
         [Fact]
-        public void RejectsResidualMultiplyOnEffectModifier()
+        public void RejectsRetiredMultiplyOperationOnEffectModifier()
         {
-            var modifier = new ModifierDefinition(new AttributeKey(0), AttributeModifierOp.Multiply, 1.1f);
+            var modifier = new ModifierDefinition(new AttributeKey(0), (AttributeModifierOp)1, 1.1f);
             var effect = new GameplayEffectDefinition(new EffectId(0), EffectType.Duration, new[] { modifier }, 1f, 0f, ClockId.Combat, StackingBehavior.None, 1, RefreshPolicy.None, SourceDeathPolicy.Persist, EffectPayloadKind.GameplayEvent, new TagId(0), Array.Empty<ExecutionId>());
             var error = Assert.Throws<CatalogValidationException>(() =>
                 CatalogValidator.Validate(Make(Ability(effects: new[] { new EffectId(0) }), new[] { effect }), Path));
             Assert.Contains(Path, error.Message, StringComparison.Ordinal);
-            Assert.Contains("Multiply", error.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("unsupported modifier operation", error.Message, StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]

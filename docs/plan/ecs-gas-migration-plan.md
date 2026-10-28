@@ -192,3 +192,4 @@ sparse/paged GAS pool + active lists。详见 [M8 evidence](../ecs-gas-m8-eviden
 下列 legacy 路径的退出条件（M5/M8 未完成）已由 owner 于 2026-10-28 豁免，按“清理退役”处理，**不是迁移完成**；仅在 golden / replay / determinism-soak 摘要不变时才删除。
 
 - C4.1 legacy 执行模式：已退役。删除 `FrameSchedulerExecutionMode`、`FrameScheduler.TickLegacy` 与全部 `*Group.Execute` / `ExecuteLegacy`（M5 的 graph/legacy replay 对照随之取消，改为 graph-only 断言）。FrameGraph 成为唯一执行路径，图/hash 不变。
+- C4.2 `Multiply` 效果路径：已退役（`AttributeModifierOp.Multiply`、adapter 的 Multiply→Percent 映射、validator 的 residual-Multiply 检查）；`SkillSystem` 改为 `Percent(1.1f - 1f)`，与旧映射逐位相同。`LegacyEffectAdapter` 保留：它仍是 BuffSystem/ElementalReaction/SkillSystem 的 live 转换点、TryRestack 的名称键载体和 `ActiveEffects` 投影（E-07）的来源，不是死代码。

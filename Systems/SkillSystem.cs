@@ -320,9 +320,10 @@ namespace BattleSystemECS.Systems
             }
 
             // Apply "Attack+10%" and "Crit Rate+5%" buffs via GameplayEffect
-            // Attack+10% 仍写 legacy Multiply(1.1)；adapter 映射为 Percent(0.1)，无其它乘区时与旧 ×1.1 一致。
+            // Attack+10%：Percent 加项。1.1f - 1f（= 0.100000024f）与旧 Multiply(1.1f) 经 adapter 映射的结果逐位相同，
+            // 不能改写成 0.1f。
             var attackBoost = new GameplayEffectDef("Attack+10%", EffectType.Instant,
-                AttributeSetDefinitions.ATTACK_DAMAGE, AttributeModifierOp.Multiply, 1.1f);
+                AttributeSetDefinitions.ATTACK_DAMAGE, AttributeModifierOp.Percent, 1.1f - 1f);
             store.TryAddGameplayEffect(playerId, LegacyEffectAdapter.CreateApplication(attackBoost,
                 store.GetEntityHandle(playerId), store.GetEntityHandle(playerId)), out _);
             // Sync to bit flags for O(1) hot-path queries

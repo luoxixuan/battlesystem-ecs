@@ -6,9 +6,9 @@ namespace BattleSystemECS.Core.GAS
 
     /// <summary>
     /// 属性修饰运算。Percent 的 magnitude 是加项（+30% 配 0.30）。
-    /// Multiply 仅作 legacy 输入，不得进入 Aggregator（adapter 映射为 Percent(m−1)）。
+    /// 旧 Multiply 已于 C4.2 退役；数值显式固定，保持 Override=2 / Percent=3 不变。
     /// </summary>
-    public enum AttributeModifierOp { Add, Multiply, Override, Percent }
+    public enum AttributeModifierOp { Add = 0, Override = 2, Percent = 3 }
 
     /// <summary>
     /// Defines how multiple instances of the same effect stack on a target.

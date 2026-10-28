@@ -1097,7 +1097,7 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void TryAdopt_MapsLegacyMultiplyCaptureToPercentOffset()
+        public void TryAdopt_CapturesLegacyPercentOffset()
         {
             var store = new ComponentStore();
             store.AddPlayer(0, 10f, 1f, 1f, 1);
@@ -1105,7 +1105,7 @@ namespace BattleSystemECS.Tests.Framework
             var key = CatalogRegistries.AttackDamage;
             store.AttributeAggregator.SetBase(target, key, 10f);
             var legacy = new GameplayEffectDef("atk-boost", EffectType.Duration, key.Value,
-                AttributeModifierOp.Multiply, 1.1f, 5f);
+                AttributeModifierOp.Percent, 1.1f - 1f, 5f);
             var application = LegacyEffectAdapter.CreateApplication(legacy,
                 store.GetEntityHandle(0), store.GetEntityHandle(target));
             Assert.True(store.GameplayEffectsRuntime.TryAdopt(application, 0, out _));

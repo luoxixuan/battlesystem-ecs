@@ -1,5 +1,13 @@
 # 更新记录 (Changelog)
 
+### 2026-10-28（退役 Multiply 效果路径 C4.2）
+- 退出条件（审计 §8.6 / R-06）未满足，由 owner 于 2026-10-28 豁免：按“清理退役”处理，非迁移完成。仅因 golden / replay / determinism-soak 摘要不变而删除。
+- 删除 `AttributeModifierOp.Multiply`（枚举显式固定 `Add=0, Override=2, Percent=3`，数值不变）、`LegacyEffectAdapter.MapLegacyModifier` 的 Multiply→Percent 换算、`GameplayRuntime.ResolveAdoptModifierCapture` 的 Multiply 分支；`CatalogValidator.RejectResidualMultiply` 改为 `RejectUnknownOperation`，`AttributeAggregator` 的守卫改为“未定义运算”（遗留数值 1 仍被拒绝）。
+- `SkillSystem` 的 Attack+10% 改为 `Percent, 1.1f - 1f`（`0.100000024f`，与旧 adapter 换算逐位相同；不得写成 `0.1f`）。生产配置无 Multiply 用法。
+- `LegacyEffectAdapter` 保留：它是 BuffSystem DoT / ElementalReaction / SkillSystem 的 live 转换点、`TryRestack` 的名称键来源，并支撑 `AppliedEffect`/`ActiveEffects` 投影（E-07），不是死代码。
+- 测试：Multiply 相关用例改为 Percent 位等价断言与“未定义运算被拒绝”断言（用 `(AttributeModifierOp)1` 模拟遗留值）。
+- 验证：分块完整套件结果见提交信息；mode 2/4/5 延期未运行。
+
 ### 2026-10-28（退役 legacy 执行模式 C4.1）
 - 退出条件（M5 declared complete）未满足，由 owner 于 2026-10-28 豁免：按“清理退役”处理，非迁移完成。仅因 golden / replay / determinism-soak 摘要不变而删除。
 - 删除 `FrameSchedulerExecutionMode`（`Graph`/`Legacy` 枚举）及 `FrameScheduler` / `GameManager` 构造参数与 `ExecutionMode` / `ConfiguredExecutionMode`；删除 `FrameScheduler.TickLegacy`、`RunWavePhaseLegacy`、`FreezeTimeContextCore`、`_externalDeltaTime`；删除全部 `*Group.Execute`、`SkillBuffGroup/PostDeathGroup.ExecuteLegacy` 及其私有辅助，以及空壳 `ISystemGroup` / `IBuildPhaseGroup`（`ISystemGroup.cs`）。`GameManager` 构造函数首参数改为 `effectClock`（Program.cs / Unity 均无传参调用）。

@@ -30,7 +30,7 @@ namespace BattleSystemECS.Core.GAS
                 foreach (var execution in ability.Executions) if ((uint)execution.Value >= (uint)catalog.Executions.Count) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} references missing execution {execution.Value}");
                 foreach (var effect in ability.Effects) if ((uint)effect.Value >= (uint)catalog.Effects.Count) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} references missing effect {effect.Value}");
                 foreach (var trigger in ability.TriggerRefs) if ((uint)trigger.Value >= (uint)catalog.Triggers.Count) throw new CatalogValidationException($"{path}: ability {ability.Id.Value} ({ability.Name}) references missing trigger {trigger.Value}");
-                foreach (var modifier in ability.Modifiers) RejectResidualMultiply(modifier, path, $"ability {ability.Id.Value}");
+                foreach (var modifier in ability.Modifiers) RejectUnknownOperation(modifier, path, $"ability {ability.Id.Value}");
                 ValidateModifierProvenance(catalog, ability, path);
             }
             if (catalog.AbilityDefinitions == null || catalog.AbilityDefinitions.Count != catalog.Abilities.Count)
@@ -73,7 +73,7 @@ namespace BattleSystemECS.Core.GAS
                     foreach (var modifier in effect.Modifiers)
                     {
                         if (!CatalogRegistries.TryAttribute(modifier.Attribute)) throw new CatalogValidationException($"{path}: effect {effect.Id.Value} has unregistered modifier attribute");
-                        RejectResidualMultiply(modifier, path, $"effect {effect.Id.Value}");
+                        RejectUnknownOperation(modifier, path, $"effect {effect.Id.Value}");
                     }
                 }
             }
@@ -111,7 +111,7 @@ namespace BattleSystemECS.Core.GAS
             if (catalog.Modifiers != null)
             {
                 for (int i = 0; i < catalog.Modifiers.Count; i++)
-                    RejectResidualMultiply(catalog.Modifiers[i], path, $"catalog modifier {i}");
+                    RejectUnknownOperation(catalog.Modifiers[i], path, $"catalog modifier {i}");
             }
             if (catalog.Aliases != null) foreach (var alias in catalog.Aliases) if ((uint)alias.Value.Value >= (uint)catalog.AbilityDefinitions.Count) throw new CatalogValidationException($"{path}: alias '{alias.Key}' references missing ability {alias.Value.Value}");
             for (int i = 0; i < catalog.Abilities.Count; i++)
@@ -122,10 +122,11 @@ namespace BattleSystemECS.Core.GAS
             }
         }
 
-        private static void RejectResidualMultiply(ModifierDefinition modifier, string path, string location)
+        private static void RejectUnknownOperation(ModifierDefinition modifier, string path, string location)
         {
-            if (modifier.Operation == AttributeModifierOp.Multiply)
-                throw new CatalogValidationException($"{path}: {location} residual Multiply is rejected; use Percent");
+            if (modifier.Operation != AttributeModifierOp.Add && modifier.Operation != AttributeModifierOp.Percent
+                && modifier.Operation != AttributeModifierOp.Override)
+                throw new CatalogValidationException($"{path}: {location} unsupported modifier operation {(int)modifier.Operation}; use Add/Percent/Override");
         }
 
         private static void ValidateCapacity(GameplayCatalog catalog, string path)
