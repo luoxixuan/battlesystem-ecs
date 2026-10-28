@@ -14,7 +14,7 @@ BattleSystem-ECS/
 ├── BattleSystemECS.Tests/    # xUnit 单元测试（net9.0，四分层；数量以最新门禁日志为准）
 ├── Systems/                  # 游戏系统（110 个，全部编译到 Core）
 ├── Core/                     # ECS 核心（ComponentStore×5、FrameScheduler、GAS、EventBus）
-├── Data/                     # 静态数据（Skills×150 由 Core 加载；Monsters/Towers/Levels 目录 Core 基本不加载，见 AGENTS.md §2.1）
+├── Data/                     # 静态数据（Configs 与 Skills×150 与 Towers/tower_synergy.json 均由 Core 加载；无加载器的 Monsters/Levels/其余 Towers 文件已删除，见 AGENTS.md §2.1）
 └── docs/ / Research/         # 架构文档、知识库
 ```
 

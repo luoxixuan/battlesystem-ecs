@@ -1,9 +1,0 @@
-{
-  "Name": "Cryo Node",
-  "Type": "Tower",
-  "Damage": 15,
-  "Range": 6,
-  "AttackSpeed": 2.0,
-  "Cost": 95,
-  "UpgradeCost": 47
-}

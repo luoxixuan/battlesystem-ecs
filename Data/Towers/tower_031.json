@@ -1,9 +1,0 @@
-{
-  "Name": "Arc Welder",
-  "Type": "Tower",
-  "Damage": 42,
-  "Range": 5,
-  "AttackSpeed": 1.1,
-  "Cost": 255,
-  "UpgradeCost": 153
-}

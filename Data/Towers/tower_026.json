@@ -1,9 +1,0 @@
-{
-  "Name": "Swarm Hive",
-  "Type": "Tower",
-  "Damage": 8,
-  "Range": 8,
-  "AttackSpeed": 4.5,
-  "Cost": 270,
-  "UpgradeCost": 162
-}

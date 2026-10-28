@@ -27,8 +27,6 @@
     <!-- Data/Skills/*.json：静态技能定义（SkillDefs 表来源之一），此前从未随产物分发 -->
     <None Include="..\Data\Skills\*.json" Link="Data\Skills\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Data\Towers\*.json" Link="Data\Towers\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\Data\Monsters\*.json" Link="Data\Monsters\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\Data\Levels\*.json" Link="Data\Levels\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

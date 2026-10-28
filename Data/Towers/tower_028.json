@@ -1,9 +1,0 @@
-{
-  "Name": "Cryo Cannon",
-  "Type": "Tower",
-  "Damage": 32,
-  "Range": 5,
-  "AttackSpeed": 1.3,
-  "Cost": 185,
-  "UpgradeCost": 111
-}

@@ -1,9 +1,0 @@
-{
-  "Name": "Plasma Drill",
-  "Type": "Tower",
-  "Damage": 75,
-  "Range": 3,
-  "AttackSpeed": 0.8,
-  "Cost": 360,
-  "UpgradeCost": 216
-}

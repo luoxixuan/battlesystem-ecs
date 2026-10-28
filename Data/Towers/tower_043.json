@@ -1,9 +1,0 @@
-{
-  "Name": "Missile Battery",
-  "Type": "Tower",
-  "Damage": 85,
-  "Range": 10,
-  "AttackSpeed": 0.45,
-  "Cost": 480,
-  "UpgradeCost": 288
-}

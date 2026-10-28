@@ -1,9 +1,0 @@
-{
-  "Name": "Void Sphere",
-  "Type": "Tower",
-  "Damage": 40,
-  "Range": 7,
-  "AttackSpeed": 1.2,
-  "Cost": 275,
-  "UpgradeCost": 165
-}

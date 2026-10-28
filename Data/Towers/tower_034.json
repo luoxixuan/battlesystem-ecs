@@ -1,9 +1,0 @@
-{
-  "Name": "Pulse Sphere",
-  "Type": "Tower",
-  "Damage": 14,
-  "Range": 8,
-  "AttackSpeed": 2.0,
-  "Cost": 170,
-  "UpgradeCost": 102
-}

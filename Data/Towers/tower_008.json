@@ -1,9 +1,0 @@
-{
-  "Name": "EMP Tower",
-  "Type": "Tower",
-  "Damage": 5,
-  "Range": 10,
-  "AttackSpeed": 0.5,
-  "Cost": 250,
-  "UpgradeCost": 150
-}

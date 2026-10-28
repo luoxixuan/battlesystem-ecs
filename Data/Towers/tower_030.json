@@ -1,9 +1,0 @@
-{
-  "Name": "Shock Tower",
-  "Type": "Tower",
-  "Damage": 16,
-  "Range": 6,
-  "AttackSpeed": 2.8,
-  "Cost": 165,
-  "UpgradeCost": 99
-}

@@ -1,9 +1,0 @@
-{
-  "Name": "Plasma Grid",
-  "Type": "Tower",
-  "Damage": 90,
-  "Range": 6,
-  "AttackSpeed": 0.6,
-  "Cost": 520,
-  "UpgradeCost": 312
-}

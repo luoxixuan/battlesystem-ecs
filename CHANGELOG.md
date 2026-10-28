@@ -1,5 +1,12 @@
 # 更新记录 (Changelog)
 
+### 2026-10-28（删除无加载器读取的 Data 文件 C3）
+- 删除前对 `Core/`、`Systems/`、测试、`tools/`、`Program.cs`、csproj（`CopyToOutputDirectory`/`Content`/`None`）与脚本逐一 grep 文件名与路径，并枚举全部 `.json` 字面量与目录枚举（仅 `Data/Skills/*.json`、`skill_*.json` 两处）。确认无加载/拷贝/引用后删除：`Data/Monsters/*`（238）、`Data/Levels/*`（6）、`Data/Towers/` 下除 `tower_synergy.json` 外的 174 个文件，以及 18 个 `Data/Configs` 文件：`auto_skill`、`backstab`、`beacon_towers`、`culling`、`damage_conversion`、`day_night`、`obstacles`、`path_junctions`、`path_terrain`、`patrol_paths`、`player`、`projectile_deflection`、`shop_reroll`、`shrine_towers`、`totems`、`tower_affixes`、`wave_gold_decay`、`wave_skip`（审计 E-09 的 11 个 + `tower_affixes`/`obstacles`/`totems` + 仅存在于注释中的 `culling`/`day_night`/`path_junctions`/`patrol_paths`）。
+- csproj：`BattleSystemECS.csproj` 去掉 `wave_gold_decay.json` / `path_terrain.json` 的 `None Update` 项；Core csproj 去掉 `Data\Monsters` / `Data\Levels` 通配拷贝项（`Data\Towers` 通配保留，用于 `tower_synergy.json`）。
+- 保留：全部被加载器读取的 33 个 `Data/Configs` 文件、`Data/Skills/*`、`Data/Towers/tower_synergy.json`；`game_config.json` 的 `MonsterTypes`/`Levels` 是运行时唯一来源。Unity 使用自己的 `StreamingAssets/level_1.json` 与 `game_config.json` 副本，不依赖本仓库 `Data/Levels`。
+- 文档：AGENTS.md §2.1/§3.1、README 同步；Systems/ 仍为 110。
+- 验证：分块完整套件结果见提交信息；mode 2/4/5 延期未运行。
+
 ### 2026-10-28（退役 CraftingSystem 与无人读取的存档文件 C2）
 - 删除 `CraftingSystem`（从未被任何生产路径构造，S-c）及其测试 `CraftingSystemTests`、`SimulationRngGuardTests` 文件名列表中的 `CraftingSystem.cs`；`ICraftingService`、`CraftingResult`、`InventorySystem.BindCraftingSystem/TryCraft`；配置 `GameConfig.CraftingRecipes`、`CraftingRecipeDef`、`CraftingItemStack`，`GameConfigLoader.LoadCraftingRecipes/ParseCraftingStacks/Clamp01`，以及 `Data/Configs/crafting_recipes.json`（`game_config.json` 中本无 crafting 键，无需改动）。`ItemDefs`/`items.json` 属于 `InventorySystem`，保留。该功能无 SOA 数组。
 - 删除每波写入、从未被读取的检查点文件：`SaveSystem`（整类，`LoadCheckpoint`/`HasCheckpoint`/元进度读写均无调用方）、`SystemRegistry.Save`、spec 条目 `Save`（`ProductionEvents` 依赖列表同步移除）、`CreateSave/WireSave/BindSave` recipe、`WireProductionEvents` 中的 `OnWaveComplete += SaveCheckpoint`，以及 Core csproj 的 `Data\Saves\*.json` 拷贝项。manifest/ledger 经 `generate-system-registry-ledger.ps1` 重新生成（注册数 -1）。`Data/Saves/checkpoint.json` 仍在 `.gitignore`（本地遗留文件不再产生）；`PrestigeSystem` 自带的 `meta_progression.json` 读写不受影响。

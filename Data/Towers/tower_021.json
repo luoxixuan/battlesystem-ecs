@@ -1,9 +1,0 @@
-{
-  "Name": "Nebula Emitter",
-  "Type": "Tower",
-  "Damage": 28,
-  "Range": 7,
-  "AttackSpeed": 1.6,
-  "Cost": 195,
-  "UpgradeCost": 117
-}

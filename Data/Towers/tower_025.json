@@ -1,9 +1,0 @@
-{
-  "Name": "Missile Pod",
-  "Type": "Tower",
-  "Damage": 60,
-  "Range": 9,
-  "AttackSpeed": 0.7,
-  "Cost": 330,
-  "UpgradeCost": 198
-}

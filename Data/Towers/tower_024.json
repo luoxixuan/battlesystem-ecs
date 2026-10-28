@@ -1,9 +1,0 @@
-{
-  "Name": "Laser Array",
-  "Type": "Tower",
-  "Damage": 22,
-  "Range": 6,
-  "AttackSpeed": 3.0,
-  "Cost": 230,
-  "UpgradeCost": 138
-}

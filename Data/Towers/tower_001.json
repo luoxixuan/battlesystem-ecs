@@ -1,9 +1,0 @@
-{
-  "Name": "Pulse Cannon",
-  "Type": "Tower",
-  "Damage": 25,
-  "Range": 5,
-  "AttackSpeed": 1.5,
-  "Cost": 120,
-  "UpgradeCost": 48
-}

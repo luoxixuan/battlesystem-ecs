@@ -1,9 +1,0 @@
-{
-  "Name": "Railgun Tower",
-  "Type": "Tower",
-  "Damage": 95,
-  "Range": 12,
-  "AttackSpeed": 0.35,
-  "Cost": 500,
-  "UpgradeCost": 300
-}

@@ -1,9 +1,0 @@
-{
-  "Name": "Quantum Cannon",
-  "Type": "Tower",
-  "Damage": 70,
-  "Range": 8,
-  "AttackSpeed": 0.6,
-  "Cost": 380,
-  "UpgradeCost": 228
-}

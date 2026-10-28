@@ -1,9 +1,0 @@
-{
-  "Name": "Photon Lance",
-  "Type": "Tower",
-  "Damage": 80,
-  "Range": 11,
-  "AttackSpeed": 0.5,
-  "Cost": 420,
-  "UpgradeCost": 252
-}

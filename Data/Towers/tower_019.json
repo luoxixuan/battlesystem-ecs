@@ -1,9 +1,0 @@
-{
-  "Name": "Singularity Core",
-  "Type": "Tower",
-  "Damage": 120,
-  "Range": 6,
-  "AttackSpeed": 0.3,
-  "Cost": 600,
-  "UpgradeCost": 360
-}

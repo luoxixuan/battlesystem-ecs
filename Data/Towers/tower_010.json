@@ -1,9 +1,0 @@
-{
-  "Name": "Cyber Leech",
-  "Type": "Tower",
-  "Damage": 12,
-  "Range": 5,
-  "AttackSpeed": 2.5,
-  "Cost": 175,
-  "UpgradeCost": 105
-}

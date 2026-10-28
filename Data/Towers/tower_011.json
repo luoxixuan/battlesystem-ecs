@@ -1,9 +1,0 @@
-{
-  "Name": "Firewall Bastion",
-  "Type": "Tower",
-  "Damage": 35,
-  "Range": 3,
-  "AttackSpeed": 1.8,
-  "Cost": 210,
-  "UpgradeCost": 126
-}

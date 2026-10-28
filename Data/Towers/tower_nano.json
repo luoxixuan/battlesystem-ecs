@@ -1,9 +1,0 @@
-{
-  "Name": "Nano Swarm",
-  "Type": "Nano",
-  "Damage": 5,
-  "Range": 4,
-  "AttackSpeed": 2,
-  "Cost": 80,
-  "UpgradeCost": 50
-}

@@ -1,9 +1,0 @@
-{
-  "Name": "Tesla Sphere",
-  "Type": "Tower",
-  "Damage": 36,
-  "Range": 7,
-  "AttackSpeed": 1.5,
-  "Cost": 290,
-  "UpgradeCost": 174
-}

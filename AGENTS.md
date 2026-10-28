@@ -31,11 +31,9 @@
 | `BattleSystemECS.csproj` | 主 EXE — net6.0，引用 Core 库，仅含 Program.cs |
 | `BattleSystemECS.Tests/BattleSystemECS.Tests.csproj` | 测试项目 — net9.0，仅项目引用 Core（不含 EXE；Core 内部消费 Engine） |
 | `game_config.json` | 运行时游戏主配置（怪物类型、关卡、波次、玩家属性、连击/PositionalDamage 参数），`CopyToOutputDirectory=PreserveNewest` |
-| `Data/Configs/*.json` | 子配置：行为树、技能（skills.json = 精选技能表，加载进 `GameConfig.SkillDefs`）、科技树、塔位规则、波次生成、阶段行为等。注意：`auto_skill` / `backstab` / `beacon_towers` / `damage_conversion` / `path_terrain` / `player` / `projectile_deflection` / `shop_reroll` / `shrine_towers` / `wave_gold_decay` / `wave_skip` 这 11 个文件当前没有任何加载器读取（见 `docs/2026-10-27-cleanup-audit.md` E-09） |
-| `Data/Monsters/*.json` | 怪物静态定义（238 个文件）；**Core 不加载**，运行时怪物类型来自 `game_config.json` 的 `MonsterTypes` |
+| `Data/Configs/*.json` | 子配置：行为树、技能（skills.json = 精选技能表，加载进 `GameConfig.SkillDefs`）、科技树、塔位规则、波次生成、阶段行为等。当前目录内每个文件都有加载器读取；曾无加载器的 18 个文件（`auto_skill` / `backstab` / `beacon_towers` / `culling` / `damage_conversion` / `day_night` / `obstacles` / `path_junctions` / `path_terrain` / `patrol_paths` / `player` / `projectile_deflection` / `shop_reroll` / `shrine_towers` / `totems` / `tower_affixes` / `wave_gold_decay` / `wave_skip`）已于 C3 删除，`crafting_recipes.json` 随 CraftingSystem 在 C2 删除（见 `docs/2026-10-27-cleanup-audit.md` E-09） |
 | `Data/Skills/*.json` | 150 种技能静态定义（按名去重合并进 `GameConfig.SkillDefs`，精选条目优先） |
-| `Data/Towers/*.json` | 塔静态定义（175 个文件）；Core 只读取 `tower_synergy.json`，其余不加载（`tower_links.json` 及其 `TowerLinkDef` 已随 B6b 删除） |
-| `Data/Levels/*.json` | 关卡文件（`level_1`–`level_5` + `doom_clock`）；**Core 不加载**（关卡来自 `game_config.json` 的 `Levels`），Unity 从自身 `StreamingAssets/level_1.json` 读取 |
+| `Data/Towers/tower_synergy.json` | 塔协同配置，`TowerSynergySystem` 启动时加载；该目录其余 174 个塔静态定义文件（无加载器）已于 C3 删除，`tower_links.json` 此前随 B6b 删除 |
 
 **注意**：没有 `.sln` 解决方案文件，直接使用 `dotnet build` / `dotnet test` 对单个 `.csproj` 操作。Core 库使用 Linked Files 方式编译，不会重复存储源码。
 
@@ -100,11 +98,9 @@ BattleSystem-ECS/
 ├── Systems/                         # 游戏系统（110 个，编译到 Core 库）
 │   └── 按职责拆分（生成 / AI / 移动 / 攻击 / 塔 / 技能 / Buff / 经济 / 天气 / 地形 …），逐一举列无意义，统一经 SystemRegistry 装配
 ├── Data/                            # 静态数据与运行时配置
-│   ├── Configs/                     # 行为树、技能、科技树、塔位、波次、阶段、自动技能
-│   ├── Levels/                      # 关卡文件（Core 不加载；Unity 读 level_1）
-│   ├── Monsters/                    # 怪物定义（Core 不加载）
+│   ├── Configs/                     # 行为树、技能、科技树、塔位、波次、阶段等（每个文件都有加载器）
 │   ├── Skills/                      # 150 种技能
-│   └── Towers/                      # 塔定义（Core 仅读 tower_synergy）
+│   └── Towers/                      # 仅 tower_synergy.json（怪物/关卡文件已删除：运行时来自 game_config.json）
 ├── docs/ / Research/                # 架构文档、研究日志；迁移计划在 docs/plan/
 ├── Program.cs                       # 入口（游戏 / 压测 / 微基准）
 └── game_config.json                 # 运行时主配置

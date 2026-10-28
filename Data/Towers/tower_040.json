@@ -1,9 +1,0 @@
-{
-  "Name": "Photon Blaster",
-  "Type": "Tower",
-  "Damage": 62,
-  "Range": 6,
-  "AttackSpeed": 1.0,
-  "Cost": 340,
-  "UpgradeCost": 204
-}

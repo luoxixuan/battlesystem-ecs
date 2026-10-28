@@ -1,9 +1,0 @@
-{
-  "Name": "Void Generator",
-  "Type": "Tower",
-  "Damage": 65,
-  "Range": 5,
-  "AttackSpeed": 0.75,
-  "Cost": 350,
-  "UpgradeCost": 210
-}

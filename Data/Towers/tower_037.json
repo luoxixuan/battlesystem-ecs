@@ -1,9 +1,0 @@
-{
-  "Name": "Quantum Sphere",
-  "Type": "Tower",
-  "Damage": 25,
-  "Range": 10,
-  "AttackSpeed": 1.8,
-  "Cost": 320,
-  "UpgradeCost": 192
-}

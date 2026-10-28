@@ -1,9 +1,0 @@
-{
-  "Name": "Fusion Core",
-  "Type": "Tower",
-  "Damage": 88,
-  "Range": 4,
-  "AttackSpeed": 0.55,
-  "Cost": 440,
-  "UpgradeCost": 264
-}

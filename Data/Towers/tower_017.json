@@ -1,9 +1,0 @@
-{
-  "Name": "Ion Storm Tower",
-  "Type": "Tower",
-  "Damage": 18,
-  "Range": 9,
-  "AttackSpeed": 2.2,
-  "Cost": 240,
-  "UpgradeCost": 144
-}

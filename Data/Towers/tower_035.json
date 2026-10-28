@@ -1,9 +1,0 @@
-{
-  "Name": "Ion Cannon",
-  "Type": "Tower",
-  "Damage": 55,
-  "Range": 6,
-  "AttackSpeed": 0.9,
-  "Cost": 305,
-  "UpgradeCost": 183
-}
