@@ -175,6 +175,18 @@ namespace BattleSystemECS.Core
         internal SkillBuffGroup   SkillBuff   { get; } = new();
         internal PostDeathGroup   PostDeath   { get; } = new();
 
+        /// <summary>
+        /// 波次生成是否被暂停。暂停期间不再推进 WaveSpawningSystem.Update（不生成、不自动进入下一波），
+        /// 已排队的波次回调仍会派发；巢穴等其他生成系统不受影响。
+        /// </summary>
+        public bool IsSpawningPaused => Spawning.WavePaused;
+
+        /// <summary>
+        /// 暂停/恢复波次生成（供 Unity 等外部驱动自行控制波次节奏）。可在封印前后随时调用；
+        /// 在 OnWaveComplete 回调内调用是安全的。与 <see cref="ProductionSystemInstaller"/> 的图组装无关。
+        /// </summary>
+        public void SetSpawningPaused(bool paused) => Spawning.WavePaused = paused;
+
         public FrameScheduler(ComponentStore store, GameConfig gameConfig, IBattleEventBus? eventBus = null,
             FrameSchedulerExecutionMode executionMode = FrameSchedulerExecutionMode.Graph,
             Core.GAS.ClockId effectClock = Core.GAS.ClockId.Combat,

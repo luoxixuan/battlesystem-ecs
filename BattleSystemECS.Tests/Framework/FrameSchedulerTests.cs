@@ -36,6 +36,33 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
+        public void SetSpawningPaused_PausedTickSpawnsNothing_ResumeSpawnsAgain()
+        {
+            Player(p => { p.X = 5f; p.Y = 0f; p.Health = 200f; });
+            var waveConfig = Config.Levels[0].Waves[0];
+            waveConfig.EnemyCount = 5;
+            int expectedSpawned = waveConfig.GetTotalEnemyCount();
+
+            var waveSpawning = new WaveSpawningSystem(Store, Renderer, Config);
+            var scheduler = new FrameScheduler(Store, Config);
+            scheduler.Spawning.WaveSpawning = waveSpawning;
+            scheduler.SealGraphComposition();
+
+            Assert.False(scheduler.IsSpawningPaused);
+            scheduler.SetSpawningPaused(true);
+            Assert.True(scheduler.IsSpawningPaused);
+
+            scheduler.TickGameTurn(1f, 0);
+            Assert.Equal(0, waveSpawning.GetTotalEnemiesSpawned());
+            Assert.Equal(0, Store.GetActiveEnemyCount());
+
+            scheduler.SetSpawningPaused(false);
+            Assert.False(scheduler.IsSpawningPaused);
+            scheduler.TickGameTurn(1f, 1);
+            Assert.Equal(expectedSpawned, waveSpawning.GetTotalEnemiesSpawned());
+        }
+
+        [Fact]
         public void Tick_ResolvesKilledEnemies()
         {
             Player(p => { p.X = 5f; p.Y = 0f; p.Health = 200f; p.Gold = 9999f; });

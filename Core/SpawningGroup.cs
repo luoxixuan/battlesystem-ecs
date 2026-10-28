@@ -6,6 +6,8 @@ namespace BattleSystemECS.Core
     {
         public Systems.WaveSpawningSystem? WaveSpawning { get; set; }
         public Systems.NestSystem? Nest { get; set; }
+        /// <summary>为 true 时跳过波次生成 Update（回调派发与巢穴不受影响）；由 FrameScheduler.SetSpawningPaused 写入。</summary>
+        internal bool WavePaused { get; set; }
         // 使用独立 FrameBindingFacts 的显式适配器；不调用旧的字符串绑定 API。
         internal void RegisterBoundFrameAdapters(FrameScheduler scheduler)
         {
@@ -13,7 +15,7 @@ namespace BattleSystemECS.Core
             {
                 scheduler.RegisterFrameBinding(FrameBindingFacts.Get("spawning.wave.update"), c =>
                 {
-                    if (scheduler.RunsGameplayScenario) WaveSpawning.Update();
+                    if (scheduler.RunsGameplayScenario && !WavePaused) WaveSpawning.Update();
                 });
                 scheduler.RegisterFrameBinding(FrameBindingFacts.Get("spawning.wave.callback-dispatch"), c => WaveSpawning.DispatchPendingCallbacks());
             }
@@ -26,7 +28,7 @@ namespace BattleSystemECS.Core
 
         public void Execute(ComponentStore store, float deltaTime, int turn)
         {
-            WaveSpawning?.Update();
+            if (!WavePaused) WaveSpawning?.Update();
             WaveSpawning?.DispatchPendingCallbacks();
             Nest?.SetTurn(turn);
             Nest?.Update(deltaTime);

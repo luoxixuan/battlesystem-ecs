@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-27（公开波次生成暂停 API，供 Unity 消费端使用）
+- 新增 `FrameScheduler.SetSpawningPaused(bool)` / `IsSpawningPaused`：暂停期间跳过 `WaveSpawningSystem.Update`（图节点 `spawning.wave.update` 与 legacy `SpawningGroup.Execute` 均遵守），已排队的波次回调与巢穴不受影响；可在 `OnWaveComplete` 回调内调用。`FrameScheduler.Spawning` 保持 `internal`。
+- 背景：Unity `BattleDriver` 原通过 `scheduler.Spawning.WaveSpawning = null/系统` 摘挂来接管波次节奏，`Spawning` 自 `4bebc43` 起为 internal（审计 §10）。
+- 测试：`FrameSchedulerTests.SetSpawningPaused_PausedTickSpawnsNothing_ResumeSpawnsAgain`。
+- 验证：Engine/Core/EXE 构建 0 警告 0 错误；仅运行上述聚焦测试与 FrameSchedulerTests；完整测试套件与 mode 2/4/5 本次未运行（完整套件另行运行）。
+
 ### 2026-10-27（删除仅 loader 触碰的塔/怪配置字段 B6c）
 - 重新核验（Core/Systems/Tests/Program.cs/tools/Unity Assets，含按名访问）无生产读取方后删除：`TowerConfig.PierceCount/PierceDmgFalloff/FalloffType/FalloffStartRatio/FalloffMinRatio`、`MonsterConfig.BurrowDuration`，及 legacy `GameConfigLoader` 中对应 5 行提取。严格解析器由 POCO 属性驱动，无需额外改动。
 - JSON 键：`game_config.json` 与仓库其余 JSON 中本就无这些键，无需删除。
