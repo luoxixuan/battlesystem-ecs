@@ -11,7 +11,7 @@ namespace BattleSystemECS.Systems
 {
     /// <summary>
     /// Skill system refactored to use the GAS (Gameplay Ability System) architecture.
-    /// Skills are stored as AbilityInstances in ComponentStore, one slot per ability.
+    /// Skills are stored as ability slots (sparse pool) in ComponentStore, one slot per ability.
     /// Casting is driven by the GameplayAbilityDef data (area shape, radius, etc.)
     /// instead of hard-coded string branching.
     /// </summary>

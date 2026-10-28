@@ -1799,7 +1799,7 @@ namespace BattleSystemECS.Core
             CorpseX = null!; CorpseY = null!; CorpseMonsterType = null!;
             CorpseOwnerId = null!; CorpseHealth = null!; CorpseDeathTime = null!;
             CorpseActive = null!; CorpseReanimated = null!;
-            AbilityInstances = null!; AbilityCount = null!;
+            AbilityCount = null!;
             ActiveEffects = null!; ActiveEffectCount = null!;
             _enemyIndexInList = null!; _towerIndexInList = null!;
         }

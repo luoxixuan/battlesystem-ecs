@@ -29,8 +29,7 @@ namespace BattleSystemECS.Tests.Framework
             long constructorAllocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocationStart;
             var arrays = CaptureArrays(store);
 
-            Assert.Equal((long)ComponentStore.MAX_ENTITIES * ComponentStore.MAX_ABILITIES_PER_ENTITY,
-                Assert.Single(arrays, item => item.Name == "AbilityInstances").Elements);
+            Assert.DoesNotContain(arrays, item => item.Name == "AbilityInstances");
             Assert.Equal((long)ComponentStore.MAX_ENTITIES * ComponentStore.MAX_ACTIVE_EFFECTS_PER_ENTITY,
                 Assert.Single(arrays, item => item.Name == "ActiveEffects").Elements);
             Assert.Equal((long)ComponentStore.MAX_ENTITIES * ComponentStore.MAX_ACTIVE_EFFECTS_PER_ENTITY,
@@ -147,7 +146,7 @@ namespace BattleSystemECS.Tests.Framework
 
         private static string Classify(string name)
         {
-            if (name == "AbilityInstances" || name == "AbilityCount") return "ability-capped-candidate";
+            if (name == "AbilityCount") return "ability-capped-candidate";
             if (name == "ActiveEffects" || name == "ActiveEffectCount" || name == "_activeEffectHandles")
                 return "legacy-effect-projection";
             if (name.StartsWith("EnemyPhase", StringComparison.Ordinal)) return "boss-phase-candidate";

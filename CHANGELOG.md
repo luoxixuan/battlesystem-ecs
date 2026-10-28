@@ -1,5 +1,12 @@
 # 更新记录 (Changelog)
 
+### 2026-10-28（退役 AbilityInstances 稠密回退 C4.4）
+- 退出条件（M8 存储决策与外部消费者确认）未满足，由 owner 于 2026-10-28 豁免：按“清理退役”处理，非迁移完成。golden / replay / determinism-soak 摘要不变；Unity 对 `AbilityInstances` 零引用。
+- 依据：槽位 handle 仅在 `SetAbility`/`TryAddAbility` 变为有效（同时写稠密槽），仅在 `ReleaseEntityAbilities` 失效（同时清为 default），因此池查询失败时稠密槽恒为 `default`，回退分支在生产中等价于返回 `default`。
+- 删除 `ComponentStore.AbilityInstances`（`MAX_ENTITIES × MAX_ABILITIES_PER_ENTITY`）；`GetAbility` 池失败即返回 `default`；`TryTickAbilityCooldown` 不再镜像冷却值。
+- 测试：冷却测试改读 `GetAbility`；存储画像测试断言该数组不存在。
+- 验证：分块完整套件结果见提交信息；mode 2/4/5 延期未运行。
+
 ### 2026-10-28（退役 ApplyEnemyDamage 兼容入口 C4.3）
 - 退出条件（M7/M8 全局 legacy 入口收口）未满足，由 owner 于 2026-10-28 豁免：按“清理退役”处理，非迁移完成。生产本无调用方，仅测试使用；golden / replay / determinism-soak 摘要不变。
 - 删除 `ComponentStore.ApplyEnemyDamage`（两个重载）、`DamageResolver.ApplyLegacy` / `LegacyApplyCount` / `LastLegacyRejection`、`ResourceResolver.ApplyEnemyDamageResources`（仅供无玩家兜底分支）、`GameplayObservation.DamageLegacyApplied`；相关注释改指 `DamageResolver`。

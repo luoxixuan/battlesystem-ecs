@@ -304,7 +304,6 @@ namespace BattleSystemECS.Core
         public const int MAX_ACTIVE_EFFECTS_PER_ENTITY = 8;
 
         // Unity / 同帧 facade：稀疏池才是 AbilityState 的 owner，这里保持密数组投影。
-        public AbilityInstance[] AbilityInstances = new AbilityInstance[MAX_ENTITIES * MAX_ABILITIES_PER_ENTITY];
         private readonly AbilityHandle[] _abilitySlotHandles = new AbilityHandle[MAX_ENTITIES * MAX_ABILITIES_PER_ENTITY];
         public readonly ActiveAbilityStore Abilities = new ActiveAbilityStore(MAX_ENTITIES * MAX_ABILITIES_PER_ENTITY);
         public AbilityPool GameplayAbilityPool => Abilities.Handles;
@@ -703,12 +702,8 @@ namespace BattleSystemECS.Core
             if (!IsValidEntity(entityId)) return default;
             if (slot < 0 || slot >= MAX_ABILITIES_PER_ENTITY) return default;
             int idx = entityId * MAX_ABILITIES_PER_ENTITY + slot;
-            if (Abilities.TryGet(_abilitySlotHandles[idx], out var inst))
-            {
-                AbilityInstances[idx] = inst;
-                return inst;
-            }
-            return AbilityInstances[idx];
+            // 稀疏池是唯一事实源；handle 失效（未分配或已释放）即返回 default。
+            return Abilities.TryGet(_abilitySlotHandles[idx], out var inst) ? inst : default;
         }
 
         public void SetAbility(int entityId, int slot, AbilityInstance inst) {
@@ -726,18 +721,15 @@ namespace BattleSystemECS.Core
                 }
                 _abilitySlotHandles[idx] = handle;
             }
-            AbilityInstances[idx] = inst;
         }
 
         /// <summary>
-        /// 冷却热路径：池内原地递减，投影只同步 Cooldown 字段（handle 有效时池与投影恒一致）。
+        /// 冷却热路径：池内原地递减。
         /// handle 失效返回 false，调用方回退 GetAbility/SetAbility 语义。
         /// </summary>
         internal bool TryTickAbilityCooldown(int entityId, int slot, float deltaSeconds) {
             int idx = entityId * MAX_ABILITIES_PER_ENTITY + slot;
-            if (!Abilities.TryTickCooldown(_abilitySlotHandles[idx], deltaSeconds, out float cooldown)) return false;
-            AbilityInstances[idx].State.Cooldown = cooldown;
-            return true;
+            return Abilities.TryTickCooldown(_abilitySlotHandles[idx], deltaSeconds, out _);
         }
 
         public void AddAbility(int entityId, GameplayAbilityDef def) { TryAddAbility(entityId, def); }
@@ -754,7 +746,6 @@ namespace BattleSystemECS.Core
             }
             int idx = entityId * MAX_ABILITIES_PER_ENTITY + slot;
             _abilitySlotHandles[idx] = handle;
-            AbilityInstances[idx] = inst;
             AbilityCount[entityId]++;
             return true;
         }
@@ -818,7 +809,6 @@ namespace BattleSystemECS.Core
                 int idx = baseIdx + slot;
                 Abilities.Release(_abilitySlotHandles[idx]);
                 _abilitySlotHandles[idx] = default(AbilityHandle);
-                AbilityInstances[idx] = default(AbilityInstance);
             }
             AbilityCount[entityId] = 0;
         }

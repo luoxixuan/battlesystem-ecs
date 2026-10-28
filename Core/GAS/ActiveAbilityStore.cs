@@ -2,7 +2,7 @@ using System;
 
 namespace BattleSystemECS.Core.GAS
 {
-    /// <summary>稀疏 AbilityState 池；实体槽位通过 generation handle 定位。AbilityInstances 稠密投影仍由 ComponentStore/SkillSystem 读取（Unity 脚本源码不引用它）。</summary>
+    /// <summary>稀疏 AbilityState 池；实体槽位通过 generation handle 定位。AbilityInstances 稠密投影已于 C4.4 退役，GetAbility 只读此池。</summary>
     public sealed class ActiveAbilityStore
     {
         private const int PageSize = 256;
