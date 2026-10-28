@@ -378,7 +378,7 @@ namespace BattleSystemECS.Systems
 
         /// <summary>
         /// Called when an enemy's elemental shield is broken (in serial phase from
-        /// ApplyEnemyDamage). Applies the configured break-reaction element and checks
+        /// DamageResolver). Applies the configured break-reaction element and checks
         /// for any further reactions against existing elements on the target.
         /// </summary>
         public void OnShieldBroken(int enemyId)
@@ -387,7 +387,7 @@ namespace BattleSystemECS.Systems
             ElementType breakElement = store.EnemyShieldBreakReaction[enemyId];
             if (breakElement == ElementType.None) return;
 
-            // Get current element mask (after the shield-break timer was set in ApplyEnemyDamage)
+            // Get current element mask (after the shield-break timer was set in DamageResolver)
             ElementType existing = store.EnemyElementStatus[enemyId] & ~breakElement;
             if (existing == ElementType.None) return;
 

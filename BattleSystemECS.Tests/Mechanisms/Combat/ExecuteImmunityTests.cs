@@ -9,7 +9,7 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat;
 /// <summary>
 /// Round 132 Direction 8 — Execute Immunity / Min-Health Floor tests.
 /// 覆盖 ClampDamageToHealthFloor / ApplyMinHealthFloorInPlace 的真实存储层行为、
-/// MarkSystem 的 ExecuteImmune 门、AddEnemy/DestroyEntity 重置，以及端到端 ApplyEnemyDamage。
+/// MarkSystem 的 ExecuteImmune 门、AddEnemy/DestroyEntity 重置，以及端到端 DamageResolver。
 /// 同构的“不触发钳制/触发钳制”分支合并为理论驱动。
 /// </summary>
 public class ExecuteImmunityTests : BattleTestBase
@@ -73,7 +73,7 @@ public class ExecuteImmunityTests : BattleTestBase
         float initialHp, float maxHp, float floor, float mutatedHp, float expectedHp)
     {
         int eid = MakeEnemy(initialHp, maxHp, floor);
-        Store.EnemyHealth[eid] = mutatedHp; // 模拟绕过 ApplyEnemyDamage 的直接 -= 路径
+        Store.EnemyHealth[eid] = mutatedHp; // 模拟绕过 DamageResolver 的直接 -= 路径
         Store.ApplyMinHealthFloorInPlace(eid);
         Assert.Equal(expectedHp, Store.EnemyHealth[eid]);
     }
@@ -90,23 +90,25 @@ public class ExecuteImmunityTests : BattleTestBase
         Assert.Equal(-50f, Store.EnemyHealth[eid]);
     }
 
-    // ── ApplyEnemyDamage：端到端 floor 语义 ─────────────────────────────
+    // ── DamageResolver：端到端 floor 语义 ─────────────────────────────
 
     [Fact]
-    public void ApplyEnemyDamage_RespectsFloor()
+    public void DamageEnemy_RespectsFloor()
     {
+        Player(); // 伤害来源（DamageResolver 需要玩家实体）
         // 60 HP、5% floor=50：1000 点过量伤害只能打到 50。
         int eid = MakeEnemy(curHp: 60f, maxHp: 1000f, floor: 0.05f);
-        Store.ApplyEnemyDamage(eid, 1000f);
+        DamageEnemy(eid, 1000f);
         Assert.Equal(50f, Store.EnemyHealth[eid]);
     }
 
     [Fact]
-    public void ApplyEnemyDamage_BelowFloor_FullyAbsorbed()
+    public void DamageEnemy_BelowFloor_FullyAbsorbed()
     {
+        Player(); // 伤害来源（DamageResolver 需要玩家实体）
         // 已在 floor 之下的敌人不会再被扣血（无“负血复活”）。
         int eid = MakeEnemy(curHp: 0f, maxHp: 1000f, floor: 0.05f);
-        Store.ApplyEnemyDamage(eid, 1f);
+        DamageEnemy(eid, 1f);
         Assert.Equal(0f, Store.EnemyHealth[eid]);
     }
 

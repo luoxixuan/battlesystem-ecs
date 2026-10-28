@@ -254,7 +254,7 @@ namespace BattleSystemECS.Core
         public float[] EnemyPathTerrainSpeedMult = new float[MAX_ENTITIES];
         // EnemyPathTerrainDmgMult: derived from PathNodeTerrain[EnemyPathNodeIndex[enemyId]].
         // 1.0 = no change to damage taken. >1.0 = take more damage (Snow tiles). Default 1.0f.
-        // Applied at ApplyEnemyDamage() entry so all shield/health damage routes respect it.
+        // Applied at DamageResolver entry so all shield/health damage routes respect it.
         public float[] EnemyPathTerrainDmgMult = new float[MAX_ENTITIES];
         // EnemyMoveSpeedBase: stores original speed for slow recovery
         public float[] EnemyMoveSpeedBase = new float[MAX_ENTITIES];
@@ -937,7 +937,7 @@ namespace BattleSystemECS.Core
         //   - Damage below the execute threshold cannot trigger execute-bonus payouts.
         //   Used by Bosses that should never be one-shot killed regardless of damage type.
         //   Default false = full participation; designers opt in via boss configs.
-        // Hot-path cost: 1 float comparison + 1 bool check per ApplyEnemyDamage call. Zero alloc.
+        // Hot-path cost: 1 float comparison + 1 bool check per DamageResolver call. Zero alloc.
         public float[] EnemyMinHealthFloor = new float[MAX_ENTITIES];
         public bool[] EnemyExecuteImmune = new bool[MAX_ENTITIES];
 
@@ -1940,7 +1940,7 @@ namespace BattleSystemECS.Core
 
         /// <summary>
         /// In-place enforcement of the Min-Health Floor (Round 132 Dir 8). Call this AFTER any
-        /// direct <c>EnemyHealth[id] -= dmg</c> statement that bypasses <see cref="ApplyEnemyDamage"/>
+        /// direct <c>EnemyHealth[id] -= dmg</c> statement that bypasses <c>DamageResolver</c>
         /// (e.g. TowerAttackSystem splash/explosion/transfer routes, Linked-Damage routing). The
         /// helper is a no-op when the enemy has no floor configured (zero cost on the hot path).
         /// Equivalent to: <c>if (EnemyMinHealthFloor[id] &gt; 0 &amp;&amp; EnemyHealth[id] &lt; maxHp*floor) EnemyHealth[id] = maxHp*floor;</c>
@@ -1953,36 +1953,6 @@ namespace BattleSystemECS.Core
             if (maxHp <= 0f) return;
             float minHp = maxHp * floor;
             if (EnemyHealth[enemyId] < minHp) EnemyHealth[enemyId] = minHp;
-        }
-
-        /// <summary>
-        /// Applies damage to an enemy, with shield absorbing damage before it reaches health.
-        /// </summary>
-        public void ApplyEnemyDamage(int enemyId, float damage)
-        {
-            ApplyEnemyDamage(enemyId, damage, ElementType.None);
-        }
-
-        /// <summary>
-        /// Applies damage to an enemy with an optional element tag, applying elemental shield rules.
-        /// If the enemy has an EnemyShieldType that matches the incoming element, the shield takes
-        /// EnemyShieldWeakMult damage (default 2.0 = breaks twice as fast). If the element is
-        /// non-matching and the shield has EnemyShieldResistMult set, shield takes reduced damage.
-        /// On shield break, the configured EnemyShieldBreakReaction element is applied to the enemy
-        /// via the ElementalReactionSystem pathway.
-        /// </summary>
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void ApplyEnemyDamage(int enemyId, float damage, ElementType attackElement)
-        {
-            // 兼容入口仅转发到统一 resolver；运行时系统必须提交完整 DamageRequest。
-            if (PositionActive[PlayerEntityId] && GetEntityHandle(PlayerEntityId).IsValid)
-            {
-                DamageResolver.ApplyLegacy(enemyId, damage, attackElement, PlayerEntityId);
-                return;
-            }
-            // 旧测试/存档可能尚未装配玩家实体；此分支只保留兼容适配，不参与运行时系统。
-            if (!IsValidEntity(enemyId) || !EnemyActive[enemyId] || damage <= 0f) return;
-            ResourceResolver.ApplyEnemyDamageResources(enemyId, damage, attackElement, false);
         }
 
         private static int ElementOrdinalForShield(ElementType element)

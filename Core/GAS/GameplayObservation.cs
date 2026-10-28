@@ -37,7 +37,6 @@ namespace BattleSystemECS.Core.GAS
 
         public long DamageAccepted { get; }
         public long DamageRejected { get; }
-        public long DamageLegacyApplied { get; }
         public long DamageStaleHandleRejections { get; }
         public int DamagePending { get; }
         public int DamagePendingPeak { get; }
@@ -110,7 +109,6 @@ namespace BattleSystemECS.Core.GAS
             DamageResolver damage = store.DamageResolver;
             DamageAccepted = damage.AcceptedCount;
             DamageRejected = damage.RejectedCount;
-            DamageLegacyApplied = damage.LegacyApplyCount;
             DamageStaleHandleRejections = damage.StaleHandleRejectedCount;
             DamagePending = damage.PendingRequestCount;
             DamagePendingPeak = damage.PeakPendingRequestCount;

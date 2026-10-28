@@ -1,5 +1,11 @@
 # 更新记录 (Changelog)
 
+### 2026-10-28（退役 ApplyEnemyDamage 兼容入口 C4.3）
+- 退出条件（M7/M8 全局 legacy 入口收口）未满足，由 owner 于 2026-10-28 豁免：按“清理退役”处理，非迁移完成。生产本无调用方，仅测试使用；golden / replay / determinism-soak 摘要不变。
+- 删除 `ComponentStore.ApplyEnemyDamage`（两个重载）、`DamageResolver.ApplyLegacy` / `LegacyApplyCount` / `LastLegacyRejection`、`ResourceResolver.ApplyEnemyDamageResources`（仅供无玩家兜底分支）、`GameplayObservation.DamageLegacyApplied`；相关注释改指 `DamageResolver`。
+- 测试：新增 `BattleTestBase.DamageEnemy`（经 `DamageResolver.TryApply` 提交 `DamageRequest`，与原 `ApplyLegacy` 同一调用）；原 ~20 处调用迁移，依赖无玩家兜底分支的用例改为先创建玩家；`DamageEnemy_Overkill` 期望值改为权威路径的 0（旧兜底分支为 -70）；删除 4 处 `LegacyApplyCount == 0` 断言及 `GameManagerProductionBootstrapDoesNotReachLegacyDamageAdapter`。
+- 验证：分块完整套件结果见提交信息；mode 2/4/5 延期未运行。
+
 ### 2026-10-28（退役 Multiply 效果路径 C4.2）
 - 退出条件（审计 §8.6 / R-06）未满足，由 owner 于 2026-10-28 豁免：按“清理退役”处理，非迁移完成。仅因 golden / replay / determinism-soak 摘要不变而删除。
 - 删除 `AttributeModifierOp.Multiply`（枚举显式固定 `Add=0, Override=2, Percent=3`，数值不变）、`LegacyEffectAdapter.MapLegacyModifier` 的 Multiply→Percent 换算、`GameplayRuntime.ResolveAdoptModifierCapture` 的 Multiply 分支；`CatalogValidator.RejectResidualMultiply` 改为 `RejectUnknownOperation`，`AttributeAggregator` 的守卫改为“未定义运算”（遗留数值 1 仍被拒绝）。

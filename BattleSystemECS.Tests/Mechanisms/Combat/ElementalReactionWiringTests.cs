@@ -103,6 +103,7 @@ public class ElementalReactionWiringTests : BattleTestBase
     [Fact]
     public void Update_DrainsPendingShieldBreaks()
     {
+        Player(); // 伤害来源（DamageResolver 需要玩家实体）
         var sys = new ElementalReactionSystem(Store, PlayerId, Renderer);
 
         int eid = Store.AddEnemy(0f, 0f, 1f, 500f, 500f, 5f, 10, 1, "Shielded", 0f, shield: 20f);
@@ -110,7 +111,7 @@ public class ElementalReactionWiringTests : BattleTestBase
         Store.EnemyShieldBreakReaction[eid] = ElementType.Ice;
         Store.EnemyShieldBreakElementDuration[eid] = 2f;
 
-        Store.ApplyEnemyDamage(eid, 50f, ElementType.Fire); // 破盾 → 入队
+        DamageEnemy(eid, 50f, ElementType.Fire); // 破盾 → 入队
         Assert.Single(Store.PendingShieldBreaks);
 
         sys.Update(0.016f);

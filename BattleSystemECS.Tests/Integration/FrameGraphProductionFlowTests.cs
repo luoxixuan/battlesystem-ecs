@@ -78,7 +78,6 @@ namespace BattleSystemECS.Tests.Integration
             Assert.Equal(7f,Store.GetPlayerGold(playerId));
             Assert.Equal(comboBefore+1f,Store.PlayerComboCount[playerId]);
             Assert.Equal(new[]{"killed","destroyed"},events.KillEvents);
-            Assert.Equal(0,Store.DamageResolver.LegacyApplyCount);
             string[] ordered={"combat.reflect.resolve","combat.reflect.apply","damage.commit",
                 "primary-death.resolve","primary-death.callback-dispatch"};
             int[] indices=ordered.Select(id=>scheduler.FrameGraphPlan.ToList()
@@ -178,8 +177,7 @@ namespace BattleSystemECS.Tests.Integration
             {
                 runtime.Scheduler.Tick(0.016f,frame);
                 Assert.Equal(10000,Store.GetActiveEnemyCount());
-                Assert.Equal(0,Store.DamageResolver.LegacyApplyCount);
-            }
+                }
             stopwatch.Stop();
             GameplayObservationSnapshot observation=GameplayObservation.Capture(Store);
 

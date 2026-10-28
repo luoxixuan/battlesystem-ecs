@@ -9,110 +9,120 @@ namespace BattleSystemECS.Tests.Mechanisms.Combat
     /// <summary>
     /// Core damage formula tests — armor, magic resist, true damage, shield absorption.
     /// 公式在 TowerAttackSystem / PlayerTowerAttackSystem 的真实攻击路径中生效；
-    /// 本文件不再在测试内复刻公式，只通过 ApplyEnemyDamage（存储层真实路径）
+    /// 本文件不再在测试内复刻公式，只通过 DamageEnemy（存储层真实路径）
     /// 与 PlayerTowerAttackSystem（真实攻击链路）断言可观测结果。
     /// </summary>
     public class DamageFormulaTests : BattleTestBase
     {
         // ══════════════════════════════════════════════════════════════
-        //  ApplyEnemyDamage：护盾吸收与直接伤害（存储层真实路径）
+        //  DamageEnemy：护盾吸收与直接伤害（存储层真实路径）
         // ══════════════════════════════════════════════════════════════
 
         [Fact]
-        public void ApplyEnemyDamage_DirectDamage_ReducesHealth()
+        public void DamageEnemy_DirectDamage_ReducesHealth()
         {
+            Player(); // 伤害来源（DamageResolver 需要玩家实体）
             int eid = Enemy();
 
-            Store.ApplyEnemyDamage(eid, 30f);
+            DamageEnemy(eid, 30f);
             Assert.Equal(70f, Store.EnemyHealth[eid]);
         }
 
         [Fact]
-        public void ApplyEnemyDamage_ShieldAbsorbsFirst()
+        public void DamageEnemy_ShieldAbsorbsFirst()
         {
+            Player(); // 伤害来源（DamageResolver 需要玩家实体）
             int eid = Enemy();
             Store.EnemyShield[eid] = 25f;
 
-            Store.ApplyEnemyDamage(eid, 20f);
+            DamageEnemy(eid, 20f);
             Assert.Equal(100f, Store.EnemyHealth[eid]);
             Assert.Equal(5f, Store.EnemyShield[eid]);
         }
 
         [Fact]
-        public void ApplyEnemyDamage_ShieldPartial()
+        public void DamageEnemy_ShieldPartial()
         {
+            Player(); // 伤害来源（DamageResolver 需要玩家实体）
             int eid = Enemy();
             Store.EnemyShield[eid] = 10f;
 
-            Store.ApplyEnemyDamage(eid, 40f);
+            DamageEnemy(eid, 40f);
             Assert.Equal(70f, Store.EnemyHealth[eid]);
             Assert.Equal(0f, Store.EnemyShield[eid]);
         }
 
         [Fact]
-        public void ApplyEnemyDamage_ZeroDamage_NoEffect()
+        public void DamageEnemy_ZeroDamage_NoEffect()
         {
+            Player(); // 伤害来源（DamageResolver 需要玩家实体）
             int eid = Enemy();
             Store.EnemyShield[eid] = 50f;
 
-            Store.ApplyEnemyDamage(eid, 0f);
+            DamageEnemy(eid, 0f);
             Assert.Equal(100f, Store.EnemyHealth[eid]);
             Assert.Equal(50f, Store.EnemyShield[eid]);
         }
 
         [Fact]
-        public void ApplyEnemyDamage_NegativeDamage_Ignored()
+        public void DamageEnemy_NegativeDamage_Ignored()
         {
+            Player(); // 伤害来源（DamageResolver 需要玩家实体）
             int eid = Enemy();
 
-            Store.ApplyEnemyDamage(eid, -10f);
+            DamageEnemy(eid, -10f);
             Assert.Equal(100f, Store.EnemyHealth[eid]);
         }
 
         [Fact]
-        public void ApplyEnemyDamage_ExactKill()
+        public void DamageEnemy_ExactKill()
         {
+            Player(); // 伤害来源（DamageResolver 需要玩家实体）
             int eid = Enemy(e => e.Health = 50f);
 
-            Store.ApplyEnemyDamage(eid, 50f);
+            DamageEnemy(eid, 50f);
             Assert.Equal(0f, Store.EnemyHealth[eid]);
         }
 
         [Fact]
-        public void ApplyEnemyDamage_Overkill()
+        public void DamageEnemy_Overkill()
         {
+            Player(); // 伤害来源（DamageResolver 需要玩家实体）
             int eid = Enemy(e => e.Health = 30f);
 
-            Store.ApplyEnemyDamage(eid, 100f);
-            Assert.Equal(-70f, Store.EnemyHealth[eid]);
+            DamageEnemy(eid, 100f);
+            // 权威 resolver 路径把血量夹到 0（旧的无玩家兼容分支才允许 -70，生产从不走它）。
+            Assert.Equal(0f, Store.EnemyHealth[eid]);
         }
 
         [Fact]
-        public void ApplyEnemyDamage_IgnoresArmor_RawDamage()
+        public void DamageEnemy_IgnoresArmor_RawDamage()
         {
+            Player(); // 伤害来源（DamageResolver 需要玩家实体）
             int eid = Enemy();
             Store.EnemyArmor[eid] = 0.3f;
 
-            // ApplyEnemyDamage 是原始伤害入口，不套护甲；护甲只在攻击系统公式中生效。
-            Store.ApplyEnemyDamage(eid, 100f);
+            // DamageEnemy 是原始伤害入口，不套护甲；护甲只在攻击系统公式中生效。
+            DamageEnemy(eid, 100f);
             Assert.Equal(0f, Store.EnemyHealth[eid]);
         }
 
         [Fact]
         public void Shield_BreakAndDamage_HandlesMultipleApplications()
         {
+            Player(); // 伤害来源（DamageResolver 需要玩家实体）
             int eid = Enemy();
             Store.EnemyShield[eid] = 30f;
 
-            Store.ApplyEnemyDamage(eid, 20f);
+            DamageEnemy(eid, 20f);
             Assert.Equal(100f, Store.EnemyHealth[eid]);
             Assert.Equal(10f, Store.EnemyShield[eid]);
 
-            Store.ApplyEnemyDamage(eid, 15f);
+            DamageEnemy(eid, 15f);
             Assert.Equal(95f, Store.EnemyHealth[eid]);
             Assert.Equal(0f, Store.EnemyShield[eid]);
 
-            Store.ApplyEnemyDamage(eid, 20f);
+            DamageEnemy(eid, 20f);
             Assert.Equal(75f, Store.EnemyHealth[eid]);
         }
 

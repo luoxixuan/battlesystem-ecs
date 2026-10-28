@@ -503,14 +503,6 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         [Fact]
-        public void GameManagerProductionBootstrapDoesNotReachLegacyDamageAdapter()
-        {
-            var manager = new GameManager();
-            manager.Initialize();
-            Assert.Equal(0, manager.SchedulerDiagnostics.Store.DamageResolver.LegacyApplyCount);
-        }
-
-        [Fact]
         public void NullableLedgerManifestAndGeneratedDocumentMatchStrictPredicate()
         {
             var properties = typeof(SystemRegistry).GetProperties(BindingFlags.Instance | BindingFlags.Public)

@@ -871,7 +871,7 @@ namespace BattleSystemECS.Systems
                     float dy = aY - store.PositionY[bId];
                     if (dx * dx + dy * dy > InfightRadiusSq) continue;
 
-                    // Apply 5% maxHp damage to both sides. Damage goes through ApplyEnemyDamage
+                    // Apply 5% maxHp damage to both sides. Damage goes through DamageResolver
                     // so shield (round 22) and other damage modifiers apply consistently.
                     float dmgA = aMaxHp * InfightDmgFrac;
                     float dmgB = store.EnemyMaxHealth[bId] * InfightDmgFrac;

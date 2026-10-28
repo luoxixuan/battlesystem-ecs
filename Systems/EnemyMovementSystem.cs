@@ -152,7 +152,7 @@ namespace BattleSystemECS.Systems
                 // If the enemy has no path (EnemyPathId < 0) or no valid node index, mults
                 // default to 1.0f (neutral). This block runs unconditionally for live enemies
                 // so that even stunned/CC'd enemies carry the current path-terrain state for
-                // the ApplyEnemyDamage() site (otherwise damage applied mid-stun would miss
+                // the DamageResolver site (otherwise damage applied mid-stun would miss
                 // the Snow bonus).
                 int pathNodeIdx = store.EnemyPathNodeIndex[enemyId];
                 int pathTerrain = store.GetPathNodeTerrain(pathNodeIdx);

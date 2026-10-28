@@ -26,6 +26,19 @@ namespace BattleSystemECS.Tests.Infrastructure
 
         protected BattleTestBase() => World = new TestWorld();
 
+        /// <summary>
+        /// 经 DamageResolver 对敌人施加原始（True）伤害，等价于旧 ApplyEnemyDamage 兼容入口；
+        /// 需要世界里已有玩家实体作为伤害来源（测试里先调用 Player()）。
+        /// </summary>
+        protected void DamageEnemy(int enemyId, float amount, ElementType element = ElementType.None)
+        {
+            int playerId = Store.PlayerEntityId;
+            Store.DamageResolver.TryApply(new Core.GAS.DamageRequest(Store.GetEntityHandle(playerId),
+                Store.GetEntityHandle(enemyId), amount, DamageType.True, element, Core.GAS.DamageFlags.None,
+                Core.GAS.DamageAmountStage.Raw, Core.GAS.DamageCommitBoundary.GameplayResolve,
+                Store.AllocateGameplaySequence(enemyId), ownerPlayerId: playerId));
+        }
+
         protected int Enemy(Action<EnemySpec>? configure = null) => World.Enemy(configure);
 
         protected int Tower(int x, int y, TowerType type = TowerType.Basic, Action<TowerSpec>? configure = null)

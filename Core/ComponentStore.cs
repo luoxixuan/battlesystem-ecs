@@ -406,7 +406,7 @@ namespace BattleSystemECS.Core
             DamageResolver.BeginFrame();
             DamageResolver.ResetDiagnostics();
             ResourceResolver.BeginFrame();
-            // Shield-break queue is per-frame by contract: ApplyEnemyDamage appends on every
+            // Shield-break queue is per-frame by contract: DamageResolver appends on every
             // elemental-shield break, and the drain lives in ElementalReactionSystem — which is
             // never constructed (no `new ElementalReactionSystem(` anywhere), so nothing ever
             // called its Clear(). Shipped data reaches this path (monster_shield.json and
@@ -977,7 +977,7 @@ namespace BattleSystemECS.Core
                 EnemyStealthMultiplier[entityId] = 1f;
                 EnemyShield[entityId] = 0f;
                 // Elemental status reset (recycled slot must not leak element bits/timers).
-                // These two are written in production by ApplyEnemyDamage's shield-break path
+                // These two are written in production by DamageResolver's shield-break path
                 // and by TowerAttackSystem's enchant path, but their only decay/clear logic
                 // lives in ElementalReactionSystem — which is never constructed. Without a
                 // reset here, a recycled id keeps the previous occupant's element bits forever,

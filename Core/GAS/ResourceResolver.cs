@@ -487,12 +487,6 @@ namespace BattleSystemECS.Core.GAS
         internal void ApplyEnemyHealthDamage(int id, float amount) { if (ComponentStore.IsValidEntity(id) && _store.EnemyActive[id] && Finite(amount)) _store.EnemyHealth[id] -= Math.Max(0f, amount); }
         internal void ClampEnemyHealthAtZero(int id) { if (ComponentStore.IsValidEntity(id) && _store.EnemyActive[id] && _store.EnemyHealth[id] < 0f) _store.EnemyHealth[id] = 0f; }
         internal void SetEnemyShield(int id, float value) { if (ComponentStore.IsValidEntity(id) && _store.EnemyActive[id] && Finite(value)) _store.EnemyShield[id] = Math.Max(0f, value); }
-        internal void ApplyEnemyDamageResources(int id, float damage, ElementType element, bool ignoreShield, bool execute = false)
-        {
-            // 兼容入口也必须与 DamageResolver 的快照/回滚串行；Monitor 允许事务内重入。
-            lock (_eventCommitLock)
-                ApplyEnemyDamageResourcesLocked(id, damage, element, ignoreShield, execute);
-        }
         /// <summary>调用方已持有 store 提交锁（DamageResolver.CommitLocked），省去重入加锁。</summary>
         internal void ApplyEnemyDamageResourcesUnderCommitLock(int id, float damage, ElementType element, bool ignoreShield, bool execute)
             => ApplyEnemyDamageResourcesLocked(id, damage, element, ignoreShield, execute);

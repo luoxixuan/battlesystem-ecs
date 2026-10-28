@@ -1873,7 +1873,7 @@ namespace BattleSystemECS.Systems
                     _battleEventBus.OnDamageDealt(enemyId, finalDmg, "Physical", wasCrit);
                 }
                 // Round 132 Dir 8 — honor Boss Min-Health Floor (TowerAttackSystem primary hot
-                // path bypasses ApplyEnemyDamage's shield+floor route, so we re-clamp here).
+                // path bypasses DamageResolver's shield+floor route, so we re-clamp here).
 
                 // ── Threat Score accumulation (Round 99 Direction 5) ──
                 // Accumulate applied damage (post-saturation) into the per-frame accumulator.

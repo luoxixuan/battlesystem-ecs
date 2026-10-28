@@ -26,7 +26,7 @@ namespace BattleSystemECS.Systems
  /// ResetAllEnemyAggregateState so stale per-enemy state from a previous zone is cleared.
  ///
  /// Execution order: CombatGroup, runs after HotZone (map terrain bonuses) and before
- /// CorpseEffect (corpse ground effects). Damage is applied via store.ApplyEnemyDamage so
+ /// CorpseEffect (corpse ground effects). Damage is applied via store.DamageResolver so
  /// shield rules + path terrain multipliers fire.
  /// </summary>
  public class TerrainZoneSystem
@@ -196,7 +196,7 @@ namespace BattleSystemECS.Systems
  /// <summary>
  /// Apply one tick of zone effects to all enemies inside the zone radius. Adds a stack to
  /// the matching per-element counter (capped at MaxStacks), accumulates aggregate slow and
- /// DPS, and on tick deals DoT damage via ApplyEnemyDamage.
+ /// DPS, and on tick deals DoT damage via DamageResolver.
  ///
  /// `aggregateSlow` is true on the first tick of this frame for this zone; on subsequent
  /// ticks (when one long frame fired multiple ticks) we still deal DoT damage but skip
@@ -274,7 +274,7 @@ namespace BattleSystemECS.Systems
  float tickDamage = baseDps * damageMultiplier * interval;
  if (tickDamage >0f && ownerPlayer >=0)
  {
- // Route damage through ApplyEnemyDamage so shield rules + path terrain
+ // Route damage through DamageResolver so shield rules + path terrain
  // multipliers fire. Element routing (Fire/Ice/Toxic/Holy) lets the existing
  // shield + reaction system apply mitigation correctly.
  var attackElement = MapElementToElementType(element);

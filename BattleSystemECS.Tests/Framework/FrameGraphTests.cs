@@ -12,13 +12,12 @@ namespace BattleSystemECS.Tests.Framework
     public sealed class FrameGraphTests : BattleTestBase
     {
         [Fact]
-        public void ExplicitCompatibilityDamageEntryCountsOnceAndUsesTypedResolver()
+        public void RawDamageRequestCountsOnceAndUsesTypedResolver()
         {
             Player();
             int enemyId=Enemy(e=>{e.Health=20f;e.MaxHealth=20f;});
             long acceptedBefore=Store.DamageResolver.AcceptedCount;
-            Store.ApplyEnemyDamage(enemyId,5f);
-            Assert.Equal(1,Store.DamageResolver.LegacyApplyCount);
+            DamageEnemy(enemyId,5f);
             Assert.Equal(acceptedBefore+1,Store.DamageResolver.AcceptedCount);
             Assert.Equal(15f,Store.EnemyHealth[enemyId]);
         }

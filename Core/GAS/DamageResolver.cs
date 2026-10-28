@@ -32,15 +32,12 @@ namespace BattleSystemECS.Core.GAS
         public bool LastEventPublicationFailed { get { return Volatile.Read(ref _eventPublicationFailed) != 0; } }
         public int EventPublicationFailures => Volatile.Read(ref _eventPublicationFailureCount);
         private int _lastCommittedBoundary = (int)DamageCommitBoundary.GameplayResolve;
-        private int _lastLegacyRejection;
-        private long _requestsValidated, _requestsFastPath, _factsPublished, _acceptedCount, _legacyApplyCount;
+        private long _requestsValidated, _requestsFastPath, _factsPublished, _acceptedCount;
         public DamageCommitBoundary LastCommittedBoundary => (DamageCommitBoundary)Volatile.Read(ref _lastCommittedBoundary);
-        public DamageRejectionReason LastLegacyRejection => (DamageRejectionReason)Volatile.Read(ref _lastLegacyRejection);
         public long RequestsValidated => Interlocked.Read(ref _requestsValidated);
         public long RequestsFastPath => Interlocked.Read(ref _requestsFastPath);
         public long FactsPublished => Interlocked.Read(ref _factsPublished);
         public long AcceptedCount => Interlocked.Read(ref _acceptedCount);
-        public long LegacyApplyCount => Interlocked.Read(ref _legacyApplyCount);
         private long _rejectedCount, _unconsumedRequestCount, _staleHandleRejectedCount;
         private readonly long[] _rejectionsByReason = new long[Enum.GetValues(typeof(DamageRejectionReason)).Length];
         private int _requestOverflowCount, _peakPendingRequestCount;
@@ -385,20 +382,5 @@ namespace BattleSystemECS.Core.GAS
             return value == (int)DamageType.Physical || value == (int)DamageType.Magic || value == (int)DamageType.Fire || value == (int)DamageType.Ice || value == (int)DamageType.Lightning || value == (int)DamageType.True || value == (int)DamageType.Holy;
         }
         private static float Clamp01(float value) => value <= 0f ? 0f : value >= 1f ? 1f : value;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void ApplyLegacy(int targetId, float amount, ElementType element, int ownerPlayerId)
-        {
-            Interlocked.Increment(ref _legacyApplyCount);
-            Volatile.Write(ref _lastLegacyRejection, (int)DamageRejectionReason.None);
-            if (ownerPlayerId < 0 || ownerPlayerId >= ComponentStore.MAX_PLAYERS) { Volatile.Write(ref _lastLegacyRejection, (int)DamageRejectionReason.InvalidOwner); return; }
-            if (!ComponentStore.IsValidEntity(targetId) || !_store.EnemyActive[targetId] || _store.EnemyHealth[targetId] <= 0f || amount <= 0f) { Volatile.Write(ref _lastLegacyRejection, (int)DamageRejectionReason.TargetAlreadyDead); return; }
-            var target = _store.GetEntityHandle(targetId);
-            var source = _store.GetEntityHandle(_store.PlayerEntityId);
-            if (!source.IsValid) { Volatile.Write(ref _lastLegacyRejection, (int)DamageRejectionReason.InvalidSource); return; }
-            TryApply(new DamageRequest(source, target, amount, DamageType.True, element, DamageFlags.None,
-                DamageAmountStage.Raw, DamageCommitBoundary.GameplayResolve,
-                _store.AllocateGameplaySequence(targetId), ownerPlayerId: ownerPlayerId));
-        }
     }
 }

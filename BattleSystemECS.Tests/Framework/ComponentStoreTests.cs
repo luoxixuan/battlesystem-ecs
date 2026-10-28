@@ -188,7 +188,7 @@ namespace BattleSystemECS.Tests.Framework
 
         // ─── Bug 回归：元素状态必须在销毁时清除（ID 复用泄漏）─────────────────
         // EnemyElementStatus / EnemyElementTimer 的生产写入者是
-        // ApplyEnemyDamage 的破盾路径与 TowerAttackSystem 的附魔路径，但唯一的
+        // DamageResolver 的破盾路径与 TowerAttackSystem 的附魔路径，但唯一的
         // 衰减/清除逻辑在 ElementalReactionSystem —— 该系统从未被构造（全库
         // `new ElementalReactionSystem(` 0 次）。所以若 DestroyEntity 不清，
         // 回收 id 会永久带着上一任的元素位，而 TowerAttackSystem 的元素亲和
@@ -229,14 +229,15 @@ namespace BattleSystemECS.Tests.Framework
         [Fact]
         public void ShieldBreakElement_IsClearedOnDestroy()
         {
-            // 走真实生产路径：带元素护盾的敌人被打破盾 → ApplyEnemyDamage 写入
+            Player(); // 伤害来源（DamageResolver 需要玩家实体）
+            // 走真实生产路径：带元素护盾的敌人被打破盾 → DamageResolver 写入
             // 元素位与计时器（ComponentStore_Enemy.cs:2184-2187），随后销毁必须清空。
             int eid = Store.AddEnemy(0f, 0f, 1f, 100f, 100f, 5f, 10, 1, "Shielded", 0f, shield: 20f);
             Store.EnemyShieldType[eid] = ElementType.Fire;
             Store.EnemyShieldBreakReaction[eid] = ElementType.Ice;
             Store.EnemyShieldBreakElementDuration[eid] = 2f;
 
-            Store.ApplyEnemyDamage(eid, 50f, ElementType.Fire); // 破盾 → 附加 Ice
+            DamageEnemy(eid, 50f, ElementType.Fire); // 破盾 → 附加 Ice
             Assert.NotEqual(ElementType.None, Store.EnemyElementStatus[eid]);
 
             Store.DestroyEntity(eid);
@@ -244,7 +245,7 @@ namespace BattleSystemECS.Tests.Framework
         }
 
         // ─── Bug 回归：破盾队列必须按帧清空（无界增长）─────────────────────
-        // ApplyEnemyDamage 每次破元素盾就往 _pendingShieldBreaks 追加一个 id，
+        // DamageResolver 每次破元素盾就往 _pendingShieldBreaks 追加一个 id，
         // 而唯一的消费者（含 Clear）在 ElementalReactionSystem —— 该系统从未被
         // 构造，所以这个 List 在整个会话里只增不减。生产数据确实走到这条路：
         // monster_shield.json / monster_enforcer.json 都带 Shield + ShieldElement，
@@ -255,9 +256,10 @@ namespace BattleSystemECS.Tests.Framework
         [Fact]
         public void BeginFrame_ClearsPendingShieldBreaks()
         {
+            Player(); // 伤害来源（DamageResolver 需要玩家实体）
             int eid = MakeElementShieldedEnemy();
 
-            Store.ApplyEnemyDamage(eid, 50f, ElementType.Fire); // 破盾 → 入队
+            DamageEnemy(eid, 50f, ElementType.Fire); // 破盾 → 入队
             Assert.Single(Store.PendingShieldBreaks);
 
             Store.BeginFrame();
@@ -268,11 +270,12 @@ namespace BattleSystemECS.Tests.Framework
         [Fact]
         public void PendingShieldBreaks_DoesNotGrowAcrossFrames()
         {
+            Player(); // 伤害来源（DamageResolver 需要玩家实体）
             for (int frame = 0; frame < 5; frame++)
             {
                 Store.BeginFrame();
                 int eid = MakeElementShieldedEnemy();
-                Store.ApplyEnemyDamage(eid, 50f, ElementType.Fire);
+                DamageEnemy(eid, 50f, ElementType.Fire);
                 // 每帧只应留下本帧这一条，而不是累积 frame+1 条
                 Assert.Single(Store.PendingShieldBreaks);
                 Store.DestroyEntity(eid);

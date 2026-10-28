@@ -76,7 +76,6 @@ namespace BattleSystemECS.Tests.Framework
             Assert.Equal(0, observation.DamageEventPublicationFailures);
             Assert.Equal(0, observation.ResourceEventPublicationFailures);
             Assert.Equal(0, observation.TriggerLoopAborts);
-            Assert.Equal(0, observation.DamageLegacyApplied);
             EvidenceWriter.WriteJsonIfRequested("BATTLESYSTEM_LIFECYCLE_SOAK_REPORT", new
             {
                 schemaVersion = 1,
